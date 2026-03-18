@@ -1,0 +1,68 @@
+@import "tailwindcss";
+
+:root {
+  --background: #f3f6fb;
+  --foreground: #111827;
+  --muted-foreground: #5b6472;
+  --card: #ffffff;
+  --card-muted: #f7f9fc;
+  --border: #d7dfe8;
+  --ring: #2563eb;
+  --primary: #1947e5;
+  --primary-soft: #d8e4ff;
+  --secondary: #152238;
+  --success: #0f9f6e;
+  --warning: #c98412;
+  --danger: #be3b49;
+  --radius: 20px;
+  --shadow-soft: 0 14px 32px rgba(15, 23, 42, 0.08);
+  --shadow-card: 0 8px 20px rgba(15, 23, 42, 0.05);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  font-size: 16px;
+  background:
+    radial-gradient(circle at top left, rgba(37, 99, 235, 0.08), transparent 32%),
+    radial-gradient(circle at top right, rgba(15, 159, 110, 0.07), transparent 28%),
+    var(--background);
+  color: var(--foreground);
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+button,
+a {
+  cursor: pointer;
+}
+
+::selection {
+  background: rgba(25, 71, 229, 0.14);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
