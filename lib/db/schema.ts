@@ -117,3 +117,15 @@ export const importJobs = pgTable("import_jobs", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow()
 });
+
+export const importMappingPresets = pgTable("import_mapping_presets", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  userId: uuid("user_id").notNull().references(() => users.id),
+  name: varchar("name", { length: 120 }).notNull(),
+  sourceType: varchar("source_type", { length: 24 }).notNull(),
+  mapping: jsonb("mapping").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow()
+}, (table) => ({
+  userPresetUniqueIdx: uniqueIndex("import_mapping_presets_user_name_idx").on(table.userId, table.name)
+}));

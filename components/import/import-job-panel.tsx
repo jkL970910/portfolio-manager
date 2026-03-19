@@ -2,31 +2,18 @@
 
 import { ChangeEvent, useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { AlertTriangle, ArrowRightLeft, Eye, FileText, Save, Upload } from "lucide-react";
+import { AlertTriangle, ArrowRightLeft, CheckCircle2, Eye, FileText, Pencil, Save, Trash2, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 
 const MAPPING_GROUPS = [
-  {
-    title: "Core",
-    fields: ["record_type", "account_key"]
-  },
-  {
-    title: "Account rows",
-    fields: ["account_type", "institution", "account_nickname", "market_value_cad", "contribution_room_cad"]
-  },
-  {
-    title: "Holding rows",
-    fields: ["symbol", "name", "asset_class", "sector", "weight_pct", "gain_loss_pct"]
-  },
-  {
-    title: "Transaction rows",
-    fields: ["booked_at", "merchant", "category", "amount_cad", "direction"]
-  }
+  { title: "Core", fields: ["record_type", "account_key"] },
+  { title: "Account rows", fields: ["account_type", "institution", "account_nickname", "market_value_cad", "contribution_room_cad"] },
+  { title: "Holding rows", fields: ["symbol", "name", "asset_class", "sector", "weight_pct", "gain_loss_pct"] },
+  { title: "Transaction rows", fields: ["booked_at", "merchant", "category", "amount_cad", "direction"] }
 ] as const;
 
 const REQUIRED_FIELDS = ["record_type", "account_key"] as const;
-const LOCAL_PRESET_KEY = "portfolio-manager-import-presets";
 
 const BUILT_IN_PRESETS = [
   { key: "canonical", label: "Canonical CSV", mapping: {} as Record<string, string> },
@@ -51,7 +38,7 @@ const BUILT_IN_PRESETS = [
       category: "spend_category",
       amount_cad: "cash_amount",
       direction: "flow_direction"
-    } satisfies Record<string, string>
+    }
   },
   {
     key: "questrade-generic",
@@ -73,9 +60,30 @@ const BUILT_IN_PRESETS = [
       category: "category",
       amount_cad: "amount",
       direction: "cash_flow"
-    } satisfies Record<string, string>
+    }
   }
 ];
+
+type PresetRecord = {
+  id: string;
+  name: string;
+  sourceType: "csv";
+  mapping: Record<string, string>;
+};
+
+type ReviewState = {
+  summary: {
+    accountsImported: number;
+    holdingsImported: number;
+    transactionsImported: number;
+  };
+  review: {
+    importMode: "replace" | "merge";
+    detectedHeaders: string[];
+    rowCount: number;
+  };
+  validationErrors: Array<{ rowNumber: number; recordType: string | null; message: string }>;
+};
 
 function normalizeHeader(value: string) {
   return value.trim().toLowerCase().replace(/\s+/g, "_");
@@ -112,25 +120,19 @@ function splitCsvLine(line: string) {
 
 function extractHeaders(csvContent: string) {
   const firstLine = csvContent.replace(/^\uFEFF/, "").split(/\r?\n/).find((line) => line.trim());
-  if (!firstLine) {
-    return [];
-  }
-  return splitCsvLine(firstLine).map((header) => header.trim()).filter(Boolean);
+  return firstLine ? splitCsvLine(firstLine).map((header) => header.trim()).filter(Boolean) : [];
 }
 
 function previewCsvRows(csvContent: string, limit = 20) {
-  const lines = csvContent
-    .replace(/^\uFEFF/, "")
-    .split(/\r?\n/)
-    .filter((line) => line.trim());
-
+  const lines = csvContent.replace(/^\uFEFF/, "").split(/\r?\n/).filter((line) => line.trim());
   if (lines.length === 0) {
     return { headers: [] as string[], rows: [] as string[][] };
   }
 
-  const headers = splitCsvLine(lines[0]).map((header) => header.trim());
-  const rows = lines.slice(1, limit + 1).map((line) => splitCsvLine(line));
-  return { headers, rows };
+  return {
+    headers: splitCsvLine(lines[0]).map((header) => header.trim()),
+    rows: lines.slice(1, limit + 1).map((line) => splitCsvLine(line))
+  };
 }
 
 function buildDefaultMapping(headers: string[]) {
@@ -143,12 +145,6 @@ function buildDefaultMapping(headers: string[]) {
   }
   return mapping;
 }
-
-type LocalPreset = {
-  key: string;
-  label: string;
-  mapping: Record<string, string>;
-};
 
 export function ImportJobPanel({
   latestJob
@@ -163,34 +159,28 @@ export function ImportJobPanel({
   const [fieldMapping, setFieldMapping] = useState<Record<string, string>>({});
   const [importMode, setImportMode] = useState<"replace" | "merge">("replace");
   const [selectedPresetKey, setSelectedPresetKey] = useState("canonical");
-  const [localPresets, setLocalPresets] = useState<LocalPreset[]>([]);
+  const [serverPresets, setServerPresets] = useState<PresetRecord[]>([]);
+  const [reviewState, setReviewState] = useState<ReviewState | null>(null);
   const [validationErrors, setValidationErrors] = useState<Array<{ rowNumber: number; recordType: string | null; message: string }>>([]);
   const [status, setStatus] = useState<{ type: "idle" | "success" | "error"; message: string }>({ type: "idle", message: "" });
 
   useEffect(() => {
-    try {
-      const raw = window.localStorage.getItem(LOCAL_PRESET_KEY);
-      if (!raw) {
-        return;
-      }
-      const parsed = JSON.parse(raw) as LocalPreset[];
-      setLocalPresets(Array.isArray(parsed) ? parsed : []);
-    } catch {
-      setLocalPresets([]);
-    }
+    fetch("/api/import/presets")
+      .then((response) => response.ok ? response.json() : Promise.reject(new Error("Failed to load presets.")))
+      .then((payload) => setServerPresets(payload.data ?? []))
+      .catch(() => setServerPresets([]));
   }, []);
 
   const preview = useMemo(() => previewCsvRows(csvContent, 20), [csvContent]);
-  const presetOptions = [...BUILT_IN_PRESETS, ...localPresets];
+  const presetOptions = [
+    ...BUILT_IN_PRESETS.map((preset) => ({ key: preset.key, label: preset.label, mapping: preset.mapping })),
+    ...serverPresets.map((preset) => ({ key: preset.id, label: preset.name, mapping: preset.mapping }))
+  ];
+  const selectedServerPreset = serverPresets.find((preset) => preset.id === selectedPresetKey) ?? null;
   const missingRequiredMappings = useMemo(
     () => REQUIRED_FIELDS.filter((field) => !fieldMapping[field]),
     [fieldMapping]
   );
-
-  function persistLocalPresets(nextPresets: LocalPreset[]) {
-    setLocalPresets(nextPresets);
-    window.localStorage.setItem(LOCAL_PRESET_KEY, JSON.stringify(nextPresets));
-  }
 
   function applyPreset(presetKey: string, detectedHeaders = headers) {
     setSelectedPresetKey(presetKey);
@@ -198,35 +188,99 @@ export function ImportJobPanel({
       setFieldMapping(buildDefaultMapping(detectedHeaders));
       return;
     }
+
     const preset = presetOptions.find((item) => item.key === presetKey);
     if (!preset) {
       return;
     }
-    setFieldMapping((current) => {
-      const next = { ...current };
-      for (const group of MAPPING_GROUPS) {
-        for (const field of group.fields) {
-          next[field] = preset.mapping[field] ?? "";
+
+    const next = { ...buildDefaultMapping(detectedHeaders) };
+    for (const group of MAPPING_GROUPS) {
+      for (const field of group.fields) {
+        const mappedHeader = preset.mapping[field];
+        if (!mappedHeader) {
+          continue;
         }
+        next[field] = detectedHeaders.find((header) => normalizeHeader(header) === normalizeHeader(mappedHeader)) ?? mappedHeader;
       }
-      return next;
-    });
+    }
+    setFieldMapping(next);
   }
 
-  function saveCurrentPreset() {
+  async function saveCurrentPreset() {
     const label = window.prompt("Preset name");
     if (!label?.trim()) {
       return;
     }
-    const preset: LocalPreset = {
-      key: `local-${Date.now()}`,
-      label: label.trim(),
-      mapping: fieldMapping
-    };
-    const nextPresets = [...localPresets, preset];
-    persistLocalPresets(nextPresets);
-    setSelectedPresetKey(preset.key);
-    setStatus({ type: "success", message: `Saved mapping preset "${preset.label}" to this browser.` });
+
+    const mapping = Object.fromEntries(Object.entries(fieldMapping).filter(([, value]) => value));
+    const response = await fetch("/api/import/presets", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: label.trim(), sourceType: "csv", mapping })
+    });
+    const payload = await response.json();
+    if (!response.ok) {
+      setStatus({ type: "error", message: payload.error ?? "Failed to save preset." });
+      return;
+    }
+
+    setServerPresets((current) => {
+      const next = [...current.filter((preset) => preset.id !== payload.data.id), payload.data];
+      return next;
+    });
+    setSelectedPresetKey(payload.data.id);
+    setStatus({ type: "success", message: `Saved mapping preset "${payload.data.name}".` });
+  }
+
+  async function renameSelectedPreset() {
+    if (!selectedServerPreset) {
+      return;
+    }
+
+    const nextName = window.prompt("Rename preset", selectedServerPreset.name);
+    if (!nextName?.trim() || nextName.trim() === selectedServerPreset.name) {
+      return;
+    }
+
+    const response = await fetch(`/api/import/presets/${selectedServerPreset.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: nextName.trim() })
+    });
+    const payload = await response.json();
+    if (!response.ok) {
+      setStatus({ type: "error", message: payload.error ?? "Failed to rename preset." });
+      return;
+    }
+
+    setServerPresets((current) => current.map((preset) => preset.id === selectedServerPreset.id ? payload.data : preset));
+    setStatus({ type: "success", message: `Renamed preset to "${payload.data.name}".` });
+  }
+
+  async function deleteSelectedPreset() {
+    if (!selectedServerPreset) {
+      return;
+    }
+
+    const confirmed = window.confirm(`Delete preset "${selectedServerPreset.name}"?`);
+    if (!confirmed) {
+      return;
+    }
+
+    const response = await fetch(`/api/import/presets/${selectedServerPreset.id}`, {
+      method: "DELETE"
+    });
+    const payload = await response.json();
+    if (!response.ok) {
+      setStatus({ type: "error", message: payload.error ?? "Failed to delete preset." });
+      return;
+    }
+
+    setServerPresets((current) => current.filter((preset) => preset.id !== selectedServerPreset.id));
+    setSelectedPresetKey("auto-detect");
+    applyPreset("auto-detect");
+    setStatus({ type: "success", message: `Deleted preset "${selectedServerPreset.name}".` });
   }
 
   async function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
@@ -235,6 +289,7 @@ export function ImportJobPanel({
       setCsvContent("");
       setHeaders([]);
       setFieldMapping({});
+      setReviewState(null);
       return;
     }
 
@@ -244,34 +299,53 @@ export function ImportJobPanel({
       setCsvContent(text);
       setFileName(selectedFile.name);
       setHeaders(nextHeaders);
+      setReviewState(null);
       setValidationErrors([]);
       setStatus({ type: "idle", message: "" });
-
-      if (selectedPresetKey && selectedPresetKey !== "canonical") {
-        const preset = [...BUILT_IN_PRESETS, ...localPresets].find((item) => item.key === selectedPresetKey);
-        if (preset) {
-          const nextMapping = { ...buildDefaultMapping(nextHeaders) };
-          for (const [field, mappedHeader] of Object.entries(preset.mapping)) {
-            nextMapping[field] = nextHeaders.find((header) => normalizeHeader(header) === normalizeHeader(mappedHeader)) ?? mappedHeader;
-          }
-          setFieldMapping(nextMapping);
-          return;
-        }
-      }
-
-      setFieldMapping(buildDefaultMapping(nextHeaders));
+      applyPreset(selectedPresetKey === "canonical" ? "auto-detect" : selectedPresetKey, nextHeaders);
     } catch {
       setStatus({ type: "error", message: "Failed to read the selected CSV file." });
     }
   }
 
-  function createJob() {
+  async function runValidation() {
     setStatus({ type: "idle", message: "" });
     setValidationErrors([]);
+    setReviewState(null);
 
-    const sanitizedFieldMapping = Object.fromEntries(
-      Object.entries(fieldMapping).filter(([, value]) => value)
-    );
+    const sanitizedFieldMapping = Object.fromEntries(Object.entries(fieldMapping).filter(([, value]) => value));
+
+    const response = await fetch("/api/import/jobs", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        fileName,
+        sourceType: "csv",
+        csvContent: csvContent || undefined,
+        fieldMapping: csvContent ? sanitizedFieldMapping : undefined,
+        importMode,
+        dryRun: true
+      })
+    });
+    const payload = await response.json();
+    if (!response.ok) {
+      setStatus({ type: "error", message: payload.error ?? "Validation failed." });
+      return;
+    }
+
+    const result = payload.data as ReviewState;
+    setValidationErrors(result.validationErrors ?? []);
+    setReviewState(result);
+    if ((result.validationErrors ?? []).length > 0) {
+      setStatus({ type: "error", message: `Validation failed. ${result.validationErrors.length} row issues were found.` });
+      return;
+    }
+    setStatus({ type: "success", message: "Validation passed. Review the import summary below, then confirm." });
+  }
+
+  function confirmImport() {
+    const sanitizedFieldMapping = Object.fromEntries(Object.entries(fieldMapping).filter(([, value]) => value));
+    setStatus({ type: "idle", message: "" });
 
     startTransition(async () => {
       const response = await fetch("/api/import/jobs", {
@@ -282,42 +356,26 @@ export function ImportJobPanel({
           sourceType: "csv",
           csvContent: csvContent || undefined,
           fieldMapping: csvContent ? sanitizedFieldMapping : undefined,
-          importMode
+          importMode,
+          dryRun: false
         })
       });
-
       const payload = await response.json();
       if (!response.ok) {
-        setStatus({ type: "error", message: payload.error ?? "Failed to create import job." });
+        setStatus({ type: "error", message: payload.error ?? "Failed to import CSV." });
         return;
       }
 
       const result = payload.data;
-      setValidationErrors(result.validationErrors ?? []);
-
-      if ((result.validationErrors ?? []).length > 0) {
-        setStatus({
-          type: "error",
-          message: `Validation failed. ${result.validationErrors.length} row issues were found. Fix the mapping or CSV values and import again.`
-        });
-        router.refresh();
-        return;
-      }
-
-      const summary = result.summary;
       const recommendationMessage = result.autoRecommendationRun
         ? ` Auto-refreshed recommendation run for ${Number(result.autoRecommendationRun.contributionAmountCad).toLocaleString("en-CA")} CAD.`
         : "";
       const modeLabel = importMode === "replace" ? "replaced" : "merged";
-
-      if (summary.accountsImported || summary.holdingsImported || summary.transactionsImported) {
-        setStatus({
-          type: "success",
-          message: `${modeLabel} ${summary.accountsImported} accounts, ${summary.holdingsImported} holdings, and ${summary.transactionsImported} transactions from ${result.job.fileName}.${recommendationMessage}`
-        });
-      } else {
-        setStatus({ type: "success", message: `Import job created for ${result.job.fileName}.` });
-      }
+      setStatus({
+        type: "success",
+        message: `${modeLabel} ${result.summary.accountsImported} accounts, ${result.summary.holdingsImported} holdings, and ${result.summary.transactionsImported} transactions from ${result.job.fileName}.${recommendationMessage}`
+      });
+      setReviewState(null);
       router.refresh();
     });
   }
@@ -326,9 +384,9 @@ export function ImportJobPanel({
     <div className="space-y-4 rounded-[24px] border border-[color:var(--border)] bg-[color:var(--card-muted)] p-5">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <p className="font-semibold">Create import job</p>
+          <p className="font-semibold">Direct CSV import</p>
           <p className="mt-1 text-sm text-[color:var(--muted-foreground)]">
-            Upload a local CSV, review field mapping, preview the first 20 rows, validate row-level issues, then write user-scoped portfolio data into PostgreSQL.
+            Bulk import is a two-step flow: validate and review first, then confirm the database write.
           </p>
         </div>
         {latestJob ? <Badge variant="neutral">Latest: {latestJob.status}</Badge> : <Badge variant="warning">No job yet</Badge>}
@@ -389,6 +447,16 @@ export function ImportJobPanel({
               <p className="font-medium">Field mapping presets</p>
             </div>
             <div className="flex flex-wrap gap-2">
+              {selectedServerPreset ? (
+                <>
+                  <Button type="button" variant="secondary" leadingIcon={<Pencil className="h-4 w-4" />} onClick={renameSelectedPreset}>
+                    Rename preset
+                  </Button>
+                  <Button type="button" variant="secondary" leadingIcon={<Trash2 className="h-4 w-4" />} onClick={deleteSelectedPreset}>
+                    Delete preset
+                  </Button>
+                </>
+              ) : null}
               <Button type="button" variant="secondary" leadingIcon={<Save className="h-4 w-4" />} onClick={saveCurrentPreset}>
                 Save current preset
               </Button>
@@ -415,9 +483,6 @@ export function ImportJobPanel({
             </div>
           </div>
 
-          <p className="text-sm text-[color:var(--muted-foreground)]">
-            Map your broker columns to the canonical import fields. Exact-name matches are prefilled when possible.
-          </p>
           {MAPPING_GROUPS.map((group) => (
             <div key={group.title} className="space-y-3">
               <p className="text-xs uppercase tracking-[0.14em] text-[color:var(--muted-foreground)]">{group.title}</p>
@@ -442,6 +507,7 @@ export function ImportJobPanel({
               </div>
             </div>
           ))}
+
           {missingRequiredMappings.length > 0 ? (
             <div className="rounded-2xl border border-[#e7b0b8] bg-[#fff3f5] px-4 py-3 text-sm text-[#8e2433]">
               Required mappings missing: {missingRequiredMappings.join(", ")}
@@ -484,6 +550,27 @@ export function ImportJobPanel({
         </div>
       ) : null}
 
+      {reviewState && reviewState.validationErrors.length === 0 ? (
+        <div className="space-y-3 rounded-2xl border border-[#b6d7c7] bg-[#eef8f1] p-4">
+          <div className="flex items-center gap-2 font-medium text-[#21613f]">
+            <CheckCircle2 className="h-4 w-4" />
+            Review before import
+          </div>
+          <div className="grid gap-3 md:grid-cols-4 text-sm text-[#21613f]">
+            <div>Accounts: {reviewState.summary.accountsImported}</div>
+            <div>Holdings: {reviewState.summary.holdingsImported}</div>
+            <div>Transactions: {reviewState.summary.transactionsImported}</div>
+            <div>Rows parsed: {reviewState.review.rowCount}</div>
+          </div>
+          <p className="text-sm text-[#21613f]">
+            Mode: {reviewState.review.importMode}. Validation passed. Confirm to write these changes into the current signed-in user&apos;s database records.
+          </p>
+          <Button type="button" onClick={confirmImport} disabled={isPending} leadingIcon={<Upload className="h-4 w-4" />}>
+            {isPending ? "Importing..." : "Confirm import"}
+          </Button>
+        </div>
+      ) : null}
+
       {latestJob ? (
         <p className="text-sm text-[color:var(--muted-foreground)]">Latest job: {latestJob.fileName}</p>
       ) : null}
@@ -506,20 +593,17 @@ export function ImportJobPanel({
                 Row {error.rowNumber}{error.recordType ? ` (${error.recordType})` : ""}: {error.message}
               </div>
             ))}
-            {validationErrors.length > 12 ? (
-              <div className="text-sm text-[#8e2433]">Showing first 12 issues out of {validationErrors.length}.</div>
-            ) : null}
           </div>
         </div>
       ) : null}
 
       <Button
         type="button"
-        onClick={createJob}
-        disabled={isPending || (!!csvContent && missingRequiredMappings.length > 0)}
+        onClick={runValidation}
+        disabled={isPending || !csvContent || missingRequiredMappings.length > 0}
         leadingIcon={<Upload className="h-4 w-4" />}
       >
-        {isPending ? "Importing..." : csvContent ? "Validate, import, and refresh recommendations" : "Create import job"}
+        Validate and review import
       </Button>
     </div>
   );

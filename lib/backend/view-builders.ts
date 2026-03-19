@@ -571,9 +571,9 @@ export function buildImportData(args: {
     steps: [
       { title: "Choose account type", description: "Start with the account structure, not a long form." },
       { title: "Choose import method", description: "CSV import first, account integrations later." },
-      { title: "Upload and map", description: "Preview the CSV, then map fields before saving." },
-      { title: "Fix issues", description: latestJob ? `Current draft status is ${latestJob.status}. Review mismatches before finalizing.` : "Review mismatches and correction prompts before using the imported data." },
-      { title: "Complete setup", description: "Set target preferences and continue to the dashboard." }
+      { title: "Provide account data", description: "Enter account details, room, and starter holding context before any write." },
+      { title: "Review and confirm", description: latestJob ? `Latest import job is ${latestJob.status}. Confirm what should be written next.` : "Review the exact account and import actions before writing them to the database." },
+      { title: "Complete setup", description: "Confirm the saved result, then continue to preferences or the dashboard." }
     ],
     setupCards: [
       { label: "Account type", title: accounts.length > 0 ? `${accounts.map((account) => account.type).join(" / ")}` : "TFSA / RRSP / Taxable / FHSA", description: "Pick the right account bucket before asking for institution detail." },

@@ -1,5 +1,5 @@
 import { hash } from "bcryptjs";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { apiSuccess } from "@/lib/backend/contracts";
 import { ImportFieldMapping, ImportValidationError, parseImportCsv } from "@/lib/backend/csv-import";
 import { getRepositories } from "@/lib/backend/repositories/factory";
@@ -28,13 +28,14 @@ import {
   cashflowTransactions,
   holdingPositions,
   importJobs,
+  importMappingPresets,
   investmentAccounts,
   preferenceProfiles,
   recommendationItems,
   recommendationRuns,
   users
 } from "@/lib/db/schema";
-import type { ImportJob, InvestmentAccount, HoldingPosition } from "@/lib/backend/models";
+import type { ImportJob, ImportMappingPreset, InvestmentAccount, HoldingPosition } from "@/lib/backend/models";
 
 export interface PreferenceProfileInput {
   riskProfile: RiskProfile;
@@ -60,6 +61,7 @@ export interface CreateImportJobInput {
   csvContent?: string;
   fieldMapping?: ImportFieldMapping;
   importMode: "replace" | "merge";
+  dryRun: boolean;
 }
 
 export interface CreateImportJobResult {
@@ -75,10 +77,52 @@ export interface CreateImportJobResult {
     contributionAmountCad: number;
     itemCount: number;
   } | null;
+  review: {
+    importMode: "replace" | "merge";
+    detectedHeaders: string[];
+    rowCount: number;
+  };
 }
 
 export interface CreateRecommendationRunInput {
   contributionAmountCad: number;
+}
+
+export interface SaveImportMappingPresetInput {
+  name: string;
+  sourceType: "csv";
+  mapping: Record<string, string>;
+}
+
+export interface UpdateImportMappingPresetInput {
+  name?: string;
+  sourceType?: "csv";
+  mapping?: Record<string, string>;
+}
+
+export interface CreateGuidedImportInput {
+  accountType: AccountType;
+  method: "single-account-csv" | "manual-entry" | "continue-later";
+  institution: string;
+  nickname: string;
+  contributionRoomCad: number;
+  initialMarketValueCad: number;
+  symbol?: string;
+  holdingName?: string;
+  assetClass?: string;
+  sector?: string;
+  gainLossPct: number;
+}
+
+export interface CreateGuidedImportResult {
+  account: InvestmentAccount;
+  importJob: ImportJob | null;
+  createdHoldingSymbol: string | null;
+  autoRecommendationRun: {
+    id: string;
+    contributionAmountCad: number;
+    itemCount: number;
+  } | null;
 }
 
 const DEFAULT_TARGETS_BY_RISK: Record<RiskProfile, AllocationTarget[]> = {
@@ -325,6 +369,139 @@ export async function getPreferenceView(userId: string) {
   }, "database");
 }
 
+export async function listImportMappingPresets(userId: string): Promise<ImportMappingPreset[]> {
+  const db = getDb();
+  const rows = await db.query.importMappingPresets.findMany({
+    where: eq(importMappingPresets.userId, userId)
+  });
+
+  return rows.map((row) => ({
+    id: row.id,
+    userId: row.userId,
+    name: row.name,
+    sourceType: row.sourceType as "csv",
+    mapping: row.mapping as Record<string, string>,
+    createdAt: row.createdAt.toISOString()
+  }));
+}
+
+export async function saveImportMappingPreset(userId: string, input: SaveImportMappingPresetInput): Promise<ImportMappingPreset> {
+  const db = getDb();
+  const existing = await db.query.importMappingPresets.findFirst({
+    where: and(
+      eq(importMappingPresets.userId, userId),
+      eq(importMappingPresets.name, input.name)
+    )
+  });
+
+  if (existing) {
+    const [updated] = await db
+      .update(importMappingPresets)
+      .set({
+        sourceType: input.sourceType,
+        mapping: input.mapping,
+        updatedAt: new Date()
+      })
+      .where(eq(importMappingPresets.id, existing.id))
+      .returning();
+
+    return {
+      id: updated.id,
+      userId: updated.userId,
+      name: updated.name,
+      sourceType: updated.sourceType as "csv",
+      mapping: updated.mapping as Record<string, string>,
+      createdAt: updated.createdAt.toISOString()
+    };
+  }
+
+  const [created] = await db
+    .insert(importMappingPresets)
+    .values({
+      userId,
+      name: input.name,
+      sourceType: input.sourceType,
+      mapping: input.mapping
+    })
+    .returning();
+
+  return {
+    id: created.id,
+    userId: created.userId,
+    name: created.name,
+    sourceType: created.sourceType as "csv",
+    mapping: created.mapping as Record<string, string>,
+    createdAt: created.createdAt.toISOString()
+  };
+}
+
+export async function updateImportMappingPreset(
+  userId: string,
+  presetId: string,
+  input: UpdateImportMappingPresetInput
+): Promise<ImportMappingPreset> {
+  const db = getDb();
+  const existing = await db.query.importMappingPresets.findFirst({
+    where: and(
+      eq(importMappingPresets.userId, userId),
+      eq(importMappingPresets.id, presetId)
+    )
+  });
+
+  if (!existing) {
+    throw new Error("Import mapping preset not found.");
+  }
+
+  const nextName = input.name?.trim() || existing.name;
+  if (nextName !== existing.name) {
+    const conflicting = await db.query.importMappingPresets.findFirst({
+      where: and(
+        eq(importMappingPresets.userId, userId),
+        eq(importMappingPresets.name, nextName)
+      )
+    });
+    if (conflicting && conflicting.id !== presetId) {
+      throw new Error("A preset with this name already exists.");
+    }
+  }
+
+  const [updated] = await db
+    .update(importMappingPresets)
+    .set({
+      name: nextName,
+      sourceType: input.sourceType ?? (existing.sourceType as "csv"),
+      mapping: input.mapping ?? (existing.mapping as Record<string, string>),
+      updatedAt: new Date()
+    })
+    .where(eq(importMappingPresets.id, presetId))
+    .returning();
+
+  return {
+    id: updated.id,
+    userId: updated.userId,
+    name: updated.name,
+    sourceType: updated.sourceType as "csv",
+    mapping: updated.mapping as Record<string, string>,
+    createdAt: updated.createdAt.toISOString()
+  };
+}
+
+export async function deleteImportMappingPreset(userId: string, presetId: string): Promise<void> {
+  const db = getDb();
+  const existing = await db.query.importMappingPresets.findFirst({
+    where: and(
+      eq(importMappingPresets.userId, userId),
+      eq(importMappingPresets.id, presetId)
+    )
+  });
+
+  if (!existing) {
+    throw new Error("Import mapping preset not found.");
+  }
+
+  await db.delete(importMappingPresets).where(eq(importMappingPresets.id, presetId));
+}
+
 export async function updatePreferenceProfile(userId: string, input: PreferenceProfileInput): Promise<PreferenceProfile> {
   const db = getDb();
 
@@ -469,11 +646,42 @@ export async function createImportJob(userId: string, input: CreateImportJobInpu
         transactionsImported: 0
       },
       validationErrors: [],
-      autoRecommendationRun: null
+      autoRecommendationRun: null,
+      review: {
+        importMode: input.importMode,
+        detectedHeaders: [],
+        rowCount: 0
+      }
     };
   }
 
   const parsed = parseImportCsv(input.csvContent, input.fieldMapping ?? {});
+  const review = {
+    importMode: input.importMode,
+    detectedHeaders: parsed.detectedHeaders,
+    rowCount: parsed.accounts.length + parsed.holdings.length + parsed.transactions.length
+  };
+
+  if (input.dryRun) {
+    return {
+      job: {
+        id: "dry-run",
+        userId,
+        status: parsed.validationErrors.length > 0 ? "draft" : "validated",
+        sourceType: input.sourceType,
+        fileName: input.fileName,
+        createdAt: new Date().toISOString()
+      },
+      summary: {
+        accountsImported: parsed.accounts.length,
+        holdingsImported: parsed.holdings.length,
+        transactionsImported: parsed.transactions.length
+      },
+      validationErrors: parsed.validationErrors,
+      autoRecommendationRun: null,
+      review
+    };
+  }
 
   if (parsed.validationErrors.length > 0) {
     const [jobRow] = await db
@@ -501,7 +709,8 @@ export async function createImportJob(userId: string, input: CreateImportJobInpu
         transactionsImported: 0
       },
       validationErrors: parsed.validationErrors,
-      autoRecommendationRun: null
+      autoRecommendationRun: null,
+      review
     };
   }
 
@@ -705,7 +914,8 @@ export async function createImportJob(userId: string, input: CreateImportJobInpu
         transactionsImported: isReplaceMode ? parsed.transactions.length : transactionsToInsert.length
       },
       validationErrors: [],
-      autoRecommendationRun: null
+      autoRecommendationRun: null,
+      review
     };
   });
 
@@ -727,6 +937,104 @@ export async function createImportJob(userId: string, input: CreateImportJobInpu
     } catch {
       autoRecommendationRun = null;
     }
+  }
+
+  return {
+    ...result,
+    autoRecommendationRun
+  };
+}
+
+export async function createGuidedImportAccount(userId: string, input: CreateGuidedImportInput): Promise<CreateGuidedImportResult> {
+  const db = getDb();
+
+  const result = await db.transaction(async (tx) => {
+    const [accountRow] = await tx
+      .insert(investmentAccounts)
+      .values({
+        userId,
+        institution: input.institution,
+        type: input.accountType,
+        nickname: input.nickname,
+        marketValueCad: input.initialMarketValueCad.toFixed(2),
+        contributionRoomCad: input.contributionRoomCad.toFixed(2)
+      })
+      .returning();
+
+    let createdHoldingSymbol: string | null = null;
+    if (input.method === "manual-entry" && input.symbol && input.assetClass) {
+      await tx.insert(holdingPositions).values({
+        userId,
+        accountId: accountRow.id,
+        symbol: input.symbol.toUpperCase(),
+        name: input.holdingName?.trim() || input.symbol.toUpperCase(),
+        assetClass: input.assetClass,
+        sector: input.sector?.trim() || "Multi-sector",
+        marketValueCad: input.initialMarketValueCad.toFixed(2),
+        weightPct: "100.00",
+        gainLossPct: input.gainLossPct.toFixed(2)
+      });
+      createdHoldingSymbol = input.symbol.toUpperCase();
+    }
+
+    let importJob: ImportJob | null = null;
+    if (input.method !== "manual-entry") {
+      const [jobRow] = await tx
+        .insert(importJobs)
+        .values({
+          userId,
+          status: "draft",
+          sourceType: "csv",
+          fileName: `guided-${input.accountType.toLowerCase()}-${input.nickname.replace(/\s+/g, "-").toLowerCase()}.csv`
+        })
+        .returning();
+
+      importJob = {
+        id: jobRow.id,
+        userId: jobRow.userId,
+        status: jobRow.status as ImportJob["status"],
+        sourceType: jobRow.sourceType as "csv",
+        fileName: jobRow.fileName,
+        createdAt: jobRow.createdAt.toISOString()
+      };
+    }
+
+    return {
+      account: {
+        id: accountRow.id,
+        userId: accountRow.userId,
+        institution: accountRow.institution,
+        type: accountRow.type as AccountType,
+        nickname: accountRow.nickname,
+        marketValueCad: Number(accountRow.marketValueCad),
+        contributionRoomCad: accountRow.contributionRoomCad == null ? null : Number(accountRow.contributionRoomCad)
+      },
+      importJob,
+      createdHoldingSymbol
+    };
+  });
+
+  let autoRecommendationRun: CreateGuidedImportResult["autoRecommendationRun"] = null;
+  try {
+    const repositories = getRepositories();
+    const [holdings, profile, transactions] = await Promise.all([
+      repositories.holdings.listByUserId(userId),
+      repositories.preferences.getByUserId(userId),
+      repositories.transactions.listByUserId(userId)
+    ]);
+
+    if (holdings.length > 0) {
+      const run = await createRecommendationRun(userId, {
+        contributionAmountCad: getAutoRecommendationAmount(profile, transactions)
+      });
+      autoRecommendationRun = {
+        id: run.id,
+        contributionAmountCad: run.contributionAmountCad,
+        itemCount: run.items.length
+      };
+    }
+  } catch {
+    autoRecommendationRun = null;
   }
 
   return {

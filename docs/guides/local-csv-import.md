@@ -2,7 +2,7 @@
 
 ## Goal
 
-Use a local broker export CSV to replace the current signed-in user's accounts, holdings, and transactions in the Portfolio Manager database.
+Use a local broker export CSV to review, validate, and then write the current signed-in user's accounts, holdings, and transactions into the Portfolio Manager database.
 
 ## Supported Row Types
 
@@ -35,14 +35,36 @@ http://localhost:3000/import
 /templates/portfolio-import-template.csv
 ```
 
-4. Fill in your local CSV or map your broker headers to the required fields in the UI.
+4. Choose the import path:
 
-5. Choose import mode:
+- `Guided setup`: create one account sleeve first, then continue account-specific import later
+- `Direct CSV import`: upload one file containing multiple accounts, holdings, and transactions
+
+### Guided setup: single-account CSV
+
+If you choose `Guided setup` and then `Upload one account CSV`:
+
+1. Select the account type
+2. Select `Upload one account CSV`
+3. Enter the institution and nickname
+4. Upload the account-specific CSV file
+5. Review the detected headers and adjust field mapping
+6. Click `Continue` to run a guided dry-run validation
+7. Review the parsed counts and any row-level issues
+8. Click `Confirm guided setup` to run the real merge import
+
+5. For direct CSV import, upload your local file or map your broker headers to the required fields in the UI.
+
+6. Choose import mode:
 
 - `Replace`: overwrite the current imported accounts, holdings, and transactions for the signed-in user
 - `Merge`: reuse matching accounts, update matching holdings, append new transactions, and preserve unrelated existing data
 
-6. Click `Validate, import, and refresh recommendations`.
+7. Click `Validate and review import`.
+
+8. Review the parsed row count, account count, holding count, and transaction count.
+
+9. Click `Confirm import` to write the reviewed changes into the database.
 
 ## Minimum Required Fields
 
@@ -94,7 +116,7 @@ transaction,tfsa_main,TFSA,Questrade,Main TFSA,,,,,,,,,2026-03-08,Loblaws,Grocer
 
 ## What Happens On Import
 
-If validation passes:
+If validation passes and you confirm the write:
 
 1. A completed `import_job` is created.
 2. Existing user-scoped accounts are replaced.
@@ -123,7 +145,7 @@ If your broker export uses different header names:
 1. Upload the CSV
 2. Review detected headers
 3. Map each canonical field to the broker column
-4. Re-run validation/import
+4. Re-run validation
 
 The importer prefills any exact header matches automatically.
 
@@ -133,9 +155,11 @@ The import screen supports:
 
 - built-in presets
 - exact-header auto-detect
-- browser-local saved presets
+- database-backed saved presets for the signed-in user
 
-Use `Save current preset` after you finish a custom mapping. The preset is stored in local browser storage and can be reused for later imports from the same machine/browser profile.
+Use `Save current preset` after you finish a custom mapping. The preset is stored in the Portfolio Manager database and can be reused by the same signed-in user on any machine.
+
+Saved presets can now also be renamed or deleted from the import screen.
 
 ## CSV Preview
 

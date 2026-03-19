@@ -39,7 +39,52 @@ export const importJobCreateSchema = z.object({
   sourceType: z.enum(["csv"]).default("csv"),
   csvContent: z.string().min(1).max(2_000_000).optional(),
   fieldMapping: z.record(z.string().min(1), z.string().min(1)).optional(),
-  importMode: z.enum(["replace", "merge"]).default("replace")
+  importMode: z.enum(["replace", "merge"]).default("replace"),
+  dryRun: z.boolean().optional().default(false)
+});
+
+export const importMappingPresetCreateSchema = z.object({
+  name: z.string().trim().min(2).max(120),
+  sourceType: z.enum(["csv"]).default("csv"),
+  mapping: z.record(z.string().min(1), z.string().min(1)).refine(
+    (value) => Object.keys(value).length > 0,
+    "At least one mapped field is required."
+  )
+});
+
+export const importMappingPresetUpdateSchema = z.object({
+  name: z.string().trim().min(2).max(120).optional(),
+  mapping: z.record(z.string().min(1), z.string().min(1)).optional(),
+  sourceType: z.enum(["csv"]).optional()
+}).refine(
+  (value) => value.name !== undefined || value.mapping !== undefined || value.sourceType !== undefined,
+  "At least one preset field must be updated."
+);
+
+export const guidedImportCreateSchema = z.object({
+  accountType: z.enum(["TFSA", "RRSP", "FHSA", "Taxable"]),
+  method: z.enum(["single-account-csv", "manual-entry", "continue-later"]),
+  institution: z.string().trim().min(2).max(120),
+  nickname: z.string().trim().min(2).max(120),
+  contributionRoomCad: z.number().min(0).max(1000000).optional().default(0),
+  initialMarketValueCad: z.number().min(0).max(100000000).optional().default(0),
+  symbol: z.string().trim().max(32).optional(),
+  holdingName: z.string().trim().max(160).optional(),
+  assetClass: z.string().trim().max(64).optional(),
+  sector: z.string().trim().max(64).optional(),
+  gainLossPct: z.number().min(-100).max(1000).optional().default(0)
+}).superRefine((value, context) => {
+  if (value.method === "manual-entry") {
+    if (!value.symbol) {
+      context.addIssue({ code: z.ZodIssueCode.custom, path: ["symbol"], message: "Manual entry requires a symbol." });
+    }
+    if (!value.assetClass) {
+      context.addIssue({ code: z.ZodIssueCode.custom, path: ["assetClass"], message: "Manual entry requires an asset class." });
+    }
+    if ((value.initialMarketValueCad ?? 0) <= 0) {
+      context.addIssue({ code: z.ZodIssueCode.custom, path: ["initialMarketValueCad"], message: "Manual entry requires a positive market value." });
+    }
+  }
 });
 
 export const recommendationRunCreateSchema = z.object({
@@ -49,4 +94,7 @@ export const recommendationRunCreateSchema = z.object({
 export type PreferenceProfileInputPayload = z.infer<typeof preferenceProfileInputSchema>;
 export type RegisterUserInputPayload = z.infer<typeof registerUserInputSchema>;
 export type ImportJobCreatePayload = z.infer<typeof importJobCreateSchema>;
+export type ImportMappingPresetCreatePayload = z.infer<typeof importMappingPresetCreateSchema>;
+export type ImportMappingPresetUpdatePayload = z.infer<typeof importMappingPresetUpdateSchema>;
+export type GuidedImportCreatePayload = z.infer<typeof guidedImportCreateSchema>;
 export type RecommendationRunCreatePayload = z.infer<typeof recommendationRunCreateSchema>;

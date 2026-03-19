@@ -1,0 +1,4 @@
+record_type,account_key,account_type,institution,account_nickname,market_value_cad,contribution_room_cad,symbol,name,asset_class,sector,weight_pct,gain_loss_pct,booked_at,merchant,category,amount_cad,direction
+account,guided_tfsa,TFSA,Wealthsimple,Guided TFSA,15000,7000,,,,,,,,,
+holding,guided_tfsa,TFSA,Wealthsimple,Guided TFSA,15000,7000,VFV,Vanguard S&P 500 Index ETF,US Equity,Multi-sector,100,4.2,,,,,
+transaction,guided_tfsa,TFSA,Wealthsimple,Guided TFSA,,,,,,,,,2026-03-18,Payroll,Income,4200,inflow

@@ -91,6 +91,15 @@ export interface ImportJob {
   createdAt: string;
 }
 
+export interface ImportMappingPreset {
+  id: EntityId;
+  userId: EntityId;
+  name: string;
+  sourceType: "csv";
+  mapping: Record<string, string>;
+  createdAt: string;
+}
+
 export interface AuthIdentity {
   userId: EntityId;
   email: string;

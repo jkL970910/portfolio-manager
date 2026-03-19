@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 const contracts = {
-  version: "0.5.0",
+  version: "0.7.0",
   entities: [
     "UserProfile",
     "InvestmentAccount",
@@ -38,6 +38,11 @@ const contracts = {
       description: "Import flow model plus latest import job state."
     },
     {
+      path: "/api/import/presets",
+      method: "GET",
+      description: "List user-scoped CSV field mapping presets saved in the database."
+    },
+    {
       path: "/api/settings/preferences",
       method: "GET",
       description: "Preference configuration screen model plus current saved preference profile."
@@ -52,7 +57,22 @@ const contracts = {
     {
       path: "/api/import/jobs",
       methods: ["POST"],
-      description: "Create a new import job, optionally validate and parse uploaded CSV content with field mapping, then replace or merge user-scoped accounts, holdings, and transactions."
+      description: "Validate direct CSV imports in a dry-run review step, then confirm and write replace-or-merge changes to user-scoped accounts, holdings, and transactions."
+    },
+    {
+      path: "/api/import/presets",
+      methods: ["POST"],
+      description: "Create or update a database-backed CSV field mapping preset for the signed-in user."
+    },
+    {
+      path: "/api/import/guided",
+      methods: ["POST"],
+      description: "Create an account-level guided onboarding record, optionally seed a starter holding, or use the guided single-account CSV path to validate and confirm a real import."
+    },
+    {
+      path: "/api/import/presets/[presetId]",
+      methods: ["PATCH", "DELETE"],
+      description: "Rename, update, or delete a user-scoped CSV mapping preset stored in the database."
     },
     {
       path: "/api/settings/preferences",

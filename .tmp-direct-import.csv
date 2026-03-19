@@ -1,0 +1,4 @@
+record_type,account_key,account_type,institution,account_nickname,market_value_cad,contribution_room_cad,symbol,name,asset_class,sector,weight_pct,gain_loss_pct,booked_at,merchant,category,amount_cad,direction
+account,direct_rrsp,RRSP,Questrade,Direct RRSP,24000,11000,,,,,,,,,
+holding,direct_rrsp,RRSP,Questrade,Direct RRSP,24000,11000,XBB,iShares Core Canadian Universe Bond,Fixed Income,Fixed Income,100,1.8,,,,,
+transaction,direct_rrsp,RRSP,Questrade,Direct RRSP,,,,,,,,,2026-03-17,Metro,Groceries,88.50,outflow
