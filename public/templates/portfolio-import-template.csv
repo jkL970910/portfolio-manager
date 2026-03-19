@@ -1,0 +1,7 @@
+record_type,account_key,account_type,institution,account_nickname,market_value_cad,contribution_room_cad,symbol,name,asset_class,sector,weight_pct,gain_loss_pct,booked_at,merchant,category,amount_cad,direction
+account,tfsa_main,TFSA,Questrade,Main TFSA,20500,12000,,,,,,,,,
+holding,tfsa_main,TFSA,Questrade,Main TFSA,14500,12000,VFV,Vanguard S&P 500 Index ETF,US Equity,Multi-sector,70.73,8.4,,,,,
+holding,tfsa_main,TFSA,Questrade,Main TFSA,6000,12000,XBB,iShares Core Canadian Universe Bond Index ETF,Fixed Income,Fixed Income,29.27,1.9,,,,,
+transaction,tfsa_main,TFSA,Questrade,Main TFSA,,,,,,,,,2026-03-05,Payroll,Income,5400,inflow
+transaction,tfsa_main,TFSA,Questrade,Main TFSA,,,,,,,,,2026-03-08,Loblaws,Groceries,182.44,outflow
+transaction,tfsa_main,TFSA,Questrade,Main TFSA,,,,,,,,,2026-03-12,Rent,Housing,1650,outflow

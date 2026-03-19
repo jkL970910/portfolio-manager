@@ -1,17 +1,21 @@
 import type { Route } from "next";
 import { ArrowRight, Info, ShieldCheck } from "lucide-react";
+import { requireViewer } from "@/lib/auth/session";
+import { getRecommendationView } from "@/lib/backend/services";
 import { AppShell } from "@/components/layout/app-shell";
+import { RecommendationRunPanel } from "@/components/recommendations/recommendation-run-panel";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { SectionHeading } from "@/components/ui/section-heading";
-import { getRecommendationsData } from "@/lib/mock-data";
 
 export default async function RecommendationsPage() {
-  const data = await getRecommendationsData();
+  const viewer = await requireViewer();
+  const { data } = await getRecommendationView(viewer.id);
 
   return (
     <AppShell
+      viewer={viewer}
       title="Recommendations"
       description="Transparent, editable funding guidance. Inputs stay visible so the workflow feels explainable rather than black-box."
     >
@@ -19,7 +23,7 @@ export default async function RecommendationsPage() {
         <div className="space-y-6">
           <SectionHeading
             title="Inputs and assumptions"
-            description="Recommendations are anchored to the user?s configured preferences, account priorities, and allocation targets."
+            description="Recommendations are anchored to the user's configured preferences, account priorities, and allocation targets."
           />
           <Card>
             <CardHeader>
@@ -28,7 +32,7 @@ export default async function RecommendationsPage() {
             <CardContent className="space-y-4">
               <div className="rounded-2xl border border-[color:var(--border)] bg-[color:var(--card-muted)] p-4">
                 <p className="text-sm text-[color:var(--muted-foreground)]">Contribution amount</p>
-                <p className="mt-2 text-3xl font-semibold">$8,000</p>
+                <p className="mt-2 text-3xl font-semibold">${data.run.contributionAmountCad.toLocaleString()}</p>
               </div>
               <div className="grid gap-3 sm:grid-cols-2">
                 {data.inputs.map((input) => (
@@ -52,6 +56,7 @@ export default async function RecommendationsPage() {
               ))}
             </CardContent>
           </Card>
+          <RecommendationRunPanel initialContributionAmount={data.run.contributionAmountCad || 5000} />
         </div>
 
         <div className="space-y-6">
@@ -87,6 +92,11 @@ export default async function RecommendationsPage() {
                   </div>
                 </div>
               ))}
+              {data.priorities.length === 0 ? (
+                <div className="rounded-[24px] border border-dashed border-[color:var(--border)] bg-[color:var(--card-muted)] p-5 text-sm text-[color:var(--muted-foreground)]">
+                  No recommendation run is available yet. Save your preferences, import holdings, then generate the first funding plan.
+                </div>
+              ) : null}
             </CardContent>
           </Card>
           <div className="grid gap-4 lg:grid-cols-2">

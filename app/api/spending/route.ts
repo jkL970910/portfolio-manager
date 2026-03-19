@@ -1,7 +1,11 @@
 import { NextResponse } from "next/server";
-import { getSpendingData } from "@/lib/mock-data";
+import { getAuthenticatedUserId } from "@/lib/auth/session";
+import { getSpendingView } from "@/lib/backend/services";
 
 export async function GET() {
-  const data = await getSpendingData();
-  return NextResponse.json({ data, source: "mock" });
+  const userId = await getAuthenticatedUserId();
+  if (!userId) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  return NextResponse.json(await getSpendingView(userId));
 }

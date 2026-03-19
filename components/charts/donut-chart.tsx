@@ -16,6 +16,7 @@ export function DonutChartCard({
   data: Array<{ name: string; value: number }>;
 }) {
   const [isMounted, setIsMounted] = useState(false);
+  const hasData = data.length > 0;
 
   useEffect(() => {
     setIsMounted(true);
@@ -29,7 +30,7 @@ export function DonutChartCard({
       </CardHeader>
       <CardContent className="grid gap-6 2xl:grid-cols-[minmax(240px,0.92fr)_minmax(220px,1.08fr)]">
         <div className="h-[240px] min-w-0">
-          {isMounted ? (
+          {isMounted && hasData ? (
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
                 <Pie data={data} dataKey="value" nameKey="name" innerRadius={60} outerRadius={88} paddingAngle={4}>
@@ -41,11 +42,13 @@ export function DonutChartCard({
               </PieChart>
             </ResponsiveContainer>
           ) : (
-            <div className="h-full rounded-full bg-[color:var(--card-muted)]" />
+            <div className="flex h-full items-center justify-center rounded-[24px] bg-[color:var(--card-muted)] px-6 text-center text-sm text-[color:var(--muted-foreground)]">
+              {hasData ? "Loading chart..." : "No allocation data yet. Import accounts to populate this chart."}
+            </div>
           )}
         </div>
         <div className="space-y-3">
-          {data.map((entry, index) => (
+          {hasData ? data.map((entry, index) => (
             <div key={entry.name} className="flex items-center justify-between rounded-2xl border border-[color:var(--border)] p-4">
               <div className="flex items-center gap-3">
                 <span className="h-3 w-3 rounded-full" style={{ backgroundColor: COLORS[index % COLORS.length] }} />
@@ -53,7 +56,11 @@ export function DonutChartCard({
               </div>
               <span className="text-sm text-[color:var(--muted-foreground)]">{entry.value}%</span>
             </div>
-          ))}
+          )) : (
+            <div className="rounded-2xl border border-[color:var(--border)] p-4 text-sm text-[color:var(--muted-foreground)]">
+              No category breakdown is available yet.
+            </div>
+          )}
         </div>
       </CardContent>
     </Card>

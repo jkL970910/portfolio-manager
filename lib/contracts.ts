@@ -29,6 +29,9 @@ export interface DashboardData {
     value: string;
   }[];
   netWorthTrend: { label: string; value: number }[];
+  spendingMonthLabel: string;
+  savingsPattern: string;
+  investableCash: string;
   spendingCategories: { name: string; value: string }[];
   healthPreview: { dimension: string; value: number }[];
   recommendation: {

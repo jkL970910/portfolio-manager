@@ -1,7 +1,12 @@
 import { NextResponse } from "next/server";
-import { getDashboardData } from "@/lib/mock-data";
+import { getAuthenticatedUserId } from "@/lib/auth/session";
+import { getDashboardView } from "@/lib/backend/services";
 
 export async function GET() {
-  const data = await getDashboardData();
-  return NextResponse.json({ data, source: "mock" });
+  const userId = await getAuthenticatedUserId();
+  if (!userId) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  return NextResponse.json(await getDashboardView(userId));
 }

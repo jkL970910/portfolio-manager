@@ -1,14 +1,17 @@
+import { requireViewer } from "@/lib/auth/session";
+import { getSpendingView } from "@/lib/backend/services";
 import { AppShell } from "@/components/layout/app-shell";
 import { LineChartCard } from "@/components/charts/line-chart";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { getSpendingData } from "@/lib/mock-data";
 
 export default async function SpendingPage() {
-  const data = await getSpendingData();
+  const viewer = await requireViewer();
+  const { data } = await getSpendingView(viewer.id);
 
   return (
     <AppShell
+      viewer={viewer}
       title="Spending"
       description="Detailed cash-flow and transaction management lives here. It supports investing decisions but does not take over the product narrative."
     >
@@ -67,6 +70,13 @@ export default async function SpendingPage() {
                   <td className="py-4">{transaction.amount}</td>
                 </tr>
               ))}
+              {data.transactions.length === 0 ? (
+                <tr className="border-t border-[color:var(--border)]">
+                  <td className="py-6 text-[color:var(--muted-foreground)]" colSpan={4}>
+                    No transactions imported yet. Spending insights will populate after the first CSV import.
+                  </td>
+                </tr>
+              ) : null}
             </tbody>
           </table>
         </CardContent>

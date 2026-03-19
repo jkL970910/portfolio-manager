@@ -1,12 +1,25 @@
+import { logout } from "@/lib/auth/actions";
+import type { Viewer } from "@/lib/auth/session";
 import { TopNav } from "@/components/navigation/top-nav";
+
+function getInitials(displayName: string) {
+  return displayName
+    .split(" ")
+    .map((part) => part[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
+}
 
 export function AppShell({
   title,
   description,
+  viewer,
   children
 }: {
   title: string;
   description: string;
+  viewer: Viewer;
   children: React.ReactNode;
 }) {
   return (
@@ -22,18 +35,23 @@ export function AppShell({
               <p className="text-sm text-white/82">Investment Decision Support</p>
             </div>
           </div>
-          <div className="flex flex-wrap items-center gap-6">
-            <div>
-              <p className="text-xs uppercase tracking-[0.18em] text-white/70">Total Portfolio Value</p>
-              <p className="mt-1 text-xl font-semibold">$296,660 CAD</p>
-            </div>
-            <div>
-              <p className="text-xs uppercase tracking-[0.18em] text-white/70">YTD Return</p>
-              <p className="mt-1 text-xl font-semibold">+6.8%</p>
+          <div className="flex flex-wrap items-center gap-4 md:gap-6">
+            <div className="text-right">
+              <p className="text-xs uppercase tracking-[0.18em] text-white/70">Signed in as</p>
+              <p className="mt-1 text-base font-semibold">{viewer.displayName}</p>
+              <p className="text-sm text-white/75">{viewer.email}</p>
             </div>
             <div className="flex h-11 w-11 items-center justify-center rounded-full bg-white text-sm font-semibold text-[color:var(--secondary)]">
-              JD
+              {getInitials(viewer.displayName)}
             </div>
+            <form action={logout}>
+              <button
+                type="submit"
+                className="inline-flex items-center justify-center rounded-full border border-white/18 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-white/10"
+              >
+                Sign out
+              </button>
+            </form>
           </div>
         </div>
         <TopNav />

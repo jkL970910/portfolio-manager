@@ -20,39 +20,28 @@
    - `/api/spending`
    - `/api/import`
    - `/api/settings/preferences`
-2. Model service boundaries around product domains rather than page files:
-   - portfolio aggregation
-   - recommendation engine
-   - spending aggregation
-   - import normalization
-   - preference storage
-3. Preserve response shapes where possible so UI changes stay localized to the data layer.
+2. Model service boundaries around product domains rather than page files.
+3. Route handlers should only return service outputs, never implement business logic directly.
+4. Use `lib/backend/mock-store.ts` only as a transition layer until repositories are backed by a database.
 
 ## Parallel work split
 ### Frontend
 - Build visual components and route-level pages.
 - Keep contracts typed in `lib/contracts.ts`.
-- Pull from `lib/mock-data.ts` until backend services are ready.
+- Consume stable API envelopes from `app/api/*`.
 
 ### Backend
-- Define database schema and domain services against the same contracts.
-- Replace route handlers from mock repository to real service orchestration.
-- Add POST and PATCH handlers after the read flows are stable.
+- Define schema from `docs/execution/backend-data-model.md`.
+- Implement services behind `lib/backend/services.ts`.
+- Swap mock-store reads for repository reads as the database comes online.
 
 ## Recommended sequence
 1. Frontend finalizes layout and component boundaries.
-2. Backend defines entities for accounts, holdings, contributions, transactions, preferences, and recommendation runs.
-3. Frontend and backend agree on contract changes in `app/api/contracts/route.ts`.
-4. Route handlers switch from mock data to actual services without changing page structure.
+2. Backend implements preference profile and import job persistence.
+3. Backend implements holdings and portfolio analytics.
+4. Backend implements recommendation generation.
+5. Frontend swaps page-level data fetching from mock imports to route or repository calls.
 
-## Core backend domains to implement next
-- Accounts and holdings ingestion
-- Portfolio analytics and drift calculations
-- Recommendation inputs and ranking logic
-- Spending aggregation and category mapping
-- Investment preferences and guided allocation output
-
-## Risk control
-- Do not couple chart components to raw database models.
-- Keep recommendation explanation text in service outputs, not UI-only constants.
-- Keep tax-aware language advisory and preference-driven, not absolute.
+## Supporting docs
+- `docs/execution/backend-architecture.md`
+- `docs/execution/backend-data-model.md`

@@ -1,15 +1,19 @@
 import { CheckCircle2, Upload, Wand2 } from "lucide-react";
+import { requireViewer } from "@/lib/auth/session";
+import { getImportView } from "@/lib/backend/services";
 import { AppShell } from "@/components/layout/app-shell";
+import { ImportJobPanel } from "@/components/import/import-job-panel";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { getImportData } from "@/lib/mock-data";
 
 export default async function ImportPage() {
-  const data = await getImportData();
+  const viewer = await requireViewer();
+  const { data } = await getImportView(viewer.id);
 
   return (
     <AppShell
+      viewer={viewer}
       title="Import"
       description="Guided portfolio setup with staged import, mapping, and review. The flow is intentionally lightweight at the first step."
     >
@@ -40,11 +44,15 @@ export default async function ImportPage() {
               ))}
             </div>
             <div className="flex flex-wrap gap-3">
-              <Button leadingIcon={<Upload className="h-4 w-4" />}>Upload CSV</Button>
-              <Button variant="secondary" leadingIcon={<Wand2 className="h-4 w-4" />}>
-                Review field mapping
+              <Button leadingIcon={<Upload className="h-4 w-4" />} disabled>Upload handled below</Button>
+              <Button variant="secondary" leadingIcon={<Wand2 className="h-4 w-4" />} disabled>
+                Mapping, preview, and validation are handled below
+              </Button>
+              <Button href="/templates/portfolio-import-template.csv" variant="secondary">
+                Download CSV template
               </Button>
             </div>
+            <ImportJobPanel latestJob={data.latestJob} />
           </CardContent>
         </Card>
         <Card>

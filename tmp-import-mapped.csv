@@ -1,0 +1,6 @@
+row_type,acct_ref,acct_kind,broker,acct_label,value_cad,room_left,ticker,security_name,asset_bucket,bucket_sector,weight_pct,pnl_pct,trade_date,payee,spend_category,cash_amount,flow_direction
+account,rrsp_core,RRSP,Wealthsimple,Core RRSP,31000,15400,,,,,,,,,
+holding,rrsp_core,RRSP,Wealthsimple,Core RRSP,21000,15400,XUU,iShares Core S&P U.S. Total Market ETF,US Equity,Multi-sector,67.74,11.2,,,,,
+holding,rrsp_core,RRSP,Wealthsimple,Core RRSP,10000,15400,ZAG,BMO Aggregate Bond Index ETF,Fixed Income,Fixed Income,32.26,2.1,,,,,
+transaction,rrsp_core,RRSP,Wealthsimple,Core RRSP,,,,,,,,,2026-03-03,Employer Match,Income,4200,inflow
+transaction,rrsp_core,RRSP,Wealthsimple,Core RRSP,,,,,,,,,2026-03-10,Utilities,Utilities,180,outflow
