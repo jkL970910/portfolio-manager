@@ -1,5 +1,6 @@
 import { logout } from "@/lib/auth/actions";
 import type { Viewer } from "@/lib/auth/session";
+import { FloatingHeaderFrame } from "@/components/layout/floating-header-frame";
 import { TopNav } from "@/components/navigation/top-nav";
 import { getFxRate } from "@/lib/market-data/fx";
 
@@ -33,30 +34,30 @@ export async function AppShell({
 
   return (
     <div className="min-h-screen px-4 pb-12 pt-4 md:px-6">
-      <header className="mx-auto max-w-[1440px] overflow-hidden rounded-[28px] border border-[color:var(--border)] bg-white shadow-[var(--shadow-soft)]">
-        <div className="flex flex-col gap-5 bg-[linear-gradient(135deg,#31568f,#1c3763)] px-6 py-6 text-white md:flex-row md:items-center md:justify-between md:px-8">
+      <FloatingHeaderFrame>
+        <div className="flex flex-col gap-5 bg-[linear-gradient(135deg,#31568f,#1c3763)] px-6 py-6 text-white transition-[padding,gap] duration-200 group-data-[scrolled=true]/header:gap-4 group-data-[scrolled=true]/header:px-5 group-data-[scrolled=true]/header:py-4 md:flex-row md:items-center md:justify-between md:px-8 group-data-[scrolled=true]/header:md:px-6">
           <div className="flex items-center gap-4">
-            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/18 text-sm font-semibold uppercase tracking-[0.18em]">
+            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/18 text-sm font-semibold uppercase tracking-[0.18em] transition-[width,height] duration-200 group-data-[scrolled=true]/header:h-10 group-data-[scrolled=true]/header:w-10">
               PM
             </div>
             <div>
-              <h1 className="text-2xl font-semibold tracking-tight">Portfolio Manager</h1>
-              <p className="text-sm text-white/82">Investment Decision Support</p>
+              <h1 className="text-2xl font-semibold tracking-tight transition-[font-size] duration-200 group-data-[scrolled=true]/header:text-[1.35rem]">Portfolio Manager</h1>
+              <p className="text-sm text-white/82 transition-[font-size] duration-200 group-data-[scrolled=true]/header:text-[13px]">Investment Decision Support</p>
             </div>
           </div>
-          <div className="flex flex-wrap items-center gap-4 md:gap-6">
+          <div className="flex flex-wrap items-center gap-4 transition-[gap] duration-200 group-data-[scrolled=true]/header:gap-3 md:gap-6 group-data-[scrolled=true]/header:md:gap-4">
             <div className="text-right">
               <p className="text-xs uppercase tracking-[0.18em] text-white/70">Signed in as</p>
               <p className="mt-1 text-base font-semibold">{viewer.displayName}</p>
               <p className="text-sm text-white/75">{viewer.email}</p>
             </div>
-            <div className="flex h-11 w-11 items-center justify-center rounded-full bg-white text-sm font-semibold text-[color:var(--secondary)]">
+            <div className="flex h-11 w-11 items-center justify-center rounded-full bg-white text-sm font-semibold text-[color:var(--secondary)] transition-[width,height] duration-200 group-data-[scrolled=true]/header:h-10 group-data-[scrolled=true]/header:w-10">
               {getInitials(viewer.displayName)}
             </div>
             <form action={logout}>
               <button
                 type="submit"
-                className="inline-flex items-center justify-center rounded-full border border-white/18 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-white/10"
+                className="inline-flex items-center justify-center rounded-full border border-white/18 px-4 py-2 text-sm font-medium text-white transition-[padding] hover:bg-white/10 group-data-[scrolled=true]/header:px-3.5 group-data-[scrolled=true]/header:py-1.5"
               >
                 Sign out
               </button>
@@ -64,7 +65,7 @@ export async function AppShell({
           </div>
         </div>
         <TopNav currency={viewer.baseCurrency} fxRateLabel={fxRateLabel} fxNote={fxNote} />
-      </header>
+      </FloatingHeaderFrame>
 
       <main className="mx-auto mt-6 max-w-[1440px] space-y-6">
         <section className="px-1">
