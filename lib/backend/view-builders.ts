@@ -637,28 +637,40 @@ export function buildSpendingData(args: {
 }
 
 export function buildImportData(args: {
-  latestJob: ImportJob | null;
+  latestPortfolioJob: ImportJob | null;
+  latestSpendingJob: ImportJob | null;
   accounts: InvestmentAccount[];
 }): ImportData {
-  const { latestJob, accounts } = args;
+  const { latestPortfolioJob, latestSpendingJob, accounts } = args;
   return {
-    steps: [
+    portfolioSteps: [
       { title: "Choose account type", description: "Start with the account structure, not a long form." },
       { title: "Choose import method", description: "CSV import first, account integrations later." },
       { title: "Provide account data", description: "Enter account details, room, and starter holding context before any write." },
-      { title: "Review and confirm", description: latestJob ? `Latest import job is ${latestJob.status}. Confirm what should be written next.` : "Review the exact account and import actions before writing them to the database." },
+      { title: "Review and confirm", description: latestPortfolioJob ? `Latest portfolio import is ${latestPortfolioJob.status}. Confirm what should be written next.` : "Review the exact account and holding actions before writing them to the database." },
       { title: "Complete setup", description: "Confirm the saved result, then continue to preferences or the dashboard." }
     ],
-    setupCards: [
+    portfolioSetupCards: [
       { label: "Account type", title: accounts.length > 0 ? `${accounts.map((account) => account.type).join(" / ")}` : "TFSA / RRSP / Taxable / FHSA", description: "Pick the right account bucket before asking for institution detail." },
       { label: "Import method", title: "CSV upload first", description: "Keeps MVP friction low while we define stable broker integrations." },
-      { label: "Field mapping", title: latestJob ? `Current file: ${latestJob.fileName}` : "Review transaction and holding columns", description: "Mapping stays explicit so the user trusts the imported data." },
+      { label: "Field mapping", title: latestPortfolioJob ? `Current file: ${latestPortfolioJob.fileName}` : "Review account and holding columns", description: "Mapping stays explicit so the user trusts the imported portfolio data." },
       { label: "Preference handoff", title: "Move into Investment Preferences", description: "The import flow hands off cleanly into target allocation and account priorities." }
     ],
-    successStates: [
+    portfolioSuccessStates: [
       "Imported holdings can be grouped by account and asset class.",
       "Invalid or unknown rows are flagged before the portfolio view updates.",
       "On completion the user can move directly to Dashboard or Recommendations."
+    ],
+    spendingSetupCards: [
+      { label: "Workflow", title: "Transaction import", description: "Import spending records separately from portfolio holdings so each workflow can evolve independently." },
+      { label: "Supported rows", title: latestSpendingJob ? `Latest file: ${latestSpendingJob.fileName}` : "Transaction rows only", description: "Focus on spending transactions, categories, merchants, and inflow/outflow direction." },
+      { label: "Review", title: "Validate before write", description: "Run preview and validation first, then confirm the transaction write." },
+      { label: "Future integrations", title: "Provider-ready boundary", description: "This path is isolated so bank or card APIs can replace CSV later without affecting portfolio import." }
+    ],
+    spendingSuccessStates: [
+      "Imported transactions flow into Spending metrics, category breakdowns, and recent transaction history.",
+      "Transaction-only imports do not overwrite holdings or recommendation runs.",
+      "This workflow can later swap CSV for bank or card provider integrations without changing the portfolio import path."
     ],
     existingAccounts: accounts.map((account) => ({
       id: account.id,

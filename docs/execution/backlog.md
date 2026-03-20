@@ -1,182 +1,158 @@
-﻿# Portfolio Manager MVP Backlog Prioritization
+# Portfolio Manager Execution Backlog
 
-## Prioritization Goal
+## Objective
 
-The current product goal is to help a self-directed investor import portfolio data, define a target strategy, understand portfolio health, and decide where new capital should go. Features are prioritized using four criteria:
+Track execution against the current alpha build, reflect what is already implemented, and clarify the next sequence of work toward a stronger MVP.
 
-- impact on the core user outcome
-- implementation effort
-- delivery risk
-- strategic alignment with the MVP
+## Current Product Goal
 
-Scoring scale:
-- Impact: 1 low to 5 high
-- Effort: 1 low to 5 high
-- Risk: 1 low to 5 high
-- Alignment: 1 low to 5 high
+Help a self-directed investor:
 
-## Top 5 Recommended Features
+- import and normalize portfolio data
+- configure investment preferences
+- understand portfolio health and allocation drift
+- connect spending visibility to investable cash
+- decide where new capital should go
 
-| Rank | Feature | Impact | Effort | Risk | Alignment | Recommendation |
-|---|---|---:|---:|---:|---:|---|
-| 1 | Account and holdings import | 5 | 3 | 2 | 5 | Build first |
-| 2 | Investment preferences settings | 5 | 3 | 3 | 5 | Build first |
-| 3 | Unified portfolio dashboard | 5 | 3 | 2 | 5 | Build in MVP |
-| 4 | Portfolio diagnostics | 5 | 3 | 3 | 5 | Build in MVP |
-| 5 | Funding recommendation engine v1 | 5 | 4 | 4 | 5 | Build in MVP, but keep rules simple |
+## Status Legend
 
-## Rationale For Top 5
+- `Completed`: implemented and usable in the current alpha
+- `In Progress`: implemented enough to use, but still missing important depth or polish
+- `Planned`: not implemented yet, but still part of the near roadmap
+- `Deferred`: intentionally pushed later
 
-### 1. Account and Holdings Import
+## Execution Snapshot
 
-Why it is first:
-- no data means no product value
-- unlocks every downstream workflow
-- import-first is feasible without live integrations
+### Completed
 
-Trade-off:
-- do not wait for broker API integration
+1. Authentication and user-scoped persistence
+   - local registration and login
+   - user-scoped API access
+   - Postgres-backed persistence
 
-### 2. Investment Preferences Settings
+2. Account and holdings import foundation
+   - direct CSV import
+   - guided import account creation
+   - guided single-account CSV import
+   - manual multi-holding entry
 
-Why it is second:
-- recommendations are not trustworthy without explicit user preferences
-- target allocation, account priorities, and cash buffer are core inputs
-- creates the product logic needed for future health scoring
+3. Import review and mapping foundation
+   - preview
+   - field mapping
+   - saved mapping presets
+   - dry-run validation
+   - confirm import
+   - replace / merge modes
 
-Trade-off:
-- start with manual setup first if guided setup creates too much MVP risk
+4. Core portfolio surfaces
+   - Dashboard
+   - Portfolio
+   - Recommendations
+   - Spending
+   - Import
+   - Settings
 
-### 3. Unified Portfolio Dashboard
+5. Investment preferences settings
+   - target allocation persistence
+   - funding priorities
+   - tax-aware placement flag
+   - transition preference
+   - watchlist symbol persistence
 
-Why it is third:
-- creates immediate visible value after import
-- gives users confidence that their data is correct
-- serves as the overview surface for wealth, alerts, and recommendation summary
+6. Recommendation engine v1
+   - drift-based allocation logic
+   - account-aware placement heuristic
+   - persisted recommendation runs
+   - auto baseline recommendation refresh after import
 
-Trade-off:
-- keep dashboard as an overview page, not a full recommendation page
+7. Market-data integration v1
+   - security search
+   - symbol normalization
+   - single-quote lookup
+   - batch quote refresh
+   - portfolio quote freshness and coverage
+   - dashboard top-holdings price freshness
 
-### 4. Portfolio Diagnostics
-
-Why it is fourth:
-- helps users understand what is wrong before suggesting what to do next
-- supports trust in the recommendation engine
-- provides strong differentiated value over generic finance apps
-
-Trade-off:
-- focus on a few high-signal analyses first: allocation, concentration, sector exposure, and performance
-
-### 5. Funding Recommendation Engine v1
-
-Why it is fifth:
-- this is the core differentiator
-- directly answers the product's main user question
-- drives repeat usage when users contribute new money
-
-Trade-off:
-- ship a transparent rule-based engine before advanced optimization
-
-## Secondary Scope For Early Releases
-
-| Feature | Why it matters | Release tendency |
-|---|---|---|
-| Guided allocation setup | Lowers friction for beginners and improves trust in target allocation | P1 unless MVP can absorb it |
-| Spending overview and transactions | Supports investable cash awareness without becoming the product core | P1 |
-| Recommendation explanation improvements | Increases trust and clarity | P1 |
-| Portfolio health score and radar analysis | Strong strategic value, but depends on stable preference and diagnostic inputs | P1 |
-
-## Deprioritized For Initial MVP
-
-| Feature | Why it is deprioritized |
-|---|---|
-| Full budgeting parity with finance apps | High scope, weak differentiation, and distracts from the core investment decision workflow |
-| Deep transaction categorization rules | Useful but not critical to capital allocation decisions |
-| Rebalancing optimizer | High complexity and high trust burden for early product stage |
-| Historical scoring and simulation | Better for later maturity, not for first user validation |
-| Real-time integrations | Expensive and not required to validate the core workflow |
-| Market signal integration | High uncertainty and not needed for first release |
-
-## MVP Release Backlog
-
-## Implementation Status Snapshot
-
-### Implemented now
-
-1. Account and holdings import
-   - direct CSV import supports preview, mapping, validation, review, confirm, replace, and merge
-   - guided import supports manual entry and single-account CSV review/confirm
-2. Investment preferences settings
-   - manual settings persist to the database
-3. Unified portfolio dashboard
-   - authenticated, user-scoped, database-backed
-4. Portfolio diagnostics
-   - portfolio, spending, and recommendation read models are backed by real data
-5. Funding recommendation engine v1
-   - recommendation runs persist to the database and auto-refresh after successful imports
-
-### Partially implemented
+## In Progress
 
 1. Spending overview and transactions
-   - live database-backed page exists, but deeper categorization and workflow polish remain
-2. Portfolio health score and radar analysis
-   - dashboard placeholder exists, detailed analysis is still pending
+   - page exists and is DB-backed
+   - deeper categorization and budgeting workflows are still missing
 
-### Still pending
+2. Portfolio diagnostics depth
+   - allocation, concentration, sector, and price freshness are present
+   - richer portfolio-health analysis is still missing
+
+3. Import review quality
+   - symbol audit and correction exist
+   - richer persisted correction workflows and staged review state are still missing
+
+## Planned: Highest Priority Next
+
+| Rank | Feature | Priority | Why now |
+|---|---|---|---|
+| 1 | Guided allocation setup in Settings | P0-next | The current settings page still expects too much manual portfolio knowledge from beginners. |
+| 2 | Recommendation engine v2 | P0-next | The current engine works, but it is still a v1 drift allocator with shallow tax/account-fit logic. |
+| 3 | Recommendation explanation improvements | P1 | Recommendation trust will plateau without more structured rationale. |
+| 4 | Portfolio health score and radar analysis | P1 | The placeholder exists, but the real scoring output is still missing. |
+| 5 | Richer import review persistence | P1 | Import review is functional, but corrections are still too session-bound and light. |
+| 6 | Watchlist and target constraints workflow | P1 | Preference storage exists, but the UX and recommendation impact are still too shallow. |
+| 7 | Cloud-ready cache / worker boundaries | P1 | Current market-data cache is process-local and import/recommendation work is still synchronous. |
+
+## Deprioritized / Deferred
+
+| Feature | Status | Reason |
+|---|---|---|
+| Full budgeting parity | Deferred | Too broad and weakly differentiated for the product's core decision-support thesis. |
+| Deep transaction categorization rules | Deferred | Useful later, but not required to validate the capital-allocation workflow. |
+| Rebalancing optimizer | Deferred | Higher trust burden and higher implementation complexity than the current stage supports. |
+| Historical scoring and simulation | Deferred | Better after recommendation and scoring logic become more stable. |
+| Advanced market signal integration | Deferred | Not required for core workflow validation. |
+| Broker-native integrations | Deferred | CSV import is sufficient for current validation and faster to iterate. |
+
+## Prioritization Table
+
+| Feature | Status | Impact | Effort | Risk | Alignment | Priority Call |
+|---|---|---:|---:|---:|---:|---|
+| Authentication and user-scoped persistence | Completed | 5 | 3 | 2 | 5 | Keep stable |
+| Account and holdings import foundation | Completed | 5 | 4 | 3 | 5 | Keep stable |
+| Investment preferences settings | Completed | 5 | 3 | 3 | 5 | Keep stable |
+| Unified portfolio dashboard | Completed | 5 | 3 | 2 | 5 | Keep stable |
+| Portfolio diagnostics foundation | In Progress | 5 | 4 | 3 | 5 | Deepen next |
+| Funding recommendation engine v1 | Completed | 5 | 4 | 4 | 5 | Upgrade to v2 |
+| Guided allocation setup | Planned | 5 | 3 | 3 | 5 | Build next |
+| Recommendation explanation improvements | Planned | 4 | 2 | 2 | 5 | Build soon |
+| Portfolio health score and radar analysis | Planned | 4 | 3 | 3 | 4 | Build after explanation depth improves |
+| Spending overview and transactions | In Progress | 3 | 3 | 2 | 3 | Keep secondary |
+| Richer import review persistence | Planned | 4 | 3 | 3 | 4 | Build soon |
+| Watchlist and target constraints workflow | Planned | 3 | 2 | 2 | 4 | Build after guided setup |
+| Cloud-ready cache and async boundaries | Planned | 3 | 4 | 3 | 4 | Build before scale work |
+| Rebalancing optimizer | Deferred | 3 | 5 | 5 | 3 | Push later |
+| Historical scoring and simulation | Deferred | 3 | 4 | 4 | 3 | Push later |
+| Full budgeting workflows | Deferred | 2 | 5 | 3 | 2 | Push later |
+| Advanced market signal integration | Deferred | 2 | 4 | 5 | 2 | Push later |
+
+## Recommended Build Order From Here
 
 1. Guided allocation setup in Settings
-2. Watchlist and target constraints as an editable workflow
-3. Recommendation explanation improvements beyond current rule text
-4. Rebalancing optimizer
-5. Advanced market signal integration
-6. Full budgeting workflows
-7. Historical portfolio scoring extensions
-
-### P0: Must Ship
-
-1. Account and holdings import
-2. Investment preferences settings
-3. Unified portfolio dashboard
-4. Portfolio diagnostics
-5. Funding recommendation engine v1
-
-### P1: Should Ship If Stable
-
-1. Guided allocation setup
-2. Watchlist and target constraints
-3. Recommendation explanation improvements
-4. Spending overview and transactions
-5. Portfolio health score and radar analysis
-
-### P2: Defer
-
-1. Rebalancing optimizer
-2. Advanced market signal integration
-3. Full budgeting workflows
-4. Historical portfolio scoring extensions
-
-## Recommended Build Order
-
-1. Data model for accounts, holdings, transactions, watchlist, and preferences
-2. CSV and manual import flow
-3. Investment preferences settings and saved target allocation
-4. Dashboard with wealth overview and recommendation summary
-5. Portfolio diagnostics calculations and alerts
-6. Recommendation rules engine
-7. Guided setup and spending support once the core loop is stable
+2. Recommendation engine v2 rules
+3. Recommendation explanation model and structured rationale output
+4. Portfolio health score and radar analysis
+5. Richer import review persistence and correction state
+6. Cloud-ready cache and async job boundaries
 
 ## Key Trade-offs
 
-- Choose import-first over integration-first
-- Choose rule-based guidance over black-box optimization
-- Choose portfolio decision support over finance platform breadth
-- Choose settings transparency over hidden defaults
-- Choose spending support as a secondary workflow, not the product identity
+- Keep the product centered on portfolio decision support, not full personal-finance breadth.
+- Prefer transparent, rule-based recommendation logic over opaque optimization.
+- Keep CSV import as the primary ingestion path until broker integrations are clearly justified.
+- Use market-data selectively and cache aggressively to protect provider quotas.
+- Add sophistication only where it materially improves trust, correctness, or repeat usage.
 
-## Next Execution Step
+## Immediate Next Execution Step
 
-Turn the next backend milestone into engineering tickets for:
+Turn the next milestone into engineering tickets for:
 
 1. guided allocation setup in Settings
 2. recommendation engine v2 rules
-3. richer import review and correction persistence
+3. recommendation explanation improvements

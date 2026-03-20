@@ -149,11 +149,14 @@ Implemented now:
   - security search
   - symbol normalization
   - quote lookup
-  - derived cost basis / market value / gain-loss
+  - auto-calculated market value
+  - optional override total value
+  - derived cost basis / gain-loss
 - portfolio price refresh with:
   - batch quote refresh
   - freshness / coverage status
 - persistent investment preferences and import mapping presets
+- unified client-side API safety helpers for fetch payload validation
 
 Not finished yet:
 

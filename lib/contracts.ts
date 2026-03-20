@@ -94,9 +94,11 @@ export interface SpendingData {
 }
 
 export interface ImportData {
-  steps: { title: string; description: string }[];
-  setupCards: { label: string; title: string; description: string }[];
-  successStates: string[];
+  portfolioSteps: { title: string; description: string }[];
+  portfolioSetupCards: { label: string; title: string; description: string }[];
+  portfolioSuccessStates: string[];
+  spendingSetupCards: { label: string; title: string; description: string }[];
+  spendingSuccessStates: string[];
   existingAccounts: {
     id: string;
     type: string;

@@ -55,6 +55,7 @@ function mapImportJob(row: typeof importJobs.$inferSelect): ImportJob {
   return {
     id: row.id,
     userId: row.userId,
+    workflow: row.workflow as ImportJob["workflow"],
     status: row.status as ImportJob["status"],
     sourceType: row.sourceType as "csv",
     fileName: row.fileName,

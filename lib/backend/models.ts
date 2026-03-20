@@ -4,6 +4,11 @@ export type AccountType = "TFSA" | "RRSP" | "FHSA" | "Taxable";
 export type RiskProfile = "Conservative" | "Balanced" | "Growth";
 export type TransitionPreference = "stay-close" | "gradual" | "direct";
 export type RecommendationStrategy = "tax-aware" | "target-first" | "balanced";
+export type GuidedAllocationGoal = "retirement" | "home" | "wealth" | "capital-preservation";
+export type GuidedAllocationHorizon = "short" | "medium" | "long";
+export type GuidedAllocationVolatility = "low" | "medium" | "high";
+export type GuidedAllocationPriority = "tax-efficiency" | "balanced" | "stay-close";
+export type GuidedAllocationCashNeed = "low" | "medium" | "high";
 
 export interface UserProfile {
   id: EntityId;
@@ -70,6 +75,25 @@ export interface PreferenceProfile {
   watchlistSymbols: string[];
 }
 
+export interface GuidedAllocationAnswers {
+  goal: GuidedAllocationGoal;
+  horizon: GuidedAllocationHorizon;
+  volatility: GuidedAllocationVolatility;
+  priority: GuidedAllocationPriority;
+  cashNeed: GuidedAllocationCashNeed;
+}
+
+export interface GuidedAllocationDraft {
+  id: EntityId;
+  userId: EntityId;
+  answers: GuidedAllocationAnswers;
+  suggestedProfile: Omit<PreferenceProfile, "id" | "userId" | "watchlistSymbols">;
+  assumptions: string[];
+  rationale: string[];
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface RecommendationItem {
   assetClass: string;
   amountCad: number;
@@ -90,6 +114,7 @@ export interface RecommendationRun {
 export interface ImportJob {
   id: EntityId;
   userId: EntityId;
+  workflow: "portfolio" | "spending";
   status: "draft" | "mapped" | "validated" | "completed";
   sourceType: "csv";
   fileName: string;

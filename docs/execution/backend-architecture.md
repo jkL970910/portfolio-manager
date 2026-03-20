@@ -81,6 +81,7 @@ Tracks CSV import state from creation to validation and completion.
   - manual multi-holding entry
   - single-account CSV import with review/confirm
 - portfolio holdings can refresh batch quotes and persist updated valuation data
+- for holding imports, `market_value_cad` is treated as the explicit total value override; if it is present, it wins over `quantity x last_price_cad`
 
 ## Candidate storage model
 Recommended production storage shape:

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 const contracts = {
-  version: "0.8.0",
+  version: "0.9.0",
   entities: [
     "UserProfile",
     "InvestmentAccount",
@@ -35,7 +35,7 @@ const contracts = {
     {
       path: "/api/import",
       method: "GET",
-      description: "Import flow model plus latest import job state."
+      description: "Import flow model with separate portfolio and spending workflow state."
     },
     {
       path: "/api/import/presets",
@@ -46,6 +46,11 @@ const contracts = {
       path: "/api/settings/preferences",
       method: "GET",
       description: "Preference configuration screen model plus current saved preference profile."
+    },
+    {
+      path: "/api/settings/guided-draft",
+      method: "GET",
+      description: "Read the saved guided allocation questionnaire draft for the signed-in user."
     },
     {
       path: "/api/market-data/search",
@@ -77,7 +82,17 @@ const contracts = {
     {
       path: "/api/import/jobs",
       methods: ["POST"],
-      description: "Validate direct CSV imports in a dry-run review step, then confirm and write replace-or-merge changes to user-scoped accounts, holdings, and transactions."
+      description: "Legacy generic import endpoint kept for compatibility."
+    },
+    {
+      path: "/api/import/portfolio/jobs",
+      methods: ["POST"],
+      description: "Validate and confirm portfolio CSV imports for accounts and holdings only. For holding rows, market_value_cad is treated as the explicit total value and overrides quantity x last_price_cad when both are present."
+    },
+    {
+      path: "/api/import/spending/jobs",
+      methods: ["POST"],
+      description: "Validate and confirm spending CSV imports for transaction rows only."
     },
     {
       path: "/api/import/presets",
@@ -98,6 +113,11 @@ const contracts = {
       path: "/api/settings/preferences",
       methods: ["PATCH"],
       description: "Persist changes to the investment preference profile."
+    },
+    {
+      path: "/api/settings/guided-draft",
+      methods: ["PATCH"],
+      description: "Persist a guided allocation questionnaire draft separately from the live preference profile."
     },
     {
       path: "/api/recommendations/runs",

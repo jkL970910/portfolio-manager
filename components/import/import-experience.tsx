@@ -16,12 +16,15 @@ import {
   TrendingUp
 } from "lucide-react";
 import { ImportJobPanel } from "@/components/import/import-job-panel";
+import { SpendingImportPanel } from "@/components/import/spending-import-panel";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { extractCsvHeaders, previewCsvContent, type ImportFieldMapping } from "@/lib/backend/csv-import";
+import { assertApiData, getApiErrorMessage, safeJson } from "@/lib/client/api";
 
 type ImportMode = "guided" | "direct";
+type ImportWorkflowView = "portfolio" | "spending";
 type GuidedMethod = "single-account-csv" | "manual-entry" | "continue-later";
 type GuidedAccountType = "TFSA" | "RRSP" | "FHSA" | "Taxable";
 
@@ -107,7 +110,7 @@ type ManualHoldingDraft = {
   quantity: string;
   avgCostPerShareCad: string;
   currentPriceCad: string;
-  marketValueCad: string;
+  overrideMarketValueCad: string;
 };
 
 type MarketDataSearchResult = {
@@ -261,7 +264,7 @@ function createManualHoldingDraft(): ManualHoldingDraft {
     quantity: "",
     avgCostPerShareCad: "",
     currentPriceCad: "",
-    marketValueCad: ""
+    overrideMarketValueCad: ""
   };
 }
 
@@ -277,7 +280,7 @@ function getManualHoldingDerivedMetrics(holding: ManualHoldingDraft) {
   const quantity = Number(holding.quantity) || 0;
   const avgCostPerShareCad = Number(holding.avgCostPerShareCad) || 0;
   const currentPriceCad = Number(holding.currentPriceCad) || 0;
-  const explicitMarketValueCad = Number(holding.marketValueCad) || 0;
+  const explicitMarketValueCad = Number(holding.overrideMarketValueCad) || 0;
 
   const costBasisCad = quantity > 0 && avgCostPerShareCad > 0 ? quantity * avgCostPerShareCad : 0;
   const computedMarketValueCad = explicitMarketValueCad > 0
@@ -298,16 +301,21 @@ function getManualHoldingDerivedMetrics(holding: ManualHoldingDraft) {
 }
 
 export function ImportExperience({
-  latestJob,
-  steps,
-  successStates,
+  latestPortfolioJob,
+  latestSpendingJob,
+  portfolioSteps,
+  portfolioSuccessStates,
+  spendingSuccessStates,
   existingAccounts
 }: {
-  latestJob: { status: string; fileName: string; createdAt: string } | null;
-  steps: { title: string; description: string }[];
-  successStates: string[];
+  latestPortfolioJob: { status: string; fileName: string; createdAt: string } | null;
+  latestSpendingJob: { status: string; fileName: string; createdAt: string } | null;
+  portfolioSteps: { title: string; description: string }[];
+  portfolioSuccessStates: string[];
+  spendingSuccessStates: string[];
   existingAccounts: ExistingAccountOption[];
 }) {
+  const [workflowView, setWorkflowView] = useState<ImportWorkflowView>("portfolio");
   const [mode, setMode] = useState<ImportMode>("guided");
   const [currentStep, setCurrentStep] = useState(1);
   const [accountType, setAccountType] = useState<GuidedAccountType | null>(null);
@@ -356,15 +364,20 @@ export function ImportExperience({
   );
   const manualHoldingsAreValid = useMemo(() => manualHoldings.every((holding) => {
     const hasIdentity = holding.symbol.trim().length > 0 && holding.assetClass.length > 0;
-    const hasMarketValue = Number(holding.marketValueCad) > 0;
-    const hasQuotePath = Number(holding.quantity) > 0 && Number(holding.currentPriceCad) > 0;
-    return hasIdentity && (hasMarketValue || hasQuotePath);
+    const hasUsableValue = getManualHoldingDerivedMetrics(holding).computedMarketValueCad > 0;
+    return hasIdentity && hasUsableValue;
   }), [manualHoldings]);
 
   useEffect(() => {
     fetch("/api/import/presets")
-      .then((response) => response.ok ? response.json() : Promise.reject(new Error("Failed to load presets.")))
-      .then((payload) => setGuidedCsvServerPresets(payload.data ?? []))
+      .then(async (response) => {
+        const payload = await safeJson(response);
+        if (!response.ok) {
+          throw new Error(getApiErrorMessage(payload, "Failed to load presets."));
+        }
+        return assertApiData<PresetRecord[]>(payload, Array.isArray, "Preset load succeeded but returned no usable preset list.");
+      })
+      .then((presets) => setGuidedCsvServerPresets(presets))
       .catch(() => setGuidedCsvServerPresets([]));
   }, []);
 
@@ -426,12 +439,17 @@ export function ImportExperience({
 
     try {
       const response = await fetch(`/api/market-data/search?query=${encodeURIComponent(query)}`);
-      const payload = await response.json();
+      const payload = await safeJson(response);
       if (!response.ok) {
-        throw new Error(payload.error ?? "Security search failed.");
+        throw new Error(getApiErrorMessage(payload, "Security search failed."));
       }
 
-      const results = (payload.data?.results ?? []) as MarketDataSearchResult[];
+      const data = assertApiData<{ results?: MarketDataSearchResult[] }>(
+        payload,
+        (candidate) => typeof candidate === "object" && candidate !== null,
+        "Security search succeeded but returned no usable search payload."
+      );
+      const results = Array.isArray(data.results) ? data.results : [];
       setManualHoldingSuggestions((current) => ({ ...current, [id]: results }));
       setManualHoldingStatus((current) => ({
         ...current,
@@ -462,16 +480,32 @@ export function ImportExperience({
 
     try {
       const response = await fetch(`/api/market-data/resolve?symbol=${encodeURIComponent(symbol)}`);
-      const payload = await response.json();
+      const payload = await safeJson(response);
       if (!response.ok) {
-        throw new Error(payload.error ?? "Security normalization failed.");
+        throw new Error(getApiErrorMessage(payload, "Security normalization failed."));
       }
 
-      const result = payload.data?.result;
+      const data = assertApiData<{ result?: { symbol?: string; name?: string; provider?: string } }>(
+        payload,
+        (candidate) => typeof candidate === "object" && candidate !== null,
+        "Security normalization succeeded but returned no usable normalization payload."
+      );
+      const result = data.result;
+      if (!result || typeof result.symbol !== "string" || result.symbol.trim().length === 0) {
+        throw new Error("Security normalization returned no usable symbol.");
+      }
+
+      const normalizedSymbol = result.symbol.toUpperCase();
+      const normalizedName = typeof result.name === "string" && result.name.trim().length > 0
+        ? result.name
+        : nextName ?? normalizedSymbol;
+      const providerLabel = typeof result.provider === "string" && result.provider.trim().length > 0
+        ? result.provider
+        : "market-data provider";
       updateManualHolding(id, {
-        symbol: result.symbol ?? symbol.toUpperCase(),
-        searchQuery: result.symbol ?? symbol.toUpperCase(),
-        holdingName: nextName ?? result.name ?? symbol.toUpperCase()
+        symbol: normalizedSymbol,
+        searchQuery: normalizedSymbol,
+        holdingName: normalizedName
       });
       setManualHoldingSuggestions((current) => ({ ...current, [id]: [] }));
       setManualHoldingStatus((current) => ({
@@ -480,7 +514,7 @@ export function ImportExperience({
           ...current[id],
           searchLoading: false,
           error: "",
-          message: `Normalized to ${result.symbol ?? symbol.toUpperCase()} via ${result.provider}.`
+          message: `Normalized to ${normalizedSymbol} via ${providerLabel}.`
         }
       }));
     } catch (error) {
@@ -512,21 +546,32 @@ export function ImportExperience({
 
     try {
       const response = await fetch(`/api/market-data/quote?symbol=${encodeURIComponent(holding.symbol.trim())}`);
-      const payload = await response.json();
+      const payload = await safeJson(response);
       if (!response.ok) {
-        throw new Error(payload.error ?? "Quote lookup failed.");
+        throw new Error(getApiErrorMessage(payload, "Quote lookup failed."));
       }
 
-      const quote = payload.data?.result;
+      const data = assertApiData<{ result?: { price?: number; provider?: string; delayed?: boolean } }>(
+        payload,
+        (candidate) => typeof candidate === "object" && candidate !== null,
+        "Quote lookup succeeded but returned no usable quote payload."
+      );
+      const quote = data.result;
+      if (!quote || typeof quote !== "object") {
+        throw new Error("Quote provider returned no quote payload for this symbol.");
+      }
+
       const nextPrice = Number(quote.price);
       if (!Number.isFinite(nextPrice) || nextPrice <= 0) {
         throw new Error("Provider returned no usable price for this symbol.");
       }
 
-      const quantity = Number(holding.quantity) || 0;
+      const providerLabel = typeof quote.provider === "string" && quote.provider.trim().length > 0
+        ? quote.provider
+        : "market-data provider";
+      const delayedSuffix = quote.delayed === true ? " (delayed)" : "";
       updateManualHolding(id, {
-        currentPriceCad: nextPrice.toFixed(2),
-        marketValueCad: quantity > 0 ? (quantity * nextPrice).toFixed(2) : holding.marketValueCad
+        currentPriceCad: nextPrice.toFixed(2)
       });
       setManualHoldingStatus((current) => ({
         ...current,
@@ -534,7 +579,7 @@ export function ImportExperience({
           ...current[id],
           quoteLoading: false,
           error: "",
-          message: `Fetched ${quote.provider} quote at ${formatCad(nextPrice)}${quote.delayed ? " (delayed)" : ""}.`
+          message: `Fetched ${providerLabel} quote at ${formatCad(nextPrice)}${delayedSuffix}.`
         }
       }));
     } catch (error) {
@@ -717,18 +762,30 @@ export function ImportExperience({
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ name: label.trim(), sourceType: "csv", mapping })
     });
-    const payload = await response.json();
+    const payload = await safeJson(response);
     if (!response.ok) {
-      setGuidedStatus({ type: "error", message: payload.error ?? "Failed to save guided preset." });
+      setGuidedStatus({ type: "error", message: getApiErrorMessage(payload, "Failed to save guided preset.") });
+      return;
+    }
+
+    let savedPreset: PresetRecord;
+    try {
+      savedPreset = assertApiData<PresetRecord>(
+        payload,
+        (candidate) => typeof candidate === "object" && candidate !== null && "id" in candidate && "name" in candidate,
+        "Guided preset save succeeded but returned no usable preset payload."
+      );
+    } catch (error) {
+      setGuidedStatus({ type: "error", message: error instanceof Error ? error.message : "Failed to save guided preset." });
       return;
     }
 
     setGuidedCsvServerPresets((current) => {
-      const next = [...current.filter((preset) => preset.id !== payload.data.id), payload.data];
+      const next = [...current.filter((preset) => preset.id !== savedPreset.id), savedPreset];
       return next;
     });
-    setGuidedCsvSelectedPresetKey(payload.data.id);
-    setGuidedStatus({ type: "success", message: `Saved guided preset "${payload.data.name}".` });
+    setGuidedCsvSelectedPresetKey(savedPreset.id);
+    setGuidedStatus({ type: "success", message: `Saved guided preset "${savedPreset.name}".` });
   }
 
   function updateGuidedCsvFieldMapping(field: string, value: string) {
@@ -762,13 +819,23 @@ export function ImportExperience({
         })
       });
 
-      const payload = await response.json();
+      const payload = await safeJson(response);
       if (!response.ok) {
-        setGuidedStatus({ type: "error", message: payload.error ?? "Guided CSV validation failed." });
+        setGuidedStatus({ type: "error", message: getApiErrorMessage(payload, "Guided CSV validation failed.") });
         return;
       }
 
-      const result = payload.data as GuidedCsvReviewState;
+      let result: GuidedCsvReviewState;
+      try {
+        result = assertApiData<GuidedCsvReviewState>(
+          payload,
+          (candidate) => typeof candidate === "object" && candidate !== null && "summary" in candidate && "review" in candidate && "validationErrors" in candidate,
+          "Guided CSV validation succeeded but returned no usable review payload."
+        );
+      } catch (error) {
+        setGuidedStatus({ type: "error", message: error instanceof Error ? error.message : "Guided CSV validation failed." });
+        return;
+      }
       setGuidedCsvReviewState(result);
       setCurrentStep(4);
       setGuidedStatus({
@@ -806,16 +873,29 @@ export function ImportExperience({
           })
         });
 
-        const payload = await response.json();
+        const payload = await safeJson(response);
         if (!response.ok) {
           setGuidedStatus({
             type: "error",
-            message: payload.error ?? "Failed to import the guided CSV file."
+            message: getApiErrorMessage(payload, "Failed to import the guided CSV file.")
           });
           return;
         }
 
-        const result = payload.data as GuidedCsvImportResult;
+        let result: GuidedCsvImportResult;
+        try {
+          result = assertApiData<GuidedCsvImportResult>(
+            payload,
+            (candidate) => typeof candidate === "object" && candidate !== null && "summary" in candidate && "job" in candidate,
+            "Guided CSV import succeeded but returned no usable import result."
+          );
+        } catch (error) {
+          setGuidedStatus({
+            type: "error",
+            message: error instanceof Error ? error.message : "Failed to import the guided CSV file."
+          });
+          return;
+        }
         setGuidedCsvImportResult(result);
         setGuidedStatus({
           type: "success",
@@ -850,22 +930,37 @@ export function ImportExperience({
                 quantity: holding.quantity ? Number(holding.quantity) : null,
                 avgCostPerShareCad: holding.avgCostPerShareCad ? Number(holding.avgCostPerShareCad) : null,
                 lastPriceCad: holding.currentPriceCad ? Number(holding.currentPriceCad) : null,
-                marketValueCad: holding.marketValueCad ? Number(holding.marketValueCad) : null
+                marketValueCad: getManualHoldingDerivedMetrics(holding).computedMarketValueCad > 0
+                  ? getManualHoldingDerivedMetrics(holding).computedMarketValueCad
+                  : null
               }))
             : []
         })
       });
 
-      const payload = await response.json();
+      const payload = await safeJson(response);
       if (!response.ok) {
         setGuidedStatus({
           type: "error",
-          message: payload.error ?? "Failed to save the guided import path."
+          message: getApiErrorMessage(payload, "Failed to save the guided import path.")
         });
         return;
       }
 
-      const result = payload.data as GuidedImportResult;
+      let result: GuidedImportResult;
+      try {
+        result = assertApiData<GuidedImportResult>(
+          payload,
+          (candidate) => typeof candidate === "object" && candidate !== null && "account" in candidate,
+          "Guided import succeeded but returned no usable account payload."
+        );
+      } catch (error) {
+        setGuidedStatus({
+          type: "error",
+          message: error instanceof Error ? error.message : "Failed to save the guided import path."
+        });
+        return;
+      }
       setGuidedResult(result);
       setGuidedStatus({
         type: "success",
@@ -907,44 +1002,85 @@ export function ImportExperience({
     <div className="space-y-6">
       <Card>
         <CardHeader>
-          <CardTitle>Import Path</CardTitle>
+          <CardTitle>Import Workflow</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid gap-3 md:grid-cols-2">
             <button
               type="button"
-              onClick={() => resetGuidedState("guided")}
-              className={`rounded-[24px] border p-5 text-left transition-colors ${mode === "guided" ? "border-[color:var(--primary)] bg-[color:var(--primary-soft)]" : "border-[color:var(--border)] bg-white"}`}
+              onClick={() => {
+                setWorkflowView("portfolio");
+                resetGuidedState("guided");
+              }}
+              className={`rounded-[24px] border p-5 text-left transition-colors ${workflowView === "portfolio" ? "border-[color:var(--primary)] bg-[color:var(--primary-soft)]" : "border-[color:var(--border)] bg-white"}`}
             >
               <div className="flex items-center justify-between gap-3">
-                <p className="text-lg font-semibold">Guided setup</p>
-                <Badge variant={mode === "guided" ? "primary" : "neutral"}>Recommended</Badge>
+                <p className="text-lg font-semibold">Portfolio Import</p>
+                <Badge variant={workflowView === "portfolio" ? "primary" : "neutral"}>Accounts + holdings</Badge>
               </div>
               <p className="mt-2 text-sm text-[color:var(--muted-foreground)]">
-                Walk through account type, data source choice, validation, and handoff one step at a time.
+                Use guided onboarding or direct CSV import for investment accounts and holdings. This path is allowed to evolve into broker integrations later.
               </p>
             </button>
             <button
               type="button"
-              onClick={() => setMode("direct")}
-              className={`rounded-[24px] border p-5 text-left transition-colors ${mode === "direct" ? "border-[color:var(--primary)] bg-[color:var(--primary-soft)]" : "border-[color:var(--border)] bg-white"}`}
+              onClick={() => setWorkflowView("spending")}
+              className={`rounded-[24px] border p-5 text-left transition-colors ${workflowView === "spending" ? "border-[color:var(--primary)] bg-[color:var(--primary-soft)]" : "border-[color:var(--border)] bg-white"}`}
             >
               <div className="flex items-center justify-between gap-3">
-                <p className="text-lg font-semibold">Direct CSV import</p>
-                <Badge variant={mode === "direct" ? "primary" : "neutral"}>Bulk</Badge>
+                <p className="text-lg font-semibold">Spending Import</p>
+                <Badge variant={workflowView === "spending" ? "primary" : "neutral"}>Transactions</Badge>
               </div>
               <p className="mt-2 text-sm text-[color:var(--muted-foreground)]">
-                Best when you already have one CSV containing multiple accounts, holdings, and transactions.
+                Keep spending transactions on their own ingestion path so future bank, card, or aggregator APIs can plug in without changing portfolio import logic.
               </p>
             </button>
           </div>
         </CardContent>
       </Card>
 
-      {mode === "guided" ? (
+      {workflowView === "portfolio" ? (
+        <Card>
+          <CardHeader>
+            <CardTitle>Portfolio import path</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid gap-3 md:grid-cols-2">
+              <button
+                type="button"
+                onClick={() => resetGuidedState("guided")}
+                className={`rounded-[24px] border p-5 text-left transition-colors ${mode === "guided" ? "border-[color:var(--primary)] bg-[color:var(--primary-soft)]" : "border-[color:var(--border)] bg-white"}`}
+              >
+                <div className="flex items-center justify-between gap-3">
+                  <p className="text-lg font-semibold">Guided setup</p>
+                  <Badge variant={mode === "guided" ? "primary" : "neutral"}>Recommended</Badge>
+                </div>
+                <p className="mt-2 text-sm text-[color:var(--muted-foreground)]">
+                  Walk through account type, data source choice, validation, and handoff one step at a time.
+                </p>
+              </button>
+              <button
+                type="button"
+                onClick={() => setMode("direct")}
+                className={`rounded-[24px] border p-5 text-left transition-colors ${mode === "direct" ? "border-[color:var(--primary)] bg-[color:var(--primary-soft)]" : "border-[color:var(--border)] bg-white"}`}
+              >
+                <div className="flex items-center justify-between gap-3">
+                  <p className="text-lg font-semibold">Direct CSV import</p>
+                  <Badge variant={mode === "direct" ? "primary" : "neutral"}>Bulk</Badge>
+                </div>
+                <p className="mt-2 text-sm text-[color:var(--muted-foreground)]">
+                  Best when your broker export already contains account and holding data and you want to validate it in one pass.
+                </p>
+              </button>
+            </div>
+          </CardContent>
+        </Card>
+      ) : null}
+
+      {workflowView === "portfolio" && mode === "guided" ? (
         <div className="space-y-6">
           <div className="grid gap-4 xl:grid-cols-5">
-            {steps.map((step, index) => {
+            {portfolioSteps.map((step, index) => {
               const stepNumber = index + 1;
               const isActive = currentStep === stepNumber;
               const isComplete = currentStep > stepNumber;
@@ -970,7 +1106,7 @@ export function ImportExperience({
           <div className="grid gap-6 xl:grid-cols-[1fr_0.8fr]">
             <Card>
               <CardHeader>
-                <CardTitle>{steps[currentStep - 1]?.title}</CardTitle>
+                <CardTitle>{portfolioSteps[currentStep - 1]?.title}</CardTitle>
               </CardHeader>
               <CardContent className="space-y-5">
                 {currentStep === 1 ? (
@@ -1044,7 +1180,7 @@ export function ImportExperience({
                     accountMode={accountMode}
                     selectedExistingAccount={matchingExistingAccounts.find((account) => account.id === selectedExistingAccountId) ?? null}
                     manualHoldings={manualHoldings}
-                    latestJob={latestJob}
+                    latestJob={latestPortfolioJob}
                     reviewActions={reviewActions}
                     guidedCsvReviewState={guidedCsvReviewState}
                   />
@@ -1098,7 +1234,7 @@ export function ImportExperience({
                 />
                 <InfoRow
                   icon={<CheckCircle2 className="mt-0.5 h-4 w-4 text-[color:var(--success)]" />}
-                  text={successStates[0]}
+                  text={portfolioSuccessStates[0]}
                 />
                 <InfoRow
                   icon={<ShieldAlert className="mt-0.5 h-4 w-4 text-[color:var(--warning)]" />}
@@ -1108,7 +1244,9 @@ export function ImportExperience({
             </Card>
           </div>
         </div>
-      ) : (
+      ) : null}
+
+      {workflowView === "portfolio" && mode === "direct" ? (
         <div className="grid gap-6 xl:grid-cols-[1fr_0.8fr]">
           <Card>
             <CardHeader>
@@ -1119,10 +1257,10 @@ export function ImportExperience({
                 <p className="text-xs uppercase tracking-[0.16em] text-[color:var(--muted-foreground)]">When to use this</p>
                 <p className="mt-2 text-lg font-semibold">One file, many accounts</p>
                 <p className="mt-2 text-sm text-[color:var(--muted-foreground)]">
-                  Use this path when your broker export already contains multiple accounts and you want to validate, preview, map, and import everything in one pass.
+                  Use this path when your broker export already contains account and holding data and you want to validate, preview, map, and import everything in one pass.
                 </p>
               </div>
-              <ImportJobPanel latestJob={latestJob} />
+              <ImportJobPanel latestJob={latestPortfolioJob} workflow="portfolio" />
             </CardContent>
           </Card>
           <Card>
@@ -1130,13 +1268,47 @@ export function ImportExperience({
               <CardTitle>Direct import notes</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
-              {successStates.map((item) => (
+              <InfoRow
+                icon={<Database className="mt-0.5 h-4 w-4 text-[color:var(--primary)]" />}
+                text="Holding valuation rule: if a CSV row includes market_value_cad, that explicit total value is used and overrides any derived value from quantity x last_price_cad."
+              />
+              {portfolioSuccessStates.map((item) => (
                 <InfoRow key={item} icon={<CheckCircle2 className="mt-0.5 h-4 w-4 text-[color:var(--success)]" />} text={item} />
               ))}
             </CardContent>
           </Card>
         </div>
-      )}
+      ) : null}
+
+      {workflowView === "spending" ? (
+        <div className="grid gap-6 xl:grid-cols-[1fr_0.8fr]">
+          <Card>
+            <CardHeader>
+              <CardTitle>Spending import</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="rounded-[24px] border border-dashed border-[color:var(--border)] bg-[color:var(--card-muted)] p-5">
+                <p className="text-xs uppercase tracking-[0.16em] text-[color:var(--muted-foreground)]">When to use this</p>
+                <p className="mt-2 text-lg font-semibold">Transaction-first import</p>
+                <p className="mt-2 text-sm text-[color:var(--muted-foreground)]">
+                  Use this path for spending and cash-flow records only. It keeps transaction ingestion separate from portfolio ingestion and leaves a clean boundary for future bank or card APIs.
+                </p>
+              </div>
+              <SpendingImportPanel latestJob={latestSpendingJob} />
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader>
+              <CardTitle>Spending import notes</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {spendingSuccessStates.map((item) => (
+                <InfoRow key={item} icon={<CheckCircle2 className="mt-0.5 h-4 w-4 text-[color:var(--success)]" />} text={item} />
+              ))}
+            </CardContent>
+          </Card>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -1477,7 +1649,7 @@ function StepProvideSource(props: {
           <div>
             <p className="font-semibold">Manual entry path</p>
             <p className="mt-2 text-sm text-[color:var(--muted-foreground)]">
-              Use this when you want to add one or more holdings into a new or existing account. Gain/loss is derived from cost basis and current price or market value.
+              Use this when you want to add one or more holdings into a new or existing account. Gain/loss is derived from cost basis and the computed market value. Only use an override when you deliberately want to replace the computed total value.
             </p>
           </div>
           <div className="space-y-4">
@@ -1535,12 +1707,34 @@ function StepProvideSource(props: {
                         Quote
                       </Button>
                     </div>
+                    <p className="text-xs text-[color:var(--muted-foreground)]">
+                      Per-share or per-unit price. Use this when you know the latest quote.
+                    </p>
                   </label>
                   <label className="space-y-2">
                     <span className="text-sm font-medium">Current market value (CAD)</span>
-                    <input type="number" min="0" value={holding.marketValueCad} onChange={(event) => onManualHoldingChange(holding.id, { marketValueCad: event.target.value })} className="w-full rounded-2xl border border-[color:var(--border)] bg-white px-4 py-3 text-sm outline-none" placeholder="Fallback if no current price" />
+                    <input type="number" min="0" value={getManualHoldingDerivedMetrics(holding).computedMarketValueCad > 0 ? getManualHoldingDerivedMetrics(holding).computedMarketValueCad.toFixed(2) : ""} readOnly className="w-full rounded-2xl border border-[color:var(--border)] bg-slate-50 px-4 py-3 text-sm outline-none" placeholder="Calculated from shares x current price or override value" />
+                    <p className="text-xs text-[color:var(--muted-foreground)]">
+                      Auto-calculated from shares and current price. If you add an override below, that override becomes the total value used for gain/loss.
+                    </p>
                   </label>
                 </div>
+                <details className="rounded-2xl border border-[color:var(--border)] bg-white px-4 py-3">
+                  <summary className="cursor-pointer text-sm font-medium text-[color:var(--foreground)]">Advanced: Override total value</summary>
+                  <div className="mt-3 space-y-2">
+                    <input
+                      type="number"
+                      min="0"
+                      value={holding.overrideMarketValueCad}
+                      onChange={(event) => onManualHoldingChange(holding.id, { overrideMarketValueCad: event.target.value })}
+                      className="w-full rounded-2xl border border-[color:var(--border)] bg-white px-4 py-3 text-sm outline-none"
+                      placeholder="Optional override total value"
+                    />
+                    <p className="text-xs text-[color:var(--muted-foreground)]">
+                      Leave empty in normal use. Only fill this if you want to override the computed total position value.
+                    </p>
+                  </div>
+                </details>
                 {manualHoldingSuggestions[holding.id]?.length ? (
                   <div className="space-y-2">
                     <p className="text-xs uppercase tracking-[0.14em] text-[color:var(--muted-foreground)]">Search results</p>
@@ -1708,7 +1902,7 @@ function StepReviewAndConfirm({
 
       <InfoRow
         icon={<ShieldAlert className="mt-0.5 h-4 w-4 text-[color:var(--warning)]" />}
-        text={latestJob ? `Latest recorded import job: ${latestJob.fileName} (${latestJob.status}).` : "No prior import job exists yet for this signed-in user."}
+        text={latestJob ? `Latest recorded portfolio import: ${latestJob.fileName} (${latestJob.status}).` : "No prior portfolio import job exists yet for this signed-in user."}
       />
     </div>
   );
@@ -1800,3 +1994,4 @@ function InfoRow({ icon, text }: { icon: React.ReactNode; text: string }) {
     </div>
   );
 }
+

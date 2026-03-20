@@ -93,6 +93,19 @@ export const allocationTargets = pgTable("allocation_targets", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow()
 });
 
+export const guidedAllocationDrafts = pgTable("guided_allocation_drafts", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  userId: uuid("user_id").notNull().references(() => users.id),
+  answers: jsonb("answers").notNull(),
+  suggestedProfile: jsonb("suggested_profile").notNull(),
+  assumptions: jsonb("assumptions").notNull(),
+  rationale: jsonb("rationale").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow()
+}, (table) => ({
+  userUniqueIdx: uniqueIndex("guided_allocation_drafts_user_id_idx").on(table.userId)
+}));
+
 export const recommendationRuns = pgTable("recommendation_runs", {
   id: uuid("id").defaultRandom().primaryKey(),
   userId: uuid("user_id").notNull().references(() => users.id),
@@ -115,6 +128,7 @@ export const recommendationItems = pgTable("recommendation_items", {
 export const importJobs = pgTable("import_jobs", {
   id: uuid("id").defaultRandom().primaryKey(),
   userId: uuid("user_id").notNull().references(() => users.id),
+  workflow: varchar("workflow", { length: 32 }).notNull().default("portfolio"),
   status: varchar("status", { length: 24 }).notNull(),
   sourceType: varchar("source_type", { length: 24 }).notNull(),
   fileName: varchar("file_name", { length: 255 }).notNull(),

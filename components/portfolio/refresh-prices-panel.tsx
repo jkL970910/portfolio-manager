@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { RefreshCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { assertApiData, getApiErrorMessage, safeJson } from "@/lib/client/api";
 
 export function RefreshPricesPanel({
   lastRefreshed,
@@ -26,18 +27,33 @@ export function RefreshPricesPanel({
 
     startTransition(async () => {
       const response = await fetch("/api/portfolio/refresh-prices", { method: "POST" });
-      const payload = await response.json();
+      const payload = await safeJson(response);
 
       if (!response.ok) {
-        setStatus({ type: "error", message: payload.error ?? "Failed to refresh portfolio prices." });
+        setStatus({ type: "error", message: getApiErrorMessage(payload, "Failed to refresh portfolio prices.") });
         return;
       }
 
-      const result = payload.data as {
+      let result: {
         refreshedHoldingCount: number;
         missingQuoteCount: number;
         sampledSymbolCount: number;
       };
+      try {
+        result = assertApiData(
+          payload,
+          (candidate) =>
+            typeof candidate === "object" &&
+            candidate !== null &&
+            "refreshedHoldingCount" in candidate &&
+            "missingQuoteCount" in candidate &&
+            "sampledSymbolCount" in candidate,
+          "Refresh succeeded but returned no usable refresh summary."
+        );
+      } catch (error) {
+        setStatus({ type: "error", message: error instanceof Error ? error.message : "Failed to refresh portfolio prices." });
+        return;
+      }
       setStatus({
         type: "success",
         message: `Refreshed ${result.refreshedHoldingCount} holdings across ${result.sampledSymbolCount} symbols.${result.missingQuoteCount > 0 ? ` Missing quotes for ${result.missingQuoteCount} symbols.` : ""}`

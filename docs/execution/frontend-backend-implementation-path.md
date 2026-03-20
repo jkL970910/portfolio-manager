@@ -12,6 +12,7 @@
 2. Keep pages static first: Dashboard, Portfolio, Recommendations, Spending, Import, Settings.
 3. Move page-specific sections into reusable components only after the shape stabilizes.
 4. Use server-side data fetching through route handlers or services instead of page-local fixtures.
+5. Use shared client-side API helpers for browser fetch flows so invalid JSON or partial payloads degrade to local UI errors instead of crashing the route.
 
 ## Backend path
 1. Keep API contracts stable by endpoint:
@@ -31,6 +32,7 @@
 - Build visual components and route-level pages.
 - Keep forms and import flows aligned to real API behavior.
 - Consume stable API envelopes from `app/api/*`.
+- Use `lib/client/api.ts` for `safeJson`, error extraction, and payload assertions in client components.
 
 ### Backend
 - Evolve schema from `docs/execution/backend-data-model.md`.
@@ -55,8 +57,10 @@ Implemented now:
 - database-backed CSV mapping presets
 - guided import flow with real account creation, manual holding entry, and single-account CSV import review/confirm
 - manual holdings entry with security search, normalization, and quote lookup
+- manual holdings entry with auto-calculated market value and optional override total value
 - portfolio batch quote refresh with persisted valuation updates
 - recommendation run generation and persistence
+- shared client-side API safety utilities applied across import, settings, recommendations, and portfolio action panels
 
 Still pending:
 

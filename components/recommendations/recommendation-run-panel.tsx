@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Wand2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { getApiErrorMessage, safeJson } from "@/lib/client/api";
 
 export function RecommendationRunPanel({ initialContributionAmount }: { initialContributionAmount: number }) {
   const router = useRouter();
@@ -20,9 +21,9 @@ export function RecommendationRunPanel({ initialContributionAmount }: { initialC
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ contributionAmountCad: Number(contributionAmount) })
       });
-      const payload = await response.json();
+      const payload = await safeJson(response);
       if (!response.ok) {
-        setStatus({ type: "error", message: payload.error ?? "Failed to generate recommendation run." });
+        setStatus({ type: "error", message: getApiErrorMessage(payload, "Failed to generate recommendation run.") });
         return;
       }
       setStatus({ type: "success", message: `Recommendation run generated for ${Number(contributionAmount).toLocaleString("en-CA")} CAD.` });

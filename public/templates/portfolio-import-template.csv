@@ -1,7 +1,5 @@
-record_type,account_key,account_type,institution,account_nickname,market_value_cad,contribution_room_cad,symbol,name,asset_class,sector,quantity,avg_cost_per_share_cad,cost_basis_cad,last_price_cad,weight_pct,gain_loss_pct,booked_at,merchant,category,amount_cad,direction
-account,tfsa_main,TFSA,Questrade,Main TFSA,20500,12000,,,,,,,,,,,,,,
-holding,tfsa_main,TFSA,Questrade,Main TFSA,14500,12000,VFV,Vanguard S&P 500 Index ETF,US Equity,Multi-sector,60,223.50,13410.00,241.67,70.73,8.13,,,,,
-holding,tfsa_main,TFSA,Questrade,Main TFSA,6000,12000,XBB,iShares Core Canadian Universe Bond Index ETF,Fixed Income,Fixed Income,200,28.80,5760.00,30.00,29.27,4.17,,,,,
-transaction,tfsa_main,TFSA,Questrade,Main TFSA,,,,,,,,,,,,,,,2026-03-05,Payroll,Income,5400,inflow
-transaction,tfsa_main,TFSA,Questrade,Main TFSA,,,,,,,,,,,,,,,2026-03-08,Loblaws,Groceries,182.44,outflow
-transaction,tfsa_main,TFSA,Questrade,Main TFSA,,,,,,,,,,,,,,,2026-03-12,Rent,Housing,1650,outflow
+record_type,account_key,account_type,institution,account_nickname,market_value_cad,contribution_room_cad,symbol,name,asset_class,sector,quantity,avg_cost_per_share_cad,cost_basis_cad,last_price_cad,weight_pct,gain_loss_pct
+account,tfsa_main,TFSA,Questrade,Main TFSA,20500,12000,,,,,,,,,,
+holding,tfsa_main,TFSA,Questrade,Main TFSA,14500,12000,VFV,Vanguard S&P 500 Index ETF,US Equity,Multi-sector,60,223.50,13410.00,241.67,70.73,8.13
+holding,tfsa_main,TFSA,Questrade,Main TFSA,6000,12000,XBB,iShares Core Canadian Universe Bond Index ETF,Fixed Income,Multi-sector,220,27.10,5962.00,27.28,29.27,0.64
+holding,tfsa_main,TFSA,Questrade,Main TFSA,1750,12000,CASH,High Interest Savings ETF,Cash,Cash,175,10.00,1750.00,,8.54,0.00

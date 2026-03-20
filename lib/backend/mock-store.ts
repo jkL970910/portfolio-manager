@@ -346,6 +346,7 @@ export const importJobs: ImportJob[] = [
   {
     id: "import_demo",
     userId: "user_demo",
+    workflow: "portfolio",
     status: "validated",
     sourceType: "csv",
     fileName: "questrade-holdings-march.csv",
@@ -354,6 +355,7 @@ export const importJobs: ImportJob[] = [
   {
     id: "import_casey",
     userId: "user_casey",
+    workflow: "portfolio",
     status: "mapped",
     sourceType: "csv",
     fileName: "wealthsimple-fhsa-march.csv",

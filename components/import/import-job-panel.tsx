@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { AlertTriangle, ArrowRightLeft, CheckCircle2, Eye, FileText, Pencil, Save, Trash2, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { assertApiData, getApiErrorMessage, safeJson } from "@/lib/client/api";
 
 const MAPPING_GROUPS = [
   { title: "Core", fields: ["record_type", "account_key"] },
@@ -192,11 +193,14 @@ function extractHoldingSymbolsForAudit(csvContent: string, mapping: Record<strin
 }
 
 export function ImportJobPanel({
-  latestJob
+  latestJob,
+  workflow = "portfolio"
 }: {
   latestJob: { status: string; fileName: string; createdAt: string } | null;
+  workflow?: "portfolio" | "spending";
 }) {
   const router = useRouter();
+  const endpoint = workflow === "portfolio" ? "/api/import/portfolio/jobs" : "/api/import/spending/jobs";
   const [isPending, startTransition] = useTransition();
   const [fileName, setFileName] = useState("broker-export.csv");
   const [csvContent, setCsvContent] = useState("");
@@ -218,8 +222,14 @@ export function ImportJobPanel({
 
   useEffect(() => {
     fetch("/api/import/presets")
-      .then((response) => response.ok ? response.json() : Promise.reject(new Error("Failed to load presets.")))
-      .then((payload) => setServerPresets(payload.data ?? []))
+      .then(async (response) => {
+        const payload = await safeJson(response);
+        if (!response.ok) {
+          throw new Error(getApiErrorMessage(payload, "Failed to load presets."));
+        }
+        return assertApiData<PresetRecord[]>(payload, Array.isArray, "Preset load succeeded but returned no usable preset list.");
+      })
+      .then((presets) => setServerPresets(presets))
       .catch(() => setServerPresets([]));
   }, []);
 
@@ -271,18 +281,29 @@ export function ImportJobPanel({
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ name: label.trim(), sourceType: "csv", mapping })
     });
-    const payload = await response.json();
+    const payload = await safeJson(response);
     if (!response.ok) {
-      setStatus({ type: "error", message: payload.error ?? "Failed to save preset." });
+      setStatus({ type: "error", message: getApiErrorMessage(payload, "Failed to save preset.") });
+      return;
+    }
+    let savedPreset: PresetRecord;
+    try {
+      savedPreset = assertApiData<PresetRecord>(
+        payload,
+        (candidate) => typeof candidate === "object" && candidate !== null && "id" in candidate && "name" in candidate,
+        "Preset save succeeded but returned no usable preset payload."
+      );
+    } catch {
+      setStatus({ type: "error", message: "Preset save succeeded but returned no usable preset payload." });
       return;
     }
 
     setServerPresets((current) => {
-      const next = [...current.filter((preset) => preset.id !== payload.data.id), payload.data];
+      const next = [...current.filter((preset) => preset.id !== savedPreset.id), savedPreset];
       return next;
     });
-    setSelectedPresetKey(payload.data.id);
-    setStatus({ type: "success", message: `Saved mapping preset "${payload.data.name}".` });
+    setSelectedPresetKey(savedPreset.id);
+    setStatus({ type: "success", message: `Saved mapping preset "${savedPreset.name}".` });
   }
 
   async function renameSelectedPreset() {
@@ -300,14 +321,26 @@ export function ImportJobPanel({
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ name: nextName.trim() })
     });
-    const payload = await response.json();
+    const payload = await safeJson(response);
     if (!response.ok) {
-      setStatus({ type: "error", message: payload.error ?? "Failed to rename preset." });
+      setStatus({ type: "error", message: getApiErrorMessage(payload, "Failed to rename preset.") });
       return;
     }
 
-    setServerPresets((current) => current.map((preset) => preset.id === selectedServerPreset.id ? payload.data : preset));
-    setStatus({ type: "success", message: `Renamed preset to "${payload.data.name}".` });
+    let renamedPreset: PresetRecord;
+    try {
+      renamedPreset = assertApiData<PresetRecord>(
+        payload,
+        (candidate) => typeof candidate === "object" && candidate !== null && "id" in candidate && "name" in candidate,
+        "Preset rename succeeded but returned no usable preset payload."
+      );
+    } catch {
+      setStatus({ type: "error", message: "Preset rename succeeded but returned no usable preset payload." });
+      return;
+    }
+
+    setServerPresets((current) => current.map((preset) => preset.id === selectedServerPreset.id ? renamedPreset : preset));
+    setStatus({ type: "success", message: `Renamed preset to "${renamedPreset.name}".` });
   }
 
   async function deleteSelectedPreset() {
@@ -323,9 +356,9 @@ export function ImportJobPanel({
     const response = await fetch(`/api/import/presets/${selectedServerPreset.id}`, {
       method: "DELETE"
     });
-    const payload = await response.json();
+    const payload = await safeJson(response);
     if (!response.ok) {
-      setStatus({ type: "error", message: payload.error ?? "Failed to delete preset." });
+      setStatus({ type: "error", message: getApiErrorMessage(payload, "Failed to delete preset.") });
       return;
     }
 
@@ -373,11 +406,12 @@ export function ImportJobPanel({
 
     const sanitizedFieldMapping = Object.fromEntries(Object.entries(fieldMapping).filter(([, value]) => value));
 
-    const response = await fetch("/api/import/jobs", {
+    const response = await fetch(endpoint, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         fileName,
+        workflow,
         sourceType: "csv",
         csvContent: csvContent || undefined,
         fieldMapping: csvContent ? sanitizedFieldMapping : undefined,
@@ -385,13 +419,23 @@ export function ImportJobPanel({
         dryRun: true
       })
     });
-    const payload = await response.json();
+    const payload = await safeJson(response);
     if (!response.ok) {
-      setStatus({ type: "error", message: payload.error ?? "Validation failed." });
+      setStatus({ type: "error", message: getApiErrorMessage(payload, "Validation failed.") });
       return;
     }
 
-    const result = payload.data as ReviewState;
+    let result: ReviewState;
+    try {
+      result = assertApiData<ReviewState>(
+        payload,
+        (candidate) => typeof candidate === "object" && candidate !== null && "summary" in candidate && "review" in candidate && "validationErrors" in candidate,
+        "Validation succeeded but returned no usable review payload."
+      );
+    } catch (error) {
+      setStatus({ type: "error", message: error instanceof Error ? error.message : "Validation failed." });
+      return;
+    }
     setValidationErrors(result.validationErrors ?? []);
     setReviewState(result);
     if ((result.validationErrors ?? []).length > 0) {
@@ -419,18 +463,22 @@ export function ImportJobPanel({
         ...sampledSymbols.map((symbol) => fetch(`/api/market-data/resolve?symbol=${encodeURIComponent(symbol)}`))
       ]);
 
-      const quotesPayload = await quotesResponse.json();
+      const quotesPayload = await safeJson(quotesResponse);
       if (!quotesResponse.ok) {
-        throw new Error(quotesPayload.error ?? "Batch quote audit failed.");
+        throw new Error(getApiErrorMessage(quotesPayload, "Batch quote audit failed."));
       }
 
       const quoteMap = new Map<string, { price: number; delayed: boolean }>(
-        ((quotesPayload.data?.results ?? []) as Array<{ symbol: string; price: number; delayed: boolean }>)
+        ((assertApiData<{ results?: Array<{ symbol: string; price: number; delayed: boolean }> }>(
+          quotesPayload,
+          (candidate) => typeof candidate === "object" && candidate !== null,
+          "Batch quote audit succeeded but returned no usable quote payload."
+        ).results ?? []) as Array<{ symbol: string; price: number; delayed: boolean }>)
           .map((quote) => [quote.symbol.toUpperCase(), { price: Number(quote.price), delayed: Boolean(quote.delayed) }])
       );
 
       const resolvedRecords = await Promise.all(resolveResponses.map(async (response, index) => {
-        const payload = await response.json();
+        const payload = await safeJson(response);
         if (!response.ok) {
           return {
             requestedSymbol: sampledSymbols[index],
@@ -440,12 +488,19 @@ export function ImportJobPanel({
             quotePrice: quoteMap.get(sampledSymbols[index])?.price ?? null,
             delayed: quoteMap.get(sampledSymbols[index])?.delayed ?? true,
             hasWarning: true,
-            warningMessage: payload.error ?? "Normalization failed."
+            warningMessage: getApiErrorMessage(payload, "Normalization failed.")
           } satisfies SymbolAuditRecord;
         }
 
-        const result = payload.data?.result;
-        const normalizedSymbol = (result.symbol ?? sampledSymbols[index]).toUpperCase();
+        const data = assertApiData<{ result?: { symbol?: string; name?: string; provider?: string } }>(
+          payload,
+          (candidate) => typeof candidate === "object" && candidate !== null,
+          "Normalization audit succeeded but returned no usable normalization payload."
+        );
+        const result = data.result;
+        const normalizedSymbol = typeof result?.symbol === "string" && result.symbol.trim().length > 0
+          ? result.symbol.toUpperCase()
+          : sampledSymbols[index];
         const quote = quoteMap.get(normalizedSymbol) ?? quoteMap.get(sampledSymbols[index]);
         const warningMessage = normalizedSymbol !== sampledSymbols[index]
           ? `Normalized from ${sampledSymbols[index]} to ${normalizedSymbol}.`
@@ -456,8 +511,8 @@ export function ImportJobPanel({
         return {
           requestedSymbol: sampledSymbols[index],
           normalizedSymbol,
-          name: result.name ?? normalizedSymbol,
-          provider: result.provider ?? "fallback",
+          name: typeof result?.name === "string" && result.name.trim().length > 0 ? result.name : normalizedSymbol,
+          provider: typeof result?.provider === "string" && result.provider.trim().length > 0 ? result.provider : "fallback",
           quotePrice: quote?.price ?? null,
           delayed: quote?.delayed ?? true,
           hasWarning: Boolean(warningMessage),
@@ -509,11 +564,12 @@ export function ImportJobPanel({
     setStatus({ type: "idle", message: "" });
 
     startTransition(async () => {
-      const response = await fetch("/api/import/jobs", {
+      const response = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           fileName,
+          workflow,
           sourceType: "csv",
           csvContent: csvContent || undefined,
           fieldMapping: csvContent ? sanitizedFieldMapping : undefined,
@@ -522,13 +578,23 @@ export function ImportJobPanel({
           dryRun: false
         })
       });
-      const payload = await response.json();
+      const payload = await safeJson(response);
       if (!response.ok) {
-        setStatus({ type: "error", message: payload.error ?? "Failed to import CSV." });
+        setStatus({ type: "error", message: getApiErrorMessage(payload, "Failed to import CSV.") });
         return;
       }
 
-      const result = payload.data;
+      let result: { summary: ReviewState["summary"]; job: { fileName: string }; autoRecommendationRun?: { contributionAmountCad: number } | null };
+      try {
+        result = assertApiData(
+          payload,
+          (candidate) => typeof candidate === "object" && candidate !== null && "summary" in candidate && "job" in candidate,
+          "Import succeeded but returned no usable import result."
+        );
+      } catch (error) {
+        setStatus({ type: "error", message: error instanceof Error ? error.message : "Failed to import CSV." });
+        return;
+      }
       const recommendationMessage = result.autoRecommendationRun
         ? ` Auto-refreshed recommendation run for ${Number(result.autoRecommendationRun.contributionAmountCad).toLocaleString("en-CA")} CAD.`
         : "";
@@ -726,6 +792,9 @@ export function ImportJobPanel({
           </div>
           <p className="text-sm text-[#21613f]">
             Mode: {reviewState.review.importMode}. Validation passed. Confirm to write these changes into the current signed-in user&apos;s database records.
+          </p>
+          <p className="text-sm text-[#21613f]">
+            Valuation rule: if a holding row includes <code>market_value_cad</code>, that explicit total value is written and takes priority over any derived value from <code>quantity x last_price_cad</code>.
           </p>
           {symbolAudit?.records?.length ? (
             <div className="rounded-2xl border border-[#b6d7c7] bg-white px-4 py-3 text-sm text-[#21613f]">

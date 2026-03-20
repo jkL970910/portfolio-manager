@@ -1,11 +1,13 @@
 import { hash } from "bcryptjs";
-import { and, eq } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import { apiSuccess } from "@/lib/backend/contracts";
 import { ImportFieldMapping, ImportValidationError, parseImportCsv } from "@/lib/backend/csv-import";
 import { getRepositories } from "@/lib/backend/repositories/factory";
 import {
   AllocationTarget,
   CashflowTransaction,
+  GuidedAllocationAnswers,
+  GuidedAllocationDraft,
   PreferenceProfile,
   RecommendationRun,
   RiskProfile,
@@ -26,6 +28,7 @@ import { getDb } from "@/lib/db/client";
 import {
   allocationTargets,
   cashflowTransactions,
+  guidedAllocationDrafts,
   holdingPositions,
   importJobs,
   importMappingPresets,
@@ -55,8 +58,16 @@ export interface RegisterUserInput {
   displayName: string;
 }
 
+export interface SaveGuidedAllocationDraftInput {
+  answers: GuidedAllocationAnswers;
+  suggestedProfile: Omit<PreferenceProfile, "id" | "userId" | "watchlistSymbols">;
+  assumptions: string[];
+  rationale: string[];
+}
+
 export interface CreateImportJobInput {
   fileName: string;
+  workflow: "portfolio" | "spending";
   sourceType: "csv";
   csvContent?: string;
   fieldMapping?: ImportFieldMapping;
@@ -350,6 +361,77 @@ function applySymbolCorrectionsToParsedImport(
   };
 }
 
+function normalizeMappedHeader(value: string) {
+  return value.trim().toLowerCase().replace(/\s+/g, "_");
+}
+
+function splitCsvLinePreservingQuotes(line: string) {
+  const values: string[] = [];
+  let current = "";
+  let inQuotes = false;
+
+  for (let index = 0; index < line.length; index += 1) {
+    const character = line[index];
+    const nextCharacter = line[index + 1];
+
+    if (character === "\"") {
+      if (inQuotes && nextCharacter === "\"") {
+        current += "\"";
+        index += 1;
+      } else {
+        inQuotes = !inQuotes;
+      }
+      continue;
+    }
+
+    if (character === "," && !inQuotes) {
+      values.push(current.trim());
+      current = "";
+      continue;
+    }
+
+    current += character;
+  }
+
+  values.push(current.trim());
+  return values;
+}
+
+function filterCsvContentByWorkflow(
+  csvContent: string,
+  fieldMapping: ImportFieldMapping | undefined,
+  workflow: CreateImportJobInput["workflow"]
+) {
+  const lines = csvContent
+    .replace(/^\uFEFF/, "")
+    .split(/\r?\n/)
+    .filter((line) => line.trim());
+
+  if (lines.length < 2) {
+    return csvContent;
+  }
+
+  const rawHeaders = splitCsvLinePreservingQuotes(lines[0]);
+  const recordTypeHeader = normalizeMappedHeader(fieldMapping?.record_type ?? "record_type");
+  const recordTypeIndex = rawHeaders.map(normalizeMappedHeader).indexOf(recordTypeHeader);
+
+  if (recordTypeIndex === -1) {
+    return csvContent;
+  }
+
+  const allowedRecordTypes = workflow === "spending"
+    ? new Set(["transaction"])
+    : new Set(["account", "holding"]);
+
+  const keptRows = lines.slice(1).filter((line) => {
+    const values = splitCsvLinePreservingQuotes(line);
+    const recordType = (values[recordTypeIndex] ?? "").trim().toLowerCase();
+    return allowedRecordTypes.has(recordType);
+  });
+
+  return [lines[0], ...keptRows].join("\n");
+}
+
 export async function getDashboardView(userId: string) {
   const repositories = getRepositories();
   const user = await repositories.users.getById(userId);
@@ -437,27 +519,126 @@ export async function getSpendingView(userId: string) {
 export async function getImportView(userId: string) {
   const repositories = getRepositories();
   const userAccounts = await repositories.accounts.listByUserId(userId);
-  let latestJob = null;
-  try {
-    latestJob = await repositories.importJobs.getLatestByUserId(userId);
-  } catch {
-    latestJob = null;
-  }
+  const db = getDb();
+  const [latestPortfolioRow, latestSpendingRow] = await Promise.all([
+    db.query.importJobs.findFirst({
+      where: and(eq(importJobs.userId, userId), eq(importJobs.workflow, "portfolio")),
+      orderBy: desc(importJobs.createdAt)
+    }),
+    db.query.importJobs.findFirst({
+      where: and(eq(importJobs.userId, userId), eq(importJobs.workflow, "spending")),
+      orderBy: desc(importJobs.createdAt)
+    })
+  ]);
+
+  const latestPortfolioJob = latestPortfolioRow ? {
+    id: latestPortfolioRow.id,
+    userId: latestPortfolioRow.userId,
+    workflow: latestPortfolioRow.workflow as ImportJob["workflow"],
+    status: latestPortfolioRow.status as ImportJob["status"],
+    sourceType: latestPortfolioRow.sourceType as "csv",
+    fileName: latestPortfolioRow.fileName,
+    createdAt: latestPortfolioRow.createdAt.toISOString()
+  } : null;
+
+  const latestSpendingJob = latestSpendingRow ? {
+    id: latestSpendingRow.id,
+    userId: latestSpendingRow.userId,
+    workflow: latestSpendingRow.workflow as ImportJob["workflow"],
+    status: latestSpendingRow.status as ImportJob["status"],
+    sourceType: latestSpendingRow.sourceType as "csv",
+    fileName: latestSpendingRow.fileName,
+    createdAt: latestSpendingRow.createdAt.toISOString()
+  } : null;
 
   return apiSuccess({
-    ...buildImportData({ latestJob, accounts: userAccounts }),
-    latestJob
+    ...buildImportData({ latestPortfolioJob, latestSpendingJob, accounts: userAccounts }),
+    latestPortfolioJob,
+    latestSpendingJob
   }, "database");
 }
 
 export async function getPreferenceView(userId: string) {
   const repositories = getRepositories();
   const profile = await repositories.preferences.getByUserId(userId);
+  const db = getDb();
+  const guidedDraftRow = await db.query.guidedAllocationDrafts.findFirst({
+    where: eq(guidedAllocationDrafts.userId, userId)
+  });
+
+  const guidedDraft = guidedDraftRow ? {
+    id: guidedDraftRow.id,
+    userId: guidedDraftRow.userId,
+    answers: guidedDraftRow.answers as GuidedAllocationAnswers,
+    suggestedProfile: guidedDraftRow.suggestedProfile as Omit<PreferenceProfile, "id" | "userId" | "watchlistSymbols">,
+    assumptions: guidedDraftRow.assumptions as string[],
+    rationale: guidedDraftRow.rationale as string[],
+    createdAt: guidedDraftRow.createdAt.toISOString(),
+    updatedAt: guidedDraftRow.updatedAt.toISOString()
+  } satisfies GuidedAllocationDraft : null;
 
   return apiSuccess({
     ...buildSettingsData(profile),
-    profile
+    profile,
+    guidedDraft
   }, "database");
+}
+
+export async function saveGuidedAllocationDraft(
+  userId: string,
+  input: SaveGuidedAllocationDraftInput
+): Promise<GuidedAllocationDraft> {
+  const db = getDb();
+  const existing = await db.query.guidedAllocationDrafts.findFirst({
+    where: eq(guidedAllocationDrafts.userId, userId)
+  });
+
+  if (existing) {
+    const [updated] = await db
+      .update(guidedAllocationDrafts)
+      .set({
+        answers: input.answers,
+        suggestedProfile: input.suggestedProfile,
+        assumptions: input.assumptions,
+        rationale: input.rationale,
+        updatedAt: new Date()
+      })
+      .where(eq(guidedAllocationDrafts.id, existing.id))
+      .returning();
+
+    return {
+      id: updated.id,
+      userId: updated.userId,
+      answers: updated.answers as GuidedAllocationAnswers,
+      suggestedProfile: updated.suggestedProfile as Omit<PreferenceProfile, "id" | "userId" | "watchlistSymbols">,
+      assumptions: updated.assumptions as string[],
+      rationale: updated.rationale as string[],
+      createdAt: updated.createdAt.toISOString(),
+      updatedAt: updated.updatedAt.toISOString()
+    };
+  }
+
+  const [created] = await db
+    .insert(guidedAllocationDrafts)
+    .values({
+      userId,
+      answers: input.answers,
+      suggestedProfile: input.suggestedProfile,
+      assumptions: input.assumptions,
+      rationale: input.rationale
+    })
+    .returning();
+
+  return {
+    id: created.id,
+    userId: created.userId,
+    answers: created.answers as GuidedAllocationAnswers,
+    suggestedProfile: created.suggestedProfile as Omit<PreferenceProfile, "id" | "userId" | "watchlistSymbols">,
+    assumptions: created.assumptions as string[],
+    rationale: created.rationale as string[],
+    createdAt: created.createdAt.toISOString(),
+    updatedAt: created.updatedAt.toISOString()
+  };
 }
 
 export async function listImportMappingPresets(userId: string): Promise<ImportMappingPreset[]> {
@@ -694,6 +875,7 @@ export async function registerUserAccount(input: RegisterUserInput): Promise<Use
 
     await tx.insert(importJobs).values({
       userId: userRow.id,
+      workflow: "portfolio",
       status: "draft",
       sourceType: "csv",
       fileName: "awaiting-first-import.csv"
@@ -716,6 +898,7 @@ export async function createImportJob(userId: string, input: CreateImportJobInpu
       .insert(importJobs)
       .values({
         userId,
+        workflow: input.workflow,
         status: "draft",
         sourceType: input.sourceType,
         fileName: input.fileName
@@ -726,6 +909,7 @@ export async function createImportJob(userId: string, input: CreateImportJobInpu
       job: {
         id: jobRow.id,
         userId: jobRow.userId,
+        workflow: jobRow.workflow as ImportJob["workflow"],
         status: jobRow.status as ImportJob["status"],
         sourceType: jobRow.sourceType as "csv",
         fileName: jobRow.fileName,
@@ -747,13 +931,25 @@ export async function createImportJob(userId: string, input: CreateImportJobInpu
   }
 
   const parsed = applySymbolCorrectionsToParsedImport(
-    parseImportCsv(input.csvContent, input.fieldMapping ?? {}),
+    parseImportCsv(filterCsvContentByWorkflow(input.csvContent, input.fieldMapping, input.workflow), input.fieldMapping ?? {}),
     input.symbolCorrections
   );
+  const workflowScopedParsed = input.workflow === "spending"
+    ? { ...parsed, accounts: [], holdings: [] }
+    : { ...parsed, transactions: [] };
+
+  if (input.workflow === "portfolio" && workflowScopedParsed.accounts.length === 0 && workflowScopedParsed.holdings.length === 0) {
+    throw new Error("Portfolio import requires at least one account or holding row.");
+  }
+
+  if (input.workflow === "spending" && workflowScopedParsed.transactions.length === 0) {
+    throw new Error("Spending import requires at least one transaction row.");
+  }
+
   const review = {
     importMode: input.importMode,
-    detectedHeaders: parsed.detectedHeaders,
-    rowCount: parsed.accounts.length + parsed.holdings.length + parsed.transactions.length
+    detectedHeaders: workflowScopedParsed.detectedHeaders,
+    rowCount: workflowScopedParsed.accounts.length + workflowScopedParsed.holdings.length + workflowScopedParsed.transactions.length
   };
 
   if (input.dryRun) {
@@ -761,15 +957,16 @@ export async function createImportJob(userId: string, input: CreateImportJobInpu
       job: {
         id: "dry-run",
         userId,
+        workflow: input.workflow,
         status: parsed.validationErrors.length > 0 ? "draft" : "validated",
         sourceType: input.sourceType,
         fileName: input.fileName,
         createdAt: new Date().toISOString()
       },
       summary: {
-        accountsImported: parsed.accounts.length,
-        holdingsImported: parsed.holdings.length,
-        transactionsImported: parsed.transactions.length
+        accountsImported: workflowScopedParsed.accounts.length,
+        holdingsImported: workflowScopedParsed.holdings.length,
+        transactionsImported: workflowScopedParsed.transactions.length
       },
       validationErrors: parsed.validationErrors,
       autoRecommendationRun: null,
@@ -782,6 +979,7 @@ export async function createImportJob(userId: string, input: CreateImportJobInpu
       .insert(importJobs)
       .values({
         userId,
+        workflow: input.workflow,
         status: "draft",
         sourceType: input.sourceType,
         fileName: input.fileName
@@ -792,6 +990,7 @@ export async function createImportJob(userId: string, input: CreateImportJobInpu
       job: {
         id: jobRow.id,
         userId: jobRow.userId,
+        workflow: jobRow.workflow as ImportJob["workflow"],
         status: jobRow.status as ImportJob["status"],
         sourceType: jobRow.sourceType as "csv",
         fileName: jobRow.fileName,
@@ -814,6 +1013,7 @@ export async function createImportJob(userId: string, input: CreateImportJobInpu
       .insert(importJobs)
       .values({
         userId,
+        workflow: input.workflow,
         status: "completed",
         sourceType: input.sourceType,
         fileName: input.fileName
@@ -821,9 +1021,12 @@ export async function createImportJob(userId: string, input: CreateImportJobInpu
       .returning();
 
     if (isReplaceMode) {
-      await tx.delete(cashflowTransactions).where(eq(cashflowTransactions.userId, userId));
-      await tx.delete(holdingPositions).where(eq(holdingPositions.userId, userId));
-      await tx.delete(investmentAccounts).where(eq(investmentAccounts.userId, userId));
+      if (input.workflow === "portfolio") {
+        await tx.delete(holdingPositions).where(eq(holdingPositions.userId, userId));
+        await tx.delete(investmentAccounts).where(eq(investmentAccounts.userId, userId));
+      } else {
+        await tx.delete(cashflowTransactions).where(eq(cashflowTransactions.userId, userId));
+      }
     }
 
     const existingAccounts = isReplaceMode
@@ -843,7 +1046,7 @@ export async function createImportJob(userId: string, input: CreateImportJobInpu
     }), account]));
 
     const accountIdByKey = new Map<string, string>();
-    const accountsToInsert = parsed.accounts.filter((account) => {
+    const accountsToInsert = workflowScopedParsed.accounts.filter((account) => {
       const matched = existingAccountByKey.get(accountMatchKey(account));
       if (matched) {
         accountIdByKey.set(account.accountKey, matched.id);
@@ -873,7 +1076,7 @@ export async function createImportJob(userId: string, input: CreateImportJobInpu
     });
 
     if (!isReplaceMode) {
-      for (const account of parsed.accounts) {
+    for (const account of workflowScopedParsed.accounts) {
         const matched = existingAccountByKey.get(accountMatchKey(account));
         if (matched) {
           await tx
@@ -905,7 +1108,7 @@ export async function createImportJob(userId: string, input: CreateImportJobInpu
       gainLossPct: string;
     }> = [];
 
-    for (const holding of parsed.holdings) {
+    for (const holding of workflowScopedParsed.holdings) {
       const accountId = accountIdByKey.get(holding.accountKey);
       if (!accountId) {
         throw new Error(`Holding ${holding.symbol} references unknown account_key ${holding.accountKey}.`);
@@ -973,9 +1176,9 @@ export async function createImportJob(userId: string, input: CreateImportJobInpu
       direction: "inflow" | "outflow";
     }> = [];
 
-    for (const transaction of parsed.transactions) {
+    for (const transaction of workflowScopedParsed.transactions) {
       const accountId = transaction.accountKey ? accountIdByKey.get(transaction.accountKey) ?? null : null;
-      if (transaction.accountKey && !accountId) {
+      if (input.workflow !== "spending" && transaction.accountKey && !accountId) {
         throw new Error(`Transaction ${transaction.merchant} references unknown account_key ${transaction.accountKey}.`);
       }
 
@@ -1005,28 +1208,29 @@ export async function createImportJob(userId: string, input: CreateImportJobInpu
       await tx.insert(cashflowTransactions).values(transactionsToInsert);
     }
 
-    return {
-      job: {
-        id: jobRow.id,
-        userId: jobRow.userId,
-        status: jobRow.status as ImportJob["status"],
-        sourceType: jobRow.sourceType as "csv",
-        fileName: jobRow.fileName,
+      return {
+        job: {
+          id: jobRow.id,
+          userId: jobRow.userId,
+          workflow: jobRow.workflow as ImportJob["workflow"],
+          status: jobRow.status as ImportJob["status"],
+          sourceType: jobRow.sourceType as "csv",
+          fileName: jobRow.fileName,
         createdAt: jobRow.createdAt.toISOString()
-      },
-      summary: {
-        accountsImported: isReplaceMode ? parsed.accounts.length : accountsToInsert.length,
-        holdingsImported: isReplaceMode ? parsed.holdings.length : holdingsToInsert.length,
-        transactionsImported: isReplaceMode ? parsed.transactions.length : transactionsToInsert.length
-      },
-      validationErrors: [],
-      autoRecommendationRun: null,
-      review
-    };
+        },
+        summary: {
+          accountsImported: isReplaceMode ? workflowScopedParsed.accounts.length : accountsToInsert.length,
+          holdingsImported: isReplaceMode ? workflowScopedParsed.holdings.length : holdingsToInsert.length,
+          transactionsImported: isReplaceMode ? workflowScopedParsed.transactions.length : transactionsToInsert.length
+        },
+        validationErrors: [],
+        autoRecommendationRun: null,
+        review
+      };
   });
 
   let autoRecommendationRun: CreateImportJobResult["autoRecommendationRun"] = null;
-  if (result.summary.accountsImported > 0 && result.summary.holdingsImported > 0) {
+  if (input.workflow === "portfolio" && result.summary.accountsImported > 0 && result.summary.holdingsImported > 0) {
     try {
       const repositories = getRepositories();
       const [profile, transactions] = await Promise.all([
@@ -1171,6 +1375,7 @@ export async function createGuidedImportAccount(userId: string, input: CreateGui
         .insert(importJobs)
         .values({
           userId,
+          workflow: "portfolio",
           status: "draft",
           sourceType: "csv",
           fileName: `guided-${input.accountType.toLowerCase()}-${input.nickname.replace(/\s+/g, "-").toLowerCase()}.csv`
@@ -1180,6 +1385,7 @@ export async function createGuidedImportAccount(userId: string, input: CreateGui
       importJob = {
         id: jobRow.id,
         userId: jobRow.userId,
+        workflow: jobRow.workflow as ImportJob["workflow"],
         status: jobRow.status as ImportJob["status"],
         sourceType: jobRow.sourceType as "csv",
         fileName: jobRow.fileName,

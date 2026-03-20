@@ -23,6 +23,7 @@ export default async function SettingsPage() {
       </Card>
       <PreferencesWorkbench
         initialProfile={data.profile}
+        initialGuidedDraft={data.guidedDraft}
         guidedQuestions={data.guidedQuestions}
         manualGroups={data.manualGroups}
       />

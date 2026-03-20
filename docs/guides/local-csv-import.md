@@ -2,21 +2,54 @@
 
 ## Goal
 
-Use a local broker export CSV to review, validate, and then write the current signed-in user's accounts, holdings, and transactions into the Portfolio Manager database.
+Use local CSV files to import either:
 
-## Supported Row Types
+- portfolio account and holding data
+- spending transaction data
 
-The importer accepts one flat CSV with a `record_type` column.
+These are now separate workflows in the app. They intentionally use separate frontend and backend entry points so future broker integrations and future bank/card integrations can evolve independently.
+
+## Import Workflow Split
+
+### Portfolio Import
+Use this for:
+- account rows
+- holding rows
+- guided onboarding for a single account
+- manual holding entry
+
+This workflow updates:
+- `investment_accounts`
+- `holding_positions`
+- recommendation baseline refresh when portfolio data changes materially
+
+### Spending Import
+Use this for:
+- transaction rows only
+- spending, inflow, and category history
+
+This workflow updates:
+- `cashflow_transactions`
+
+It does not overwrite:
+- holdings
+- portfolio accounts
+- recommendation runs directly
+
+## Portfolio CSV
+
+### Supported Row Types
+
+The portfolio importer accepts these row types:
 
 - `account`
 - `holding`
-- `transaction`
 
-Each row type can share the same file. Rows are linked with `account_key`.
+Rows are linked with `account_key`.
 
-## Canonical Holding Model
+### Canonical Holding Model
 
-The current import model treats a holding as:
+The current holding model treats a holding as:
 
 - account identity
 - ticker symbol
@@ -27,33 +60,19 @@ The current import model treats a holding as:
 - average cost per share
 - optional explicit cost basis
 - optional current price
-- optional explicit current market value
+- optional explicit current market value override
 
 The importer will derive missing values when enough fields are available.
 
-## Quick Start
+In the CSV workflow, the canonical field name is still `market_value_cad`.
+That field now serves the same purpose as the UI's `Override total value`:
 
-1. Start the app:
+- if `market_value_cad` is present and greater than `0`, it is treated as the explicit total position value
+- if `market_value_cad` is empty, the importer falls back to `quantity x last_price_cad`
 
-```powershell
-npm run local:start
-```
+### Guided Setup
 
-2. Open the import page:
-
-```text
-http://localhost:3000/import
-```
-
-3. Download the starter template:
-
-```text
-/templates/portfolio-import-template.csv
-```
-
-## Guided Setup
-
-### Single-account CSV
+#### Single-account CSV
 
 Use this when you want to onboard one account at a time.
 
@@ -67,7 +86,7 @@ Use this when you want to onboard one account at a time.
 8. Review parsed counts and row-level issues
 9. Click `Confirm guided setup` to run the real merge import
 
-### Manual Entry
+#### Manual Entry
 
 Use this when you want to add holdings without a broker export.
 
@@ -87,15 +106,23 @@ Use this when you want to add holdings without a broker export.
    - sector
    - quantity
    - average cost per share
-   - current price or current market value
+   - current price
+   - optional override total value
 8. Review the write
 9. Confirm the write to upsert holdings into the target account
 
 Manual entry no longer asks for gain/loss directly. The application derives it from cost basis and valuation inputs.
 
-## Direct CSV Import
+`Current market value` is now a read-only derived field:
 
-Use this when your broker export already contains multiple accounts, holdings, and transactions in one file.
+- normal path: `quantity x current price`
+- override path: `override total value`
+
+Use `Override total value` only when you intentionally want to replace the computed total position value.
+
+### Direct Portfolio CSV Import
+
+Use this when your broker export already contains multiple accounts and holdings in one file.
 
 1. Upload the file
 2. Review the preview
@@ -113,14 +140,22 @@ Use this when your broker export already contains multiple accounts, holdings, a
 8. If needed, override symbol or name for flagged securities
 9. Click `Confirm import` to write the changes into the database
 
-## Minimum Required Fields
+### Portfolio Template
 
-### Core
+Download:
+
+```text
+/templates/portfolio-import-template.csv
+```
+
+### Portfolio Minimum Required Fields
+
+#### Core
 
 - `record_type`
 - `account_key`
 
-### Account Rows
+#### Account Rows
 
 Required:
 
@@ -133,7 +168,7 @@ Optional:
 - `market_value_cad`
 - `contribution_room_cad`
 
-### Holding Rows
+#### Holding Rows
 
 Required:
 
@@ -153,40 +188,56 @@ Optional:
 - `weight_pct`
 - `gain_loss_pct`
 
-### Transaction Rows
+`market_value_cad` has higher priority than `quantity x last_price_cad`.
+Use it when you want to explicitly override the computed total value for the holding.
+
+## Spending CSV
+
+### Supported Row Types
+
+The spending importer accepts:
+
+- `transaction`
+
+`account_key` is optional at the workflow level, but still available when you want to preserve a source-level account reference.
+
+### Direct Spending CSV Import
+
+Use this when you want to import cash-flow history separately from portfolio positions.
+
+1. Open `Spending Import`
+2. Upload the file
+3. Review the preview
+4. Map transaction fields if needed
+5. Choose import mode:
+   - `Merge`
+   - `Replace`
+6. Click `Validate and review spending import`
+7. Review transaction counts and row-level issues
+8. Click `Confirm spending import`
+
+### Spending Template
+
+Download:
+
+```text
+/templates/spending-import-template.csv
+```
+
+### Spending Minimum Required Fields
 
 Required:
 
+- `record_type`
 - `booked_at`
 - `merchant`
 - `category`
 - `amount_cad`
 - `direction`
 
-## Example
+Optional:
 
-```csv
-record_type,account_key,account_type,institution,account_nickname,market_value_cad,contribution_room_cad,symbol,name,asset_class,sector,quantity,avg_cost_per_share_cad,cost_basis_cad,last_price_cad,weight_pct,gain_loss_pct,booked_at,merchant,category,amount_cad,direction
-account,tfsa_main,TFSA,Questrade,Main TFSA,20500,12000,,,,,,,,,,,,,,
-holding,tfsa_main,TFSA,Questrade,Main TFSA,14500,12000,VFV,Vanguard S&P 500 Index ETF,US Equity,Multi-sector,60,223.50,13410.00,241.67,70.73,8.13,,,,,
-transaction,tfsa_main,TFSA,Questrade,Main TFSA,,,,,,,,,,,,,2026-03-08,Loblaws,Groceries,182.44,outflow
-```
-
-## What Happens On Import
-
-If validation passes and you confirm the write:
-
-1. A completed `import_job` is created.
-2. Accounts are created or matched in user scope.
-3. Holdings are inserted or updated in user scope.
-4. Transactions are inserted in user scope.
-5. A new baseline recommendation run is generated automatically.
-
-If validation fails:
-
-1. A draft `import_job` is created.
-2. No portfolio data is replaced.
-3. Row-level validation errors are shown in the UI.
+- `account_key`
 
 ## Validation Rules
 
@@ -194,25 +245,15 @@ If validation fails:
 - `direction` must be `inflow` or `outflow`
 - `booked_at` must use `YYYY-MM-DD`
 - numeric fields must be parseable after removing `$` and commas
-- each `holding` row and `account` row must include `account_key`
+- each portfolio `holding` row and `account` row must include `account_key`
 - each holding must provide either:
   - `market_value_cad`
   - or `quantity` plus `last_price_cad`
-
-## Field Mapping
-
-If your broker export uses different header names:
-
-1. Upload the CSV
-2. Review detected headers
-3. Map each canonical field to the broker column
-4. Re-run validation
-
-The importer prefills any exact header matches automatically.
+- if both `market_value_cad` and `quantity + last_price_cad` are present, `market_value_cad` wins
 
 ## Mapping Presets
 
-The import screen supports:
+The portfolio import screen supports:
 
 - built-in presets
 - exact-header auto-detect
@@ -220,11 +261,11 @@ The import screen supports:
 
 Use `Save current preset` after you finish a custom mapping. The preset is stored in the Portfolio Manager database and can be reused by the same signed-in user on any machine.
 
-Saved presets can also be renamed or deleted from the direct import screen.
+Saved presets can also be renamed or deleted from the direct portfolio import screen.
 
 ## Symbol Audit
 
-Direct CSV import now performs a symbol audit during review.
+Direct portfolio CSV import performs a symbol audit during review.
 
 This review can show:
 
@@ -244,7 +285,7 @@ The preferred source fields are:
 - quantity
 - average cost per share
 - current price
-- or current market value
+- optional override total value
 
 From these, the importer can derive:
 

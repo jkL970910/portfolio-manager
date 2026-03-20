@@ -11,12 +11,14 @@ export default async function ImportPage() {
     <AppShell
       viewer={viewer}
       title="Import"
-      description="Choose between a guided account-by-account onboarding flow and a direct CSV import path for bulk broker exports."
+      description="Portfolio and spending imports now run as separate workflows. Portfolio onboarding stays account-and-holding focused, while spending imports remain transaction focused and ready for future bank or card provider integrations. For portfolio holdings, explicit total value takes priority over any value derived from quantity and price."
     >
       <ImportExperience
-        latestJob={data.latestJob}
-        steps={data.steps}
-        successStates={data.successStates}
+        latestPortfolioJob={data.latestPortfolioJob}
+        latestSpendingJob={data.latestSpendingJob}
+        portfolioSteps={data.portfolioSteps}
+        portfolioSuccessStates={data.portfolioSuccessStates}
+        spendingSuccessStates={data.spendingSuccessStates}
         existingAccounts={data.existingAccounts}
       />
     </AppShell>

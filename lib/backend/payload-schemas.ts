@@ -36,6 +36,7 @@ export const registerUserInputSchema = z.object({
 
 export const importJobCreateSchema = z.object({
   fileName: z.string().trim().min(3).max(255),
+  workflow: z.enum(["portfolio", "spending"]).default("portfolio"),
   sourceType: z.enum(["csv"]).default("csv"),
   csvContent: z.string().min(1).max(2_000_000).optional(),
   fieldMapping: z.record(z.string().min(1), z.string().min(1)).optional(),
@@ -113,6 +114,39 @@ export const recommendationRunCreateSchema = z.object({
   contributionAmountCad: z.number().positive().max(1000000)
 });
 
+export const guidedAllocationDraftSchema = z.object({
+  answers: z.object({
+    goal: z.enum(["retirement", "home", "wealth", "capital-preservation"]),
+    horizon: z.enum(["short", "medium", "long"]),
+    volatility: z.enum(["low", "medium", "high"]),
+    priority: z.enum(["tax-efficiency", "balanced", "stay-close"]),
+    cashNeed: z.enum(["low", "medium", "high"])
+  }),
+  suggestedProfile: z.object({
+    riskProfile: z.enum(["Conservative", "Balanced", "Growth"]),
+    targetAllocation: z.array(allocationTargetSchema).min(1),
+    accountFundingPriority: z.array(z.enum(["TFSA", "RRSP", "FHSA", "Taxable"]))
+      .min(1)
+      .refine((items) => new Set(items).size === items.length, "Account priorities must be unique."),
+    taxAwarePlacement: z.boolean(),
+    cashBufferTargetCad: z.number().min(0).max(1000000),
+    transitionPreference: z.enum(["stay-close", "gradual", "direct"]),
+    recommendationStrategy: z.enum(["tax-aware", "target-first", "balanced"]),
+    rebalancingTolerancePct: z.number().int().min(0).max(50)
+  }).superRefine((value, context) => {
+    const total = value.targetAllocation.reduce((sum, target) => sum + target.targetPct, 0);
+    if (total !== 100) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["targetAllocation"],
+        message: "Target allocation must sum to 100."
+      });
+    }
+  }),
+  assumptions: z.array(z.string().trim().min(1).max(240)).min(1).max(12),
+  rationale: z.array(z.string().trim().min(1).max(240)).min(1).max(12)
+});
+
 export type PreferenceProfileInputPayload = z.infer<typeof preferenceProfileInputSchema>;
 export type RegisterUserInputPayload = z.infer<typeof registerUserInputSchema>;
 export type ImportJobCreatePayload = z.infer<typeof importJobCreateSchema>;
@@ -120,3 +154,4 @@ export type ImportMappingPresetCreatePayload = z.infer<typeof importMappingPrese
 export type ImportMappingPresetUpdatePayload = z.infer<typeof importMappingPresetUpdateSchema>;
 export type GuidedImportCreatePayload = z.infer<typeof guidedImportCreateSchema>;
 export type RecommendationRunCreatePayload = z.infer<typeof recommendationRunCreateSchema>;
+export type GuidedAllocationDraftPayload = z.infer<typeof guidedAllocationDraftSchema>;
