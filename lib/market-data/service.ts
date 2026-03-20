@@ -80,3 +80,16 @@ export async function getSecurityQuote(symbol: string): Promise<{ result: Securi
     providerHealth: getProviderHealth()
   };
 }
+
+export async function getBatchSecurityQuotes(symbols: string[]): Promise<{ results: SecurityQuote[]; providerHealth: ReturnType<typeof getProviderHealth> }> {
+  const uniqueSymbols = [...new Set(symbols.map((symbol) => symbol.trim().toUpperCase()).filter(Boolean))];
+  const results = await Promise.all(uniqueSymbols.map(async (symbol) => {
+    const quote = await getSecurityQuote(symbol);
+    return quote.result;
+  }));
+
+  return {
+    results,
+    providerHealth: getProviderHealth()
+  };
+}

@@ -61,6 +61,11 @@ const contracts = {
       path: "/api/market-data/quote",
       method: "GET",
       description: "Fetch the latest available quote through the configured market-data provider layer."
+    },
+    {
+      path: "/api/market-data/quotes",
+      method: "GET",
+      description: "Fetch latest available quotes for multiple symbols through the configured market-data provider layer."
     }
   ],
   plannedMutations: [
@@ -98,6 +103,11 @@ const contracts = {
       path: "/api/recommendations/runs",
       methods: ["POST"],
       description: "Generate a new recommendation run from current holdings and preferences."
+    },
+    {
+      path: "/api/portfolio/refresh-prices",
+      methods: ["POST"],
+      description: "Refresh user-scoped holding prices in bulk, persist updated market value and gain/loss, and recompute account weights."
     }
   ]
 };

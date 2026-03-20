@@ -60,6 +60,7 @@ export interface CreateImportJobInput {
   sourceType: "csv";
   csvContent?: string;
   fieldMapping?: ImportFieldMapping;
+  symbolCorrections?: Record<string, { symbol: string; name?: string }>;
   importMode: "replace" | "merge";
   dryRun: boolean;
 }
@@ -82,6 +83,13 @@ export interface CreateImportJobResult {
     detectedHeaders: string[];
     rowCount: number;
   };
+}
+
+export interface RefreshPortfolioQuotesResult {
+  refreshedHoldingCount: number;
+  missingQuoteCount: number;
+  sampledSymbolCount: number;
+  refreshedAt: string;
 }
 
 export interface CreateRecommendationRunInput {
@@ -304,6 +312,41 @@ function normalizeManualHolding(input: NonNullable<CreateGuidedImportInput["hold
     lastPriceCad,
     marketValueCad,
     gainLossPct
+  };
+}
+
+function applySymbolCorrectionsToParsedImport(
+  parsed: ReturnType<typeof parseImportCsv>,
+  corrections: Record<string, { symbol: string; name?: string }> | undefined
+) {
+  if (!corrections || Object.keys(corrections).length === 0) {
+    return parsed;
+  }
+
+  const normalizedCorrections = new Map(
+    Object.entries(corrections).map(([requestedSymbol, correction]) => [
+      requestedSymbol.trim().toUpperCase(),
+      {
+        symbol: correction.symbol.trim().toUpperCase(),
+        name: correction.name?.trim() || undefined
+      }
+    ])
+  );
+
+  return {
+    ...parsed,
+    holdings: parsed.holdings.map((holding) => {
+      const correction = normalizedCorrections.get(holding.symbol.trim().toUpperCase());
+      if (!correction) {
+        return holding;
+      }
+
+      return {
+        ...holding,
+        symbol: correction.symbol,
+        name: correction.name ?? holding.name
+      };
+    })
   };
 }
 
@@ -703,7 +746,10 @@ export async function createImportJob(userId: string, input: CreateImportJobInpu
     };
   }
 
-  const parsed = parseImportCsv(input.csvContent, input.fieldMapping ?? {});
+  const parsed = applySymbolCorrectionsToParsedImport(
+    parseImportCsv(input.csvContent, input.fieldMapping ?? {}),
+    input.symbolCorrections
+  );
   const review = {
     importMode: input.importMode,
     detectedHeaders: parsed.detectedHeaders,
@@ -1182,6 +1228,103 @@ export async function createGuidedImportAccount(userId: string, input: CreateGui
   return {
     ...result,
     autoRecommendationRun
+  };
+}
+
+export async function refreshPortfolioQuotes(userId: string): Promise<RefreshPortfolioQuotesResult> {
+  const db = getDb();
+  const repositories = getRepositories();
+  const holdings = await repositories.holdings.listByUserId(userId);
+  const uniqueSymbols = [...new Set(holdings.map((holding) => holding.symbol.trim().toUpperCase()).filter(Boolean))];
+
+  if (uniqueSymbols.length === 0) {
+    return {
+      refreshedHoldingCount: 0,
+      missingQuoteCount: 0,
+      sampledSymbolCount: 0,
+      refreshedAt: new Date().toISOString()
+    };
+  }
+
+  const { getBatchSecurityQuotes } = await import("@/lib/market-data/service");
+  const quoteResults = await getBatchSecurityQuotes(uniqueSymbols);
+  const quoteMap = new Map(
+    quoteResults.results
+      .filter((quote) => Number.isFinite(quote.price) && quote.price > 0)
+      .map((quote) => [quote.symbol.trim().toUpperCase(), quote.price])
+  );
+
+  const refreshedAt = new Date();
+  let refreshedHoldingCount = 0;
+
+  await db.transaction(async (tx) => {
+    const currentHoldings = await tx.select().from(holdingPositions).where(eq(holdingPositions.userId, userId));
+
+    for (const holding of currentHoldings) {
+      const quotePrice = quoteMap.get(holding.symbol.trim().toUpperCase());
+      if (!quotePrice) {
+        continue;
+      }
+
+      const quantity = holding.quantity == null ? null : Number(holding.quantity);
+      const currentMarketValue = quantity != null && quantity > 0
+        ? round(quantity * quotePrice)
+        : Number(holding.marketValueCad);
+      const costBasis = holding.costBasisCad == null ? null : Number(holding.costBasisCad);
+      const gainLossPct = costBasis != null && costBasis > 0
+        ? round(((currentMarketValue - costBasis) / costBasis) * 100, 2)
+        : Number(holding.gainLossPct);
+
+      await tx
+        .update(holdingPositions)
+        .set({
+          lastPriceCad: quotePrice.toFixed(4),
+          marketValueCad: currentMarketValue.toFixed(2),
+          gainLossPct: gainLossPct.toFixed(2),
+          updatedAt: refreshedAt
+        })
+        .where(eq(holdingPositions.id, holding.id));
+
+      refreshedHoldingCount += 1;
+    }
+
+    const refreshedHoldings = await tx.select().from(holdingPositions).where(eq(holdingPositions.userId, userId));
+    const holdingsByAccount = new Map<string, typeof refreshedHoldings>();
+    for (const holding of refreshedHoldings) {
+      const group = holdingsByAccount.get(holding.accountId) ?? [];
+      group.push(holding);
+      holdingsByAccount.set(holding.accountId, group);
+    }
+
+    for (const [accountId, accountHoldings] of holdingsByAccount.entries()) {
+      const accountTotal = accountHoldings.reduce((sum, holding) => sum + Number(holding.marketValueCad), 0);
+
+      for (const holding of accountHoldings) {
+        const weightPct = accountTotal > 0 ? round((Number(holding.marketValueCad) / accountTotal) * 100, 2) : 0;
+        await tx
+          .update(holdingPositions)
+          .set({
+            weightPct: weightPct.toFixed(2),
+            updatedAt: refreshedAt
+          })
+          .where(eq(holdingPositions.id, holding.id));
+      }
+
+      await tx
+        .update(investmentAccounts)
+        .set({
+          marketValueCad: accountTotal.toFixed(2),
+          updatedAt: refreshedAt
+        })
+        .where(eq(investmentAccounts.id, accountId));
+    }
+  });
+
+  return {
+    refreshedHoldingCount,
+    missingQuoteCount: uniqueSymbols.length - quoteMap.size,
+    sampledSymbolCount: uniqueSymbols.length,
+    refreshedAt: refreshedAt.toISOString()
   };
 }
 

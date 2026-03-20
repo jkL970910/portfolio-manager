@@ -4,6 +4,7 @@ import { getPortfolioView } from "@/lib/backend/services";
 import { AppShell } from "@/components/layout/app-shell";
 import { DonutChartCard } from "@/components/charts/donut-chart";
 import { LineChartCard } from "@/components/charts/line-chart";
+import { RefreshPricesPanel } from "@/components/portfolio/refresh-prices-panel";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { SectionHeading } from "@/components/ui/section-heading";
@@ -73,6 +74,7 @@ export default async function PortfolioPage() {
               <CardTitle>Quick Actions</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
+              <RefreshPricesPanel />
               <QuickAction icon={<ShieldAlert className="h-4 w-4" />} title="Review Concentration Risk" description="Inspect the positions driving the highest single-name exposure." />
               <QuickAction icon={<PieChart className="h-4 w-4" />} title="Inspect Allocation Gaps" description="See the biggest underweight and overweight classes before funding." />
               <QuickAction icon={<CircleGauge className="h-4 w-4" />} title="Open Recommendation Drivers" description="Trace which portfolio signals are pushing the current recommendation." />

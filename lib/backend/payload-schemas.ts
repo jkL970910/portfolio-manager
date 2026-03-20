@@ -39,6 +39,13 @@ export const importJobCreateSchema = z.object({
   sourceType: z.enum(["csv"]).default("csv"),
   csvContent: z.string().min(1).max(2_000_000).optional(),
   fieldMapping: z.record(z.string().min(1), z.string().min(1)).optional(),
+  symbolCorrections: z.record(
+    z.string().trim().min(1).max(32),
+    z.object({
+      symbol: z.string().trim().min(1).max(32),
+      name: z.string().trim().min(1).max(160).optional()
+    })
+  ).optional(),
   importMode: z.enum(["replace", "merge"]).default("replace"),
   dryRun: z.boolean().optional().default(false)
 });

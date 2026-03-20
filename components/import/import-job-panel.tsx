@@ -85,6 +85,22 @@ type ReviewState = {
   validationErrors: Array<{ rowNumber: number; recordType: string | null; message: string }>;
 };
 
+type SymbolAuditRecord = {
+  requestedSymbol: string;
+  normalizedSymbol: string;
+  name: string;
+  provider: string;
+  quotePrice: number | null;
+  delayed: boolean;
+  hasWarning: boolean;
+  warningMessage: string | null;
+};
+
+type SymbolCorrectionDraft = {
+  symbol: string;
+  name: string;
+};
+
 function normalizeHeader(value: string) {
   return value.trim().toLowerCase().replace(/\s+/g, "_");
 }
@@ -146,6 +162,35 @@ function buildDefaultMapping(headers: string[]) {
   return mapping;
 }
 
+function extractHoldingSymbolsForAudit(csvContent: string, mapping: Record<string, string>) {
+  const lines = csvContent.replace(/^\uFEFF/, "").split(/\r?\n/).filter((line) => line.trim());
+  if (lines.length < 2) {
+    return [];
+  }
+
+  const headers = splitCsvLine(lines[0]).map((header) => header.trim());
+  const headerIndex = new Map(headers.map((header, index) => [header, index]));
+  const recordTypeHeader = mapping.record_type;
+  const symbolHeader = mapping.symbol;
+
+  if (!recordTypeHeader || !symbolHeader) {
+    return [];
+  }
+
+  const recordTypeIndex = headerIndex.get(recordTypeHeader);
+  const symbolIndex = headerIndex.get(symbolHeader);
+  if (recordTypeIndex == null || symbolIndex == null) {
+    return [];
+  }
+
+  return [...new Set(lines
+    .slice(1)
+    .map((line) => splitCsvLine(line))
+    .filter((row) => (row[recordTypeIndex] ?? "").trim().toLowerCase() === "holding")
+    .map((row) => (row[symbolIndex] ?? "").trim().toUpperCase())
+    .filter(Boolean))];
+}
+
 export function ImportJobPanel({
   latestJob
 }: {
@@ -162,6 +207,13 @@ export function ImportJobPanel({
   const [serverPresets, setServerPresets] = useState<PresetRecord[]>([]);
   const [reviewState, setReviewState] = useState<ReviewState | null>(null);
   const [validationErrors, setValidationErrors] = useState<Array<{ rowNumber: number; recordType: string | null; message: string }>>([]);
+  const [symbolAudit, setSymbolAudit] = useState<{ records: SymbolAuditRecord[]; sampled: number; total: number } | null>(null);
+  const [symbolCorrections, setSymbolCorrections] = useState<Record<string, SymbolCorrectionDraft>>({});
+  const [symbolAuditStatus, setSymbolAuditStatus] = useState<{ loading: boolean; message: string; error: string }>({
+    loading: false,
+    message: "",
+    error: ""
+  });
   const [status, setStatus] = useState<{ type: "idle" | "success" | "error"; message: string }>({ type: "idle", message: "" });
 
   useEffect(() => {
@@ -301,6 +353,9 @@ export function ImportJobPanel({
       setHeaders(nextHeaders);
       setReviewState(null);
       setValidationErrors([]);
+      setSymbolAudit(null);
+      setSymbolCorrections({});
+      setSymbolAuditStatus({ loading: false, message: "", error: "" });
       setStatus({ type: "idle", message: "" });
       applyPreset(selectedPresetKey === "canonical" ? "auto-detect" : selectedPresetKey, nextHeaders);
     } catch {
@@ -312,6 +367,9 @@ export function ImportJobPanel({
     setStatus({ type: "idle", message: "" });
     setValidationErrors([]);
     setReviewState(null);
+    setSymbolAudit(null);
+    setSymbolCorrections({});
+    setSymbolAuditStatus({ loading: false, message: "", error: "" });
 
     const sanitizedFieldMapping = Object.fromEntries(Object.entries(fieldMapping).filter(([, value]) => value));
 
@@ -340,11 +398,114 @@ export function ImportJobPanel({
       setStatus({ type: "error", message: `Validation failed. ${result.validationErrors.length} row issues were found.` });
       return;
     }
+    void runSymbolAudit(sanitizedFieldMapping);
     setStatus({ type: "success", message: "Validation passed. Review the import summary below, then confirm." });
+  }
+
+  async function runSymbolAudit(sanitizedFieldMapping: Record<string, string>) {
+    const allSymbols = extractHoldingSymbolsForAudit(csvContent, sanitizedFieldMapping);
+    if (allSymbols.length === 0) {
+      setSymbolAudit(null);
+      setSymbolAuditStatus({ loading: false, message: "No holding symbols were found for symbol audit.", error: "" });
+      return;
+    }
+
+    const sampledSymbols = allSymbols.slice(0, 20);
+    setSymbolAuditStatus({ loading: true, message: "", error: "" });
+
+    try {
+      const [quotesResponse, ...resolveResponses] = await Promise.all([
+        fetch(`/api/market-data/quotes?symbols=${encodeURIComponent(sampledSymbols.join(","))}`),
+        ...sampledSymbols.map((symbol) => fetch(`/api/market-data/resolve?symbol=${encodeURIComponent(symbol)}`))
+      ]);
+
+      const quotesPayload = await quotesResponse.json();
+      if (!quotesResponse.ok) {
+        throw new Error(quotesPayload.error ?? "Batch quote audit failed.");
+      }
+
+      const quoteMap = new Map<string, { price: number; delayed: boolean }>(
+        ((quotesPayload.data?.results ?? []) as Array<{ symbol: string; price: number; delayed: boolean }>)
+          .map((quote) => [quote.symbol.toUpperCase(), { price: Number(quote.price), delayed: Boolean(quote.delayed) }])
+      );
+
+      const resolvedRecords = await Promise.all(resolveResponses.map(async (response, index) => {
+        const payload = await response.json();
+        if (!response.ok) {
+          return {
+            requestedSymbol: sampledSymbols[index],
+            normalizedSymbol: sampledSymbols[index],
+            name: sampledSymbols[index],
+            provider: "fallback",
+            quotePrice: quoteMap.get(sampledSymbols[index])?.price ?? null,
+            delayed: quoteMap.get(sampledSymbols[index])?.delayed ?? true,
+            hasWarning: true,
+            warningMessage: payload.error ?? "Normalization failed."
+          } satisfies SymbolAuditRecord;
+        }
+
+        const result = payload.data?.result;
+        const normalizedSymbol = (result.symbol ?? sampledSymbols[index]).toUpperCase();
+        const quote = quoteMap.get(normalizedSymbol) ?? quoteMap.get(sampledSymbols[index]);
+        const warningMessage = normalizedSymbol !== sampledSymbols[index]
+          ? `Normalized from ${sampledSymbols[index]} to ${normalizedSymbol}.`
+          : quote == null || !Number.isFinite(quote.price) || quote.price <= 0
+            ? "No usable quote was returned for this symbol."
+            : null;
+
+        return {
+          requestedSymbol: sampledSymbols[index],
+          normalizedSymbol,
+          name: result.name ?? normalizedSymbol,
+          provider: result.provider ?? "fallback",
+          quotePrice: quote?.price ?? null,
+          delayed: quote?.delayed ?? true,
+          hasWarning: Boolean(warningMessage),
+          warningMessage
+        } satisfies SymbolAuditRecord;
+      }));
+
+      setSymbolAudit({
+        records: resolvedRecords,
+        sampled: sampledSymbols.length,
+        total: allSymbols.length
+      });
+      setSymbolCorrections(
+        Object.fromEntries(
+          resolvedRecords.map((record) => [
+            record.requestedSymbol,
+            { symbol: record.normalizedSymbol, name: record.name }
+          ])
+        )
+      );
+      setSymbolAuditStatus({
+        loading: false,
+        message: `Symbol audit checked ${sampledSymbols.length} of ${allSymbols.length} unique holding symbols.`,
+        error: ""
+      });
+    } catch (error) {
+      setSymbolAudit(null);
+      setSymbolAuditStatus({
+        loading: false,
+        message: "",
+        error: error instanceof Error ? error.message : "Symbol audit failed."
+      });
+    }
   }
 
   function confirmImport() {
     const sanitizedFieldMapping = Object.fromEntries(Object.entries(fieldMapping).filter(([, value]) => value));
+    const sanitizedCorrections = Object.fromEntries(
+      Object.entries(symbolCorrections)
+        .filter(([, value]) => value.symbol.trim())
+        .map(([requestedSymbol, value]) => [
+          requestedSymbol,
+          {
+            symbol: value.symbol.trim().toUpperCase(),
+            name: value.name.trim() || undefined
+          }
+        ])
+    );
     setStatus({ type: "idle", message: "" });
 
     startTransition(async () => {
@@ -356,6 +517,7 @@ export function ImportJobPanel({
           sourceType: "csv",
           csvContent: csvContent || undefined,
           fieldMapping: csvContent ? sanitizedFieldMapping : undefined,
+          symbolCorrections: Object.keys(sanitizedCorrections).length > 0 ? sanitizedCorrections : undefined,
           importMode,
           dryRun: false
         })
@@ -568,6 +730,82 @@ export function ImportJobPanel({
           <Button type="button" onClick={confirmImport} disabled={isPending} leadingIcon={<Upload className="h-4 w-4" />}>
             {isPending ? "Importing..." : "Confirm import"}
           </Button>
+        </div>
+      ) : null}
+
+      {reviewState && reviewState.validationErrors.length === 0 ? (
+        <div className="space-y-3 rounded-2xl border border-[color:var(--border)] bg-white p-4">
+          <div className="flex items-center gap-2 font-medium text-[color:var(--foreground)]">
+            <Eye className="h-4 w-4 text-[color:var(--primary)]" />
+            Symbol audit
+            {symbolAuditStatus.loading ? <Badge variant="warning">Running</Badge> : <Badge variant="neutral">Review aid</Badge>}
+          </div>
+          {symbolAuditStatus.message ? (
+            <p className="text-sm text-[color:var(--muted-foreground)]">{symbolAuditStatus.message}</p>
+          ) : null}
+          {symbolAuditStatus.error ? (
+            <div className="rounded-2xl border border-[#e7b0b8] bg-[#fff3f5] px-4 py-3 text-sm text-[#8e2433]">
+              {symbolAuditStatus.error}
+            </div>
+          ) : null}
+          {symbolAudit ? (
+            <div className="space-y-2">
+              {symbolAudit.records.map((record) => (
+                <div key={`${record.requestedSymbol}-${record.normalizedSymbol}`} className={`rounded-xl border px-4 py-3 text-sm ${record.hasWarning ? "border-[#f0c9d0] bg-[#fff8f9]" : "border-[color:var(--border)] bg-[color:var(--card-muted)]"}`}>
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                      <p className="font-medium">
+                        {record.requestedSymbol} {"->"} {record.normalizedSymbol} · {record.name}
+                      </p>
+                      <p className="mt-1 text-[color:var(--muted-foreground)]">
+                        Provider: {record.provider}{record.quotePrice != null ? ` · Quote ${record.quotePrice.toFixed(2)}${record.delayed ? " (delayed)" : ""}` : " · No quote"}
+                      </p>
+                    </div>
+                    <Badge variant={record.hasWarning ? "warning" : "success"}>
+                      {record.hasWarning ? "Needs review" : "Looks good"}
+                    </Badge>
+                  </div>
+                  {record.warningMessage ? (
+                    <p className={`mt-2 ${record.hasWarning ? "text-[#8e2433]" : "text-[color:var(--muted-foreground)]"}`}>
+                      {record.warningMessage}
+                    </p>
+                  ) : null}
+                  {record.hasWarning ? (
+                    <div className="mt-3 grid gap-3 md:grid-cols-2">
+                      <label className="space-y-2">
+                        <span className="text-xs font-medium uppercase tracking-[0.12em] text-[color:var(--muted-foreground)]">Override symbol</span>
+                        <input
+                          value={symbolCorrections[record.requestedSymbol]?.symbol ?? record.normalizedSymbol}
+                          onChange={(event) => setSymbolCorrections((current) => ({
+                            ...current,
+                            [record.requestedSymbol]: {
+                              symbol: event.target.value.toUpperCase(),
+                              name: current[record.requestedSymbol]?.name ?? record.name
+                            }
+                          }))}
+                          className="w-full rounded-2xl border border-[color:var(--border)] bg-white px-4 py-3 text-sm outline-none"
+                        />
+                      </label>
+                      <label className="space-y-2">
+                        <span className="text-xs font-medium uppercase tracking-[0.12em] text-[color:var(--muted-foreground)]">Override name</span>
+                        <input
+                          value={symbolCorrections[record.requestedSymbol]?.name ?? record.name}
+                          onChange={(event) => setSymbolCorrections((current) => ({
+                            ...current,
+                            [record.requestedSymbol]: {
+                              symbol: current[record.requestedSymbol]?.symbol ?? record.normalizedSymbol,
+                              name: event.target.value
+                            }
+                          }))}
+                          className="w-full rounded-2xl border border-[color:var(--border)] bg-white px-4 py-3 text-sm outline-none"
+                        />
+                      </label>
+                    </div>
+                  ) : null}
+                </div>
+              ))}
+            </div>
+          ) : null}
         </div>
       ) : null}
 
