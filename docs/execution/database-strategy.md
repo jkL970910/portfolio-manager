@@ -4,8 +4,8 @@
 - Primary database: PostgreSQL
 - ORM / query layer: Drizzle ORM
 - Migration tool: drizzle-kit
-- Initial runtime mode: mock repository
-- Future production mode: Postgres-backed repositories behind the same service contracts
+- Current runtime mode: Postgres-backed repositories behind the same service contracts
+- Local developer database: PostgreSQL running on the local machine for seeded multi-user testing
 
 ## Why PostgreSQL
 - Strong relational fit for accounts, holdings, transactions, preferences, and recommendation runs
@@ -34,23 +34,36 @@ This keeps the backend replaceable and makes testing easier.
 
 ## Repository modes
 ### Current
-- `mock`
-- implemented via `lib/backend/repositories/mock-repositories.ts`
-
-### Planned
 - `postgres-drizzle`
-- to be implemented behind `lib/backend/repositories/factory.ts`
+- implemented via `lib/backend/repositories/postgres-repositories.ts`
 
-## First repository implementations to build
-1. `PreferenceRepository`
-2. `AccountRepository`
-3. `HoldingRepository`
-4. `ImportJobRepository`
-5. `RecommendationRepository`
-6. `TransactionRepository`
+### Secondary fallback
+- `mock`
+- retained behind `lib/backend/repositories/factory.ts` for isolated UI work or debugging
 
-## Immediate next backend coding steps
-1. install Drizzle + postgres driver
-2. add schema files for the tables in `docs/execution/backend-data-model.md`
-3. implement repository methods for preferences and accounts first
-4. switch `repositoryMode` from `mock` to `postgres-drizzle` once parity is ready
+## Repositories currently in use
+1. `UserRepository`
+2. `PreferenceRepository`
+3. `AccountRepository`
+4. `HoldingRepository`
+5. `TransactionRepository`
+6. `ImportJobRepository`
+7. `RecommendationRepository`
+
+## Current persisted tables
+- `users`
+- `investment_accounts`
+- `holding_positions`
+- `cashflow_transactions`
+- `preference_profiles`
+- `allocation_targets`
+- `recommendation_runs`
+- `recommendation_items`
+- `import_jobs`
+- `import_mapping_presets`
+
+## Current next backend coding steps
+1. add database-backed guided allocation outputs when Settings flow is implemented
+2. store richer import review state instead of relying only on dry-run responses
+3. persist more structured recommendation rationale for future explainability
+4. prepare object-storage and worker boundaries before broker-scale imports

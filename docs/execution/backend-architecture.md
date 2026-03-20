@@ -1,7 +1,7 @@
-# Backend Architecture Baseline
+# Backend Architecture
 
 ## Objective
-Establish a backend foundation that can evolve from mock services to real persistence without forcing UI rewrites.
+Maintain a backend foundation that supports authenticated, user-scoped portfolio workflows without forcing UI rewrites as persistence and logic deepen.
 
 ## Domain boundaries
 - Portfolio aggregation
@@ -34,9 +34,10 @@ Tracks CSV import state from creation to validation and completion.
 
 ## Service flow
 1. Route handler receives request.
-2. Route handler calls a backend service in `lib/backend/services.ts`.
-3. Service orchestrates repositories and transforms raw domain data into view models.
-4. Route returns a stable API envelope from `lib/backend/contracts.ts`.
+2. Route handler resolves the signed-in user session.
+3. Route handler validates request payloads and calls a backend service in `lib/backend/services.ts`.
+4. Service orchestrates repositories and transforms raw domain data into view models or persisted records.
+5. Route returns a stable API envelope from `lib/backend/contracts.ts`.
 
 ## Why this split matters
 - Route handlers stay thin.
@@ -44,30 +45,34 @@ Tracks CSV import state from creation to validation and completion.
 - Database migration can happen behind service functions.
 - Recommendation logic can be implemented independently from React pages.
 
-## Near-term repository plan
-### Mock repository phase
-- use in-memory fixtures in `lib/backend/mock-store.ts`
-- keep frontend moving while backend contracts stabilize
+## Current runtime shape
 
-### Database-backed phase
-Replace mock-store access with repositories for:
-- accounts
-- holdings
-- transactions
-- preference profiles
-- recommendation runs
-- import jobs
+### Auth and user scope
+- Auth.js credentials flow
+- local registration endpoint
+- all major routes and services execute in `user_id` scope
+
+### Repository mode
+- current primary mode: `postgres-drizzle`
+- mock repositories still exist as a development fallback, but are no longer the main runtime path
+
+### Implemented write paths
+- register user
+- patch preference profile
+- create recommendation run
+- create guided import account
+- validate and confirm direct CSV import
+- create, rename, and delete import mapping presets
 
 ## Candidate storage model
-Recommended first production storage shape:
+Recommended production storage shape:
 - Postgres for durable product data
 - object storage for raw import files
 - background job worker for import normalization and recommendation runs
 
 ## Recommended implementation order
-1. Implement preference profile persistence.
-2. Implement account and holdings persistence.
-3. Implement import job creation and normalization.
-4. Implement portfolio analytics service.
-5. Implement recommendation run generation.
-6. Implement spending aggregation from transaction records.
+1. Deepen recommendation engine rules beyond drift-only allocation.
+2. Add saved guided-allocation outputs in Settings.
+3. Move import correction and review into a richer state machine.
+4. Add broker or file-source abstractions for future integrations.
+5. Split heavy import and recommendation work into background jobs when runtime cost justifies it.

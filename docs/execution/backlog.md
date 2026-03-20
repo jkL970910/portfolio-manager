@@ -99,6 +99,39 @@ Trade-off:
 
 ## MVP Release Backlog
 
+## Implementation Status Snapshot
+
+### Implemented now
+
+1. Account and holdings import
+   - direct CSV import supports preview, mapping, validation, review, confirm, replace, and merge
+   - guided import supports manual entry and single-account CSV review/confirm
+2. Investment preferences settings
+   - manual settings persist to the database
+3. Unified portfolio dashboard
+   - authenticated, user-scoped, database-backed
+4. Portfolio diagnostics
+   - portfolio, spending, and recommendation read models are backed by real data
+5. Funding recommendation engine v1
+   - recommendation runs persist to the database and auto-refresh after successful imports
+
+### Partially implemented
+
+1. Spending overview and transactions
+   - live database-backed page exists, but deeper categorization and workflow polish remain
+2. Portfolio health score and radar analysis
+   - dashboard placeholder exists, detailed analysis is still pending
+
+### Still pending
+
+1. Guided allocation setup in Settings
+2. Watchlist and target constraints as an editable workflow
+3. Recommendation explanation improvements beyond current rule text
+4. Rebalancing optimizer
+5. Advanced market signal integration
+6. Full budgeting workflows
+7. Historical portfolio scoring extensions
+
 ### P0: Must Ship
 
 1. Account and holdings import
@@ -142,4 +175,8 @@ Trade-off:
 
 ## Next Execution Step
 
-Turn the P0 backlog into engineering tickets with explicit acceptance criteria and dependencies. The first technical milestone should end with a user who can import data, configure a target allocation, and see a trustworthy dashboard and recommendation summary in one session.
+Turn the next backend milestone into engineering tickets for:
+
+1. guided allocation setup in Settings
+2. recommendation engine v2 rules
+3. richer import review and correction persistence

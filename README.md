@@ -96,6 +96,12 @@ The goal is not to claim “AI built everything automatically.” The value is i
 - Figma Make for UI exploration
 - Figma MCP for design-review workflows
 
+### Backend / Data
+- Next.js Route Handlers
+- PostgreSQL
+- Drizzle ORM
+- Auth.js credentials flow
+
 ### AI Workflow
 - Codex project skills
 - product strategy / PRD / prioritization skills
@@ -103,25 +109,29 @@ The goal is not to claim “AI built everything automatically.” The value is i
 
 ## Current Status
 
-This repository is currently in prototype / scaffold stage.
+This repository is currently in working prototype stage.
 
 What already exists:
 
 - local BRD / PRD / UX docs
 - Notion backlog and project structure
 - Figma-informed dashboard and app layout
-- static frontend pages for all major product areas
-- typed mock data contracts
-- placeholder API routes for later backend integration
+- authenticated frontend pages for all major product areas
+- PostgreSQL schema and Drizzle data layer
+- user-scoped API routes and repository-backed services
+- direct CSV import with preview, mapping, review, confirm, replace, and merge
+- guided import flow with real account creation and single-account CSV import
+- recommendation runs persisted to the database
+- persistent investment preferences and import mapping presets
 
 What is not finished yet:
 
-- real database schema
-- import normalization pipeline
-- recommendation engine backend logic
-- authenticated user flows
-- persistent preferences and transactions
-- production-ready charts and state handling
+- guided allocation setup in Settings
+- recommendation engine v2 logic
+- richer import review and correction persistence
+- broker integrations and async workers
+- production auth provider options beyond local credentials
+- production-ready chart polish and edge-state handling
 
 ## Quick Start
 
@@ -134,10 +144,15 @@ What is not finished yet:
 npm install
 ```
 
+### Start local database
+```bash
+npm run db:start
+```
+
 ### Run locally
 ```bash
 npm run dev
-```p
+```
 
 ### Validation
 ```bash
@@ -145,12 +160,16 @@ npm run typecheck
 npm run build
 ```
 
+### Demo login
+- `jiekun@example.com` / `demo1234`
+- `casey@example.com` / `demo1234`
+
 ## Project Structure
 
 ```text
 app/                  Next.js routes and API handlers
-components/           shared UI, layout, and chart components
-lib/                  typed contracts and mock repositories
+components/           shared UI, layout, chart, and feature components
+lib/                  backend services, repositories, auth, and database code
 docs/                 BRD, PRD, UX specs, execution docs
 design-system/        persisted design-system output from AI-assisted UI workflow
 .codex/skills/        local project skills used by Codex
@@ -171,7 +190,6 @@ This project is useful as a portfolio piece because it demonstrates:
 The most natural next implementation steps are:
 
 1. define backend data models for accounts, holdings, transactions, and preferences
-2. replace mock repositories with real domain services
-3. add mutations for import, preferences, and recommendation generation
+2. implement guided allocation setup in Settings
+3. deepen recommendation engine rules and explanation quality
 4. refine page-level interactions and loading / empty states
-
