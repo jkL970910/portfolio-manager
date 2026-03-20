@@ -9,6 +9,7 @@ Maintain a backend foundation that supports authenticated, user-scoped portfolio
 - Spending aggregation
 - Import normalization
 - Preference profile management
+- Market-data integration
 
 ## Core entities
 ### UserProfile
@@ -18,7 +19,7 @@ Represents the current signed-in user context and base currency.
 Stores account wrapper, institution, nickname, market value, and available contribution room.
 
 ### HoldingPosition
-Stores portfolio positions, asset classification, sector attribution, market value, and performance metrics.
+Stores portfolio positions, asset classification, sector attribution, market value, valuation inputs, and performance metrics.
 
 ### CashflowTransaction
 Stores spending and inflow records used to calculate spending summary, savings rate, and investable cash.
@@ -54,7 +55,8 @@ Tracks CSV import state from creation to validation and completion.
 
 ### Repository mode
 - current primary mode: `postgres-drizzle`
-- mock repositories still exist as a development fallback, but are no longer the main runtime path
+- page-level mock data has been removed from the runtime path
+- repository and service boundaries remain in place so future storage changes do not affect UI contracts
 
 ### Implemented write paths
 - register user
@@ -62,7 +64,23 @@ Tracks CSV import state from creation to validation and completion.
 - create recommendation run
 - create guided import account
 - validate and confirm direct CSV import
+- create guided single-account CSV imports
+- refresh holding prices from market-data providers
 - create, rename, and delete import mapping presets
+- apply symbol corrections during import review
+
+## Current external data integration
+- OpenFIGI for security normalization
+- Twelve Data for search and latest-available quotes
+- process-local TTL cache for local and single-instance rate protection
+
+## Current import/runtime behavior
+- direct CSV import supports preview, mapping, dry-run validation, symbol audit, correction, and confirm import
+- guided import supports:
+  - new or existing account selection
+  - manual multi-holding entry
+  - single-account CSV import with review/confirm
+- portfolio holdings can refresh batch quotes and persist updated valuation data
 
 ## Candidate storage model
 Recommended production storage shape:

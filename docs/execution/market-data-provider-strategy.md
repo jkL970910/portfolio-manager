@@ -18,6 +18,7 @@ Use a provider adapter layer:
 - `searchSecurities(query)`
 - `resolveSecurity(symbol)`
 - `getSecurityQuote(symbol)`
+- `getBatchSecurityQuotes(symbols)`
 
 All UI and recommendation logic should call this internal layer instead of calling vendor APIs directly.
 
@@ -62,14 +63,15 @@ The project now includes:
 - `GET /api/market-data/search?query=...`
 - `GET /api/market-data/resolve?symbol=...`
 - `GET /api/market-data/quote?symbol=...`
+- `GET /api/market-data/quotes?symbols=...`
 
-The first implementation also includes an in-process TTL cache to reduce provider usage during local development and single-instance deployments.
+The implementation includes an in-process TTL cache to reduce provider usage during local development and single-instance deployments.
 
 Default cache policy:
 
 - search: 6 hours
 - normalization: 7 days
-- quote: 15 minutes
+- quote: 30 minutes
 
 If a provider call fails after a cached value exists, the service can return stale cached data instead of failing immediately.
 
@@ -80,6 +82,23 @@ Current provider routing:
 - quote -> Twelve Data
 
 If keys are missing, the layer returns safe fallback payloads instead of crashing the app.
+
+## Current product usage
+
+Market-data is already wired into:
+
+- guided manual holding entry
+  - search
+  - normalization
+  - single-symbol quote lookup
+- direct CSV import review
+  - symbol audit
+  - correction review
+- portfolio
+  - batch price refresh
+  - freshness / coverage display
+- dashboard
+  - top holdings latest-price and freshness display
 
 ## Required environment variables
 
@@ -92,10 +111,10 @@ If keys are missing, the layer returns safe fallback payloads instead of crashin
 
 ## Next steps
 
-1. Connect the import manual-entry symbol field to `/api/market-data/search`
-2. Normalize confirmed symbols through `/api/market-data/resolve`
-3. Add delayed quote refresh for holdings and derived gain/loss
-4. Add batch quote support before wiring quote refresh into dashboard and portfolio pages
+1. move quote freshness deeper into recommendation inputs and explanation outputs
+2. add batch quote refresh support to more views where it improves usability without wasting provider credits
+3. add durable cloud cache when the app moves beyond single-instance deployment
+4. introduce security-master persistence if import and recommendation logic start depending on richer security metadata
 
 ## Important deployment note
 

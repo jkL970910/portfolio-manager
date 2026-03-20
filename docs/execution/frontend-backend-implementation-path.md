@@ -51,9 +51,11 @@ Implemented now:
 - authenticated login and registration
 - user-scoped database reads and writes
 - database-backed portfolio, recommendations, spending, settings, and import views
-- direct CSV import with preview, field mapping, validation, review, confirm, replace, and merge
+- direct CSV import with preview, field mapping, validation, symbol audit, review, confirm, replace, and merge
 - database-backed CSV mapping presets
-- guided import flow with real account creation and single-account CSV import review/confirm
+- guided import flow with real account creation, manual holding entry, and single-account CSV import review/confirm
+- manual holdings entry with security search, normalization, and quote lookup
+- portfolio batch quote refresh with persisted valuation updates
 - recommendation run generation and persistence
 
 Still pending:
@@ -68,3 +70,4 @@ Still pending:
 - `docs/execution/backend-architecture.md`
 - `docs/execution/backend-data-model.md`
 - `docs/execution/recommendation-engine-v1.md`
+- `docs/execution/market-data-provider-strategy.md`

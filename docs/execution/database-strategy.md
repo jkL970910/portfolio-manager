@@ -33,13 +33,15 @@ The intended stack is:
 This keeps the backend replaceable and makes testing easier.
 
 ## Repository modes
-### Current
+### Current runtime
 - `postgres-drizzle`
 - implemented via `lib/backend/repositories/postgres-repositories.ts`
 
-### Secondary fallback
+### Legacy fallback in code only
 - `mock`
-- retained behind `lib/backend/repositories/factory.ts` for isolated UI work or debugging
+- retained only behind `lib/backend/repositories/factory.ts`
+- no page-level mock data remains in the active app runtime
+- local development is expected to use the real Postgres path
 
 ## Repositories currently in use
 1. `UserRepository`

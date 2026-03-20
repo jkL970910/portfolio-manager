@@ -76,7 +76,11 @@ Use this when you want to add holdings without a broker export.
 3. Choose whether to add a new account or use an existing account
 4. Enter or confirm institution, nickname, and contribution room
 5. Add one or more holdings
-6. For each holding, enter:
+6. For each holding, you can:
+   - search by ticker or security name
+   - normalize the symbol before saving
+   - fetch a latest-available quote
+7. For each holding, confirm or enter:
    - ticker symbol
    - optional holding name
    - asset class
@@ -84,8 +88,8 @@ Use this when you want to add holdings without a broker export.
    - quantity
    - average cost per share
    - current price or current market value
-7. Review the write
-8. Confirm the write to upsert holdings into the target account
+8. Review the write
+9. Confirm the write to upsert holdings into the target account
 
 Manual entry no longer asks for gain/loss directly. The application derives it from cost basis and valuation inputs.
 
@@ -101,8 +105,13 @@ Use this when your broker export already contains multiple accounts, holdings, a
    - `Replace`
    - `Merge`
 6. Click `Validate and review import`
-7. Review row counts and validation issues
-8. Click `Confirm import` to write the changes into the database
+7. Review:
+   - row counts
+   - validation issues
+   - symbol audit output
+   - final write values after corrections
+8. If needed, override symbol or name for flagged securities
+9. Click `Confirm import` to write the changes into the database
 
 ## Minimum Required Fields
 
@@ -212,6 +221,19 @@ The import screen supports:
 Use `Save current preset` after you finish a custom mapping. The preset is stored in the Portfolio Manager database and can be reused by the same signed-in user on any machine.
 
 Saved presets can also be renamed or deleted from the direct import screen.
+
+## Symbol Audit
+
+Direct CSV import now performs a symbol audit during review.
+
+This review can show:
+
+- normalized symbol suggestions
+- provider-backed name lookups
+- quote availability
+- warnings for symbols that need review
+
+If a row needs correction, you can override the final symbol or final name before confirming the import.
 
 ## Why Gain/Loss Is No Longer the Primary Input
 

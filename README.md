@@ -1,74 +1,82 @@
 # Portfolio Manager
 
-Portfolio Manager is an AI-assisted personal investing platform prototype focused on one core question:
+Portfolio Manager is an AI-assisted investing product prototype for self-directed investors. The product focuses on one operational question:
 
 `Where should my next dollar go?`
 
-It combines portfolio analytics, contribution recommendations, spending visibility, and guided investment preferences into a single decision-support workflow for self-directed investors.
+It combines:
 
-This repository was planned, documented, and scaffolded with AI agent collaboration. Product definition, information architecture, UI/UX iteration, backlog setup, and the current frontend baseline were all produced through coordinated agent-assisted workflows.
+- portfolio analytics
+- contribution recommendation workflows
+- spending visibility
+- import and normalization workflows
+- investment preference configuration
+
+This repository was planned, documented, designed, and implemented with AI-agent-assisted workflows. The point is not "AI built it automatically"; the point is to show a realistic product-building workflow where AI accelerates research, UX iteration, implementation, and documentation while engineering decisions still stay explicit.
 
 ## Why This Project Exists
 
-Most retail finance tools are strong at tracking or budgeting, but weak at helping users make portfolio allocation decisions with context.
+Most retail finance apps are good at tracking balances or budgets, but weak at helping users decide how to allocate new capital across real account constraints.
 
-Portfolio Manager is designed to close that gap by helping users:
+Portfolio Manager is designed to help users:
 
 - understand portfolio health
 - identify allocation drift
-- decide where new capital should be allocated
-- connect spending capacity with investable cash
-- configure investment preferences without requiring advanced portfolio expertise
+- connect spending capacity to investable cash
+- import and normalize real account data
+- configure preferences without advanced portfolio expertise
+- generate recommendation runs tied to current holdings and account priorities
 
 ## Core Product Features
 
 ### 1. Dashboard
-- high-level portfolio summary
-- available contribution room
+- portfolio summary
+- contribution room visibility
 - portfolio risk snapshot
-- recommendation alert
 - asset mix and top holdings
+- top holdings price freshness
 - net worth trend
 - monthly spending snapshot
 - recommendation summary
 
 ### 2. Portfolio Analysis
 - account allocation analysis
-- sector exposure
 - holdings detail
-- performance context
 - drift and concentration review
+- price refresh workflow
+- quote freshness and coverage display
 
-### 3. Recommendation Engine
-- contribution-based funding priorities
-- account-aware allocation suggestions
-- transparent recommendation logic
-- confidence and rationale display
+### 3. Recommendation Engine v1
+- contribution-based allocation suggestions
+- account-aware placement
+- persisted recommendation runs
+- transparent rationale based on current drift and configured preferences
 
 ### 4. Spending
-- monthly spending summary
+- spending summary
 - category breakdown
-- recent transactions
+- transaction view
 - investable cash framing
 
 ### 5. Import
-- staged onboarding flow
-- CSV-first import path
-- review and correction workflow
-- setup handoff into investment preferences
+- guided setup flow
+- direct CSV import flow
+- single-account CSV onboarding
+- manual entry with security search and quote lookup
+- field mapping presets
+- dry-run review, symbol audit, correction, and confirm import
 
 ### 6. Investment Preferences
-- manual portfolio preference setup
-- guided allocation setup for beginner users
-- account priority configuration
+- user-scoped preference persistence
+- target allocation setup
+- funding priority configuration
 - tax-aware placement settings
-- future link to portfolio health scoring
+- watchlist and transition preferences
+- future link to Portfolio Health Score and guided allocation setup
 
 ## AI Agent Contribution
 
-This project is intentionally built as an example of practical AI-agent-assisted product development.
-
-AI agents were used to help with:
+AI agents were used for:
 
 - BRD analysis and revision
 - PRD generation
@@ -77,9 +85,9 @@ AI agents were used to help with:
 - information architecture design
 - Figma Make review and iteration
 - frontend scaffolding
-- API contract placeholder design
-
-The goal is not to claim “AI built everything automatically.” The value is in showing a realistic workflow where an engineer or product builder uses AI agents to accelerate product planning and implementation while still making the product decisions.
+- backend contract design
+- implementation planning
+- market-data provider evaluation
 
 ## Tech Stack
 
@@ -90,17 +98,23 @@ The goal is not to claim “AI built everything automatically.” The value is i
 - Recharts
 - Lucide React
 
-### Product / Documentation Workflow
-- Markdown docs in-repo
-- Notion MCP for backlog and project management
-- Figma Make for UI exploration
-- Figma MCP for design-review workflows
-
 ### Backend / Data
 - Next.js Route Handlers
 - PostgreSQL
 - Drizzle ORM
 - Auth.js credentials flow
+- user-scoped repository + service architecture
+
+### Market Data
+- OpenFIGI for symbol normalization
+- Twelve Data for security search and latest-available quotes
+- in-process TTL cache for provider-rate protection in local and single-instance environments
+
+### Product / Documentation Workflow
+- Markdown docs in-repo
+- Notion MCP for backlog and project management
+- Figma Make for UI exploration
+- Figma MCP for design review workflows
 
 ### AI Workflow
 - Codex project skills
@@ -109,29 +123,46 @@ The goal is not to claim “AI built everything automatically.” The value is i
 
 ## Current Status
 
-This repository is currently in working prototype stage.
+This repository is in `working prototype / alpha` stage.
 
-What already exists:
+Implemented now:
 
-- local BRD / PRD / UX docs
-- Notion backlog and project structure
-- Figma-informed dashboard and app layout
-- authenticated frontend pages for all major product areas
-- PostgreSQL schema and Drizzle data layer
-- user-scoped API routes and repository-backed services
-- direct CSV import with preview, mapping, review, confirm, replace, and merge
-- guided import flow with real account creation and single-account CSV import
+- authenticated login and local registration
+- PostgreSQL schema and Drizzle-backed repositories
+- user-scoped API routes and services
+- Dashboard, Portfolio, Recommendations, Spending, Import, and Settings pages
 - recommendation runs persisted to the database
+- direct CSV import with:
+  - preview
+  - mapping
+  - presets
+  - dry-run review
+  - symbol audit
+  - confirm import
+  - replace / merge modes
+- guided import with:
+  - new or existing account selection
+  - manual holdings entry
+  - single-account CSV import
+  - preset reuse
+- manual holdings entry with:
+  - security search
+  - symbol normalization
+  - quote lookup
+  - derived cost basis / market value / gain-loss
+- portfolio price refresh with:
+  - batch quote refresh
+  - freshness / coverage status
 - persistent investment preferences and import mapping presets
 
-What is not finished yet:
+Not finished yet:
 
 - guided allocation setup in Settings
-- recommendation engine v2 logic
-- richer import review and correction persistence
+- recommendation engine v2
+- richer review persistence for invalid imports
 - broker integrations and async workers
-- production auth provider options beyond local credentials
-- production-ready chart polish and edge-state handling
+- production auth providers beyond local credentials
+- cloud-scale cache / object storage / background jobs
 
 ## Quick Start
 
@@ -139,20 +170,18 @@ What is not finished yet:
 - Node.js 20+
 - npm
 
-### Install
+### One-command local startup
 ```bash
-npm install
+npm run local:start
 ```
 
-### Start local database
-```bash
-npm run db:start
-```
+This will:
 
-### Run locally
-```bash
-npm run dev
-```
+- prepare local env files
+- initialize local PostgreSQL
+- push schema
+- seed demo data if needed
+- start the Next.js dev server
 
 ### Validation
 ```bash
@@ -164,32 +193,39 @@ npm run build
 - `jiekun@example.com` / `demo1234`
 - `casey@example.com` / `demo1234`
 
+### Important local pages
+- `/dashboard`
+- `/portfolio`
+- `/recommendations`
+- `/spending`
+- `/import`
+- `/settings`
+
 ## Project Structure
 
 ```text
-app/                  Next.js routes and API handlers
-components/           shared UI, layout, chart, and feature components
-lib/                  backend services, repositories, auth, and database code
-docs/                 BRD, PRD, UX specs, execution docs
+app/                  Next.js pages and API handlers
+components/           shared UI, chart, and feature components
+lib/                  backend services, repositories, auth, db, and market-data code
+docs/                 BRD, PRD, UX specs, execution docs, guides
 design-system/        persisted design-system output from AI-assisted UI workflow
 .codex/skills/        local project skills used by Codex
 ```
 
 ## Interview / Demo Angle
 
-This project is useful as a portfolio piece because it demonstrates:
+This project demonstrates:
 
-- product thinking, not just code execution
-- structured AI-agent collaboration in a real workflow
-- translation from BRD/PRD to backlog to UI to implementation scaffold
-- ability to design systems and API contracts before backend completion
-- practical judgment around where AI should accelerate work and where product decisions still need explicit ownership
+- product thinking and scope control
+- practical AI-agent collaboration in a real workflow
+- translation from BRD/PRD to backlog to Figma to implementation
+- repository/service architecture before backend complexity grows
+- pragmatic handling of import workflows, market-data tradeoffs, and user-scoped persistence
 
 ## Next Steps
 
-The most natural next implementation steps are:
-
-1. define backend data models for accounts, holdings, transactions, and preferences
-2. implement guided allocation setup in Settings
-3. deepen recommendation engine rules and explanation quality
-4. refine page-level interactions and loading / empty states
+1. implement guided allocation setup in Settings
+2. deepen recommendation engine rules and explanation quality
+3. persist richer import review and correction state
+4. add cloud-ready cache and object-storage boundaries
+5. introduce broker-scale background jobs when runtime cost justifies them
