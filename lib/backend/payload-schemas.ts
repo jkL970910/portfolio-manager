@@ -28,6 +28,10 @@ export const preferenceProfileInputSchema = z.object({
   }
 });
 
+export const displayCurrencyInputSchema = z.object({
+  currency: z.enum(["CAD", "USD"])
+});
+
 export const registerUserInputSchema = z.object({
   displayName: z.string().trim().min(2).max(160),
   email: z.string().trim().email(),
@@ -74,16 +78,17 @@ const guidedHoldingSchema = z.object({
   holdingName: z.string().trim().max(160).optional(),
   assetClass: z.string().trim().min(1).max(64),
   sector: z.string().trim().max(64).optional(),
+  currency: z.enum(["CAD", "USD"]).default("CAD"),
   quantity: z.number().positive().max(1_000_000_000).nullable().optional(),
-  avgCostPerShareCad: z.number().min(0).max(1_000_000).nullable().optional(),
-  costBasisCad: z.number().min(0).max(1_000_000_000).nullable().optional(),
-  lastPriceCad: z.number().min(0).max(1_000_000).nullable().optional(),
-  marketValueCad: z.number().min(0).max(1_000_000_000).nullable().optional()
+  avgCostPerShareAmount: z.number().min(0).max(1_000_000).nullable().optional(),
+  costBasisAmount: z.number().min(0).max(1_000_000_000).nullable().optional(),
+  lastPriceAmount: z.number().min(0).max(1_000_000).nullable().optional(),
+  marketValueAmount: z.number().min(0).max(1_000_000_000).nullable().optional()
 }).superRefine((value, context) => {
-  if ((value.marketValueCad ?? 0) <= 0 && !((value.quantity ?? 0) > 0 && (value.lastPriceCad ?? 0) > 0)) {
+  if ((value.marketValueAmount ?? 0) <= 0 && !((value.quantity ?? 0) > 0 && (value.lastPriceAmount ?? 0) > 0)) {
     context.addIssue({
       code: z.ZodIssueCode.custom,
-      path: ["marketValueCad"],
+      path: ["marketValueAmount"],
       message: "Each holding requires market value or quantity plus current price."
     });
   }
@@ -96,8 +101,9 @@ export const guidedImportCreateSchema = z.object({
   method: z.enum(["single-account-csv", "manual-entry", "continue-later"]),
   institution: z.string().trim().min(2).max(120),
   nickname: z.string().trim().min(2).max(120),
+  currency: z.enum(["CAD", "USD"]).default("CAD"),
   contributionRoomCad: z.number().min(0).max(1000000).optional().default(0),
-  initialMarketValueCad: z.number().min(0).max(100000000).optional().default(0),
+  initialMarketValueAmount: z.number().min(0).max(100000000).optional().default(0),
   holdings: z.array(guidedHoldingSchema).max(100).optional().default([])
 }).superRefine((value, context) => {
   if (value.accountMode === "existing" && !value.existingAccountId) {
@@ -148,6 +154,7 @@ export const guidedAllocationDraftSchema = z.object({
 });
 
 export type PreferenceProfileInputPayload = z.infer<typeof preferenceProfileInputSchema>;
+export type DisplayCurrencyInputPayload = z.infer<typeof displayCurrencyInputSchema>;
 export type RegisterUserInputPayload = z.infer<typeof registerUserInputSchema>;
 export type ImportJobCreatePayload = z.infer<typeof importJobCreateSchema>;
 export type ImportMappingPresetCreatePayload = z.infer<typeof importMappingPresetCreateSchema>;

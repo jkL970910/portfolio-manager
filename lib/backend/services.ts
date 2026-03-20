@@ -1,11 +1,12 @@
 import { hash } from "bcryptjs";
 import { and, desc, eq } from "drizzle-orm";
 import { apiSuccess } from "@/lib/backend/contracts";
-import { ImportFieldMapping, ImportValidationError, parseImportCsv } from "@/lib/backend/csv-import";
+import { ImportFieldMapping, ImportValidationError, ParsedCsvImport, parseImportCsv } from "@/lib/backend/csv-import";
 import { getRepositories } from "@/lib/backend/repositories/factory";
 import {
   AllocationTarget,
   CashflowTransaction,
+  CurrencyCode,
   GuidedAllocationAnswers,
   GuidedAllocationDraft,
   PreferenceProfile,
@@ -39,6 +40,7 @@ import {
   users
 } from "@/lib/db/schema";
 import type { ImportJob, ImportMappingPreset, InvestmentAccount, HoldingPosition } from "@/lib/backend/models";
+import { convertCurrencyAmount, getFxRate } from "@/lib/market-data/fx";
 
 export interface PreferenceProfileInput {
   riskProfile: RiskProfile;
@@ -63,6 +65,10 @@ export interface SaveGuidedAllocationDraftInput {
   suggestedProfile: Omit<PreferenceProfile, "id" | "userId" | "watchlistSymbols">;
   assumptions: string[];
   rationale: string[];
+}
+
+export interface UpdateDisplayCurrencyInput {
+  currency: CurrencyCode;
 }
 
 export interface CreateImportJobInput {
@@ -126,18 +132,20 @@ export interface CreateGuidedImportInput {
   method: "single-account-csv" | "manual-entry" | "continue-later";
   institution: string;
   nickname: string;
+  currency: CurrencyCode;
   contributionRoomCad: number;
-  initialMarketValueCad: number;
+  initialMarketValueAmount: number;
   holdings?: Array<{
     symbol: string;
     holdingName?: string;
     assetClass: string;
     sector?: string;
+    currency: CurrencyCode;
     quantity?: number | null;
-    avgCostPerShareCad?: number | null;
-    costBasisCad?: number | null;
-    lastPriceCad?: number | null;
-    marketValueCad?: number | null;
+    avgCostPerShareAmount?: number | null;
+    costBasisAmount?: number | null;
+    lastPriceAmount?: number | null;
+    marketValueAmount?: number | null;
   }>;
 }
 
@@ -291,22 +299,39 @@ function round(value: number, digits = 2) {
   return Math.round(value * factor) / factor;
 }
 
-function normalizeManualHolding(input: NonNullable<CreateGuidedImportInput["holdings"]>[number]) {
+function normalizeCurrencyCode(value: string): CurrencyCode {
+  return value === "USD" ? "USD" : "CAD";
+}
+
+async function toCadAmount(amount: number | null | undefined, currency: CurrencyCode) {
+  if (amount == null || !Number.isFinite(amount)) {
+    return null;
+  }
+  return currency === "CAD" ? round(amount) : round(await convertCurrencyAmount(amount, currency, "CAD"));
+}
+
+async function normalizeManualHolding(input: NonNullable<CreateGuidedImportInput["holdings"]>[number]) {
   const quantity = input.quantity ?? null;
-  const avgCostPerShareCad = input.avgCostPerShareCad ?? null;
-  const explicitCostBasisCad = input.costBasisCad ?? null;
-  const lastPriceCad = input.lastPriceCad ?? null;
-  const explicitMarketValueCad = input.marketValueCad ?? null;
-  const costBasisCad = explicitCostBasisCad ?? (
-    quantity != null && avgCostPerShareCad != null ? round(quantity * avgCostPerShareCad) : null
+  const currency = normalizeCurrencyCode(input.currency);
+  const avgCostPerShareAmount = input.avgCostPerShareAmount ?? null;
+  const explicitCostBasisAmount = input.costBasisAmount ?? null;
+  const lastPriceAmount = input.lastPriceAmount ?? null;
+  const explicitMarketValueAmount = input.marketValueAmount ?? null;
+  const costBasisAmount = explicitCostBasisAmount ?? (
+    quantity != null && avgCostPerShareAmount != null ? round(quantity * avgCostPerShareAmount) : null
   );
-  const marketValueCad = explicitMarketValueCad ?? (
-    quantity != null && lastPriceCad != null ? round(quantity * lastPriceCad) : null
+  const marketValueAmount = explicitMarketValueAmount ?? (
+    quantity != null && lastPriceAmount != null ? round(quantity * lastPriceAmount) : null
   );
 
-  if (marketValueCad == null || marketValueCad <= 0) {
+  if (marketValueAmount == null || marketValueAmount <= 0) {
     throw new Error(`Holding ${input.symbol.toUpperCase()} requires market value or quantity plus current price.`);
   }
+
+  const avgCostPerShareCad = await toCadAmount(avgCostPerShareAmount, currency);
+  const costBasisCad = await toCadAmount(costBasisAmount, currency);
+  const lastPriceCad = await toCadAmount(lastPriceAmount, currency);
+  const marketValueCad = (await toCadAmount(marketValueAmount, currency)) ?? 0;
 
   const gainLossPct = costBasisCad != null && costBasisCad > 0
     ? round(((marketValueCad - costBasisCad) / costBasisCad) * 100, 2)
@@ -317,7 +342,12 @@ function normalizeManualHolding(input: NonNullable<CreateGuidedImportInput["hold
     name: input.holdingName?.trim() || input.symbol.trim().toUpperCase(),
     assetClass: input.assetClass,
     sector: input.sector?.trim() || "Multi-sector",
+    currency,
     quantity,
+    avgCostPerShareAmount,
+    costBasisAmount,
+    lastPriceAmount,
+    marketValueAmount,
     avgCostPerShareCad,
     costBasisCad,
     lastPriceCad,
@@ -327,7 +357,7 @@ function normalizeManualHolding(input: NonNullable<CreateGuidedImportInput["hold
 }
 
 function applySymbolCorrectionsToParsedImport(
-  parsed: ReturnType<typeof parseImportCsv>,
+  parsed: ParsedCsvImport,
   corrections: Record<string, { symbol: string; name?: string }> | undefined
 ) {
   if (!corrections || Object.keys(corrections).length === 0) {
@@ -449,6 +479,11 @@ export async function getDashboardView(userId: string) {
     latestRun = null;
   }
 
+  const display = {
+    currency: user.baseCurrency,
+    cadToDisplayRate: await getFxRate("CAD", user.baseCurrency)
+  } as const;
+
   return apiSuccess({
     ...buildDashboardData({
       viewer: user,
@@ -456,7 +491,8 @@ export async function getDashboardView(userId: string) {
       holdings: userHoldings,
       transactions: userTransactions,
       profile,
-      latestRun
+      latestRun,
+      display
     }),
     context: {
       userId: user.id,
@@ -469,14 +505,20 @@ export async function getDashboardView(userId: string) {
 
 export async function getPortfolioView(userId: string) {
   const repositories = getRepositories();
-  const [userAccounts, userHoldings, profile] = await Promise.all([
+  const [user, userAccounts, userHoldings, profile] = await Promise.all([
+    repositories.users.getById(userId),
     repositories.accounts.listByUserId(userId),
     repositories.holdings.listByUserId(userId),
     repositories.preferences.getByUserId(userId)
   ]);
 
+  const display = {
+    currency: user.baseCurrency,
+    cadToDisplayRate: await getFxRate("CAD", user.baseCurrency)
+  } as const;
+
   return apiSuccess({
-    ...buildPortfolioData({ accounts: userAccounts, holdings: userHoldings, profile }),
+    ...buildPortfolioData({ accounts: userAccounts, holdings: userHoldings, profile, display }),
     context: {
       totalMarketValueCad: userAccounts.reduce((sum, account) => sum + account.marketValueCad, 0),
       topHoldingSymbol: [...userHoldings].sort((left, right) => right.marketValueCad - left.marketValueCad)[0]?.symbol ?? null
@@ -486,7 +528,10 @@ export async function getPortfolioView(userId: string) {
 
 export async function getRecommendationView(userId: string) {
   const repositories = getRepositories();
-  const profile = await repositories.preferences.getByUserId(userId);
+  const [user, profile] = await Promise.all([
+    repositories.users.getById(userId),
+    repositories.preferences.getByUserId(userId)
+  ]);
   let latestRun: RecommendationRun | null = null;
   try {
     latestRun = await repositories.recommendations.getLatestByUserId(userId);
@@ -494,26 +539,41 @@ export async function getRecommendationView(userId: string) {
     latestRun = null;
   }
 
+  const display = {
+    currency: user.baseCurrency,
+    cadToDisplayRate: await getFxRate("CAD", user.baseCurrency)
+  } as const;
+
   return apiSuccess({
-    ...buildRecommendationsData({ profile, latestRun }),
+    ...buildRecommendationsData({ profile, latestRun, display }),
     run: latestRun ?? createEmptyRun(userId)
   }, "database");
 }
 
 export async function getSpendingView(userId: string) {
   const repositories = getRepositories();
-  const [userTransactions, profile] = await Promise.all([
+  const [user, userTransactions, profile] = await Promise.all([
+    repositories.users.getById(userId),
     repositories.transactions.listByUserId(userId),
     repositories.preferences.getByUserId(userId)
   ]);
 
+  const display = {
+    currency: user.baseCurrency,
+    cadToDisplayRate: await getFxRate("CAD", user.baseCurrency)
+  } as const;
+
   return apiSuccess({
-    ...buildSpendingData({ transactions: userTransactions, profile }),
+    ...buildSpendingData({ transactions: userTransactions, profile, display }),
     context: {
       transactionCount: userTransactions.length,
       latestBookedAt: [...userTransactions].sort((left, right) => right.bookedAt.localeCompare(left.bookedAt))[0]?.bookedAt ?? null
     }
   }, "database");
+}
+
+export async function updateDisplayCurrency(userId: string, input: UpdateDisplayCurrencyInput): Promise<UserProfile> {
+  return getRepositories().users.updateBaseCurrency(userId, input.currency);
 }
 
 export async function getImportView(userId: string) {
@@ -885,7 +945,7 @@ export async function registerUserAccount(input: RegisterUserInput): Promise<Use
       id: userRow.id,
       email: userRow.email,
       displayName: userRow.displayName,
-      baseCurrency: userRow.baseCurrency as "CAD"
+      baseCurrency: userRow.baseCurrency as CurrencyCode
     };
   });
 }
@@ -931,7 +991,7 @@ export async function createImportJob(userId: string, input: CreateImportJobInpu
   }
 
   const parsed = applySymbolCorrectionsToParsedImport(
-    parseImportCsv(filterCsvContentByWorkflow(input.csvContent, input.fieldMapping, input.workflow), input.fieldMapping ?? {}),
+    await parseImportCsv(filterCsvContentByWorkflow(input.csvContent, input.fieldMapping, input.workflow), input.fieldMapping ?? {}),
     input.symbolCorrections
   );
   const workflowScopedParsed = input.workflow === "spending"
@@ -1062,6 +1122,8 @@ export async function createImportJob(userId: string, input: CreateImportJobInpu
             institution: account.institution,
             type: account.type,
             nickname: account.nickname,
+            currency: account.currency,
+            marketValueAmount: (account.marketValueAmount ?? account.marketValueCad ?? 0).toFixed(2),
             marketValueCad: (account.marketValueCad ?? 0).toFixed(2),
             contributionRoomCad: account.contributionRoomCad?.toFixed(2) ?? null
           }))
@@ -1082,6 +1144,8 @@ export async function createImportJob(userId: string, input: CreateImportJobInpu
           await tx
             .update(investmentAccounts)
             .set({
+              currency: account.currency,
+              marketValueAmount: (account.marketValueAmount ?? account.marketValueCad ?? 0).toFixed(2),
               marketValueCad: (account.marketValueCad ?? 0).toFixed(2),
               contributionRoomCad: account.contributionRoomCad?.toFixed(2) ?? null,
               updatedAt: new Date()
@@ -1099,7 +1163,12 @@ export async function createImportJob(userId: string, input: CreateImportJobInpu
       name: string;
       assetClass: string;
       sector: string;
+      currency: CurrencyCode;
       quantity: string | null;
+      avgCostPerShareAmount: string | null;
+      costBasisAmount: string | null;
+      lastPriceAmount: string | null;
+      marketValueAmount: string;
       avgCostPerShareCad: string | null;
       costBasisCad: string | null;
       lastPriceCad: string | null;
@@ -1121,7 +1190,12 @@ export async function createImportJob(userId: string, input: CreateImportJobInpu
         name: holding.name,
         assetClass: holding.assetClass,
         sector: holding.sector,
+        currency: holding.currency,
         quantity: holding.quantity?.toFixed(6) ?? null,
+        avgCostPerShareAmount: holding.avgCostPerShareAmount?.toFixed(4) ?? null,
+        costBasisAmount: holding.costBasisAmount?.toFixed(2) ?? null,
+        lastPriceAmount: holding.lastPriceAmount?.toFixed(4) ?? null,
+        marketValueAmount: holding.marketValueAmount.toFixed(2),
         avgCostPerShareCad: holding.avgCostPerShareCad?.toFixed(4) ?? null,
         costBasisCad: holding.costBasisCad?.toFixed(2) ?? null,
         lastPriceCad: holding.lastPriceCad?.toFixed(4) ?? null,
@@ -1138,7 +1212,12 @@ export async function createImportJob(userId: string, input: CreateImportJobInpu
             name: payload.name,
             assetClass: payload.assetClass,
             sector: payload.sector,
+            currency: payload.currency,
             quantity: payload.quantity,
+            avgCostPerShareAmount: payload.avgCostPerShareAmount,
+            costBasisAmount: payload.costBasisAmount,
+            lastPriceAmount: payload.lastPriceAmount,
+            marketValueAmount: payload.marketValueAmount,
             avgCostPerShareCad: payload.avgCostPerShareCad,
             costBasisCad: payload.costBasisCad,
             lastPriceCad: payload.lastPriceCad,
@@ -1275,6 +1354,7 @@ export async function createGuidedImportAccount(userId: string, input: CreateGui
         .set({
           institution: input.institution,
           nickname: input.nickname,
+          currency: input.currency,
           contributionRoomCad: input.contributionRoomCad.toFixed(2),
           updatedAt: new Date()
         })
@@ -1289,7 +1369,9 @@ export async function createGuidedImportAccount(userId: string, input: CreateGui
           institution: input.institution,
           type: input.accountType,
           nickname: input.nickname,
-          marketValueCad: input.initialMarketValueCad.toFixed(2),
+          currency: input.currency,
+          marketValueAmount: input.initialMarketValueAmount.toFixed(2),
+          marketValueCad: (await toCadAmount(input.initialMarketValueAmount, input.currency) ?? 0).toFixed(2),
           contributionRoomCad: input.contributionRoomCad.toFixed(2)
         })
         .returning();
@@ -1304,7 +1386,7 @@ export async function createGuidedImportAccount(userId: string, input: CreateGui
         )
       );
       const existingHoldingBySymbol = new Map(existingHoldings.map((holding) => [holding.symbol.toUpperCase(), holding]));
-      const normalizedHoldings = input.holdings.map(normalizeManualHolding);
+      const normalizedHoldings = await Promise.all(input.holdings.map(normalizeManualHolding));
 
       for (const holding of normalizedHoldings) {
         const matched = existingHoldingBySymbol.get(holding.symbol);
@@ -1315,7 +1397,12 @@ export async function createGuidedImportAccount(userId: string, input: CreateGui
               name: holding.name,
               assetClass: holding.assetClass,
               sector: holding.sector,
+              currency: holding.currency,
               quantity: holding.quantity?.toFixed(6) ?? null,
+              avgCostPerShareAmount: holding.avgCostPerShareAmount?.toFixed(4) ?? null,
+              costBasisAmount: holding.costBasisAmount?.toFixed(2) ?? null,
+              lastPriceAmount: holding.lastPriceAmount?.toFixed(4) ?? null,
+              marketValueAmount: holding.marketValueAmount.toFixed(2),
               avgCostPerShareCad: holding.avgCostPerShareCad?.toFixed(4) ?? null,
               costBasisCad: holding.costBasisCad?.toFixed(2) ?? null,
               lastPriceCad: holding.lastPriceCad?.toFixed(4) ?? null,
@@ -1332,7 +1419,12 @@ export async function createGuidedImportAccount(userId: string, input: CreateGui
             name: holding.name,
             assetClass: holding.assetClass,
             sector: holding.sector,
+            currency: holding.currency,
             quantity: holding.quantity?.toFixed(6) ?? null,
+            avgCostPerShareAmount: holding.avgCostPerShareAmount?.toFixed(4) ?? null,
+            costBasisAmount: holding.costBasisAmount?.toFixed(2) ?? null,
+            lastPriceAmount: holding.lastPriceAmount?.toFixed(4) ?? null,
+            marketValueAmount: holding.marketValueAmount.toFixed(2),
             avgCostPerShareCad: holding.avgCostPerShareCad?.toFixed(4) ?? null,
             costBasisCad: holding.costBasisCad?.toFixed(2) ?? null,
             lastPriceCad: holding.lastPriceCad?.toFixed(4) ?? null,
@@ -1360,6 +1452,7 @@ export async function createGuidedImportAccount(userId: string, input: CreateGui
       const [updatedAccount] = await tx
         .update(investmentAccounts)
         .set({
+          marketValueAmount: ((await convertCurrencyAmount(totalMarketValue, "CAD", accountRow.currency as CurrencyCode)) || totalMarketValue).toFixed(2),
           marketValueCad: totalMarketValue.toFixed(2),
           updatedAt: new Date()
         })
@@ -1400,6 +1493,8 @@ export async function createGuidedImportAccount(userId: string, input: CreateGui
         institution: accountRow.institution,
         type: accountRow.type as AccountType,
         nickname: accountRow.nickname,
+        currency: accountRow.currency as CurrencyCode,
+        marketValueAmount: Number(accountRow.marketValueAmount),
         marketValueCad: Number(accountRow.marketValueCad),
         contributionRoomCad: accountRow.contributionRoomCad == null ? null : Number(accountRow.contributionRoomCad)
       },
@@ -1457,7 +1552,7 @@ export async function refreshPortfolioQuotes(userId: string): Promise<RefreshPor
   const quoteMap = new Map(
     quoteResults.results
       .filter((quote) => Number.isFinite(quote.price) && quote.price > 0)
-      .map((quote) => [quote.symbol.trim().toUpperCase(), quote.price])
+      .map((quote) => [quote.symbol.trim().toUpperCase(), quote])
   );
 
   const refreshedAt = new Date();
@@ -1467,25 +1562,39 @@ export async function refreshPortfolioQuotes(userId: string): Promise<RefreshPor
     const currentHoldings = await tx.select().from(holdingPositions).where(eq(holdingPositions.userId, userId));
 
     for (const holding of currentHoldings) {
-      const quotePrice = quoteMap.get(holding.symbol.trim().toUpperCase());
-      if (!quotePrice) {
+      const quote = quoteMap.get(holding.symbol.trim().toUpperCase());
+      if (!quote) {
         continue;
       }
+      const holdingCurrency = normalizeCurrencyCode((holding.currency as string) || "CAD");
+      const quoteCurrency = normalizeCurrencyCode(quote.currency || holdingCurrency);
+      const nativePrice = quote.price;
+      const priceInCad = quoteCurrency === "CAD"
+        ? nativePrice
+        : await convertCurrencyAmount(nativePrice, quoteCurrency, "CAD");
 
       const quantity = holding.quantity == null ? null : Number(holding.quantity);
       const currentMarketValue = quantity != null && quantity > 0
-        ? round(quantity * quotePrice)
+        ? round((holdingCurrency === quoteCurrency
+          ? quantity * nativePrice
+          : quantity * (holding.lastPriceAmount == null ? nativePrice : Number(holding.lastPriceAmount))))
+        : Number(holding.marketValueAmount ?? holding.marketValueCad);
+      const currentMarketValueCad = quantity != null && quantity > 0
+        ? round(quantity * priceInCad)
         : Number(holding.marketValueCad);
       const costBasis = holding.costBasisCad == null ? null : Number(holding.costBasisCad);
       const gainLossPct = costBasis != null && costBasis > 0
-        ? round(((currentMarketValue - costBasis) / costBasis) * 100, 2)
+        ? round(((currentMarketValueCad - costBasis) / costBasis) * 100, 2)
         : Number(holding.gainLossPct);
 
       await tx
         .update(holdingPositions)
         .set({
-          lastPriceCad: quotePrice.toFixed(4),
-          marketValueCad: currentMarketValue.toFixed(2),
+          currency: holdingCurrency,
+          lastPriceAmount: nativePrice.toFixed(4),
+          lastPriceCad: priceInCad.toFixed(4),
+          marketValueAmount: currentMarketValue.toFixed(2),
+          marketValueCad: currentMarketValueCad.toFixed(2),
           gainLossPct: gainLossPct.toFixed(2),
           updatedAt: refreshedAt
         })
@@ -1504,6 +1613,9 @@ export async function refreshPortfolioQuotes(userId: string): Promise<RefreshPor
 
     for (const [accountId, accountHoldings] of holdingsByAccount.entries()) {
       const accountTotal = accountHoldings.reduce((sum, holding) => sum + Number(holding.marketValueCad), 0);
+      const accountRow = await tx.query.investmentAccounts.findFirst({
+        where: eq(investmentAccounts.id, accountId)
+      });
 
       for (const holding of accountHoldings) {
         const weightPct = accountTotal > 0 ? round((Number(holding.marketValueCad) / accountTotal) * 100, 2) : 0;
@@ -1519,6 +1631,7 @@ export async function refreshPortfolioQuotes(userId: string): Promise<RefreshPor
       await tx
         .update(investmentAccounts)
         .set({
+          marketValueAmount: ((await convertCurrencyAmount(accountTotal, "CAD", normalizeCurrencyCode((accountRow?.currency as string) || "CAD"))) || accountTotal).toFixed(2),
           marketValueCad: accountTotal.toFixed(2),
           updatedAt: refreshedAt
         })

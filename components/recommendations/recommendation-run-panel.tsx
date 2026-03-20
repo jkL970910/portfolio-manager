@@ -26,7 +26,10 @@ export function RecommendationRunPanel({ initialContributionAmount }: { initialC
         setStatus({ type: "error", message: getApiErrorMessage(payload, "Failed to generate recommendation run.") });
         return;
       }
-      setStatus({ type: "success", message: `Recommendation run generated for ${Number(contributionAmount).toLocaleString("en-CA")} CAD.` });
+      setStatus({
+        type: "success",
+        message: `Recommendation run generated for ${Number(contributionAmount).toLocaleString("en-CA")} CAD in the planning base currency.`
+      });
       router.refresh();
     });
   }
@@ -41,7 +44,7 @@ export function RecommendationRunPanel({ initialContributionAmount }: { initialC
         <Badge variant="primary">POST /api/recommendations/runs</Badge>
       </div>
       <label className="block space-y-2">
-        <span className="text-sm font-medium text-[color:var(--foreground)]">Contribution amount (CAD)</span>
+        <span className="text-sm font-medium text-[color:var(--foreground)]">Contribution amount (planning base, CAD)</span>
         <input
           type="number"
           min={1}
@@ -49,6 +52,9 @@ export function RecommendationRunPanel({ initialContributionAmount }: { initialC
           onChange={(event) => setContributionAmount(Number(event.target.value))}
           className="w-full rounded-2xl border border-[color:var(--border)] bg-white px-4 py-3 text-sm outline-none"
         />
+        <p className="text-xs text-[color:var(--muted-foreground)]">
+          Recommendation runs are generated in the planning base currency, then displayed in your selected currency across the product.
+        </p>
       </label>
       {status.type !== "idle" ? (
         <div className={`rounded-2xl border px-4 py-3 text-sm ${status.type === "success" ? "border-[#b6d7c7] bg-[#eef8f1] text-[#21613f]" : "border-[#e7b0b8] bg-[#fff3f5] text-[#8e2433]"}`}>

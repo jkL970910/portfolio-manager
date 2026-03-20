@@ -31,6 +31,7 @@ Portfolio Manager is designed to help users:
 
 ### 1. Dashboard
 - portfolio summary
+- global CAD / USD display toggle
 - contribution room visibility
 - portfolio risk snapshot
 - asset mix and top holdings
@@ -63,12 +64,14 @@ Portfolio Manager is designed to help users:
 - direct CSV import flow
 - single-account CSV onboarding
 - manual entry with security search and quote lookup
+- multi-currency account and holding entry for CAD / USD
 - field mapping presets
 - dry-run review, symbol audit, correction, and confirm import
 
 ### 6. Investment Preferences
 - user-scoped preference persistence
 - target allocation setup
+- guided allocation setup with saved draft persistence
 - funding priority configuration
 - tax-aware placement settings
 - watchlist and transition preferences
@@ -152,15 +155,16 @@ Implemented now:
   - auto-calculated market value
   - optional override total value
   - derived cost basis / gain-loss
+- CAD / USD display switching across dashboard, portfolio, recommendations, and spending
 - portfolio price refresh with:
   - batch quote refresh
   - freshness / coverage status
 - persistent investment preferences and import mapping presets
+- persisted guided allocation questionnaire drafts
 - unified client-side API safety helpers for fetch payload validation
 
 Not finished yet:
 
-- guided allocation setup in Settings
 - recommendation engine v2
 - richer review persistence for invalid imports
 - broker integrations and async workers

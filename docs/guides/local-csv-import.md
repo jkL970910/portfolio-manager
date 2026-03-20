@@ -64,11 +64,21 @@ The current holding model treats a holding as:
 
 The importer will derive missing values when enough fields are available.
 
-In the CSV workflow, the canonical field name is still `market_value_cad`.
-That field now serves the same purpose as the UI's `Override total value`:
+In the CSV workflow, the canonical field names are now:
 
-- if `market_value_cad` is present and greater than `0`, it is treated as the explicit total position value
-- if `market_value_cad` is empty, the importer falls back to `quantity x last_price_cad`
+- `account_currency`
+- `holding_currency`
+- `market_value`
+- `avg_cost_per_share`
+- `cost_basis`
+- `last_price`
+
+`market_value` serves the same purpose as the UI's `Override total value`:
+
+- if `market_value` is present and greater than `0`, it is treated as the explicit total position value in the row currency
+- if `market_value` is empty, the importer falls back to `quantity x last_price`
+
+Use `account_currency` and `holding_currency` to declare whether the amounts are in `CAD` or `USD`. The backend normalizes those values to CAD for analytics, while the product can still display CAD or USD globally.
 
 ### Guided Setup
 
@@ -165,7 +175,8 @@ Optional:
 
 - `institution`
 - `account_nickname`
-- `market_value_cad`
+- `account_currency`
+- `market_value`
 - `contribution_room_cad`
 
 #### Holding Rows
@@ -174,21 +185,22 @@ Required:
 
 - `symbol`
 - `asset_class`
-- `market_value_cad`
-  - or `quantity` plus `last_price_cad`
+- `holding_currency`
+- `market_value`
+  - or `quantity` plus `last_price`
 
 Optional:
 
 - `name`
 - `sector`
 - `quantity`
-- `avg_cost_per_share_cad`
-- `cost_basis_cad`
-- `last_price_cad`
+- `avg_cost_per_share`
+- `cost_basis`
+- `last_price`
 - `weight_pct`
 - `gain_loss_pct`
 
-`market_value_cad` has higher priority than `quantity x last_price_cad`.
+`market_value` has higher priority than `quantity x last_price`.
 Use it when you want to explicitly override the computed total value for the holding.
 
 ## Spending CSV
@@ -247,9 +259,9 @@ Optional:
 - numeric fields must be parseable after removing `$` and commas
 - each portfolio `holding` row and `account` row must include `account_key`
 - each holding must provide either:
-  - `market_value_cad`
-  - or `quantity` plus `last_price_cad`
-- if both `market_value_cad` and `quantity + last_price_cad` are present, `market_value_cad` wins
+  - `market_value`
+  - or `quantity` plus `last_price`
+- if both `market_value` and `quantity + last_price` are present, `market_value` wins
 
 ## Mapping Presets
 

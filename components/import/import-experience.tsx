@@ -27,6 +27,7 @@ type ImportMode = "guided" | "direct";
 type ImportWorkflowView = "portfolio" | "spending";
 type GuidedMethod = "single-account-csv" | "manual-entry" | "continue-later";
 type GuidedAccountType = "TFSA" | "RRSP" | "FHSA" | "Taxable";
+type SupportedCurrency = "CAD" | "USD";
 
 type GuidedImportResult = {
   account: {
@@ -34,6 +35,8 @@ type GuidedImportResult = {
     institution: string;
     type: GuidedAccountType;
     nickname: string;
+    currency: SupportedCurrency;
+    marketValueAmount: number;
     marketValueCad: number;
     contributionRoomCad: number | null;
   };
@@ -96,7 +99,9 @@ type ExistingAccountOption = {
   type: string;
   institution: string;
   nickname: string;
+  currency: SupportedCurrency;
   contributionRoomCad: number | null;
+  marketValueAmount: number;
   marketValueCad: number;
 };
 
@@ -107,10 +112,11 @@ type ManualHoldingDraft = {
   holdingName: string;
   assetClass: (typeof ASSET_CLASS_OPTIONS)[number];
   sector: string;
+  currency: SupportedCurrency;
   quantity: string;
-  avgCostPerShareCad: string;
-  currentPriceCad: string;
-  overrideMarketValueCad: string;
+  avgCostPerShareAmount: string;
+  currentPriceAmount: string;
+  overrideMarketValueAmount: string;
 };
 
 type MarketDataSearchResult = {
@@ -166,8 +172,8 @@ const ASSET_CLASS_OPTIONS = [
 
 const GUIDED_MAPPING_GROUPS = [
   { title: "Core", fields: ["record_type", "account_key"] },
-  { title: "Account rows", fields: ["account_type", "institution", "account_nickname", "market_value_cad", "contribution_room_cad"] },
-  { title: "Holding rows", fields: ["symbol", "name", "asset_class", "sector", "quantity", "avg_cost_per_share_cad", "cost_basis_cad", "last_price_cad", "market_value_cad", "weight_pct", "gain_loss_pct"] },
+  { title: "Account rows", fields: ["account_type", "institution", "account_nickname", "account_currency", "market_value", "contribution_room_cad"] },
+  { title: "Holding rows", fields: ["symbol", "name", "asset_class", "sector", "holding_currency", "quantity", "avg_cost_per_share", "cost_basis", "last_price", "market_value", "weight_pct", "gain_loss_pct"] },
   { title: "Transaction rows", fields: ["booked_at", "merchant", "category", "amount_cad", "direction"] }
 ] as const;
 
@@ -184,16 +190,18 @@ const GUIDED_BUILT_IN_PRESETS = [
       account_type: "acct_kind",
       institution: "broker",
       account_nickname: "acct_label",
-      market_value_cad: "value_cad",
+      account_currency: "acct_currency",
+      market_value: "value_native",
       contribution_room_cad: "room_left",
       symbol: "ticker",
       name: "security_name",
       asset_class: "asset_bucket",
       sector: "bucket_sector",
+      holding_currency: "trade_currency",
       quantity: "units",
-      avg_cost_per_share_cad: "avg_cost",
-      cost_basis_cad: "book_cost",
-      last_price_cad: "last_price",
+      avg_cost_per_share: "avg_cost",
+      cost_basis: "book_cost",
+      last_price: "last_price",
       gain_loss_pct: "pnl_pct",
       booked_at: "trade_date",
       merchant: "payee",
@@ -210,16 +218,18 @@ const GUIDED_BUILT_IN_PRESETS = [
       account_type: "account_type",
       institution: "broker_name",
       account_nickname: "account_name",
-      market_value_cad: "market_value",
+      account_currency: "account_currency",
+      market_value: "market_value",
       contribution_room_cad: "remaining_room",
       symbol: "symbol",
       name: "security_name",
       asset_class: "asset_class",
       sector: "sector_name",
+      holding_currency: "currency",
       quantity: "quantity",
-      avg_cost_per_share_cad: "avg_cost",
-      cost_basis_cad: "cost_basis",
-      last_price_cad: "last_price",
+      avg_cost_per_share: "avg_cost",
+      cost_basis: "cost_basis",
+      last_price: "last_price",
       gain_loss_pct: "gain_loss_pct",
       booked_at: "transaction_date",
       merchant: "description",
@@ -246,11 +256,19 @@ function buildDefaultMapping(headers: string[]) {
 }
 
 function formatCad(value: number) {
-  return Number(value || 0).toLocaleString("en-CA", {
+  return formatAmount(value, "CAD");
+}
+
+function formatAmount(value: number, currency: SupportedCurrency) {
+  return Number(value || 0).toLocaleString(currency === "CAD" ? "en-CA" : "en-US", {
     style: "currency",
-    currency: "CAD",
+    currency,
     maximumFractionDigits: 0
   });
+}
+
+function normalizeSupportedCurrency(value?: string | null): SupportedCurrency {
+  return value === "USD" ? "USD" : "CAD";
 }
 
 function createManualHoldingDraft(): ManualHoldingDraft {
@@ -261,10 +279,11 @@ function createManualHoldingDraft(): ManualHoldingDraft {
     holdingName: "",
     assetClass: "Canadian Equity",
     sector: "Multi-sector",
+    currency: "CAD",
     quantity: "",
-    avgCostPerShareCad: "",
-    currentPriceCad: "",
-    overrideMarketValueCad: ""
+    avgCostPerShareAmount: "",
+    currentPriceAmount: "",
+    overrideMarketValueAmount: ""
   };
 }
 
@@ -278,24 +297,24 @@ function formatPercent(value: number | null) {
 
 function getManualHoldingDerivedMetrics(holding: ManualHoldingDraft) {
   const quantity = Number(holding.quantity) || 0;
-  const avgCostPerShareCad = Number(holding.avgCostPerShareCad) || 0;
-  const currentPriceCad = Number(holding.currentPriceCad) || 0;
-  const explicitMarketValueCad = Number(holding.overrideMarketValueCad) || 0;
+  const avgCostPerShareAmount = Number(holding.avgCostPerShareAmount) || 0;
+  const currentPriceAmount = Number(holding.currentPriceAmount) || 0;
+  const explicitMarketValueAmount = Number(holding.overrideMarketValueAmount) || 0;
 
-  const costBasisCad = quantity > 0 && avgCostPerShareCad > 0 ? quantity * avgCostPerShareCad : 0;
-  const computedMarketValueCad = explicitMarketValueCad > 0
-    ? explicitMarketValueCad
-    : quantity > 0 && currentPriceCad > 0
-      ? quantity * currentPriceCad
+  const costBasisAmount = quantity > 0 && avgCostPerShareAmount > 0 ? quantity * avgCostPerShareAmount : 0;
+  const computedMarketValueAmount = explicitMarketValueAmount > 0
+    ? explicitMarketValueAmount
+    : quantity > 0 && currentPriceAmount > 0
+      ? quantity * currentPriceAmount
       : 0;
 
-  const gainLossPct = costBasisCad > 0 && computedMarketValueCad > 0
-    ? ((computedMarketValueCad - costBasisCad) / costBasisCad) * 100
+  const gainLossPct = costBasisAmount > 0 && computedMarketValueAmount > 0
+    ? ((computedMarketValueAmount - costBasisAmount) / costBasisAmount) * 100
     : null;
 
   return {
-    costBasisCad,
-    computedMarketValueCad,
+    costBasisAmount,
+    computedMarketValueAmount,
     gainLossPct
   };
 }
@@ -322,10 +341,11 @@ export function ImportExperience({
   const [method, setMethod] = useState<GuidedMethod | null>(null);
   const [accountMode, setAccountMode] = useState<"new" | "existing">("new");
   const [selectedExistingAccountId, setSelectedExistingAccountId] = useState("");
+  const [accountCurrency, setAccountCurrency] = useState<SupportedCurrency>("CAD");
   const [institution, setInstitution] = useState("");
   const [nickname, setNickname] = useState("");
   const [contributionRoomCad, setContributionRoomCad] = useState("0");
-  const [initialMarketValueCad, setInitialMarketValueCad] = useState("0");
+  const [initialMarketValueAmount, setInitialMarketValueAmount] = useState("0");
   const [manualHoldings, setManualHoldings] = useState<ManualHoldingDraft[]>([createManualHoldingDraft()]);
   const [guidedResult, setGuidedResult] = useState<GuidedImportResult | null>(null);
   const [guidedCsvFileName, setGuidedCsvFileName] = useState("single-account.csv");
@@ -345,7 +365,7 @@ export function ImportExperience({
   const [isPending, startTransition] = useTransition();
 
   const parsedContributionRoom = Number(contributionRoomCad) || 0;
-  const parsedInitialMarketValue = Number(initialMarketValueCad) || 0;
+  const parsedInitialMarketValue = Number(initialMarketValueAmount) || 0;
   const guidedCsvPreview = useMemo(() => previewCsvContent(guidedCsvContent, 10), [guidedCsvContent]);
   const guidedCsvPresetOptions = useMemo(
     () => [
@@ -364,7 +384,7 @@ export function ImportExperience({
   );
   const manualHoldingsAreValid = useMemo(() => manualHoldings.every((holding) => {
     const hasIdentity = holding.symbol.trim().length > 0 && holding.assetClass.length > 0;
-    const hasUsableValue = getManualHoldingDerivedMetrics(holding).computedMarketValueCad > 0;
+    const hasUsableValue = getManualHoldingDerivedMetrics(holding).computedMarketValueAmount > 0;
     return hasIdentity && hasUsableValue;
   }), [manualHoldings]);
 
@@ -391,8 +411,9 @@ export function ImportExperience({
     }
     setInstitution(selected.institution);
     setNickname(selected.nickname);
+    setAccountCurrency(selected.currency);
     setContributionRoomCad(String(selected.contributionRoomCad ?? 0));
-    setInitialMarketValueCad(String(selected.marketValueCad ?? 0));
+    setInitialMarketValueAmount(String(selected.marketValueAmount ?? selected.marketValueCad ?? 0));
   }, [accountMode, existingAccounts, selectedExistingAccountId]);
 
   function updateManualHolding(id: string, patch: Partial<ManualHoldingDraft>) {
@@ -485,7 +506,7 @@ export function ImportExperience({
         throw new Error(getApiErrorMessage(payload, "Security normalization failed."));
       }
 
-      const data = assertApiData<{ result?: { symbol?: string; name?: string; provider?: string } }>(
+      const data = assertApiData<{ result?: { symbol?: string; name?: string; provider?: string; currency?: string | null } }>(
         payload,
         (candidate) => typeof candidate === "object" && candidate !== null,
         "Security normalization succeeded but returned no usable normalization payload."
@@ -496,6 +517,7 @@ export function ImportExperience({
       }
 
       const normalizedSymbol = result.symbol.toUpperCase();
+      const normalizedCurrency = normalizeSupportedCurrency(result.currency);
       const normalizedName = typeof result.name === "string" && result.name.trim().length > 0
         ? result.name
         : nextName ?? normalizedSymbol;
@@ -505,7 +527,8 @@ export function ImportExperience({
       updateManualHolding(id, {
         symbol: normalizedSymbol,
         searchQuery: normalizedSymbol,
-        holdingName: normalizedName
+        holdingName: normalizedName,
+        currency: normalizedCurrency
       });
       setManualHoldingSuggestions((current) => ({ ...current, [id]: [] }));
       setManualHoldingStatus((current) => ({
@@ -551,7 +574,7 @@ export function ImportExperience({
         throw new Error(getApiErrorMessage(payload, "Quote lookup failed."));
       }
 
-      const data = assertApiData<{ result?: { price?: number; provider?: string; delayed?: boolean } }>(
+      const data = assertApiData<{ result?: { price?: number; provider?: string; delayed?: boolean; currency?: string | null } }>(
         payload,
         (candidate) => typeof candidate === "object" && candidate !== null,
         "Quote lookup succeeded but returned no usable quote payload."
@@ -571,7 +594,8 @@ export function ImportExperience({
         : "market-data provider";
       const delayedSuffix = quote.delayed === true ? " (delayed)" : "";
       updateManualHolding(id, {
-        currentPriceCad: nextPrice.toFixed(2)
+        currentPriceAmount: nextPrice.toFixed(2),
+        currency: normalizeSupportedCurrency(quote.currency)
       });
       setManualHoldingStatus((current) => ({
         ...current,
@@ -579,7 +603,7 @@ export function ImportExperience({
           ...current[id],
           quoteLoading: false,
           error: "",
-          message: `Fetched ${providerLabel} quote at ${formatCad(nextPrice)}${delayedSuffix}.`
+          message: `Fetched ${providerLabel} quote at ${formatAmount(nextPrice, normalizeSupportedCurrency(quote.currency))}${delayedSuffix}.`
         }
       }));
     } catch (error) {
@@ -677,10 +701,11 @@ export function ImportExperience({
     setMethod(null);
     setAccountMode("new");
     setSelectedExistingAccountId("");
+    setAccountCurrency("CAD");
     setInstitution("");
     setNickname("");
     setContributionRoomCad("0");
-    setInitialMarketValueCad("0");
+    setInitialMarketValueAmount("0");
     setManualHoldings([createManualHoldingDraft()]);
     setManualHoldingSuggestions({});
     setManualHoldingStatus({});
@@ -919,19 +944,21 @@ export function ImportExperience({
           method,
           institution: institution.trim(),
           nickname: nickname.trim(),
+          currency: accountCurrency,
           contributionRoomCad: parsedContributionRoom,
-          initialMarketValueCad: parsedInitialMarketValue,
+          initialMarketValueAmount: parsedInitialMarketValue,
           holdings: method === "manual-entry"
             ? manualHoldings.map((holding) => ({
                 symbol: holding.symbol.trim(),
                 holdingName: holding.holdingName.trim() || undefined,
                 assetClass: holding.assetClass,
                 sector: holding.sector.trim() || undefined,
+                currency: holding.currency,
                 quantity: holding.quantity ? Number(holding.quantity) : null,
-                avgCostPerShareCad: holding.avgCostPerShareCad ? Number(holding.avgCostPerShareCad) : null,
-                lastPriceCad: holding.currentPriceCad ? Number(holding.currentPriceCad) : null,
-                marketValueCad: getManualHoldingDerivedMetrics(holding).computedMarketValueCad > 0
-                  ? getManualHoldingDerivedMetrics(holding).computedMarketValueCad
+                avgCostPerShareAmount: holding.avgCostPerShareAmount ? Number(holding.avgCostPerShareAmount) : null,
+                lastPriceAmount: holding.currentPriceAmount ? Number(holding.currentPriceAmount) : null,
+                marketValueAmount: getManualHoldingDerivedMetrics(holding).computedMarketValueAmount > 0
+                  ? getManualHoldingDerivedMetrics(holding).computedMarketValueAmount
                   : null
               }))
             : []
@@ -1136,19 +1163,21 @@ export function ImportExperience({
                     accountMode={accountMode}
                     selectedExistingAccountId={selectedExistingAccountId}
                     existingAccounts={matchingExistingAccounts}
+                    accountCurrency={accountCurrency}
                     institution={institution}
                     nickname={nickname}
                     contributionRoomCad={contributionRoomCad}
-                    initialMarketValueCad={initialMarketValueCad}
+                    initialMarketValueAmount={initialMarketValueAmount}
                     manualHoldings={manualHoldings}
                     manualHoldingSuggestions={manualHoldingSuggestions}
                     manualHoldingStatus={manualHoldingStatus}
                     onAccountModeChange={setAccountMode}
                     onExistingAccountChange={setSelectedExistingAccountId}
+                    onAccountCurrencyChange={setAccountCurrency}
                     onInstitutionChange={setInstitution}
                     onNicknameChange={setNickname}
                     onContributionRoomChange={setContributionRoomCad}
-                    onInitialMarketValueChange={setInitialMarketValueCad}
+                    onInitialMarketValueChange={setInitialMarketValueAmount}
                     onManualHoldingChange={updateManualHolding}
                     onAddManualHolding={addManualHolding}
                     onRemoveManualHolding={removeManualHolding}
@@ -1175,8 +1204,9 @@ export function ImportExperience({
                     method={method}
                     institution={institution}
                     nickname={nickname}
+                    accountCurrency={accountCurrency}
                     contributionRoomCad={parsedContributionRoom}
-                    initialMarketValueCad={parsedInitialMarketValue}
+                    initialMarketValueAmount={parsedInitialMarketValue}
                     accountMode={accountMode}
                     selectedExistingAccount={matchingExistingAccounts.find((account) => account.id === selectedExistingAccountId) ?? null}
                     manualHoldings={manualHoldings}
@@ -1270,7 +1300,7 @@ export function ImportExperience({
             <CardContent className="space-y-3">
               <InfoRow
                 icon={<Database className="mt-0.5 h-4 w-4 text-[color:var(--primary)]" />}
-                text="Holding valuation rule: if a CSV row includes market_value_cad, that explicit total value is used and overrides any derived value from quantity x last_price_cad."
+                text="Holding valuation rule: if a CSV row includes market_value, that explicit total value is used and overrides any derived value from quantity x last_price."
               />
               {portfolioSuccessStates.map((item) => (
                 <InfoRow key={item} icon={<CheckCircle2 className="mt-0.5 h-4 w-4 text-[color:var(--success)]" />} text={item} />
@@ -1378,15 +1408,17 @@ function StepProvideSource(props: {
   accountMode: "new" | "existing";
   selectedExistingAccountId: string;
   existingAccounts: ExistingAccountOption[];
+  accountCurrency: SupportedCurrency;
   institution: string;
   nickname: string;
   contributionRoomCad: string;
-  initialMarketValueCad: string;
+  initialMarketValueAmount: string;
   manualHoldings: ManualHoldingDraft[];
   manualHoldingSuggestions: Record<string, MarketDataSearchResult[]>;
   manualHoldingStatus: Record<string, { searchLoading?: boolean; quoteLoading?: boolean; message?: string; error?: string }>;
   onAccountModeChange: (value: "new" | "existing") => void;
   onExistingAccountChange: (value: string) => void;
+  onAccountCurrencyChange: (value: SupportedCurrency) => void;
   onInstitutionChange: (value: string) => void;
   onNicknameChange: (value: string) => void;
   onContributionRoomChange: (value: string) => void;
@@ -1415,15 +1447,17 @@ function StepProvideSource(props: {
     accountMode,
     selectedExistingAccountId,
     existingAccounts,
+    accountCurrency,
     institution,
     nickname,
     contributionRoomCad,
-    initialMarketValueCad,
+    initialMarketValueAmount,
     manualHoldings,
     manualHoldingSuggestions,
     manualHoldingStatus,
     onAccountModeChange,
     onExistingAccountChange,
+    onAccountCurrencyChange,
     onInstitutionChange,
     onNicknameChange,
     onContributionRoomChange,
@@ -1480,7 +1514,7 @@ function StepProvideSource(props: {
               <option value="">Select an existing {accountType ?? "account"}</option>
               {existingAccounts.map((account) => (
                 <option key={account.id} value={account.id}>
-                  {account.nickname} / {account.institution} / {formatCad(account.marketValueCad)}
+                  {account.nickname} / {account.institution} / {formatAmount(account.marketValueAmount ?? account.marketValueCad, account.currency)}
                 </option>
               ))}
             </select>
@@ -1507,6 +1541,17 @@ function StepProvideSource(props: {
             />
           </label>
           <label className="space-y-2">
+            <span className="text-sm font-medium">Account currency</span>
+            <select
+              value={accountCurrency}
+              onChange={(event) => onAccountCurrencyChange(normalizeSupportedCurrency(event.target.value))}
+              className="w-full rounded-2xl border border-[color:var(--border)] bg-white px-4 py-3 text-sm outline-none"
+            >
+              <option value="CAD">CAD</option>
+              <option value="USD">USD</option>
+            </select>
+          </label>
+          <label className="space-y-2">
             <span className="text-sm font-medium">Contribution room (CAD)</span>
             <input
               type="number"
@@ -1518,11 +1563,11 @@ function StepProvideSource(props: {
             />
           </label>
           <label className="space-y-2">
-            <span className="text-sm font-medium">Current market value (CAD)</span>
+            <span className="text-sm font-medium">Current market value ({accountCurrency})</span>
             <input
               type="number"
               min="0"
-              value={initialMarketValueCad}
+              value={initialMarketValueAmount}
               onChange={(event) => onInitialMarketValueChange(event.target.value)}
               className="w-full rounded-2xl border border-[color:var(--border)] bg-white px-4 py-3 text-sm outline-none"
               placeholder="Auto-calculated after holdings write"
@@ -1692,17 +1737,28 @@ function StepProvideSource(props: {
                     <input value={holding.sector} onChange={(event) => onManualHoldingChange(holding.id, { sector: event.target.value })} className="w-full rounded-2xl border border-[color:var(--border)] bg-white px-4 py-3 text-sm outline-none" placeholder="Multi-sector" />
                   </label>
                   <label className="space-y-2">
+                    <span className="text-sm font-medium">Holding currency</span>
+                    <select
+                      value={holding.currency}
+                      onChange={(event) => onManualHoldingChange(holding.id, { currency: normalizeSupportedCurrency(event.target.value) })}
+                      className="w-full rounded-2xl border border-[color:var(--border)] bg-white px-4 py-3 text-sm outline-none"
+                    >
+                      <option value="CAD">CAD</option>
+                      <option value="USD">USD</option>
+                    </select>
+                  </label>
+                  <label className="space-y-2">
                     <span className="text-sm font-medium">Shares</span>
                     <input type="number" min="0" value={holding.quantity} onChange={(event) => onManualHoldingChange(holding.id, { quantity: event.target.value })} className="w-full rounded-2xl border border-[color:var(--border)] bg-white px-4 py-3 text-sm outline-none" placeholder="10" />
                   </label>
                   <label className="space-y-2">
-                    <span className="text-sm font-medium">Avg cost / share (CAD)</span>
-                    <input type="number" min="0" value={holding.avgCostPerShareCad} onChange={(event) => onManualHoldingChange(holding.id, { avgCostPerShareCad: event.target.value })} className="w-full rounded-2xl border border-[color:var(--border)] bg-white px-4 py-3 text-sm outline-none" placeholder="105.25" />
+                    <span className="text-sm font-medium">Avg cost / share ({holding.currency})</span>
+                    <input type="number" min="0" value={holding.avgCostPerShareAmount} onChange={(event) => onManualHoldingChange(holding.id, { avgCostPerShareAmount: event.target.value })} className="w-full rounded-2xl border border-[color:var(--border)] bg-white px-4 py-3 text-sm outline-none" placeholder="105.25" />
                   </label>
                   <label className="space-y-2">
-                    <span className="text-sm font-medium">Current price (CAD)</span>
+                    <span className="text-sm font-medium">Current price ({holding.currency})</span>
                     <div className="flex gap-2">
-                      <input type="number" min="0" value={holding.currentPriceCad} onChange={(event) => onManualHoldingChange(holding.id, { currentPriceCad: event.target.value })} className="w-full rounded-2xl border border-[color:var(--border)] bg-white px-4 py-3 text-sm outline-none" placeholder="Fetch delayed quote or enter manually" />
+                      <input type="number" min="0" value={holding.currentPriceAmount} onChange={(event) => onManualHoldingChange(holding.id, { currentPriceAmount: event.target.value })} className="w-full rounded-2xl border border-[color:var(--border)] bg-white px-4 py-3 text-sm outline-none" placeholder="Fetch delayed quote or enter manually" />
                       <Button type="button" variant="secondary" onClick={() => void onManualHoldingQuoteFetch(holding.id)} leadingIcon={manualHoldingStatus[holding.id]?.quoteLoading ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <TrendingUp className="h-4 w-4" />}>
                         Quote
                       </Button>
@@ -1712,8 +1768,8 @@ function StepProvideSource(props: {
                     </p>
                   </label>
                   <label className="space-y-2">
-                    <span className="text-sm font-medium">Current market value (CAD)</span>
-                    <input type="number" min="0" value={getManualHoldingDerivedMetrics(holding).computedMarketValueCad > 0 ? getManualHoldingDerivedMetrics(holding).computedMarketValueCad.toFixed(2) : ""} readOnly className="w-full rounded-2xl border border-[color:var(--border)] bg-slate-50 px-4 py-3 text-sm outline-none" placeholder="Calculated from shares x current price or override value" />
+                    <span className="text-sm font-medium">Current market value ({holding.currency})</span>
+                    <input type="number" min="0" value={getManualHoldingDerivedMetrics(holding).computedMarketValueAmount > 0 ? getManualHoldingDerivedMetrics(holding).computedMarketValueAmount.toFixed(2) : ""} readOnly className="w-full rounded-2xl border border-[color:var(--border)] bg-slate-50 px-4 py-3 text-sm outline-none" placeholder="Calculated from shares x current price or override value" />
                     <p className="text-xs text-[color:var(--muted-foreground)]">
                       Auto-calculated from shares and current price. If you add an override below, that override becomes the total value used for gain/loss.
                     </p>
@@ -1725,8 +1781,8 @@ function StepProvideSource(props: {
                     <input
                       type="number"
                       min="0"
-                      value={holding.overrideMarketValueCad}
-                      onChange={(event) => onManualHoldingChange(holding.id, { overrideMarketValueCad: event.target.value })}
+                      value={holding.overrideMarketValueAmount}
+                      onChange={(event) => onManualHoldingChange(holding.id, { overrideMarketValueAmount: event.target.value })}
                       className="w-full rounded-2xl border border-[color:var(--border)] bg-white px-4 py-3 text-sm outline-none"
                       placeholder="Optional override total value"
                     />
@@ -1771,11 +1827,11 @@ function StepProvideSource(props: {
                 <div className="grid gap-3 md:grid-cols-3">
                   <InfoRow
                     icon={<Database className="mt-0.5 h-4 w-4 text-[color:var(--primary)]" />}
-                    text={`Derived cost basis: ${formatCad(getManualHoldingDerivedMetrics(holding).costBasisCad)}`}
+                    text={`Derived cost basis: ${formatAmount(getManualHoldingDerivedMetrics(holding).costBasisAmount, holding.currency)}`}
                   />
                   <InfoRow
                     icon={<TrendingUp className="mt-0.5 h-4 w-4 text-[color:var(--primary)]" />}
-                    text={`Derived market value: ${formatCad(getManualHoldingDerivedMetrics(holding).computedMarketValueCad)}`}
+                    text={`Derived market value: ${formatAmount(getManualHoldingDerivedMetrics(holding).computedMarketValueAmount, holding.currency)}`}
                   />
                   <InfoRow
                     icon={<CheckCircle2 className="mt-0.5 h-4 w-4 text-[color:var(--success)]" />}
@@ -1808,8 +1864,9 @@ function StepReviewAndConfirm({
   method,
   institution,
   nickname,
+  accountCurrency,
   contributionRoomCad,
-  initialMarketValueCad,
+  initialMarketValueAmount,
   accountMode,
   selectedExistingAccount,
   manualHoldings,
@@ -1821,8 +1878,9 @@ function StepReviewAndConfirm({
   method: GuidedMethod | null;
   institution: string;
   nickname: string;
+  accountCurrency: SupportedCurrency;
   contributionRoomCad: number;
-  initialMarketValueCad: number;
+  initialMarketValueAmount: number;
   accountMode: "new" | "existing";
   selectedExistingAccount: ExistingAccountOption | null;
   manualHoldings: ManualHoldingDraft[];
@@ -1846,7 +1904,7 @@ function StepReviewAndConfirm({
       <div className="grid gap-3 md:grid-cols-2">
         <InfoRow
           icon={<CheckCircle2 className="mt-0.5 h-4 w-4 text-[color:var(--success)]" />}
-          text={`Current market value baseline: ${formatCad(initialMarketValueCad)}`}
+          text={`Current market value baseline: ${formatAmount(initialMarketValueAmount, accountCurrency)}`}
         />
         <InfoRow
           icon={<PencilLine className="mt-0.5 h-4 w-4 text-[color:var(--primary)]" />}
@@ -1994,4 +2052,5 @@ function InfoRow({ icon, text }: { icon: React.ReactNode; text: string }) {
     </div>
   );
 }
+
 

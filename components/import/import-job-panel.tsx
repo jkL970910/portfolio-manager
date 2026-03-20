@@ -9,8 +9,8 @@ import { assertApiData, getApiErrorMessage, safeJson } from "@/lib/client/api";
 
 const MAPPING_GROUPS = [
   { title: "Core", fields: ["record_type", "account_key"] },
-  { title: "Account rows", fields: ["account_type", "institution", "account_nickname", "market_value_cad", "contribution_room_cad"] },
-  { title: "Holding rows", fields: ["symbol", "name", "asset_class", "sector", "weight_pct", "gain_loss_pct"] },
+  { title: "Account rows", fields: ["account_type", "institution", "account_nickname", "account_currency", "market_value", "contribution_room_cad"] },
+  { title: "Holding rows", fields: ["symbol", "name", "asset_class", "sector", "holding_currency", "quantity", "avg_cost_per_share", "cost_basis", "last_price", "market_value", "weight_pct", "gain_loss_pct"] },
   { title: "Transaction rows", fields: ["booked_at", "merchant", "category", "amount_cad", "direction"] }
 ] as const;
 
@@ -27,12 +27,18 @@ const BUILT_IN_PRESETS = [
       account_type: "acct_kind",
       institution: "broker",
       account_nickname: "acct_label",
-      market_value_cad: "value_cad",
+      account_currency: "acct_currency",
+      market_value: "value_native",
       contribution_room_cad: "room_left",
       symbol: "ticker",
       name: "security_name",
       asset_class: "asset_bucket",
       sector: "bucket_sector",
+      holding_currency: "trade_currency",
+      quantity: "units",
+      avg_cost_per_share: "avg_cost",
+      cost_basis: "book_cost",
+      last_price: "last_price",
       gain_loss_pct: "pnl_pct",
       booked_at: "trade_date",
       merchant: "payee",
@@ -49,12 +55,18 @@ const BUILT_IN_PRESETS = [
       account_type: "account_type",
       institution: "broker_name",
       account_nickname: "account_name",
-      market_value_cad: "market_value",
+      account_currency: "account_currency",
+      market_value: "market_value",
       contribution_room_cad: "remaining_room",
       symbol: "symbol",
       name: "security_name",
       asset_class: "asset_class",
       sector: "sector_name",
+      holding_currency: "currency",
+      quantity: "quantity",
+      avg_cost_per_share: "avg_cost",
+      cost_basis: "cost_basis",
+      last_price: "last_price",
       gain_loss_pct: "gain_loss_pct",
       booked_at: "transaction_date",
       merchant: "description",
@@ -794,7 +806,7 @@ export function ImportJobPanel({
             Mode: {reviewState.review.importMode}. Validation passed. Confirm to write these changes into the current signed-in user&apos;s database records.
           </p>
           <p className="text-sm text-[#21613f]">
-            Valuation rule: if a holding row includes <code>market_value_cad</code>, that explicit total value is written and takes priority over any derived value from <code>quantity x last_price_cad</code>.
+            Valuation rule: if a holding row includes <code>market_value</code>, that explicit total value is written and takes priority over any derived value from <code>quantity x last_price</code>.
           </p>
           {symbolAudit?.records?.length ? (
             <div className="rounded-2xl border border-[#b6d7c7] bg-white px-4 py-3 text-sm text-[#21613f]">

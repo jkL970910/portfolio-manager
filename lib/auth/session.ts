@@ -1,12 +1,13 @@
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { getRepositories } from "@/lib/backend/repositories/factory";
+import type { CurrencyCode } from "@/lib/backend/models";
 
 export interface Viewer {
   id: string;
   email: string;
   displayName: string;
-  baseCurrency: "CAD";
+  baseCurrency: CurrencyCode;
 }
 
 export async function getViewerOrNull(): Promise<Viewer | null> {

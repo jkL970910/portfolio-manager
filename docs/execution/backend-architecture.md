@@ -16,10 +16,10 @@ Maintain a backend foundation that supports authenticated, user-scoped portfolio
 Represents the current signed-in user context and base currency.
 
 ### InvestmentAccount
-Stores account wrapper, institution, nickname, market value, and available contribution room.
+Stores account wrapper, institution, nickname, account currency, native market value, CAD-normalized market value, and available contribution room.
 
 ### HoldingPosition
-Stores portfolio positions, asset classification, sector attribution, market value, valuation inputs, and performance metrics.
+Stores portfolio positions, asset classification, sector attribution, native currency valuation inputs, CAD-normalized analytics values, and performance metrics.
 
 ### CashflowTransaction
 Stores spending and inflow records used to calculate spending summary, savings rate, and investable cash.
@@ -80,8 +80,10 @@ Tracks CSV import state from creation to validation and completion.
   - new or existing account selection
   - manual multi-holding entry
   - single-account CSV import with review/confirm
+- portfolio accounts and holdings support CAD and USD native currency inputs
+- users can switch the global display currency between CAD and USD without changing the underlying CAD-normalized analytics model
 - portfolio holdings can refresh batch quotes and persist updated valuation data
-- for holding imports, `market_value_cad` is treated as the explicit total value override; if it is present, it wins over `quantity x last_price_cad`
+- for holding imports, `market_value` is treated as the explicit total value override; if it is present, it wins over `quantity x last_price`
 
 ## Candidate storage model
 Recommended production storage shape:

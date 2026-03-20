@@ -479,7 +479,10 @@ export function PreferencesWorkbench({
                 <InfoBlock label="Risk profile" value={guidedDraft.riskProfile} />
                 <InfoBlock label="Account priority" value={guidedDraft.accountFundingPriority.join(" -> ")} />
                 <InfoBlock label="Recommendation strategy" value={guidedDraft.recommendationStrategy} />
-                <InfoBlock label="Cash buffer target" value={`${guidedDraft.cashBufferTargetCad.toLocaleString("en-CA")} CAD`} />
+                <InfoBlock
+                  label="Cash buffer target"
+                  value={`${guidedDraft.cashBufferTargetCad.toLocaleString("en-CA")} in planning base CAD`}
+                />
               </div>
 
               <div className="space-y-2">
@@ -585,7 +588,7 @@ export function PreferencesWorkbench({
                 className="w-full rounded-2xl border border-[color:var(--border)] bg-white px-4 py-3 text-sm outline-none"
               />
             </Field>
-            <Field label="Cash buffer target (CAD)">
+            <Field label="Cash buffer target (planning base, CAD)">
               <input
                 type="number"
                 min={0}

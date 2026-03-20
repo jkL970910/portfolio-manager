@@ -17,6 +17,7 @@ export interface AuthUserRecord {
 export interface UserRepository {
   getById(userId: EntityId): Promise<UserProfile>;
   findByEmail(email: string): Promise<AuthUserRecord | null>;
+  updateBaseCurrency(userId: EntityId, currency: UserProfile["baseCurrency"]): Promise<UserProfile>;
 }
 
 export interface AccountRepository {

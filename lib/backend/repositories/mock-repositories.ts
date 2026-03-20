@@ -21,6 +21,16 @@ export const mockRepositories: BackendRepositories = {
     },
     async findByEmail(email) {
       return findAuthUserByEmail(email.toLowerCase());
+    },
+    async updateBaseCurrency(userId, currency) {
+      const user = findUserById(userId);
+      if (!user) {
+        throw new Error(`User not found for id ${userId}.`);
+      }
+      return {
+        ...user,
+        baseCurrency: currency
+      };
     }
   },
   accounts: {

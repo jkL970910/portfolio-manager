@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 const contracts = {
-  version: "0.9.0",
+  version: "1.0.0",
   entities: [
     "UserProfile",
     "InvestmentAccount",
@@ -87,7 +87,7 @@ const contracts = {
     {
       path: "/api/import/portfolio/jobs",
       methods: ["POST"],
-      description: "Validate and confirm portfolio CSV imports for accounts and holdings only. For holding rows, market_value_cad is treated as the explicit total value and overrides quantity x last_price_cad when both are present."
+      description: "Validate and confirm portfolio CSV imports for accounts and holdings only. Supports account_currency, holding_currency, and native amount fields. For holding rows, market_value is treated as the explicit total value and overrides quantity x last_price when both are present."
     },
     {
       path: "/api/import/spending/jobs",
@@ -118,6 +118,11 @@ const contracts = {
       path: "/api/settings/guided-draft",
       methods: ["PATCH"],
       description: "Persist a guided allocation questionnaire draft separately from the live preference profile."
+    },
+    {
+      path: "/api/settings/display-currency",
+      methods: ["PATCH"],
+      description: "Update the signed-in user's global display currency between CAD and USD for dashboard, portfolio, recommendations, and spending views."
     },
     {
       path: "/api/recommendations/runs",

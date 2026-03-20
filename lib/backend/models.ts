@@ -1,4 +1,5 @@
 export type EntityId = string;
+export type CurrencyCode = "CAD" | "USD";
 
 export type AccountType = "TFSA" | "RRSP" | "FHSA" | "Taxable";
 export type RiskProfile = "Conservative" | "Balanced" | "Growth";
@@ -14,7 +15,7 @@ export interface UserProfile {
   id: EntityId;
   email: string;
   displayName: string;
-  baseCurrency: "CAD";
+  baseCurrency: CurrencyCode;
 }
 
 export interface InvestmentAccount {
@@ -23,6 +24,8 @@ export interface InvestmentAccount {
   institution: string;
   type: AccountType;
   nickname: string;
+  currency?: CurrencyCode;
+  marketValueAmount?: number;
   marketValueCad: number;
   contributionRoomCad: number | null;
 }
@@ -35,7 +38,12 @@ export interface HoldingPosition {
   name: string;
   assetClass: string;
   sector: string;
+  currency?: CurrencyCode;
   quantity?: number | null;
+  avgCostPerShareAmount?: number | null;
+  costBasisAmount?: number | null;
+  lastPriceAmount?: number | null;
+  marketValueAmount?: number;
   avgCostPerShareCad?: number | null;
   costBasisCad?: number | null;
   lastPriceCad?: number | null;

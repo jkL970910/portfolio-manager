@@ -18,7 +18,8 @@ export function getMarketDataConfig() {
     alphaVantageApiKey: readEnv("ALPHA_VANTAGE_API_KEY"),
     searchCacheTtlSeconds: readIntEnv("MARKET_DATA_SEARCH_CACHE_TTL_SECONDS", 21600),
     resolveCacheTtlSeconds: readIntEnv("MARKET_DATA_RESOLVE_CACHE_TTL_SECONDS", 604800),
-    quoteCacheTtlSeconds: readIntEnv("MARKET_DATA_QUOTE_CACHE_TTL_SECONDS", 900)
+    quoteCacheTtlSeconds: readIntEnv("MARKET_DATA_QUOTE_CACHE_TTL_SECONDS", 1800),
+    fxCacheTtlSeconds: readIntEnv("MARKET_DATA_FX_CACHE_TTL_SECONDS", 43200)
   };
 }
 

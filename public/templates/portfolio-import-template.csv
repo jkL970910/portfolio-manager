@@ -1,5 +1,6 @@
-record_type,account_key,account_type,institution,account_nickname,market_value_cad,contribution_room_cad,symbol,name,asset_class,sector,quantity,avg_cost_per_share_cad,cost_basis_cad,last_price_cad,weight_pct,gain_loss_pct
-account,tfsa_main,TFSA,Questrade,Main TFSA,20500,12000,,,,,,,,,,
-holding,tfsa_main,TFSA,Questrade,Main TFSA,14500,12000,VFV,Vanguard S&P 500 Index ETF,US Equity,Multi-sector,60,223.50,13410.00,241.67,70.73,8.13
-holding,tfsa_main,TFSA,Questrade,Main TFSA,6000,12000,XBB,iShares Core Canadian Universe Bond Index ETF,Fixed Income,Multi-sector,220,27.10,5962.00,27.28,29.27,0.64
-holding,tfsa_main,TFSA,Questrade,Main TFSA,1750,12000,CASH,High Interest Savings ETF,Cash,Cash,175,10.00,1750.00,,8.54,0.00
+record_type,account_key,account_type,institution,account_nickname,account_currency,market_value,contribution_room_cad,symbol,name,asset_class,sector,holding_currency,quantity,avg_cost_per_share,cost_basis,last_price,weight_pct,gain_loss_pct
+account,tfsa_cad,TFSA,Questrade,Main TFSA CAD,CAD,20500,12000,,,,,,,,,,,
+holding,tfsa_cad,TFSA,Questrade,Main TFSA CAD,CAD,20500,12000,ZQQ,BMO NASDAQ 100 Equity Hedged to CAD Index ETF,US Equity,Multi-sector,CAD,60,84.50,5070.00,92.10,26.96,8.99
+account,tfsa_usd,TFSA,Questrade,Main TFSA USD,USD,9800,12000,,,,,,,,,,,
+holding,tfsa_usd,TFSA,Questrade,Main TFSA USD,USD,9800,12000,NVDA,NVIDIA Corp,US Equity,Technology,USD,18,118.20,2127.60,132.40,24.32,12.01
+holding,tfsa_usd,TFSA,Questrade,Main TFSA USD,USD,9800,12000,SGOV,iShares 0-3 Month Treasury Bond ETF,Fixed Income,Government Bonds,USD,55,100.15,5508.25,100.21,56.24,0.06

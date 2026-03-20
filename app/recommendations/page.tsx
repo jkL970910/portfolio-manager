@@ -19,6 +19,15 @@ export default async function RecommendationsPage() {
       title="Recommendations"
       description="Transparent, editable funding guidance. Inputs stay visible so the workflow feels explainable rather than black-box."
     >
+      <Card>
+        <CardContent className="flex flex-col gap-2 px-6 py-4 md:flex-row md:items-center md:justify-between">
+          <div>
+            <p className="text-sm font-medium">Display currency: {data.displayContext.currency}</p>
+            <p className="text-sm text-[color:var(--muted-foreground)]">{data.displayContext.fxNote}</p>
+          </div>
+          <Badge variant="neutral">{data.displayContext.fxRateLabel}</Badge>
+        </CardContent>
+      </Card>
       <div className="grid gap-6 xl:grid-cols-[0.9fr_1.1fr]">
         <div className="space-y-6">
           <SectionHeading
@@ -32,7 +41,7 @@ export default async function RecommendationsPage() {
             <CardContent className="space-y-4">
               <div className="rounded-2xl border border-[color:var(--border)] bg-[color:var(--card-muted)] p-4">
                 <p className="text-sm text-[color:var(--muted-foreground)]">Contribution amount</p>
-                <p className="mt-2 text-3xl font-semibold">${data.run.contributionAmountCad.toLocaleString()}</p>
+                <p className="mt-2 text-3xl font-semibold">{data.contributionAmount}</p>
               </div>
               <div className="grid gap-3 sm:grid-cols-2">
                 {data.inputs.map((input) => (

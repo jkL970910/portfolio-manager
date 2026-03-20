@@ -1,10 +1,12 @@
-import { AccountType } from "@/lib/backend/models";
+import { AccountType, CurrencyCode } from "@/lib/backend/models";
 
 export interface ParsedAccountSeed {
   accountKey: string;
   institution: string;
   type: AccountType;
   nickname: string;
+  currency: CurrencyCode;
+  marketValueAmount: number | null;
   marketValueCad: number | null;
   contributionRoomCad: number | null;
 }
@@ -15,7 +17,12 @@ export interface ParsedHoldingSeed {
   name: string;
   assetClass: string;
   sector: string;
+  currency: CurrencyCode;
   quantity: number | null;
+  avgCostPerShareAmount: number | null;
+  costBasisAmount: number | null;
+  lastPriceAmount: number | null;
+  marketValueAmount: number;
   avgCostPerShareCad: number | null;
   costBasisCad: number | null;
   lastPriceCad: number | null;
@@ -60,15 +67,21 @@ export type ImportCanonicalField =
   | "account_type"
   | "institution"
   | "account_nickname"
+  | "account_currency"
+  | "market_value"
   | "market_value_cad"
   | "contribution_room_cad"
   | "symbol"
   | "name"
   | "asset_class"
   | "sector"
+  | "holding_currency"
   | "quantity"
+  | "avg_cost_per_share"
   | "avg_cost_per_share_cad"
+  | "cost_basis"
   | "cost_basis_cad"
+  | "last_price"
   | "last_price_cad"
   | "weight_pct"
   | "gain_loss_pct"
@@ -154,6 +167,11 @@ function parseAccountType(value: string): AccountType {
   throw new Error(`Unsupported account_type: ${value}`);
 }
 
+function parseCurrency(value: string, fallback: CurrencyCode = "CAD"): CurrencyCode {
+  const normalized = value.trim().toUpperCase();
+  return normalized === "USD" ? "USD" : fallback;
+}
+
 function parseDirection(value: string): "inflow" | "outflow" {
   const normalized = value.trim().toLowerCase();
   if (normalized === "inflow" || normalized === "outflow") {
@@ -188,7 +206,18 @@ function getMappedValue(
   return row[resolvedHeader] ?? "";
 }
 
-export function parseImportCsv(csvContent: string, fieldMapping: ImportFieldMapping = {}): ParsedCsvImport {
+async function convertAmountToCad(amount: number | null, currency: CurrencyCode) {
+  if (amount == null) {
+    return null;
+  }
+  if (currency === "CAD") {
+    return round(amount);
+  }
+  const { convertCurrencyAmount } = await import("@/lib/market-data/fx");
+  return round(await convertCurrencyAmount(amount, currency, "CAD"));
+}
+
+export async function parseImportCsv(csvContent: string, fieldMapping: ImportFieldMapping = {}): Promise<ParsedCsvImport> {
   const lines = csvContent
     .replace(/^\uFEFF/, "")
     .split(/\r?\n/)
@@ -238,12 +267,17 @@ export function parseImportCsv(csvContent: string, fieldMapping: ImportFieldMapp
         if (!accountKey) {
           throw new Error("Account rows must include account_key.");
         }
+        const currency = parseCurrency(getMappedValue(record, "account_currency", fieldMapping) || "CAD");
+        const explicitMarketValueAmount = parseNumber(getMappedValue(record, "market_value", fieldMapping))
+          ?? parseNumber(getMappedValue(record, "market_value_cad", fieldMapping));
         accountMap.set(accountKey, {
           accountKey,
           institution: getMappedValue(record, "institution", fieldMapping).trim() || "Imported Broker",
           type: parseAccountType(getMappedValue(record, "account_type", fieldMapping)),
           nickname: getMappedValue(record, "account_nickname", fieldMapping).trim() || accountKey,
-          marketValueCad: parseNumber(getMappedValue(record, "market_value_cad", fieldMapping)),
+          currency,
+          marketValueAmount: explicitMarketValueAmount,
+          marketValueCad: await convertAmountToCad(explicitMarketValueAmount, currency),
           contributionRoomCad: parseNumber(getMappedValue(record, "contribution_room_cad", fieldMapping))
         });
         continue;
@@ -253,21 +287,34 @@ export function parseImportCsv(csvContent: string, fieldMapping: ImportFieldMapp
         if (!accountKey) {
           throw new Error("Holding rows must include account_key.");
         }
-        const quantity = parseNumber(getMappedValue(record, "quantity", fieldMapping));
-        const avgCostPerShareCad = parseNumber(getMappedValue(record, "avg_cost_per_share_cad", fieldMapping));
-        const explicitCostBasisCad = parseNumber(getMappedValue(record, "cost_basis_cad", fieldMapping));
-        const lastPriceCad = parseNumber(getMappedValue(record, "last_price_cad", fieldMapping));
-        const explicitMarketValueCad = parseNumber(getMappedValue(record, "market_value_cad", fieldMapping));
-        const computedCostBasisCad = explicitCostBasisCad ?? (
-          quantity != null && avgCostPerShareCad != null ? round(quantity * avgCostPerShareCad) : null
+        const currency = parseCurrency(
+          getMappedValue(record, "holding_currency", fieldMapping)
+          || getMappedValue(record, "account_currency", fieldMapping)
+          || "CAD"
         );
-        const marketValueCad = explicitMarketValueCad ?? (
-          quantity != null && lastPriceCad != null ? round(quantity * lastPriceCad) : null
+        const quantity = parseNumber(getMappedValue(record, "quantity", fieldMapping));
+        const avgCostPerShareAmount = parseNumber(getMappedValue(record, "avg_cost_per_share", fieldMapping))
+          ?? parseNumber(getMappedValue(record, "avg_cost_per_share_cad", fieldMapping));
+        const explicitCostBasisAmount = parseNumber(getMappedValue(record, "cost_basis", fieldMapping))
+          ?? parseNumber(getMappedValue(record, "cost_basis_cad", fieldMapping));
+        const lastPriceAmount = parseNumber(getMappedValue(record, "last_price", fieldMapping))
+          ?? parseNumber(getMappedValue(record, "last_price_cad", fieldMapping));
+        const explicitMarketValueAmount = parseNumber(getMappedValue(record, "market_value", fieldMapping))
+          ?? parseNumber(getMappedValue(record, "market_value_cad", fieldMapping));
+        const computedCostBasisAmount = explicitCostBasisAmount ?? (
+          quantity != null && avgCostPerShareAmount != null ? round(quantity * avgCostPerShareAmount) : null
+        );
+        const marketValueAmount = explicitMarketValueAmount ?? (
+          quantity != null && lastPriceAmount != null ? round(quantity * lastPriceAmount) : null
         );
 
-        if (marketValueCad == null) {
-          throw new Error("Holding rows must include market_value_cad or quantity plus last_price_cad.");
+        if (marketValueAmount == null) {
+          throw new Error("Holding rows must include market_value or quantity plus last_price.");
         }
+        const avgCostPerShareCad = await convertAmountToCad(avgCostPerShareAmount, currency);
+        const computedCostBasisCad = await convertAmountToCad(computedCostBasisAmount, currency);
+        const lastPriceCad = await convertAmountToCad(lastPriceAmount, currency);
+        const marketValueCad = (await convertAmountToCad(marketValueAmount, currency)) ?? 0;
 
         const explicitGainLossPct = parseNumber(getMappedValue(record, "gain_loss_pct", fieldMapping));
         const computedGainLossPct = explicitGainLossPct ?? (
@@ -282,7 +329,12 @@ export function parseImportCsv(csvContent: string, fieldMapping: ImportFieldMapp
           name: getMappedValue(record, "name", fieldMapping).trim() || getMappedValue(record, "symbol", fieldMapping).trim() || "Imported Holding",
           assetClass: getMappedValue(record, "asset_class", fieldMapping).trim() || "Unknown",
           sector: getMappedValue(record, "sector", fieldMapping).trim() || "Multi-sector",
+          currency,
           quantity,
+          avgCostPerShareAmount,
+          costBasisAmount: computedCostBasisAmount,
+          lastPriceAmount,
+          marketValueAmount,
           avgCostPerShareCad,
           costBasisCad: computedCostBasisCad,
           lastPriceCad,
@@ -297,6 +349,8 @@ export function parseImportCsv(csvContent: string, fieldMapping: ImportFieldMapp
             institution: getMappedValue(record, "institution", fieldMapping).trim() || "Imported Broker",
             type: parseAccountType(getMappedValue(record, "account_type", fieldMapping) || "TFSA"),
             nickname: getMappedValue(record, "account_nickname", fieldMapping).trim() || accountKey,
+            currency,
+            marketValueAmount: null,
             marketValueCad: null,
             contributionRoomCad: parseNumber(getMappedValue(record, "contribution_room_cad", fieldMapping))
           });
@@ -333,10 +387,11 @@ export function parseImportCsv(csvContent: string, fieldMapping: ImportFieldMapp
   const accounts = [...accountMap.values()].map((account) => {
     const holdingTotal = holdings
       .filter((holding) => holding.accountKey === account.accountKey)
-      .reduce((sum, holding) => sum + holding.marketValueCad, 0);
+      .reduce((sum, holding) => sum + (holding.marketValueCad ?? 0), 0);
 
     return {
       ...account,
+      marketValueAmount: account.marketValueAmount ?? holdingTotal,
       marketValueCad: account.marketValueCad ?? holdingTotal
     };
   });

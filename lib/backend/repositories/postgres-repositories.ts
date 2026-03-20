@@ -12,6 +12,7 @@ import {
   users
 } from "@/lib/db/schema";
 import {
+  HoldingPosition,
   ImportJob,
   InvestmentAccount,
   PreferenceProfile,
@@ -35,18 +36,23 @@ function mapUser(row: typeof users.$inferSelect): UserProfile {
     id: row.id,
     email: row.email,
     displayName: row.displayName,
-    baseCurrency: row.baseCurrency as "CAD"
+    baseCurrency: row.baseCurrency as UserProfile["baseCurrency"]
   };
 }
 
 function mapAccount(row: typeof investmentAccounts.$inferSelect): InvestmentAccount {
+  const currency = (row.currency as InvestmentAccount["currency"]) ?? "CAD";
+  const marketValueCad = toNumber(row.marketValueCad);
+  const marketValueAmount = toNumber(row.marketValueAmount);
   return {
     id: row.id,
     userId: row.userId,
     institution: row.institution,
     type: row.type as InvestmentAccount["type"],
     nickname: row.nickname,
-    marketValueCad: toNumber(row.marketValueCad),
+    currency,
+    marketValueAmount: marketValueAmount > 0 ? marketValueAmount : marketValueCad,
+    marketValueCad,
     contributionRoomCad: row.contributionRoomCad == null ? null : toNumber(row.contributionRoomCad)
   };
 }
@@ -83,6 +89,21 @@ export const postgresRepositories: BackendRepositories = {
         profile: mapUser(row),
         passwordHash: row.passwordHash
       };
+    },
+    async updateBaseCurrency(userId, currency) {
+      const db = getDb();
+      const [row] = await db
+        .update(users)
+        .set({
+          baseCurrency: currency,
+          updatedAt: new Date()
+        })
+        .where(eq(users.id, userId))
+        .returning();
+      if (!row) {
+        throw new Error(`User not found for id ${userId}.`);
+      }
+      return mapUser(row);
     }
   },
   accounts: {
@@ -97,6 +118,14 @@ export const postgresRepositories: BackendRepositories = {
       const db = getDb();
       const rows = await db.query.holdingPositions.findMany({ where: eq(holdingPositions.userId, userId) });
       return rows.map((row) => ({
+        ...(() => {
+          const currency = (row.currency as HoldingPosition["currency"]) ?? "CAD";
+          const marketValueCad = toNumber(row.marketValueCad);
+          const marketValueAmount = toNumber(row.marketValueAmount);
+          const avgCostPerShareCad = row.avgCostPerShareCad == null ? null : toNumber(row.avgCostPerShareCad);
+          const costBasisCad = row.costBasisCad == null ? null : toNumber(row.costBasisCad);
+          const lastPriceCad = row.lastPriceCad == null ? null : toNumber(row.lastPriceCad);
+          return {
         id: row.id,
         userId: row.userId,
         accountId: row.accountId,
@@ -104,14 +133,21 @@ export const postgresRepositories: BackendRepositories = {
         name: row.name,
         assetClass: row.assetClass,
         sector: row.sector,
+        currency,
         quantity: row.quantity == null ? null : toNumber(row.quantity),
-        avgCostPerShareCad: row.avgCostPerShareCad == null ? null : toNumber(row.avgCostPerShareCad),
-        costBasisCad: row.costBasisCad == null ? null : toNumber(row.costBasisCad),
-        lastPriceCad: row.lastPriceCad == null ? null : toNumber(row.lastPriceCad),
-        marketValueCad: toNumber(row.marketValueCad),
+        avgCostPerShareAmount: row.avgCostPerShareAmount == null ? avgCostPerShareCad : toNumber(row.avgCostPerShareAmount),
+        costBasisAmount: row.costBasisAmount == null ? costBasisCad : toNumber(row.costBasisAmount),
+        lastPriceAmount: row.lastPriceAmount == null ? lastPriceCad : toNumber(row.lastPriceAmount),
+        marketValueAmount: marketValueAmount > 0 ? marketValueAmount : marketValueCad,
+        avgCostPerShareCad,
+        costBasisCad,
+        lastPriceCad,
+        marketValueCad,
         weightPct: toNumber(row.weightPct),
         gainLossPct: toNumber(row.gainLossPct),
         updatedAt: row.updatedAt.toISOString()
+          };
+        })()
       }));
     }
   },

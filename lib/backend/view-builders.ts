@@ -9,6 +9,7 @@ import {
 import {
   AllocationTarget,
   CashflowTransaction,
+  CurrencyCode,
   HoldingPosition,
   ImportJob,
   InvestmentAccount,
@@ -17,6 +18,7 @@ import {
   RiskProfile,
   UserProfile
 } from "@/lib/backend/models";
+import { formatMoney, roundAmount } from "@/lib/money/display";
 
 const MONTH_LABELS = ["Oct", "Nov", "Dec", "Jan", "Feb", "Mar"];
 const PRIORITY_BADGE_VARIANTS = {
@@ -69,12 +71,39 @@ const TARGET_PRESETS: Record<RiskProfile, AllocationTarget[]> = {
   ]
 };
 
-function formatCurrency(value: number) {
-  return new Intl.NumberFormat("en-CA", {
-    style: "currency",
-    currency: "CAD",
-    maximumFractionDigits: value % 1 === 0 ? 0 : 2
-  }).format(value);
+type DisplayContext = {
+  currency: CurrencyCode;
+  cadToDisplayRate: number;
+};
+
+function convertCadToDisplay(valueCad: number, context: DisplayContext) {
+  return context.currency === "CAD"
+    ? valueCad
+    : roundAmount(valueCad * context.cadToDisplayRate, 2);
+}
+
+function formatDisplayCurrency(valueCad: number, context: DisplayContext) {
+  return formatMoney(convertCadToDisplay(valueCad, context), context.currency);
+}
+
+function buildDisplayContext(context: DisplayContext) {
+  const fxRate = context.currency === "CAD" ? 1 : context.cadToDisplayRate;
+  return {
+    currency: context.currency,
+    fxRateLabel: context.currency === "CAD"
+      ? "Base analytics and display are in CAD."
+      : `1 CAD = ${fxRate.toFixed(4)} USD`,
+    fxNote: context.currency === "CAD"
+      ? "CAD is the active display currency. USD-native positions retain their own price inputs, while portfolio analytics stay normalized in CAD."
+      : "USD is the active display currency. Portfolio analytics remain normalized in CAD and are converted into USD for display using the latest cached USD/CAD FX rate."
+  };
+}
+
+function formatMoneyForDisplay(valueAmount: number | null | undefined, nativeCurrency: CurrencyCode, valueCad: number, context: DisplayContext) {
+  if ((valueAmount ?? 0) > 0 && nativeCurrency === context.currency) {
+    return formatMoney(valueAmount ?? 0, context.currency);
+  }
+  return formatDisplayCurrency(valueCad, context);
 }
 
 function formatCompactPercent(value: number, digits = 0) {
@@ -225,7 +254,7 @@ function getHealthPreview(currentAllocation: Map<string, number>, targetAllocati
   ];
 }
 
-function getRecommendationTheme(run: RecommendationRun | null) {
+function getRecommendationTheme(run: RecommendationRun | null, context: DisplayContext) {
   const lead = run?.items[0];
   if (!lead) {
     return {
@@ -241,7 +270,7 @@ function getRecommendationTheme(run: RecommendationRun | null) {
 
   return {
     theme: `${lead.assetClass} in ${lead.targetAccountType}`,
-    subtitle: `Leading recommendation for the next ${formatCurrency(run.contributionAmountCad)} contribution`,
+    subtitle: `Leading recommendation for the next ${formatDisplayCurrency(run.contributionAmountCad, context)} contribution`,
     reason: lead.explanation,
     signals: run.assumptions.slice(0, 2)
   };
@@ -385,8 +414,9 @@ export function buildDashboardData(args: {
   transactions: CashflowTransaction[];
   profile: PreferenceProfile;
   latestRun: RecommendationRun | null;
+  display: DisplayContext;
 }): DashboardData {
-  const { accounts, holdings, transactions, profile, latestRun } = args;
+  const { accounts, holdings, transactions, profile, latestRun, display } = args;
   const totalPortfolio = sum(accounts.map((account) => account.marketValueCad));
   const availableRoom = sum(accounts.map((account) => account.contributionRoomCad ?? 0));
   const currentAllocation = getCurrentAllocation(holdings);
@@ -402,18 +432,19 @@ export function buildDashboardData(args: {
     .slice(0, 3);
   const spending = buildSpendingSummary(transactions, profile.cashBufferTargetCad);
   const accountPriorityOrder = profile.accountFundingPriority;
-  const recommendation = getRecommendationTheme(latestRun);
+  const recommendation = getRecommendationTheme(latestRun, display);
 
   return {
+    displayContext: buildDisplayContext(display),
     metrics: [
       {
         label: "Total Portfolio",
-        value: formatCurrency(totalPortfolio),
+        value: formatDisplayCurrency(totalPortfolio, display),
         detail: `${accounts.length} accounts connected`
       },
       {
         label: "Available Room",
-        value: formatCurrency(availableRoom),
+        value: formatDisplayCurrency(availableRoom, display),
         detail: "TFSA, RRSP, and FHSA contribution room remaining"
       },
       {
@@ -438,8 +469,8 @@ export function buildDashboardData(args: {
       .map((account, index) => ({
         name: account.type,
         caption: ACCOUNT_CAPTIONS[account.type],
-        value: formatCurrency(account.marketValueCad),
-        room: account.contributionRoomCad == null ? "No tax shelter" : `${formatCurrency(account.contributionRoomCad)} room left`,
+        value: formatMoneyForDisplay(account.marketValueAmount, account.currency ?? "CAD", account.marketValueCad, display),
+        room: account.contributionRoomCad == null ? "No tax shelter" : `${formatDisplayCurrency(account.contributionRoomCad, display)} room left`,
         badge: index === 0 ? "Priority" : accountPriorityOrder.includes(account.type) ? "Tax fit" : "Review",
         badgeVariant: index === 0
           ? PRIORITY_BADGE_VARIANTS.first
@@ -461,17 +492,17 @@ export function buildDashboardData(args: {
         symbol: holding.symbol,
         name: holding.name,
         account: accounts.find((account) => account.id === holding.accountId)?.type ?? "Account",
-        lastPrice: holding.lastPriceCad != null && holding.lastPriceCad > 0 ? formatCurrency(holding.lastPriceCad) : "Not priced",
+        lastPrice: holding.lastPriceCad != null && holding.lastPriceCad > 0 ? formatMoneyForDisplay(holding.lastPriceAmount, holding.currency ?? "CAD", holding.lastPriceCad, display) : "Not priced",
         lastUpdated: formatHoldingLastUpdated(holding.updatedAt),
         freshnessVariant: getHoldingFreshnessVariant(holding.updatedAt),
         weight: formatCompactPercent(holding.weightPct, 1),
-        value: formatCurrency(holding.marketValueCad)
+        value: formatMoneyForDisplay(holding.marketValueAmount, holding.currency ?? "CAD", holding.marketValueCad, display)
       })),
     netWorthTrend: getSixMonthSeries(totalPortfolio, profile),
     spendingMonthLabel: getLatestMonthLabel(),
     savingsPattern: formatCompactPercent(spending.savingsRate, 1),
-    investableCash: formatCurrency(spending.investableCash),
-    spendingCategories: spending.categories.slice(0, 3).map(([name, value]) => ({ name, value: formatCurrency(value) })),
+    investableCash: formatDisplayCurrency(spending.investableCash, display),
+    spendingCategories: spending.categories.slice(0, 3).map(([name, value]) => ({ name, value: formatDisplayCurrency(value, display) })),
     healthPreview: getHealthPreview(currentAllocation, targetAllocation, holdings, profile),
     recommendation
   };
@@ -481,8 +512,9 @@ export function buildPortfolioData(args: {
   accounts: InvestmentAccount[];
   holdings: HoldingPosition[];
   profile: PreferenceProfile;
+  display: DisplayContext;
 }): PortfolioData {
-  const { accounts, holdings, profile } = args;
+  const { accounts, holdings, profile, display } = args;
   const currentAllocation = getCurrentAllocation(holdings);
   const targetAllocation = getTargetAllocation(profile);
   const totalPortfolio = sum(accounts.map((account) => account.marketValueCad));
@@ -513,6 +545,7 @@ export function buildPortfolioData(args: {
   const mainGap = [...driftMap.entries()].sort((left, right) => Math.abs(right[1]) - Math.abs(left[1]))[0];
 
   return {
+    displayContext: buildDisplayContext(display),
     performance: getSixMonthSeries(totalPortfolio || 1, profile).map((point, index) => ({
       label: point.label,
       value: round((performanceBase[index] / baseline) * 100, 1)
@@ -528,7 +561,7 @@ export function buildPortfolioData(args: {
       .map((holding) => ({
         symbol: holding.symbol,
         account: accounts.find((account) => account.id === holding.accountId)?.type ?? "Account",
-        lastPrice: holding.lastPriceCad != null && holding.lastPriceCad > 0 ? formatCurrency(holding.lastPriceCad) : "Not priced",
+        lastPrice: holding.lastPriceCad != null && holding.lastPriceCad > 0 ? formatMoneyForDisplay(holding.lastPriceAmount, holding.currency ?? "CAD", holding.lastPriceCad, display) : "Not priced",
         lastUpdated: formatHoldingLastUpdated(holding.updatedAt),
         freshnessVariant: getHoldingFreshnessVariant(holding.updatedAt),
         weight: formatCompactPercent(holding.weightPct, 1),
@@ -548,8 +581,9 @@ export function buildPortfolioData(args: {
 export function buildRecommendationsData(args: {
   profile: PreferenceProfile;
   latestRun: RecommendationRun | null;
+  display: DisplayContext;
 }): RecommendationsData {
-  const { profile, latestRun } = args;
+  const { profile, latestRun, display } = args;
   const equityTarget = sum(profile.targetAllocation
     .filter((target) => target.assetClass !== "Fixed Income" && target.assetClass !== "Cash")
     .map((target) => target.targetPct));
@@ -557,6 +591,8 @@ export function buildRecommendationsData(args: {
   const cashTarget = profile.targetAllocation.find((target) => target.assetClass === "Cash")?.targetPct ?? 0;
 
   return {
+    displayContext: buildDisplayContext(display),
+    contributionAmount: formatDisplayCurrency(latestRun?.contributionAmountCad ?? 0, display),
     inputs: [
       { label: "Target allocation", value: `${equityTarget} / ${fixedIncomeTarget} / ${cashTarget}` },
       { label: "Account priority", value: profile.accountFundingPriority.join(" -> ") },
@@ -573,7 +609,7 @@ export function buildRecommendationsData(args: {
     priorities: (latestRun?.items ?? []).map((item) => ({
       assetClass: item.assetClass,
       description: item.explanation,
-      amount: formatCurrency(item.amountCad),
+      amount: formatDisplayCurrency(item.amountCad, display),
       account: item.targetAccountType,
       tickers: item.tickerOptions.join(", "),
       accountFit: ACCOUNT_TYPE_FIT[item.targetAccountType]
@@ -590,8 +626,9 @@ export function buildRecommendationsData(args: {
 export function buildSpendingData(args: {
   transactions: CashflowTransaction[];
   profile: PreferenceProfile;
+  display: DisplayContext;
 }): SpendingData {
-  const { transactions, profile } = args;
+  const { transactions, profile, display } = args;
   const spending = buildSpendingSummary(transactions, profile.cashBufferTargetCad);
   const latestTransactions = [...transactions]
     .sort((left, right) => right.bookedAt.localeCompare(left.bookedAt))
@@ -599,10 +636,11 @@ export function buildSpendingData(args: {
   const discipline = spending.savingsRate >= 30 ? "Stable" : spending.savingsRate >= 20 ? "Watch" : "At risk";
 
   return {
+    displayContext: buildDisplayContext(display),
     metrics: [
       {
         label: "Monthly spend",
-        value: formatCurrency(spending.outflowTotal),
+        value: formatDisplayCurrency(spending.outflowTotal, display),
         detail: "Current month outflow total"
       },
       {
@@ -612,26 +650,26 @@ export function buildSpendingData(args: {
       },
       {
         label: "Investable cash",
-        value: formatCurrency(spending.investableCash),
+        value: formatDisplayCurrency(spending.investableCash, display),
         detail: "Monthly inflow minus spending and buffer reserve"
       },
       {
         label: "Cash discipline",
         value: discipline,
-        detail: `Cash buffer target is ${formatCurrency(profile.cashBufferTargetCad)}`
+        detail: `Cash buffer target is ${formatDisplayCurrency(profile.cashBufferTargetCad, display)}`
       }
     ],
     trend: getMonthlyTransactionSeries(transactions),
     categories: spending.categories.slice(0, 4).map(([name, value]) => ({
       name,
       share: spending.outflowTotal > 0 ? formatCompactPercent((value / spending.outflowTotal) * 100, 0) : "0%",
-      amount: formatCurrency(value)
+      amount: formatDisplayCurrency(value, display)
     })),
     transactions: latestTransactions.map((transaction) => ({
       date: transaction.bookedAt,
       merchant: transaction.merchant,
       category: transaction.category,
-      amount: `${transaction.direction === "outflow" ? "-" : "+"}${formatCurrency(transaction.amountCad)}`
+      amount: `${transaction.direction === "outflow" ? "-" : "+"}${formatDisplayCurrency(transaction.amountCad, display)}`
     }))
   };
 }
@@ -677,7 +715,9 @@ export function buildImportData(args: {
       type: account.type,
       institution: account.institution,
       nickname: account.nickname,
+      currency: account.currency ?? "CAD",
       contributionRoomCad: account.contributionRoomCad,
+      marketValueAmount: account.marketValueAmount ?? account.marketValueCad,
       marketValueCad: account.marketValueCad
     }))
   };

@@ -20,6 +20,15 @@ export default async function PortfolioPage() {
       title="Portfolio"
       description="Deep portfolio analysis, concentration checks, and performance context that support recommendation trust."
     >
+      <Card>
+        <CardContent className="flex flex-col gap-2 px-6 py-4 md:flex-row md:items-center md:justify-between">
+          <div>
+            <p className="text-sm font-medium">Display currency: {data.displayContext.currency}</p>
+            <p className="text-sm text-[color:var(--muted-foreground)]">{data.displayContext.fxNote}</p>
+          </div>
+          <Badge variant="neutral">{data.displayContext.fxRateLabel}</Badge>
+        </CardContent>
+      </Card>
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1.45fr)_320px]">
         <div className="space-y-6">
           <SectionHeading

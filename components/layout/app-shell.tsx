@@ -54,7 +54,7 @@ export function AppShell({
             </form>
           </div>
         </div>
-        <TopNav />
+        <TopNav currency={viewer.baseCurrency} />
       </header>
 
       <main className="mx-auto mt-6 max-w-[1440px] space-y-6">

@@ -17,6 +17,8 @@
 - institution
 - type
 - nickname
+- currency
+- market_value_amount
 - market_value_cad
 - contribution_room_cad
 - created_at
@@ -30,6 +32,12 @@
 - name
 - asset_class
 - sector
+- currency
+- quantity
+- avg_cost_per_share_amount
+- cost_basis_amount
+- last_price_amount
+- market_value_amount
 - market_value_cad
 - weight_pct
 - gain_loss_pct

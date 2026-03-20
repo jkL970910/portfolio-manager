@@ -5,6 +5,11 @@ export interface MetricCard {
 }
 
 export interface DashboardData {
+  displayContext: {
+    currency: "CAD" | "USD";
+    fxRateLabel: string;
+    fxNote: string;
+  };
   metrics: MetricCard[];
   accounts: {
     name: string;
@@ -46,6 +51,11 @@ export interface DashboardData {
 }
 
 export interface PortfolioData {
+  displayContext: {
+    currency: "CAD" | "USD";
+    fxRateLabel: string;
+    fxNote: string;
+  };
   performance: { label: string; value: number }[];
   accountAllocation: { name: string; value: number }[];
   sectorExposure: { name: string; value: number }[];
@@ -68,6 +78,12 @@ export interface PortfolioData {
 }
 
 export interface RecommendationsData {
+  displayContext: {
+    currency: "CAD" | "USD";
+    fxRateLabel: string;
+    fxNote: string;
+  };
+  contributionAmount: string;
   inputs: { label: string; value: string }[];
   explainer: string[];
   priorities: {
@@ -82,6 +98,11 @@ export interface RecommendationsData {
 }
 
 export interface SpendingData {
+  displayContext: {
+    currency: "CAD" | "USD";
+    fxRateLabel: string;
+    fxNote: string;
+  };
   metrics: MetricCard[];
   trend: { label: string; value: number }[];
   categories: { name: string; share: string; amount: string }[];
@@ -104,7 +125,9 @@ export interface ImportData {
     type: string;
     institution: string;
     nickname: string;
+    currency: "CAD" | "USD";
     contributionRoomCad: number | null;
+    marketValueAmount: number;
     marketValueCad: number;
   }[];
 }
