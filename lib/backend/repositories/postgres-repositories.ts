@@ -109,7 +109,8 @@ export const postgresRepositories: BackendRepositories = {
         lastPriceCad: row.lastPriceCad == null ? null : toNumber(row.lastPriceCad),
         marketValueCad: toNumber(row.marketValueCad),
         weightPct: toNumber(row.weightPct),
-        gainLossPct: toNumber(row.gainLossPct)
+        gainLossPct: toNumber(row.gainLossPct),
+        updatedAt: row.updatedAt.toISOString()
       }));
     }
   },

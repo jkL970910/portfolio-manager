@@ -40,6 +40,8 @@ export default async function PortfolioPage() {
                   <tr>
                     <th className="pb-3 font-medium">Holding</th>
                     <th className="pb-3 font-medium">Account</th>
+                    <th className="pb-3 font-medium">Last Price</th>
+                    <th className="pb-3 font-medium">Last Updated</th>
                     <th className="pb-3 font-medium">Weight</th>
                     <th className="pb-3 font-medium">Gain / Loss</th>
                     <th className="pb-3 font-medium">Signal</th>
@@ -50,6 +52,8 @@ export default async function PortfolioPage() {
                     <tr key={holding.symbol} className="border-t border-[color:var(--border)]">
                       <td className="py-4 font-medium">{holding.symbol}</td>
                       <td className="py-4 text-[color:var(--muted-foreground)]">{holding.account}</td>
+                      <td className="py-4">{holding.lastPrice}</td>
+                      <td className="py-4 text-[color:var(--muted-foreground)]">{holding.lastUpdated}</td>
                       <td className="py-4">{holding.weight}</td>
                       <td className="py-4">{holding.gainLoss}</td>
                       <td className="py-4 text-[color:var(--muted-foreground)]">{holding.signal}</td>
@@ -57,7 +61,7 @@ export default async function PortfolioPage() {
                   ))}
                   {data.holdings.length === 0 ? (
                     <tr className="border-t border-[color:var(--border)]">
-                      <td className="py-6 text-[color:var(--muted-foreground)]" colSpan={5}>
+                      <td className="py-6 text-[color:var(--muted-foreground)]" colSpan={7}>
                         No holdings imported yet. Complete the import flow to unlock portfolio analysis.
                       </td>
                     </tr>
@@ -74,7 +78,11 @@ export default async function PortfolioPage() {
               <CardTitle>Quick Actions</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
-              <RefreshPricesPanel />
+              <RefreshPricesPanel
+                lastRefreshed={data.quoteStatus.lastRefreshed}
+                freshness={data.quoteStatus.freshness}
+                coverage={data.quoteStatus.coverage}
+              />
               <QuickAction icon={<ShieldAlert className="h-4 w-4" />} title="Review Concentration Risk" description="Inspect the positions driving the highest single-name exposure." />
               <QuickAction icon={<PieChart className="h-4 w-4" />} title="Inspect Allocation Gaps" description="See the biggest underweight and overweight classes before funding." />
               <QuickAction icon={<CircleGauge className="h-4 w-4" />} title="Open Recommendation Drivers" description="Trace which portfolio signals are pushing the current recommendation." />

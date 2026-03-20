@@ -37,6 +37,7 @@ export interface HoldingPosition {
   marketValueCad: number;
   weightPct: number;
   gainLossPct: number;
+  updatedAt?: string | null;
 }
 
 export interface CashflowTransaction {

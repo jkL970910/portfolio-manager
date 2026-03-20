@@ -727,6 +727,21 @@ export function ImportJobPanel({
           <p className="text-sm text-[#21613f]">
             Mode: {reviewState.review.importMode}. Validation passed. Confirm to write these changes into the current signed-in user&apos;s database records.
           </p>
+          {symbolAudit?.records?.length ? (
+            <div className="rounded-2xl border border-[#b6d7c7] bg-white px-4 py-3 text-sm text-[#21613f]">
+              <p className="font-medium">Final holding symbols that will be written</p>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {symbolAudit.records.slice(0, 8).map((record) => (
+                  <Badge key={`final-write-${record.requestedSymbol}`} variant="success">
+                    {(symbolCorrections[record.requestedSymbol]?.symbol ?? record.normalizedSymbol).toUpperCase()}
+                  </Badge>
+                ))}
+                {symbolAudit.records.length > 8 ? (
+                  <Badge variant="neutral">+{symbolAudit.records.length - 8} more</Badge>
+                ) : null}
+              </div>
+            </div>
+          ) : null}
           <Button type="button" onClick={confirmImport} disabled={isPending} leadingIcon={<Upload className="h-4 w-4" />}>
             {isPending ? "Importing..." : "Confirm import"}
           </Button>
@@ -755,10 +770,10 @@ export function ImportJobPanel({
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <div>
                       <p className="font-medium">
-                        {record.requestedSymbol} {"->"} {record.normalizedSymbol} · {record.name}
+                        {record.requestedSymbol} {"->"} {record.normalizedSymbol} - {record.name}
                       </p>
                       <p className="mt-1 text-[color:var(--muted-foreground)]">
-                        Provider: {record.provider}{record.quotePrice != null ? ` · Quote ${record.quotePrice.toFixed(2)}${record.delayed ? " (delayed)" : ""}` : " · No quote"}
+                        Provider: {record.provider}{record.quotePrice != null ? ` - Quote ${record.quotePrice.toFixed(2)}${record.delayed ? " (delayed)" : ""}` : " - No quote"}
                       </p>
                     </div>
                     <Badge variant={record.hasWarning ? "warning" : "success"}>
@@ -802,6 +817,10 @@ export function ImportJobPanel({
                       </label>
                     </div>
                   ) : null}
+                  <div className="mt-3 rounded-2xl border border-[color:var(--border)] bg-white px-4 py-3 text-sm text-[color:var(--muted-foreground)]">
+                    <span className="font-medium text-[color:var(--foreground)]">Final write:</span>{" "}
+                    {(symbolCorrections[record.requestedSymbol]?.symbol ?? record.normalizedSymbol).toUpperCase()} - {symbolCorrections[record.requestedSymbol]?.name ?? record.name}
+                  </div>
                 </div>
               ))}
             </div>
@@ -846,3 +865,4 @@ export function ImportJobPanel({
     </div>
   );
 }
+

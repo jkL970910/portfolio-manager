@@ -163,11 +163,16 @@ const portfolioByUser: Record<"demo" | "casey", PortfolioData> = {
       { name: "Energy", value: 9 },
       { name: "Other", value: 29 }
     ],
+    quoteStatus: {
+      lastRefreshed: "Mar 19, 10:30 AM",
+      freshness: "Fresh within cache window",
+      coverage: "4/4 holdings have provider-backed prices"
+    },
     holdings: [
-      { symbol: "VEQT", account: "TFSA", weight: "18.2%", gainLoss: "+11.4%", signal: "Stable anchor position" },
-      { symbol: "XAW", account: "RRSP", weight: "11.8%", gainLoss: "+8.7%", signal: "Supports global equity exposure" },
-      { symbol: "CASH", account: "Taxable", weight: "9.9%", gainLoss: "+3.4%", signal: "Raises cash drag if kept too high" },
-      { symbol: "XBB", account: "RRSP", weight: "5.4%", gainLoss: "+2.1%", signal: "Below target allocation" }
+      { symbol: "VEQT", account: "TFSA", lastPrice: "$41.82", lastUpdated: "Mar 19, 10:30 AM", weight: "18.2%", gainLoss: "+11.4%", signal: "Stable anchor position" },
+      { symbol: "XAW", account: "RRSP", lastPrice: "$39.14", lastUpdated: "Mar 19, 10:30 AM", weight: "11.8%", gainLoss: "+8.7%", signal: "Supports global equity exposure" },
+      { symbol: "CASH", account: "Taxable", lastPrice: "$50.18", lastUpdated: "Mar 19, 10:30 AM", weight: "9.9%", gainLoss: "+3.4%", signal: "Raises cash drag if kept too high" },
+      { symbol: "XBB", account: "RRSP", lastPrice: "$28.42", lastUpdated: "Mar 19, 10:30 AM", weight: "5.4%", gainLoss: "+2.1%", signal: "Below target allocation" }
     ],
     summaryPoints: [
       "Fixed income remains the clearest underweight class when compared to target allocation.",
@@ -196,11 +201,16 @@ const portfolioByUser: Record<"demo" | "casey", PortfolioData> = {
       { name: "Consumer", value: 11 },
       { name: "Other", value: 32 }
     ],
+    quoteStatus: {
+      lastRefreshed: "Mar 19, 10:25 AM",
+      freshness: "Fresh within cache window",
+      coverage: "4/4 holdings have provider-backed prices"
+    },
     holdings: [
-      { symbol: "XEQT", account: "TFSA", weight: "18.6%", gainLoss: "+14.8%", signal: "Core growth position remains oversized." },
-      { symbol: "VFV", account: "RRSP", weight: "15.8%", gainLoss: "+16.2%", signal: "Large U.S. equity concentration." },
-      { symbol: "XEF", account: "FHSA", weight: "8.8%", gainLoss: "+9.6%", signal: "Supports diversification gap closure." },
-      { symbol: "CASH", account: "FHSA", weight: "4.1%", gainLoss: "+3.2%", signal: "Helps protect short-horizon home goal." }
+      { symbol: "XEQT", account: "TFSA", lastPrice: "$34.55", lastUpdated: "Mar 19, 10:25 AM", weight: "18.6%", gainLoss: "+14.8%", signal: "Core growth position remains oversized." },
+      { symbol: "VFV", account: "RRSP", lastPrice: "$128.91", lastUpdated: "Mar 19, 10:25 AM", weight: "15.8%", gainLoss: "+16.2%", signal: "Large U.S. equity concentration." },
+      { symbol: "XEF", account: "FHSA", lastPrice: "$31.24", lastUpdated: "Mar 19, 10:25 AM", weight: "8.8%", gainLoss: "+9.6%", signal: "Supports diversification gap closure." },
+      { symbol: "CASH", account: "FHSA", lastPrice: "$50.18", lastUpdated: "Mar 19, 10:25 AM", weight: "4.1%", gainLoss: "+3.2%", signal: "Helps protect short-horizon home goal." }
     ],
     summaryPoints: [
       "International exposure is still too low relative to the configured target.",
@@ -402,3 +412,5 @@ export async function getRecommendationsData(userId = "user_demo") { return reco
 export async function getSpendingData(userId = "user_demo") { return spendingByUser[resolveUserKey(userId)]; }
 export async function getImportData(userId = "user_demo") { return importByUser[resolveUserKey(userId)]; }
 export async function getSettingsData(userId = "user_demo") { return settingsByUser[resolveUserKey(userId)]; }
+
+

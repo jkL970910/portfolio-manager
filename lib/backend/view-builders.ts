@@ -261,6 +261,57 @@ function getSignalForHolding(holding: HoldingPosition, driftMap: Map<string, num
   return "Supports the current portfolio mix without driving the main gaps.";
 }
 
+function formatHoldingLastUpdated(value?: string | null) {
+  if (!value) {
+    return "Not refreshed";
+  }
+
+  return new Date(value).toLocaleString("en-CA", {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit"
+  });
+}
+
+function getPortfolioQuoteStatus(holdings: HoldingPosition[]) {
+  const quotedHoldings = holdings.filter((holding) => (holding.lastPriceCad ?? 0) > 0 && holding.updatedAt);
+  const coverage = holdings.length > 0
+    ? `${quotedHoldings.length}/${holdings.length} holdings have provider-backed prices`
+    : "No holdings available for quote refresh";
+
+  if (quotedHoldings.length === 0) {
+    return {
+      lastRefreshed: "No quote refresh yet",
+      freshness: "Unknown",
+      coverage
+    };
+  }
+
+  const latestUpdatedAt = quotedHoldings
+    .map((holding) => new Date(holding.updatedAt!))
+    .sort((left, right) => right.getTime() - left.getTime())[0];
+
+  const ageMs = Date.now() - latestUpdatedAt.getTime();
+  const ageMinutes = Math.max(0, Math.round(ageMs / 60000));
+  const freshness = ageMinutes <= 30
+    ? "Fresh within cache window"
+    : ageMinutes <= 180
+      ? "Stale but still usable"
+      : "Refresh recommended";
+
+  return {
+    lastRefreshed: latestUpdatedAt.toLocaleString("en-CA", {
+      month: "short",
+      day: "numeric",
+      hour: "numeric",
+      minute: "2-digit"
+    }),
+    freshness,
+    coverage
+  };
+}
+
 function sortTargetsForDisplay(targets: AllocationTarget[]) {
   return [...targets].sort((left, right) => {
     const order = ["Canadian Equity", "US Equity", "International Equity", "Fixed Income", "Cash"];
@@ -452,11 +503,14 @@ export function buildPortfolioData(args: {
       value: totalPortfolio > 0 ? round((account.marketValueCad / totalPortfolio) * 100, 0) : 0
     })),
     sectorExposure,
+    quoteStatus: getPortfolioQuoteStatus(holdings),
     holdings: [...holdings]
       .sort((left, right) => right.marketValueCad - left.marketValueCad)
       .map((holding) => ({
         symbol: holding.symbol,
         account: accounts.find((account) => account.id === holding.accountId)?.type ?? "Account",
+        lastPrice: holding.lastPriceCad != null && holding.lastPriceCad > 0 ? formatCurrency(holding.lastPriceCad) : "Not priced",
+        lastUpdated: formatHoldingLastUpdated(holding.updatedAt),
         weight: formatCompactPercent(holding.weightPct, 1),
         gainLoss: formatSignedPercent(holding.gainLossPct, 1),
         signal: getSignalForHolding(holding, driftMap)

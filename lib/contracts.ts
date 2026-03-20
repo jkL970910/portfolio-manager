@@ -46,9 +46,16 @@ export interface PortfolioData {
   performance: { label: string; value: number }[];
   accountAllocation: { name: string; value: number }[];
   sectorExposure: { name: string; value: number }[];
+  quoteStatus: {
+    lastRefreshed: string;
+    freshness: string;
+    coverage: string;
+  };
   holdings: {
     symbol: string;
     account: string;
+    lastPrice: string;
+    lastUpdated: string;
     weight: string;
     gainLoss: string;
     signal: string;

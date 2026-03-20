@@ -5,7 +5,15 @@ import { useRouter } from "next/navigation";
 import { RefreshCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
-export function RefreshPricesPanel() {
+export function RefreshPricesPanel({
+  lastRefreshed,
+  freshness,
+  coverage
+}: {
+  lastRefreshed: string;
+  freshness: string;
+  coverage: string;
+}) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [status, setStatus] = useState<{ type: "idle" | "success" | "error"; message: string }>({
@@ -45,6 +53,11 @@ export function RefreshPricesPanel() {
         <p className="mt-2 text-sm text-[color:var(--muted-foreground)]">
           Pull the latest cached quotes for imported holdings, then recompute market value, gain/loss, and account weights.
         </p>
+      </div>
+      <div className="rounded-2xl border border-[color:var(--border)] bg-[color:var(--card-muted)] px-4 py-3 text-sm text-[color:var(--muted-foreground)]">
+        <p><span className="font-medium text-[color:var(--foreground)]">Last refreshed:</span> {lastRefreshed}</p>
+        <p className="mt-1"><span className="font-medium text-[color:var(--foreground)]">Freshness:</span> {freshness}</p>
+        <p className="mt-1"><span className="font-medium text-[color:var(--foreground)]">Coverage:</span> {coverage}</p>
       </div>
       <Button type="button" variant="secondary" onClick={refreshPrices} disabled={isPending} leadingIcon={<RefreshCcw className={`h-4 w-4 ${isPending ? "animate-spin" : ""}`} />}>
         {isPending ? "Refreshing prices..." : "Refresh prices"}
