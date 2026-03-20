@@ -335,7 +335,8 @@ const importByUser: Record<"demo" | "casey", ImportData> = {
       "Imported holdings can be grouped by account and asset class.",
       "Invalid or unknown rows are flagged before the portfolio view updates.",
       "On completion the user can move directly to Dashboard or Recommendations."
-    ]
+    ],
+    existingAccounts: []
   },
   casey: {
     steps: [
@@ -355,7 +356,8 @@ const importByUser: Record<"demo" | "casey", ImportData> = {
       "Imported accounts stay grouped by goal and account type.",
       "Unknown rows are flagged before recommendation logic uses them.",
       "On completion the user can move directly into Dashboard or Recommendations."
-    ]
+    ],
+    existingAccounts: []
   }
 };
 

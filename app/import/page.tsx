@@ -13,7 +13,12 @@ export default async function ImportPage() {
       title="Import"
       description="Choose between a guided account-by-account onboarding flow and a direct CSV import path for bulk broker exports."
     >
-      <ImportExperience latestJob={data.latestJob} steps={data.steps} successStates={data.successStates} />
+      <ImportExperience
+        latestJob={data.latestJob}
+        steps={data.steps}
+        successStates={data.successStates}
+        existingAccounts={data.existingAccounts}
+      />
     </AppShell>
   );
 }

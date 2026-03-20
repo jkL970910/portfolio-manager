@@ -86,6 +86,14 @@ export interface ImportData {
   steps: { title: string; description: string }[];
   setupCards: { label: string; title: string; description: string }[];
   successStates: string[];
+  existingAccounts: {
+    id: string;
+    type: string;
+    institution: string;
+    nickname: string;
+    contributionRoomCad: number | null;
+    marketValueCad: number;
+  }[];
 }
 
 export interface SettingsData {

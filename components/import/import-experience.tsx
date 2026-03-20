@@ -8,9 +8,12 @@ import {
   Database,
   Eye,
   FolderInput,
+  LoaderCircle,
   PencilLine,
+  Search,
   Save,
-  ShieldAlert
+  ShieldAlert,
+  TrendingUp
 } from "lucide-react";
 import { ImportJobPanel } from "@/components/import/import-job-panel";
 import { Badge } from "@/components/ui/badge";
@@ -85,6 +88,38 @@ type PresetRecord = {
   mapping: Record<string, string>;
 };
 
+type ExistingAccountOption = {
+  id: string;
+  type: string;
+  institution: string;
+  nickname: string;
+  contributionRoomCad: number | null;
+  marketValueCad: number;
+};
+
+type ManualHoldingDraft = {
+  id: string;
+  searchQuery: string;
+  symbol: string;
+  holdingName: string;
+  assetClass: (typeof ASSET_CLASS_OPTIONS)[number];
+  sector: string;
+  quantity: string;
+  avgCostPerShareCad: string;
+  currentPriceCad: string;
+  marketValueCad: string;
+};
+
+type MarketDataSearchResult = {
+  symbol: string;
+  name: string;
+  exchange?: string | null;
+  country?: string | null;
+  currency?: string | null;
+  type: string;
+  provider: string;
+};
+
 const ACCOUNT_OPTIONS: Array<{
   type: GuidedAccountType;
   caption: string;
@@ -129,7 +164,7 @@ const ASSET_CLASS_OPTIONS = [
 const GUIDED_MAPPING_GROUPS = [
   { title: "Core", fields: ["record_type", "account_key"] },
   { title: "Account rows", fields: ["account_type", "institution", "account_nickname", "market_value_cad", "contribution_room_cad"] },
-  { title: "Holding rows", fields: ["symbol", "name", "asset_class", "sector", "weight_pct", "gain_loss_pct"] },
+  { title: "Holding rows", fields: ["symbol", "name", "asset_class", "sector", "quantity", "avg_cost_per_share_cad", "cost_basis_cad", "last_price_cad", "market_value_cad", "weight_pct", "gain_loss_pct"] },
   { title: "Transaction rows", fields: ["booked_at", "merchant", "category", "amount_cad", "direction"] }
 ] as const;
 
@@ -152,6 +187,10 @@ const GUIDED_BUILT_IN_PRESETS = [
       name: "security_name",
       asset_class: "asset_bucket",
       sector: "bucket_sector",
+      quantity: "units",
+      avg_cost_per_share_cad: "avg_cost",
+      cost_basis_cad: "book_cost",
+      last_price_cad: "last_price",
       gain_loss_pct: "pnl_pct",
       booked_at: "trade_date",
       merchant: "payee",
@@ -174,6 +213,10 @@ const GUIDED_BUILT_IN_PRESETS = [
       name: "security_name",
       asset_class: "asset_class",
       sector: "sector_name",
+      quantity: "quantity",
+      avg_cost_per_share_cad: "avg_cost",
+      cost_basis_cad: "cost_basis",
+      last_price_cad: "last_price",
       gain_loss_pct: "gain_loss_pct",
       booked_at: "transaction_date",
       merchant: "description",
@@ -207,28 +250,75 @@ function formatCad(value: number) {
   });
 }
 
+function createManualHoldingDraft(): ManualHoldingDraft {
+  return {
+    id: Math.random().toString(36).slice(2, 10),
+    searchQuery: "",
+    symbol: "",
+    holdingName: "",
+    assetClass: "Canadian Equity",
+    sector: "Multi-sector",
+    quantity: "",
+    avgCostPerShareCad: "",
+    currentPriceCad: "",
+    marketValueCad: ""
+  };
+}
+
+function formatPercent(value: number | null) {
+  if (value === null || !Number.isFinite(value)) {
+    return "Not enough data";
+  }
+
+  return `${value >= 0 ? "+" : ""}${value.toFixed(1)}%`;
+}
+
+function getManualHoldingDerivedMetrics(holding: ManualHoldingDraft) {
+  const quantity = Number(holding.quantity) || 0;
+  const avgCostPerShareCad = Number(holding.avgCostPerShareCad) || 0;
+  const currentPriceCad = Number(holding.currentPriceCad) || 0;
+  const explicitMarketValueCad = Number(holding.marketValueCad) || 0;
+
+  const costBasisCad = quantity > 0 && avgCostPerShareCad > 0 ? quantity * avgCostPerShareCad : 0;
+  const computedMarketValueCad = explicitMarketValueCad > 0
+    ? explicitMarketValueCad
+    : quantity > 0 && currentPriceCad > 0
+      ? quantity * currentPriceCad
+      : 0;
+
+  const gainLossPct = costBasisCad > 0 && computedMarketValueCad > 0
+    ? ((computedMarketValueCad - costBasisCad) / costBasisCad) * 100
+    : null;
+
+  return {
+    costBasisCad,
+    computedMarketValueCad,
+    gainLossPct
+  };
+}
+
 export function ImportExperience({
   latestJob,
   steps,
-  successStates
+  successStates,
+  existingAccounts
 }: {
   latestJob: { status: string; fileName: string; createdAt: string } | null;
   steps: { title: string; description: string }[];
   successStates: string[];
+  existingAccounts: ExistingAccountOption[];
 }) {
   const [mode, setMode] = useState<ImportMode>("guided");
   const [currentStep, setCurrentStep] = useState(1);
   const [accountType, setAccountType] = useState<GuidedAccountType | null>(null);
   const [method, setMethod] = useState<GuidedMethod | null>(null);
+  const [accountMode, setAccountMode] = useState<"new" | "existing">("new");
+  const [selectedExistingAccountId, setSelectedExistingAccountId] = useState("");
   const [institution, setInstitution] = useState("");
   const [nickname, setNickname] = useState("");
   const [contributionRoomCad, setContributionRoomCad] = useState("0");
   const [initialMarketValueCad, setInitialMarketValueCad] = useState("0");
-  const [symbol, setSymbol] = useState("");
-  const [holdingName, setHoldingName] = useState("");
-  const [assetClass, setAssetClass] = useState<(typeof ASSET_CLASS_OPTIONS)[number]>("Canadian Equity");
-  const [sector, setSector] = useState("Multi-sector");
-  const [gainLossPct, setGainLossPct] = useState("0");
+  const [manualHoldings, setManualHoldings] = useState<ManualHoldingDraft[]>([createManualHoldingDraft()]);
   const [guidedResult, setGuidedResult] = useState<GuidedImportResult | null>(null);
   const [guidedCsvFileName, setGuidedCsvFileName] = useState("single-account.csv");
   const [guidedCsvContent, setGuidedCsvContent] = useState("");
@@ -238,6 +328,8 @@ export function ImportExperience({
   const [guidedCsvServerPresets, setGuidedCsvServerPresets] = useState<PresetRecord[]>([]);
   const [guidedCsvReviewState, setGuidedCsvReviewState] = useState<GuidedCsvReviewState | null>(null);
   const [guidedCsvImportResult, setGuidedCsvImportResult] = useState<GuidedCsvImportResult | null>(null);
+  const [manualHoldingSuggestions, setManualHoldingSuggestions] = useState<Record<string, MarketDataSearchResult[]>>({});
+  const [manualHoldingStatus, setManualHoldingStatus] = useState<Record<string, { searchLoading?: boolean; quoteLoading?: boolean; message?: string; error?: string }>>({});
   const [guidedStatus, setGuidedStatus] = useState<{ type: "idle" | "success" | "error"; message: string }>({
     type: "idle",
     message: ""
@@ -246,7 +338,6 @@ export function ImportExperience({
 
   const parsedContributionRoom = Number(contributionRoomCad) || 0;
   const parsedInitialMarketValue = Number(initialMarketValueCad) || 0;
-  const parsedGainLossPct = Number(gainLossPct) || 0;
   const guidedCsvPreview = useMemo(() => previewCsvContent(guidedCsvContent, 10), [guidedCsvContent]);
   const guidedCsvPresetOptions = useMemo(
     () => [
@@ -259,6 +350,16 @@ export function ImportExperience({
     () => GUIDED_REQUIRED_FIELDS.filter((field) => !guidedCsvFieldMapping[field]),
     [guidedCsvFieldMapping]
   );
+  const matchingExistingAccounts = useMemo(
+    () => existingAccounts.filter((account) => !accountType || account.type === accountType),
+    [existingAccounts, accountType]
+  );
+  const manualHoldingsAreValid = useMemo(() => manualHoldings.every((holding) => {
+    const hasIdentity = holding.symbol.trim().length > 0 && holding.assetClass.length > 0;
+    const hasMarketValue = Number(holding.marketValueCad) > 0;
+    const hasQuotePath = Number(holding.quantity) > 0 && Number(holding.currentPriceCad) > 0;
+    return hasIdentity && (hasMarketValue || hasQuotePath);
+  }), [manualHoldings]);
 
   useEffect(() => {
     fetch("/api/import/presets")
@@ -266,6 +367,187 @@ export function ImportExperience({
       .then((payload) => setGuidedCsvServerPresets(payload.data ?? []))
       .catch(() => setGuidedCsvServerPresets([]));
   }, []);
+
+  useEffect(() => {
+    if (accountMode !== "existing" || !selectedExistingAccountId) {
+      return;
+    }
+    const selected = existingAccounts.find((account) => account.id === selectedExistingAccountId);
+    if (!selected) {
+      return;
+    }
+    setInstitution(selected.institution);
+    setNickname(selected.nickname);
+    setContributionRoomCad(String(selected.contributionRoomCad ?? 0));
+    setInitialMarketValueCad(String(selected.marketValueCad ?? 0));
+  }, [accountMode, existingAccounts, selectedExistingAccountId]);
+
+  function updateManualHolding(id: string, patch: Partial<ManualHoldingDraft>) {
+    setManualHoldings((current) => current.map((holding) => holding.id === id ? { ...holding, ...patch } : holding));
+  }
+
+  function addManualHolding() {
+    setManualHoldings((current) => [...current, createManualHoldingDraft()]);
+  }
+
+  function removeManualHolding(id: string) {
+    setManualHoldings((current) => current.length > 1 ? current.filter((holding) => holding.id !== id) : current);
+    setManualHoldingSuggestions((current) => {
+      const next = { ...current };
+      delete next[id];
+      return next;
+    });
+    setManualHoldingStatus((current) => {
+      const next = { ...current };
+      delete next[id];
+      return next;
+    });
+  }
+
+  async function searchManualHolding(id: string) {
+    const holding = manualHoldings.find((item) => item.id === id);
+    if (!holding) {
+      return;
+    }
+
+    const query = holding.searchQuery.trim() || holding.symbol.trim() || holding.holdingName.trim();
+    if (!query) {
+      setManualHoldingStatus((current) => ({
+        ...current,
+        [id]: { ...current[id], error: "Enter a ticker or security name before searching." }
+      }));
+      return;
+    }
+
+    setManualHoldingStatus((current) => ({
+      ...current,
+      [id]: { ...current[id], searchLoading: true, error: "", message: "" }
+    }));
+
+    try {
+      const response = await fetch(`/api/market-data/search?query=${encodeURIComponent(query)}`);
+      const payload = await response.json();
+      if (!response.ok) {
+        throw new Error(payload.error ?? "Security search failed.");
+      }
+
+      const results = (payload.data?.results ?? []) as MarketDataSearchResult[];
+      setManualHoldingSuggestions((current) => ({ ...current, [id]: results }));
+      setManualHoldingStatus((current) => ({
+        ...current,
+        [id]: {
+          ...current[id],
+          searchLoading: false,
+          error: results.length === 0 ? "No matching securities found." : "",
+          message: results.length > 0 ? `Found ${results.length} candidates.` : ""
+        }
+      }));
+    } catch (error) {
+      setManualHoldingStatus((current) => ({
+        ...current,
+        [id]: {
+          ...current[id],
+          searchLoading: false,
+          error: error instanceof Error ? error.message : "Security search failed."
+        }
+      }));
+    }
+  }
+
+  async function resolveManualHolding(id: string, symbol: string, nextName?: string) {
+    setManualHoldingStatus((current) => ({
+      ...current,
+      [id]: { ...current[id], searchLoading: true, error: "", message: "" }
+    }));
+
+    try {
+      const response = await fetch(`/api/market-data/resolve?symbol=${encodeURIComponent(symbol)}`);
+      const payload = await response.json();
+      if (!response.ok) {
+        throw new Error(payload.error ?? "Security normalization failed.");
+      }
+
+      const result = payload.data?.result;
+      updateManualHolding(id, {
+        symbol: result.symbol ?? symbol.toUpperCase(),
+        searchQuery: result.symbol ?? symbol.toUpperCase(),
+        holdingName: nextName ?? result.name ?? symbol.toUpperCase()
+      });
+      setManualHoldingSuggestions((current) => ({ ...current, [id]: [] }));
+      setManualHoldingStatus((current) => ({
+        ...current,
+        [id]: {
+          ...current[id],
+          searchLoading: false,
+          error: "",
+          message: `Normalized to ${result.symbol ?? symbol.toUpperCase()} via ${result.provider}.`
+        }
+      }));
+    } catch (error) {
+      setManualHoldingStatus((current) => ({
+        ...current,
+        [id]: {
+          ...current[id],
+          searchLoading: false,
+          error: error instanceof Error ? error.message : "Security normalization failed."
+        }
+      }));
+    }
+  }
+
+  async function fetchManualHoldingQuote(id: string) {
+    const holding = manualHoldings.find((item) => item.id === id);
+    if (!holding?.symbol.trim()) {
+      setManualHoldingStatus((current) => ({
+        ...current,
+        [id]: { ...current[id], error: "Pick or enter a normalized symbol before fetching a quote." }
+      }));
+      return;
+    }
+
+    setManualHoldingStatus((current) => ({
+      ...current,
+      [id]: { ...current[id], quoteLoading: true, error: "", message: "" }
+    }));
+
+    try {
+      const response = await fetch(`/api/market-data/quote?symbol=${encodeURIComponent(holding.symbol.trim())}`);
+      const payload = await response.json();
+      if (!response.ok) {
+        throw new Error(payload.error ?? "Quote lookup failed.");
+      }
+
+      const quote = payload.data?.result;
+      const nextPrice = Number(quote.price);
+      if (!Number.isFinite(nextPrice) || nextPrice <= 0) {
+        throw new Error("Provider returned no usable price for this symbol.");
+      }
+
+      const quantity = Number(holding.quantity) || 0;
+      updateManualHolding(id, {
+        currentPriceCad: nextPrice.toFixed(2),
+        marketValueCad: quantity > 0 ? (quantity * nextPrice).toFixed(2) : holding.marketValueCad
+      });
+      setManualHoldingStatus((current) => ({
+        ...current,
+        [id]: {
+          ...current[id],
+          quoteLoading: false,
+          error: "",
+          message: `Fetched ${quote.provider} quote at ${formatCad(nextPrice)}${quote.delayed ? " (delayed)" : ""}.`
+        }
+      }));
+    } catch (error) {
+      setManualHoldingStatus((current) => ({
+        ...current,
+        [id]: {
+          ...current[id],
+          quoteLoading: false,
+          error: error instanceof Error ? error.message : "Quote lookup failed."
+        }
+      }));
+    }
+  }
 
   const canAdvance = useMemo(() => {
     if (currentStep === 1) {
@@ -278,7 +560,11 @@ export function ImportExperience({
 
     if (currentStep === 3) {
       const hasBaseFields = institution.trim().length > 1 && nickname.trim().length > 1;
+      const hasValidAccountSelection = accountMode === "new" || selectedExistingAccountId.length > 0;
       if (!hasBaseFields || !method) {
+        return false;
+      }
+      if (!hasValidAccountSelection) {
         return false;
       }
 
@@ -287,7 +573,7 @@ export function ImportExperience({
       }
 
       if (method === "manual-entry") {
-        return symbol.trim().length > 0 && assetClass.length > 0 && parsedInitialMarketValue > 0;
+        return manualHoldings.length > 0 && manualHoldingsAreValid;
       }
 
       return true;
@@ -304,7 +590,6 @@ export function ImportExperience({
     return false;
   }, [
     accountType,
-    assetClass,
     currentStep,
     institution,
     isPending,
@@ -313,8 +598,10 @@ export function ImportExperience({
     guidedCsvContent,
     guidedCsvMissingRequiredMappings.length,
     guidedCsvReviewState,
-    parsedInitialMarketValue,
-    symbol
+    accountMode,
+    selectedExistingAccountId,
+    manualHoldings,
+    manualHoldingsAreValid
   ]);
 
   const reviewActions = useMemo(() => {
@@ -322,9 +609,11 @@ export function ImportExperience({
       return [];
     }
 
-    const actions = [`Create ${accountType} account at ${institution || "selected institution"}`];
+    const actions = [accountMode === "existing"
+      ? `Update existing ${accountType} account at ${institution || "selected institution"}`
+      : `Create ${accountType} account at ${institution || "selected institution"}`];
     if (method === "manual-entry") {
-      actions.push(`Write starter holding ${symbol.toUpperCase() || "manual holding"} into the account`);
+      actions.push(`Upsert ${manualHoldings.length} holdings into the selected account`);
     } else {
       actions.push("Create a draft import job for later CSV completion");
     }
@@ -332,7 +621,7 @@ export function ImportExperience({
       actions.push("Recompute a baseline recommendation run after the account write");
     }
     return actions;
-  }, [accountType, institution, method, parsedInitialMarketValue, symbol]);
+  }, [accountMode, accountType, institution, method, parsedInitialMarketValue, manualHoldings.length]);
 
   function resetGuidedState(nextMode?: ImportMode) {
     if (nextMode) {
@@ -341,15 +630,15 @@ export function ImportExperience({
     setCurrentStep(1);
     setAccountType(null);
     setMethod(null);
+    setAccountMode("new");
+    setSelectedExistingAccountId("");
     setInstitution("");
     setNickname("");
     setContributionRoomCad("0");
     setInitialMarketValueCad("0");
-    setSymbol("");
-    setHoldingName("");
-    setAssetClass("Canadian Equity");
-    setSector("Multi-sector");
-    setGainLossPct("0");
+    setManualHoldings([createManualHoldingDraft()]);
+    setManualHoldingSuggestions({});
+    setManualHoldingStatus({});
     setGuidedCsvFileName("single-account.csv");
     setGuidedCsvContent("");
     setGuidedCsvHeaders([]);
@@ -544,17 +833,26 @@ export function ImportExperience({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          accountMode,
+          existingAccountId: accountMode === "existing" ? selectedExistingAccountId : undefined,
           accountType,
           method,
           institution: institution.trim(),
           nickname: nickname.trim(),
           contributionRoomCad: parsedContributionRoom,
           initialMarketValueCad: parsedInitialMarketValue,
-          symbol: symbol.trim() || undefined,
-          holdingName: holdingName.trim() || undefined,
-          assetClass: method === "manual-entry" ? assetClass : undefined,
-          sector: sector.trim() || undefined,
-          gainLossPct: parsedGainLossPct
+          holdings: method === "manual-entry"
+            ? manualHoldings.map((holding) => ({
+                symbol: holding.symbol.trim(),
+                holdingName: holding.holdingName.trim() || undefined,
+                assetClass: holding.assetClass,
+                sector: holding.sector.trim() || undefined,
+                quantity: holding.quantity ? Number(holding.quantity) : null,
+                avgCostPerShareCad: holding.avgCostPerShareCad ? Number(holding.avgCostPerShareCad) : null,
+                lastPriceCad: holding.currentPriceCad ? Number(holding.currentPriceCad) : null,
+                marketValueCad: holding.marketValueCad ? Number(holding.marketValueCad) : null
+              }))
+            : []
         })
       });
 
@@ -699,24 +997,28 @@ export function ImportExperience({
                   <StepProvideSource
                     method={method}
                     accountType={accountType}
+                    accountMode={accountMode}
+                    selectedExistingAccountId={selectedExistingAccountId}
+                    existingAccounts={matchingExistingAccounts}
                     institution={institution}
                     nickname={nickname}
                     contributionRoomCad={contributionRoomCad}
                     initialMarketValueCad={initialMarketValueCad}
-                    symbol={symbol}
-                    holdingName={holdingName}
-                    assetClass={assetClass}
-                    sector={sector}
-                    gainLossPct={gainLossPct}
+                    manualHoldings={manualHoldings}
+                    manualHoldingSuggestions={manualHoldingSuggestions}
+                    manualHoldingStatus={manualHoldingStatus}
+                    onAccountModeChange={setAccountMode}
+                    onExistingAccountChange={setSelectedExistingAccountId}
                     onInstitutionChange={setInstitution}
                     onNicknameChange={setNickname}
                     onContributionRoomChange={setContributionRoomCad}
                     onInitialMarketValueChange={setInitialMarketValueCad}
-                    onSymbolChange={setSymbol}
-                    onHoldingNameChange={setHoldingName}
-                    onAssetClassChange={(value) => setAssetClass(value as (typeof ASSET_CLASS_OPTIONS)[number])}
-                    onSectorChange={setSector}
-                    onGainLossPctChange={setGainLossPct}
+                    onManualHoldingChange={updateManualHolding}
+                    onAddManualHolding={addManualHolding}
+                    onRemoveManualHolding={removeManualHolding}
+                    onManualHoldingSearch={searchManualHolding}
+                    onManualHoldingSuggestionSelect={resolveManualHolding}
+                    onManualHoldingQuoteFetch={fetchManualHoldingQuote}
                     guidedCsvFileName={guidedCsvFileName}
                     guidedCsvHeaders={guidedCsvHeaders}
                     guidedCsvFieldMapping={guidedCsvFieldMapping}
@@ -739,8 +1041,9 @@ export function ImportExperience({
                     nickname={nickname}
                     contributionRoomCad={parsedContributionRoom}
                     initialMarketValueCad={parsedInitialMarketValue}
-                    symbol={symbol}
-                    assetClass={assetClass}
+                    accountMode={accountMode}
+                    selectedExistingAccount={matchingExistingAccounts.find((account) => account.id === selectedExistingAccountId) ?? null}
+                    manualHoldings={manualHoldings}
                     latestJob={latestJob}
                     reviewActions={reviewActions}
                     guidedCsvReviewState={guidedCsvReviewState}
@@ -900,24 +1203,28 @@ function StepChooseMethod({
 function StepProvideSource(props: {
   method: GuidedMethod | null;
   accountType: GuidedAccountType | null;
+  accountMode: "new" | "existing";
+  selectedExistingAccountId: string;
+  existingAccounts: ExistingAccountOption[];
   institution: string;
   nickname: string;
   contributionRoomCad: string;
   initialMarketValueCad: string;
-  symbol: string;
-  holdingName: string;
-  assetClass: string;
-  sector: string;
-  gainLossPct: string;
+  manualHoldings: ManualHoldingDraft[];
+  manualHoldingSuggestions: Record<string, MarketDataSearchResult[]>;
+  manualHoldingStatus: Record<string, { searchLoading?: boolean; quoteLoading?: boolean; message?: string; error?: string }>;
+  onAccountModeChange: (value: "new" | "existing") => void;
+  onExistingAccountChange: (value: string) => void;
   onInstitutionChange: (value: string) => void;
   onNicknameChange: (value: string) => void;
   onContributionRoomChange: (value: string) => void;
   onInitialMarketValueChange: (value: string) => void;
-  onSymbolChange: (value: string) => void;
-  onHoldingNameChange: (value: string) => void;
-  onAssetClassChange: (value: string) => void;
-  onSectorChange: (value: string) => void;
-  onGainLossPctChange: (value: string) => void;
+  onManualHoldingChange: (id: string, patch: Partial<ManualHoldingDraft>) => void;
+  onAddManualHolding: () => void;
+  onRemoveManualHolding: (id: string) => void;
+  onManualHoldingSearch: (id: string) => Promise<void>;
+  onManualHoldingSuggestionSelect: (id: string, symbol: string, name?: string) => Promise<void>;
+  onManualHoldingQuoteFetch: (id: string) => Promise<void>;
   guidedCsvFileName: string;
   guidedCsvHeaders: string[];
   guidedCsvFieldMapping: Record<string, string>;
@@ -933,24 +1240,28 @@ function StepProvideSource(props: {
   const {
     method,
     accountType,
+    accountMode,
+    selectedExistingAccountId,
+    existingAccounts,
     institution,
     nickname,
     contributionRoomCad,
     initialMarketValueCad,
-    symbol,
-    holdingName,
-    assetClass,
-    sector,
-    gainLossPct,
+    manualHoldings,
+    manualHoldingSuggestions,
+    manualHoldingStatus,
+    onAccountModeChange,
+    onExistingAccountChange,
     onInstitutionChange,
     onNicknameChange,
     onContributionRoomChange,
     onInitialMarketValueChange,
-    onSymbolChange,
-    onHoldingNameChange,
-    onAssetClassChange,
-    onSectorChange,
-    onGainLossPctChange,
+    onManualHoldingChange,
+    onAddManualHolding,
+    onRemoveManualHolding,
+    onManualHoldingSearch,
+    onManualHoldingSuggestionSelect,
+    onManualHoldingQuoteFetch,
     guidedCsvFileName,
     guidedCsvHeaders,
     guidedCsvFieldMapping,
@@ -971,47 +1282,81 @@ function StepProvideSource(props: {
         <p className="mt-2 font-semibold">{accountType ?? "No account selected"} / {method ?? "No method selected"}</p>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2">
-        <label className="space-y-2">
-          <span className="text-sm font-medium">Institution</span>
-          <input
-            value={institution}
-            onChange={(event) => onInstitutionChange(event.target.value)}
-            className="w-full rounded-2xl border border-[color:var(--border)] bg-white px-4 py-3 text-sm outline-none"
-            placeholder="Questrade, Wealthsimple, RBC Direct Investing..."
-          />
-        </label>
-        <label className="space-y-2">
-          <span className="text-sm font-medium">Account nickname</span>
-          <input
-            value={nickname}
-            onChange={(event) => onNicknameChange(event.target.value)}
-            className="w-full rounded-2xl border border-[color:var(--border)] bg-white px-4 py-3 text-sm outline-none"
-            placeholder="Main TFSA, Retirement RRSP..."
-          />
-        </label>
-        <label className="space-y-2">
-          <span className="text-sm font-medium">Contribution room (CAD)</span>
-          <input
-            type="number"
-            min="0"
-            value={contributionRoomCad}
-            onChange={(event) => onContributionRoomChange(event.target.value)}
-            className="w-full rounded-2xl border border-[color:var(--border)] bg-white px-4 py-3 text-sm outline-none"
-            placeholder="0"
-          />
-        </label>
-        <label className="space-y-2">
-          <span className="text-sm font-medium">Current market value (CAD)</span>
-          <input
-            type="number"
-            min="0"
-            value={initialMarketValueCad}
-            onChange={(event) => onInitialMarketValueChange(event.target.value)}
-            className="w-full rounded-2xl border border-[color:var(--border)] bg-white px-4 py-3 text-sm outline-none"
-            placeholder="0"
-          />
-        </label>
+      <div className="space-y-4 rounded-[24px] border border-[color:var(--border)] bg-white p-5">
+        <div className="flex flex-wrap gap-3">
+          <Button type="button" variant={accountMode === "new" ? "primary" : "secondary"} onClick={() => onAccountModeChange("new")}>
+            Add a new {accountType ?? "account"}
+          </Button>
+          <Button
+            type="button"
+            variant={accountMode === "existing" ? "primary" : "secondary"}
+            onClick={() => onAccountModeChange("existing")}
+            disabled={existingAccounts.length === 0}
+          >
+            Use existing {accountType ?? "account"}
+          </Button>
+        </div>
+
+        {accountMode === "existing" ? (
+          <label className="space-y-2">
+            <span className="text-sm font-medium">Existing account</span>
+            <select
+              value={selectedExistingAccountId}
+              onChange={(event) => onExistingAccountChange(event.target.value)}
+              className="w-full rounded-2xl border border-[color:var(--border)] bg-white px-4 py-3 text-sm outline-none"
+            >
+              <option value="">Select an existing {accountType ?? "account"}</option>
+              {existingAccounts.map((account) => (
+                <option key={account.id} value={account.id}>
+                  {account.nickname} / {account.institution} / {formatCad(account.marketValueCad)}
+                </option>
+              ))}
+            </select>
+          </label>
+        ) : null}
+
+        <div className="grid gap-4 md:grid-cols-2">
+          <label className="space-y-2">
+            <span className="text-sm font-medium">Institution</span>
+            <input
+              value={institution}
+              onChange={(event) => onInstitutionChange(event.target.value)}
+              className="w-full rounded-2xl border border-[color:var(--border)] bg-white px-4 py-3 text-sm outline-none"
+              placeholder="Questrade, Wealthsimple, RBC Direct Investing..."
+            />
+          </label>
+          <label className="space-y-2">
+            <span className="text-sm font-medium">Account nickname</span>
+            <input
+              value={nickname}
+              onChange={(event) => onNicknameChange(event.target.value)}
+              className="w-full rounded-2xl border border-[color:var(--border)] bg-white px-4 py-3 text-sm outline-none"
+              placeholder="Main TFSA, Retirement RRSP..."
+            />
+          </label>
+          <label className="space-y-2">
+            <span className="text-sm font-medium">Contribution room (CAD)</span>
+            <input
+              type="number"
+              min="0"
+              value={contributionRoomCad}
+              onChange={(event) => onContributionRoomChange(event.target.value)}
+              className="w-full rounded-2xl border border-[color:var(--border)] bg-white px-4 py-3 text-sm outline-none"
+              placeholder="0"
+            />
+          </label>
+          <label className="space-y-2">
+            <span className="text-sm font-medium">Current market value (CAD)</span>
+            <input
+              type="number"
+              min="0"
+              value={initialMarketValueCad}
+              onChange={(event) => onInitialMarketValueChange(event.target.value)}
+              className="w-full rounded-2xl border border-[color:var(--border)] bg-white px-4 py-3 text-sm outline-none"
+              placeholder="Auto-calculated after holdings write"
+            />
+          </label>
+        </div>
       </div>
 
       {method === "single-account-csv" ? (
@@ -1132,61 +1477,122 @@ function StepProvideSource(props: {
           <div>
             <p className="font-semibold">Manual entry path</p>
             <p className="mt-2 text-sm text-[color:var(--muted-foreground)]">
-              Use this when you want to seed a simple account directly into the database without waiting on a broker export.
+              Use this when you want to add one or more holdings into a new or existing account. Gain/loss is derived from cost basis and current price or market value.
             </p>
           </div>
-          <div className="grid gap-4 md:grid-cols-2">
-            <label className="space-y-2">
-              <span className="text-sm font-medium">Ticker symbol</span>
-              <input
-                value={symbol}
-                onChange={(event) => onSymbolChange(event.target.value)}
-                className="w-full rounded-2xl border border-[color:var(--border)] bg-white px-4 py-3 text-sm outline-none"
-                placeholder="VFV"
-              />
-            </label>
-            <label className="space-y-2">
-              <span className="text-sm font-medium">Holding name</span>
-              <input
-                value={holdingName}
-                onChange={(event) => onHoldingNameChange(event.target.value)}
-                className="w-full rounded-2xl border border-[color:var(--border)] bg-white px-4 py-3 text-sm outline-none"
-                placeholder="Vanguard S&P 500 Index ETF"
-              />
-            </label>
-            <label className="space-y-2">
-              <span className="text-sm font-medium">Asset class</span>
-              <select
-                value={assetClass}
-                onChange={(event) => onAssetClassChange(event.target.value)}
-                className="w-full rounded-2xl border border-[color:var(--border)] bg-white px-4 py-3 text-sm outline-none"
-              >
-                {ASSET_CLASS_OPTIONS.map((option) => (
-                  <option key={option} value={option}>
-                    {option}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="space-y-2">
-              <span className="text-sm font-medium">Sector</span>
-              <input
-                value={sector}
-                onChange={(event) => onSectorChange(event.target.value)}
-                className="w-full rounded-2xl border border-[color:var(--border)] bg-white px-4 py-3 text-sm outline-none"
-                placeholder="Multi-sector"
-              />
-            </label>
-            <label className="space-y-2">
-              <span className="text-sm font-medium">Gain / loss %</span>
-              <input
-                type="number"
-                value={gainLossPct}
-                onChange={(event) => onGainLossPctChange(event.target.value)}
-                className="w-full rounded-2xl border border-[color:var(--border)] bg-white px-4 py-3 text-sm outline-none"
-                placeholder="0"
-              />
-            </label>
+          <div className="space-y-4">
+            {manualHoldings.map((holding, index) => (
+              <div key={holding.id} className="space-y-4 rounded-2xl border border-[color:var(--border)] bg-[color:var(--card-muted)] p-4">
+                <div className="flex items-center justify-between gap-3">
+                  <p className="font-medium">Holding {index + 1}</p>
+                  <Button type="button" variant="secondary" onClick={() => onRemoveManualHolding(holding.id)} disabled={manualHoldings.length === 1}>
+                    Remove
+                  </Button>
+                </div>
+                <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                  <label className="space-y-2 xl:col-span-2">
+                    <span className="text-sm font-medium">Security search</span>
+                    <div className="flex gap-2">
+                      <input value={holding.searchQuery} onChange={(event) => onManualHoldingChange(holding.id, { searchQuery: event.target.value })} className="w-full rounded-2xl border border-[color:var(--border)] bg-white px-4 py-3 text-sm outline-none" placeholder="Search by ticker or company name" />
+                      <Button type="button" variant="secondary" onClick={() => void onManualHoldingSearch(holding.id)} leadingIcon={manualHoldingStatus[holding.id]?.searchLoading ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}>
+                        Search
+                      </Button>
+                    </div>
+                  </label>
+                  <label className="space-y-2">
+                    <span className="text-sm font-medium">Ticker symbol</span>
+                    <input value={holding.symbol} onChange={(event) => onManualHoldingChange(holding.id, { symbol: event.target.value.toUpperCase() })} className="w-full rounded-2xl border border-[color:var(--border)] bg-white px-4 py-3 text-sm outline-none" placeholder="VFV" />
+                  </label>
+                  <label className="space-y-2">
+                    <span className="text-sm font-medium">Holding name</span>
+                    <input value={holding.holdingName} onChange={(event) => onManualHoldingChange(holding.id, { holdingName: event.target.value })} className="w-full rounded-2xl border border-[color:var(--border)] bg-white px-4 py-3 text-sm outline-none" placeholder="Auto-filled from normalization when available" />
+                  </label>
+                  <label className="space-y-2">
+                    <span className="text-sm font-medium">Asset class</span>
+                    <select value={holding.assetClass} onChange={(event) => onManualHoldingChange(holding.id, { assetClass: event.target.value as (typeof ASSET_CLASS_OPTIONS)[number] })} className="w-full rounded-2xl border border-[color:var(--border)] bg-white px-4 py-3 text-sm outline-none">
+                      {ASSET_CLASS_OPTIONS.map((option) => (
+                        <option key={option} value={option}>{option}</option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="space-y-2">
+                    <span className="text-sm font-medium">Sector</span>
+                    <input value={holding.sector} onChange={(event) => onManualHoldingChange(holding.id, { sector: event.target.value })} className="w-full rounded-2xl border border-[color:var(--border)] bg-white px-4 py-3 text-sm outline-none" placeholder="Multi-sector" />
+                  </label>
+                  <label className="space-y-2">
+                    <span className="text-sm font-medium">Shares</span>
+                    <input type="number" min="0" value={holding.quantity} onChange={(event) => onManualHoldingChange(holding.id, { quantity: event.target.value })} className="w-full rounded-2xl border border-[color:var(--border)] bg-white px-4 py-3 text-sm outline-none" placeholder="10" />
+                  </label>
+                  <label className="space-y-2">
+                    <span className="text-sm font-medium">Avg cost / share (CAD)</span>
+                    <input type="number" min="0" value={holding.avgCostPerShareCad} onChange={(event) => onManualHoldingChange(holding.id, { avgCostPerShareCad: event.target.value })} className="w-full rounded-2xl border border-[color:var(--border)] bg-white px-4 py-3 text-sm outline-none" placeholder="105.25" />
+                  </label>
+                  <label className="space-y-2">
+                    <span className="text-sm font-medium">Current price (CAD)</span>
+                    <div className="flex gap-2">
+                      <input type="number" min="0" value={holding.currentPriceCad} onChange={(event) => onManualHoldingChange(holding.id, { currentPriceCad: event.target.value })} className="w-full rounded-2xl border border-[color:var(--border)] bg-white px-4 py-3 text-sm outline-none" placeholder="Fetch delayed quote or enter manually" />
+                      <Button type="button" variant="secondary" onClick={() => void onManualHoldingQuoteFetch(holding.id)} leadingIcon={manualHoldingStatus[holding.id]?.quoteLoading ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <TrendingUp className="h-4 w-4" />}>
+                        Quote
+                      </Button>
+                    </div>
+                  </label>
+                  <label className="space-y-2">
+                    <span className="text-sm font-medium">Current market value (CAD)</span>
+                    <input type="number" min="0" value={holding.marketValueCad} onChange={(event) => onManualHoldingChange(holding.id, { marketValueCad: event.target.value })} className="w-full rounded-2xl border border-[color:var(--border)] bg-white px-4 py-3 text-sm outline-none" placeholder="Fallback if no current price" />
+                  </label>
+                </div>
+                {manualHoldingSuggestions[holding.id]?.length ? (
+                  <div className="space-y-2">
+                    <p className="text-xs uppercase tracking-[0.14em] text-[color:var(--muted-foreground)]">Search results</p>
+                    <div className="space-y-2">
+                      {manualHoldingSuggestions[holding.id].slice(0, 5).map((result) => (
+                        <button
+                          key={`${holding.id}-${result.symbol}-${result.exchange ?? ""}`}
+                          type="button"
+                          onClick={() => void onManualHoldingSuggestionSelect(holding.id, result.symbol, result.name)}
+                          className="flex w-full items-start justify-between gap-3 rounded-2xl border border-[color:var(--border)] bg-white px-4 py-3 text-left transition-colors hover:border-[color:var(--primary)]"
+                        >
+                          <div>
+                            <p className="font-medium">{result.symbol} · {result.name}</p>
+                            <p className="mt-1 text-sm text-[color:var(--muted-foreground)]">
+                              {result.exchange ?? "Unknown exchange"}{result.country ? ` · ${result.country}` : ""}{result.currency ? ` · ${result.currency}` : ""}
+                            </p>
+                          </div>
+                          <Badge variant="neutral">{result.type}</Badge>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
+                {manualHoldingStatus[holding.id]?.message ? (
+                  <div className="rounded-2xl border border-[#b6d7c7] bg-[#eef8f1] px-4 py-3 text-sm text-[#21613f]">
+                    {manualHoldingStatus[holding.id]?.message}
+                  </div>
+                ) : null}
+                {manualHoldingStatus[holding.id]?.error ? (
+                  <div className="rounded-2xl border border-[#e7b0b8] bg-[#fff3f5] px-4 py-3 text-sm text-[#8e2433]">
+                    {manualHoldingStatus[holding.id]?.error}
+                  </div>
+                ) : null}
+                <div className="grid gap-3 md:grid-cols-3">
+                  <InfoRow
+                    icon={<Database className="mt-0.5 h-4 w-4 text-[color:var(--primary)]" />}
+                    text={`Derived cost basis: ${formatCad(getManualHoldingDerivedMetrics(holding).costBasisCad)}`}
+                  />
+                  <InfoRow
+                    icon={<TrendingUp className="mt-0.5 h-4 w-4 text-[color:var(--primary)]" />}
+                    text={`Derived market value: ${formatCad(getManualHoldingDerivedMetrics(holding).computedMarketValueCad)}`}
+                  />
+                  <InfoRow
+                    icon={<CheckCircle2 className="mt-0.5 h-4 w-4 text-[color:var(--success)]" />}
+                    text={`Derived gain/loss: ${formatPercent(getManualHoldingDerivedMetrics(holding).gainLossPct)}`}
+                  />
+                </div>
+              </div>
+            ))}
+            <Button type="button" variant="secondary" onClick={onAddManualHolding}>
+              Add another holding
+            </Button>
           </div>
         </div>
       ) : null}
@@ -1210,8 +1616,9 @@ function StepReviewAndConfirm({
   nickname,
   contributionRoomCad,
   initialMarketValueCad,
-  symbol,
-  assetClass,
+  accountMode,
+  selectedExistingAccount,
+  manualHoldings,
   latestJob,
   reviewActions,
   guidedCsvReviewState
@@ -1222,8 +1629,9 @@ function StepReviewAndConfirm({
   nickname: string;
   contributionRoomCad: number;
   initialMarketValueCad: number;
-  symbol: string;
-  assetClass: string;
+  accountMode: "new" | "existing";
+  selectedExistingAccount: ExistingAccountOption | null;
+  manualHoldings: ManualHoldingDraft[];
   latestJob: { status: string; fileName: string; createdAt: string } | null;
   reviewActions: string[];
   guidedCsvReviewState: GuidedCsvReviewState | null;
@@ -1234,19 +1642,22 @@ function StepReviewAndConfirm({
         <p className="text-xs uppercase tracking-[0.16em] text-[color:var(--muted-foreground)]">Review and confirm</p>
         <p className="mt-2 text-lg font-semibold">{accountType ?? "Unspecified account"} via {method ?? "unspecified method"}</p>
         <p className="mt-2 text-sm text-[color:var(--muted-foreground)]">
-          Institution: {institution || "Not set"}. Nickname: {nickname || "Not set"}. Contribution room: {formatCad(contributionRoomCad)}.
+          {accountMode === "existing" && selectedExistingAccount
+            ? `Updating existing ${selectedExistingAccount.type} account ${selectedExistingAccount.nickname} at ${selectedExistingAccount.institution}. `
+            : `Institution: ${institution || "Not set"}. Nickname: ${nickname || "Not set"}. `}
+          Contribution room: {formatCad(contributionRoomCad)}.
         </p>
       </div>
 
       <div className="grid gap-3 md:grid-cols-2">
         <InfoRow
           icon={<CheckCircle2 className="mt-0.5 h-4 w-4 text-[color:var(--success)]" />}
-          text={`Current market value on create: ${formatCad(initialMarketValueCad)}`}
+          text={`Current market value baseline: ${formatCad(initialMarketValueCad)}`}
         />
         <InfoRow
           icon={<PencilLine className="mt-0.5 h-4 w-4 text-[color:var(--primary)]" />}
           text={method === "manual-entry"
-            ? `Manual holding will be seeded as ${symbol.toUpperCase() || "ticker"} in ${assetClass}.`
+            ? `Manual entry will upsert ${manualHoldings.length} holdings into ${accountMode === "existing" ? "the existing account" : "the new account"}.`
             : "CSV-specific data entry can continue after the account shell is created."}
         />
       </div>

@@ -30,6 +30,10 @@ export interface HoldingPosition {
   name: string;
   assetClass: string;
   sector: string;
+  quantity?: number | null;
+  avgCostPerShareCad?: number | null;
+  costBasisCad?: number | null;
+  lastPriceCad?: number | null;
   marketValueCad: number;
   weightPct: number;
   gainLossPct: number;

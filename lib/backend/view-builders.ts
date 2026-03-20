@@ -585,7 +585,15 @@ export function buildImportData(args: {
       "Imported holdings can be grouped by account and asset class.",
       "Invalid or unknown rows are flagged before the portfolio view updates.",
       "On completion the user can move directly to Dashboard or Recommendations."
-    ]
+    ],
+    existingAccounts: accounts.map((account) => ({
+      id: account.id,
+      type: account.type,
+      institution: account.institution,
+      nickname: account.nickname,
+      contributionRoomCad: account.contributionRoomCad,
+      marketValueCad: account.marketValueCad
+    }))
   };
 }
 

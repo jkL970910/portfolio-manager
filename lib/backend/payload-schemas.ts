@@ -61,28 +61,43 @@ export const importMappingPresetUpdateSchema = z.object({
   "At least one preset field must be updated."
 );
 
+const guidedHoldingSchema = z.object({
+  symbol: z.string().trim().min(1).max(32),
+  holdingName: z.string().trim().max(160).optional(),
+  assetClass: z.string().trim().min(1).max(64),
+  sector: z.string().trim().max(64).optional(),
+  quantity: z.number().positive().max(1_000_000_000).nullable().optional(),
+  avgCostPerShareCad: z.number().min(0).max(1_000_000).nullable().optional(),
+  costBasisCad: z.number().min(0).max(1_000_000_000).nullable().optional(),
+  lastPriceCad: z.number().min(0).max(1_000_000).nullable().optional(),
+  marketValueCad: z.number().min(0).max(1_000_000_000).nullable().optional()
+}).superRefine((value, context) => {
+  if ((value.marketValueCad ?? 0) <= 0 && !((value.quantity ?? 0) > 0 && (value.lastPriceCad ?? 0) > 0)) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["marketValueCad"],
+      message: "Each holding requires market value or quantity plus current price."
+    });
+  }
+});
+
 export const guidedImportCreateSchema = z.object({
+  accountMode: z.enum(["new", "existing"]).default("new"),
+  existingAccountId: z.string().uuid().optional(),
   accountType: z.enum(["TFSA", "RRSP", "FHSA", "Taxable"]),
   method: z.enum(["single-account-csv", "manual-entry", "continue-later"]),
   institution: z.string().trim().min(2).max(120),
   nickname: z.string().trim().min(2).max(120),
   contributionRoomCad: z.number().min(0).max(1000000).optional().default(0),
   initialMarketValueCad: z.number().min(0).max(100000000).optional().default(0),
-  symbol: z.string().trim().max(32).optional(),
-  holdingName: z.string().trim().max(160).optional(),
-  assetClass: z.string().trim().max(64).optional(),
-  sector: z.string().trim().max(64).optional(),
-  gainLossPct: z.number().min(-100).max(1000).optional().default(0)
+  holdings: z.array(guidedHoldingSchema).max(100).optional().default([])
 }).superRefine((value, context) => {
+  if (value.accountMode === "existing" && !value.existingAccountId) {
+    context.addIssue({ code: z.ZodIssueCode.custom, path: ["existingAccountId"], message: "Select an existing account." });
+  }
   if (value.method === "manual-entry") {
-    if (!value.symbol) {
-      context.addIssue({ code: z.ZodIssueCode.custom, path: ["symbol"], message: "Manual entry requires a symbol." });
-    }
-    if (!value.assetClass) {
-      context.addIssue({ code: z.ZodIssueCode.custom, path: ["assetClass"], message: "Manual entry requires an asset class." });
-    }
-    if ((value.initialMarketValueCad ?? 0) <= 0) {
-      context.addIssue({ code: z.ZodIssueCode.custom, path: ["initialMarketValueCad"], message: "Manual entry requires a positive market value." });
+    if ((value.holdings?.length ?? 0) === 0) {
+      context.addIssue({ code: z.ZodIssueCode.custom, path: ["holdings"], message: "Manual entry requires at least one holding." });
     }
   }
 });

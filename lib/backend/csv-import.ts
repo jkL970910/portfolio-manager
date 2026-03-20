@@ -15,6 +15,10 @@ export interface ParsedHoldingSeed {
   name: string;
   assetClass: string;
   sector: string;
+  quantity: number | null;
+  avgCostPerShareCad: number | null;
+  costBasisCad: number | null;
+  lastPriceCad: number | null;
   marketValueCad: number;
   weightPct: number | null;
   gainLossPct: number;
@@ -62,6 +66,10 @@ export type ImportCanonicalField =
   | "name"
   | "asset_class"
   | "sector"
+  | "quantity"
+  | "avg_cost_per_share_cad"
+  | "cost_basis_cad"
+  | "last_price_cad"
   | "weight_pct"
   | "gain_loss_pct"
   | "booked_at"
@@ -162,6 +170,11 @@ function parseDate(value: string) {
   return normalized;
 }
 
+function round(value: number, digits = 2) {
+  const factor = 10 ** digits;
+  return Math.round(value * factor) / factor;
+}
+
 function resolveMappedHeader(canonicalField: ImportCanonicalField, fieldMapping: ImportFieldMapping) {
   return normalizeHeader(fieldMapping[canonicalField] ?? canonicalField);
 }
@@ -240,19 +253,42 @@ export function parseImportCsv(csvContent: string, fieldMapping: ImportFieldMapp
         if (!accountKey) {
           throw new Error("Holding rows must include account_key.");
         }
-        const marketValueCad = parseNumber(getMappedValue(record, "market_value_cad", fieldMapping));
+        const quantity = parseNumber(getMappedValue(record, "quantity", fieldMapping));
+        const avgCostPerShareCad = parseNumber(getMappedValue(record, "avg_cost_per_share_cad", fieldMapping));
+        const explicitCostBasisCad = parseNumber(getMappedValue(record, "cost_basis_cad", fieldMapping));
+        const lastPriceCad = parseNumber(getMappedValue(record, "last_price_cad", fieldMapping));
+        const explicitMarketValueCad = parseNumber(getMappedValue(record, "market_value_cad", fieldMapping));
+        const computedCostBasisCad = explicitCostBasisCad ?? (
+          quantity != null && avgCostPerShareCad != null ? round(quantity * avgCostPerShareCad) : null
+        );
+        const marketValueCad = explicitMarketValueCad ?? (
+          quantity != null && lastPriceCad != null ? round(quantity * lastPriceCad) : null
+        );
+
         if (marketValueCad == null) {
-          throw new Error("Holding rows must include market_value_cad.");
+          throw new Error("Holding rows must include market_value_cad or quantity plus last_price_cad.");
         }
+
+        const explicitGainLossPct = parseNumber(getMappedValue(record, "gain_loss_pct", fieldMapping));
+        const computedGainLossPct = explicitGainLossPct ?? (
+          computedCostBasisCad != null && computedCostBasisCad > 0
+            ? round(((marketValueCad - computedCostBasisCad) / computedCostBasisCad) * 100, 2)
+            : 0
+        );
+
         holdings.push({
           accountKey,
           symbol: getMappedValue(record, "symbol", fieldMapping).trim() || "UNKNOWN",
           name: getMappedValue(record, "name", fieldMapping).trim() || getMappedValue(record, "symbol", fieldMapping).trim() || "Imported Holding",
           assetClass: getMappedValue(record, "asset_class", fieldMapping).trim() || "Unknown",
           sector: getMappedValue(record, "sector", fieldMapping).trim() || "Multi-sector",
+          quantity,
+          avgCostPerShareCad,
+          costBasisCad: computedCostBasisCad,
+          lastPriceCad,
           marketValueCad,
           weightPct: parseNumber(getMappedValue(record, "weight_pct", fieldMapping)),
-          gainLossPct: parseNumber(getMappedValue(record, "gain_loss_pct", fieldMapping)) ?? 0
+          gainLossPct: computedGainLossPct
         });
 
         if (!accountMap.has(accountKey)) {

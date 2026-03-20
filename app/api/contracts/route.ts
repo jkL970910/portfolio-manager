@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 const contracts = {
-  version: "0.7.0",
+  version: "0.8.0",
   entities: [
     "UserProfile",
     "InvestmentAccount",
@@ -46,6 +46,21 @@ const contracts = {
       path: "/api/settings/preferences",
       method: "GET",
       description: "Preference configuration screen model plus current saved preference profile."
+    },
+    {
+      path: "/api/market-data/search",
+      method: "GET",
+      description: "Search securities by symbol or company name through the configured market-data provider layer."
+    },
+    {
+      path: "/api/market-data/resolve",
+      method: "GET",
+      description: "Normalize a symbol into a canonical security identity, preferring OpenFIGI when configured."
+    },
+    {
+      path: "/api/market-data/quote",
+      method: "GET",
+      description: "Fetch the latest available quote through the configured market-data provider layer."
     }
   ],
   plannedMutations: [

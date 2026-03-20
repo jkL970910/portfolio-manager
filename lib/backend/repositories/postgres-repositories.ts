@@ -103,6 +103,10 @@ export const postgresRepositories: BackendRepositories = {
         name: row.name,
         assetClass: row.assetClass,
         sector: row.sector,
+        quantity: row.quantity == null ? null : toNumber(row.quantity),
+        avgCostPerShareCad: row.avgCostPerShareCad == null ? null : toNumber(row.avgCostPerShareCad),
+        costBasisCad: row.costBasisCad == null ? null : toNumber(row.costBasisCad),
+        lastPriceCad: row.lastPriceCad == null ? null : toNumber(row.lastPriceCad),
         marketValueCad: toNumber(row.marketValueCad),
         weightPct: toNumber(row.weightPct),
         gainLossPct: toNumber(row.gainLossPct)

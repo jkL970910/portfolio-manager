@@ -101,17 +101,25 @@ export interface UpdateImportMappingPresetInput {
 }
 
 export interface CreateGuidedImportInput {
+  accountMode: "new" | "existing";
+  existingAccountId?: string;
   accountType: AccountType;
   method: "single-account-csv" | "manual-entry" | "continue-later";
   institution: string;
   nickname: string;
   contributionRoomCad: number;
   initialMarketValueCad: number;
-  symbol?: string;
-  holdingName?: string;
-  assetClass?: string;
-  sector?: string;
-  gainLossPct: number;
+  holdings?: Array<{
+    symbol: string;
+    holdingName?: string;
+    assetClass: string;
+    sector?: string;
+    quantity?: number | null;
+    avgCostPerShareCad?: number | null;
+    costBasisCad?: number | null;
+    lastPriceCad?: number | null;
+    marketValueCad?: number | null;
+  }>;
 }
 
 export interface CreateGuidedImportResult {
@@ -257,6 +265,46 @@ function transactionMatchKey(transaction: {
   direction: "inflow" | "outflow";
 }) {
   return `${transaction.accountId ?? "none"}::${transaction.bookedAt}::${transaction.merchant.toLowerCase()}::${transaction.category.toLowerCase()}::${transaction.amountCad.toFixed(2)}::${transaction.direction}`;
+}
+
+function round(value: number, digits = 2) {
+  const factor = 10 ** digits;
+  return Math.round(value * factor) / factor;
+}
+
+function normalizeManualHolding(input: NonNullable<CreateGuidedImportInput["holdings"]>[number]) {
+  const quantity = input.quantity ?? null;
+  const avgCostPerShareCad = input.avgCostPerShareCad ?? null;
+  const explicitCostBasisCad = input.costBasisCad ?? null;
+  const lastPriceCad = input.lastPriceCad ?? null;
+  const explicitMarketValueCad = input.marketValueCad ?? null;
+  const costBasisCad = explicitCostBasisCad ?? (
+    quantity != null && avgCostPerShareCad != null ? round(quantity * avgCostPerShareCad) : null
+  );
+  const marketValueCad = explicitMarketValueCad ?? (
+    quantity != null && lastPriceCad != null ? round(quantity * lastPriceCad) : null
+  );
+
+  if (marketValueCad == null || marketValueCad <= 0) {
+    throw new Error(`Holding ${input.symbol.toUpperCase()} requires market value or quantity plus current price.`);
+  }
+
+  const gainLossPct = costBasisCad != null && costBasisCad > 0
+    ? round(((marketValueCad - costBasisCad) / costBasisCad) * 100, 2)
+    : 0;
+
+  return {
+    symbol: input.symbol.trim().toUpperCase(),
+    name: input.holdingName?.trim() || input.symbol.trim().toUpperCase(),
+    assetClass: input.assetClass,
+    sector: input.sector?.trim() || "Multi-sector",
+    quantity,
+    avgCostPerShareCad,
+    costBasisCad,
+    lastPriceCad,
+    marketValueCad,
+    gainLossPct
+  };
 }
 
 export async function getDashboardView(userId: string) {
@@ -802,6 +850,10 @@ export async function createImportJob(userId: string, input: CreateImportJobInpu
       name: string;
       assetClass: string;
       sector: string;
+      quantity: string | null;
+      avgCostPerShareCad: string | null;
+      costBasisCad: string | null;
+      lastPriceCad: string | null;
       marketValueCad: string;
       weightPct: string;
       gainLossPct: string;
@@ -820,6 +872,10 @@ export async function createImportJob(userId: string, input: CreateImportJobInpu
         name: holding.name,
         assetClass: holding.assetClass,
         sector: holding.sector,
+        quantity: holding.quantity?.toFixed(6) ?? null,
+        avgCostPerShareCad: holding.avgCostPerShareCad?.toFixed(4) ?? null,
+        costBasisCad: holding.costBasisCad?.toFixed(2) ?? null,
+        lastPriceCad: holding.lastPriceCad?.toFixed(4) ?? null,
         marketValueCad: holding.marketValueCad.toFixed(2),
         weightPct: (holding.weightPct ?? 0).toFixed(2),
         gainLossPct: holding.gainLossPct.toFixed(2)
@@ -833,6 +889,10 @@ export async function createImportJob(userId: string, input: CreateImportJobInpu
             name: payload.name,
             assetClass: payload.assetClass,
             sector: payload.sector,
+            quantity: payload.quantity,
+            avgCostPerShareCad: payload.avgCostPerShareCad,
+            costBasisCad: payload.costBasisCad,
+            lastPriceCad: payload.lastPriceCad,
             marketValueCad: payload.marketValueCad,
             weightPct: payload.weightPct,
             gainLossPct: payload.gainLossPct,
@@ -949,32 +1009,114 @@ export async function createGuidedImportAccount(userId: string, input: CreateGui
   const db = getDb();
 
   const result = await db.transaction(async (tx) => {
-    const [accountRow] = await tx
-      .insert(investmentAccounts)
-      .values({
-        userId,
-        institution: input.institution,
-        type: input.accountType,
-        nickname: input.nickname,
-        marketValueCad: input.initialMarketValueCad.toFixed(2),
-        contributionRoomCad: input.contributionRoomCad.toFixed(2)
-      })
-      .returning();
+    let accountRow: typeof investmentAccounts.$inferSelect;
+    if (input.accountMode === "existing" && input.existingAccountId) {
+      const existing = await tx.query.investmentAccounts.findFirst({
+        where: and(
+          eq(investmentAccounts.userId, userId),
+          eq(investmentAccounts.id, input.existingAccountId)
+        )
+      });
+      if (!existing) {
+        throw new Error("Selected account was not found.");
+      }
+      const [updatedAccount] = await tx
+        .update(investmentAccounts)
+        .set({
+          institution: input.institution,
+          nickname: input.nickname,
+          contributionRoomCad: input.contributionRoomCad.toFixed(2),
+          updatedAt: new Date()
+        })
+        .where(eq(investmentAccounts.id, existing.id))
+        .returning();
+      accountRow = updatedAccount;
+    } else {
+      [accountRow] = await tx
+        .insert(investmentAccounts)
+        .values({
+          userId,
+          institution: input.institution,
+          type: input.accountType,
+          nickname: input.nickname,
+          marketValueCad: input.initialMarketValueCad.toFixed(2),
+          contributionRoomCad: input.contributionRoomCad.toFixed(2)
+        })
+        .returning();
+    }
 
     let createdHoldingSymbol: string | null = null;
-    if (input.method === "manual-entry" && input.symbol && input.assetClass) {
-      await tx.insert(holdingPositions).values({
-        userId,
-        accountId: accountRow.id,
-        symbol: input.symbol.toUpperCase(),
-        name: input.holdingName?.trim() || input.symbol.toUpperCase(),
-        assetClass: input.assetClass,
-        sector: input.sector?.trim() || "Multi-sector",
-        marketValueCad: input.initialMarketValueCad.toFixed(2),
-        weightPct: "100.00",
-        gainLossPct: input.gainLossPct.toFixed(2)
-      });
-      createdHoldingSymbol = input.symbol.toUpperCase();
+    if (input.method === "manual-entry" && input.holdings && input.holdings.length > 0) {
+      const existingHoldings = await tx.select().from(holdingPositions).where(
+        and(
+          eq(holdingPositions.userId, userId),
+          eq(holdingPositions.accountId, accountRow.id)
+        )
+      );
+      const existingHoldingBySymbol = new Map(existingHoldings.map((holding) => [holding.symbol.toUpperCase(), holding]));
+      const normalizedHoldings = input.holdings.map(normalizeManualHolding);
+
+      for (const holding of normalizedHoldings) {
+        const matched = existingHoldingBySymbol.get(holding.symbol);
+        if (matched) {
+          await tx
+            .update(holdingPositions)
+            .set({
+              name: holding.name,
+              assetClass: holding.assetClass,
+              sector: holding.sector,
+              quantity: holding.quantity?.toFixed(6) ?? null,
+              avgCostPerShareCad: holding.avgCostPerShareCad?.toFixed(4) ?? null,
+              costBasisCad: holding.costBasisCad?.toFixed(2) ?? null,
+              lastPriceCad: holding.lastPriceCad?.toFixed(4) ?? null,
+              marketValueCad: holding.marketValueCad.toFixed(2),
+              gainLossPct: holding.gainLossPct.toFixed(2),
+              updatedAt: new Date()
+            })
+            .where(eq(holdingPositions.id, matched.id));
+        } else {
+          await tx.insert(holdingPositions).values({
+            userId,
+            accountId: accountRow.id,
+            symbol: holding.symbol,
+            name: holding.name,
+            assetClass: holding.assetClass,
+            sector: holding.sector,
+            quantity: holding.quantity?.toFixed(6) ?? null,
+            avgCostPerShareCad: holding.avgCostPerShareCad?.toFixed(4) ?? null,
+            costBasisCad: holding.costBasisCad?.toFixed(2) ?? null,
+            lastPriceCad: holding.lastPriceCad?.toFixed(4) ?? null,
+            marketValueCad: holding.marketValueCad.toFixed(2),
+            weightPct: "0.00",
+            gainLossPct: holding.gainLossPct.toFixed(2)
+          });
+        }
+      }
+
+      const refreshedHoldings = await tx.select().from(holdingPositions).where(
+        and(
+          eq(holdingPositions.userId, userId),
+          eq(holdingPositions.accountId, accountRow.id)
+        )
+      );
+      const totalMarketValue = refreshedHoldings.reduce((sum, holding) => sum + Number(holding.marketValueCad), 0);
+      for (const holding of refreshedHoldings) {
+        const weightPct = totalMarketValue > 0 ? round((Number(holding.marketValueCad) / totalMarketValue) * 100, 2) : 0;
+        await tx
+          .update(holdingPositions)
+          .set({ weightPct: weightPct.toFixed(2), updatedAt: new Date() })
+          .where(eq(holdingPositions.id, holding.id));
+      }
+      const [updatedAccount] = await tx
+        .update(investmentAccounts)
+        .set({
+          marketValueCad: totalMarketValue.toFixed(2),
+          updatedAt: new Date()
+        })
+        .where(eq(investmentAccounts.id, accountRow.id))
+        .returning();
+      accountRow = updatedAccount;
+      createdHoldingSymbol = normalizedHoldings.map((holding) => holding.symbol).join(", ");
     }
 
     let importJob: ImportJob | null = null;

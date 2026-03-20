@@ -14,13 +14,29 @@ The importer accepts one flat CSV with a `record_type` column.
 
 Each row type can share the same file. Rows are linked with `account_key`.
 
+## Canonical Holding Model
+
+The current import model treats a holding as:
+
+- account identity
+- ticker symbol
+- optional security name
+- asset class
+- sector
+- quantity
+- average cost per share
+- optional explicit cost basis
+- optional current price
+- optional explicit current market value
+
+The importer will derive missing values when enough fields are available.
+
 ## Quick Start
 
 1. Start the app:
 
 ```powershell
-npm run db:start
-npm run dev
+npm run local:start
 ```
 
 2. Open the import page:
@@ -35,36 +51,58 @@ http://localhost:3000/import
 /templates/portfolio-import-template.csv
 ```
 
-4. Choose the import path:
+## Guided Setup
 
-- `Guided setup`: create one account sleeve first, then continue account-specific import later
-- `Direct CSV import`: upload one file containing multiple accounts, holdings, and transactions
+### Single-account CSV
 
-### Guided setup: single-account CSV
+Use this when you want to onboard one account at a time.
 
-If you choose `Guided setup` and then `Upload one account CSV`:
+1. Choose account type
+2. Choose `Upload one account CSV`
+3. Choose whether to add a new account or use an existing account
+4. Enter or confirm institution, nickname, and contribution room
+5. Upload the CSV
+6. Review detected headers and adjust field mapping
+7. Click `Continue` to run a dry-run validation
+8. Review parsed counts and row-level issues
+9. Click `Confirm guided setup` to run the real merge import
 
-1. Select the account type
-2. Select `Upload one account CSV`
-3. Enter the institution and nickname
-4. Upload the account-specific CSV file
-5. Review the detected headers and adjust field mapping
-6. Click `Continue` to run a guided dry-run validation
-7. Review the parsed counts and any row-level issues
-8. Click `Confirm guided setup` to run the real merge import
+### Manual Entry
 
-5. For direct CSV import, upload your local file or map your broker headers to the required fields in the UI.
+Use this when you want to add holdings without a broker export.
 
-6. Choose import mode:
+1. Choose account type
+2. Choose `Enter holdings manually`
+3. Choose whether to add a new account or use an existing account
+4. Enter or confirm institution, nickname, and contribution room
+5. Add one or more holdings
+6. For each holding, enter:
+   - ticker symbol
+   - optional holding name
+   - asset class
+   - sector
+   - quantity
+   - average cost per share
+   - current price or current market value
+7. Review the write
+8. Confirm the write to upsert holdings into the target account
 
-- `Replace`: overwrite the current imported accounts, holdings, and transactions for the signed-in user
-- `Merge`: reuse matching accounts, update matching holdings, append new transactions, and preserve unrelated existing data
+Manual entry no longer asks for gain/loss directly. The application derives it from cost basis and valuation inputs.
 
-7. Click `Validate and review import`.
+## Direct CSV Import
 
-8. Review the parsed row count, account count, holding count, and transaction count.
+Use this when your broker export already contains multiple accounts, holdings, and transactions in one file.
 
-9. Click `Confirm import` to write the reviewed changes into the database.
+1. Upload the file
+2. Review the preview
+3. Map fields if the broker headers differ from the canonical names
+4. Save a preset if you want to reuse the mapping
+5. Choose import mode:
+   - `Replace`
+   - `Merge`
+6. Click `Validate and review import`
+7. Review row counts and validation issues
+8. Click `Confirm import` to write the changes into the database
 
 ## Minimum Required Fields
 
@@ -74,6 +112,8 @@ If you choose `Guided setup` and then `Upload one account CSV`:
 - `account_key`
 
 ### Account Rows
+
+Required:
 
 - `account_type`
 
@@ -86,18 +126,27 @@ Optional:
 
 ### Holding Rows
 
+Required:
+
 - `symbol`
 - `asset_class`
 - `market_value_cad`
+  - or `quantity` plus `last_price_cad`
 
 Optional:
 
 - `name`
 - `sector`
+- `quantity`
+- `avg_cost_per_share_cad`
+- `cost_basis_cad`
+- `last_price_cad`
 - `weight_pct`
 - `gain_loss_pct`
 
 ### Transaction Rows
+
+Required:
 
 - `booked_at`
 - `merchant`
@@ -108,10 +157,10 @@ Optional:
 ## Example
 
 ```csv
-record_type,account_key,account_type,institution,account_nickname,market_value_cad,contribution_room_cad,symbol,name,asset_class,sector,weight_pct,gain_loss_pct,booked_at,merchant,category,amount_cad,direction
-account,tfsa_main,TFSA,Questrade,Main TFSA,20500,12000,,,,,,,,,
-holding,tfsa_main,TFSA,Questrade,Main TFSA,14500,12000,VFV,Vanguard S&P 500 Index ETF,US Equity,Multi-sector,70.73,8.4,,,,,
-transaction,tfsa_main,TFSA,Questrade,Main TFSA,,,,,,,,,2026-03-08,Loblaws,Groceries,182.44,outflow
+record_type,account_key,account_type,institution,account_nickname,market_value_cad,contribution_room_cad,symbol,name,asset_class,sector,quantity,avg_cost_per_share_cad,cost_basis_cad,last_price_cad,weight_pct,gain_loss_pct,booked_at,merchant,category,amount_cad,direction
+account,tfsa_main,TFSA,Questrade,Main TFSA,20500,12000,,,,,,,,,,,,,,
+holding,tfsa_main,TFSA,Questrade,Main TFSA,14500,12000,VFV,Vanguard S&P 500 Index ETF,US Equity,Multi-sector,60,223.50,13410.00,241.67,70.73,8.13,,,,,
+transaction,tfsa_main,TFSA,Questrade,Main TFSA,,,,,,,,,,,,,2026-03-08,Loblaws,Groceries,182.44,outflow
 ```
 
 ## What Happens On Import
@@ -119,9 +168,9 @@ transaction,tfsa_main,TFSA,Questrade,Main TFSA,,,,,,,,,2026-03-08,Loblaws,Grocer
 If validation passes and you confirm the write:
 
 1. A completed `import_job` is created.
-2. Existing user-scoped accounts are replaced.
-3. Existing user-scoped holdings are replaced.
-4. Existing user-scoped transactions are replaced.
+2. Accounts are created or matched in user scope.
+3. Holdings are inserted or updated in user scope.
+4. Transactions are inserted in user scope.
 5. A new baseline recommendation run is generated automatically.
 
 If validation fails:
@@ -137,6 +186,9 @@ If validation fails:
 - `booked_at` must use `YYYY-MM-DD`
 - numeric fields must be parseable after removing `$` and commas
 - each `holding` row and `account` row must include `account_key`
+- each holding must provide either:
+  - `market_value_cad`
+  - or `quantity` plus `last_price_cad`
 
 ## Field Mapping
 
@@ -159,13 +211,23 @@ The import screen supports:
 
 Use `Save current preset` after you finish a custom mapping. The preset is stored in the Portfolio Manager database and can be reused by the same signed-in user on any machine.
 
-Saved presets can now also be renamed or deleted from the import screen.
+Saved presets can also be renamed or deleted from the direct import screen.
 
-## CSV Preview
+## Why Gain/Loss Is No Longer the Primary Input
 
-After you upload a file, the importer shows the first 20 data rows before import. Use this to confirm:
+Typing gain/loss directly is fragile because it is derived data.
 
-- the file is the correct export
-- the headers are what you expect
-- account, holding, and transaction rows are all present
-- date and amount columns look parseable
+The preferred source fields are:
+
+- quantity
+- average cost per share
+- current price
+- or current market value
+
+From these, the importer can derive:
+
+- cost basis
+- market value
+- gain/loss percentage
+
+This is a better foundation for future live-price integrations and reduces manual entry mistakes.
