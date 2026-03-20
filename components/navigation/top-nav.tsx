@@ -16,7 +16,15 @@ const navItems = [
   { href: "/settings", label: "Settings" }
 ] as const satisfies ReadonlyArray<{ href: Route; label: string }>;
 
-export function TopNav({ currency }: { currency: CurrencyCode }) {
+export function TopNav({
+  currency,
+  fxRateLabel,
+  fxNote
+}: {
+  currency: CurrencyCode;
+  fxRateLabel: string;
+  fxNote: string;
+}) {
   const pathname = usePathname();
 
   return (
@@ -41,7 +49,7 @@ export function TopNav({ currency }: { currency: CurrencyCode }) {
             );
           })}
         </div>
-        <DisplayCurrencyToggle currency={currency} />
+        <DisplayCurrencyToggle currency={currency} fxRateLabel={fxRateLabel} fxNote={fxNote} />
       </div>
     </nav>
   );

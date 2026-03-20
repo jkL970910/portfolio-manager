@@ -1,6 +1,7 @@
 import { logout } from "@/lib/auth/actions";
 import type { Viewer } from "@/lib/auth/session";
 import { TopNav } from "@/components/navigation/top-nav";
+import { getFxRate } from "@/lib/market-data/fx";
 
 function getInitials(displayName: string) {
   return displayName
@@ -11,7 +12,7 @@ function getInitials(displayName: string) {
     .toUpperCase();
 }
 
-export function AppShell({
+export async function AppShell({
   title,
   description,
   viewer,
@@ -22,6 +23,14 @@ export function AppShell({
   viewer: Viewer;
   children: React.ReactNode;
 }) {
+  const fxRate = viewer.baseCurrency === "CAD" ? 1 : await getFxRate("CAD", viewer.baseCurrency);
+  const fxRateLabel =
+    viewer.baseCurrency === "CAD" ? "Base analytics and display are in CAD." : `1 CAD = ${fxRate.toFixed(4)} USD`;
+  const fxNote =
+    viewer.baseCurrency === "CAD"
+      ? "CAD is the active display currency. USD-native positions retain their own price inputs, while portfolio analytics stay normalized in CAD."
+      : "USD is the active display currency. Portfolio analytics remain normalized in CAD and are converted into USD for display using the latest cached USD/CAD FX rate.";
+
   return (
     <div className="min-h-screen px-4 pb-12 pt-4 md:px-6">
       <header className="mx-auto max-w-[1440px] overflow-hidden rounded-[28px] border border-[color:var(--border)] bg-white shadow-[var(--shadow-soft)]">
@@ -54,7 +63,7 @@ export function AppShell({
             </form>
           </div>
         </div>
-        <TopNav currency={viewer.baseCurrency} />
+        <TopNav currency={viewer.baseCurrency} fxRateLabel={fxRateLabel} fxNote={fxNote} />
       </header>
 
       <main className="mx-auto mt-6 max-w-[1440px] space-y-6">

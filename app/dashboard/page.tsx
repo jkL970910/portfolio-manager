@@ -28,15 +28,6 @@ export default async function DashboardPage() {
 
   return (
     <AppShell viewer={viewer} title="Dashboard" description="Portfolio overview and wealth snapshot">
-      <Card>
-        <CardContent className="flex flex-col gap-2 px-6 py-4 md:flex-row md:items-center md:justify-between">
-          <div>
-            <p className="text-sm font-medium">Display currency: {data.displayContext.currency}</p>
-            <p className="text-sm text-[color:var(--muted-foreground)]">{data.displayContext.fxNote}</p>
-          </div>
-          <Badge variant="neutral">{data.displayContext.fxRateLabel}</Badge>
-        </CardContent>
-      </Card>
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         {data.metrics.slice(0, 3).map((metric) => (
           <Card key={metric.label}>

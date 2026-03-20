@@ -19,15 +19,6 @@ export default async function RecommendationsPage() {
       title="Recommendations"
       description="Transparent, editable funding guidance. Inputs stay visible so the workflow feels explainable rather than black-box."
     >
-      <Card>
-        <CardContent className="flex flex-col gap-2 px-6 py-4 md:flex-row md:items-center md:justify-between">
-          <div>
-            <p className="text-sm font-medium">Display currency: {data.displayContext.currency}</p>
-            <p className="text-sm text-[color:var(--muted-foreground)]">{data.displayContext.fxNote}</p>
-          </div>
-          <Badge variant="neutral">{data.displayContext.fxRateLabel}</Badge>
-        </CardContent>
-      </Card>
       <div className="grid gap-6 xl:grid-cols-[0.9fr_1.1fr]">
         <div className="space-y-6">
           <SectionHeading
