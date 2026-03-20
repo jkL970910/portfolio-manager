@@ -607,9 +607,9 @@ export function ImportJobPanel({
         setStatus({ type: "error", message: error instanceof Error ? error.message : "Failed to import CSV." });
         return;
       }
-      const recommendationMessage = result.autoRecommendationRun
-        ? ` Auto-refreshed recommendation run for ${Number(result.autoRecommendationRun.contributionAmountCad).toLocaleString("en-CA")} CAD.`
-        : "";
+        const recommendationMessage = result.autoRecommendationRun
+          ? ` Auto-refreshed recommendation run for ${Number(result.autoRecommendationRun.contributionAmountCad).toLocaleString("en-CA")} CAD in the planning base currency.`
+          : "";
       const modeLabel = importMode === "replace" ? "replaced" : "merged";
       setStatus({
         type: "success",

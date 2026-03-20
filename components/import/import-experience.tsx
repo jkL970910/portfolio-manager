@@ -2006,11 +2006,11 @@ function StepCompleteSetup({
           {guidedResult.importJob ? (
             <p>Draft import job opened: {guidedResult.importJob.fileName}.</p>
           ) : null}
-          {guidedResult.autoRecommendationRun ? (
-            <p>
-              Recommendation baseline refreshed for {formatCad(guidedResult.autoRecommendationRun.contributionAmountCad)} across {guidedResult.autoRecommendationRun.itemCount} items.
-            </p>
-          ) : null}
+            {guidedResult.autoRecommendationRun ? (
+              <p>
+                Recommendation baseline refreshed for {formatCad(guidedResult.autoRecommendationRun.contributionAmountCad)} in the planning base currency across {guidedResult.autoRecommendationRun.itemCount} items.
+              </p>
+            ) : null}
         </div>
       ) : null}
 
@@ -2024,11 +2024,11 @@ function StepCompleteSetup({
           <p>
             Imported {guidedCsvImportResult.summary.accountsImported} accounts, {guidedCsvImportResult.summary.holdingsImported} holdings, and {guidedCsvImportResult.summary.transactionsImported} transactions.
           </p>
-          {guidedCsvImportResult.autoRecommendationRun ? (
-            <p>
-              Recommendation baseline refreshed for {formatCad(guidedCsvImportResult.autoRecommendationRun.contributionAmountCad)} across {guidedCsvImportResult.autoRecommendationRun.itemCount} items.
-            </p>
-          ) : null}
+            {guidedCsvImportResult.autoRecommendationRun ? (
+              <p>
+                Recommendation baseline refreshed for {formatCad(guidedCsvImportResult.autoRecommendationRun.contributionAmountCad)} in the planning base currency across {guidedCsvImportResult.autoRecommendationRun.itemCount} items.
+              </p>
+            ) : null}
         </div>
       ) : null}
 
