@@ -729,11 +729,11 @@ export function ImportJobPanel({
           </p>
           {symbolAudit?.records?.length ? (
             <div className="rounded-2xl border border-[#b6d7c7] bg-white px-4 py-3 text-sm text-[#21613f]">
-              <p className="font-medium">Final holding symbols that will be written</p>
+              <p className="font-medium">Final holdings that will be written</p>
               <div className="mt-2 flex flex-wrap gap-2">
                 {symbolAudit.records.slice(0, 8).map((record) => (
                   <Badge key={`final-write-${record.requestedSymbol}`} variant="success">
-                    {(symbolCorrections[record.requestedSymbol]?.symbol ?? record.normalizedSymbol).toUpperCase()}
+                    {(symbolCorrections[record.requestedSymbol]?.symbol ?? record.normalizedSymbol).toUpperCase()} - {(symbolCorrections[record.requestedSymbol]?.name ?? record.name)}
                   </Badge>
                 ))}
                 {symbolAudit.records.length > 8 ? (

@@ -274,6 +274,22 @@ function formatHoldingLastUpdated(value?: string | null) {
   });
 }
 
+function getHoldingFreshnessVariant(value?: string | null): "success" | "warning" | "neutral" {
+  if (!value) {
+    return "neutral";
+  }
+
+  const ageMs = Date.now() - new Date(value).getTime();
+  const ageMinutes = Math.max(0, Math.round(ageMs / 60000));
+  if (ageMinutes <= 30) {
+    return "success";
+  }
+  if (ageMinutes <= 180) {
+    return "warning";
+  }
+  return "neutral";
+}
+
 function getPortfolioQuoteStatus(holdings: HoldingPosition[]) {
   const quotedHoldings = holdings.filter((holding) => (holding.lastPriceCad ?? 0) > 0 && holding.updatedAt);
   const coverage = holdings.length > 0
@@ -445,6 +461,9 @@ export function buildDashboardData(args: {
         symbol: holding.symbol,
         name: holding.name,
         account: accounts.find((account) => account.id === holding.accountId)?.type ?? "Account",
+        lastPrice: holding.lastPriceCad != null && holding.lastPriceCad > 0 ? formatCurrency(holding.lastPriceCad) : "Not priced",
+        lastUpdated: formatHoldingLastUpdated(holding.updatedAt),
+        freshnessVariant: getHoldingFreshnessVariant(holding.updatedAt),
         weight: formatCompactPercent(holding.weightPct, 1),
         value: formatCurrency(holding.marketValueCad)
       })),
@@ -511,6 +530,7 @@ export function buildPortfolioData(args: {
         account: accounts.find((account) => account.id === holding.accountId)?.type ?? "Account",
         lastPrice: holding.lastPriceCad != null && holding.lastPriceCad > 0 ? formatCurrency(holding.lastPriceCad) : "Not priced",
         lastUpdated: formatHoldingLastUpdated(holding.updatedAt),
+        freshnessVariant: getHoldingFreshnessVariant(holding.updatedAt),
         weight: formatCompactPercent(holding.weightPct, 1),
         gainLoss: formatSignedPercent(holding.gainLossPct, 1),
         signal: getSignalForHolding(holding, driftMap)

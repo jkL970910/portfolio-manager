@@ -25,6 +25,9 @@ export interface DashboardData {
     symbol: string;
     name: string;
     account: string;
+    lastPrice: string;
+    lastUpdated: string;
+    freshnessVariant: "success" | "warning" | "neutral";
     weight: string;
     value: string;
   }[];
@@ -56,6 +59,7 @@ export interface PortfolioData {
     account: string;
     lastPrice: string;
     lastUpdated: string;
+    freshnessVariant: "success" | "warning" | "neutral";
     weight: string;
     gainLoss: string;
     signal: string;

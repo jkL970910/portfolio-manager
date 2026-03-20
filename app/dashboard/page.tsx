@@ -162,7 +162,15 @@ export default async function DashboardPage() {
                     <p className="font-medium">
                       {holding.symbol} <span className="text-sm text-[color:var(--muted-foreground)]">{holding.name}</span>
                     </p>
-                    <p className="text-sm text-[color:var(--muted-foreground)]">{holding.account}</p>
+                    <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-[color:var(--muted-foreground)]">
+                      <span>{holding.account}</span>
+                      <span>-</span>
+                      <span>{holding.lastPrice}</span>
+                      <Badge variant={holding.freshnessVariant}>
+                        {holding.freshnessVariant === "success" ? "Fresh" : holding.freshnessVariant === "warning" ? "Aging" : "Unknown"}
+                      </Badge>
+                    </div>
+                    <p className="mt-1 text-[13px] text-[color:var(--muted-foreground)]">{holding.lastUpdated}</p>
                   </div>
                   <div className="text-right">
                     <p className="font-semibold">{holding.weight}</p>

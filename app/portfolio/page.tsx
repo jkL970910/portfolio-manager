@@ -5,6 +5,7 @@ import { AppShell } from "@/components/layout/app-shell";
 import { DonutChartCard } from "@/components/charts/donut-chart";
 import { LineChartCard } from "@/components/charts/line-chart";
 import { RefreshPricesPanel } from "@/components/portfolio/refresh-prices-panel";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { SectionHeading } from "@/components/ui/section-heading";
@@ -53,7 +54,14 @@ export default async function PortfolioPage() {
                       <td className="py-4 font-medium">{holding.symbol}</td>
                       <td className="py-4 text-[color:var(--muted-foreground)]">{holding.account}</td>
                       <td className="py-4">{holding.lastPrice}</td>
-                      <td className="py-4 text-[color:var(--muted-foreground)]">{holding.lastUpdated}</td>
+                      <td className="py-4">
+                        <div className="flex flex-col gap-2">
+                          <span className="text-[color:var(--muted-foreground)]">{holding.lastUpdated}</span>
+                          <Badge variant={holding.freshnessVariant}>
+                            {holding.freshnessVariant === "success" ? "Fresh" : holding.freshnessVariant === "warning" ? "Aging" : "Unknown"}
+                          </Badge>
+                        </div>
+                      </td>
                       <td className="py-4">{holding.weight}</td>
                       <td className="py-4">{holding.gainLoss}</td>
                       <td className="py-4 text-[color:var(--muted-foreground)]">{holding.signal}</td>
