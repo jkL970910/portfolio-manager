@@ -1,4 +1,4 @@
-# Local CSV Import Guide
+﻿# Local CSV Import Guide
 
 ## Goal
 
@@ -271,7 +271,7 @@ The portfolio import screen supports:
 - exact-header auto-detect
 - database-backed saved presets for the signed-in user
 
-Use `Save current preset` after you finish a custom mapping. The preset is stored in the Portfolio Manager database and can be reused by the same signed-in user on any machine.
+Use `Save current preset` after you finish a custom mapping. The preset is stored in the Loo国的财富宝库 database and can be reused by the same signed-in user on any machine.
 
 Saved presets can also be renamed or deleted from the direct portfolio import screen.
 
@@ -306,3 +306,4 @@ From these, the importer can derive:
 - gain/loss percentage
 
 This is a better foundation for future live-price integrations and reduces manual entry mistakes.
+

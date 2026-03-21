@@ -1,11 +1,12 @@
-import { ArrowRight, BarChart3, CircleGauge, PieChart, ShieldAlert } from "lucide-react";
+﻿import { ArrowRight, BarChart3, CircleGauge, PieChart, ShieldAlert } from "lucide-react";
 import { requireViewer } from "@/lib/auth/session";
 import { getPortfolioView } from "@/lib/backend/services";
 import { AppShell } from "@/components/layout/app-shell";
 import { DonutChartCard } from "@/components/charts/donut-chart";
 import { LineChartCard } from "@/components/charts/line-chart";
+import { HoldingTable } from "@/components/portfolio/holding-table";
+import { QuickActionCard } from "@/components/portfolio/quick-action-card";
 import { RefreshPricesPanel } from "@/components/portfolio/refresh-prices-panel";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { SectionHeading } from "@/components/ui/section-heading";
@@ -15,11 +16,29 @@ export default async function PortfolioPage() {
   const { data } = await getPortfolioView(viewer.id);
 
   return (
-    <AppShell
-      viewer={viewer}
-      title="Portfolio"
-      description="Deep portfolio analysis, concentration checks, and performance context that support recommendation trust."
-    >
+    <AppShell viewer={viewer} title="宝库结构" description="这里是更深的分析层。收益走势、账户分布、持仓细节和集中度信号都在这里展开。">
+      <Card className="overflow-hidden bg-[linear-gradient(135deg,rgba(255,255,255,0.68),rgba(246,218,230,0.5),rgba(221,232,255,0.44))]">
+        <CardContent className="grid gap-6 px-6 py-6 md:grid-cols-[1.2fr_0.8fr] md:items-center">
+          <div className="space-y-4">
+            <div className="inline-flex rounded-full border border-white/60 bg-white/44 px-4 py-2 text-sm font-medium text-[color:var(--foreground)] backdrop-blur-md">
+              Loo 的结构分析台
+            </div>
+            <div className="space-y-3">
+              <h2 className="text-[30px] font-semibold tracking-[-0.04em] text-[color:var(--foreground)]">
+                看组合长什么样，再判断推荐有没有说服力。
+              </h2>
+              <p className="max-w-3xl text-sm leading-7 text-[color:var(--muted-foreground)]">
+                这一页故意更重。表现走势、集中度、账户分布和最新价格刷新都放在这里，不挤回首页。
+              </p>
+            </div>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <PortfolioSignal title="分析重点" detail="集中度、偏离、持仓 freshness" />
+            <PortfolioSignal title="下一步动作" detail="看清结构后再打开配置建议" />
+          </div>
+        </CardContent>
+      </Card>
+
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1.45fr)_320px]">
         <div className="space-y-6">
           <SectionHeading
@@ -35,47 +54,8 @@ export default async function PortfolioPage() {
             <CardHeader>
               <CardTitle>Holdings Detail</CardTitle>
             </CardHeader>
-            <CardContent className="overflow-x-auto">
-              <table className="min-w-full text-left text-sm">
-                <thead className="text-[color:var(--muted-foreground)]">
-                  <tr>
-                    <th className="pb-3 font-medium">Holding</th>
-                    <th className="pb-3 font-medium">Account</th>
-                    <th className="pb-3 font-medium">Last Price</th>
-                    <th className="pb-3 font-medium">Last Updated</th>
-                    <th className="pb-3 font-medium">Weight</th>
-                    <th className="pb-3 font-medium">Gain / Loss</th>
-                    <th className="pb-3 font-medium">Signal</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {data.holdings.map((holding) => (
-                    <tr key={holding.symbol} className="border-t border-[color:var(--border)]">
-                      <td className="py-4 font-medium">{holding.symbol}</td>
-                      <td className="py-4 text-[color:var(--muted-foreground)]">{holding.account}</td>
-                      <td className="py-4">{holding.lastPrice}</td>
-                      <td className="py-4">
-                        <div className="flex flex-col gap-2">
-                          <span className="text-[color:var(--muted-foreground)]">{holding.lastUpdated}</span>
-                          <Badge variant={holding.freshnessVariant}>
-                            {holding.freshnessVariant === "success" ? "Fresh" : holding.freshnessVariant === "warning" ? "Aging" : "Unknown"}
-                          </Badge>
-                        </div>
-                      </td>
-                      <td className="py-4">{holding.weight}</td>
-                      <td className="py-4">{holding.gainLoss}</td>
-                      <td className="py-4 text-[color:var(--muted-foreground)]">{holding.signal}</td>
-                    </tr>
-                  ))}
-                  {data.holdings.length === 0 ? (
-                    <tr className="border-t border-[color:var(--border)]">
-                      <td className="py-6 text-[color:var(--muted-foreground)]" colSpan={7}>
-                        No holdings imported yet. Complete the import flow to unlock portfolio analysis.
-                      </td>
-                    </tr>
-                  ) : null}
-                </tbody>
-              </table>
+            <CardContent>
+              <HoldingTable holdings={data.holdings} />
             </CardContent>
           </Card>
         </div>
@@ -91,10 +71,10 @@ export default async function PortfolioPage() {
                 freshness={data.quoteStatus.freshness}
                 coverage={data.quoteStatus.coverage}
               />
-              <QuickAction icon={<ShieldAlert className="h-4 w-4" />} title="Review Concentration Risk" description="Inspect the positions driving the highest single-name exposure." />
-              <QuickAction icon={<PieChart className="h-4 w-4" />} title="Inspect Allocation Gaps" description="See the biggest underweight and overweight classes before funding." />
-              <QuickAction icon={<CircleGauge className="h-4 w-4" />} title="Open Recommendation Drivers" description="Trace which portfolio signals are pushing the current recommendation." />
-              <QuickAction icon={<BarChart3 className="h-4 w-4" />} title="View Sector Exposure" description="Surface over-indexed sectors and thematic concentration." />
+              <QuickActionCard icon={<ShieldAlert className="h-4 w-4" />} title="Review Concentration Risk" description="Inspect the positions driving the highest single-name exposure." />
+              <QuickActionCard icon={<PieChart className="h-4 w-4" />} title="Inspect Allocation Gaps" description="See the biggest underweight and overweight classes before funding." />
+              <QuickActionCard icon={<CircleGauge className="h-4 w-4" />} title="Open Recommendation Drivers" description="Trace which portfolio signals are pushing the current recommendation." />
+              <QuickActionCard icon={<BarChart3 className="h-4 w-4" />} title="View Sector Exposure" description="Surface over-indexed sectors and thematic concentration." />
             </CardContent>
           </Card>
           <Card>
@@ -103,7 +83,7 @@ export default async function PortfolioPage() {
             </CardHeader>
             <CardContent className="space-y-3">
               {data.summaryPoints.map((point) => (
-                <div key={point} className="rounded-2xl border border-[color:var(--border)] p-4 text-sm text-[color:var(--muted-foreground)]">
+                <div key={point} className="rounded-[24px] border border-white/55 bg-white/38 p-4 text-sm text-[color:var(--muted-foreground)] backdrop-blur-md">
                   {point}
                 </div>
               ))}
@@ -118,14 +98,11 @@ export default async function PortfolioPage() {
   );
 }
 
-function QuickAction({ icon, title, description }: { icon: React.ReactNode; title: string; description: string }) {
+function PortfolioSignal({ title, detail }: { title: string; detail: string }) {
   return (
-    <div className="rounded-2xl border border-[color:var(--border)] p-4">
-      <div className="flex items-center gap-2 font-medium">
-        {icon}
-        {title}
-      </div>
-      <p className="mt-2 text-sm text-[color:var(--muted-foreground)]">{description}</p>
+    <div className="rounded-[24px] border border-white/55 bg-white/44 p-4 backdrop-blur-md">
+      <p className="text-sm font-medium text-[color:var(--muted-foreground)]">{title}</p>
+      <p className="mt-3 text-base font-semibold text-[color:var(--foreground)]">{detail}</p>
     </div>
   );
 }

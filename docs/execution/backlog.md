@@ -1,4 +1,4 @@
-# Portfolio Manager Execution Backlog
+﻿# Loo国的财富宝库 Execution Backlog
 
 ## Objective
 
@@ -156,3 +156,4 @@ Turn the next milestone into engineering tickets for:
 1. guided allocation setup in Settings
 2. recommendation engine v2 rules
 3. recommendation explanation improvements
+

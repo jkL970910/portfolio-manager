@@ -9,6 +9,9 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { assertApiData, getApiErrorMessage, safeJson } from "@/lib/client/api";
 
+const FIELD_CLASS_NAME =
+  "w-full rounded-[22px] border border-white/55 bg-white/46 px-4 py-3 text-sm text-[color:var(--foreground)] outline-none backdrop-blur-md focus:border-[color:var(--primary)]";
+
 const RISK_PRESETS: Record<PreferenceProfile["riskProfile"], PreferenceProfile["targetAllocation"]> = {
   Conservative: [
     { assetClass: "Canadian Equity", targetPct: 18 },
@@ -356,12 +359,12 @@ export function PreferencesWorkbench({
 
   return (
     <div className="grid gap-6 xl:grid-cols-2">
-      <Card>
+      <Card className="bg-[linear-gradient(180deg,rgba(255,255,255,0.66),rgba(255,255,255,0.46))]">
         <CardHeader>
           <CardTitle>Guided Allocation Setup</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="rounded-[24px] border border-[color:var(--border)] bg-[color:var(--card-muted)] p-5">
+          <div className="rounded-[24px] border border-white/55 bg-white/38 p-5 backdrop-blur-md">
             <Badge variant="primary">For newer users</Badge>
             <p className="mt-3 text-lg font-semibold">Help me build my allocation</p>
             <p className="mt-2 text-sm text-[color:var(--muted-foreground)]">
@@ -381,7 +384,7 @@ export function PreferencesWorkbench({
                     <select
                       value={guidedAnswers.goal}
                       onChange={(event) => setGuidedAnswers((current) => ({ ...current, goal: event.target.value as GuidedAllocationAnswers["goal"] }))}
-                      className="w-full rounded-2xl border border-[color:var(--border)] bg-white px-4 py-3 text-sm outline-none"
+                      className={FIELD_CLASS_NAME}
                     >
                       <option value="retirement">Retirement growth</option>
                       <option value="home">Home purchase</option>
@@ -393,7 +396,7 @@ export function PreferencesWorkbench({
                     <select
                       value={guidedAnswers.horizon}
                       onChange={(event) => setGuidedAnswers((current) => ({ ...current, horizon: event.target.value as GuidedAllocationAnswers["horizon"] }))}
-                      className="w-full rounded-2xl border border-[color:var(--border)] bg-white px-4 py-3 text-sm outline-none"
+                      className={FIELD_CLASS_NAME}
                     >
                       <option value="short">Under 3 years</option>
                       <option value="medium">3 to 7 years</option>
@@ -411,7 +414,7 @@ export function PreferencesWorkbench({
                   <select
                     value={guidedAnswers.volatility}
                     onChange={(event) => setGuidedAnswers((current) => ({ ...current, volatility: event.target.value as GuidedAllocationAnswers["volatility"] }))}
-                    className="w-full rounded-2xl border border-[color:var(--border)] bg-white px-4 py-3 text-sm outline-none"
+                    className={FIELD_CLASS_NAME}
                   >
                     <option value="low">Low - avoid large swings</option>
                     <option value="medium">Medium - moderate volatility is acceptable</option>
@@ -428,7 +431,7 @@ export function PreferencesWorkbench({
                   <select
                     value={guidedAnswers.priority}
                     onChange={(event) => setGuidedAnswers((current) => ({ ...current, priority: event.target.value as GuidedAllocationAnswers["priority"] }))}
-                    className="w-full rounded-2xl border border-[color:var(--border)] bg-white px-4 py-3 text-sm outline-none"
+                    className={FIELD_CLASS_NAME}
                   >
                     <option value="tax-efficiency">Tax efficiency first</option>
                     <option value="balanced">Balanced recommendation behavior</option>
@@ -456,7 +459,7 @@ export function PreferencesWorkbench({
             />
           </div>
 
-          <Card className="bg-[linear-gradient(135deg,rgba(25,71,229,0.06),rgba(25,71,229,0.02))]">
+          <Card className="bg-[linear-gradient(135deg,rgba(240,143,178,0.14),rgba(111,141,246,0.1),rgba(255,255,255,0.24))]">
             <CardContent className="space-y-4 px-5 py-5">
               <div className="flex items-center justify-between gap-4">
                 <div>
@@ -468,7 +471,7 @@ export function PreferencesWorkbench({
 
               <div className="grid gap-3 md:grid-cols-2">
                 {guidedDraft.targetAllocation.map((target) => (
-                  <div key={target.assetClass} className="rounded-2xl border border-[color:var(--border)] bg-white px-4 py-3 text-sm">
+                  <div key={target.assetClass} className="rounded-[24px] border border-white/55 bg-white/42 px-4 py-3 text-sm backdrop-blur-md">
                     <span className="font-medium">{target.assetClass}</span>
                     <span className="float-right">{target.targetPct}%</span>
                   </div>
@@ -521,19 +524,19 @@ export function PreferencesWorkbench({
         </CardContent>
       </Card>
 
-      <Card>
+      <Card className="bg-[linear-gradient(180deg,rgba(255,255,255,0.66),rgba(255,255,255,0.46))]">
         <CardHeader>
           <CardTitle>Manual Configuration</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="rounded-[24px] border border-[color:var(--border)] bg-[color:var(--card-muted)] p-5">
+          <div className="rounded-[24px] border border-white/55 bg-white/38 p-5 backdrop-blur-md">
             <p className="font-semibold">Current profile</p>
             <p className="mt-1 text-sm text-[color:var(--muted-foreground)]">
               {form.riskProfile} risk, {form.transitionPreference} transition, {form.recommendationStrategy} recommendation strategy.
             </p>
           </div>
           {manualGroups.map((group) => (
-            <div key={group.title} className="rounded-[24px] border border-[color:var(--border)] p-5">
+            <div key={group.title} className="rounded-[24px] border border-white/55 bg-white/36 p-5 backdrop-blur-md">
               <div className="flex items-center justify-between gap-4">
                 <div>
                   <p className="font-semibold">{group.title}</p>
@@ -544,12 +547,12 @@ export function PreferencesWorkbench({
             </div>
           ))}
 
-          <div className="grid gap-4 rounded-[24px] border border-[color:var(--border)] p-5 md:grid-cols-2">
+          <div className="grid gap-4 rounded-[24px] border border-white/55 bg-white/36 p-5 backdrop-blur-md md:grid-cols-2">
             <Field label="Risk profile">
               <select
                 value={form.riskProfile}
                 onChange={(event) => setForm((current) => ({ ...current, riskProfile: event.target.value as PreferenceProfile["riskProfile"] }))}
-                className="w-full rounded-2xl border border-[color:var(--border)] bg-white px-4 py-3 text-sm outline-none"
+                className={FIELD_CLASS_NAME}
               >
                 <option value="Conservative">Conservative</option>
                 <option value="Balanced">Balanced</option>
@@ -560,7 +563,7 @@ export function PreferencesWorkbench({
               <select
                 value={form.transitionPreference}
                 onChange={(event) => setForm((current) => ({ ...current, transitionPreference: event.target.value as PreferenceProfile["transitionPreference"] }))}
-                className="w-full rounded-2xl border border-[color:var(--border)] bg-white px-4 py-3 text-sm outline-none"
+                className={FIELD_CLASS_NAME}
               >
                 <option value="stay-close">Stay close to current holdings</option>
                 <option value="gradual">Gradually transition to target</option>
@@ -571,7 +574,7 @@ export function PreferencesWorkbench({
               <select
                 value={form.recommendationStrategy}
                 onChange={(event) => setForm((current) => ({ ...current, recommendationStrategy: event.target.value as PreferenceProfile["recommendationStrategy"] }))}
-                className="w-full rounded-2xl border border-[color:var(--border)] bg-white px-4 py-3 text-sm outline-none"
+                className={FIELD_CLASS_NAME}
               >
                 <option value="balanced">Balanced</option>
                 <option value="tax-aware">Tax-aware</option>
@@ -585,7 +588,7 @@ export function PreferencesWorkbench({
                 max={50}
                 value={form.rebalancingTolerancePct}
                 onChange={(event) => setForm((current) => ({ ...current, rebalancingTolerancePct: Number(event.target.value) }))}
-                className="w-full rounded-2xl border border-[color:var(--border)] bg-white px-4 py-3 text-sm outline-none"
+                className={FIELD_CLASS_NAME}
               />
             </Field>
             <Field label="Cash buffer target (planning base, CAD)">
@@ -594,10 +597,10 @@ export function PreferencesWorkbench({
                 min={0}
                 value={form.cashBufferTargetCad}
                 onChange={(event) => setForm((current) => ({ ...current, cashBufferTargetCad: Number(event.target.value) }))}
-                className="w-full rounded-2xl border border-[color:var(--border)] bg-white px-4 py-3 text-sm outline-none"
+                className={FIELD_CLASS_NAME}
               />
             </Field>
-            <label className="flex items-center gap-3 rounded-2xl border border-[color:var(--border)] bg-[color:var(--card-muted)] px-4 py-3 text-sm font-medium">
+            <label className="flex items-center gap-3 rounded-[22px] border border-white/55 bg-white/38 px-4 py-3 text-sm font-medium backdrop-blur-md">
               <input
                 type="checkbox"
                 checked={form.taxAwarePlacement}
@@ -607,7 +610,7 @@ export function PreferencesWorkbench({
             </label>
           </div>
 
-          <div className="rounded-[24px] border border-[color:var(--border)] p-5">
+          <div className="rounded-[24px] border border-white/55 bg-white/36 p-5 backdrop-blur-md">
             <div className="flex items-center justify-between gap-4">
               <div>
                 <p className="font-semibold">Target allocation</p>
@@ -624,14 +627,14 @@ export function PreferencesWorkbench({
                     max={100}
                     value={target.targetPct}
                     onChange={(event) => updateAllocation(target.assetClass, Number(event.target.value))}
-                    className="w-full rounded-2xl border border-[color:var(--border)] bg-white px-4 py-3 text-sm outline-none"
+                    className={FIELD_CLASS_NAME}
                   />
                 </Field>
               ))}
             </div>
           </div>
 
-          <div className="rounded-[24px] border border-[color:var(--border)] p-5">
+          <div className="rounded-[24px] border border-white/55 bg-white/36 p-5 backdrop-blur-md">
             <p className="font-semibold">Account funding priorities</p>
             <p className="mt-1 text-sm text-[color:var(--muted-foreground)]">Set the contribution ladder used by the recommendation engine.</p>
             <div className="mt-4 grid gap-3 md:grid-cols-3">
@@ -640,7 +643,7 @@ export function PreferencesWorkbench({
                   <select
                     value={form.accountFundingPriority[index] ?? "Taxable"}
                     onChange={(event) => updatePriority(index, event.target.value as PreferenceProfile["accountFundingPriority"][number])}
-                    className="w-full rounded-2xl border border-[color:var(--border)] bg-white px-4 py-3 text-sm outline-none"
+                    className={FIELD_CLASS_NAME}
                   >
                     <option value="TFSA">TFSA</option>
                     <option value="RRSP">RRSP</option>
@@ -652,7 +655,7 @@ export function PreferencesWorkbench({
             </div>
           </div>
 
-          <div className="rounded-[24px] border border-[color:var(--border)] bg-[color:var(--card-muted)] p-5">
+          <div className="rounded-[24px] border border-white/55 bg-white/34 p-5 backdrop-blur-md">
             <div className="flex items-center justify-between gap-4">
               <div>
                 <p className="font-semibold">Advanced tax settings</p>
@@ -670,12 +673,12 @@ export function PreferencesWorkbench({
               value={form.watchlistSymbols}
               onChange={(event) => setForm((current) => ({ ...current, watchlistSymbols: event.target.value }))}
               placeholder="XEF, VCN, CASH"
-              className="w-full rounded-2xl border border-[color:var(--border)] bg-white px-4 py-3 text-sm outline-none"
+              className={FIELD_CLASS_NAME}
             />
           </Field>
 
           {status.type !== "idle" ? (
-            <div className={`rounded-2xl border px-4 py-3 text-sm ${status.type === "success" ? "border-[#b6d7c7] bg-[#eef8f1] text-[#21613f]" : "border-[#e7b0b8] bg-[#fff3f5] text-[#8e2433]"}`}>
+            <div className={`rounded-[22px] border px-4 py-3 text-sm ${status.type === "success" ? "border-[#b6d7c7] bg-[#eef8f1] text-[#21613f]" : "border-[#e7b0b8] bg-[#fff3f5] text-[#8e2433]"}`}>
               {status.message}
             </div>
           ) : null}
@@ -700,7 +703,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 
 function QuestionCard({ label, control }: { label: string; control: React.ReactNode }) {
   return (
-    <div className="rounded-[24px] border border-[color:var(--border)] p-5">
+    <div className="rounded-[24px] border border-white/55 bg-white/34 p-5 backdrop-blur-md">
       <p className="text-sm font-medium text-[color:var(--foreground)]">{label}</p>
       <div className="mt-3">{control}</div>
     </div>
@@ -709,7 +712,7 @@ function QuestionCard({ label, control }: { label: string; control: React.ReactN
 
 function InfoBlock({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-2xl border border-[color:var(--border)] bg-white px-4 py-3 text-sm">
+    <div className="rounded-[24px] border border-white/55 bg-white/42 px-4 py-3 text-sm backdrop-blur-md">
       <p className="text-[color:var(--muted-foreground)]">{label}</p>
       <p className="mt-1 font-medium text-[color:var(--foreground)]">{value}</p>
     </div>

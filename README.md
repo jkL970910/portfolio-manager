@@ -1,6 +1,6 @@
-# Portfolio Manager
+﻿# Loo国的财富宝库
 
-Portfolio Manager is an AI-assisted investing product prototype for self-directed investors. The product focuses on one operational question:
+Loo国的财富宝库 is an AI-assisted investing product prototype for self-directed investors. The product focuses on one operational question:
 
 `Where should my next dollar go?`
 
@@ -18,7 +18,7 @@ This repository was planned, documented, designed, and implemented with AI-agent
 
 Most retail finance apps are good at tracking balances or budgets, but weak at helping users decide how to allocate new capital across real account constraints.
 
-Portfolio Manager is designed to help users:
+Loo国的财富宝库 is designed to help users:
 
 - understand portfolio health
 - identify allocation drift
@@ -236,3 +236,4 @@ This project demonstrates:
 3. persist richer import review and correction state
 4. add cloud-ready cache and object-storage boundaries
 5. introduce broker-scale background jobs when runtime cost justifies them
+

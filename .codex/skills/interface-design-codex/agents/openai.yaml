@@ -1,0 +1,4 @@
+version: 1
+display_name: Interface Design Codex
+short_description: Preserve Portfolio Manager UI consistency and reuse shared components before creating new ones.
+default_prompt: Use the Portfolio Manager design system and component library. Reuse existing components first, extract repeated patterns when justified, and update the UI docs when shared patterns change.

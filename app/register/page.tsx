@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowRight, UserPlus } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { register } from "@/lib/auth/actions";
@@ -18,9 +18,9 @@ export default async function RegisterPage({
   const error = typeof params.error === "string" ? params.error : undefined;
 
   return (
-    <div className="min-h-screen bg-[linear-gradient(180deg,#f6f8fc_0%,#edf2fb_100%)] px-4 py-10 md:px-6">
+    <div className="min-h-screen bg-[linear-gradient(180deg,#fbf5fa_0%,#f0f4ff_100%)] px-4 py-10 md:px-6">
       <div className="mx-auto grid max-w-6xl gap-8 lg:grid-cols-[0.95fr_1.05fr]">
-        <section className="rounded-[32px] border border-[color:var(--border)] bg-white p-8 shadow-[var(--shadow-card)] md:p-10">
+        <section className="rounded-[36px] border border-[color:var(--border)] bg-white/62 p-8 shadow-[var(--shadow-card)] backdrop-blur-2xl md:p-10">
           <div className="space-y-2">
             <p className="text-sm font-medium uppercase tracking-[0.18em] text-[color:var(--muted-foreground)]">Local account</p>
             <h1 className="text-3xl font-semibold tracking-tight">Create an account</h1>
@@ -30,7 +30,7 @@ export default async function RegisterPage({
           </div>
 
           {error ? (
-            <div className="mt-6 rounded-2xl border border-[#e7b0b8] bg-[#fff3f5] px-4 py-3 text-sm text-[#8e2433]">
+            <div className="mt-6 rounded-2xl border border-[#f3b8c7] bg-white/72 px-4 py-3 text-sm text-[#a64a67] backdrop-blur-xl">
               {error}
             </div>
           ) : null}
@@ -42,7 +42,7 @@ export default async function RegisterPage({
 
             <button
               type="submit"
-              className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-[color:var(--primary)] px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-[#1039c5]"
+              className="inline-flex w-full items-center justify-center gap-2 rounded-full border border-white/45 bg-[linear-gradient(135deg,rgba(240,143,178,0.92),rgba(111,141,246,0.88))] px-5 py-3 text-sm font-semibold text-white shadow-[var(--shadow-card)] transition-[transform,opacity] hover:-translate-y-0.5 hover:opacity-95"
             >
               Create account
               <ArrowRight className="h-4 w-4" />
@@ -51,18 +51,18 @@ export default async function RegisterPage({
 
           <p className="mt-6 text-sm text-[color:var(--muted-foreground)]">
             Already have a demo or local account?{" "}
-            <Link href="/login" className="font-medium text-[color:var(--primary)]">
+            <Link href="/login" className="font-medium text-[color:var(--secondary)]">
               Sign in
             </Link>
           </p>
         </section>
 
-        <section className="rounded-[32px] border border-[color:var(--border)] bg-[linear-gradient(145deg,#2b4b83,#182d4f)] p-8 text-white shadow-[var(--shadow-soft)] md:p-10">
-          <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white/14 text-sm font-semibold uppercase tracking-[0.18em]">
-            <UserPlus className="h-6 w-6" />
+        <section className="rounded-[36px] border border-[color:var(--border)] bg-[linear-gradient(145deg,rgba(255,255,255,0.46),rgba(244,208,224,0.34),rgba(206,227,255,0.32))] p-8 text-[color:var(--foreground)] shadow-[var(--shadow-soft)] backdrop-blur-2xl md:p-10">
+          <div className="flex h-14 w-14 items-center justify-center rounded-[22px] border border-white/55 bg-[linear-gradient(135deg,rgba(255,255,255,0.88),rgba(255,232,242,0.96))] text-sm font-bold tracking-[0.06em] shadow-[var(--shadow-card)]">
+            Loo
           </div>
-          <h2 className="mt-8 text-4xl font-semibold tracking-tight">What gets provisioned</h2>
-          <div className="mt-8 space-y-4 text-sm leading-7 text-white/80">
+          <h2 className="mt-8 text-4xl font-semibold tracking-tight">??????????</h2>
+          <div className="mt-8 space-y-4 text-sm leading-7 text-[color:var(--muted-foreground)]">
             <p>A new user row with credentials-backed authentication.</p>
             <p>A default balanced preference profile with editable allocation targets.</p>
             <p>A starter draft import job so the onboarding flow has a first state.</p>
@@ -93,7 +93,7 @@ function Field({
         type={type}
         required
         defaultValue={defaultValue}
-        className="w-full rounded-2xl border border-[color:var(--border)] bg-white px-4 py-3 text-sm outline-none"
+        className="w-full rounded-2xl border border-[color:var(--border)] bg-white/54 px-4 py-3 text-sm outline-none backdrop-blur-xl"
       />
     </label>
   );

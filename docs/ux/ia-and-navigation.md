@@ -1,4 +1,4 @@
-﻿# Portfolio Manager Information Architecture
+﻿# Loo国的财富宝库 Information Architecture
 
 Last updated: 2026-03-17
 
@@ -119,3 +119,4 @@ Contains:
 - Recommendations is detailed, not summary-only
 - Spending supports the investing workflow, not the other way around
 - Settings must make the recommendation engine feel transparent, not black-box
+

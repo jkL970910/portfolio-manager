@@ -28,7 +28,7 @@ export function TopNav({
   const pathname = usePathname();
 
   return (
-    <nav className="border-t border-white/12 bg-[#233f6d] px-4 py-3 md:px-8">
+    <nav className="border-t border-white/35 bg-[linear-gradient(180deg,rgba(255,255,255,0.24),rgba(255,255,255,0.14))] px-4 py-3 backdrop-blur-xl md:px-8">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap gap-2">
           {navItems.map((item) => {
@@ -38,10 +38,10 @@ export function TopNav({
                 key={item.href}
                 href={item.href}
                 className={cn(
-                  "rounded-full px-4 py-2.5 text-sm font-medium transition-colors duration-200",
+                  "rounded-full border px-4 py-2.5 text-sm font-medium transition-[background-color,color,border-color,transform] duration-200",
                   active
-                    ? "bg-white text-[color:var(--secondary)] shadow-[var(--shadow-card)]"
-                    : "text-white/88 hover:bg-white/14 hover:text-white"
+                    ? "border-white/60 bg-white/78 text-[color:var(--foreground)] shadow-[var(--shadow-card)]"
+                    : "border-transparent text-[color:var(--foreground)]/78 hover:-translate-y-0.5 hover:border-white/30 hover:bg-white/28 hover:text-[color:var(--foreground)]"
                 )}
               >
                 {item.label}

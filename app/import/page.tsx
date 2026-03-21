@@ -10,8 +10,8 @@ export default async function ImportPage() {
   return (
     <AppShell
       viewer={viewer}
-      title="Import"
-      description="Portfolio and spending imports now run as separate workflows. Portfolio onboarding stays account-and-holding focused, while spending imports remain transaction focused and ready for future bank or card provider integrations. For portfolio holdings, explicit total value takes priority over any value derived from quantity and price."
+      title="入库中心"
+      description="投资标的和消费流水分开导入。账户、持仓、交易各走自己的 workflow，同时保留后续接 broker 或 bank API 的边界。"
     >
       <ImportExperience
         latestPortfolioJob={data.latestPortfolioJob}

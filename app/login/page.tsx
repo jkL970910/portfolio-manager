@@ -18,15 +18,15 @@ export default async function LoginPage({
   const error = typeof params.error === "string" ? params.error : undefined;
 
   return (
-    <div className="min-h-screen bg-[linear-gradient(180deg,#f6f8fc_0%,#edf2fb_100%)] px-4 py-10 md:px-6">
+    <div className="min-h-screen bg-[linear-gradient(180deg,#fbf5fa_0%,#f0f4ff_100%)] px-4 py-10 md:px-6">
       <div className="mx-auto grid max-w-6xl gap-8 lg:grid-cols-[1.1fr_0.9fr]">
-        <section className="rounded-[32px] border border-[color:var(--border)] bg-[linear-gradient(145deg,#2b4b83,#182d4f)] p-8 text-white shadow-[var(--shadow-soft)] md:p-10">
-          <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white/14 text-sm font-semibold uppercase tracking-[0.18em]">
-            PM
+        <section className="rounded-[36px] border border-[color:var(--border)] bg-[linear-gradient(145deg,rgba(255,255,255,0.46),rgba(244,208,224,0.34),rgba(206,227,255,0.32))] p-8 text-[color:var(--foreground)] shadow-[var(--shadow-soft)] backdrop-blur-2xl md:p-10">
+          <div className="flex h-14 w-14 items-center justify-center rounded-[22px] border border-white/55 bg-[linear-gradient(135deg,rgba(255,255,255,0.88),rgba(255,232,242,0.96))] text-sm font-bold tracking-[0.06em] shadow-[var(--shadow-card)]">
+            Loo
           </div>
-          <h1 className="mt-8 text-4xl font-semibold tracking-tight">Portfolio Manager</h1>
-          <p className="mt-3 max-w-xl text-base leading-7 text-white/80">
-            Multi-account portfolio analysis, funding recommendations, spending visibility, and future portfolio health scoring in one workflow.
+          <h1 className="mt-8 text-4xl font-semibold tracking-tight">Loo??????</h1>
+          <p className="mt-3 max-w-xl text-base leading-7 text-[color:var(--muted-foreground)]">
+            ??????????,????????????????,???????????
           </p>
           <div className="mt-10 grid gap-4 md:grid-cols-2">
             <Feature title="User-scoped dashboard" description="Every page and API route now loads data against the signed-in user context." />
@@ -36,7 +36,7 @@ export default async function LoginPage({
           </div>
         </section>
 
-        <section className="rounded-[32px] border border-[color:var(--border)] bg-white p-8 shadow-[var(--shadow-card)] md:p-10">
+        <section className="rounded-[36px] border border-[color:var(--border)] bg-white/62 p-8 shadow-[var(--shadow-card)] backdrop-blur-2xl md:p-10">
           <div className="space-y-2">
             <p className="text-sm font-medium uppercase tracking-[0.18em] text-[color:var(--muted-foreground)]">Demo access</p>
             <h2 className="text-3xl font-semibold tracking-tight">Sign in</h2>
@@ -46,7 +46,7 @@ export default async function LoginPage({
           </div>
 
           {error ? (
-            <div className="mt-6 rounded-2xl border border-[#e7b0b8] bg-[#fff3f5] px-4 py-3 text-sm text-[#8e2433]">
+            <div className="mt-6 rounded-2xl border border-[#f3b8c7] bg-white/72 px-4 py-3 text-sm text-[#a64a67] backdrop-blur-xl">
               Login failed. Check the demo credentials and try again.
             </div>
           ) : null}
@@ -54,7 +54,7 @@ export default async function LoginPage({
           <form action={authenticate} className="mt-8 space-y-5">
             <label className="block space-y-2">
               <span className="text-sm font-medium text-[color:var(--foreground)]">Email</span>
-              <div className="flex items-center gap-3 rounded-2xl border border-[color:var(--border)] px-4 py-3">
+              <div className="flex items-center gap-3 rounded-2xl border border-[color:var(--border)] bg-white/54 px-4 py-3 backdrop-blur-xl">
                 <UserRound className="h-4 w-4 text-[color:var(--muted-foreground)]" />
                 <input
                   name="email"
@@ -68,7 +68,7 @@ export default async function LoginPage({
 
             <label className="block space-y-2">
               <span className="text-sm font-medium text-[color:var(--foreground)]">Password</span>
-              <div className="flex items-center gap-3 rounded-2xl border border-[color:var(--border)] px-4 py-3">
+              <div className="flex items-center gap-3 rounded-2xl border border-[color:var(--border)] bg-white/54 px-4 py-3 backdrop-blur-xl">
                 <LockKeyhole className="h-4 w-4 text-[color:var(--muted-foreground)]" />
                 <input
                   name="password"
@@ -82,14 +82,14 @@ export default async function LoginPage({
 
             <button
               type="submit"
-              className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-[color:var(--primary)] px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-[#1039c5]"
+              className="inline-flex w-full items-center justify-center gap-2 rounded-full border border-white/45 bg-[linear-gradient(135deg,rgba(240,143,178,0.92),rgba(111,141,246,0.88))] px-5 py-3 text-sm font-semibold text-white shadow-[var(--shadow-card)] transition-[transform,opacity] hover:-translate-y-0.5 hover:opacity-95"
             >
               Continue to dashboard
               <ArrowRight className="h-4 w-4" />
             </button>
           </form>
 
-          <div className="mt-8 space-y-3 rounded-[28px] border border-[color:var(--border)] bg-[color:var(--card-muted)] p-5">
+          <div className="mt-8 space-y-3 rounded-[28px] border border-[color:var(--border)] bg-[color:var(--card-muted)] p-5 backdrop-blur-xl">
             <p className="text-sm font-semibold text-[color:var(--foreground)]">Seeded demo users</p>
             <DemoUser email="jiekun@example.com" label="Balanced investor, higher TFSA/RRSP balance" />
             <DemoUser email="casey@example.com" label="Growth investor, leaner fixed income and different cash-flow profile" />
@@ -97,7 +97,7 @@ export default async function LoginPage({
           </div>
           <p className="mt-6 text-sm text-[color:var(--muted-foreground)]">
             Need a fresh local account?{" "}
-            <Link href="/register" className="font-medium text-[color:var(--primary)]">
+            <Link href="/register" className="font-medium text-[color:var(--secondary)]">
               Create one here
             </Link>
           </p>
@@ -109,16 +109,16 @@ export default async function LoginPage({
 
 function Feature({ title, description }: { title: string; description: string }) {
   return (
-    <div className="rounded-[24px] border border-white/12 bg-white/8 p-5">
+    <div className="rounded-[24px] border border-white/40 bg-white/26 p-5 backdrop-blur-xl">
       <p className="font-medium">{title}</p>
-      <p className="mt-2 text-sm leading-6 text-white/72">{description}</p>
+      <p className="mt-2 text-sm leading-6 text-[color:var(--muted-foreground)]">{description}</p>
     </div>
   );
 }
 
 function DemoUser({ email, label }: { email: string; label: string }) {
   return (
-    <div className="rounded-2xl border border-[color:var(--border)] bg-white px-4 py-3">
+    <div className="rounded-2xl border border-[color:var(--border)] bg-white/56 px-4 py-3 backdrop-blur-xl">
       <p className="text-sm font-medium">{email}</p>
       <p className="mt-1 text-sm text-[color:var(--muted-foreground)]">{label}</p>
     </div>

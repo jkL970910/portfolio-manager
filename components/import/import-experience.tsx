@@ -1,4 +1,4 @@
-
+﻿
 "use client";
 
 import { ChangeEvent, useEffect, useMemo, useState, useTransition } from "react";
@@ -17,9 +17,11 @@ import {
 } from "lucide-react";
 import { ImportJobPanel } from "@/components/import/import-job-panel";
 import { SpendingImportPanel } from "@/components/import/spending-import-panel";
+import { WorkflowOptionCard } from "@/components/import/workflow-option-card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { InfoRow } from "@/components/ui/info-row";
 import { extractCsvHeaders, previewCsvContent, type ImportFieldMapping } from "@/lib/backend/csv-import";
 import { assertApiData, getApiErrorMessage, safeJson } from "@/lib/client/api";
 
@@ -1027,41 +1029,53 @@ export function ImportExperience({
 
   return (
     <div className="space-y-6">
+      <Card className="overflow-hidden bg-[linear-gradient(135deg,rgba(255,255,255,0.7),rgba(246,218,230,0.56),rgba(221,232,255,0.48))]">
+        <CardContent className="grid gap-6 px-6 py-6 md:grid-cols-[1.2fr_0.8fr] md:items-center">
+          <div className="space-y-4">
+            <Badge variant="primary">Loo 的入库向导</Badge>
+            <div className="space-y-3">
+              <h2 className="text-[30px] font-semibold tracking-[-0.04em] text-[color:var(--foreground)]">
+                先决定导入路径，再把宝库整理干净。
+              </h2>
+              <p className="max-w-3xl text-sm leading-7 text-[color:var(--muted-foreground)]">
+                投资标的和消费流水现在是两条独立工作流。这样后续接 broker API、银行流水或聚合器时，不会互相污染。
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-3 text-sm text-[color:var(--muted-foreground)]">
+              <span className="rounded-full border border-white/60 bg-white/42 px-4 py-2 backdrop-blur-md">Guided onboarding for one-account-at-a-time setup</span>
+              <span className="rounded-full border border-white/60 bg-white/42 px-4 py-2 backdrop-blur-md">Bulk CSV import for existing exports</span>
+            </div>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <LooSignal title="Portfolio path" detail="账户、持仓、估值与推荐刷新" />
+            <LooSignal title="Spending path" detail="交易流水、分类与现金流" />
+          </div>
+        </CardContent>
+      </Card>
+
       <Card>
         <CardHeader>
           <CardTitle>Import Workflow</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid gap-3 md:grid-cols-2">
-            <button
-              type="button"
+            <WorkflowOptionCard
+              title="Portfolio Import"
+              badge="Accounts + holdings"
+              detail="Use guided onboarding or direct CSV import for investment accounts and holdings. This path is allowed to evolve into broker integrations later."
+              active={workflowView === "portfolio"}
               onClick={() => {
                 setWorkflowView("portfolio");
                 resetGuidedState("guided");
               }}
-              className={`rounded-[24px] border p-5 text-left transition-colors ${workflowView === "portfolio" ? "border-[color:var(--primary)] bg-[color:var(--primary-soft)]" : "border-[color:var(--border)] bg-white"}`}
-            >
-              <div className="flex items-center justify-between gap-3">
-                <p className="text-lg font-semibold">Portfolio Import</p>
-                <Badge variant={workflowView === "portfolio" ? "primary" : "neutral"}>Accounts + holdings</Badge>
-              </div>
-              <p className="mt-2 text-sm text-[color:var(--muted-foreground)]">
-                Use guided onboarding or direct CSV import for investment accounts and holdings. This path is allowed to evolve into broker integrations later.
-              </p>
-            </button>
-            <button
-              type="button"
+            />
+            <WorkflowOptionCard
+              title="Spending Import"
+              badge="Transactions"
+              detail="Keep spending transactions on their own ingestion path so future bank, card, or aggregator APIs can plug in without changing portfolio import logic."
+              active={workflowView === "spending"}
               onClick={() => setWorkflowView("spending")}
-              className={`rounded-[24px] border p-5 text-left transition-colors ${workflowView === "spending" ? "border-[color:var(--primary)] bg-[color:var(--primary-soft)]" : "border-[color:var(--border)] bg-white"}`}
-            >
-              <div className="flex items-center justify-between gap-3">
-                <p className="text-lg font-semibold">Spending Import</p>
-                <Badge variant={workflowView === "spending" ? "primary" : "neutral"}>Transactions</Badge>
-              </div>
-              <p className="mt-2 text-sm text-[color:var(--muted-foreground)]">
-                Keep spending transactions on their own ingestion path so future bank, card, or aggregator APIs can plug in without changing portfolio import logic.
-              </p>
-            </button>
+            />
           </div>
         </CardContent>
       </Card>
@@ -1073,32 +1087,20 @@ export function ImportExperience({
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid gap-3 md:grid-cols-2">
-              <button
-                type="button"
+              <WorkflowOptionCard
+                title="Guided setup"
+                badge="Recommended"
+                detail="Walk through account type, data source choice, validation, and handoff one step at a time."
+                active={mode === "guided"}
                 onClick={() => resetGuidedState("guided")}
-                className={`rounded-[24px] border p-5 text-left transition-colors ${mode === "guided" ? "border-[color:var(--primary)] bg-[color:var(--primary-soft)]" : "border-[color:var(--border)] bg-white"}`}
-              >
-                <div className="flex items-center justify-between gap-3">
-                  <p className="text-lg font-semibold">Guided setup</p>
-                  <Badge variant={mode === "guided" ? "primary" : "neutral"}>Recommended</Badge>
-                </div>
-                <p className="mt-2 text-sm text-[color:var(--muted-foreground)]">
-                  Walk through account type, data source choice, validation, and handoff one step at a time.
-                </p>
-              </button>
-              <button
-                type="button"
+              />
+              <WorkflowOptionCard
+                title="Direct CSV import"
+                badge="Bulk"
+                detail="Best when your broker export already contains account and holding data and you want to validate it in one pass."
+                active={mode === "direct"}
                 onClick={() => setMode("direct")}
-                className={`rounded-[24px] border p-5 text-left transition-colors ${mode === "direct" ? "border-[color:var(--primary)] bg-[color:var(--primary-soft)]" : "border-[color:var(--border)] bg-white"}`}
-              >
-                <div className="flex items-center justify-between gap-3">
-                  <p className="text-lg font-semibold">Direct CSV import</p>
-                  <Badge variant={mode === "direct" ? "primary" : "neutral"}>Bulk</Badge>
-                </div>
-                <p className="mt-2 text-sm text-[color:var(--muted-foreground)]">
-                  Best when your broker export already contains account and holding data and you want to validate it in one pass.
-                </p>
-              </button>
+              />
             </div>
           </CardContent>
         </Card>
@@ -1116,7 +1118,7 @@ export function ImportExperience({
                   type="button"
                   key={step.title}
                   onClick={() => !isPending && setCurrentStep(stepNumber)}
-                  className={`rounded-[24px] border bg-white px-5 py-5 text-left transition-colors ${isActive ? "border-[color:var(--primary)] bg-[color:var(--primary-soft)]" : "border-[color:var(--border)]"} ${isComplete ? "shadow-[var(--shadow-card)]" : ""}`}
+                  className={`rounded-[24px] border px-5 py-5 text-left transition-colors backdrop-blur-md ${isActive ? "border-[color:var(--primary)] bg-[color:var(--primary-soft)]" : "border-white/55 bg-white/36"} ${isComplete ? "shadow-[var(--shadow-card)]" : ""}`}
                 >
                   <div className="space-y-3">
                     <Badge variant={isActive ? "primary" : isComplete ? "success" : "neutral"}>
@@ -1283,7 +1285,7 @@ export function ImportExperience({
               <CardTitle>Direct CSV import</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="rounded-[24px] border border-dashed border-[color:var(--border)] bg-[color:var(--card-muted)] p-5">
+              <div className="rounded-[24px] border border-dashed border-white/60 bg-white/34 p-5 backdrop-blur-md">
                 <p className="text-xs uppercase tracking-[0.16em] text-[color:var(--muted-foreground)]">When to use this</p>
                 <p className="mt-2 text-lg font-semibold">One file, many accounts</p>
                 <p className="mt-2 text-sm text-[color:var(--muted-foreground)]">
@@ -1317,7 +1319,7 @@ export function ImportExperience({
               <CardTitle>Spending import</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="rounded-[24px] border border-dashed border-[color:var(--border)] bg-[color:var(--card-muted)] p-5">
+              <div className="rounded-[24px] border border-dashed border-white/60 bg-white/34 p-5 backdrop-blur-md">
                 <p className="text-xs uppercase tracking-[0.16em] text-[color:var(--muted-foreground)]">When to use this</p>
                 <p className="mt-2 text-lg font-semibold">Transaction-first import</p>
                 <p className="mt-2 text-sm text-[color:var(--muted-foreground)]">
@@ -2044,11 +2046,11 @@ function StepCompleteSetup({
   );
 }
 
-function InfoRow({ icon, text }: { icon: React.ReactNode; text: string }) {
+function LooSignal({ title, detail }: { title: string; detail: string }) {
   return (
-    <div className="flex gap-3 rounded-2xl border border-[color:var(--border)] p-4 text-sm text-[color:var(--muted-foreground)]">
-      {icon}
-      {text}
+    <div className="rounded-[24px] border border-white/55 bg-white/44 p-4 backdrop-blur-md">
+      <p className="text-sm font-medium text-[color:var(--muted-foreground)]">{title}</p>
+      <p className="mt-3 text-base font-semibold text-[color:var(--foreground)]">{detail}</p>
     </div>
   );
 }

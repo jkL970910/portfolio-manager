@@ -2,7 +2,12 @@ import { cn } from "@/lib/utils";
 
 export function Card({ className, children }: { className?: string; children: React.ReactNode }) {
   return (
-    <section className={cn("rounded-[24px] border border-[color:var(--border)] bg-white shadow-[var(--shadow-card)]", className)}>
+    <section
+      className={cn(
+        "rounded-[28px] border border-[color:var(--border)] bg-[color:var(--card)] backdrop-blur-xl shadow-[var(--shadow-card)]",
+        className
+      )}
+    >
       {children}
     </section>
   );
