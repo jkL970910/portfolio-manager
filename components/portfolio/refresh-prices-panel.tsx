@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { RefreshCcw } from "lucide-react";
+import { MascotAsset } from "@/components/brand/mascot-asset";
 import { Button } from "@/components/ui/button";
 import { assertApiData, getApiErrorMessage, safeJson } from "@/lib/client/api";
 
@@ -64,11 +65,16 @@ export function RefreshPricesPanel({
 
   return (
     <div className="space-y-3 rounded-2xl border border-[color:var(--border)] p-4">
-      <div>
-        <p className="font-medium">Refresh market prices</p>
-        <p className="mt-2 text-sm text-[color:var(--muted-foreground)]">
-          Pull the latest cached quotes for imported holdings, then recompute market value, gain/loss, and account weights.
-        </p>
+      <div className="grid gap-4 md:grid-cols-[1fr_112px] md:items-start">
+        <div>
+          <p className="font-medium">Refresh market prices</p>
+          <p className="mt-2 text-sm text-[color:var(--muted-foreground)]">
+            Pull the latest cached quotes for imported holdings, then recompute market value, gain/loss, and account weights.
+          </p>
+        </div>
+        <div className="justify-self-start md:justify-self-end">
+          <MascotAsset name="sideEyeReview" className="h-[112px] w-[112px]" sizes="112px" />
+        </div>
       </div>
       <div className="rounded-2xl border border-[color:var(--border)] bg-[color:var(--card-muted)] px-4 py-3 text-sm text-[color:var(--muted-foreground)]">
         <p><span className="font-medium text-[color:var(--foreground)]">Last refreshed:</span> {lastRefreshed}</p>
@@ -79,8 +85,11 @@ export function RefreshPricesPanel({
         {isPending ? "Refreshing prices..." : "Refresh prices"}
       </Button>
       {status.type !== "idle" ? (
-        <div className={`rounded-2xl border px-4 py-3 text-sm ${status.type === "success" ? "border-[#b6d7c7] bg-[#eef8f1] text-[#21613f]" : "border-[#e7b0b8] bg-[#fff3f5] text-[#8e2433]"}`}>
-          {status.message}
+        <div className={`grid gap-3 rounded-2xl border px-4 py-3 text-sm md:grid-cols-[1fr_96px] md:items-center ${status.type === "success" ? "border-[#b6d7c7] bg-[#eef8f1] text-[#21613f]" : "border-[#e7b0b8] bg-[#fff3f5] text-[#8e2433]"}`}>
+          <div>{status.message}</div>
+          <div className="justify-self-start md:justify-self-end">
+            <MascotAsset name={status.type === "success" ? "successSmirk" : "alertRun"} className="h-24 w-24" sizes="96px" />
+          </div>
         </div>
       ) : null}
     </div>

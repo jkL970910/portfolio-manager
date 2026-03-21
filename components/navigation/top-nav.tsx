@@ -28,7 +28,7 @@ export function TopNav({
   const pathname = usePathname();
 
   return (
-    <nav className="border-t border-white/35 bg-[linear-gradient(180deg,rgba(255,255,255,0.24),rgba(255,255,255,0.14))] px-4 py-3 backdrop-blur-xl md:px-8">
+    <nav className="rounded-b-[28px] border-t border-white/35 bg-[linear-gradient(180deg,rgba(255,255,255,0.24),rgba(255,255,255,0.14))] px-4 py-3 backdrop-blur-xl md:px-8">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap gap-2">
           {navItems.map((item) => {

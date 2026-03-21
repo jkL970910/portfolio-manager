@@ -18,6 +18,7 @@ import {
 import { ImportJobPanel } from "@/components/import/import-job-panel";
 import { SpendingImportPanel } from "@/components/import/spending-import-panel";
 import { WorkflowOptionCard } from "@/components/import/workflow-option-card";
+import { MascotAsset } from "@/components/brand/mascot-asset";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -1030,7 +1031,7 @@ export function ImportExperience({
   return (
     <div className="space-y-6">
       <Card className="overflow-hidden bg-[linear-gradient(135deg,rgba(255,255,255,0.7),rgba(246,218,230,0.56),rgba(221,232,255,0.48))]">
-        <CardContent className="grid gap-6 px-6 py-6 md:grid-cols-[1.2fr_0.8fr] md:items-center">
+        <CardContent className="grid gap-6 px-6 py-6 md:grid-cols-[1.1fr_0.9fr] md:items-center">
           <div className="space-y-4">
             <Badge variant="primary">Loo 的入库向导</Badge>
             <div className="space-y-3">
@@ -1046,9 +1047,19 @@ export function ImportExperience({
               <span className="rounded-full border border-white/60 bg-white/42 px-4 py-2 backdrop-blur-md">Bulk CSV import for existing exports</span>
             </div>
           </div>
-          <div className="grid gap-3 sm:grid-cols-2">
-            <LooSignal title="Portfolio path" detail="账户、持仓、估值与推荐刷新" />
-            <LooSignal title="Spending path" detail="交易流水、分类与现金流" />
+          <div className="grid gap-4 md:grid-cols-[220px_1fr] md:items-center">
+            <div className="flex justify-center md:justify-start">
+              <div className="space-y-3 pt-8">
+                <MascotAsset name="miniSticker" className="h-[180px] w-[180px]" sizes="180px" />
+                <div className="max-w-[210px] rounded-[22px] border border-white/60 bg-white/70 px-4 py-3 text-sm font-medium leading-6 text-[color:var(--foreground)] shadow-[var(--shadow-card)] backdrop-blur-xl">
+                  你先选路径, 我来保证账户和流水不会串在一起。
+                </div>
+              </div>
+            </div>
+            <div className="grid gap-3">
+              <LooSignal title="Portfolio path" detail="账户、持仓、估值与推荐刷新" />
+              <LooSignal title="Spending path" detail="交易流水、分类与现金流" />
+            </div>
           </div>
         </CardContent>
       </Card>

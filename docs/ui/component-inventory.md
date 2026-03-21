@@ -17,9 +17,13 @@
 | MetricCard | stable | [metric-card.tsx](E:\Projects\Portfolio%20Manager\components\ui\metric-card.tsx) | Shared KPI / hero metric surface |
 | InfoRow | stable | [info-row.tsx](E:\Projects\Portfolio%20Manager\components\ui\info-row.tsx) | Shared icon + explanation row |
 | StatBlock | stable | [stat-block.tsx](E:\Projects\Portfolio%20Manager\components\ui\stat-block.tsx) | Shared compact metric block |
+| EmptyStatePanel | stable | [empty-state-panel.tsx](E:\Projects\Portfolio%20Manager\components\ui\empty-state-panel.tsx) | Shared empty-state surface with optional sticker |
+| LiquidGlassShell | stable | [liquid-glass-shell.tsx](E:\Projects\Portfolio%20Manager\components\ui\liquid-glass-shell.tsx) | Small-area liquid-glass enhancement wrapper for compact controls and hero signal surfaces |
 | TopNav | stable | [top-nav.tsx](E:\Projects\Portfolio%20Manager\components\navigation\top-nav.tsx) | Shared top-level nav |
 | DisplayCurrencyToggle | stable | [display-currency-toggle.tsx](E:\Projects\Portfolio%20Manager\components\navigation\display-currency-toggle.tsx) | Global CAD/USD control |
 | FxInfoPopoverContent | stable | [fx-info-popover-content.tsx](E:\Projects\Portfolio%20Manager\components\navigation\fx-info-popover-content.tsx) | Shared FX explanation block |
+| LooMascot | stable | [loo-mascot.tsx](E:\Projects\Portfolio%20Manager\components\brand\loo-mascot.tsx) | Shared original brand mascot for hero and onboarding surfaces |
+| MascotAsset | stable | [mascot-asset.tsx](E:\Projects\Portfolio%20Manager\components\brand\mascot-asset.tsx) | Wrapper for user-supplied mascot images stored in `public/mascot` |
 | AppShell | stable | [app-shell.tsx](E:\Projects\Portfolio%20Manager\components\layout\app-shell.tsx) | Shared page shell |
 | FloatingHeaderFrame | stable | [floating-header-frame.tsx](E:\Projects\Portfolio%20Manager\components\layout\floating-header-frame.tsx) | Shared sticky header behavior |
 | LineChartCard | stable | [line-chart.tsx](E:\Projects\Portfolio%20Manager\components\charts\line-chart.tsx) | Shared trend chart shell |

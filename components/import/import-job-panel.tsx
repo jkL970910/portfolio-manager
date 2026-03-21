@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { AlertTriangle, ArrowRightLeft, CheckCircle2, Eye, FileText, Pencil, Save, Trash2, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { MascotAsset } from "@/components/brand/mascot-asset";
 import { assertApiData, getApiErrorMessage, safeJson } from "@/lib/client/api";
 
 const MAPPING_GROUPS = [
@@ -792,22 +793,29 @@ export function ImportJobPanel({
 
       {reviewState && reviewState.validationErrors.length === 0 ? (
         <div className="space-y-3 rounded-2xl border border-[#b6d7c7] bg-[#eef8f1] p-4">
-          <div className="flex items-center gap-2 font-medium text-[#21613f]">
-            <CheckCircle2 className="h-4 w-4" />
-            Review before import
+          <div className="grid gap-4 md:grid-cols-[1fr_140px] md:items-start">
+            <div className="space-y-3">
+              <div className="flex items-center gap-2 font-medium text-[#21613f]">
+                <CheckCircle2 className="h-4 w-4" />
+                Review before import
+              </div>
+              <div className="grid gap-3 md:grid-cols-4 text-sm text-[#21613f]">
+                <div>Accounts: {reviewState.summary.accountsImported}</div>
+                <div>Holdings: {reviewState.summary.holdingsImported}</div>
+                <div>Transactions: {reviewState.summary.transactionsImported}</div>
+                <div>Rows parsed: {reviewState.review.rowCount}</div>
+              </div>
+              <p className="text-sm text-[#21613f]">
+                Mode: {reviewState.review.importMode}. Validation passed. Confirm to write these changes into the current signed-in user&apos;s database records.
+              </p>
+              <p className="text-sm text-[#21613f]">
+                Valuation rule: if a holding row includes <code>market_value</code>, that explicit total value is written and takes priority over any derived value from <code>quantity x last_price</code>.
+              </p>
+            </div>
+            <div className="justify-self-start md:justify-self-end">
+              <MascotAsset name="reviewPointing" className="h-[132px] w-[132px]" sizes="132px" />
+            </div>
           </div>
-          <div className="grid gap-3 md:grid-cols-4 text-sm text-[#21613f]">
-            <div>Accounts: {reviewState.summary.accountsImported}</div>
-            <div>Holdings: {reviewState.summary.holdingsImported}</div>
-            <div>Transactions: {reviewState.summary.transactionsImported}</div>
-            <div>Rows parsed: {reviewState.review.rowCount}</div>
-          </div>
-          <p className="text-sm text-[#21613f]">
-            Mode: {reviewState.review.importMode}. Validation passed. Confirm to write these changes into the current signed-in user&apos;s database records.
-          </p>
-          <p className="text-sm text-[#21613f]">
-            Valuation rule: if a holding row includes <code>market_value</code>, that explicit total value is written and takes priority over any derived value from <code>quantity x last_price</code>.
-          </p>
           {symbolAudit?.records?.length ? (
             <div className="rounded-2xl border border-[#b6d7c7] bg-white px-4 py-3 text-sm text-[#21613f]">
               <p className="font-medium">Final holdings that will be written</p>
@@ -831,19 +839,26 @@ export function ImportJobPanel({
 
       {reviewState && reviewState.validationErrors.length === 0 ? (
         <div className="space-y-3 rounded-2xl border border-[color:var(--border)] bg-white p-4">
-          <div className="flex items-center gap-2 font-medium text-[color:var(--foreground)]">
-            <Eye className="h-4 w-4 text-[color:var(--primary)]" />
-            Symbol audit
-            {symbolAuditStatus.loading ? <Badge variant="warning">Running</Badge> : <Badge variant="neutral">Review aid</Badge>}
-          </div>
-          {symbolAuditStatus.message ? (
-            <p className="text-sm text-[color:var(--muted-foreground)]">{symbolAuditStatus.message}</p>
-          ) : null}
-          {symbolAuditStatus.error ? (
-            <div className="rounded-2xl border border-[#e7b0b8] bg-[#fff3f5] px-4 py-3 text-sm text-[#8e2433]">
-              {symbolAuditStatus.error}
+          <div className="grid gap-4 md:grid-cols-[1fr_112px] md:items-start">
+            <div className="space-y-3">
+              <div className="flex items-center gap-2 font-medium text-[color:var(--foreground)]">
+                <Eye className="h-4 w-4 text-[color:var(--primary)]" />
+                Symbol audit
+                {symbolAuditStatus.loading ? <Badge variant="warning">Running</Badge> : <Badge variant="neutral">Review aid</Badge>}
+              </div>
+              {symbolAuditStatus.message ? (
+                <p className="text-sm text-[color:var(--muted-foreground)]">{symbolAuditStatus.message}</p>
+              ) : null}
+              {symbolAuditStatus.error ? (
+                <div className="rounded-2xl border border-[#e7b0b8] bg-[#fff3f5] px-4 py-3 text-sm text-[#8e2433]">
+                  {symbolAuditStatus.error}
+                </div>
+              ) : null}
             </div>
-          ) : null}
+            <div className="justify-self-start md:justify-self-end">
+              <MascotAsset name="sideEyeReview" className="h-[112px] w-[112px]" sizes="112px" />
+            </div>
+          </div>
           {symbolAudit ? (
             <div className="space-y-2">
               {symbolAudit.records.map((record) => (
@@ -914,23 +929,33 @@ export function ImportJobPanel({
       ) : null}
 
       {status.type !== "idle" ? (
-        <div className={`rounded-2xl border px-4 py-3 text-sm ${status.type === "success" ? "border-[#b6d7c7] bg-[#eef8f1] text-[#21613f]" : "border-[#e7b0b8] bg-[#fff3f5] text-[#8e2433]"}`}>
-          {status.message}
+        <div className={`grid gap-3 rounded-2xl border px-4 py-3 text-sm md:grid-cols-[1fr_96px] md:items-center ${status.type === "success" ? "border-[#b6d7c7] bg-[#eef8f1] text-[#21613f]" : "border-[#e7b0b8] bg-[#fff3f5] text-[#8e2433]"}`}>
+          <div>{status.message}</div>
+          <div className="justify-self-start md:justify-self-end">
+            <MascotAsset name={status.type === "success" ? "successSmirk" : "alertRun"} className="h-24 w-24" sizes="96px" />
+          </div>
         </div>
       ) : null}
 
       {validationErrors.length > 0 ? (
         <div className="space-y-3 rounded-2xl border border-[#e7b0b8] bg-[#fff8f9] p-4">
-          <div className="flex items-center gap-2 font-medium text-[#8e2433]">
-            <AlertTriangle className="h-4 w-4" />
-            Import validation issues
-          </div>
-          <div className="space-y-2">
-            {validationErrors.slice(0, 12).map((error) => (
-              <div key={`${error.rowNumber}-${error.message}`} className="rounded-xl border border-[#f0c9d0] bg-white px-3 py-2 text-sm text-[#8e2433]">
-                Row {error.rowNumber}{error.recordType ? ` (${error.recordType})` : ""}: {error.message}
+          <div className="grid gap-4 md:grid-cols-[1fr_112px] md:items-start">
+            <div className="space-y-3">
+              <div className="flex items-center gap-2 font-medium text-[#8e2433]">
+                <AlertTriangle className="h-4 w-4" />
+                Import validation issues
               </div>
-            ))}
+              <div className="space-y-2">
+                {validationErrors.slice(0, 12).map((error) => (
+                  <div key={`${error.rowNumber}-${error.message}`} className="rounded-xl border border-[#f0c9d0] bg-white px-3 py-2 text-sm text-[#8e2433]">
+                    Row {error.rowNumber}{error.recordType ? ` (${error.recordType})` : ""}: {error.message}
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="justify-self-start md:justify-self-end">
+              <MascotAsset name="alertRun" className="h-[112px] w-[112px]" sizes="112px" />
+            </div>
           </div>
         </div>
       ) : null}

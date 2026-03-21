@@ -1,4 +1,5 @@
 import { Badge } from "@/components/ui/badge";
+import { EmptyStatePanel } from "@/components/ui/empty-state-panel";
 
 type HoldingTableRow = {
   symbol: string;
@@ -47,8 +48,11 @@ export function HoldingTable({ holdings }: { holdings: HoldingTableRow[] }) {
           ))}
           {holdings.length === 0 ? (
             <tr className="border-t border-white/45">
-              <td className="py-6 text-[color:var(--muted-foreground)]" colSpan={7}>
-                No holdings imported yet. Complete the import flow to unlock portfolio analysis.
+              <td className="py-6" colSpan={7}>
+                <EmptyStatePanel
+                  title="No holdings imported yet"
+                  text="Complete the import flow to unlock portfolio analysis."
+                />
               </td>
             </tr>
           ) : null}

@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Wand2 } from "lucide-react";
+import { MascotAsset } from "@/components/brand/mascot-asset";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { getApiErrorMessage, safeJson } from "@/lib/client/api";
@@ -36,12 +37,15 @@ export function RecommendationRunPanel({ initialContributionAmount }: { initialC
 
   return (
     <div className="space-y-4 rounded-[24px] border border-[color:var(--border)] bg-[color:var(--card-muted)] p-5">
-      <div className="flex items-start justify-between gap-4">
+      <div className="grid gap-4 md:grid-cols-[1fr_132px] md:items-start">
         <div>
           <p className="font-semibold">Generate new recommendation run</p>
           <p className="mt-1 text-sm text-[color:var(--muted-foreground)]">This recomputes ranked funding priorities from current holdings and saved preferences.</p>
         </div>
-        <Badge variant="primary">POST /api/recommendations/runs</Badge>
+        <div className="space-y-3 justify-self-start md:justify-self-end">
+          <Badge variant="primary">POST /api/recommendations/runs</Badge>
+          <MascotAsset name="reviewPointing" className="h-[132px] w-[132px]" sizes="132px" />
+        </div>
       </div>
       <label className="block space-y-2">
         <span className="text-sm font-medium text-[color:var(--foreground)]">Contribution amount (planning base, CAD)</span>
@@ -57,8 +61,11 @@ export function RecommendationRunPanel({ initialContributionAmount }: { initialC
         </p>
       </label>
       {status.type !== "idle" ? (
-        <div className={`rounded-2xl border px-4 py-3 text-sm ${status.type === "success" ? "border-[#b6d7c7] bg-[#eef8f1] text-[#21613f]" : "border-[#e7b0b8] bg-[#fff3f5] text-[#8e2433]"}`}>
-          {status.message}
+        <div className={`grid gap-3 rounded-2xl border px-4 py-3 text-sm md:grid-cols-[1fr_96px] md:items-center ${status.type === "success" ? "border-[#b6d7c7] bg-[#eef8f1] text-[#21613f]" : "border-[#e7b0b8] bg-[#fff3f5] text-[#8e2433]"}`}>
+          <div>{status.message}</div>
+          <div className="justify-self-start md:justify-self-end">
+            <MascotAsset name={status.type === "success" ? "successSmirk" : "alertRun"} className="h-24 w-24" sizes="96px" />
+          </div>
         </div>
       ) : null}
       <Button type="button" onClick={generateRun} disabled={isPending} leadingIcon={<Wand2 className="h-4 w-4" />}>

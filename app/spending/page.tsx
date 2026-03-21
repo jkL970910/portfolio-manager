@@ -4,6 +4,7 @@ import { AppShell } from "@/components/layout/app-shell";
 import { LineChartCard } from "@/components/charts/line-chart";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { EmptyStatePanel } from "@/components/ui/empty-state-panel";
 
 export default async function SpendingPage() {
   const viewer = await requireViewer();
@@ -72,8 +73,11 @@ export default async function SpendingPage() {
               ))}
               {data.transactions.length === 0 ? (
                 <tr className="border-t border-[color:var(--border)]">
-                  <td className="py-6 text-[color:var(--muted-foreground)]" colSpan={4}>
-                    No transactions imported yet. Spending insights will populate after the first CSV import.
+                  <td className="py-6" colSpan={4}>
+                    <EmptyStatePanel
+                      title="No transactions imported yet"
+                      text="Spending insights will populate after the first CSV import."
+                    />
                   </td>
                 </tr>
               ) : null}

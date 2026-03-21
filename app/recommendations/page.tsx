@@ -4,6 +4,7 @@ import { requireViewer } from "@/lib/auth/session";
 import { getRecommendationView } from "@/lib/backend/services";
 import { AppShell } from "@/components/layout/app-shell";
 import { RecommendationRunPanel } from "@/components/recommendations/recommendation-run-panel";
+import { EmptyStatePanel } from "@/components/ui/empty-state-panel";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -109,9 +110,10 @@ export default async function RecommendationsPage() {
                 </div>
               ))}
               {data.priorities.length === 0 ? (
-                <div className="rounded-[24px] border border-dashed border-white/60 bg-white/32 p-5 text-sm text-[color:var(--muted-foreground)] backdrop-blur-md">
-                  No recommendation run is available yet. Save your preferences, import holdings, then generate the first funding plan.
-                </div>
+                <EmptyStatePanel
+                  title="No recommendation run is available yet"
+                  text="Save your preferences, import holdings, then generate the first funding plan."
+                />
               ) : null}
             </CardContent>
           </Card>

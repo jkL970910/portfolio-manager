@@ -61,7 +61,7 @@ export default async function RegisterPage({
           <div className="flex h-14 w-14 items-center justify-center rounded-[22px] border border-white/55 bg-[linear-gradient(135deg,rgba(255,255,255,0.88),rgba(255,232,242,0.96))] text-sm font-bold tracking-[0.06em] shadow-[var(--shadow-card)]">
             Loo
           </div>
-          <h2 className="mt-8 text-4xl font-semibold tracking-tight">??????????</h2>
+          <h2 className="mt-8 text-4xl font-semibold tracking-tight">给自己开一座新宝库</h2>
           <div className="mt-8 space-y-4 text-sm leading-7 text-[color:var(--muted-foreground)]">
             <p>A new user row with credentials-backed authentication.</p>
             <p>A default balanced preference profile with editable allocation targets.</p>

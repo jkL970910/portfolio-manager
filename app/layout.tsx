@@ -9,7 +9,7 @@ const nunitoSans = Nunito_Sans({
 });
 
 export const metadata: Metadata = {
-  title: "Loo??????",
+  title: "Loo国的财富宝库",
   description: "A softer glassmorphism wealth dashboard for portfolio analysis, spending visibility, and recommendation workflows."
 };
 

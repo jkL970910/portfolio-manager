@@ -1,7 +1,9 @@
-import { ArrowRight, LockKeyhole, UserRound } from "lucide-react";
+﻿import { ArrowRight, LockKeyhole, UserRound } from "lucide-react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
+import { MascotAsset } from "@/components/brand/mascot-asset";
+import { Badge } from "@/components/ui/badge";
 import { authenticate } from "@/lib/auth/actions";
 
 export default async function LoginPage({
@@ -21,18 +23,33 @@ export default async function LoginPage({
     <div className="min-h-screen bg-[linear-gradient(180deg,#fbf5fa_0%,#f0f4ff_100%)] px-4 py-10 md:px-6">
       <div className="mx-auto grid max-w-6xl gap-8 lg:grid-cols-[1.1fr_0.9fr]">
         <section className="rounded-[36px] border border-[color:var(--border)] bg-[linear-gradient(145deg,rgba(255,255,255,0.46),rgba(244,208,224,0.34),rgba(206,227,255,0.32))] p-8 text-[color:var(--foreground)] shadow-[var(--shadow-soft)] backdrop-blur-2xl md:p-10">
-          <div className="flex h-14 w-14 items-center justify-center rounded-[22px] border border-white/55 bg-[linear-gradient(135deg,rgba(255,255,255,0.88),rgba(255,232,242,0.96))] text-sm font-bold tracking-[0.06em] shadow-[var(--shadow-card)]">
-            Loo
-          </div>
-          <h1 className="mt-8 text-4xl font-semibold tracking-tight">Loo??????</h1>
-          <p className="mt-3 max-w-xl text-base leading-7 text-[color:var(--muted-foreground)]">
-            ??????????,????????????????,???????????
-          </p>
-          <div className="mt-10 grid gap-4 md:grid-cols-2">
-            <Feature title="User-scoped dashboard" description="Every page and API route now loads data against the signed-in user context." />
-            <Feature title="Credentials auth" description="Local demo login runs without external auth setup, but keeps a migration path to real providers." />
-            <Feature title="Database-ready schema" description="Drizzle schema and repository boundaries are in place for PostgreSQL migration." />
-            <Feature title="Recommendation workflow" description="Investment preferences, recommendations, and portfolio analysis all use the same user scope." />
+          <div className="grid gap-8 md:grid-cols-[1fr_260px] md:items-center">
+            <div>
+              <div className="flex h-14 w-14 items-center justify-center rounded-[22px] border border-white/55 bg-[linear-gradient(135deg,rgba(255,255,255,0.88),rgba(255,232,242,0.96))] text-sm font-bold tracking-[0.06em] shadow-[var(--shadow-card)]">
+                Loo
+              </div>
+              <Badge variant="primary" className="mt-8">
+                Loo 的欢迎台
+              </Badge>
+              <h1 className="mt-4 text-4xl font-semibold tracking-tight">Loo国的财富宝库</h1>
+              <p className="mt-3 max-w-xl text-base leading-7 text-[color:var(--muted-foreground)]">
+                把资产放进一个更柔和的玻璃宝库里，再慢慢看清结构、支出和下一笔钱怎么走。
+              </p>
+              <div className="mt-10 grid gap-4 md:grid-cols-2">
+                <Feature title="User-scoped dashboard" description="Every page and API route now loads data against the signed-in user context." />
+                <Feature title="Credentials auth" description="Local demo login runs without external auth setup, but keeps a migration path to real providers." />
+                <Feature title="Database-ready schema" description="Drizzle schema and repository boundaries are in place for PostgreSQL migration." />
+                <Feature title="Recommendation workflow" description="Investment preferences, recommendations, and portfolio analysis all use the same user scope." />
+              </div>
+            </div>
+            <div className="flex justify-center md:justify-end">
+              <div className="space-y-3 pt-8">
+                <MascotAsset name="dashboardSmirk" className="h-[260px] w-[220px]" priority sizes="220px" />
+                <div className="rounded-[22px] border border-white/60 bg-white/70 px-4 py-3 text-sm font-medium leading-6 text-[color:var(--foreground)] shadow-[var(--shadow-card)] backdrop-blur-xl">
+                  先登录，我带你看看今天的宝库状态。
+                </div>
+              </div>
+            </div>
           </div>
         </section>
 

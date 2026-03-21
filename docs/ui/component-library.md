@@ -17,6 +17,7 @@ Use it as the source of truth before introducing any new UI component.
 
 ```text
 components/
+  brand/
   charts/
   import/
   layout/
@@ -93,6 +94,25 @@ components/
 - File: [stat-block.tsx](E:\Projects\Portfolio%20Manager\components\ui\stat-block.tsx)
 - Purpose: compact metric block used for small analytical summaries
 
+### `EmptyStatePanel`
+
+- File: [empty-state-panel.tsx](E:\Projects\Portfolio%20Manager\components\ui\empty-state-panel.tsx)
+- Purpose: shared empty-state surface with supporting text and optional mascot sticker
+- Use when:
+  - a table or workflow has no usable records yet
+  - the product should keep a warm helper tone without inventing a page-specific empty card
+
+### `LiquidGlassShell`
+
+- File: [liquid-glass-shell.tsx](E:\Projects\Portfolio%20Manager\components\ui\liquid-glass-shell.tsx)
+- Purpose: bounded liquid-glass enhancement layer for small hero or navigation surfaces
+- Use when:
+  - a compact control or signal card needs a stronger iOS-style liquid treatment
+- Do not use for:
+  - dense tables
+  - full-page shells
+  - standard analytical cards that already work with the default frosted `Card`
+
 ## Navigation Components
 
 ### `TopNav`
@@ -116,6 +136,31 @@ components/
 
 - File: [fx-info-popover-content.tsx](E:\Projects\Portfolio%20Manager\components\navigation\fx-info-popover-content.tsx)
 - Purpose: shared FX explanation block used inside the global currency control
+
+## Brand Components
+
+### `LooMascot`
+
+- File: [loo-mascot.tsx](E:\Projects\Portfolio%20Manager\components\brand\loo-mascot.tsx)
+- Purpose: original brand mascot used in hero areas, onboarding, summaries, and empty states
+- Moods:
+  - `guide`
+  - `smirk`
+  - `side-eye`
+  - `proud`
+- Rules:
+  - keep it out of dense analytical tables
+  - use it as a companion surface, not decorative noise
+
+### `MascotAsset`
+
+- File: [mascot-asset.tsx](E:\Projects\Portfolio%20Manager\components\brand\mascot-asset.tsx)
+- Purpose: wrapper for user-supplied static mascot images dropped into `public/mascot`
+- Use when:
+  - a provided sticker or reaction image should be placed into a hero, summary, or review surface
+- Do not use inside:
+  - dense tables
+  - row-by-row diagnostics
 
 ## Layout Components
 

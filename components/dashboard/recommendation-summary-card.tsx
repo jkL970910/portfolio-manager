@@ -2,6 +2,7 @@ import { ArrowRight, ShieldCheck } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { MascotAsset } from "@/components/brand/mascot-asset";
 
 type RecommendationSummaryCardProps = {
   title: string;
@@ -33,12 +34,15 @@ export function RecommendationSummaryCard({
       </CardHeader>
       <CardContent className="space-y-5">
         <div className="rounded-[24px] border border-white/55 bg-white/36 p-5 backdrop-blur-md">
-          <div className="flex items-center justify-between gap-3">
+          <div className="grid gap-4 md:grid-cols-[1fr_160px] md:items-center">
             <div>
               <p className="text-xl font-semibold text-[color:var(--foreground)]">{theme}</p>
               <p className="mt-2 max-w-4xl text-sm leading-6 text-[color:var(--muted-foreground)]">{reason}</p>
             </div>
-            <ShieldCheck className="h-5 w-5 text-[color:var(--success)]" />
+            <div className="flex items-center justify-end gap-3 md:flex-col md:items-end">
+              <ShieldCheck className="h-5 w-5 text-[color:var(--success)]" />
+              <MascotAsset name="successSmirk" className="h-[132px] w-[132px]" sizes="132px" />
+            </div>
           </div>
           <div className="mt-5 grid gap-3 md:grid-cols-2">
             {signals.map((signal) => (

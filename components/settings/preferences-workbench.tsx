@@ -1,13 +1,14 @@
-"use client";
+﻿"use client";
 
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowRight, Save, SlidersHorizontal } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, ChevronDown, Save } from "lucide-react";
 import type { AccountType, GuidedAllocationAnswers, GuidedAllocationDraft, PreferenceProfile } from "@/lib/backend/models";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { assertApiData, getApiErrorMessage, safeJson } from "@/lib/client/api";
+import { cn } from "@/lib/utils";
 
 const FIELD_CLASS_NAME =
   "w-full rounded-[22px] border border-white/55 bg-white/46 px-4 py-3 text-sm text-[color:var(--foreground)] outline-none backdrop-blur-md focus:border-[color:var(--primary)]";
@@ -53,6 +54,23 @@ type GuidedDraft = Omit<FormState, "watchlistSymbols"> & {
   rationale: string[];
   targetMixLabel: string;
 };
+
+type ManualSectionId = "strategy" | "allocation" | "priority" | "tax" | "watchlist";
+
+type ManualSectionMeta = {
+  id: ManualSectionId;
+  title: string;
+  description: string;
+  badge?: string;
+};
+
+const GUIDED_STEP_META = [
+  { id: 0, title: "Step 1", label: "Goal & horizon" },
+  { id: 1, title: "Step 2", label: "Volatility" },
+  { id: 2, title: "Step 3", label: "Engine priority" },
+  { id: 3, title: "Step 4", label: "Cash reserve" },
+  { id: 4, title: "Step 5", label: "Review draft" }
+] as const;
 
 function getTargetMixLabel(targetAllocation: PreferenceProfile["targetAllocation"]) {
   const equity = targetAllocation
@@ -197,6 +215,59 @@ function formatDraftSavedAt(value: string | null) {
   }).format(date);
 }
 
+function getManualSectionSummary(section: ManualSectionId, form: FormState, currentTargetTotal: number) {
+  switch (section) {
+    case "strategy":
+      return `${form.riskProfile} · ${form.transitionPreference} · ${form.recommendationStrategy}`;
+    case "allocation":
+      return `${currentTargetTotal}% total across ${form.targetAllocation.length} sleeves`;
+    case "priority":
+      return form.accountFundingPriority.join(" -> ");
+    case "tax":
+      return form.taxAwarePlacement ? "Tax-aware placement enabled" : "Simple account-fit rules only";
+    case "watchlist": {
+      const count = form.watchlistSymbols.split(",").map((item) => item.trim()).filter(Boolean).length;
+      return count > 0 ? `${count} tracked symbol${count === 1 ? "" : "s"}` : "No watchlist symbols yet";
+    }
+    default:
+      return "";
+  }
+}
+
+function getManualSectionMeta(manualGroups: Array<{ title: string; description: string; badge?: string }>): ManualSectionMeta[] {
+  const [allocationGroup, priorityGroup, behaviorGroup, taxGroup] = manualGroups;
+  return [
+    {
+      id: "strategy",
+      title: "Strategy controls",
+      description: behaviorGroup?.description ?? "Control risk, transition behavior, recommendation strategy, and planning buffer.",
+      badge: behaviorGroup?.badge
+    },
+    {
+      id: "allocation",
+      title: allocationGroup?.title ?? "Target allocation",
+      description: allocationGroup?.description ?? "Edit the target mix that anchors recommendations and health scoring.",
+      badge: allocationGroup?.badge
+    },
+    {
+      id: "priority",
+      title: priorityGroup?.title ?? "Account funding priorities",
+      description: priorityGroup?.description ?? "Set the contribution ladder used by the recommendation engine.",
+      badge: priorityGroup?.badge
+    },
+    {
+      id: "tax",
+      title: taxGroup?.title ?? "Tax-aware placement",
+      description: taxGroup?.description ?? "Keep higher-friction tax details collapsed until they are needed.",
+      badge: taxGroup?.badge
+    },
+    {
+      id: "watchlist",
+      title: "Watchlist and target constraints",
+      description: "Track symbols that should stay visible while you refine the recommendation engine inputs."
+    }
+  ];
+}
 export function PreferencesWorkbench({
   initialProfile,
   initialGuidedDraft,
@@ -227,12 +298,15 @@ export function PreferencesWorkbench({
   });
   const [guidedAnswers, setGuidedAnswers] = useState<GuidedAllocationAnswers>(() => initialGuidedDraft?.answers ?? getDefaultGuidedAnswers(initialProfile));
   const [guidedDraftSavedAt, setGuidedDraftSavedAt] = useState<string | null>(() => initialGuidedDraft?.updatedAt ?? null);
+  const [guidedStep, setGuidedStep] = useState(0);
+  const [openManualSection, setOpenManualSection] = useState<ManualSectionId>("strategy");
 
   const currentTargetTotal = useMemo(
     () => form.targetAllocation.reduce((sum, target) => sum + Number(target.targetPct || 0), 0),
     [form.targetAllocation]
   );
   const guidedDraft = useMemo(() => buildGuidedDraft(guidedAnswers), [guidedAnswers]);
+  const manualSectionMeta = useMemo(() => getManualSectionMeta(manualGroups), [manualGroups]);
 
   function updateAllocation(assetClass: string, targetPct: number) {
     setForm((current) => ({
@@ -266,7 +340,8 @@ export function PreferencesWorkbench({
       recommendationStrategy: guidedDraft.recommendationStrategy,
       rebalancingTolerancePct: guidedDraft.rebalancingTolerancePct
     }));
-    setStatus({ type: "success", message: "Guided allocation draft loaded into manual configuration. Review and save when ready." });
+    setOpenManualSection("strategy");
+    setStatus({ type: "success", message: "Guided allocation draft loaded into manual configuration. Review the collapsed sections and save when ready." });
   }
 
   function persistProfile(nextForm: FormState, successMessage: string) {
@@ -357,338 +432,436 @@ export function PreferencesWorkbench({
     persistProfile(nextForm, "Guided allocation draft applied and saved to PostgreSQL.");
   }
 
+  function goToNextGuidedStep() {
+    setGuidedStep((current) => Math.min(current + 1, GUIDED_STEP_META.length - 1));
+  }
+
+  function goToPreviousGuidedStep() {
+    setGuidedStep((current) => Math.max(current - 1, 0));
+  }
+
   return (
-    <div className="grid gap-6 xl:grid-cols-2">
-      <Card className="bg-[linear-gradient(180deg,rgba(255,255,255,0.66),rgba(255,255,255,0.46))]">
-        <CardHeader>
-          <CardTitle>Guided Allocation Setup</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="rounded-[24px] border border-white/55 bg-white/38 p-5 backdrop-blur-md">
-            <Badge variant="primary">For newer users</Badge>
-            <p className="mt-3 text-lg font-semibold">Help me build my allocation</p>
-            <p className="mt-2 text-sm text-[color:var(--muted-foreground)]">
-              This guided flow now produces a real portfolio draft. You can apply it to manual configuration first or save it directly as your live preference profile.
-            </p>
-            <p className="mt-3 text-xs text-[color:var(--muted-foreground)]">
-              Last saved draft: {formatDraftSavedAt(guidedDraftSavedAt)}
-            </p>
-          </div>
+    <div className="space-y-4">
+      {status.type !== "idle" ? (
+        <div className={cn(
+          "rounded-[22px] border px-4 py-3 text-sm",
+          status.type === "success" ? "border-[#b6d7c7] bg-[#eef8f1] text-[#21613f]" : "border-[#e7b0b8] bg-[#fff3f5] text-[#8e2433]"
+        )}>
+          {status.message}
+        </div>
+      ) : null}
 
-          <div className="grid gap-4">
-            <QuestionCard
-              label={guidedQuestions[0] ?? "Primary goal and time horizon"}
-              control={(
-                <div className="grid gap-3 md:grid-cols-2">
-                  <Field label="Primary goal">
-                    <select
-                      value={guidedAnswers.goal}
-                      onChange={(event) => setGuidedAnswers((current) => ({ ...current, goal: event.target.value as GuidedAllocationAnswers["goal"] }))}
-                      className={FIELD_CLASS_NAME}
-                    >
-                      <option value="retirement">Retirement growth</option>
-                      <option value="home">Home purchase</option>
-                      <option value="wealth">General long-term wealth</option>
-                      <option value="capital-preservation">Capital preservation</option>
-                    </select>
-                  </Field>
-                  <Field label="Time horizon">
-                    <select
-                      value={guidedAnswers.horizon}
-                      onChange={(event) => setGuidedAnswers((current) => ({ ...current, horizon: event.target.value as GuidedAllocationAnswers["horizon"] }))}
-                      className={FIELD_CLASS_NAME}
-                    >
-                      <option value="short">Under 3 years</option>
-                      <option value="medium">3 to 7 years</option>
-                      <option value="long">7+ years</option>
-                    </select>
-                  </Field>
-                </div>
-              )}
-            />
-
-            <QuestionCard
-              label={guidedQuestions[1] ?? "Volatility comfort"}
-              control={(
-                <Field label="Drawdown tolerance">
-                  <select
-                    value={guidedAnswers.volatility}
-                    onChange={(event) => setGuidedAnswers((current) => ({ ...current, volatility: event.target.value as GuidedAllocationAnswers["volatility"] }))}
-                    className={FIELD_CLASS_NAME}
-                  >
-                    <option value="low">Low - avoid large swings</option>
-                    <option value="medium">Medium - moderate volatility is acceptable</option>
-                    <option value="high">High - comfortable with equity-heavy swings</option>
-                  </select>
-                </Field>
-              )}
-            />
-
-            <QuestionCard
-              label={guidedQuestions[2] ?? "Engine priority"}
-              control={(
-                <Field label="What should the engine optimize for first?">
-                  <select
-                    value={guidedAnswers.priority}
-                    onChange={(event) => setGuidedAnswers((current) => ({ ...current, priority: event.target.value as GuidedAllocationAnswers["priority"] }))}
-                    className={FIELD_CLASS_NAME}
-                  >
-                    <option value="tax-efficiency">Tax efficiency first</option>
-                    <option value="balanced">Balanced recommendation behavior</option>
-                    <option value="stay-close">Stay closer to current holdings</option>
-                  </select>
-                </Field>
-              )}
-            />
-
-            <QuestionCard
-              label={guidedQuestions[3] ?? "Cash reserve preference"}
-              control={(
-                <Field label="Cash reserve target">
-                  <select
-                    value={guidedAnswers.cashNeed}
-                    onChange={(event) => setGuidedAnswers((current) => ({ ...current, cashNeed: event.target.value as GuidedAllocationAnswers["cashNeed"] }))}
-                    className="w-full rounded-2xl border border-[color:var(--border)] bg-white px-4 py-3 text-sm outline-none"
-                  >
-                    <option value="low">Low - deploy most capital</option>
-                    <option value="medium">Medium - keep a moderate buffer</option>
-                    <option value="high">High - preserve more cash</option>
-                  </select>
-                </Field>
-              )}
-            />
-          </div>
-
-          <Card className="bg-[linear-gradient(135deg,rgba(240,143,178,0.14),rgba(111,141,246,0.1),rgba(255,255,255,0.24))]">
-            <CardContent className="space-y-4 px-5 py-5">
+      <div className="grid gap-6 xl:grid-cols-2">
+        <Card className="bg-[linear-gradient(180deg,rgba(255,255,255,0.66),rgba(255,255,255,0.46))]">
+          <CardHeader>
+            <CardTitle>Guided Allocation Setup</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-5">
+            <div className="rounded-[24px] border border-white/55 bg-white/38 p-5 backdrop-blur-md">
               <div className="flex items-center justify-between gap-4">
                 <div>
-                  <p className="text-sm text-[color:var(--muted-foreground)]">Suggested starting allocation</p>
-                  <p className="mt-1 text-xl font-semibold">{guidedDraft.targetMixLabel}</p>
+                  <Badge variant="primary">For newer users</Badge>
+                  <p className="mt-3 text-lg font-semibold">Step through the setup one answer at a time</p>
+                  <p className="mt-2 text-sm text-[color:var(--muted-foreground)]">
+                    This flow behaves like onboarding now. Answer one question, move forward, then review the draft before you apply anything.
+                  </p>
                 </div>
-                <Badge variant="success">Editable draft</Badge>
-              </div>
-
-              <div className="grid gap-3 md:grid-cols-2">
-                {guidedDraft.targetAllocation.map((target) => (
-                  <div key={target.assetClass} className="rounded-[24px] border border-white/55 bg-white/42 px-4 py-3 text-sm backdrop-blur-md">
-                    <span className="font-medium">{target.assetClass}</span>
-                    <span className="float-right">{target.targetPct}%</span>
-                  </div>
-                ))}
-              </div>
-
-              <div className="grid gap-4 md:grid-cols-2">
-                <InfoBlock label="Risk profile" value={guidedDraft.riskProfile} />
-                <InfoBlock label="Account priority" value={guidedDraft.accountFundingPriority.join(" -> ")} />
-                <InfoBlock label="Recommendation strategy" value={guidedDraft.recommendationStrategy} />
-                <InfoBlock
-                  label="Cash buffer target"
-                  value={`${guidedDraft.cashBufferTargetCad.toLocaleString("en-CA")} in planning base CAD`}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <p className="text-sm font-medium text-[color:var(--foreground)]">Assumptions</p>
-                {guidedDraft.assumptions.map((assumption) => (
-                  <div key={assumption} className="rounded-2xl border border-[color:var(--border)] bg-white px-4 py-3 text-sm text-[color:var(--muted-foreground)]">
-                    {assumption}
-                  </div>
-                ))}
-              </div>
-
-              <div className="space-y-2">
-                <p className="text-sm font-medium text-[color:var(--foreground)]">Why this draft was suggested</p>
-                {guidedDraft.rationale.map((item) => (
-                  <div key={item} className="rounded-2xl border border-[color:var(--border)] bg-white px-4 py-3 text-sm text-[color:var(--muted-foreground)]">
-                    {item}
-                  </div>
-                ))}
-              </div>
-
-              <div className="grid gap-3 sm:grid-cols-2">
-                <Button type="button" variant="secondary" onClick={applyGuidedDraftToForm}>
-                  Apply to manual configuration
-                </Button>
-                <Button type="button" variant="secondary" leadingIcon={<Save className="h-4 w-4" />} onClick={saveGuidedDraft} disabled={isPending}>
-                  {isPending ? "Saving draft..." : "Save guided draft"}
-                </Button>
-              </div>
-              <div className="grid gap-3 sm:grid-cols-1">
-                <Button type="button" onClick={applyAndSaveGuidedDraft} disabled={isPending}>
-                  {isPending ? "Saving guided draft..." : "Apply and save profile"}
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        </CardContent>
-      </Card>
-
-      <Card className="bg-[linear-gradient(180deg,rgba(255,255,255,0.66),rgba(255,255,255,0.46))]">
-        <CardHeader>
-          <CardTitle>Manual Configuration</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="rounded-[24px] border border-white/55 bg-white/38 p-5 backdrop-blur-md">
-            <p className="font-semibold">Current profile</p>
-            <p className="mt-1 text-sm text-[color:var(--muted-foreground)]">
-              {form.riskProfile} risk, {form.transitionPreference} transition, {form.recommendationStrategy} recommendation strategy.
-            </p>
-          </div>
-          {manualGroups.map((group) => (
-            <div key={group.title} className="rounded-[24px] border border-white/55 bg-white/36 p-5 backdrop-blur-md">
-              <div className="flex items-center justify-between gap-4">
-                <div>
-                  <p className="font-semibold">{group.title}</p>
-                  <p className="mt-1 text-sm text-[color:var(--muted-foreground)]">{group.description}</p>
+                <div className="rounded-full border border-white/55 bg-white/64 px-3 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-[color:var(--muted-foreground)]">
+                  {GUIDED_STEP_META[guidedStep].title}
                 </div>
-                {group.badge ? <Badge variant="neutral">{group.badge}</Badge> : null}
               </div>
+              <p className="mt-3 text-xs text-[color:var(--muted-foreground)]">Last saved draft: {formatDraftSavedAt(guidedDraftSavedAt)}</p>
             </div>
-          ))}
 
-          <div className="grid gap-4 rounded-[24px] border border-white/55 bg-white/36 p-5 backdrop-blur-md md:grid-cols-2">
-            <Field label="Risk profile">
-              <select
-                value={form.riskProfile}
-                onChange={(event) => setForm((current) => ({ ...current, riskProfile: event.target.value as PreferenceProfile["riskProfile"] }))}
-                className={FIELD_CLASS_NAME}
-              >
-                <option value="Conservative">Conservative</option>
-                <option value="Balanced">Balanced</option>
-                <option value="Growth">Growth</option>
-              </select>
-            </Field>
-            <Field label="Transition preference">
-              <select
-                value={form.transitionPreference}
-                onChange={(event) => setForm((current) => ({ ...current, transitionPreference: event.target.value as PreferenceProfile["transitionPreference"] }))}
-                className={FIELD_CLASS_NAME}
-              >
-                <option value="stay-close">Stay close to current holdings</option>
-                <option value="gradual">Gradually transition to target</option>
-                <option value="direct">Move directly toward target</option>
-              </select>
-            </Field>
-            <Field label="Recommendation strategy">
-              <select
-                value={form.recommendationStrategy}
-                onChange={(event) => setForm((current) => ({ ...current, recommendationStrategy: event.target.value as PreferenceProfile["recommendationStrategy"] }))}
-                className={FIELD_CLASS_NAME}
-              >
-                <option value="balanced">Balanced</option>
-                <option value="tax-aware">Tax-aware</option>
-                <option value="target-first">Target-first</option>
-              </select>
-            </Field>
-            <Field label="Rebalancing tolerance %">
-              <input
-                type="number"
-                min={0}
-                max={50}
-                value={form.rebalancingTolerancePct}
-                onChange={(event) => setForm((current) => ({ ...current, rebalancingTolerancePct: Number(event.target.value) }))}
-                className={FIELD_CLASS_NAME}
-              />
-            </Field>
-            <Field label="Cash buffer target (planning base, CAD)">
-              <input
-                type="number"
-                min={0}
-                value={form.cashBufferTargetCad}
-                onChange={(event) => setForm((current) => ({ ...current, cashBufferTargetCad: Number(event.target.value) }))}
-                className={FIELD_CLASS_NAME}
-              />
-            </Field>
-            <label className="flex items-center gap-3 rounded-[22px] border border-white/55 bg-white/38 px-4 py-3 text-sm font-medium backdrop-blur-md">
-              <input
-                type="checkbox"
-                checked={form.taxAwarePlacement}
-                onChange={(event) => setForm((current) => ({ ...current, taxAwarePlacement: event.target.checked }))}
-              />
-              Tax-aware asset placement
-            </label>
-          </div>
-
-          <div className="rounded-[24px] border border-white/55 bg-white/36 p-5 backdrop-blur-md">
-            <div className="flex items-center justify-between gap-4">
-              <div>
-                <p className="font-semibold">Target allocation</p>
-                <p className="mt-1 text-sm text-[color:var(--muted-foreground)]">The total must sum to 100. Current total: {currentTargetTotal}%.</p>
-              </div>
-              <Badge variant={currentTargetTotal === 100 ? "success" : "warning"}>{currentTargetTotal}%</Badge>
-            </div>
-            <div className="mt-4 grid gap-3 md:grid-cols-2">
-              {form.targetAllocation.map((target) => (
-                <Field key={target.assetClass} label={target.assetClass}>
-                  <input
-                    type="number"
-                    min={0}
-                    max={100}
-                    value={target.targetPct}
-                    onChange={(event) => updateAllocation(target.assetClass, Number(event.target.value))}
-                    className={FIELD_CLASS_NAME}
-                  />
-                </Field>
-              ))}
-            </div>
-          </div>
-
-          <div className="rounded-[24px] border border-white/55 bg-white/36 p-5 backdrop-blur-md">
-            <p className="font-semibold">Account funding priorities</p>
-            <p className="mt-1 text-sm text-[color:var(--muted-foreground)]">Set the contribution ladder used by the recommendation engine.</p>
-            <div className="mt-4 grid gap-3 md:grid-cols-3">
-              {[0, 1, 2].map((index) => (
-                <Field key={index} label={`Priority ${index + 1}`}>
-                  <select
-                    value={form.accountFundingPriority[index] ?? "Taxable"}
-                    onChange={(event) => updatePriority(index, event.target.value as PreferenceProfile["accountFundingPriority"][number])}
-                    className={FIELD_CLASS_NAME}
+            <div className="grid gap-2 sm:grid-cols-5">
+              {GUIDED_STEP_META.map((step, index) => {
+                const active = index === guidedStep;
+                const completed = index < guidedStep;
+                return (
+                  <button
+                    key={step.id}
+                    type="button"
+                    onClick={() => setGuidedStep(index)}
+                    className={cn(
+                      "rounded-[22px] border px-3 py-3 text-left transition-colors",
+                      active
+                        ? "border-white/70 bg-white/72 shadow-[var(--shadow-card)]"
+                        : completed
+                          ? "border-white/50 bg-white/46"
+                          : "border-white/40 bg-white/26 hover:bg-white/36"
+                    )}
                   >
-                    <option value="TFSA">TFSA</option>
-                    <option value="RRSP">RRSP</option>
-                    <option value="FHSA">FHSA</option>
-                    <option value="Taxable">Taxable</option>
-                  </select>
-                </Field>
-              ))}
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[color:var(--muted-foreground)]">{step.title}</span>
+                      {completed ? <Check className="h-3.5 w-3.5 text-[color:var(--success)]" /> : null}
+                    </div>
+                    <p className="mt-2 text-sm font-medium text-[color:var(--foreground)]">{step.label}</p>
+                  </button>
+                );
+              })}
             </div>
-          </div>
 
-          <div className="rounded-[24px] border border-white/55 bg-white/34 p-5 backdrop-blur-md">
-            <div className="flex items-center justify-between gap-4">
-              <div>
-                <p className="font-semibold">Advanced tax settings</p>
-                <p className="mt-1 text-sm text-[color:var(--muted-foreground)]">
-                  Province and marginal tax bracket are hidden until the user opts into tax-aware placement details.
-                </p>
-              </div>
-              <SlidersHorizontal className="h-5 w-5 text-[color:var(--secondary)]" />
-            </div>
-          </div>
-
-          <Field label="Watchlist symbols">
-            <input
-              type="text"
-              value={form.watchlistSymbols}
-              onChange={(event) => setForm((current) => ({ ...current, watchlistSymbols: event.target.value }))}
-              placeholder="XEF, VCN, CASH"
-              className={FIELD_CLASS_NAME}
+            <GuidedStepPanel
+              step={guidedStep}
+              guidedQuestions={guidedQuestions}
+              guidedAnswers={guidedAnswers}
+              setGuidedAnswers={setGuidedAnswers}
+              guidedDraft={guidedDraft}
+              onNext={goToNextGuidedStep}
+              onPrevious={goToPreviousGuidedStep}
+              onApplyToManual={applyGuidedDraftToForm}
+              onSaveDraft={saveGuidedDraft}
+              onApplyAndSave={applyAndSaveGuidedDraft}
+              isPending={isPending}
             />
-          </Field>
+          </CardContent>
+        </Card>
 
-          {status.type !== "idle" ? (
-            <div className={`rounded-[22px] border px-4 py-3 text-sm ${status.type === "success" ? "border-[#b6d7c7] bg-[#eef8f1] text-[#21613f]" : "border-[#e7b0b8] bg-[#fff3f5] text-[#8e2433]"}`}>
-              {status.message}
+        <Card className="bg-[linear-gradient(180deg,rgba(255,255,255,0.66),rgba(255,255,255,0.46))]">
+          <CardHeader>
+            <CardTitle>Manual Configuration</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="rounded-[24px] border border-white/55 bg-white/38 p-5 backdrop-blur-md">
+              <p className="font-semibold">Current profile</p>
+              <p className="mt-1 text-sm text-[color:var(--muted-foreground)]">
+                {form.riskProfile} risk, {form.transitionPreference} transition, {form.recommendationStrategy} recommendation strategy.
+              </p>
             </div>
-          ) : null}
 
-          <Button type="button" className="w-full" trailingIcon={<ArrowRight className="h-4 w-4" />} onClick={saveProfile} disabled={isPending}>
-            {isPending ? "Saving..." : "Save preference profile"}
-          </Button>
-        </CardContent>
-      </Card>
+            <div className="space-y-3">
+              {manualSectionMeta.map((section) => {
+                const isOpen = openManualSection === section.id;
+                return (
+                  <ManualSection
+                    key={section.id}
+                    title={section.title}
+                    description={section.description}
+                    summary={getManualSectionSummary(section.id, form, currentTargetTotal)}
+                    badge={section.badge}
+                    open={isOpen}
+                    onToggle={() => setOpenManualSection(section.id)}
+                  >
+                    {section.id === "strategy" ? (
+                      <div className="grid gap-4 md:grid-cols-2">
+                        <Field label="Risk profile">
+                          <select
+                            value={form.riskProfile}
+                            onChange={(event) => setForm((current) => ({ ...current, riskProfile: event.target.value as PreferenceProfile["riskProfile"] }))}
+                            className={FIELD_CLASS_NAME}
+                          >
+                            <option value="Conservative">Conservative</option>
+                            <option value="Balanced">Balanced</option>
+                            <option value="Growth">Growth</option>
+                          </select>
+                        </Field>
+                        <Field label="Transition preference">
+                          <select
+                            value={form.transitionPreference}
+                            onChange={(event) => setForm((current) => ({ ...current, transitionPreference: event.target.value as PreferenceProfile["transitionPreference"] }))}
+                            className={FIELD_CLASS_NAME}
+                          >
+                            <option value="stay-close">Stay close to current holdings</option>
+                            <option value="gradual">Gradually transition to target</option>
+                            <option value="direct">Move directly toward target</option>
+                          </select>
+                        </Field>
+                        <Field label="Recommendation strategy">
+                          <select
+                            value={form.recommendationStrategy}
+                            onChange={(event) => setForm((current) => ({ ...current, recommendationStrategy: event.target.value as PreferenceProfile["recommendationStrategy"] }))}
+                            className={FIELD_CLASS_NAME}
+                          >
+                            <option value="balanced">Balanced</option>
+                            <option value="tax-aware">Tax-aware</option>
+                            <option value="target-first">Target-first</option>
+                          </select>
+                        </Field>
+                        <Field label="Rebalancing tolerance %">
+                          <input
+                            type="number"
+                            min={0}
+                            max={50}
+                            value={form.rebalancingTolerancePct}
+                            onChange={(event) => setForm((current) => ({ ...current, rebalancingTolerancePct: Number(event.target.value) }))}
+                            className={FIELD_CLASS_NAME}
+                          />
+                        </Field>
+                        <Field label="Cash buffer target (planning base, CAD)">
+                          <input
+                            type="number"
+                            min={0}
+                            value={form.cashBufferTargetCad}
+                            onChange={(event) => setForm((current) => ({ ...current, cashBufferTargetCad: Number(event.target.value) }))}
+                            className={FIELD_CLASS_NAME}
+                          />
+                        </Field>
+                        <label className="flex items-center gap-3 rounded-[22px] border border-white/55 bg-white/38 px-4 py-3 text-sm font-medium backdrop-blur-md">
+                          <input
+                            type="checkbox"
+                            checked={form.taxAwarePlacement}
+                            onChange={(event) => setForm((current) => ({ ...current, taxAwarePlacement: event.target.checked }))}
+                          />
+                          Tax-aware asset placement
+                        </label>
+                      </div>
+                    ) : null}
+
+                    {section.id === "allocation" ? (
+                      <div className="space-y-4">
+                        <div className="flex items-center justify-between gap-4">
+                          <p className="text-sm text-[color:var(--muted-foreground)]">The total must sum to 100. Current total: {currentTargetTotal}%.</p>
+                          <Badge variant={currentTargetTotal === 100 ? "success" : "warning"}>{currentTargetTotal}%</Badge>
+                        </div>
+                        <div className="grid gap-3 md:grid-cols-2">
+                          {form.targetAllocation.map((target) => (
+                            <Field key={target.assetClass} label={target.assetClass}>
+                              <input
+                                type="number"
+                                min={0}
+                                max={100}
+                                value={target.targetPct}
+                                onChange={(event) => updateAllocation(target.assetClass, Number(event.target.value))}
+                                className={FIELD_CLASS_NAME}
+                              />
+                            </Field>
+                          ))}
+                        </div>
+                      </div>
+                    ) : null}
+
+                    {section.id === "priority" ? (
+                      <div className="grid gap-3 md:grid-cols-3">
+                        {[0, 1, 2].map((index) => (
+                          <Field key={index} label={`Priority ${index + 1}`}>
+                            <select
+                              value={form.accountFundingPriority[index] ?? "Taxable"}
+                              onChange={(event) => updatePriority(index, event.target.value as PreferenceProfile["accountFundingPriority"][number])}
+                              className={FIELD_CLASS_NAME}
+                            >
+                              <option value="TFSA">TFSA</option>
+                              <option value="RRSP">RRSP</option>
+                              <option value="FHSA">FHSA</option>
+                              <option value="Taxable">Taxable</option>
+                            </select>
+                          </Field>
+                        ))}
+                      </div>
+                    ) : null}
+
+                    {section.id === "tax" ? (
+                      <div className="rounded-[22px] border border-white/55 bg-white/34 px-4 py-4 text-sm text-[color:var(--muted-foreground)]">
+                        Province and marginal tax bracket remain collapsed until the product needs deeper tax modeling. For now this toggle controls whether the engine favors tax-aware placement heuristics.
+                      </div>
+                    ) : null}
+
+                    {section.id === "watchlist" ? (
+                      <Field label="Watchlist symbols">
+                        <input
+                          type="text"
+                          value={form.watchlistSymbols}
+                          onChange={(event) => setForm((current) => ({ ...current, watchlistSymbols: event.target.value }))}
+                          placeholder="XEF, VCN, CASH"
+                          className={FIELD_CLASS_NAME}
+                        />
+                      </Field>
+                    ) : null}
+                  </ManualSection>
+                );
+              })}
+            </div>
+
+            <Button type="button" className="w-full" trailingIcon={<ArrowRight className="h-4 w-4" />} onClick={saveProfile} disabled={isPending}>
+              {isPending ? "Saving..." : "Save preference profile"}
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
     </div>
+  );
+}
+
+function GuidedStepPanel({
+  step,
+  guidedQuestions,
+  guidedAnswers,
+  setGuidedAnswers,
+  guidedDraft,
+  onNext,
+  onPrevious,
+  onApplyToManual,
+  onSaveDraft,
+  onApplyAndSave,
+  isPending
+}: {
+  step: number;
+  guidedQuestions: string[];
+  guidedAnswers: GuidedAllocationAnswers;
+  setGuidedAnswers: React.Dispatch<React.SetStateAction<GuidedAllocationAnswers>>;
+  guidedDraft: GuidedDraft;
+  onNext: () => void;
+  onPrevious: () => void;
+  onApplyToManual: () => void;
+  onSaveDraft: () => void;
+  onApplyAndSave: () => void;
+  isPending: boolean;
+}) {
+  const onFinalReview = step === GUIDED_STEP_META.length - 1;
+
+  return (
+    <Card className="bg-[linear-gradient(135deg,rgba(240,143,178,0.14),rgba(111,141,246,0.1),rgba(255,255,255,0.24))]">
+      <CardContent className="space-y-5 px-5 py-5">
+        {!onFinalReview ? (
+          <>
+            <div className="space-y-2">
+              <p className="text-sm font-medium uppercase tracking-[0.16em] text-[color:var(--muted-foreground)]">Question {step + 1} of 4</p>
+              <p className="text-xl font-semibold text-[color:var(--foreground)]">{guidedQuestions[step] ?? GUIDED_STEP_META[step].label}</p>
+            </div>
+
+            {step === 0 ? (
+              <div className="grid gap-3 md:grid-cols-2">
+                <Field label="Primary goal">
+                  <select
+                    value={guidedAnswers.goal}
+                    onChange={(event) => setGuidedAnswers((current) => ({ ...current, goal: event.target.value as GuidedAllocationAnswers["goal"] }))}
+                    className={FIELD_CLASS_NAME}
+                  >
+                    <option value="retirement">Retirement growth</option>
+                    <option value="home">Home purchase</option>
+                    <option value="wealth">General long-term wealth</option>
+                    <option value="capital-preservation">Capital preservation</option>
+                  </select>
+                </Field>
+                <Field label="Time horizon">
+                  <select
+                    value={guidedAnswers.horizon}
+                    onChange={(event) => setGuidedAnswers((current) => ({ ...current, horizon: event.target.value as GuidedAllocationAnswers["horizon"] }))}
+                    className={FIELD_CLASS_NAME}
+                  >
+                    <option value="short">Under 3 years</option>
+                    <option value="medium">3 to 7 years</option>
+                    <option value="long">7+ years</option>
+                  </select>
+                </Field>
+              </div>
+            ) : null}
+
+            {step === 1 ? (
+              <Field label="Drawdown tolerance">
+                <select
+                  value={guidedAnswers.volatility}
+                  onChange={(event) => setGuidedAnswers((current) => ({ ...current, volatility: event.target.value as GuidedAllocationAnswers["volatility"] }))}
+                  className={FIELD_CLASS_NAME}
+                >
+                  <option value="low">Low - avoid large swings</option>
+                  <option value="medium">Medium - moderate volatility is acceptable</option>
+                  <option value="high">High - comfortable with equity-heavy swings</option>
+                </select>
+              </Field>
+            ) : null}
+            {step === 2 ? (
+              <Field label="What should the engine optimize for first?">
+                <select
+                  value={guidedAnswers.priority}
+                  onChange={(event) => setGuidedAnswers((current) => ({ ...current, priority: event.target.value as GuidedAllocationAnswers["priority"] }))}
+                  className={FIELD_CLASS_NAME}
+                >
+                  <option value="tax-efficiency">Tax efficiency first</option>
+                  <option value="balanced">Balanced recommendation behavior</option>
+                  <option value="stay-close">Stay closer to current holdings</option>
+                </select>
+              </Field>
+            ) : null}
+
+            {step === 3 ? (
+              <Field label="Cash reserve target">
+                <select
+                  value={guidedAnswers.cashNeed}
+                  onChange={(event) => setGuidedAnswers((current) => ({ ...current, cashNeed: event.target.value as GuidedAllocationAnswers["cashNeed"] }))}
+                  className={FIELD_CLASS_NAME}
+                >
+                  <option value="low">Low - deploy most capital</option>
+                  <option value="medium">Medium - keep a moderate buffer</option>
+                  <option value="high">High - preserve more cash</option>
+                </select>
+              </Field>
+            ) : null}
+
+            <div className="flex items-center justify-between gap-3 border-t border-white/40 pt-2">
+              <Button type="button" variant="ghost" onClick={onPrevious} disabled={step === 0} leadingIcon={<ArrowLeft className="h-4 w-4" />}>
+                Back
+              </Button>
+              <Button type="button" onClick={onNext} trailingIcon={<ArrowRight className="h-4 w-4" />}>
+                Continue
+              </Button>
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-sm font-medium uppercase tracking-[0.16em] text-[color:var(--muted-foreground)]">Review guided draft</p>
+                <p className="mt-2 text-xl font-semibold">Suggested starting allocation: {guidedDraft.targetMixLabel}</p>
+              </div>
+              <Badge variant="success">Editable draft</Badge>
+            </div>
+
+            <div className="grid gap-3 md:grid-cols-2">
+              {guidedDraft.targetAllocation.map((target) => (
+                <div key={target.assetClass} className="rounded-[24px] border border-white/55 bg-white/42 px-4 py-3 text-sm backdrop-blur-md">
+                  <span className="font-medium">{target.assetClass}</span>
+                  <span className="float-right">{target.targetPct}%</span>
+                </div>
+              ))}
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-2">
+              <InfoBlock label="Risk profile" value={guidedDraft.riskProfile} />
+              <InfoBlock label="Account priority" value={guidedDraft.accountFundingPriority.join(" -> ")} />
+              <InfoBlock label="Recommendation strategy" value={guidedDraft.recommendationStrategy} />
+              <InfoBlock label="Cash buffer target" value={`${guidedDraft.cashBufferTargetCad.toLocaleString("en-CA")} in planning base CAD`} />
+            </div>
+
+            <div className="space-y-2">
+              <p className="text-sm font-medium text-[color:var(--foreground)]">Assumptions</p>
+              {guidedDraft.assumptions.map((assumption) => (
+                <div key={assumption} className="rounded-2xl border border-[color:var(--border)] bg-white px-4 py-3 text-sm text-[color:var(--muted-foreground)]">
+                  {assumption}
+                </div>
+              ))}
+            </div>
+
+            <div className="space-y-2">
+              <p className="text-sm font-medium text-[color:var(--foreground)]">Why this draft was suggested</p>
+              {guidedDraft.rationale.map((item) => (
+                <div key={item} className="rounded-2xl border border-[color:var(--border)] bg-white px-4 py-3 text-sm text-[color:var(--muted-foreground)]">
+                  {item}
+                </div>
+              ))}
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Button type="button" variant="secondary" onClick={onApplyToManual}>
+                Apply to manual configuration
+              </Button>
+              <Button type="button" variant="secondary" leadingIcon={<Save className="h-4 w-4" />} onClick={onSaveDraft} disabled={isPending}>
+                {isPending ? "Saving draft..." : "Save guided draft"}
+              </Button>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-1">
+              <Button type="button" onClick={onApplyAndSave} disabled={isPending}>
+                {isPending ? "Saving guided draft..." : "Apply and save profile"}
+              </Button>
+            </div>
+            <div className="flex items-center justify-between gap-3 border-t border-white/40 pt-2">
+              <Button type="button" variant="ghost" onClick={onPrevious} leadingIcon={<ArrowLeft className="h-4 w-4" />}>
+                Back
+              </Button>
+            </div>
+          </>
+        )}
+      </CardContent>
+    </Card>
   );
 }
 
@@ -701,20 +874,50 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   );
 }
 
-function QuestionCard({ label, control }: { label: string; control: React.ReactNode }) {
-  return (
-    <div className="rounded-[24px] border border-white/55 bg-white/34 p-5 backdrop-blur-md">
-      <p className="text-sm font-medium text-[color:var(--foreground)]">{label}</p>
-      <div className="mt-3">{control}</div>
-    </div>
-  );
-}
-
 function InfoBlock({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-[24px] border border-white/55 bg-white/42 px-4 py-3 text-sm backdrop-blur-md">
       <p className="text-[color:var(--muted-foreground)]">{label}</p>
       <p className="mt-1 font-medium text-[color:var(--foreground)]">{value}</p>
+    </div>
+  );
+}
+
+function ManualSection({
+  title,
+  description,
+  summary,
+  badge,
+  open,
+  onToggle,
+  children
+}: {
+  title: string;
+  description: string;
+  summary: string;
+  badge?: string;
+  open: boolean;
+  onToggle: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="rounded-[24px] border border-white/55 bg-white/36 backdrop-blur-md">
+      <button
+        type="button"
+        onClick={onToggle}
+        className="flex w-full items-start justify-between gap-4 px-5 py-5 text-left"
+      >
+        <div>
+          <div className="flex items-center gap-2">
+            <p className="font-semibold">{title}</p>
+            {badge ? <Badge variant="neutral">{badge}</Badge> : null}
+          </div>
+          <p className="mt-1 text-sm text-[color:var(--muted-foreground)]">{description}</p>
+          <p className="mt-3 text-sm font-medium text-[color:var(--foreground)]">{summary}</p>
+        </div>
+        <ChevronDown className={cn("mt-1 h-5 w-5 shrink-0 text-[color:var(--muted-foreground)] transition-transform", open ? "rotate-180" : "rotate-0")} />
+      </button>
+      {open ? <div className="border-t border-white/40 px-5 py-5">{children}</div> : null}
     </div>
   );
 }

@@ -10,7 +10,7 @@ Use it before building or changing any product UI. The goal is consistency, not 
 
 - Product type: portfolio decision support application
 - Domain: personal investing, portfolio analysis, spending visibility
-- Brand name: Loo??????
+- Brand name: Loo国的财富宝库
 - Tone: warm, reassuring, analytical, premium, softly playful
 - Avoid: generic budgeting-app aesthetics, childish cartoon UI, dark-mode-first styling
 
@@ -93,6 +93,7 @@ Use it before building or changing any product UI. The goal is consistency, not 
 - Header padding: `px-6 pt-6`
 - Content padding: `px-6 pb-6 pt-4`
 - Keep card interiors structured; avoid dumping unrelated sections into a single card
+- Liquid glass shader effects are opt-in accent treatments, not the default card surface
 
 ### Badge
 
@@ -105,6 +106,7 @@ Use it before building or changing any product UI. The goal is consistency, not 
 - Use pill navigation with clear active state
 - Global display-currency explanation belongs in the toggle popover, not repeated in page bodies
 - Header remains sticky and slightly compresses on scroll
+- If `LiquidGlassShell` is used in navigation, keep it to small bounded controls only
 
 ### Finance-Specific UI
 
@@ -112,6 +114,14 @@ Use it before building or changing any product UI. The goal is consistency, not 
 - If a value is fixed to planning-base CAD, label it explicitly
 - If a value is a global display amount, do not append hard-coded CAD copy
 - Native currency and display currency are different concerns; do not blur them in labels
+
+### Mascot
+
+- `Loo` is an original brand mascot, not a copy of an existing cartoon IP
+- Keep the silhouette droplet-like and compact, with a jewel nose, one small tooth, blush cheeks, and a stamp-like treasure tail
+- Allowed moods: guide, sly, side-eye, proud
+- Use mascot art in hero sections, summaries, onboarding, and empty states
+- Do not place mascot art inside holdings tables, ranking tables, or dense diagnostics
 
 ## Reuse Policy
 
@@ -129,6 +139,7 @@ Before creating a new component:
 - Do not hard-code `CAD` into user-facing labels unless the field is genuinely CAD-based
 - Do not use decorative gradients, glows, or motion that reduce data clarity
 - Do not mix surface depths randomly
+- Do not replace all analytical cards with shader-driven liquid glass; reserve it for small emphasis surfaces
 
 ## New Component Checklist
 

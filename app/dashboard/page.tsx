@@ -10,6 +10,7 @@
 import { requireViewer } from "@/lib/auth/session";
 import { getDashboardView } from "@/lib/backend/services";
 import { AppShell } from "@/components/layout/app-shell";
+import { MascotAsset } from "@/components/brand/mascot-asset";
 import { RecommendationSummaryCard } from "@/components/dashboard/recommendation-summary-card";
 import { DonutChartCard } from "@/components/charts/donut-chart";
 import { LineChartCard } from "@/components/charts/line-chart";
@@ -17,6 +18,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { MetricCard } from "@/components/ui/metric-card";
+import { LiquidGlassShell } from "@/components/ui/liquid-glass-shell";
 import { SectionHeading } from "@/components/ui/section-heading";
 import { StatBlock } from "@/components/ui/stat-block";
 
@@ -32,7 +34,7 @@ export default async function DashboardPage() {
   return (
     <AppShell viewer={viewer} title="宝库总览" description="先看全局，再决定下一笔钱。这里汇总账户状态、组合偏离、消费节奏和当前藏宝路线。">
       <Card className="overflow-hidden bg-[linear-gradient(135deg,rgba(255,255,255,0.68),rgba(246,218,230,0.58),rgba(221,232,255,0.5))]">
-        <CardContent className="grid gap-6 px-6 py-6 md:grid-cols-[1.25fr_0.75fr] md:items-center">
+        <CardContent className="grid gap-6 px-6 py-6 md:grid-cols-[1.1fr_0.9fr] md:items-center">
           <div className="space-y-4">
             <Badge variant="primary">Loo 的今日宝库巡检</Badge>
             <div className="space-y-3">
@@ -52,9 +54,19 @@ export default async function DashboardPage() {
               </Button>
             </div>
           </div>
-          <div className="grid gap-3 sm:grid-cols-2">
-            <WelcomeSignal title="今日重点" detail={hasRecommendationRun ? "优先处理配置缺口" : "先完成导入与偏好设置"} icon={<ShieldCheck className="h-4 w-4" />} />
-            <WelcomeSignal title="节奏提醒" detail={data.savingsPattern} icon={<TrendingUp className="h-4 w-4" />} />
+          <div className="grid gap-4 md:grid-cols-[240px_1fr] md:items-center">
+            <div className="flex justify-center md:justify-start">
+              <div className="space-y-3 pt-8">
+                <MascotAsset name="dashboardSmirk" className="h-[220px] w-[200px]" sizes="200px" />
+                <div className="max-w-[220px] rounded-[22px] border border-white/60 bg-white/70 px-4 py-3 text-sm font-medium leading-6 text-[color:var(--foreground)] shadow-[var(--shadow-card)] backdrop-blur-xl">
+                  {hasRecommendationRun ? "今天先补缺口, 别急着追热点。" : "先把数据和偏好补齐, 路线就会清楚很多。"}
+                </div>
+              </div>
+            </div>
+            <div className="grid gap-3">
+              <WelcomeSignal title="今日重点" detail={hasRecommendationRun ? "优先处理配置缺口" : "先完成导入与偏好设置"} icon={<ShieldCheck className="h-4 w-4" />} />
+              <WelcomeSignal title="节奏提醒" detail={data.savingsPattern} icon={<TrendingUp className="h-4 w-4" />} />
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -244,13 +256,25 @@ export default async function DashboardPage() {
 
 function WelcomeSignal({ title, detail, icon }: { title: string; detail: string; icon: React.ReactNode }) {
   return (
-    <div className="rounded-[24px] border border-white/55 bg-white/46 p-4 backdrop-blur-md">
-      <div className="flex items-center gap-2 text-sm font-medium text-[color:var(--muted-foreground)]">
-        <span className="text-[color:var(--primary)]">{icon}</span>
-        {title}
+    <LiquidGlassShell
+      className="rounded-[24px]"
+      fallbackClassName="rounded-[24px] border border-white/60 bg-white/32"
+      cornerRadius={24}
+      mode="prominent"
+      displacementScale={48}
+      blurAmount={0.09}
+      saturation={150}
+      aberrationIntensity={1.35}
+      elasticity={0.16}
+    >
+      <div className="rounded-[24px] p-4">
+        <div className="flex items-center gap-2 text-sm font-medium text-[color:var(--muted-foreground)]">
+          <span className="text-[color:var(--primary)]">{icon}</span>
+          {title}
+        </div>
+        <p className="mt-3 text-base font-semibold text-[color:var(--foreground)]">{detail}</p>
       </div>
-      <p className="mt-3 text-base font-semibold text-[color:var(--foreground)]">{detail}</p>
-    </div>
+    </LiquidGlassShell>
   );
 }
 
