@@ -6,7 +6,14 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { CitizenIdentityCard } from "@/components/auth/citizen-identity-card";
 import { LooTermsDialog } from "@/components/auth/loo-terms-dialog";
-import { getCitizenAddressLabel, getCitizenAvatarAsset, getCitizenGenderLabel, getCitizenRankLabel } from "@/lib/i18n/citizen";
+import {
+  getCitizenAddressLabel,
+  getCitizenAddressVisualSrc,
+  getCitizenAvatarAsset,
+  getCitizenGenderLabel,
+  getCitizenRankLabel,
+  getCitizenRankVisualSrc
+} from "@/lib/i18n/citizen";
 import type { CitizenProfile, CitizenGender, DisplayLanguage } from "@/lib/backend/models";
 
 type RegisterResult = {
@@ -69,7 +76,10 @@ export function ChineseRegisterPanel({
           { label: "住址", value: "按资产自动授予" }
         ]}
         idCode="LOO-待颁发"
-        mascotName="looEmperor"
+        language={language}
+        mascotName="citizenDefault"
+        issueLabel="发证状态"
+        issueValue="等待 Loo皇审批"
       >
         <form action={handleSubmit} className="space-y-4">
           <label className="block space-y-2">
@@ -136,7 +146,12 @@ export function ChineseRegisterPanel({
                   { label: "住址", value: getCitizenAddressLabel(issued.citizenProfile.effectiveAddressTier, language) }
                 ]}
                 idCode={issued.citizenProfile.effectiveIdCode}
+                language={language}
                 mascotName={getCitizenAvatarAsset(issued.citizenProfile.avatarType)}
+                issueLabel="发证时间"
+                issueValue={new Date(issued.citizenProfile.issuedAt).toLocaleDateString("zh-CN")}
+                rankVisualSrc={getCitizenRankVisualSrc(issued.citizenProfile.effectiveRank)}
+                addressVisualSrc={getCitizenAddressVisualSrc(issued.citizenProfile.effectiveAddressTier)}
               />
             </div>
             <div className="mt-6 flex justify-end">

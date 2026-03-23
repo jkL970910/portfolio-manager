@@ -42,3 +42,27 @@ export function getCitizenAvatarAsset(value: CitizenAvatarType) {
       return "citizenDefault";
   }
 }
+
+export function getCitizenRankVisualSrc(value: CitizenRank) {
+  const map: Record<CitizenRank, string> = {
+    "lowly-ox": "/mascot/rank-lowly-ox.jpg",
+    "base-loo": "/mascot/rank-base-loo.jpg",
+    citizen: "/mascot/rank-citizen.jpg",
+    general: "/mascot/rank-general.jpg",
+    emperor: "/mascot/Loo_King.jpg"
+  };
+
+  return map[value];
+}
+
+export function getCitizenAddressVisualSrc(value: CitizenAddressTier) {
+  const map: Partial<Record<CitizenAddressTier, string>> = {
+    cowshed: "/mascot/address-lowly-ox.jpg",
+    suburbs: "/mascot/address-base-loo.jpg",
+    city: "/mascot/address-citizen.jpg",
+    "palace-gate": "/mascot/address-general.jpg",
+    bedchamber: "/mascot/address-emperor.jpg"
+  };
+
+  return map[value] ?? null;
+}

@@ -39,7 +39,7 @@ const MASCOT_ASSETS = {
     alt: "Female citizen mascot"
   },
   citizenDefault: {
-    src: "/mascot/mini-sticker.png",
+    src: "/mascot/citizen-default.jpg",
     alt: "Default citizen mascot"
   }
 } as const;

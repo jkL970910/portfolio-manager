@@ -6,7 +6,14 @@ import type { CitizenAddressTier, CitizenProfile, CitizenRank, DisplayLanguage }
 import { CitizenIdentityCard } from "@/components/auth/citizen-identity-card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { getCitizenAddressLabel, getCitizenAvatarAsset, getCitizenGenderLabel, getCitizenRankLabel } from "@/lib/i18n/citizen";
+import {
+  getCitizenAddressLabel,
+  getCitizenAddressVisualSrc,
+  getCitizenAvatarAsset,
+  getCitizenGenderLabel,
+  getCitizenRankLabel,
+  getCitizenRankVisualSrc
+} from "@/lib/i18n/citizen";
 import { getApiErrorMessage, safeJson } from "@/lib/client/api";
 
 const FIELD_CLASS_NAME =
@@ -29,18 +36,22 @@ export function CitizenProfilePanel({
   const [rank, setRank] = useState<CitizenRank | "">(citizen.overrideRank ?? "");
   const [addressTier, setAddressTier] = useState<CitizenAddressTier | "">(citizen.overrideAddressTier ?? "");
   const [idCode, setIdCode] = useState(citizen.overrideIdCode ?? "");
+  const hasActiveOverride = Boolean(citizen.overrideRank || citizen.overrideAddressTier || citizen.overrideIdCode);
+  const previewRank = rank || citizen.derivedRank;
+  const previewAddressTier = addressTier || citizen.derivedAddressTier;
+  const previewIdCode = idCode.trim() || citizen.derivedIdCode;
 
-  function saveOverrides() {
+  function saveOverrides(next: {
+    rank?: CitizenRank | null;
+    addressTier?: CitizenAddressTier | null;
+    idCode?: string | null;
+  }) {
     setStatus("");
     startTransition(async () => {
       const response = await fetch("/api/settings/citizen-profile", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          rank: rank || null,
-          addressTier: addressTier || null,
-          idCode: idCode.trim() ? idCode.trim() : null
-        })
+        body: JSON.stringify(next)
       });
       const payload = await safeJson(response);
       if (!response.ok) {
@@ -48,6 +59,25 @@ export function CitizenProfilePanel({
         return;
       }
       setStatus("公民档案 override 已保存。刷新后会看到最新生效值。");
+    });
+  }
+
+  function saveCurrentOverrides() {
+    void saveOverrides({
+      rank: rank || null,
+      addressTier: addressTier || null,
+      idCode: idCode.trim() ? idCode.trim() : null
+    });
+  }
+
+  function clearOverrides() {
+    setRank("");
+    setAddressTier("");
+    setIdCode("");
+    void saveOverrides({
+      rank: null,
+      addressTier: null,
+      idCode: null
     });
   }
 
@@ -68,7 +98,12 @@ export function CitizenProfilePanel({
           { label: language === "zh" ? "住址" : "Address", value: getCitizenAddressLabel(citizen.effectiveAddressTier, language) }
         ]}
         idCode={citizen.effectiveIdCode}
+        language={language}
         mascotName={getCitizenAvatarAsset(citizen.effectiveRank === "emperor" ? "emperor" : citizen.avatarType)}
+        issueLabel={language === "zh" ? "发证时间" : "Issued"}
+        issueValue={new Date(citizen.issuedAt).toLocaleDateString(language === "zh" ? "zh-CN" : "en-CA")}
+        rankVisualSrc={getCitizenRankVisualSrc(citizen.effectiveRank)}
+        addressVisualSrc={getCitizenAddressVisualSrc(citizen.effectiveAddressTier)}
       >
         <div className="rounded-[22px] border border-white/55 bg-white/42 px-4 py-3 text-sm text-[color:var(--muted-foreground)]">
           {language === "zh"
@@ -76,6 +111,50 @@ export function CitizenProfilePanel({
             : `Wealth snapshot: CAD ${citizen.wealthScoreSnapshotCad.toLocaleString("en-CA")}. Rank and address are derived from this value unless an admin override is active.`}
         </div>
       </CitizenIdentityCard>
+
+      <div className="grid gap-4 md:grid-cols-3">
+        <div className="rounded-[24px] border border-white/55 bg-white/38 p-4 backdrop-blur-md">
+          <p className="text-sm text-[color:var(--muted-foreground)]">{language === "zh" ? "当前生效身份" : "Effective rank"}</p>
+          <p className="mt-3 text-xl font-semibold text-[color:var(--foreground)]">{getCitizenRankLabel(citizen.effectiveRank, language)}</p>
+        </div>
+        <div className="rounded-[24px] border border-white/55 bg-white/38 p-4 backdrop-blur-md">
+          <p className="text-sm text-[color:var(--muted-foreground)]">{language === "zh" ? "系统推导住址" : "Derived address"}</p>
+          <p className="mt-3 text-xl font-semibold text-[color:var(--foreground)]">{getCitizenAddressLabel(citizen.derivedAddressTier, language)}</p>
+        </div>
+        <div className="rounded-[24px] border border-white/55 bg-white/38 p-4 backdrop-blur-md">
+          <p className="text-sm text-[color:var(--muted-foreground)]">{language === "zh" ? "Override 状态" : "Override status"}</p>
+          <p className="mt-3 text-xl font-semibold text-[color:var(--foreground)]">
+            {hasActiveOverride ? (language === "zh" ? "已启用" : "Active") : (language === "zh" ? "未启用" : "Inactive")}
+          </p>
+        </div>
+      </div>
+
+      {isAdmin ? (
+        <CitizenIdentityCard
+          title={citizen.citizenName}
+          subtitle={language === "zh" ? "Admin override 预览" : "Admin override preview"}
+          badge={getCitizenRankLabel(previewRank, language)}
+          fields={[
+            { label: language === "zh" ? "性别" : "Gender", value: getCitizenGenderLabel(citizen.gender, language) },
+            { label: language === "zh" ? "生日" : "Birth date", value: citizen.birthDate ?? (language === "zh" ? "未登记" : "Not set") },
+            { label: language === "zh" ? "身份" : "Rank", value: getCitizenRankLabel(previewRank, language) },
+            { label: language === "zh" ? "住址" : "Address", value: getCitizenAddressLabel(previewAddressTier, language) }
+          ]}
+          idCode={previewIdCode}
+          language={language}
+          mascotName={getCitizenAvatarAsset(previewRank === "emperor" ? "emperor" : citizen.avatarType)}
+          issueLabel={language === "zh" ? "预览状态" : "Preview status"}
+          issueValue={language === "zh" ? "保存后生效" : "Applies after save"}
+          rankVisualSrc={getCitizenRankVisualSrc(previewRank)}
+          addressVisualSrc={getCitizenAddressVisualSrc(previewAddressTier)}
+        >
+          <div className="rounded-[22px] border border-white/55 bg-white/42 px-4 py-3 text-sm text-[color:var(--muted-foreground)]">
+            {language === "zh"
+              ? "这里预览的是当前 override 选择将会生成的最终身份证效果。未保存前不会覆盖正式档案。"
+              : "This previews the effective citizen card that will be generated from the current override selections. It does not overwrite the saved archive until you save."}
+          </div>
+        </CitizenIdentityCard>
+      ) : null}
 
       {isAdmin ? (
         <div className="rounded-[28px] border border-white/58 bg-[color:var(--card-muted)] p-5 shadow-[var(--shadow-card)]">
@@ -113,9 +192,12 @@ export function CitizenProfilePanel({
             </label>
           </div>
           {status ? <p className="mt-4 text-sm text-[color:var(--muted-foreground)]">{status}</p> : null}
-          <div className="mt-5">
-            <Button type="button" onClick={saveOverrides} disabled={isPending}>
+          <div className="mt-5 flex flex-wrap gap-3">
+            <Button type="button" onClick={saveCurrentOverrides} disabled={isPending}>
               {isPending ? (language === "zh" ? "保存中..." : "Saving...") : (language === "zh" ? "保存 override" : "Save override")}
+            </Button>
+            <Button type="button" variant="secondary" onClick={clearOverrides} disabled={isPending || !hasActiveOverride}>
+              {language === "zh" ? "清空 override" : "Clear override"}
             </Button>
           </div>
         </div>

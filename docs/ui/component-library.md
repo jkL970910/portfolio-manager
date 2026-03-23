@@ -170,6 +170,10 @@ components/
   - rendering the default citizen template on login
   - rendering an issued citizen card after registration
   - showing the active citizen archive in Settings
+- Notes:
+  - uses a structured ID-card layout inspired by the Figma citizen card template
+  - supports embedded children so login/register inputs can live inside the card body
+  - supports rank and address visual stamps when matching mascot assets exist
 
 ### `LooTermsDialog`
 

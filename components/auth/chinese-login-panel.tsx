@@ -4,7 +4,14 @@ import { ArrowRight, LogOut, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { CitizenIdentityCard } from "@/components/auth/citizen-identity-card";
 import { LooTermsDialog } from "@/components/auth/loo-terms-dialog";
-import { getCitizenAddressLabel, getCitizenAvatarAsset, getCitizenGenderLabel, getCitizenRankLabel } from "@/lib/i18n/citizen";
+import {
+  getCitizenAddressLabel,
+  getCitizenAddressVisualSrc,
+  getCitizenAvatarAsset,
+  getCitizenGenderLabel,
+  getCitizenRankLabel,
+  getCitizenRankVisualSrc
+} from "@/lib/i18n/citizen";
 import type { CitizenProfile, DisplayLanguage } from "@/lib/backend/models";
 
 export function ChineseLoginPanel({
@@ -40,7 +47,12 @@ export function ChineseLoginPanel({
           { label: "住址", value: getCitizenAddressLabel(citizen.effectiveAddressTier, language) }
         ]}
         idCode={citizen.effectiveIdCode}
+        language={language}
         mascotName={getCitizenAvatarAsset(citizen.effectiveRank === "emperor" ? "emperor" : citizen.avatarType)}
+        issueLabel="发证时间"
+        issueValue={new Date(citizen.issuedAt).toLocaleDateString("zh-CN")}
+        rankVisualSrc={getCitizenRankVisualSrc(citizen.effectiveRank)}
+        addressVisualSrc={getCitizenAddressVisualSrc(citizen.effectiveAddressTier)}
       >
         <div className="flex flex-wrap gap-3">
           <Button href="/dashboard" trailingIcon={<ArrowRight className="h-4 w-4" />}>
@@ -63,7 +75,10 @@ export function ChineseLoginPanel({
       badge="待认证"
       fields={defaultCitizenCard.fields}
       idCode={defaultCitizenCard.idCode}
-      mascotName="looEmperor"
+      language={language}
+      mascotName="citizenDefault"
+      issueLabel="发证状态"
+      issueValue="等待 Loo皇审查"
     >
       <div className="space-y-4">
         <p className="text-sm leading-7 text-[color:var(--muted-foreground)]">

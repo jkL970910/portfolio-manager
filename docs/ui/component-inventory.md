@@ -24,7 +24,7 @@
 | FxInfoPopoverContent | stable | [fx-info-popover-content.tsx](E:\Projects\Portfolio%20Manager\components\navigation\fx-info-popover-content.tsx) | Shared FX explanation block |
 | LooMascot | stable | [loo-mascot.tsx](E:\Projects\Portfolio%20Manager\components\brand\loo-mascot.tsx) | Shared original brand mascot for hero and onboarding surfaces |
 | MascotAsset | stable | [mascot-asset.tsx](E:\Projects\Portfolio%20Manager\components\brand\mascot-asset.tsx) | Wrapper for user-supplied mascot images stored in `public/mascot` |
-| CitizenIdentityCard | stable | [citizen-identity-card.tsx](E:\Projects\Portfolio%20Manager\components\auth\citizen-identity-card.tsx) | Shared identity-card surface for the Chinese Loo国 citizen flow |
+| CitizenIdentityCard | stable | [citizen-identity-card.tsx](E:\Projects\Portfolio%20Manager\components\auth\citizen-identity-card.tsx) | Shared structured ID-card surface for the Chinese Loo国 citizen flow, with embedded auth-field support and visual stamps |
 | LooTermsDialog | stable | [loo-terms-dialog.tsx](E:\Projects\Portfolio%20Manager\components\auth\loo-terms-dialog.tsx) | Shared terms / oath modal for Chinese-mode auth |
 | AppShell | stable | [app-shell.tsx](E:\Projects\Portfolio%20Manager\components\layout\app-shell.tsx) | Shared page shell |
 | FloatingHeaderFrame | stable | [floating-header-frame.tsx](E:\Projects\Portfolio%20Manager\components\layout\floating-header-frame.tsx) | Shared sticky header behavior |

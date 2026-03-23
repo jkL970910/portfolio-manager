@@ -93,7 +93,7 @@ export function SpendingImportPanel({
       setReviewState(null);
       setStatus({ type: "idle", message: "" });
     } catch {
-      setStatus({ type: "error", message: pick(language, "è¯»å–æ¶ˆè´¹ CSV æ–‡ä»¶å¤±è´¥ã€‚", "Failed to read the selected spending CSV file.") });
+      setStatus({ type: "error", message: pick(language, "读取消费 CSV 文件失败。", "Failed to read the selected spending CSV file.") });
     }
   }
 
@@ -118,7 +118,7 @@ export function SpendingImportPanel({
     });
     const payload = await safeJson(response);
     if (!response.ok) {
-      setStatus({ type: "error", message: getApiErrorMessage(payload, pick(language, "æ¶ˆè´¹å¯¼å…¥æ ¡éªŒå¤±è´¥ã€‚", "Spending validation failed.")) });
+      setStatus({ type: "error", message: getApiErrorMessage(payload, pick(language, "消费导入校验失败。", "Spending validation failed.")) });
       return;
     }
 
@@ -127,10 +127,10 @@ export function SpendingImportPanel({
       result = assertApiData<ReviewState>(
         payload,
         (candidate) => typeof candidate === "object" && candidate !== null && "summary" in candidate && "review" in candidate && "validationErrors" in candidate,
-        pick(language, "æ ¡éªŒè¯·æ±‚æˆåŠŸï¼Œä½†æ²¡æœ‰è¿”å›žå¯ç”¨çš„æ¶ˆè´¹å¯¼å…¥é¢„è§ˆæ•°æ®ã€‚", "Validation succeeded but returned no usable spending review payload.")
+        pick(language, "校验请求成功，但没有返回可用的消费导入预览数据。", "Validation succeeded but returned no usable spending review payload.")
       );
     } catch (error) {
-      setStatus({ type: "error", message: error instanceof Error ? error.message : pick(language, "æ¶ˆè´¹å¯¼å…¥æ ¡éªŒå¤±è´¥ã€‚", "Spending validation failed.") });
+      setStatus({ type: "error", message: error instanceof Error ? error.message : pick(language, "消费导入校验失败。", "Spending validation failed.") });
       return;
     }
     setReviewState(result);
@@ -139,13 +139,13 @@ export function SpendingImportPanel({
         type: "error",
         message: pick(
           language,
-          `æ ¡éªŒæœªé€šè¿‡ï¼Œå‘çŽ° ${result.validationErrors.length} æ¡äº¤æ˜“æµæ°´é—®é¢˜ã€‚`,
+          `校验未通过，发现 ${result.validationErrors.length} 条交易流水问题。`,
           `Validation failed. ${result.validationErrors.length} transaction-row issues were found.`
         )
       });
       return;
     }
-    setStatus({ type: "success", message: pick(language, "æ ¡éªŒé€šè¿‡ï¼Œè¯·å…ˆç¡®è®¤äº¤æ˜“æ•°é‡å’Œé¢„è§ˆç»“æžœï¼Œå†æ‰§è¡Œå†™å…¥ã€‚", "Validation passed. Review transaction counts and confirm the write.") });
+    setStatus({ type: "success", message: pick(language, "校验通过，请先确认交易数量和预览结果，再执行写入。", "Validation passed. Review transaction counts and confirm the write.") });
   }
 
   function confirmImport() {
@@ -168,7 +168,7 @@ export function SpendingImportPanel({
       });
       const payload = await safeJson(response);
       if (!response.ok) {
-        setStatus({ type: "error", message: getApiErrorMessage(payload, pick(language, "å¯¼å…¥æ¶ˆè´¹ CSV å¤±è´¥ã€‚", "Failed to import spending CSV.")) });
+        setStatus({ type: "error", message: getApiErrorMessage(payload, pick(language, "导入消费 CSV 失败。", "Failed to import spending CSV.")) });
         return;
       }
 
@@ -177,20 +177,20 @@ export function SpendingImportPanel({
         result = assertApiData(
           payload,
           (candidate) => typeof candidate === "object" && candidate !== null && "summary" in candidate && "job" in candidate,
-          pick(language, "å¯¼å…¥æˆåŠŸï¼Œä½†æ²¡æœ‰è¿”å›žå¯ç”¨çš„æ¶ˆè´¹å¯¼å…¥ç»“æžœã€‚", "Import succeeded but returned no usable spending import result.")
+          pick(language, "导入成功，但没有返回可用的消费导入结果。", "Import succeeded but returned no usable spending import result.")
         );
       } catch (error) {
-        setStatus({ type: "error", message: error instanceof Error ? error.message : pick(language, "å¯¼å…¥æ¶ˆè´¹ CSV å¤±è´¥ã€‚", "Failed to import spending CSV.") });
+        setStatus({ type: "error", message: error instanceof Error ? error.message : pick(language, "导入消费 CSV 失败。", "Failed to import spending CSV.") });
         return;
       }
       const modeLabel = importMode === "replace"
-        ? pick(language, "å·²æ›¿æ¢", "replaced")
-        : pick(language, "å·²åˆå¹¶", "merged");
+        ? pick(language, "已替换", "replaced")
+        : pick(language, "已合并", "merged");
       setStatus({
         type: "success",
         message: pick(
           language,
-          `${modeLabel} ${result.job.fileName} ä¸­çš„ ${result.summary.transactionsImported} æ¡äº¤æ˜“æµæ°´ã€‚æŠ•èµ„è´¦æˆ·å’ŒæŒä»“ä¸ä¼šè¢«ä¿®æ”¹ã€‚`,
+          `${modeLabel} ${result.job.fileName} 中的 ${result.summary.transactionsImported} 条交易流水。投资账户和持仓不会被修改。`,
           `${modeLabel} ${result.summary.transactionsImported} transactions from ${result.job.fileName}. Portfolio holdings were left unchanged.`
         )
       });
@@ -203,19 +203,19 @@ export function SpendingImportPanel({
     <div className="space-y-4 rounded-[24px] border border-[color:var(--border)] bg-[color:var(--card-muted)] p-5">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <p className="font-semibold">{pick(language, "æ¶ˆè´¹æµæ°´ CSV å¯¼å…¥", "Transaction CSV import")}</p>
+          <p className="font-semibold">{pick(language, "消费流水 CSV 导入", "Transaction CSV import")}</p>
           <p className="mt-1 text-sm text-[color:var(--muted-foreground)]">
-            {pick(language, "è¿™æ¡å·¥ä½œæµåªå¯¼å…¥æ¶ˆè´¹æµæ°´ã€‚å®ƒä¸ä¼šåˆ›å»ºæŒä»“ï¼Œä¹Ÿä¸ä¼šè¦†ç›–æŠ•èµ„è´¦æˆ·ã€‚", "This workflow imports spending records only. It does not create holdings and it does not overwrite portfolio accounts.")}
+            {pick(language, "这条工作流只导入消费流水。它不会创建持仓，也不会覆盖投资账户。", "This workflow imports spending records only. It does not create holdings and it does not overwrite portfolio accounts.")}
           </p>
         </div>
         {latestJob
-          ? <Badge variant="neutral">{pick(language, "æœ€è¿‘ä¸€æ¬¡ï¼š", "Latest: ")}{latestJob.status}</Badge>
-          : <Badge variant="warning">{pick(language, "è¿˜æ²¡æœ‰å¯¼å…¥ä»»åŠ¡", "No job yet")}</Badge>}
+          ? <Badge variant="neutral">{pick(language, "最近一次：", "Latest: ")}{latestJob.status}</Badge>
+          : <Badge variant="warning">{pick(language, "还没有导入任务", "No job yet")}</Badge>}
       </div>
 
       <div className="grid gap-4 md:grid-cols-2">
         <label className="block space-y-2">
-          <span className="text-sm font-medium text-[color:var(--foreground)]">{pick(language, "CSV æ–‡ä»¶å", "CSV file name")}</span>
+          <span className="text-sm font-medium text-[color:var(--foreground)]">{pick(language, "CSV 文件名", "CSV file name")}</span>
           <input
             type="text"
             value={fileName}
@@ -225,14 +225,14 @@ export function SpendingImportPanel({
         </label>
 
         <label className="block space-y-2">
-          <span className="text-sm font-medium text-[color:var(--foreground)]">{pick(language, "å¯¼å…¥æ¨¡å¼", "Import mode")}</span>
+          <span className="text-sm font-medium text-[color:var(--foreground)]">{pick(language, "导入模式", "Import mode")}</span>
           <select
             value={importMode}
             onChange={(event) => setImportMode(event.target.value as "replace" | "merge")}
             className="w-full rounded-2xl border border-[color:var(--border)] bg-white px-4 py-3 text-sm outline-none"
           >
-            <option value="merge">{pick(language, "åˆå¹¶åˆ°çŽ°æœ‰æµæ°´", "Merge into existing transactions")}</option>
-            <option value="replace">{pick(language, "æ›¿æ¢å…¨éƒ¨å·²å¯¼å…¥æµæ°´", "Replace all imported transactions")}</option>
+            <option value="merge">{pick(language, "合并到现有流水", "Merge into existing transactions")}</option>
+            <option value="replace">{pick(language, "替换全部已导入流水", "Replace all imported transactions")}</option>
           </select>
         </label>
       </div>
@@ -250,10 +250,10 @@ export function SpendingImportPanel({
       <div className="rounded-2xl border border-dashed border-[color:var(--border)] bg-white px-4 py-4 text-sm text-[color:var(--muted-foreground)]">
         <div className="flex items-center gap-2 font-medium text-[color:var(--foreground)]">
           <FileText className="h-4 w-4" />
-          {pick(language, "æ¶ˆè´¹æµæ°´æ¨¡æ¿", "Spending CSV template")}
+          {pick(language, "消费流水模板", "Spending CSV template")}
         </div>
         <p className="mt-2">
-          {pick(language, "å¯ä»Žè¿™é‡Œä¸‹è½½èµ·å§‹æ¨¡æ¿ï¼š", "Download the starter template at")}{" "}
+          {pick(language, "可从这里下载起始模板：", "Download the starter template at")}{" "}
           <a href="/templates/spending-import-template.csv" className="font-medium text-[color:var(--primary)] underline">
             /templates/spending-import-template.csv
           </a>.
@@ -264,8 +264,8 @@ export function SpendingImportPanel({
         <div className="space-y-4 rounded-2xl border border-[color:var(--border)] bg-white p-4">
           <div className="flex items-center gap-2">
             <Eye className="h-4 w-4 text-[color:var(--primary)]" />
-            <p className="font-medium">{pick(language, "å­—æ®µæ˜ å°„", "Field mapping")}</p>
-            <Badge variant="neutral">{pick(language, `æ£€æµ‹åˆ° ${headers.length} ä¸ªè¡¨å¤´`, `${headers.length} headers detected`)}</Badge>
+            <p className="font-medium">{pick(language, "字段映射", "Field mapping")}</p>
+            <Badge variant="neutral">{pick(language, `检测到 ${headers.length} 个表头`, `${headers.length} headers detected`)}</Badge>
           </div>
           {mappingGroups.map((group) => (
             <div key={group.title} className="space-y-3">
@@ -279,7 +279,7 @@ export function SpendingImportPanel({
                       onChange={(event) => setFieldMapping((current) => ({ ...current, [field]: event.target.value }))}
                       className="w-full rounded-2xl border border-[color:var(--border)] bg-white px-4 py-3 text-sm outline-none"
                     >
-                      <option value="">{pick(language, "æœªæ˜ å°„", "Not mapped")}</option>
+                      <option value="">{pick(language, "未映射", "Not mapped")}</option>
                       {headers.map((header) => (
                         <option key={`${field}-${header}`} value={header}>{header}</option>
                       ))}
@@ -292,7 +292,7 @@ export function SpendingImportPanel({
 
           {missingRequiredMappings.length > 0 ? (
             <div className="rounded-2xl border border-[#e7b0b8] bg-[#fff3f5] px-4 py-3 text-sm text-[#8e2433]">
-              {pick(language, "ç¼ºå°‘å¿…å¡«æ˜ å°„ï¼š", "Required mappings missing: ")}{missingRequiredMappings.join(", ")}
+              {pick(language, "缺少必填映射：", "Required mappings missing: ")}{missingRequiredMappings.join(", ")}
             </div>
           ) : null}
         </div>
@@ -302,8 +302,8 @@ export function SpendingImportPanel({
         <div className="space-y-4 rounded-2xl border border-[color:var(--border)] bg-white p-4">
           <div className="flex items-center gap-2">
             <Eye className="h-4 w-4 text-[color:var(--primary)]" />
-            <p className="font-medium">{pick(language, "CSV é¢„è§ˆ", "CSV preview")}</p>
-            <Badge variant="neutral">{pick(language, `å‰ ${preview.rows.length} è¡Œ`, `First ${preview.rows.length} rows`)}</Badge>
+            <p className="font-medium">{pick(language, "CSV 预览", "CSV preview")}</p>
+            <Badge variant="neutral">{pick(language, `前 ${preview.rows.length} 行`, `First ${preview.rows.length} rows`)}</Badge>
           </div>
           <div className="overflow-x-auto rounded-2xl border border-[color:var(--border)]">
             <table className="min-w-full text-left text-sm">
@@ -332,19 +332,19 @@ export function SpendingImportPanel({
         <div className="space-y-3 rounded-2xl border border-[#b6d7c7] bg-[#eef8f1] p-4">
           <div className="flex items-center gap-2 font-medium text-[#21613f]">
             <CheckCircle2 className="h-4 w-4" />
-            {pick(language, "å¯¼å…¥å‰å¤æ ¸", "Review before import")}
+            {pick(language, "导入前复核", "Review before import")}
           </div>
           <div className="grid gap-3 md:grid-cols-4 text-sm text-[#21613f]">
-            <div>{pick(language, "äº¤æ˜“æµæ°´ï¼š", "Transactions: ")}{reviewState.summary.transactionsImported}</div>
-            <div>{pick(language, "è§£æžè¡Œæ•°ï¼š", "Rows parsed: ")}{reviewState.review.rowCount}</div>
-            <div>{pick(language, "æ¨¡å¼ï¼š", "Mode: ")}{reviewState.review.importMode}</div>
-            <div>{pick(language, "æŒä»“å½±å“ï¼š0", "Holdings touched: 0")}</div>
+            <div>{pick(language, "交易流水：", "Transactions: ")}{reviewState.summary.transactionsImported}</div>
+            <div>{pick(language, "解析行数：", "Rows parsed: ")}{reviewState.review.rowCount}</div>
+            <div>{pick(language, "模式：", "Mode: ")}{reviewState.review.importMode}</div>
+            <div>{pick(language, "持仓影响：0", "Holdings touched: 0")}</div>
           </div>
           <p className="text-sm text-[#21613f]">
-            {pick(language, "æ ¡éªŒé€šè¿‡ã€‚ç¡®è®¤åŽä¼šæŠŠè¿™äº›æ¶ˆè´¹æµæ°´å†™å…¥å½“å‰ç™»å½•ç”¨æˆ·çš„æ•°æ®åº“è®°å½•ã€‚", "Validation passed. Confirm to write these spending transactions into the current signed-in user's database records.")}
+            {pick(language, "校验通过。确认后会把这些消费流水写入当前登录用户的数据库记录。", "Validation passed. Confirm to write these spending transactions into the current signed-in user's database records.")}
           </p>
           <Button type="button" onClick={confirmImport} disabled={isPending} leadingIcon={<Upload className="h-4 w-4" />}>
-            {isPending ? pick(language, "å¯¼å…¥ä¸­...", "Importing...") : pick(language, "ç¡®è®¤å¯¼å…¥æ¶ˆè´¹æµæ°´", "Confirm spending import")}
+            {isPending ? pick(language, "导入中...", "Importing...") : pick(language, "确认导入消费流水", "Confirm spending import")}
           </Button>
         </div>
       ) : null}
@@ -353,12 +353,12 @@ export function SpendingImportPanel({
         <div className="space-y-3 rounded-2xl border border-[#e7b0b8] bg-[#fff8f9] p-4">
           <div className="flex items-center gap-2 font-medium text-[#8e2433]">
             <AlertTriangle className="h-4 w-4" />
-            {pick(language, "æ¶ˆè´¹å¯¼å…¥æ ¡éªŒé—®é¢˜", "Spending import validation issues")}
+            {pick(language, "消费导入校验问题", "Spending import validation issues")}
           </div>
           <div className="space-y-2">
             {reviewState.validationErrors.slice(0, 12).map((error) => (
               <div key={`${error.rowNumber}-${error.message}`} className="rounded-xl border border-[#f0c9d0] bg-white px-3 py-2 text-sm text-[#8e2433]">
-                {pick(language, "ç¬¬ ", "Row ")}{error.rowNumber}{error.recordType ? ` (${error.recordType})` : ""}: {error.message}
+                {pick(language, "第 ", "Row ")}{error.rowNumber}{error.recordType ? ` (${error.recordType})` : ""}: {error.message}
               </div>
             ))}
           </div>
@@ -366,7 +366,7 @@ export function SpendingImportPanel({
       ) : null}
 
       {latestJob ? (
-        <p className="text-sm text-[color:var(--muted-foreground)]">{pick(language, "æœ€è¿‘ä¸€æ¬¡æ¶ˆè´¹å¯¼å…¥ï¼š", "Latest spending job: ")}{latestJob.fileName}</p>
+        <p className="text-sm text-[color:var(--muted-foreground)]">{pick(language, "最近一次消费导入：", "Latest spending job: ")}{latestJob.fileName}</p>
       ) : null}
 
       {status.type !== "idle" ? (
@@ -381,9 +381,10 @@ export function SpendingImportPanel({
         disabled={isPending || !csvContent || missingRequiredMappings.length > 0}
         leadingIcon={<Upload className="h-4 w-4" />}
       >
-        {pick(language, "æ ¡éªŒå¹¶å¤æ ¸æ¶ˆè´¹å¯¼å…¥", "Validate and review spending import")}
+        {pick(language, "校验并复核消费导入", "Validate and review spending import")}
       </Button>
     </div>
   );
 }
+
 
