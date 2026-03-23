@@ -1,32 +1,50 @@
-﻿"use client";
+"use client";
 
-import { Languages } from "lucide-react";
+import { ChevronDown } from "lucide-react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
 import type { DisplayLanguage } from "@/lib/i18n/ui";
 import { assertApiData, getApiErrorMessage, safeJson } from "@/lib/client/api";
 import { cn } from "@/lib/utils";
 
 const OPTIONS: Array<{
   language: DisplayLanguage;
-  flag: string;
+  shortLabel: string;
   label: string;
-  title: string;
 }> = [
-  { language: "zh", flag: "🇨🇳", label: "中文", title: "切换到中文" },
-  { language: "en", flag: "🇺🇸", label: "EN", title: "Switch to English" }
+  { language: "zh", shortLabel: "CN", label: "中文" },
+  { language: "en", shortLabel: "US", label: "English" }
 ];
 
 export function DisplayLanguageToggle({ language }: { language: DisplayLanguage }) {
   const router = useRouter();
+  const rootRef = useRef<HTMLDivElement | null>(null);
   const [isPending, startTransition] = useTransition();
+  const [isOpen, setIsOpen] = useState(false);
   const [status, setStatus] = useState<{ type: "idle" | "error"; message: string }>({
     type: "idle",
     message: ""
   });
 
+  useEffect(() => {
+    function handlePointerDown(event: MouseEvent) {
+      if (!rootRef.current) {
+        return;
+      }
+      if (!rootRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    }
+
+    document.addEventListener("mousedown", handlePointerDown);
+    return () => document.removeEventListener("mousedown", handlePointerDown);
+  }, []);
+
+  const currentOption = OPTIONS.find((option) => option.language === language) ?? OPTIONS[0];
+
   function updateLanguage(nextLanguage: DisplayLanguage) {
     if (nextLanguage === language) {
+      setIsOpen(false);
       return;
     }
 
@@ -61,42 +79,58 @@ export function DisplayLanguageToggle({ language }: { language: DisplayLanguage 
         return;
       }
 
+      setIsOpen(false);
       router.refresh();
     });
   }
 
   return (
-    <div className="relative flex items-center gap-2">
-      <div className="flex items-center gap-1 rounded-full border border-white/58 bg-white/52 px-2 py-2 shadow-[var(--shadow-card)] backdrop-blur-xl">
-        {OPTIONS.map((option) => {
-          const active = option.language === language;
-          return (
-            <button
-              key={option.language}
-              type="button"
-              onClick={() => updateLanguage(option.language)}
-              disabled={isPending}
-              title={option.title}
-              className={cn(
-                "inline-flex h-11 w-11 items-center justify-center rounded-full border text-lg transition-[background-color,border-color,transform,box-shadow]",
-                active
-                  ? "border-white/70 bg-white/84 shadow-[0_12px_22px_rgba(110,103,130,0.08)]"
-                  : "border-transparent bg-white/18 hover:-translate-y-0.5 hover:border-white/34 hover:bg-white/34"
-              )}
-              aria-pressed={active}
-              aria-label={option.label}
-            >
-              <span aria-hidden="true">{option.flag}</span>
-            </button>
-          );
-        })}
-      </div>
-      <div className="hidden items-center gap-2 rounded-full border border-white/45 bg-white/36 px-3 py-2 text-xs text-[color:var(--muted-foreground)] shadow-[var(--shadow-card)] backdrop-blur-xl xl:flex">
-        <Languages className="h-3.5 w-3.5" />
-        <span>{language === "zh" ? "界面语言" : "Interface language"}</span>
-      </div>
+    <div ref={rootRef} className="relative">
+      <button
+        type="button"
+        onClick={() => setIsOpen((value) => !value)}
+        disabled={isPending}
+        className="inline-flex items-center gap-3 rounded-full border border-white/58 bg-white/52 px-4 py-2.5 text-sm font-medium text-[color:var(--foreground)] shadow-[var(--shadow-card)] backdrop-blur-xl transition-[background-color,transform] hover:-translate-y-0.5 hover:bg-white/68"
+        aria-haspopup="menu"
+        aria-expanded={isOpen}
+      >
+        <span className="inline-flex min-w-[44px] items-center justify-center rounded-full border border-white/62 bg-white/78 px-2 py-1 text-xs font-semibold tracking-[0.12em] text-[color:var(--foreground)]">
+          {currentOption.shortLabel}
+        </span>
+        <span>{language === "zh" ? "界面语言" : "Interface"}</span>
+        <ChevronDown className={cn("h-4 w-4 text-[color:var(--muted-foreground)] transition-transform", isOpen ? "rotate-180" : "")} />
+      </button>
+
+      {isOpen ? (
+        <div className="absolute right-0 top-[calc(100%+10px)] z-30 min-w-[180px] rounded-[24px] border border-white/65 bg-[linear-gradient(180deg,rgba(255,255,255,0.92),rgba(247,244,251,0.84))] p-2 shadow-[var(--shadow-card)] backdrop-blur-2xl">
+          {OPTIONS.map((option) => {
+            const active = option.language === language;
+            return (
+              <button
+                key={option.language}
+                type="button"
+                onClick={() => updateLanguage(option.language)}
+                disabled={isPending}
+                className={cn(
+                  "flex w-full items-center justify-between rounded-[18px] px-3 py-2.5 text-left text-sm transition-colors",
+                  active
+                    ? "bg-[linear-gradient(135deg,rgba(255,255,255,0.92),rgba(255,240,246,0.86))] text-[color:var(--foreground)]"
+                    : "text-[color:var(--foreground)]/82 hover:bg-white/58"
+                )}
+                role="menuitem"
+              >
+                <span>{option.label}</span>
+                <span className="rounded-full border border-white/62 bg-white/72 px-2 py-0.5 text-[11px] font-semibold tracking-[0.12em] text-[color:var(--muted-foreground)]">
+                  {option.shortLabel}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      ) : null}
+
       {status.type === "error" ? (
-        <div className="absolute right-0 top-[calc(100%+8px)] z-20 min-w-[220px] rounded-2xl border border-[#e7b0b8] bg-[#fff3f5] px-4 py-3 text-xs text-[#8e2433] shadow-[var(--shadow-card)]">
+        <div className="absolute right-0 top-[calc(100%+72px)] z-20 min-w-[220px] rounded-2xl border border-[#e7b0b8] bg-[#fff3f5] px-4 py-3 text-xs text-[#8e2433] shadow-[var(--shadow-card)]">
           {status.message}
         </div>
       ) : null}

@@ -1,6 +1,7 @@
 ﻿"use client";
 
 import { ArrowRight, LogOut, ShieldCheck } from "lucide-react";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { CitizenIdentityCard } from "@/components/auth/citizen-identity-card";
 import { LooTermsDialog } from "@/components/auth/loo-terms-dialog";
@@ -122,6 +123,11 @@ export function ChineseLoginPanel({
           <Button type="submit" trailingIcon={<ShieldCheck className="h-4 w-4" />}>
             进入 Loo国
           </Button>
+          <div className="pt-1">
+            <Link href="/register" className="text-sm font-medium text-[color:var(--secondary)]">
+              还没有公民身份证？去申请加入 Loo国
+            </Link>
+          </div>
         </form>
       </div>
     </CitizenIdentityCard>

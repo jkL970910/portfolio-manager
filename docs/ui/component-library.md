@@ -126,7 +126,8 @@ components/
 - File: [display-language-toggle.tsx](E:\Projects\Portfolio%20Manager\components\navigation\display-language-toggle.tsx)
 - Purpose: global UI language control for the Chinese `Loo国的财富宝库` theme and the English `Portfolio Manager` theme
 - Includes:
-  - circular flag buttons
+  - compact dropdown trigger
+  - CN / US language options
   - cookie + user preference update
   - optimistic route refresh
 
@@ -197,6 +198,7 @@ components/
 - Scope:
   - Chinese mode only
   - creates the user and shows the issued citizen card before manual entry
+  - includes gender-based citizen preview and Loo皇 approval / rejection result modals
 
 ## Layout Components
 

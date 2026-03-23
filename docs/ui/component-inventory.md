@@ -1,4 +1,4 @@
-# Component Inventory
+﻿# Component Inventory
 
 ## Status Labels
 
@@ -47,7 +47,7 @@
 | RecommendationRunPanel | domain | [recommendation-run-panel.tsx](E:\Projects\Portfolio%20Manager\components\recommendations\recommendation-run-panel.tsx) | Recommendation generation action |
 | PreferencesWorkbench | domain | [preferences-workbench.tsx](E:\Projects\Portfolio%20Manager\components\settings\preferences-workbench.tsx) | Guided + manual settings workflow |
 | ChineseLoginPanel | domain | [chinese-login-panel.tsx](E:\Projects\Portfolio%20Manager\components\auth\chinese-login-panel.tsx) | Chinese-mode citizen identity gate for login |
-| ChineseRegisterPanel | domain | [chinese-register-panel.tsx](E:\Projects\Portfolio%20Manager\components\auth\chinese-register-panel.tsx) | Chinese-mode citizen application and issuance flow |
+| ChineseRegisterPanel | domain | [chinese-register-panel.tsx](E:\Projects\Portfolio%20Manager\components\auth\chinese-register-panel.tsx) | Chinese-mode citizen application flow with gender preview and Loo皇 approval / rejection modals |
 | CitizenProfilePanel | domain | [citizen-profile-panel.tsx](E:\Projects\Portfolio%20Manager\components\settings\citizen-profile-panel.tsx) | Chinese-mode citizen archive with admin override controls |
 
 ## Extraction Candidates
