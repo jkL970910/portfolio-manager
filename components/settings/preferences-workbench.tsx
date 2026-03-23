@@ -73,13 +73,15 @@ type ManualSectionMeta = {
   badge?: string;
 };
 
-const GUIDED_STEP_META = [
-  { id: 0, title: "Step 1", label: "Goal & horizon" },
-  { id: 1, title: "Step 2", label: "Volatility" },
-  { id: 2, title: "Step 3", label: "Engine priority" },
-  { id: 3, title: "Step 4", label: "Cash reserve" },
-  { id: 4, title: "Step 5", label: "Review draft" }
-] as const;
+function getGuidedStepMeta(language: DisplayLanguage) {
+  return [
+    { id: 0, title: pick(language, "步骤 1", "Step 1"), label: pick(language, "目标与期限", "Goal & horizon") },
+    { id: 1, title: pick(language, "步骤 2", "Step 2"), label: pick(language, "波动承受", "Volatility") },
+    { id: 2, title: pick(language, "步骤 3", "Step 3"), label: pick(language, "引擎优先级", "Engine priority") },
+    { id: 3, title: pick(language, "步骤 4", "Step 4"), label: pick(language, "现金缓冲", "Cash reserve") },
+    { id: 4, title: pick(language, "步骤 5", "Step 5"), label: pick(language, "草稿审阅", "Review draft") }
+  ] as const;
+}
 
 function getTargetMixLabel(targetAllocation: PreferenceProfile["targetAllocation"]) {
   const equity = targetAllocation
@@ -326,6 +328,7 @@ export function PreferencesWorkbench({
   );
   const guidedDraft = useMemo(() => buildGuidedDraft(guidedAnswers), [guidedAnswers]);
   const manualSectionMeta = useMemo(() => getManualSectionMeta(language, manualGroups), [language, manualGroups]);
+  const guidedStepMeta = useMemo(() => getGuidedStepMeta(language), [language]);
 
   function updateAllocation(assetClass: string, targetPct: number) {
     setForm((current) => ({
@@ -455,7 +458,7 @@ export function PreferencesWorkbench({
   }
 
   function goToNextGuidedStep() {
-    setGuidedStep((current) => Math.min(current + 1, GUIDED_STEP_META.length - 1));
+    setGuidedStep((current) => Math.min(current + 1, guidedStepMeta.length - 1));
   }
 
   function goToPreviousGuidedStep() {
@@ -489,14 +492,14 @@ export function PreferencesWorkbench({
                   </p>
                 </div>
                 <div className="rounded-full border border-white/55 bg-white/64 px-3 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-[color:var(--muted-foreground)]">
-                  {GUIDED_STEP_META[guidedStep].title}
+                  {guidedStepMeta[guidedStep].title}
                 </div>
               </div>
               <p className="mt-3 text-xs text-[color:var(--muted-foreground)]">{pick(language, "上次保存草稿：", "Last saved draft: ")}{formatDraftSavedAt(guidedDraftSavedAt, language)}</p>
             </div>
 
             <div className="grid gap-2 sm:grid-cols-5">
-              {GUIDED_STEP_META.map((step, index) => {
+              {guidedStepMeta.map((step, index) => {
                 const active = index === guidedStep;
                 const completed = index < guidedStep;
                 return (
@@ -525,6 +528,7 @@ export function PreferencesWorkbench({
 
             <GuidedStepPanel
               step={guidedStep}
+              guidedStepMeta={guidedStepMeta}
               language={language}
               guidedQuestions={guidedQuestions}
               guidedAnswers={guidedAnswers}
@@ -742,6 +746,7 @@ export function PreferencesWorkbench({
 
 function GuidedStepPanel({
   step,
+  guidedStepMeta,
   language,
   guidedQuestions,
   guidedAnswers,
@@ -755,6 +760,7 @@ function GuidedStepPanel({
   isPending
 }: {
   step: number;
+  guidedStepMeta: ReturnType<typeof getGuidedStepMeta>;
   language: DisplayLanguage;
   guidedQuestions: string[];
   guidedAnswers: GuidedAllocationAnswers;
@@ -767,7 +773,7 @@ function GuidedStepPanel({
   onApplyAndSave: () => void;
   isPending: boolean;
 }) {
-  const onFinalReview = step === GUIDED_STEP_META.length - 1;
+  const onFinalReview = step === guidedStepMeta.length - 1;
   const guidedQuestionCopy = [
     pick(language, "你的主要目标和投资期限是什么？", "What is your primary goal and time horizon?"),
     pick(language, "你能接受多大的组合波动？", "How much volatility can you tolerate?"),
@@ -784,7 +790,7 @@ function GuidedStepPanel({
               <p className="text-sm font-medium uppercase tracking-[0.16em] text-[color:var(--muted-foreground)]">
                 {pick(language, `问题 ${step + 1} / 4`, `Question ${step + 1} of 4`)}
               </p>
-              <p className="text-xl font-semibold text-[color:var(--foreground)]">{guidedQuestionCopy[step] ?? guidedQuestions[step] ?? GUIDED_STEP_META[step].label}</p>
+              <p className="text-xl font-semibold text-[color:var(--foreground)]">{guidedQuestionCopy[step] ?? guidedQuestions[step] ?? guidedStepMeta[step].label}</p>
             </div>
 
             {step === 0 ? (

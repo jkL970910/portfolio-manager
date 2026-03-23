@@ -85,7 +85,7 @@ export function CitizenProfilePanel({
     <div className="space-y-5">
       <div className="flex items-center gap-3">
         <Badge variant="primary">{language === "zh" ? "公民档案" : "Profile"}</Badge>
-        {isAdmin ? <Badge variant="warning">{language === "zh" ? "Admin override 可用" : "Admin override enabled"}</Badge> : null}
+        {isAdmin ? <Badge variant="warning">{language === "zh" ? "可进行皇令改写" : "Admin override enabled"}</Badge> : null}
       </div>
       <CitizenIdentityCard
         title={citizen.citizenName}
@@ -109,7 +109,7 @@ export function CitizenProfilePanel({
       >
         <div className="rounded-[22px] border border-white/55 bg-white/42 px-4 py-3 text-sm text-[color:var(--muted-foreground)]">
           {language === "zh"
-            ? `当前财富快照：CAD ${citizen.wealthScoreSnapshotCad.toLocaleString("en-CA")}。系统默认按这个值推导身份和住址，若存在 Admin override，则以 override 为准。`
+            ? `当前财富快照：CAD ${citizen.wealthScoreSnapshotCad.toLocaleString("en-CA")}。系统默认按这个值推导身份和住址；若存在皇令改写，则以改写结果为准。`
             : `Wealth snapshot: CAD ${citizen.wealthScoreSnapshotCad.toLocaleString("en-CA")}. Rank and address are derived from this value unless an admin override is active.`}
         </div>
       </CitizenIdentityCard>
@@ -126,7 +126,7 @@ export function CitizenProfilePanel({
         <div className="rounded-[24px] border border-white/55 bg-white/38 p-4 backdrop-blur-md">
           <p className="text-sm text-[color:var(--muted-foreground)]">{language === "zh" ? "Override 状态" : "Override status"}</p>
           <p className="mt-3 text-xl font-semibold text-[color:var(--foreground)]">
-            {hasActiveOverride ? (language === "zh" ? "已启用" : "Active") : (language === "zh" ? "未启用" : "Inactive")}
+            {hasActiveOverride ? (language === "zh" ? "已启用皇令改写" : "Active") : (language === "zh" ? "未启用" : "Inactive")}
           </p>
         </div>
       </div>
@@ -134,7 +134,7 @@ export function CitizenProfilePanel({
       {isAdmin ? (
         <CitizenIdentityCard
           title={citizen.citizenName}
-          subtitle={language === "zh" ? "Admin override 预览" : "Admin override preview"}
+          subtitle={language === "zh" ? "皇令改写预览" : "Admin override preview"}
           badge={getCitizenRankLabel(previewRank, language)}
           fields={[
             { label: language === "zh" ? "性别" : "Gender", value: getCitizenGenderLabel(citizen.gender, language) },
@@ -154,7 +154,7 @@ export function CitizenProfilePanel({
         >
           <div className="rounded-[22px] border border-white/55 bg-white/42 px-4 py-3 text-sm text-[color:var(--muted-foreground)]">
             {language === "zh"
-              ? "这里预览的是当前 override 选择将会生成的最终身份证效果。未保存前不会覆盖正式档案。"
+              ? "这里预览的是当前皇令改写选择将会生成的最终身份证效果。未保存前不会覆盖正式档案。"
               : "This previews the effective citizen card that will be generated from the current override selections. It does not overwrite the saved archive until you save."}
           </div>
         </CitizenIdentityCard>
@@ -165,15 +165,15 @@ export function CitizenProfilePanel({
           <div className="flex items-center gap-3">
             <ShieldCheck className="h-5 w-5 text-[color:var(--warning)]" />
             <div>
-              <p className="font-semibold text-[color:var(--foreground)]">Admin override</p>
+              <p className="font-semibold text-[color:var(--foreground)]">{language === "zh" ? "皇令改写" : "Admin override"}</p>
               <p className="text-sm text-[color:var(--muted-foreground)]">
-                {language === "zh" ? "第一阶段只支持修改当前查看公民的身份、住址和身份证号。" : "First-stage admin controls update the current citizen's rank, address, and ID code only."}
+                {language === "zh" ? "第一阶段只支持改写当前查看公民的身份、住址和身份证号。" : "First-stage admin controls update the current citizen's rank, address, and ID code only."}
               </p>
             </div>
           </div>
           <div className="mt-5 grid gap-4 md:grid-cols-3">
             <label className="block space-y-2">
-              <span className="text-sm font-medium">{language === "zh" ? "Override 身份" : "Override rank"}</span>
+              <span className="text-sm font-medium">{language === "zh" ? "改写身份" : "Override rank"}</span>
               <select value={rank} onChange={(event) => setRank(event.target.value as CitizenRank | "")} className={FIELD_CLASS_NAME}>
                 <option value="">{language === "zh" ? "沿用系统推导" : "Use derived value"}</option>
                 {RANK_OPTIONS.map((option) => (
@@ -182,7 +182,7 @@ export function CitizenProfilePanel({
               </select>
             </label>
             <label className="block space-y-2">
-              <span className="text-sm font-medium">{language === "zh" ? "Override 住址" : "Override address"}</span>
+              <span className="text-sm font-medium">{language === "zh" ? "改写住址" : "Override address"}</span>
               <select value={addressTier} onChange={(event) => setAddressTier(event.target.value as CitizenAddressTier | "")} className={FIELD_CLASS_NAME}>
                 <option value="">{language === "zh" ? "沿用系统推导" : "Use derived value"}</option>
                 {ADDRESS_OPTIONS.map((option) => (
@@ -191,17 +191,17 @@ export function CitizenProfilePanel({
               </select>
             </label>
             <label className="block space-y-2">
-              <span className="text-sm font-medium">{language === "zh" ? "Override 身份证号" : "Override citizen ID"}</span>
+              <span className="text-sm font-medium">{language === "zh" ? "改写身份证号" : "Override citizen ID"}</span>
               <input value={idCode} onChange={(event) => setIdCode(event.target.value)} className={FIELD_CLASS_NAME} placeholder="LOO9988" />
             </label>
           </div>
           {status ? <p className="mt-4 text-sm text-[color:var(--muted-foreground)]">{status}</p> : null}
           <div className="mt-5 flex flex-wrap gap-3">
             <Button type="button" onClick={saveCurrentOverrides} disabled={isPending}>
-              {isPending ? (language === "zh" ? "保存中..." : "Saving...") : (language === "zh" ? "保存 override" : "Save override")}
+              {isPending ? (language === "zh" ? "保存中..." : "Saving...") : (language === "zh" ? "保存改写" : "Save override")}
             </Button>
             <Button type="button" variant="secondary" onClick={clearOverrides} disabled={isPending || !hasActiveOverride}>
-              {language === "zh" ? "清空 override" : "Clear override"}
+              {language === "zh" ? "清空改写" : "Clear override"}
             </Button>
           </div>
         </div>

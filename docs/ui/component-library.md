@@ -176,7 +176,8 @@ components/
   - uses a structured ID-card layout inspired by the Figma citizen card template
   - supports embedded children so login/register inputs can live inside the card body
   - supports rank and address visual stamps when matching mascot assets exist
-  - rank and address stamps expose hover/focus lore popovers for richer in-world explanation
+  - rank and address stamps scale on hover and open richer click popovers with enlarged visuals and world-building copy
+  - only one lore popover should be open at a time, and `Esc` should dismiss it
 
 ### `LooTermsDialog`
 
