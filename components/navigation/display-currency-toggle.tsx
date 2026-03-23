@@ -53,7 +53,7 @@ export function DisplayCurrencyToggle({
   }
 
   return (
-    <div className="group relative inline-flex items-center gap-2">
+    <div className="relative z-40 inline-flex items-center gap-2">
       <div className="inline-flex items-center rounded-full border border-white/60 bg-white/44 p-1.5 shadow-[0_12px_28px_rgba(110,103,130,0.07)] backdrop-blur-xl">
         {(["CAD", "USD"] as const).map((option) => {
           const active = option === activeCurrency;
@@ -74,11 +74,17 @@ export function DisplayCurrencyToggle({
           );
         })}
       </div>
-      <div className="flex h-9 w-9 items-center justify-center rounded-full border border-white/60 bg-white/44 text-[color:var(--foreground)]/78 shadow-[0_12px_28px_rgba(110,103,130,0.07)] backdrop-blur-xl transition-colors group-hover:text-[color:var(--foreground)] group-focus-within:text-[color:var(--foreground)]">
-        <Info className="h-4 w-4" />
-      </div>
-      <div className="pointer-events-none absolute right-0 top-[calc(100%+12px)] z-20 w-[340px] rounded-[24px] border border-[color:var(--border)] bg-white/72 p-4 text-left text-[13px] text-[color:var(--foreground)] opacity-0 shadow-[0_18px_40px_rgba(110,103,130,0.09)] backdrop-blur-2xl transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100">
-        <FxInfoPopoverContent currency={activeCurrency} fxRateLabel={fxRateLabel} fxNote={fxNote} />
+      <div className="group/info relative">
+        <button
+          type="button"
+          className="flex h-9 w-9 items-center justify-center rounded-full border border-white/60 bg-white/44 text-[color:var(--foreground)]/78 shadow-[0_12px_28px_rgba(110,103,130,0.07)] backdrop-blur-xl transition-colors hover:text-[color:var(--foreground)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--ring)]"
+          aria-label="FX info"
+        >
+          <Info className="h-4 w-4" />
+        </button>
+        <div className="pointer-events-none absolute right-0 top-[calc(100%+12px)] z-50 w-[340px] rounded-[24px] border border-[color:var(--border)] bg-white/80 p-4 text-left text-[13px] text-[color:var(--foreground)] opacity-0 shadow-[0_18px_40px_rgba(110,103,130,0.09)] backdrop-blur-2xl transition-opacity duration-150 group-hover/info:opacity-100 group-focus-within/info:opacity-100">
+          <FxInfoPopoverContent currency={activeCurrency} fxRateLabel={fxRateLabel} fxNote={fxNote} />
+        </div>
       </div>
     </div>
   );

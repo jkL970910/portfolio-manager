@@ -104,6 +104,8 @@ export function CitizenProfilePanel({
         issueValue={new Date(citizen.issuedAt).toLocaleDateString(language === "zh" ? "zh-CN" : "en-CA")}
         rankVisualSrc={getCitizenRankVisualSrc(citizen.effectiveRank)}
         addressVisualSrc={getCitizenAddressVisualSrc(citizen.effectiveAddressTier)}
+        rankValue={citizen.effectiveRank}
+        addressTier={citizen.effectiveAddressTier}
       >
         <div className="rounded-[22px] border border-white/55 bg-white/42 px-4 py-3 text-sm text-[color:var(--muted-foreground)]">
           {language === "zh"
@@ -147,6 +149,8 @@ export function CitizenProfilePanel({
           issueValue={language === "zh" ? "保存后生效" : "Applies after save"}
           rankVisualSrc={getCitizenRankVisualSrc(previewRank)}
           addressVisualSrc={getCitizenAddressVisualSrc(previewAddressTier)}
+          rankValue={previewRank}
+          addressTier={previewAddressTier}
         >
           <div className="rounded-[22px] border border-white/55 bg-white/42 px-4 py-3 text-sm text-[color:var(--muted-foreground)]">
             {language === "zh"

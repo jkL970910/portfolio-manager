@@ -130,6 +130,7 @@ components/
   - CN / US language options
   - cookie + user preference update
   - optimistic route refresh
+  - elevated dropdown layer that must remain visible above page hero badges
 
 ### `FxInfoPopoverContent`
 
@@ -175,6 +176,7 @@ components/
   - uses a structured ID-card layout inspired by the Figma citizen card template
   - supports embedded children so login/register inputs can live inside the card body
   - supports rank and address visual stamps when matching mascot assets exist
+  - rank and address stamps expose hover/focus lore popovers for richer in-world explanation
 
 ### `LooTermsDialog`
 

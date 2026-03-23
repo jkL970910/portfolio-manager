@@ -54,6 +54,8 @@ export function ChineseLoginPanel({
         issueValue={new Date(citizen.issuedAt).toLocaleDateString("zh-CN")}
         rankVisualSrc={getCitizenRankVisualSrc(citizen.effectiveRank)}
         addressVisualSrc={getCitizenAddressVisualSrc(citizen.effectiveAddressTier)}
+        rankValue={citizen.effectiveRank}
+        addressTier={citizen.effectiveAddressTier}
       >
         <div className="flex flex-wrap gap-3">
           <Button href="/dashboard" trailingIcon={<ArrowRight className="h-4 w-4" />}>
@@ -80,6 +82,8 @@ export function ChineseLoginPanel({
       mascotName="citizenDefault"
       issueLabel="发证状态"
       issueValue="等待 Loo皇审查"
+      rankValue={null}
+      addressTier={null}
     >
       <div className="space-y-4">
         <p className="text-sm leading-7 text-[color:var(--muted-foreground)]">

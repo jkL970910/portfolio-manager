@@ -2,9 +2,10 @@
 
 import Image from "next/image";
 import type { ReactNode } from "react";
-import type { DisplayLanguage } from "@/lib/backend/models";
+import type { CitizenAddressTier, CitizenRank, DisplayLanguage } from "@/lib/backend/models";
 import { MascotAsset, type MascotAssetName } from "@/components/brand/mascot-asset";
 import { Badge } from "@/components/ui/badge";
+import { pick } from "@/lib/i18n/ui";
 import { cn } from "@/lib/utils";
 
 type CitizenField = {
@@ -25,7 +26,9 @@ export function CitizenIdentityCard({
   issueValue,
   language = "zh",
   rankVisualSrc,
-  addressVisualSrc
+  addressVisualSrc,
+  rankValue,
+  addressTier
 }: {
   title: string;
   subtitle?: string;
@@ -40,6 +43,8 @@ export function CitizenIdentityCard({
   language?: DisplayLanguage;
   rankVisualSrc?: string | null;
   addressVisualSrc?: string | null;
+  rankValue?: CitizenRank | null;
+  addressTier?: CitizenAddressTier | null;
 }) {
   const leadingFields = fields.slice(0, 2);
   const trailingFields = fields.slice(2, 4);
@@ -59,9 +64,7 @@ export function CitizenIdentityCard({
         <div className="relative z-10">
           <div className="mb-5 flex items-start justify-between gap-3">
             <div className="rounded-full bg-[linear-gradient(135deg,rgba(151,198,255,0.24),rgba(248,205,229,0.34))] px-4 py-2 shadow-[0_10px_24px_rgba(119,132,175,0.08)]">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[color:var(--muted-foreground)]">
-                {subtitle}
-              </p>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[color:var(--muted-foreground)]">{subtitle}</p>
             </div>
             {badge ? <Badge variant="primary">{badge}</Badge> : null}
           </div>
@@ -70,7 +73,7 @@ export function CitizenIdentityCard({
             <div className="space-y-4">
               <div className="rounded-[24px] border border-white/70 bg-[linear-gradient(180deg,rgba(226,241,255,0.82),rgba(255,236,243,0.72))] px-5 py-4 shadow-[0_14px_28px_rgba(108,121,160,0.08)]">
                 <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-[color:var(--muted-foreground)]">
-                  {language === "zh" ? "公民姓名" : "Citizen name"}
+                  {pick(language, "公民姓名", "Citizen name")}
                 </p>
                 <h3 className="mt-2 text-[28px] font-semibold tracking-[-0.04em] text-[color:var(--foreground)]">{title}</h3>
               </div>
@@ -92,22 +95,30 @@ export function CitizenIdentityCard({
               <div className="relative rounded-[30px] bg-[linear-gradient(180deg,rgba(190,229,255,0.66),rgba(255,228,239,0.54))] p-2 shadow-[0_16px_28px_rgba(111,133,173,0.12)]">
                 <MascotAsset name={mascotName} className="h-[208px] w-[184px] rounded-[24px] border-white/65 bg-white/42" sizes="184px" />
                 {rankVisualSrc ? (
-                  <div className="absolute -bottom-3 left-5 rounded-full border-2 border-white/90 bg-[linear-gradient(135deg,rgba(255,255,255,0.94),rgba(255,243,247,0.88))] px-2 py-2 shadow-[0_12px_24px_rgba(110,103,130,0.16)]">
-                    <MiniStamp src={rankVisualSrc} alt="Citizen rank visual" />
-                  </div>
+                  <StampPopover
+                    side="left"
+                    src={rankVisualSrc}
+                    alt="Citizen rank visual"
+                    title={pick(language, "身份等级", "Citizen rank")}
+                    description={getRankFlavorText(rankValue, language)}
+                  />
                 ) : null}
                 {addressVisualSrc ? (
-                  <div className="absolute -bottom-3 right-5 rounded-full border-2 border-white/90 bg-[linear-gradient(135deg,rgba(255,255,255,0.94),rgba(243,248,255,0.88))] px-2 py-2 shadow-[0_12px_24px_rgba(110,103,130,0.16)]">
-                    <MiniStamp src={addressVisualSrc} alt="Citizen address visual" />
-                  </div>
+                  <StampPopover
+                    side="right"
+                    src={addressVisualSrc}
+                    alt="Citizen address visual"
+                    title={pick(language, "Loo国住址", "Loo residence")}
+                    description={getAddressFlavorText(addressTier, language)}
+                  />
                 ) : null}
               </div>
               <div className="rounded-[22px] border border-white/65 bg-white/58 px-4 py-3 text-center backdrop-blur-xl">
                 <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-[color:var(--muted-foreground)]">
-                  {language === "zh" ? "证件级别" : "Card class"}
+                  {pick(language, "证件级别", "Card class")}
                 </p>
                 <p className="mt-2 text-sm font-semibold text-[color:var(--foreground)]">
-                  {badge ?? (language === "zh" ? "公民档案" : "Citizen archive")}
+                  {badge ?? pick(language, "公民档案", "Citizen archive")}
                 </p>
               </div>
             </div>
@@ -122,13 +133,13 @@ export function CitizenIdentityCard({
           <div className="mt-5 grid gap-3 rounded-[24px] border border-white/70 bg-[linear-gradient(180deg,rgba(217,238,255,0.72),rgba(255,237,244,0.66))] px-5 py-4 shadow-[0_14px_28px_rgba(111,133,173,0.08)] md:grid-cols-[0.9fr_1.1fr] md:items-center">
             <div>
               <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-[color:var(--muted-foreground)]">
-                {issueLabel ?? (language === "zh" ? "发证时间" : "Issued")}
+                {issueLabel ?? pick(language, "发证时间", "Issued")}
               </p>
               <p className="mt-2 text-sm font-semibold text-[color:var(--foreground)]">{issueValue ?? "--"}</p>
             </div>
             <div className="rounded-[18px] bg-white/58 px-4 py-3 backdrop-blur-xl">
               <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-[color:var(--muted-foreground)]">
-                {language === "zh" ? "公民编号" : "Citizen ID"}
+                {pick(language, "公民编号", "Citizen ID")}
               </p>
               <p className="mt-2 text-sm font-bold tracking-[0.18em] text-[color:var(--foreground)]">{idCode}</p>
             </div>
@@ -164,16 +175,73 @@ function FieldBlock({
   );
 }
 
-function MiniStamp({
+function StampPopover({
+  side,
   src,
-  alt
+  alt,
+  title,
+  description
 }: {
+  side: "left" | "right";
   src: string;
   alt: string;
+  title: string;
+  description: string;
 }) {
   return (
-    <div className="h-10 w-10 overflow-hidden rounded-full">
-      <Image src={src} alt={alt} width={80} height={80} className="h-full w-full object-cover" unoptimized />
+    <div className={cn("group/stamp absolute -bottom-3 z-20", side === "left" ? "left-5" : "right-5")}>
+      <button
+        type="button"
+        className="rounded-full border-2 border-white/90 bg-[linear-gradient(135deg,rgba(255,255,255,0.94),rgba(255,243,247,0.88))] px-2 py-2 shadow-[0_12px_24px_rgba(110,103,130,0.16)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--ring)]"
+        aria-label={title}
+      >
+        <div className="h-10 w-10 overflow-hidden rounded-full">
+          <Image src={src} alt={alt} width={80} height={80} className="h-full w-full object-cover" unoptimized />
+        </div>
+      </button>
+      <div
+        className={cn(
+          "pointer-events-none absolute bottom-[calc(100%+12px)] z-30 w-56 rounded-[22px] border border-white/70 bg-white/86 p-3 text-left opacity-0 shadow-[0_18px_36px_rgba(110,103,130,0.12)] backdrop-blur-2xl transition-opacity duration-150 group-hover/stamp:opacity-100 group-focus-within/stamp:opacity-100",
+          side === "left" ? "left-0" : "right-0"
+        )}
+      >
+        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[color:var(--muted-foreground)]">{title}</p>
+        <p className="mt-2 text-sm leading-6 text-[color:var(--foreground)]">{description}</p>
+      </div>
     </div>
   );
+}
+
+function getRankFlavorText(rank: CitizenRank | null | undefined, language: DisplayLanguage) {
+  switch (rank) {
+    case "lowly-ox":
+      return pick(language, "刚入籍的基层公民，目前多在牛棚劳作，离真正的宝库核心还很远。", "A newly admitted citizen still working from the outer barn, far from the vault core.");
+    case "base-loo":
+      return pick(language, "已经离开牛棚，搬进了 Loo 国郊区，开始拥有更稳定的国库资格。", "Past the barn phase and now living in the Loo suburbs with a steadier place in the treasury.");
+    case "citizen":
+      return pick(language, "正式 Loo 国子民，可以在城内安家，也更接近核心财富配置权。", "A full citizen of Loo with city access and a stronger place in the capital allocation order.");
+    case "general":
+      return pick(language, "Loo 皇大将军，已被视为宝库核心战力，距离皇殿只差一步。", "A Grand General of Loo, treated as core treasury strength and one step from the palace.");
+    case "emperor":
+      return pick(language, "由管理员特批的最高等级，拥有 Loo 皇级别的专属身份与最稀缺编号。", "The admin-only highest class, carrying emperor-level status and the rarest ID numbers.");
+    default:
+      return pick(language, "这枚章记录你当前在 Loo 国的身份等级。", "This stamp shows your current rank inside Loo.");
+  }
+}
+
+function getAddressFlavorText(addressTier: CitizenAddressTier | null | undefined, language: DisplayLanguage) {
+  switch (addressTier) {
+    case "cowshed":
+      return pick(language, "宝库之外的起点住址，说明当前资产还停留在最早期的观察阶段。", "The outer starting address, used when assets are still at the earliest stage.");
+    case "suburbs":
+      return pick(language, "Loo 国郊区，说明你已通过最基础的资产门槛。", "The Loo suburbs, showing that you have crossed the initial wealth threshold.");
+    case "city":
+      return pick(language, "Loo 国城内，代表你已经是稳定的国库居民。", "Inner Loo City, marking you as a stable resident of the treasury.");
+    case "palace-gate":
+      return pick(language, "Loo 皇殿前，意味着你的资产规模已经接近核心层。", "Before the palace gate, meaning your assets are now near the inner core.");
+    case "bedchamber":
+      return pick(language, "Loo 皇寝宫，仅向最高等级开放。", "The Emperor's Chamber, reserved for the highest class only.");
+    default:
+      return pick(language, "这枚住址章会随着你的资产等级自动变化。", "This residence stamp changes automatically with your wealth tier.");
+  }
 }

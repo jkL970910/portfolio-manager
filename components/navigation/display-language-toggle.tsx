@@ -85,7 +85,7 @@ export function DisplayLanguageToggle({ language }: { language: DisplayLanguage 
   }
 
   return (
-    <div ref={rootRef} className="relative">
+    <div ref={rootRef} className="relative z-40">
       <button
         type="button"
         onClick={() => setIsOpen((value) => !value)}
@@ -102,7 +102,7 @@ export function DisplayLanguageToggle({ language }: { language: DisplayLanguage 
       </button>
 
       {isOpen ? (
-        <div className="absolute right-0 top-[calc(100%+10px)] z-30 min-w-[180px] rounded-[24px] border border-white/65 bg-[linear-gradient(180deg,rgba(255,255,255,0.92),rgba(247,244,251,0.84))] p-2 shadow-[var(--shadow-card)] backdrop-blur-2xl">
+        <div className="absolute right-0 top-[calc(100%+10px)] z-50 min-w-[180px] rounded-[24px] border border-white/65 bg-[linear-gradient(180deg,rgba(255,255,255,0.96),rgba(247,244,251,0.92))] p-2 shadow-[var(--shadow-card)] backdrop-blur-2xl">
           {OPTIONS.map((option) => {
             const active = option.language === language;
             return (
@@ -130,7 +130,7 @@ export function DisplayLanguageToggle({ language }: { language: DisplayLanguage 
       ) : null}
 
       {status.type === "error" ? (
-        <div className="absolute right-0 top-[calc(100%+72px)] z-20 min-w-[220px] rounded-2xl border border-[#e7b0b8] bg-[#fff3f5] px-4 py-3 text-xs text-[#8e2433] shadow-[var(--shadow-card)]">
+        <div className="absolute right-0 top-[calc(100%+72px)] z-50 min-w-[220px] rounded-2xl border border-[#e7b0b8] bg-[#fff3f5] px-4 py-3 text-xs text-[#8e2433] shadow-[var(--shadow-card)]">
           {status.message}
         </div>
       ) : null}

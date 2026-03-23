@@ -115,6 +115,8 @@ export function ChineseRegisterPanel({
         mascotName={previewAvatar}
         issueLabel="发证状态"
         issueValue="等待 Loo皇审批"
+        rankValue={null}
+        addressTier={null}
       >
         <div className="space-y-5">
           <div className="flex flex-wrap gap-3">
@@ -229,6 +231,8 @@ export function ChineseRegisterPanel({
             issueValue={new Date(resultModal.citizenProfile.issuedAt).toLocaleDateString("zh-CN")}
             rankVisualSrc={getCitizenRankVisualSrc(resultModal.citizenProfile.effectiveRank)}
             addressVisualSrc={getCitizenAddressVisualSrc(resultModal.citizenProfile.effectiveAddressTier)}
+            rankValue={resultModal.citizenProfile.effectiveRank}
+            addressTier={resultModal.citizenProfile.effectiveAddressTier}
           />
         ) : null}
       </LooApprovalDialog>

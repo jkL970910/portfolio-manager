@@ -30,7 +30,7 @@ export function TopNav({
   ] as const satisfies ReadonlyArray<{ href: Route; label: string }>;
 
   return (
-    <nav className="relative overflow-hidden rounded-b-[28px] border-t border-white/40 bg-[linear-gradient(180deg,rgba(255,255,255,0.3),rgba(255,255,255,0.16))] px-4 py-3 backdrop-blur-xl before:pointer-events-none before:absolute before:inset-0 before:bg-[radial-gradient(circle_at_18%_18%,rgba(240,143,178,0.12),transparent_24%),radial-gradient(circle_at_82%_26%,rgba(139,168,255,0.14),transparent_22%)] after:pointer-events-none after:absolute after:inset-x-0 after:top-0 after:h-px after:bg-[linear-gradient(90deg,transparent,var(--edge-highlight),transparent)] md:px-8">
+    <nav className="relative overflow-visible rounded-b-[28px] border-t border-white/40 bg-[linear-gradient(180deg,rgba(255,255,255,0.3),rgba(255,255,255,0.16))] px-4 py-3 backdrop-blur-xl before:pointer-events-none before:absolute before:inset-0 before:bg-[radial-gradient(circle_at_18%_18%,rgba(240,143,178,0.12),transparent_24%),radial-gradient(circle_at_82%_26%,rgba(139,168,255,0.14),transparent_22%)] after:pointer-events-none after:absolute after:inset-x-0 after:top-0 after:h-px after:bg-[linear-gradient(90deg,transparent,var(--edge-highlight),transparent)] md:px-8">
       <div className="relative z-10 flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap gap-2">
           {navItems.map((item) => {

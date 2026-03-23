@@ -64,7 +64,7 @@ type GuidedDraft = Omit<FormState, "watchlistSymbols"> & {
   targetMixLabel: string;
 };
 
-type ManualSectionId = "strategy" | "allocation" | "priority" | "tax" | "watchlist";
+type ManualSectionId = "overview" | "strategy" | "allocation" | "priority" | "tax" | "watchlist";
 
 type ManualSectionMeta = {
   id: ManualSectionId;
@@ -226,6 +226,8 @@ function formatDraftSavedAt(value: string | null, language: DisplayLanguage) {
 
 function getManualSectionSummary(section: ManualSectionId, form: FormState, currentTargetTotal: number, language: DisplayLanguage) {
   switch (section) {
+    case "overview":
+      return pick(language, "先看总概述，再决定展开哪一组细节。", "Start from the summary, then open the detail group you want.");
     case "strategy":
       return `${getRiskProfileLabel(form.riskProfile, language)} · ${getTransitionPreferenceLabel(form.transitionPreference, language)} · ${getRecommendationStrategyLabel(form.recommendationStrategy, language)}`;
     case "allocation":
@@ -250,6 +252,11 @@ function getManualSectionSummary(section: ManualSectionId, form: FormState, curr
 function getManualSectionMeta(language: DisplayLanguage, manualGroups: Array<{ title: string; description: string; badge?: string }>): ManualSectionMeta[] {
   const [, , , taxGroup] = manualGroups;
   return [
+    {
+      id: "overview",
+      title: pick(language, "总概述", "Overview"),
+      description: pick(language, "先浏览当前配置摘要，再决定进入哪一组细节。", "Review the active profile summary before opening any detailed group.")
+    },
     {
       id: "strategy",
       title: pick(language, "策略控制", "Strategy controls"),
@@ -311,7 +318,7 @@ export function PreferencesWorkbench({
   const [guidedAnswers, setGuidedAnswers] = useState<GuidedAllocationAnswers>(() => initialGuidedDraft?.answers ?? getDefaultGuidedAnswers(initialProfile));
   const [guidedDraftSavedAt, setGuidedDraftSavedAt] = useState<string | null>(() => initialGuidedDraft?.updatedAt ?? null);
   const [guidedStep, setGuidedStep] = useState(0);
-  const [openManualSection, setOpenManualSection] = useState<ManualSectionId>("strategy");
+  const [openManualSection, setOpenManualSection] = useState<ManualSectionId>("overview");
 
   const currentTargetTotal = useMemo(
     () => form.targetAllocation.reduce((sum, target) => sum + Number(target.targetPct || 0), 0),
@@ -352,7 +359,7 @@ export function PreferencesWorkbench({
       recommendationStrategy: guidedDraft.recommendationStrategy,
       rebalancingTolerancePct: guidedDraft.rebalancingTolerancePct
     }));
-    setOpenManualSection("strategy");
+    setOpenManualSection("overview");
     setStatus({
       type: "success",
       message: pick(language, "引导式配置草稿已加载到手动设置。检查折叠项后再保存。", "Guided allocation draft loaded into manual configuration. Review the collapsed sections and save when ready.")
@@ -562,6 +569,38 @@ export function PreferencesWorkbench({
                     open={isOpen}
                     onToggle={() => setOpenManualSection(section.id)}
                   >
+                    {section.id === "overview" ? (
+                      <div className="grid gap-4 md:grid-cols-2">
+                        <div className="rounded-[22px] border border-white/55 bg-white/38 p-4 backdrop-blur-md">
+                          <p className="text-sm font-semibold text-[color:var(--foreground)]">{pick(language, "当前策略摘要", "Current strategy summary")}</p>
+                          <p className="mt-2 text-sm leading-7 text-[color:var(--muted-foreground)]">
+                            {pick(
+                              language,
+                              `${getRiskProfileLabel(form.riskProfile, language)}，${getTransitionPreferenceLabel(form.transitionPreference, language)}，${getRecommendationStrategyLabel(form.recommendationStrategy, language)}。`,
+                              `${getRiskProfileLabel(form.riskProfile, language)} risk, ${getTransitionPreferenceLabel(form.transitionPreference, language)} transition, ${getRecommendationStrategyLabel(form.recommendationStrategy, language)} strategy.`
+                            )}
+                          </p>
+                        </div>
+                        <div className="rounded-[22px] border border-white/55 bg-white/38 p-4 backdrop-blur-md">
+                          <p className="text-sm font-semibold text-[color:var(--foreground)]">{pick(language, "资金与约束", "Funding and constraints")}</p>
+                          <p className="mt-2 text-sm leading-7 text-[color:var(--muted-foreground)]">
+                            {pick(
+                              language,
+                              `目标配置共 ${currentTargetTotal}%，账户顺序为 ${form.accountFundingPriority.map((type) => getAccountTypeLabel(type, language)).join(" -> ")}。`,
+                              `Target mix totals ${currentTargetTotal}% and the funding ladder is ${form.accountFundingPriority.map((type) => getAccountTypeLabel(type, language)).join(" -> ")}.`
+                            )}
+                          </p>
+                          <p className="mt-2 text-sm leading-7 text-[color:var(--muted-foreground)]">
+                            {pick(
+                              language,
+                              `现金缓冲目标 ${form.cashBufferTargetCad.toLocaleString("en-CA")} CAD，${form.taxAwarePlacement ? "已启用税务感知放置。" : "暂未启用税务感知放置。"} `,
+                              `Cash buffer target ${form.cashBufferTargetCad.toLocaleString("en-CA")} CAD, with ${form.taxAwarePlacement ? "tax-aware placement enabled." : "tax-aware placement disabled."}`
+                            )}
+                          </p>
+                        </div>
+                      </div>
+                    ) : null}
+
                     {section.id === "strategy" ? (
                       <div className="grid gap-4 md:grid-cols-2">
                         <Field label={pick(language, "风险档位", "Risk profile")}>
