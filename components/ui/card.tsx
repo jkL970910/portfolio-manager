@@ -4,11 +4,11 @@ export function Card({ className, children }: { className?: string; children: Re
   return (
     <section
       className={cn(
-        "rounded-[28px] border border-[color:var(--border)] bg-[color:var(--card)] backdrop-blur-xl shadow-[var(--shadow-card)]",
+        "relative isolate overflow-hidden rounded-[28px] border border-[color:var(--border)] bg-[color:var(--card)] shadow-[var(--shadow-card)] backdrop-blur-xl before:pointer-events-none before:absolute before:inset-px before:rounded-[26px] before:bg-[linear-gradient(180deg,rgba(255,255,255,0.42),rgba(255,255,255,0.14)_40%,rgba(255,255,255,0.02)_100%)] before:opacity-90",
         className
       )}
     >
-      {children}
+      <div className="relative z-10">{children}</div>
     </section>
   );
 }

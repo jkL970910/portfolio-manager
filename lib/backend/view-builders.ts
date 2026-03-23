@@ -1,4 +1,4 @@
-import {
+﻿import {
   DashboardData,
   ImportData,
   PortfolioData,
@@ -18,33 +18,67 @@ import {
   RiskProfile,
   UserProfile
 } from "@/lib/backend/models";
+import {
+  getAccountTypeLabel,
+  getAssetClassLabel,
+  getCategoryLabel,
+  getMerchantLabel,
+  getRecommendationStrategyLabel,
+  getRiskProfileLabel,
+  getSectorLabel,
+  getTransitionPreferenceLabel
+} from "@/lib/i18n/finance";
 import { formatMoney, roundAmount } from "@/lib/money/display";
+import type { DisplayLanguage } from "@/lib/i18n/ui";
+import { pick } from "@/lib/i18n/ui";
 
-const MONTH_LABELS = ["Oct", "Nov", "Dec", "Jan", "Feb", "Mar"];
+const MONTH_LABELS_EN = ["Oct", "Nov", "Dec", "Jan", "Feb", "Mar"];
+const MONTH_LABELS_ZH = ["10月", "11月", "12月", "1月", "2月", "3月"];
 const PRIORITY_BADGE_VARIANTS = {
   first: "primary",
   second: "success",
   later: "warning"
 } as const;
 
-const ACCOUNT_CAPTIONS: Record<InvestmentAccount["type"], string> = {
-  TFSA: "Tax-free growth sleeve",
-  RRSP: "Long-horizon retirement sleeve",
-  FHSA: "Home down-payment sleeve",
-  Taxable: "Flexible capital account"
+const ACCOUNT_CAPTIONS: Record<InvestmentAccount["type"], { zh: string; en: string }> = {
+  TFSA: { zh: "免税增长账户", en: "Tax-free growth sleeve" },
+  RRSP: { zh: "长期退休账户", en: "Long-horizon retirement sleeve" },
+  FHSA: { zh: "购房目标账户", en: "Home down-payment sleeve" },
+  Taxable: { zh: "灵活应税账户", en: "Flexible capital account" }
 };
 
-const ACCOUNT_TYPE_FIT: Record<InvestmentAccount["type"], string> = {
-  TFSA: "Generally suitable for tax-free compounding and secondary funding priorities.",
-  RRSP: "Commonly preferred for sheltered long-horizon allocations.",
-  FHSA: "Commonly preferred when home-goal room remains available.",
-  Taxable: "Fallback account once sheltered room is consumed or flexibility is needed."
+const ACCOUNT_TYPE_FIT: Record<InvestmentAccount["type"], { zh: string; en: string }> = {
+  TFSA: {
+    zh: "通常更适合免税复利增长，以及作为第二优先的注资账户。",
+    en: "Generally suitable for tax-free compounding and secondary funding priorities."
+  },
+  RRSP: {
+    zh: "通常更适合长期、受税务保护的核心配置。",
+    en: "Commonly preferred for sheltered long-horizon allocations."
+  },
+  FHSA: {
+    zh: "当购房目标相关额度仍可用时，通常会优先考虑。",
+    en: "Commonly preferred when home-goal room remains available."
+  },
+  Taxable: {
+    zh: "在受保护账户额度用尽，或需要更高灵活性时作为回退账户。",
+    en: "Fallback account once sheltered room is consumed or flexibility is needed."
+  }
 };
 
-const RISK_DETAILS: Record<RiskProfile, string> = {
-  Conservative: "Defensive profile with more income and cash tolerance.",
-  Balanced: "Within configured tolerance band.",
-  Growth: "Higher equity exposure than target comfort band."
+const RISK_DETAILS: Record<RiskProfile, { zh: string; en: string }> = {
+  Conservative: {
+    zh: "更偏防守型，允许更高的固定收益和现金比例。",
+    en: "Defensive profile with more income and cash tolerance."
+  },
+  Balanced: {
+    zh: "当前风险暴露大致在你设定的容忍区间内。",
+    en: "Within configured tolerance band."
+  },
+  Growth: {
+    zh: "股票暴露高于较保守配置的舒适区间。",
+    en: "Higher equity exposure than target comfort band."
+  }
 };
 
 const TARGET_PRESETS: Record<RiskProfile, AllocationTarget[]> = {
@@ -86,16 +120,16 @@ function formatDisplayCurrency(valueCad: number, context: DisplayContext) {
   return formatMoney(convertCadToDisplay(valueCad, context), context.currency);
 }
 
-function buildDisplayContext(context: DisplayContext) {
+function buildDisplayContext(context: DisplayContext, language: DisplayLanguage) {
   const fxRate = context.currency === "CAD" ? 1 : context.cadToDisplayRate;
   return {
     currency: context.currency,
     fxRateLabel: context.currency === "CAD"
-      ? "Base analytics and display are in CAD."
+      ? pick(language, "分析基准与显示币种当前都为 CAD。", "Base analytics and display are in CAD.")
       : `1 CAD = ${fxRate.toFixed(4)} USD`,
     fxNote: context.currency === "CAD"
-      ? "CAD is the active display currency. USD-native positions retain their own price inputs, while portfolio analytics stay normalized in CAD."
-      : "USD is the active display currency. Portfolio analytics remain normalized in CAD and are converted into USD for display using the latest cached USD/CAD FX rate."
+      ? pick(language, "CAD 是当前显示币种。USD 原生持仓会保留自己的价格输入，但组合分析仍统一按 CAD 归一化。", "CAD is the active display currency. USD-native positions retain their own price inputs, while portfolio analytics stay normalized in CAD.")
+      : pick(language, "USD 是当前显示币种。底层组合分析仍按 CAD 归一化，再按最新缓存的 USD/CAD 汇率换算成 USD 显示。", "USD is the active display currency. Portfolio analytics remain normalized in CAD and are converted into USD for display using the latest cached USD/CAD FX rate.")
   };
 }
 
@@ -123,9 +157,13 @@ function round(value: number, digits = 0) {
   return Math.round(value * factor) / factor;
 }
 
-function getLatestMonthLabel() {
+function getMonthLabels(language: DisplayLanguage) {
+  return language === "zh" ? MONTH_LABELS_ZH : MONTH_LABELS_EN;
+}
+
+function getLatestMonthLabel(language: DisplayLanguage) {
   const now = new Date();
-  return now.toLocaleString("en-CA", { month: "long", year: "numeric" });
+  return now.toLocaleString(language === "zh" ? "zh-CN" : "en-CA", { month: "long", year: "numeric" });
 }
 
 function sum(values: number[]) {
@@ -166,7 +204,7 @@ function getTargetAllocation(profile: PreferenceProfile) {
   return new Map(TARGET_PRESETS[profile.riskProfile].map((target) => [target.assetClass, target.targetPct]));
 }
 
-function getSixMonthSeries(latestValue: number, profile: PreferenceProfile, labels = MONTH_LABELS) {
+function getSixMonthSeries(latestValue: number, profile: PreferenceProfile, labels = MONTH_LABELS_EN) {
   const growthCurve = profile.riskProfile === "Growth"
     ? [0.88, 0.91, 0.93, 0.95, 0.97, 1]
     : profile.riskProfile === "Conservative"
@@ -179,7 +217,7 @@ function getSixMonthSeries(latestValue: number, profile: PreferenceProfile, labe
   }));
 }
 
-function getMonthlyTransactionSeries(transactions: CashflowTransaction[]) {
+function getMonthlyTransactionSeries(transactions: CashflowTransaction[], language: DisplayLanguage) {
   const outflows = transactions.filter((transaction) => transaction.direction === "outflow");
   const monthlyTotals = groupBy(
     outflows,
@@ -190,14 +228,14 @@ function getMonthlyTransactionSeries(transactions: CashflowTransaction[]) {
 
   if (sortedKeys.length >= 6) {
     return sortedKeys.slice(-6).map((key) => ({
-      label: new Date(`${key}-01T00:00:00`).toLocaleString("en-CA", { month: "short" }),
+      label: new Date(`${key}-01T00:00:00`).toLocaleString(language === "zh" ? "zh-CN" : "en-CA", { month: "short" }),
       value: round(monthlyTotals.get(key) ?? 0, 0)
     }));
   }
 
   const latestValue = round(sortedKeys.length > 0 ? monthlyTotals.get(sortedKeys[sortedKeys.length - 1]) ?? 0 : 0, 0);
   const fallback = [1.08, 1.05, 1.02, 0.98, 1.01, 1].map((factor) => round(latestValue * factor, 0));
-  return MONTH_LABELS.map((label, index) => ({ label, value: fallback[index] ?? latestValue }));
+  return getMonthLabels(language).map((label, index) => ({ label, value: fallback[index] ?? latestValue }));
 }
 
 function getCurrentMonthTransactions(transactions: CashflowTransaction[]) {
@@ -233,7 +271,13 @@ function buildSpendingSummary(transactions: CashflowTransaction[], cashBufferTar
   };
 }
 
-function getHealthPreview(currentAllocation: Map<string, number>, targetAllocation: Map<string, number>, holdings: HoldingPosition[], profile: PreferenceProfile) {
+function getHealthPreview(
+  currentAllocation: Map<string, number>,
+  targetAllocation: Map<string, number>,
+  holdings: HoldingPosition[],
+  profile: PreferenceProfile,
+  language: DisplayLanguage
+) {
   const allocationGap = [...targetAllocation.entries()].map(([assetClass, targetPct]) => Math.abs((currentAllocation.get(assetClass) ?? 0) - targetPct));
   const allocationScore = clamp(100 - sum(allocationGap) * 1.8, 32, 92);
   const largestHolding = holdings.sort((left, right) => right.weightPct - left.weightPct)[0]?.weightPct ?? 0;
@@ -246,56 +290,73 @@ function getHealthPreview(currentAllocation: Map<string, number>, targetAllocati
   const riskAlignmentScore = clamp(82 - fixedIncomeGap * 2 - riskPenalty, 40, 90);
 
   return [
-    { dimension: "Allocation", value: round(allocationScore, 0) },
-    { dimension: "Diversification", value: round(diversificationScore, 0) },
-    { dimension: "Efficiency", value: round(efficiencyScore, 0) },
-    { dimension: "Concentration", value: round(concentrationScore, 0) },
-    { dimension: "Risk Fit", value: round(riskAlignmentScore, 0) }
+    { dimension: pick(language, "配置贴合", "Allocation"), value: round(allocationScore, 0) },
+    { dimension: pick(language, "分散度", "Diversification"), value: round(diversificationScore, 0) },
+    { dimension: pick(language, "账户效率", "Efficiency"), value: round(efficiencyScore, 0) },
+    { dimension: pick(language, "集中度", "Concentration"), value: round(concentrationScore, 0) },
+    { dimension: pick(language, "风险匹配", "Risk Fit"), value: round(riskAlignmentScore, 0) }
   ];
 }
 
-function getRecommendationTheme(run: RecommendationRun | null, context: DisplayContext) {
+function getRecommendationTheme(
+  run: RecommendationRun | null,
+  context: DisplayContext,
+  language: DisplayLanguage,
+  profile: PreferenceProfile
+) {
   const lead = run?.items[0];
   if (!lead) {
     return {
-      theme: "Complete import and preference setup to generate recommendations",
-      subtitle: "No recommendation run has been generated yet.",
-      reason: "Once holdings, accounts, and allocation preferences are available, the engine can rank contribution priorities.",
+      theme: pick(language, "完成导入和偏好设置后即可生成建议", "Complete import and preference setup to generate recommendations"),
+      subtitle: pick(language, "当前还没有生成 recommendation run。", "No recommendation run has been generated yet."),
+      reason: pick(language, "当持仓、账户和目标配置都可用时，引擎才能开始排序下一笔资金的优先去向。", "Once holdings, accounts, and allocation preferences are available, the engine can rank contribution priorities."),
       signals: [
-        "Import at least one account and one holding to unlock portfolio diagnostics.",
-        "Save investment preferences so the recommendation engine has a target allocation baseline."
+        pick(language, "至少导入一个账户和一个持仓，才能解锁组合诊断。", "Import at least one account and one holding to unlock portfolio diagnostics."),
+        pick(language, "先保存投资偏好，让推荐引擎拥有目标配置基线。", "Save investment preferences so the recommendation engine has a target allocation baseline.")
       ]
     };
   }
 
   return {
-    theme: `${lead.assetClass} in ${lead.targetAccountType}`,
-    subtitle: `Leading recommendation for the next ${formatDisplayCurrency(run.contributionAmountCad, context)} contribution`,
-    reason: lead.explanation,
-    signals: run.assumptions.slice(0, 2)
+    theme: pick(
+      language,
+      `${getAccountTypeLabel(lead.targetAccountType, language)} 的 ${getAssetClassLabel(lead.assetClass, language)}`,
+      `${getAssetClassLabel(lead.assetClass, language)} in ${getAccountTypeLabel(lead.targetAccountType, language)}`
+    ),
+    subtitle: pick(
+      language,
+      `下一笔 ${formatDisplayCurrency(run.contributionAmountCad, context)} 资金的优先建议`,
+      `Leading recommendation for the next ${formatDisplayCurrency(run.contributionAmountCad, context)} contribution`
+    ),
+    reason: getRecommendationItemExplanation(lead, context, language),
+    signals: getRecommendationAssumptions(profile, language).slice(0, 2)
   };
 }
 
-function getSignalForHolding(holding: HoldingPosition, driftMap: Map<string, number>) {
+function getSignalForHolding(holding: HoldingPosition, driftMap: Map<string, number>, language: DisplayLanguage) {
   const gap = driftMap.get(holding.assetClass) ?? 0;
   if (holding.symbol === "CASH" && holding.weightPct > 8) {
-    return "Cash drag is still elevated relative to the target mix.";
+    return pick(language, "现金占比相对目标配置仍然偏高。", "Cash drag is still elevated relative to the target mix.");
   }
   if (gap < -4) {
-    return `This sleeve remains underweight by ${formatCompactPercent(Math.abs(gap), 0)} versus target.`;
+    return pick(
+      language,
+      `该资产袖口相对目标仍低配 ${formatCompactPercent(Math.abs(gap), 0)}。`,
+      `This sleeve remains underweight by ${formatCompactPercent(Math.abs(gap), 0)} versus target.`
+    );
   }
   if (holding.weightPct >= 15) {
-    return "Core position is carrying a meaningful share of total portfolio risk.";
+    return pick(language, "这笔核心仓位承担了组合中相当显著的一部分风险。", "Core position is carrying a meaningful share of total portfolio risk.");
   }
-  return "Supports the current portfolio mix without driving the main gaps.";
+  return pick(language, "它支持当前组合结构，但不是主要偏差来源。", "Supports the current portfolio mix without driving the main gaps.");
 }
 
-function formatHoldingLastUpdated(value?: string | null) {
+function formatHoldingLastUpdated(value: string | null | undefined, language: DisplayLanguage) {
   if (!value) {
-    return "Not refreshed";
+    return pick(language, "尚未刷新", "Not refreshed");
   }
 
-  return new Date(value).toLocaleString("en-CA", {
+  return new Date(value).toLocaleString(language === "zh" ? "zh-CN" : "en-CA", {
     month: "short",
     day: "numeric",
     hour: "numeric",
@@ -319,16 +380,20 @@ function getHoldingFreshnessVariant(value?: string | null): "success" | "warning
   return "neutral";
 }
 
-function getPortfolioQuoteStatus(holdings: HoldingPosition[]) {
+function getPortfolioQuoteStatus(holdings: HoldingPosition[], language: DisplayLanguage) {
   const quotedHoldings = holdings.filter((holding) => (holding.lastPriceCad ?? 0) > 0 && holding.updatedAt);
   const coverage = holdings.length > 0
-    ? `${quotedHoldings.length}/${holdings.length} holdings have provider-backed prices`
-    : "No holdings available for quote refresh";
+    ? pick(
+      language,
+      `${quotedHoldings.length}/${holdings.length} 个持仓已有 provider 行情价格`,
+      `${quotedHoldings.length}/${holdings.length} holdings have provider-backed prices`
+    )
+    : pick(language, "当前没有可刷新行情的持仓", "No holdings available for quote refresh");
 
   if (quotedHoldings.length === 0) {
     return {
-      lastRefreshed: "No quote refresh yet",
-      freshness: "Unknown",
+      lastRefreshed: pick(language, "尚未刷新行情", "No quote refresh yet"),
+      freshness: pick(language, "未知", "Unknown"),
       coverage
     };
   }
@@ -340,13 +405,13 @@ function getPortfolioQuoteStatus(holdings: HoldingPosition[]) {
   const ageMs = Date.now() - latestUpdatedAt.getTime();
   const ageMinutes = Math.max(0, Math.round(ageMs / 60000));
   const freshness = ageMinutes <= 30
-    ? "Fresh within cache window"
+    ? pick(language, "缓存窗口内，较新", "Fresh within cache window")
     : ageMinutes <= 180
-      ? "Stale but still usable"
-      : "Refresh recommended";
+      ? pick(language, "略旧，但仍可参考", "Stale but still usable")
+      : pick(language, "建议刷新", "Refresh recommended");
 
   return {
-    lastRefreshed: latestUpdatedAt.toLocaleString("en-CA", {
+    lastRefreshed: latestUpdatedAt.toLocaleString(language === "zh" ? "zh-CN" : "en-CA", {
       month: "short",
       day: "numeric",
       hour: "numeric",
@@ -364,45 +429,140 @@ function sortTargetsForDisplay(targets: AllocationTarget[]) {
   });
 }
 
-function getGuidedQuestions(profile: PreferenceProfile) {
+function getRiskDetail(riskProfile: RiskProfile, language: DisplayLanguage) {
+  const detail = RISK_DETAILS[riskProfile];
+  return pick(language, detail.zh, detail.en);
+}
+
+function getAccountCaption(type: InvestmentAccount["type"], language: DisplayLanguage) {
+  const caption = ACCOUNT_CAPTIONS[type];
+  return pick(language, caption.zh, caption.en);
+}
+
+function getAccountTypeFit(type: InvestmentAccount["type"], language: DisplayLanguage) {
+  const fit = ACCOUNT_TYPE_FIT[type];
+  return pick(language, fit.zh, fit.en);
+}
+
+function formatRoomDetail(account: InvestmentAccount, display: DisplayContext, language: DisplayLanguage) {
+  if (account.contributionRoomCad == null) {
+    return pick(language, "无税务保护额度", "No tax shelter");
+  }
+  return pick(
+    language,
+    `剩余 ${formatDisplayCurrency(account.contributionRoomCad, display)} 额度`,
+    `${formatDisplayCurrency(account.contributionRoomCad, display)} room left`
+  );
+}
+
+function getAccountBadgeLabel(index: number, includedInPriority: boolean, language: DisplayLanguage) {
+  if (index === 0) {
+    return pick(language, "优先", "Priority");
+  }
+  if (includedInPriority) {
+    return pick(language, "账户匹配", "Tax fit");
+  }
+  return pick(language, "复核", "Review");
+}
+
+function formatAccountPriorityOrder(priorityOrder: InvestmentAccount["type"][], language: DisplayLanguage) {
+  return priorityOrder.map((type) => getAccountTypeLabel(type, language)).join(" -> ");
+}
+
+function formatHoldingPrice(amount: number | null | undefined, currency: CurrencyCode | null | undefined, amountCad: number | null | undefined, display: DisplayContext, language: DisplayLanguage) {
+  if (amountCad != null && amountCad > 0) {
+    return formatMoneyForDisplay(amount ?? amountCad, currency ?? "CAD", amountCad, display);
+  }
+  return pick(language, "暂无价格", "Not priced");
+}
+
+function getRecommendationAssumptions(profile: PreferenceProfile, language: DisplayLanguage) {
+  return [
+    pick(
+      language,
+      `建议基于${getRiskProfileLabel(profile.riskProfile, language)}目标配置和当前资产类别偏差生成。`,
+      `Recommendation uses the ${profile.riskProfile.toLowerCase()} target allocation and current asset-class drift.`
+    ),
+    pick(
+      language,
+      `账户优先级顺序为 ${formatAccountPriorityOrder(profile.accountFundingPriority, language)}。`,
+      `Account priority order is ${formatAccountPriorityOrder(profile.accountFundingPriority, language)}.`
+    ),
+    profile.taxAwarePlacement
+      ? pick(
+        language,
+        "已启用税务感知放置，因此在账户匹配接近时会优先考虑受保护额度。",
+        "Tax-aware placement is enabled, so sheltered room is favored when account fit is comparable."
+      )
+      : pick(
+        language,
+        "当前未启用税务感知放置，因此本轮优先考虑目标配置贴合而不是税务保护。",
+        "Tax-aware placement is disabled, so the run prioritizes target fit over tax sheltering."
+      )
+  ];
+}
+
+function getRecommendationItemExplanation(
+  item: RecommendationRun["items"][number],
+  display: DisplayContext,
+  language: DisplayLanguage
+) {
+  const assetClass = getAssetClassLabel(item.assetClass, language);
+  const accountType = getAccountTypeLabel(item.targetAccountType, language);
+  return pick(
+    language,
+    `${assetClass} 当前相对目标配置仍处于低配，因此本轮建议向 ${accountType} 分配 ${formatDisplayCurrency(item.amountCad, display)}。`,
+    `${assetClass} is currently underweight relative to the configured target, so this run allocates ${formatDisplayCurrency(item.amountCad, display)} to ${accountType}.`
+  );
+}
+
+function getGuidedQuestions(profile: PreferenceProfile, language: DisplayLanguage) {
   if (profile.riskProfile === "Growth") {
     return [
-      "How important is the home goal compared with long-term portfolio growth?",
-      "How much short-term volatility can you tolerate before changing course?",
-      "Should the engine prioritize sheltered room before broader drift correction?",
-      "How much cash should remain available for shorter-term milestones?"
+      pick(language, "购房目标和长期增值相比，你更看重哪一个？", "How important is the home goal compared with long-term portfolio growth?"),
+      pick(language, "面对短期波动时，你能接受多大幅度而不改变计划？", "How much short-term volatility can you tolerate before changing course?"),
+      pick(language, "在修正大类偏差前，系统是否应优先使用受保护账户额度？", "Should the engine prioritize sheltered room before broader drift correction?"),
+      pick(language, "为了短期里程碑，你希望保留多少现金缓冲？", "How much cash should remain available for shorter-term milestones?")
     ];
   }
 
   return [
-    "What is your primary financial goal and time horizon?",
-    "How comfortable are you with portfolio volatility and drawdowns?",
-    "Should the engine prioritize tax efficiency or staying close to current holdings?",
-    "Should recommendations preserve a larger cash buffer for upcoming spending?"
+    pick(language, "你的主要财务目标和时间跨度是什么？", "What is your primary financial goal and time horizon?"),
+    pick(language, "你对组合波动和回撤的接受度如何？", "How comfortable are you with portfolio volatility and drawdowns?"),
+    pick(language, "系统应该优先税务效率，还是尽量贴近当前持仓？", "Should the engine prioritize tax efficiency or staying close to current holdings?"),
+    pick(language, "在接下来有支出计划时，建议是否应保留更大的现金缓冲？", "Should recommendations preserve a larger cash buffer for upcoming spending?")
   ];
 }
 
-function getManualGroups(profile: PreferenceProfile): SettingsData["manualGroups"] {
+function getManualGroups(profile: PreferenceProfile, language: DisplayLanguage): SettingsData["manualGroups"] {
   return [
     {
-      title: "Risk profile and target allocation",
-      description: `Current profile is ${profile.riskProfile.toLowerCase()} with ${sortTargetsForDisplay(profile.targetAllocation).length} target sleeves configured.`
+      title: pick(language, "风险画像与目标配置", "Risk profile and target allocation"),
+      description: pick(
+        language,
+        `当前画像为${getRiskProfileLabel(profile.riskProfile, language)}，已配置 ${sortTargetsForDisplay(profile.targetAllocation).length} 个目标资产袖口。`,
+        `Current profile is ${profile.riskProfile.toLowerCase()} with ${sortTargetsForDisplay(profile.targetAllocation).length} target sleeves configured.`
+      )
     },
     {
-      title: "Account funding priorities",
-      description: `Current order: ${profile.accountFundingPriority.join(" -> ")}`,
-      badge: "Sortable"
+      title: pick(language, "账户注资优先级", "Account funding priorities"),
+      description: pick(language, `当前顺序：${profile.accountFundingPriority.join(" -> ")}`, `Current order: ${profile.accountFundingPriority.join(" -> ")}`),
+      badge: pick(language, "可排序", "Sortable")
     },
     {
-      title: "Recommendation behavior",
-      description: `Transition is ${profile.transitionPreference}, strategy is ${profile.recommendationStrategy}.`
+      title: pick(language, "推荐行为", "Recommendation behavior"),
+      description: pick(
+        language,
+        `当前过渡方式为${getTransitionPreferenceLabel(profile.transitionPreference, language)}，策略为${getRecommendationStrategyLabel(profile.recommendationStrategy, language)}。`,
+        `Transition is ${profile.transitionPreference}, strategy is ${profile.recommendationStrategy}.`
+      )
     },
     {
-      title: "Tax-aware placement",
+      title: pick(language, "税务感知放置", "Tax-aware placement"),
       description: profile.taxAwarePlacement
-        ? "Tax-aware placement is enabled. Advanced province and marginal bracket fields can stay collapsed by default."
-        : "Tax-aware placement is disabled. The engine will favor simpler account-fit rules.",
-      badge: "Advanced"
+        ? pick(language, "已启用税务感知放置。省份与边际税率等高级字段默认可保持折叠。", "Tax-aware placement is enabled. Advanced province and marginal bracket fields can stay collapsed by default.")
+        : pick(language, "当前未启用税务感知放置。引擎会优先使用更简单的账户匹配规则。", "Tax-aware placement is disabled. The engine will favor simpler account-fit rules."),
+      badge: pick(language, "高级", "Advanced")
     }
   ];
 }
@@ -416,7 +576,8 @@ export function buildDashboardData(args: {
   latestRun: RecommendationRun | null;
   display: DisplayContext;
 }): DashboardData {
-  const { accounts, holdings, transactions, profile, latestRun, display } = args;
+  const { viewer, accounts, holdings, transactions, profile, latestRun, display } = args;
+  const language = viewer.displayLanguage;
   const totalPortfolio = sum(accounts.map((account) => account.marketValueCad));
   const availableRoom = sum(accounts.map((account) => account.contributionRoomCad ?? 0));
   const currentAllocation = getCurrentAllocation(holdings);
@@ -432,30 +593,30 @@ export function buildDashboardData(args: {
     .slice(0, 3);
   const spending = buildSpendingSummary(transactions, profile.cashBufferTargetCad);
   const accountPriorityOrder = profile.accountFundingPriority;
-  const recommendation = getRecommendationTheme(latestRun, display);
+  const recommendation = getRecommendationTheme(latestRun, display, language, profile);
 
   return {
-    displayContext: buildDisplayContext(display),
+    displayContext: buildDisplayContext(display, language),
     metrics: [
       {
-        label: "Total Portfolio",
+        label: pick(language, "总资产", "Total Portfolio"),
         value: formatDisplayCurrency(totalPortfolio, display),
-        detail: `${accounts.length} accounts connected`
+        detail: pick(language, `${accounts.length} 个账户已连接`, `${accounts.length} accounts connected`)
       },
       {
-        label: "Available Room",
+        label: pick(language, "可用额度", "Available Room"),
         value: formatDisplayCurrency(availableRoom, display),
-        detail: "TFSA, RRSP, and FHSA contribution room remaining"
+        detail: pick(language, "TFSA、RRSP 和 FHSA 剩余注资额度", "TFSA, RRSP, and FHSA contribution room remaining")
       },
       {
-        label: "Portfolio Risk",
-        value: profile.riskProfile,
-        detail: RISK_DETAILS[profile.riskProfile]
+        label: pick(language, "组合风险", "Portfolio Risk"),
+        value: getRiskProfileLabel(profile.riskProfile, language),
+        detail: getRiskDetail(profile.riskProfile, language)
       },
       {
-        label: "Portfolio Health Score",
+        label: pick(language, "组合健康分", "Portfolio Health Score"),
         value: "P1",
-        detail: "Preview radar ships after scoring logic"
+        detail: pick(language, "评分逻辑落地后将开放完整雷达图。", "Preview radar ships after scoring logic")
       }
     ],
     accounts: [...accounts]
@@ -468,10 +629,10 @@ export function buildDashboardData(args: {
       })
       .map((account, index) => ({
         name: account.type,
-        caption: ACCOUNT_CAPTIONS[account.type],
+        caption: getAccountCaption(account.type, language),
         value: formatMoneyForDisplay(account.marketValueAmount, account.currency ?? "CAD", account.marketValueCad, display),
-        room: account.contributionRoomCad == null ? "No tax shelter" : `${formatDisplayCurrency(account.contributionRoomCad, display)} room left`,
-        badge: index === 0 ? "Priority" : accountPriorityOrder.includes(account.type) ? "Tax fit" : "Review",
+        room: formatRoomDetail(account, display, language),
+        badge: getAccountBadgeLabel(index, accountPriorityOrder.includes(account.type), language),
         badgeVariant: index === 0
           ? PRIORITY_BADGE_VARIANTS.first
           : accountPriorityOrder.includes(account.type)
@@ -479,42 +640,46 @@ export function buildDashboardData(args: {
             : PRIORITY_BADGE_VARIANTS.later
       })),
     drift: drift.map((item) => ({
-      assetClass: item.assetClass,
+      assetClass: getAssetClassLabel(item.assetClass, language),
       current: formatCompactPercent(item.current, 0),
       target: formatCompactPercent(item.target, 0),
       delta: formatSignedPercent(item.delta, 0)
     })),
-    assetMix: [...currentAllocation.entries()].map(([name, value]) => ({ name, value: round(value, 0) })),
+    assetMix: [...currentAllocation.entries()].map(([name, value]) => ({ name: getAssetClassLabel(name, language), value: round(value, 0) })),
     topHoldings: [...holdings]
       .sort((left, right) => right.marketValueCad - left.marketValueCad)
       .slice(0, 3)
       .map((holding) => ({
         symbol: holding.symbol,
         name: holding.name,
-        account: accounts.find((account) => account.id === holding.accountId)?.type ?? "Account",
-        lastPrice: holding.lastPriceCad != null && holding.lastPriceCad > 0 ? formatMoneyForDisplay(holding.lastPriceAmount, holding.currency ?? "CAD", holding.lastPriceCad, display) : "Not priced",
-        lastUpdated: formatHoldingLastUpdated(holding.updatedAt),
+        account: accounts.find((account) => account.id === holding.accountId)?.type ?? pick(language, "账户", "Account"),
+        lastPrice: formatHoldingPrice(holding.lastPriceAmount, holding.currency, holding.lastPriceCad, display, language),
+        lastUpdated: formatHoldingLastUpdated(holding.updatedAt, language),
         freshnessVariant: getHoldingFreshnessVariant(holding.updatedAt),
         weight: formatCompactPercent(holding.weightPct, 1),
         value: formatMoneyForDisplay(holding.marketValueAmount, holding.currency ?? "CAD", holding.marketValueCad, display)
       })),
-    netWorthTrend: getSixMonthSeries(totalPortfolio, profile),
-    spendingMonthLabel: getLatestMonthLabel(),
+    netWorthTrend: getSixMonthSeries(totalPortfolio, profile, getMonthLabels(language)),
+    spendingMonthLabel: getLatestMonthLabel(language),
     savingsPattern: formatCompactPercent(spending.savingsRate, 1),
     investableCash: formatDisplayCurrency(spending.investableCash, display),
-    spendingCategories: spending.categories.slice(0, 3).map(([name, value]) => ({ name, value: formatDisplayCurrency(value, display) })),
-    healthPreview: getHealthPreview(currentAllocation, targetAllocation, holdings, profile),
+    spendingCategories: spending.categories.slice(0, 3).map(([name, value]) => ({
+      name: getCategoryLabel(name, language),
+      value: formatDisplayCurrency(value, display)
+    })),
+    healthPreview: getHealthPreview(currentAllocation, targetAllocation, holdings, profile, language),
     recommendation
   };
 }
 
 export function buildPortfolioData(args: {
+  language: DisplayLanguage;
   accounts: InvestmentAccount[];
   holdings: HoldingPosition[];
   profile: PreferenceProfile;
   display: DisplayContext;
 }): PortfolioData {
-  const { accounts, holdings, profile, display } = args;
+  const { language, accounts, holdings, profile, display } = args;
   const currentAllocation = getCurrentAllocation(holdings);
   const targetAllocation = getTargetAllocation(profile);
   const totalPortfolio = sum(accounts.map((account) => account.marketValueCad));
@@ -533,57 +698,69 @@ export function buildPortfolioData(args: {
     .sort((left, right) => right[1] - left[1]);
 
   const sectorExposure = sectors.slice(0, 4).map(([name, value]) => ({
-    name,
+    name: getSectorLabel(name, language),
     value: totalPortfolio > 0 ? round((value / totalPortfolio) * 100, 0) : 0
   }));
   const sectorRemainder = round(100 - sum(sectorExposure.map((item) => item.value)), 0);
   if (sectorRemainder > 0) {
-    sectorExposure.push({ name: "Other", value: sectorRemainder });
+    sectorExposure.push({ name: pick(language, "其他", "Other"), value: sectorRemainder });
   }
 
   const largestHolding = [...holdings].sort((left, right) => right.weightPct - left.weightPct)[0];
   const mainGap = [...driftMap.entries()].sort((left, right) => Math.abs(right[1]) - Math.abs(left[1]))[0];
 
   return {
-    displayContext: buildDisplayContext(display),
-    performance: getSixMonthSeries(totalPortfolio || 1, profile).map((point, index) => ({
+    displayContext: buildDisplayContext(display, language),
+    performance: getSixMonthSeries(totalPortfolio || 1, profile, getMonthLabels(language)).map((point, index) => ({
       label: point.label,
       value: round((performanceBase[index] / baseline) * 100, 1)
     })),
     accountAllocation: accounts.map((account) => ({
-      name: account.type,
+      name: getAccountTypeLabel(account.type, language),
       value: totalPortfolio > 0 ? round((account.marketValueCad / totalPortfolio) * 100, 0) : 0
     })),
     sectorExposure,
-    quoteStatus: getPortfolioQuoteStatus(holdings),
+    quoteStatus: getPortfolioQuoteStatus(holdings, language),
     holdings: [...holdings]
       .sort((left, right) => right.marketValueCad - left.marketValueCad)
       .map((holding) => ({
         symbol: holding.symbol,
-        account: accounts.find((account) => account.id === holding.accountId)?.type ?? "Account",
-        lastPrice: holding.lastPriceCad != null && holding.lastPriceCad > 0 ? formatMoneyForDisplay(holding.lastPriceAmount, holding.currency ?? "CAD", holding.lastPriceCad, display) : "Not priced",
-        lastUpdated: formatHoldingLastUpdated(holding.updatedAt),
+        account: (() => {
+          const accountType = accounts.find((account) => account.id === holding.accountId)?.type;
+          return accountType ? getAccountTypeLabel(accountType, language) : pick(language, "账户", "Account");
+        })(),
+        lastPrice: formatHoldingPrice(holding.lastPriceAmount, holding.currency, holding.lastPriceCad, display, language),
+        lastUpdated: formatHoldingLastUpdated(holding.updatedAt, language),
         freshnessVariant: getHoldingFreshnessVariant(holding.updatedAt),
         weight: formatCompactPercent(holding.weightPct, 1),
         gainLoss: formatSignedPercent(holding.gainLossPct, 1),
-        signal: getSignalForHolding(holding, driftMap)
+        signal: getSignalForHolding(holding, driftMap, language)
       })),
     summaryPoints: [
-      mainGap ? `${mainGap[0]} is the clearest allocation gap versus the configured target.` : "Set a target allocation to unlock drift analysis.",
-      largestHolding ? `${largestHolding.symbol} is the largest position and drives the current concentration score.` : "Import holdings to unlock concentration analysis.",
+      mainGap
+        ? pick(
+          language,
+          `${getAssetClassLabel(mainGap[0], language)} 是当前相对目标配置最明显的偏差来源。`,
+          `${getAssetClassLabel(mainGap[0], language)} is the clearest allocation gap versus the configured target.`
+        )
+        : pick(language, "先设置目标配置，才能解锁偏差分析。", "Set a target allocation to unlock drift analysis."),
+      largestHolding
+        ? pick(language, `${largestHolding.symbol} 是当前最大仓位，并显著影响集中度评分。`, `${largestHolding.symbol} is the largest position and drives the current concentration score.`)
+        : pick(language, "先导入持仓，才能解锁集中度分析。", "Import holdings to unlock concentration analysis."),
       accounts.some((account) => account.type === "Taxable")
-        ? "Taxable capital remains available as a secondary funding sleeve after sheltered room is consumed."
-        : "Sheltered accounts dominate the current portfolio, which keeps account placement simpler."
+        ? pick(language, "当受保护账户额度用尽后，应税账户仍可作为第二注资层。", "Taxable capital remains available as a secondary funding sleeve after sheltered room is consumed.")
+        : pick(language, "当前组合主要集中在受保护账户中，因此账户放置逻辑会更简单。", "Sheltered accounts dominate the current portfolio, which keeps account placement simpler.")
     ]
   };
 }
 
 export function buildRecommendationsData(args: {
+  language: DisplayLanguage;
   profile: PreferenceProfile;
   latestRun: RecommendationRun | null;
   display: DisplayContext;
 }): RecommendationsData {
-  const { profile, latestRun, display } = args;
+  const { language, profile, latestRun, display } = args;
   const equityTarget = sum(profile.targetAllocation
     .filter((target) => target.assetClass !== "Fixed Income" && target.assetClass !== "Cash")
     .map((target) => target.targetPct));
@@ -591,84 +768,97 @@ export function buildRecommendationsData(args: {
   const cashTarget = profile.targetAllocation.find((target) => target.assetClass === "Cash")?.targetPct ?? 0;
 
   return {
-    displayContext: buildDisplayContext(display),
+    displayContext: buildDisplayContext(display, language),
     contributionAmount: formatDisplayCurrency(latestRun?.contributionAmountCad ?? 0, display),
     inputs: [
-      { label: "Target allocation", value: `${equityTarget} / ${fixedIncomeTarget} / ${cashTarget}` },
-      { label: "Account priority", value: profile.accountFundingPriority.join(" -> ") },
-      { label: "Tax-aware placement", value: profile.taxAwarePlacement ? "Enabled" : "Disabled" },
-      { label: "Transition preference", value: profile.transitionPreference }
+      { label: pick(language, "目标配置", "Target allocation"), value: `${equityTarget} / ${fixedIncomeTarget} / ${cashTarget}` },
+      { label: pick(language, "账户优先级", "Account priority"), value: formatAccountPriorityOrder(profile.accountFundingPriority, language) },
+      { label: pick(language, "税务感知放置", "Tax-aware placement"), value: profile.taxAwarePlacement ? pick(language, "已启用", "Enabled") : pick(language, "未启用", "Disabled") },
+      { label: pick(language, "过渡偏好", "Transition preference"), value: getTransitionPreferenceLabel(profile.transitionPreference, language) }
     ],
     explainer: latestRun?.assumptions?.length
-      ? latestRun.assumptions
+      ? getRecommendationAssumptions(profile, language)
       : [
-          "Recommendations are generated once holdings and target allocation are available.",
-          "Account room and target drift are used to rank asset classes.",
-          "Ticker options appear only after the engine identifies the preferred account and asset sleeve."
+          pick(language, "当持仓和目标配置可用后，系统才会生成建议。", "Recommendations are generated once holdings and target allocation are available."),
+          pick(language, "账户额度和目标偏差会共同决定资产类别的优先级。", "Account room and target drift are used to rank asset classes."),
+          pick(language, "只有在引擎先确定账户和资产袖口后，才会出现 ticker 选项。", "Ticker options appear only after the engine identifies the preferred account and asset sleeve.")
         ],
     priorities: (latestRun?.items ?? []).map((item) => ({
-      assetClass: item.assetClass,
-      description: item.explanation,
+      assetClass: getAssetClassLabel(item.assetClass, language),
+      description: getRecommendationItemExplanation(item, display, language),
       amount: formatDisplayCurrency(item.amountCad, display),
-      account: item.targetAccountType,
+      account: getAccountTypeLabel(item.targetAccountType, language),
       tickers: item.tickerOptions.join(", "),
-      accountFit: ACCOUNT_TYPE_FIT[item.targetAccountType]
+      accountFit: getAccountTypeFit(item.targetAccountType, language)
     })),
     notes: [
       profile.taxAwarePlacement
-        ? "Tax-aware placement is expressed as account fit based on your configured preferences, not guaranteed tax optimization."
-        : "Tax-aware placement is disabled, so recommendations prioritize allocation fit over tax sheltering.",
-      `Current strategy: ${profile.recommendationStrategy}. Rebalancing tolerance is ${profile.rebalancingTolerancePct}%.`
+        ? pick(language, "税务感知放置目前通过账户匹配规则体现，基于你的配置偏好，不代表保证的税务最优解。", "Tax-aware placement is expressed as account fit based on your configured preferences, not guaranteed tax optimization.")
+        : pick(language, "当前未启用税务感知放置，因此建议会优先考虑配置贴合而不是税务保护。", "Tax-aware placement is disabled, so recommendations prioritize allocation fit over tax sheltering."),
+      pick(
+        language,
+        `当前策略：${getRecommendationStrategyLabel(profile.recommendationStrategy, language)}。再平衡容忍度为 ${profile.rebalancingTolerancePct}%。`,
+        `Current strategy: ${getRecommendationStrategyLabel(profile.recommendationStrategy, language)}. Rebalancing tolerance is ${profile.rebalancingTolerancePct}%.`
+      )
     ]
   };
 }
 
 export function buildSpendingData(args: {
+  language: DisplayLanguage;
   transactions: CashflowTransaction[];
   profile: PreferenceProfile;
   display: DisplayContext;
 }): SpendingData {
-  const { transactions, profile, display } = args;
+  const { language, transactions, profile, display } = args;
   const spending = buildSpendingSummary(transactions, profile.cashBufferTargetCad);
   const latestTransactions = [...transactions]
     .sort((left, right) => right.bookedAt.localeCompare(left.bookedAt))
     .slice(0, 10);
-  const discipline = spending.savingsRate >= 30 ? "Stable" : spending.savingsRate >= 20 ? "Watch" : "At risk";
+  const discipline = spending.savingsRate >= 30
+    ? pick(language, "稳定", "Stable")
+    : spending.savingsRate >= 20
+      ? pick(language, "关注", "Watch")
+      : pick(language, "有风险", "At risk");
 
   return {
-    displayContext: buildDisplayContext(display),
+    displayContext: buildDisplayContext(display, language),
     metrics: [
       {
-        label: "Monthly spend",
+        label: pick(language, "月度支出", "Monthly spend"),
         value: formatDisplayCurrency(spending.outflowTotal, display),
-        detail: "Current month outflow total"
+        detail: pick(language, "当前月份流出总额", "Current month outflow total")
       },
       {
-        label: "Savings rate",
+        label: pick(language, "储蓄率", "Savings rate"),
         value: formatCompactPercent(spending.savingsRate, 1),
-        detail: "Based on current month inflows and outflows"
+        detail: pick(language, "基于当前月份的流入和流出", "Based on current month inflows and outflows")
       },
       {
-        label: "Investable cash",
+        label: pick(language, "可投资现金", "Investable cash"),
         value: formatDisplayCurrency(spending.investableCash, display),
-        detail: "Monthly inflow minus spending and buffer reserve"
+        detail: pick(language, "月度流入减去支出和缓冲储备后得到", "Monthly inflow minus spending and buffer reserve")
       },
       {
-        label: "Cash discipline",
+        label: pick(language, "现金纪律", "Cash discipline"),
         value: discipline,
-        detail: `Cash buffer target is ${formatDisplayCurrency(profile.cashBufferTargetCad, display)}`
+        detail: pick(
+          language,
+          `现金缓冲目标为 ${formatDisplayCurrency(profile.cashBufferTargetCad, display)}`,
+          `Cash buffer target is ${formatDisplayCurrency(profile.cashBufferTargetCad, display)}`
+        )
       }
     ],
-    trend: getMonthlyTransactionSeries(transactions),
+    trend: getMonthlyTransactionSeries(transactions, language),
     categories: spending.categories.slice(0, 4).map(([name, value]) => ({
-      name,
+      name: getCategoryLabel(name, language),
       share: spending.outflowTotal > 0 ? formatCompactPercent((value / spending.outflowTotal) * 100, 0) : "0%",
       amount: formatDisplayCurrency(value, display)
     })),
     transactions: latestTransactions.map((transaction) => ({
       date: transaction.bookedAt,
-      merchant: transaction.merchant,
-      category: transaction.category,
+      merchant: getMerchantLabel(transaction.merchant, language),
+      category: getCategoryLabel(transaction.category, language),
       amount: `${transaction.direction === "outflow" ? "-" : "+"}${formatDisplayCurrency(transaction.amountCad, display)}`
     }))
   };
@@ -678,37 +868,101 @@ export function buildImportData(args: {
   latestPortfolioJob: ImportJob | null;
   latestSpendingJob: ImportJob | null;
   accounts: InvestmentAccount[];
+  language: DisplayLanguage;
 }): ImportData {
-  const { latestPortfolioJob, latestSpendingJob, accounts } = args;
+  const { latestPortfolioJob, latestSpendingJob, accounts, language } = args;
   return {
     portfolioSteps: [
-      { title: "Choose account type", description: "Start with the account structure, not a long form." },
-      { title: "Choose import method", description: "CSV import first, account integrations later." },
-      { title: "Provide account data", description: "Enter account details, room, and starter holding context before any write." },
-      { title: "Review and confirm", description: latestPortfolioJob ? `Latest portfolio import is ${latestPortfolioJob.status}. Confirm what should be written next.` : "Review the exact account and holding actions before writing them to the database." },
-      { title: "Complete setup", description: "Confirm the saved result, then continue to preferences or the dashboard." }
+      {
+        title: pick(language, "选择账户类型", "Choose account type"),
+        description: pick(language, "先确定账户结构，再进入更细的导入方式。", "Start with the account structure, not a long form.")
+      },
+      {
+        title: pick(language, "选择导入方式", "Choose import method"),
+        description: pick(language, "先支持 CSV，后续再接 broker 集成。", "CSV import first, account integrations later.")
+      },
+      {
+        title: pick(language, "提供账户数据", "Provide account data"),
+        description: pick(language, "在真正写库前，先确认账户信息、额度和初始持仓上下文。", "Enter account details, room, and starter holding context before any write.")
+      },
+      {
+        title: pick(language, "复核并确认", "Review and confirm"),
+        description: latestPortfolioJob
+          ? pick(
+            language,
+            `最近一次投资导入状态为 ${latestPortfolioJob.status}。确认接下来真正要写入的内容。`,
+            `Latest portfolio import is ${latestPortfolioJob.status}. Confirm what should be written next.`
+          )
+          : pick(
+            language,
+            "在写入数据库之前，先复核本次账户和持仓的具体动作。",
+            "Review the exact account and holding actions before writing them to the database."
+          )
+      },
+      {
+        title: pick(language, "完成设置", "Complete setup"),
+        description: pick(language, "确认保存结果后，可继续前往偏好设置或总览页。", "Confirm the saved result, then continue to preferences or the dashboard.")
+      }
     ],
     portfolioSetupCards: [
-      { label: "Account type", title: accounts.length > 0 ? `${accounts.map((account) => account.type).join(" / ")}` : "TFSA / RRSP / Taxable / FHSA", description: "Pick the right account bucket before asking for institution detail." },
-      { label: "Import method", title: "CSV upload first", description: "Keeps MVP friction low while we define stable broker integrations." },
-      { label: "Field mapping", title: latestPortfolioJob ? `Current file: ${latestPortfolioJob.fileName}` : "Review account and holding columns", description: "Mapping stays explicit so the user trusts the imported portfolio data." },
-      { label: "Preference handoff", title: "Move into Investment Preferences", description: "The import flow hands off cleanly into target allocation and account priorities." }
+      {
+        label: pick(language, "账户类型", "Account type"),
+        title: accounts.length > 0
+          ? `${accounts.map((account) => getAccountTypeLabel(account.type, language)).join(" / ")}`
+          : `${getAccountTypeLabel("TFSA", language)} / ${getAccountTypeLabel("RRSP", language)} / ${getAccountTypeLabel("Taxable", language)} / ${getAccountTypeLabel("FHSA", language)}`,
+        description: pick(language, "先选对账户桶位，再进入机构和细节。", "Pick the right account bucket before asking for institution detail.")
+      },
+      {
+        label: pick(language, "导入方式", "Import method"),
+        title: pick(language, "优先 CSV 上传", "CSV upload first"),
+        description: pick(language, "在 broker 集成稳定前，先保持 MVP 的低摩擦导入。", "Keeps MVP friction low while we define stable broker integrations.")
+      },
+      {
+        label: pick(language, "字段映射", "Field mapping"),
+        title: latestPortfolioJob
+          ? pick(language, `当前文件：${latestPortfolioJob.fileName}`, `Current file: ${latestPortfolioJob.fileName}`)
+          : pick(language, "复核账户与持仓列", "Review account and holding columns"),
+        description: pick(language, "映射保持显式可见，用户才会信任导入后的组合数据。", "Mapping stays explicit so the user trusts the imported portfolio data.")
+      },
+      {
+        label: pick(language, "偏好承接", "Preference handoff"),
+        title: pick(language, "继续进入投资偏好", "Move into Investment Preferences"),
+        description: pick(language, "导入完成后，顺畅衔接到目标配置与账户优先级设置。", "The import flow hands off cleanly into target allocation and account priorities.")
+      }
     ],
     portfolioSuccessStates: [
-      "Imported holdings can be grouped by account and asset class.",
-      "Invalid or unknown rows are flagged before the portfolio view updates.",
-      "On completion the user can move directly to Dashboard or Recommendations."
+      pick(language, "导入后的持仓可以按账户和资产类别分组展示。", "Imported holdings can be grouped by account and asset class."),
+      pick(language, "无效或未知行会在更新组合视图前先被标记出来。", "Invalid or unknown rows are flagged before the portfolio view updates."),
+      pick(language, "完成后可直接前往总览页或推荐页。", "On completion the user can move directly to Dashboard or Recommendations.")
     ],
     spendingSetupCards: [
-      { label: "Workflow", title: "Transaction import", description: "Import spending records separately from portfolio holdings so each workflow can evolve independently." },
-      { label: "Supported rows", title: latestSpendingJob ? `Latest file: ${latestSpendingJob.fileName}` : "Transaction rows only", description: "Focus on spending transactions, categories, merchants, and inflow/outflow direction." },
-      { label: "Review", title: "Validate before write", description: "Run preview and validation first, then confirm the transaction write." },
-      { label: "Future integrations", title: "Provider-ready boundary", description: "This path is isolated so bank or card APIs can replace CSV later without affecting portfolio import." }
+      {
+        label: pick(language, "工作流", "Workflow"),
+        title: pick(language, "交易流水导入", "Transaction import"),
+        description: pick(language, "消费流水与投资持仓分开导入，便于两条 workflow 独立演进。", "Import spending records separately from portfolio holdings so each workflow can evolve independently.")
+      },
+      {
+        label: pick(language, "支持行", "Supported rows"),
+        title: latestSpendingJob
+          ? pick(language, `最近文件：${latestSpendingJob.fileName}`, `Latest file: ${latestSpendingJob.fileName}`)
+          : pick(language, "仅支持 transaction 行", "Transaction rows only"),
+        description: pick(language, "聚焦消费流水、分类、商户以及流入/流出方向。", "Focus on spending transactions, categories, merchants, and inflow/outflow direction.")
+      },
+      {
+        label: pick(language, "复核", "Review"),
+        title: pick(language, "先校验再写入", "Validate before write"),
+        description: pick(language, "先做预览和校验，再确认本次流水写入。", "Run preview and validation first, then confirm the transaction write.")
+      },
+      {
+        label: pick(language, "后续集成", "Future integrations"),
+        title: pick(language, "为 Provider 预留边界", "Provider-ready boundary"),
+        description: pick(language, "这条路径独立存在，后续可用 bank 或 card API 替换 CSV，而不影响投资导入。", "This path is isolated so bank or card APIs can replace CSV later without affecting portfolio import.")
+      }
     ],
     spendingSuccessStates: [
-      "Imported transactions flow into Spending metrics, category breakdowns, and recent transaction history.",
-      "Transaction-only imports do not overwrite holdings or recommendation runs.",
-      "This workflow can later swap CSV for bank or card provider integrations without changing the portfolio import path."
+      pick(language, "导入后的交易会进入 Spending 指标、分类分布和近期交易历史。", "Imported transactions flow into Spending metrics, category breakdowns, and recent transaction history."),
+      pick(language, "纯交易导入不会覆盖持仓或 recommendation runs。", "Transaction-only imports do not overwrite holdings or recommendation runs."),
+      pick(language, "后续这条路径可以从 CSV 平滑切到 bank 或 card provider，而无需改动投资导入。", "This workflow can later swap CSV for bank or card provider integrations without changing the portfolio import path.")
     ],
     existingAccounts: accounts.map((account) => ({
       id: account.id,
@@ -723,9 +977,10 @@ export function buildImportData(args: {
   };
 }
 
-export function buildSettingsData(profile: PreferenceProfile): SettingsData {
+export function buildSettingsData(profile: PreferenceProfile, language: DisplayLanguage): SettingsData {
   return {
-    guidedQuestions: getGuidedQuestions(profile),
-    manualGroups: getManualGroups(profile)
+    guidedQuestions: getGuidedQuestions(profile, language),
+    manualGroups: getManualGroups(profile, language)
   };
 }
+

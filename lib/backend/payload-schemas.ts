@@ -32,11 +32,41 @@ export const displayCurrencyInputSchema = z.object({
   currency: z.enum(["CAD", "USD"])
 });
 
+export const displayLanguageInputSchema = z.object({
+  language: z.enum(["zh", "en"])
+});
+
 export const registerUserInputSchema = z.object({
   displayName: z.string().trim().min(2).max(160),
   email: z.string().trim().email(),
-  password: z.string().min(8).max(128)
+  password: z.string().min(8).max(128),
+  mode: z.enum(["standard", "loo-zh"]).default("standard"),
+  gender: z.enum(["male", "female"]).optional(),
+  birthDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  acceptLooTerms: z.boolean().optional(),
+  displayLanguage: z.enum(["zh", "en"]).optional()
+}).superRefine((value, context) => {
+  if (value.mode === "loo-zh") {
+    if (!value.gender) {
+      context.addIssue({ code: z.ZodIssueCode.custom, path: ["gender"], message: "Gender is required for Loo citizenship registration." });
+    }
+    if (!value.birthDate) {
+      context.addIssue({ code: z.ZodIssueCode.custom, path: ["birthDate"], message: "Birth date is required for Loo citizenship registration." });
+    }
+    if (value.acceptLooTerms !== true) {
+      context.addIssue({ code: z.ZodIssueCode.custom, path: ["acceptLooTerms"], message: "Loo terms must be accepted." });
+    }
+  }
 });
+
+export const citizenOverrideInputSchema = z.object({
+  rank: z.enum(["lowly-ox", "base-loo", "citizen", "general", "emperor"]).nullable().optional(),
+  addressTier: z.enum(["cowshed", "suburbs", "city", "palace-gate", "bedchamber"]).nullable().optional(),
+  idCode: z.string().trim().min(4).max(32).nullable().optional()
+}).refine(
+  (value) => value.rank !== undefined || value.addressTier !== undefined || value.idCode !== undefined,
+  "At least one citizen override field must be provided."
+);
 
 export const importJobCreateSchema = z.object({
   fileName: z.string().trim().min(3).max(255),
@@ -155,6 +185,7 @@ export const guidedAllocationDraftSchema = z.object({
 
 export type PreferenceProfileInputPayload = z.infer<typeof preferenceProfileInputSchema>;
 export type DisplayCurrencyInputPayload = z.infer<typeof displayCurrencyInputSchema>;
+export type DisplayLanguageInputPayload = z.infer<typeof displayLanguageInputSchema>;
 export type RegisterUserInputPayload = z.infer<typeof registerUserInputSchema>;
 export type ImportJobCreatePayload = z.infer<typeof importJobCreateSchema>;
 export type ImportMappingPresetCreatePayload = z.infer<typeof importMappingPresetCreateSchema>;
@@ -162,3 +193,4 @@ export type ImportMappingPresetUpdatePayload = z.infer<typeof importMappingPrese
 export type GuidedImportCreatePayload = z.infer<typeof guidedImportCreateSchema>;
 export type RecommendationRunCreatePayload = z.infer<typeof recommendationRunCreateSchema>;
 export type GuidedAllocationDraftPayload = z.infer<typeof guidedAllocationDraftSchema>;
+export type CitizenOverrideInputPayload = z.infer<typeof citizenOverrideInputSchema>;

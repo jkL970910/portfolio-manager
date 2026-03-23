@@ -18,10 +18,32 @@ export const users = pgTable("users", {
   passwordHash: text("password_hash").notNull(),
   displayName: varchar("display_name", { length: 160 }).notNull(),
   baseCurrency: varchar("base_currency", { length: 3 }).notNull().default("CAD"),
+  displayLanguage: varchar("display_language", { length: 8 }).notNull().default("zh"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow()
 }, (table) => ({
   emailIdx: uniqueIndex("users_email_idx").on(table.email)
+}));
+
+export const citizenProfiles = pgTable("citizen_profiles", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  userId: uuid("user_id").notNull().references(() => users.id),
+  citizenName: varchar("citizen_name", { length: 160 }).notNull(),
+  gender: varchar("gender", { length: 16 }),
+  birthDate: date("birth_date"),
+  avatarType: varchar("avatar_type", { length: 24 }).notNull().default("default"),
+  derivedRank: varchar("derived_rank", { length: 32 }).notNull(),
+  derivedAddressTier: varchar("derived_address_tier", { length: 32 }).notNull(),
+  derivedIdCode: varchar("derived_id_code", { length: 32 }).notNull(),
+  overrideRank: varchar("override_rank", { length: 32 }),
+  overrideAddressTier: varchar("override_address_tier", { length: 32 }),
+  overrideIdCode: varchar("override_id_code", { length: 32 }),
+  wealthScoreSnapshotCad: numeric("wealth_score_snapshot_cad", { precision: 14, scale: 2 }).notNull().default("0"),
+  issuedAt: timestamp("issued_at", { withTimezone: true }).notNull().defaultNow(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow()
+}, (table) => ({
+  userUniqueIdx: uniqueIndex("citizen_profiles_user_id_idx").on(table.userId)
 }));
 
 export const investmentAccounts = pgTable("investment_accounts", {

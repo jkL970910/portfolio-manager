@@ -15,13 +15,15 @@ export const users: UserProfile[] = [
     id: "user_demo",
     email: "jiekun@example.com",
     displayName: "Jiekun Liu",
-    baseCurrency: "CAD"
+    baseCurrency: "CAD",
+    displayLanguage: "zh"
   },
   {
     id: "user_casey",
     email: "casey@example.com",
     displayName: "Casey Morgan",
-    baseCurrency: "CAD"
+    baseCurrency: "CAD",
+    displayLanguage: "zh"
   }
 ];
 

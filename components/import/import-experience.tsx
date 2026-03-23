@@ -25,6 +25,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { InfoRow } from "@/components/ui/info-row";
 import { extractCsvHeaders, previewCsvContent, type ImportFieldMapping } from "@/lib/backend/csv-import";
 import { assertApiData, getApiErrorMessage, safeJson } from "@/lib/client/api";
+import { getAccountTypeLabel, getAssetClassLabel } from "@/lib/i18n/finance";
+import { getImportMappingGroupTitle, getImportPresetLabel } from "@/lib/i18n/import";
+import { DisplayLanguage, pick } from "@/lib/i18n/ui";
 
 type ImportMode = "guided" | "direct";
 type ImportWorkflowView = "portfolio" | "spending";
@@ -323,6 +326,7 @@ function getManualHoldingDerivedMetrics(holding: ManualHoldingDraft) {
 }
 
 export function ImportExperience({
+  language = "zh",
   latestPortfolioJob,
   latestSpendingJob,
   portfolioSteps,
@@ -330,6 +334,7 @@ export function ImportExperience({
   spendingSuccessStates,
   existingAccounts
 }: {
+  language?: DisplayLanguage;
   latestPortfolioJob: { status: string; fileName: string; createdAt: string } | null;
   latestSpendingJob: { status: string; fileName: string; createdAt: string } | null;
   portfolioSteps: { title: string; description: string }[];
@@ -465,13 +470,13 @@ export function ImportExperience({
       const response = await fetch(`/api/market-data/search?query=${encodeURIComponent(query)}`);
       const payload = await safeJson(response);
       if (!response.ok) {
-        throw new Error(getApiErrorMessage(payload, "Security search failed."));
+        throw new Error(getApiErrorMessage(payload, pick(language, "证券搜索失败。", "Security search failed.")));
       }
 
       const data = assertApiData<{ results?: MarketDataSearchResult[] }>(
         payload,
         (candidate) => typeof candidate === "object" && candidate !== null,
-        "Security search succeeded but returned no usable search payload."
+        pick(language, "证券搜索成功，但没有返回可用的搜索结果。", "Security search succeeded but returned no usable search payload.")
       );
       const results = Array.isArray(data.results) ? data.results : [];
       setManualHoldingSuggestions((current) => ({ ...current, [id]: results }));
@@ -480,8 +485,8 @@ export function ImportExperience({
         [id]: {
           ...current[id],
           searchLoading: false,
-          error: results.length === 0 ? "No matching securities found." : "",
-          message: results.length > 0 ? `Found ${results.length} candidates.` : ""
+          error: results.length === 0 ? pick(language, "没有找到匹配的证券。", "No matching securities found.") : "",
+          message: results.length > 0 ? pick(language, `找到 ${results.length} 个候选项。`, `Found ${results.length} candidates.`) : ""
         }
       }));
     } catch (error) {
@@ -490,7 +495,7 @@ export function ImportExperience({
         [id]: {
           ...current[id],
           searchLoading: false,
-          error: error instanceof Error ? error.message : "Security search failed."
+          error: error instanceof Error ? error.message : pick(language, "证券搜索失败。", "Security search failed.")
         }
       }));
     }
@@ -779,7 +784,7 @@ export function ImportExperience({
   }
 
   async function saveCurrentGuidedPreset() {
-    const label = window.prompt("Preset name");
+    const label = window.prompt(pick(language, "预设名称", "Preset name"));
     if (!label?.trim()) {
       return;
     }
@@ -813,7 +818,7 @@ export function ImportExperience({
       return next;
     });
     setGuidedCsvSelectedPresetKey(savedPreset.id);
-    setGuidedStatus({ type: "success", message: `Saved guided preset "${savedPreset.name}".` });
+    setGuidedStatus({ type: "success", message: pick(language, `已保存引导预设“${savedPreset.name}”。`, `Saved guided preset "${savedPreset.name}".`) });
   }
 
   function updateGuidedCsvFieldMapping(field: string, value: string) {
@@ -1023,16 +1028,18 @@ export function ImportExperience({
   }
 
   const continueButtonLabel = currentStep === 4
-    ? (isPending ? "Saving..." : "Confirm guided setup")
+    ? (isPending ? pick(language, "保存中...", "Saving...") : pick(language, "确认引导设置", "Confirm guided setup"))
     : currentStep === 5
-      ? "Completed"
-      : "Continue";
+      ? pick(language, "已完成", "Completed")
+      : pick(language, "继续", "Continue");
 
   return (
     <div className="space-y-6">
-      <Card className="overflow-hidden bg-[linear-gradient(135deg,rgba(255,255,255,0.7),rgba(246,218,230,0.56),rgba(221,232,255,0.48))]">
+      <Card className="overflow-hidden bg-[linear-gradient(135deg,rgba(255,255,255,0.72),rgba(248,223,233,0.54),rgba(224,235,255,0.48))] before:bg-[linear-gradient(180deg,rgba(255,255,255,0.48),rgba(255,255,255,0.12)_38%,rgba(255,255,255,0.02)_100%)]">
         <CardContent className="grid gap-6 px-6 py-6 md:grid-cols-[1.1fr_0.9fr] md:items-center">
-          <div className="space-y-4">
+          <div className="relative space-y-4">
+            <div className="pointer-events-none absolute -left-14 top-[-60px] h-44 w-44 rounded-full bg-[radial-gradient(circle,rgba(240,143,178,0.2),rgba(240,143,178,0))] blur-3xl" />
+            <div className="pointer-events-none absolute left-1/2 top-[-80px] h-40 w-40 -translate-x-1/2 rounded-full bg-[radial-gradient(circle,rgba(255,255,255,0.3),rgba(255,255,255,0))] blur-3xl" />
             <Badge variant="primary">Loo 的入库向导</Badge>
             <div className="space-y-3">
               <h2 className="text-[30px] font-semibold tracking-[-0.04em] text-[color:var(--foreground)]">
@@ -1043,22 +1050,23 @@ export function ImportExperience({
               </p>
             </div>
             <div className="flex flex-wrap gap-3 text-sm text-[color:var(--muted-foreground)]">
-              <span className="rounded-full border border-white/60 bg-white/42 px-4 py-2 backdrop-blur-md">Guided onboarding for one-account-at-a-time setup</span>
-              <span className="rounded-full border border-white/60 bg-white/42 px-4 py-2 backdrop-blur-md">Bulk CSV import for existing exports</span>
+              <span className="rounded-full border border-white/60 bg-white/42 px-4 py-2 backdrop-blur-md">{pick(language, "逐账户引导式入库", "Guided onboarding for one-account-at-a-time setup")}</span>
+              <span className="rounded-full border border-white/60 bg-white/42 px-4 py-2 backdrop-blur-md">{pick(language, "面向已有导出的批量 CSV 导入", "Bulk CSV import for existing exports")}</span>
             </div>
           </div>
-          <div className="grid gap-4 md:grid-cols-[220px_1fr] md:items-center">
+          <div className="relative grid gap-4 md:grid-cols-[220px_1fr] md:items-center">
+            <div className="pointer-events-none absolute bottom-[-30px] right-[-18px] h-36 w-36 rounded-full bg-[radial-gradient(circle,rgba(139,168,255,0.16),rgba(139,168,255,0))] blur-3xl" />
             <div className="flex justify-center md:justify-start">
               <div className="space-y-3 pt-8">
                 <MascotAsset name="miniSticker" className="h-[180px] w-[180px]" sizes="180px" />
-                <div className="max-w-[210px] rounded-[22px] border border-white/60 bg-white/70 px-4 py-3 text-sm font-medium leading-6 text-[color:var(--foreground)] shadow-[var(--shadow-card)] backdrop-blur-xl">
-                  你先选路径, 我来保证账户和流水不会串在一起。
+                <div className="max-w-[210px] rounded-[22px] border border-white/62 bg-[linear-gradient(180deg,rgba(255,255,255,0.78),rgba(255,248,251,0.64))] px-4 py-3 text-sm font-medium leading-6 text-[color:var(--foreground)] shadow-[0_14px_30px_rgba(110,103,130,0.07)] backdrop-blur-xl">
+                  {pick(language, "你先选路径，我来保证账户和流水不会串在一起。", "Pick the path first. I will keep accounts and transaction feeds from getting mixed together.")}
                 </div>
               </div>
             </div>
             <div className="grid gap-3">
-              <LooSignal title="Portfolio path" detail="账户、持仓、估值与推荐刷新" />
-              <LooSignal title="Spending path" detail="交易流水、分类与现金流" />
+              <LooSignal title={pick(language, "投资路径", "Portfolio path")} detail={pick(language, "账户、持仓、估值与推荐刷新", "Accounts, holdings, valuation, and recommendation refresh")} />
+              <LooSignal title={pick(language, "消费路径", "Spending path")} detail={pick(language, "交易流水、分类与现金流", "Transactions, categories, and cash flow")} />
             </div>
           </div>
         </CardContent>
@@ -1066,14 +1074,14 @@ export function ImportExperience({
 
       <Card>
         <CardHeader>
-          <CardTitle>Import Workflow</CardTitle>
+          <CardTitle>{pick(language, "导入工作流", "Import Workflow")}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid gap-3 md:grid-cols-2">
             <WorkflowOptionCard
-              title="Portfolio Import"
-              badge="Accounts + holdings"
-              detail="Use guided onboarding or direct CSV import for investment accounts and holdings. This path is allowed to evolve into broker integrations later."
+              title={pick(language, "投资组合导入", "Portfolio Import")}
+              badge={pick(language, "账户 + 持仓", "Accounts + holdings")}
+              detail={pick(language, "投资账户和持仓可走引导式入库，也可直接 CSV 导入。这条路径后续会自然扩展到 broker 集成。", "Use guided onboarding or direct CSV import for investment accounts and holdings. This path is allowed to evolve into broker integrations later.")}
               active={workflowView === "portfolio"}
               onClick={() => {
                 setWorkflowView("portfolio");
@@ -1081,9 +1089,9 @@ export function ImportExperience({
               }}
             />
             <WorkflowOptionCard
-              title="Spending Import"
-              badge="Transactions"
-              detail="Keep spending transactions on their own ingestion path so future bank, card, or aggregator APIs can plug in without changing portfolio import logic."
+              title={pick(language, "消费导入", "Spending Import")}
+              badge={pick(language, "交易流水", "Transactions")}
+              detail={pick(language, "把消费流水独立成单独入口，后续接银行、信用卡或聚合器 API 时，不会影响投资导入逻辑。", "Keep spending transactions on their own ingestion path so future bank, card, or aggregator APIs can plug in without changing portfolio import logic.")}
               active={workflowView === "spending"}
               onClick={() => setWorkflowView("spending")}
             />
@@ -1094,21 +1102,21 @@ export function ImportExperience({
       {workflowView === "portfolio" ? (
         <Card>
           <CardHeader>
-            <CardTitle>Portfolio import path</CardTitle>
+            <CardTitle>{pick(language, "投资导入路径", "Portfolio import path")}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid gap-3 md:grid-cols-2">
               <WorkflowOptionCard
-                title="Guided setup"
-                badge="Recommended"
-                detail="Walk through account type, data source choice, validation, and handoff one step at a time."
+                title={pick(language, "引导式设置", "Guided setup")}
+                badge={pick(language, "推荐", "Recommended")}
+                detail={pick(language, "按步骤完成账户类型、数据来源、校验和交接。", "Walk through account type, data source choice, validation, and handoff one step at a time.")}
                 active={mode === "guided"}
                 onClick={() => resetGuidedState("guided")}
               />
               <WorkflowOptionCard
-                title="Direct CSV import"
-                badge="Bulk"
-                detail="Best when your broker export already contains account and holding data and you want to validate it in one pass."
+                title={pick(language, "直接 CSV 导入", "Direct CSV import")}
+                badge={pick(language, "批量", "Bulk")}
+                detail={pick(language, "如果 broker 导出里已经包含账户和持仓信息，适合一次性校验并导入。", "Best when your broker export already contains account and holding data and you want to validate it in one pass.")}
                 active={mode === "direct"}
                 onClick={() => setMode("direct")}
               />
@@ -1126,15 +1134,15 @@ export function ImportExperience({
               const isComplete = currentStep > stepNumber;
               return (
                 <button
-                  type="button"
-                  key={step.title}
-                  onClick={() => !isPending && setCurrentStep(stepNumber)}
+                    type="button"
+                    key={step.title}
+                    onClick={() => !isPending && setCurrentStep(stepNumber)}
                   className={`rounded-[24px] border px-5 py-5 text-left transition-colors backdrop-blur-md ${isActive ? "border-[color:var(--primary)] bg-[color:var(--primary-soft)]" : "border-white/55 bg-white/36"} ${isComplete ? "shadow-[var(--shadow-card)]" : ""}`}
                 >
-                  <div className="space-y-3">
-                    <Badge variant={isActive ? "primary" : isComplete ? "success" : "neutral"}>
-                      Step {stepNumber}
-                    </Badge>
+                    <div className="space-y-3">
+                      <Badge variant={isActive ? "primary" : isComplete ? "success" : "neutral"}>
+                      {pick(language, "步骤", "Step")} {stepNumber}
+                      </Badge>
                     <p className="font-semibold">{step.title}</p>
                     <p className="text-sm text-[color:var(--muted-foreground)]">{step.description}</p>
                   </div>
@@ -1151,6 +1159,7 @@ export function ImportExperience({
               <CardContent className="space-y-5">
                 {currentStep === 1 ? (
                   <StepChooseAccountType
+                    language={language}
                     accountType={accountType}
                     onSelect={(value) => {
                       setAccountType(value);
@@ -1161,6 +1170,7 @@ export function ImportExperience({
 
                 {currentStep === 2 ? (
                   <StepChooseMethod
+                    language={language}
                     method={method}
                     onSelect={(value) => {
                       setMethod(value);
@@ -1171,6 +1181,7 @@ export function ImportExperience({
 
                 {currentStep === 3 ? (
                   <StepProvideSource
+                    language={language}
                     method={method}
                     accountType={accountType}
                     accountMode={accountMode}
@@ -1213,6 +1224,7 @@ export function ImportExperience({
 
                 {currentStep === 4 ? (
                   <StepReviewAndConfirm
+                    language={language}
                     accountType={accountType}
                     method={method}
                     institution={institution}
@@ -1231,6 +1243,7 @@ export function ImportExperience({
 
                 {currentStep === 5 ? (
                   <StepCompleteSetup
+                    language={language}
                     accountType={accountType}
                     method={method}
                     institution={institution}
@@ -1248,7 +1261,7 @@ export function ImportExperience({
 
                 <div className="flex flex-wrap justify-between gap-3 border-t border-[color:var(--border)] pt-4">
                   <Button type="button" variant="secondary" onClick={goToPreviousStep} disabled={currentStep === 1 || isPending}>
-                    Back
+                    {pick(language, "返回", "Back")}
                   </Button>
                   <Button
                     type="button"
@@ -1264,16 +1277,16 @@ export function ImportExperience({
 
             <Card>
               <CardHeader>
-                <CardTitle>Guided setup notes</CardTitle>
+                <CardTitle>{pick(language, "引导式说明", "Guided setup notes")}</CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
                 <InfoRow
                   icon={<FolderInput className="mt-0.5 h-4 w-4 text-[color:var(--primary)]" />}
-                  text="Guided setup is account-first. It helps the user think in account sleeves before thinking in CSV structure."
+                  text={pick(language, "引导式流程先按账户思考，再处理 CSV 结构，更适合新用户一步步梳理。", "Guided setup is account-first. It helps the user think in account sleeves before thinking in CSV structure.")}
                 />
                 <InfoRow
                   icon={<Database className="mt-0.5 h-4 w-4 text-[color:var(--primary)]" />}
-                  text="Direct CSV import remains available for one-file broker exports. Guided setup now writes account-level onboarding data to the backend."
+                  text={pick(language, "如果你已经有完整 broker 导出，仍然可以直接 CSV 导入。引导式路径会把账户级 onboarding 数据先写入后端。", "Direct CSV import remains available for one-file broker exports. Guided setup now writes account-level onboarding data to the backend.")}
                 />
                 <InfoRow
                   icon={<CheckCircle2 className="mt-0.5 h-4 w-4 text-[color:var(--success)]" />}
@@ -1281,7 +1294,7 @@ export function ImportExperience({
                 />
                 <InfoRow
                   icon={<ShieldAlert className="mt-0.5 h-4 w-4 text-[color:var(--warning)]" />}
-                  text="Step 4 is now a real review and confirm state. Step 5 reflects what was actually written for the signed-in user."
+                  text={pick(language, "第 4 步是真实的复核确认，第 5 步会展示实际写入当前登录用户的数据结果。", "Step 4 is now a real review and confirm state. Step 5 reflects what was actually written for the signed-in user.")}
                 />
               </CardContent>
             </Card>
@@ -1293,27 +1306,27 @@ export function ImportExperience({
         <div className="grid gap-6 xl:grid-cols-[1fr_0.8fr]">
           <Card>
             <CardHeader>
-              <CardTitle>Direct CSV import</CardTitle>
+              <CardTitle>{pick(language, "直接 CSV 导入", "Direct CSV import")}</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="rounded-[24px] border border-dashed border-white/60 bg-white/34 p-5 backdrop-blur-md">
-                <p className="text-xs uppercase tracking-[0.16em] text-[color:var(--muted-foreground)]">When to use this</p>
-                <p className="mt-2 text-lg font-semibold">One file, many accounts</p>
+                <p className="text-xs uppercase tracking-[0.16em] text-[color:var(--muted-foreground)]">{pick(language, "适用场景", "When to use this")}</p>
+                <p className="mt-2 text-lg font-semibold">{pick(language, "一个文件，多个账户", "One file, many accounts")}</p>
                 <p className="mt-2 text-sm text-[color:var(--muted-foreground)]">
-                  Use this path when your broker export already contains account and holding data and you want to validate, preview, map, and import everything in one pass.
+                  {pick(language, "如果你的 broker 导出已经包含账户和持仓数据，这条路径适合一次完成校验、预览、映射和导入。", "Use this path when your broker export already contains account and holding data and you want to validate, preview, map, and import everything in one pass.")}
                 </p>
               </div>
-              <ImportJobPanel latestJob={latestPortfolioJob} workflow="portfolio" />
+              <ImportJobPanel latestJob={latestPortfolioJob} workflow="portfolio" language={language} />
             </CardContent>
           </Card>
           <Card>
             <CardHeader>
-              <CardTitle>Direct import notes</CardTitle>
+              <CardTitle>{pick(language, "直接导入说明", "Direct import notes")}</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
               <InfoRow
                 icon={<Database className="mt-0.5 h-4 w-4 text-[color:var(--primary)]" />}
-                text="Holding valuation rule: if a CSV row includes market_value, that explicit total value is used and overrides any derived value from quantity x last_price."
+                text={pick(language, "持仓估值规则：如果 CSV 行包含 market_value，系统会优先采用显式总值，而不是 quantity x last_price 的推导值。", "Holding valuation rule: if a CSV row includes market_value, that explicit total value is used and overrides any derived value from quantity x last_price.")}
               />
               {portfolioSuccessStates.map((item) => (
                 <InfoRow key={item} icon={<CheckCircle2 className="mt-0.5 h-4 w-4 text-[color:var(--success)]" />} text={item} />
@@ -1327,22 +1340,22 @@ export function ImportExperience({
         <div className="grid gap-6 xl:grid-cols-[1fr_0.8fr]">
           <Card>
             <CardHeader>
-              <CardTitle>Spending import</CardTitle>
+              <CardTitle>{pick(language, "消费导入", "Spending import")}</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="rounded-[24px] border border-dashed border-white/60 bg-white/34 p-5 backdrop-blur-md">
-                <p className="text-xs uppercase tracking-[0.16em] text-[color:var(--muted-foreground)]">When to use this</p>
-                <p className="mt-2 text-lg font-semibold">Transaction-first import</p>
+                <p className="text-xs uppercase tracking-[0.16em] text-[color:var(--muted-foreground)]">{pick(language, "适用场景", "When to use this")}</p>
+                <p className="mt-2 text-lg font-semibold">{pick(language, "以交易流水为先", "Transaction-first import")}</p>
                 <p className="mt-2 text-sm text-[color:var(--muted-foreground)]">
-                  Use this path for spending and cash-flow records only. It keeps transaction ingestion separate from portfolio ingestion and leaves a clean boundary for future bank or card APIs.
+                  {pick(language, "这条路径只处理消费和现金流记录。它把流水导入和投资导入彻底分开，为后续银行或信用卡 API 预留清晰边界。", "Use this path for spending and cash-flow records only. It keeps transaction ingestion separate from portfolio ingestion and leaves a clean boundary for future bank or card APIs.")}
                 </p>
               </div>
-              <SpendingImportPanel latestJob={latestSpendingJob} />
+              <SpendingImportPanel latestJob={latestSpendingJob} language={language} />
             </CardContent>
           </Card>
           <Card>
             <CardHeader>
-              <CardTitle>Spending import notes</CardTitle>
+              <CardTitle>{pick(language, "消费导入说明", "Spending import notes")}</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
               {spendingSuccessStates.map((item) => (
@@ -1357,16 +1370,18 @@ export function ImportExperience({
 }
 
 function StepChooseAccountType({
+  language,
   accountType,
   onSelect
 }: {
+  language: DisplayLanguage;
   accountType: GuidedAccountType | null;
   onSelect: (value: GuidedAccountType) => void;
 }) {
   return (
     <div className="space-y-4">
       <p className="text-sm text-[color:var(--muted-foreground)]">
-        Start by selecting the first account sleeve you want to onboard. This keeps the guided flow narrow and easier for new users.
+        {pick(language, "先选要入库的第一个账户壳层。这样引导范围更聚焦，也更适合新用户一步步完成。", "Start by selecting the first account sleeve you want to onboard. This keeps the guided flow narrow and easier for new users.")}
       </p>
       <div className="grid gap-3 md:grid-cols-2">
         {ACCOUNT_OPTIONS.map((option) => (
@@ -1376,9 +1391,33 @@ function StepChooseAccountType({
             onClick={() => onSelect(option.type)}
             className={`rounded-[24px] border p-5 text-left transition-colors ${accountType === option.type ? "border-[color:var(--primary)] bg-[color:var(--primary-soft)]" : "border-[color:var(--border)] bg-white"}`}
           >
-            <p className="text-lg font-semibold">{option.type}</p>
-            <p className="mt-2 text-sm text-[color:var(--foreground)]">{option.caption}</p>
-            <p className="mt-2 text-sm text-[color:var(--muted-foreground)]">{option.detail}</p>
+            <p className="text-lg font-semibold">{getAccountTypeLabel(option.type, language)}</p>
+            <p className="mt-2 text-sm text-[color:var(--foreground)]">
+              {pick(
+                language,
+                option.type === "TFSA"
+                  ? "免税增长账户"
+                  : option.type === "RRSP"
+                    ? "退休优先的递延税账户"
+                    : option.type === "FHSA"
+                      ? "面向购房目标的账户"
+                      : "灵活的应税账户",
+                option.caption
+              )}
+            </p>
+            <p className="mt-2 text-sm text-[color:var(--muted-foreground)]">
+              {pick(
+                language,
+                option.type === "TFSA"
+                  ? "对大多数首次配置的用户来说是很好的默认起点。"
+                  : option.type === "RRSP"
+                    ? "当长期退休储蓄是主要目标时更适合。"
+                    : option.type === "FHSA"
+                      ? "当中短期购房目标很重要时更适合。"
+                      : "当注册账户额度已基本用完时可以考虑。",
+                option.detail
+              )}
+            </p>
           </button>
         ))}
       </div>
@@ -1387,16 +1426,18 @@ function StepChooseAccountType({
 }
 
 function StepChooseMethod({
+  language,
   method,
   onSelect
 }: {
+  language: DisplayLanguage;
   method: GuidedMethod | null;
   onSelect: (value: GuidedMethod) => void;
 }) {
   return (
     <div className="space-y-4">
       <p className="text-sm text-[color:var(--muted-foreground)]">
-        Decide whether this account should come from a single-account CSV, be entered manually, or be skipped and completed later.
+        {pick(language, "决定这个账户是通过单账户 CSV、手动录入，还是先跳过以后再补。", "Decide whether this account should come from a single-account CSV, be entered manually, or be skipped and completed later.")}
       </p>
       <div className="grid gap-3">
         {METHOD_OPTIONS.map((option) => (
@@ -1406,8 +1447,28 @@ function StepChooseMethod({
             onClick={() => onSelect(option.value)}
             className={`rounded-[24px] border p-5 text-left transition-colors ${method === option.value ? "border-[color:var(--primary)] bg-[color:var(--primary-soft)]" : "border-[color:var(--border)] bg-white"}`}
           >
-            <p className="text-lg font-semibold">{option.title}</p>
-            <p className="mt-2 text-sm text-[color:var(--muted-foreground)]">{option.detail}</p>
+            <p className="text-lg font-semibold">
+              {pick(
+                language,
+                option.value === "single-account-csv"
+                  ? "上传单账户 CSV"
+                  : option.value === "manual-entry"
+                    ? "手动录入持仓"
+                    : "先跳过，稍后补充",
+                option.title
+              )}
+            </p>
+            <p className="mt-2 text-sm text-[color:var(--muted-foreground)]">
+              {pick(
+                language,
+                option.value === "single-account-csv"
+                  ? "适合一边引导一边检查，只处理一个账户。"
+                  : option.value === "manual-entry"
+                    ? "适合小型起步组合，或 broker 导出比较混乱的时候。"
+                    : "先把账户壳层记下来，数据导入以后再补。",
+                option.detail
+              )}
+            </p>
           </button>
         ))}
       </div>
@@ -1416,6 +1477,7 @@ function StepChooseMethod({
 }
 
 function StepProvideSource(props: {
+  language: DisplayLanguage;
   method: GuidedMethod | null;
   accountType: GuidedAccountType | null;
   accountMode: "new" | "existing";
@@ -1455,6 +1517,7 @@ function StepProvideSource(props: {
   onSaveGuidedPreset: () => void;
 }) {
   const {
+    language,
     method,
     accountType,
     accountMode,
@@ -1497,14 +1560,16 @@ function StepProvideSource(props: {
   return (
     <div className="space-y-4">
       <div className="rounded-[24px] border border-[color:var(--border)] bg-[color:var(--card-muted)] p-5">
-        <p className="text-xs uppercase tracking-[0.16em] text-[color:var(--muted-foreground)]">Current setup</p>
-        <p className="mt-2 font-semibold">{accountType ?? "No account selected"} / {method ?? "No method selected"}</p>
+        <p className="text-xs uppercase tracking-[0.16em] text-[color:var(--muted-foreground)]">{pick(language, "当前设置", "Current setup")}</p>
+        <p className="mt-2 font-semibold">
+          {accountType ? getAccountTypeLabel(accountType, language) : pick(language, "还未选择账户", "No account selected")} / {method ?? pick(language, "还未选择方式", "No method selected")}
+        </p>
       </div>
 
       <div className="space-y-4 rounded-[24px] border border-[color:var(--border)] bg-white p-5">
         <div className="flex flex-wrap gap-3">
           <Button type="button" variant={accountMode === "new" ? "primary" : "secondary"} onClick={() => onAccountModeChange("new")}>
-            Add a new {accountType ?? "account"}
+            {pick(language, "新增一个", "Add a new ")}{accountType ? getAccountTypeLabel(accountType, language) : pick(language, "账户", "account")}
           </Button>
           <Button
             type="button"
@@ -1512,22 +1577,22 @@ function StepProvideSource(props: {
             onClick={() => onAccountModeChange("existing")}
             disabled={existingAccounts.length === 0}
           >
-            Use existing {accountType ?? "account"}
+            {pick(language, "使用已有", "Use existing ")}{accountType ? getAccountTypeLabel(accountType, language) : pick(language, "账户", "account")}
           </Button>
         </div>
 
         {accountMode === "existing" ? (
           <label className="space-y-2">
-            <span className="text-sm font-medium">Existing account</span>
+            <span className="text-sm font-medium">{pick(language, "已有账户", "Existing account")}</span>
             <select
               value={selectedExistingAccountId}
               onChange={(event) => onExistingAccountChange(event.target.value)}
               className="w-full rounded-2xl border border-[color:var(--border)] bg-white px-4 py-3 text-sm outline-none"
             >
-              <option value="">Select an existing {accountType ?? "account"}</option>
+              <option value="">{pick(language, "选择已有", "Select an existing ")}{accountType ? getAccountTypeLabel(accountType, language) : pick(language, "账户", "account")}</option>
               {existingAccounts.map((account) => (
                 <option key={account.id} value={account.id}>
-                  {account.nickname} / {account.institution} / {formatAmount(account.marketValueAmount ?? account.marketValueCad, account.currency)}
+                  {getAccountTypeLabel(account.type as GuidedAccountType, language)} / {account.nickname} / {account.institution} / {formatAmount(account.marketValueAmount ?? account.marketValueCad, account.currency)}
                 </option>
               ))}
             </select>
@@ -1536,25 +1601,25 @@ function StepProvideSource(props: {
 
         <div className="grid gap-4 md:grid-cols-2">
           <label className="space-y-2">
-            <span className="text-sm font-medium">Institution</span>
+            <span className="text-sm font-medium">{pick(language, "机构", "Institution")}</span>
             <input
               value={institution}
               onChange={(event) => onInstitutionChange(event.target.value)}
               className="w-full rounded-2xl border border-[color:var(--border)] bg-white px-4 py-3 text-sm outline-none"
-              placeholder="Questrade, Wealthsimple, RBC Direct Investing..."
+              placeholder={pick(language, "Questrade、Wealthsimple、RBC Direct Investing...", "Questrade, Wealthsimple, RBC Direct Investing...")}
             />
           </label>
           <label className="space-y-2">
-            <span className="text-sm font-medium">Account nickname</span>
+            <span className="text-sm font-medium">{pick(language, "账户昵称", "Account nickname")}</span>
             <input
               value={nickname}
               onChange={(event) => onNicknameChange(event.target.value)}
               className="w-full rounded-2xl border border-[color:var(--border)] bg-white px-4 py-3 text-sm outline-none"
-              placeholder="Main TFSA, Retirement RRSP..."
+              placeholder={pick(language, "主 TFSA、退休 RRSP...", "Main TFSA, Retirement RRSP...")}
             />
           </label>
           <label className="space-y-2">
-            <span className="text-sm font-medium">Account currency</span>
+            <span className="text-sm font-medium">{pick(language, "账户币种", "Account currency")}</span>
             <select
               value={accountCurrency}
               onChange={(event) => onAccountCurrencyChange(normalizeSupportedCurrency(event.target.value))}
@@ -1565,7 +1630,7 @@ function StepProvideSource(props: {
             </select>
           </label>
           <label className="space-y-2">
-            <span className="text-sm font-medium">Contribution room (CAD)</span>
+            <span className="text-sm font-medium">{pick(language, "供款额度（CAD）", "Contribution room (CAD)")}</span>
             <input
               type="number"
               min="0"
@@ -1576,14 +1641,14 @@ function StepProvideSource(props: {
             />
           </label>
           <label className="space-y-2">
-            <span className="text-sm font-medium">Current market value ({accountCurrency})</span>
+            <span className="text-sm font-medium">{pick(language, "当前市值", "Current market value")} ({accountCurrency})</span>
             <input
               type="number"
               min="0"
               value={initialMarketValueAmount}
               onChange={(event) => onInitialMarketValueChange(event.target.value)}
               className="w-full rounded-2xl border border-[color:var(--border)] bg-white px-4 py-3 text-sm outline-none"
-              placeholder="Auto-calculated after holdings write"
+              placeholder={pick(language, "写入持仓后可自动计算", "Auto-calculated after holdings write")}
             />
           </label>
         </div>
@@ -1592,13 +1657,13 @@ function StepProvideSource(props: {
       {method === "single-account-csv" ? (
         <div className="space-y-4 rounded-[24px] border border-[color:var(--border)] bg-white p-5">
           <div>
-            <p className="font-semibold">Single-account CSV path</p>
+            <p className="font-semibold">{pick(language, "单账户 CSV 路径", "Single-account CSV path")}</p>
             <p className="mt-2 text-sm text-[color:var(--muted-foreground)]">
-              Upload one account-specific CSV, review the parsed rows, then the wizard will run a merge-mode import on confirm.
+              {pick(language, "上传一个账户专用的 CSV，先复核解析结果，再在确认时用 merge 模式写入。", "Upload one account-specific CSV, review the parsed rows, then the wizard will run a merge-mode import on confirm.")}
             </p>
           </div>
           <label className="space-y-2">
-            <span className="text-sm font-medium">CSV upload</span>
+            <span className="text-sm font-medium">{pick(language, "上传 CSV", "CSV upload")}</span>
             <input
               type="file"
               accept=".csv,text/csv"
@@ -1607,35 +1672,35 @@ function StepProvideSource(props: {
             />
           </label>
           <p className="text-sm text-[color:var(--muted-foreground)]">
-            Selected file: {guidedCsvFileName}
+            {pick(language, "已选文件：", "Selected file: ")}{guidedCsvFileName}
           </p>
 
           {guidedCsvHeaders.length > 0 ? (
             <div className="space-y-4 rounded-2xl border border-[color:var(--border)] bg-[color:var(--card-muted)] p-4">
-              <div className="flex items-center justify-between gap-3">
-                <p className="font-medium">Field mapping</p>
+            <div className="flex items-center justify-between gap-3">
+                <p className="font-medium">{pick(language, "字段映射", "Field mapping")}</p>
                 <Button type="button" variant="secondary" leadingIcon={<Save className="h-4 w-4" />} onClick={onSaveGuidedPreset}>
-                  Save current preset
+                  {pick(language, "保存当前预设", "Save current preset")}
                 </Button>
               </div>
               <label className="space-y-2">
-                <span className="text-sm font-medium">Mapping preset</span>
+                <span className="text-sm font-medium">{pick(language, "映射预设", "Mapping preset")}</span>
                 <select
                   value={guidedCsvSelectedPresetKey}
                   onChange={(event) => onGuidedCsvPresetChange(event.target.value)}
                   className="w-full rounded-2xl border border-[color:var(--border)] bg-white px-4 py-3 text-sm outline-none"
                 >
-                  <option value="auto-detect">Auto-detect from headers</option>
+                  <option value="auto-detect">{getImportPresetLabel("auto-detect", "Auto-detect from headers", language)}</option>
                   {guidedCsvPresetOptions.map((preset) => (
                     <option key={preset.key} value={preset.key}>
-                      {preset.label}
+                      {getImportPresetLabel(preset.key, preset.label, language)}
                     </option>
                   ))}
                 </select>
               </label>
               {GUIDED_MAPPING_GROUPS.map((group) => (
                 <div key={group.title} className="space-y-3">
-                  <p className="text-xs uppercase tracking-[0.14em] text-[color:var(--muted-foreground)]">{group.title}</p>
+                  <p className="text-xs uppercase tracking-[0.14em] text-[color:var(--muted-foreground)]">{getImportMappingGroupTitle(group.title, language)}</p>
                   <div className="grid gap-3 md:grid-cols-2">
                     {group.fields.map((field) => (
                       <label key={field} className="space-y-2">
@@ -1645,7 +1710,7 @@ function StepProvideSource(props: {
                           onChange={(event) => onGuidedCsvFieldMappingChange(field, event.target.value)}
                           className="w-full rounded-2xl border border-[color:var(--border)] bg-white px-4 py-3 text-sm outline-none"
                         >
-                          <option value="">Not mapped</option>
+                          <option value="">{pick(language, "未映射", "Not mapped")}</option>
                           {guidedCsvHeaders.map((header) => (
                             <option key={`${field}-${header}`} value={header}>
                               {header}
@@ -1660,7 +1725,7 @@ function StepProvideSource(props: {
 
               {guidedCsvMissingRequiredMappings.length > 0 ? (
                 <div className="rounded-2xl border border-[#e7b0b8] bg-[#fff3f5] px-4 py-3 text-sm text-[#8e2433]">
-                  Required mappings missing: {guidedCsvMissingRequiredMappings.join(", ")}
+                  {pick(language, "缺少必填映射：", "Required mappings missing: ")}{guidedCsvMissingRequiredMappings.join(", ")}
                 </div>
               ) : null}
 
@@ -1668,8 +1733,8 @@ function StepProvideSource(props: {
                 <div className="space-y-3">
                   <div className="flex items-center gap-2">
                     <Eye className="h-4 w-4 text-[color:var(--primary)]" />
-                    <p className="font-medium">Preview</p>
-                    <Badge variant="neutral">First {guidedCsvPreview.rows.length} rows</Badge>
+                    <p className="font-medium">{pick(language, "预览", "Preview")}</p>
+                    <Badge variant="neutral">{pick(language, `前 ${guidedCsvPreview.rows.length} 行`, `First ${guidedCsvPreview.rows.length} rows`)}</Badge>
                   </div>
                   <div className="overflow-x-auto rounded-2xl border border-[color:var(--border)] bg-white">
                     <table className="min-w-full text-left text-sm">
@@ -1705,52 +1770,52 @@ function StepProvideSource(props: {
       {method === "manual-entry" ? (
         <div className="space-y-4 rounded-[24px] border border-[color:var(--border)] bg-white p-5">
           <div>
-            <p className="font-semibold">Manual entry path</p>
+            <p className="font-semibold">{pick(language, "手动录入路径", "Manual entry path")}</p>
             <p className="mt-2 text-sm text-[color:var(--muted-foreground)]">
-              Use this when you want to add one or more holdings into a new or existing account. Gain/loss is derived from cost basis and the computed market value. Only use an override when you deliberately want to replace the computed total value.
+              {pick(language, "如果你想把一个或多个持仓写入新账户或已有账户，就用这条路径。盈亏会由成本基础和计算后的市值自动推导；只有在你明确想覆盖推导值时，才使用 override。", "Use this when you want to add one or more holdings into a new or existing account. Gain/loss is derived from cost basis and the computed market value. Only use an override when you deliberately want to replace the computed total value.")}
             </p>
           </div>
           <div className="space-y-4">
             {manualHoldings.map((holding, index) => (
               <div key={holding.id} className="space-y-4 rounded-2xl border border-[color:var(--border)] bg-[color:var(--card-muted)] p-4">
                 <div className="flex items-center justify-between gap-3">
-                  <p className="font-medium">Holding {index + 1}</p>
+                  <p className="font-medium">{pick(language, "持仓", "Holding")} {index + 1}</p>
                   <Button type="button" variant="secondary" onClick={() => onRemoveManualHolding(holding.id)} disabled={manualHoldings.length === 1}>
-                    Remove
+                    {pick(language, "移除", "Remove")}
                   </Button>
                 </div>
                 <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
                   <label className="space-y-2 xl:col-span-2">
-                    <span className="text-sm font-medium">Security search</span>
+                    <span className="text-sm font-medium">{pick(language, "证券搜索", "Security search")}</span>
                     <div className="flex gap-2">
-                      <input value={holding.searchQuery} onChange={(event) => onManualHoldingChange(holding.id, { searchQuery: event.target.value })} className="w-full rounded-2xl border border-[color:var(--border)] bg-white px-4 py-3 text-sm outline-none" placeholder="Search by ticker or company name" />
+                      <input value={holding.searchQuery} onChange={(event) => onManualHoldingChange(holding.id, { searchQuery: event.target.value })} className="w-full rounded-2xl border border-[color:var(--border)] bg-white px-4 py-3 text-sm outline-none" placeholder={pick(language, "按代码或公司名称搜索", "Search by ticker or company name")} />
                       <Button type="button" variant="secondary" onClick={() => void onManualHoldingSearch(holding.id)} leadingIcon={manualHoldingStatus[holding.id]?.searchLoading ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}>
-                        Search
+                        {pick(language, "搜索", "Search")}
                       </Button>
                     </div>
                   </label>
                   <label className="space-y-2">
-                    <span className="text-sm font-medium">Ticker symbol</span>
+                    <span className="text-sm font-medium">{pick(language, "代码", "Ticker symbol")}</span>
                     <input value={holding.symbol} onChange={(event) => onManualHoldingChange(holding.id, { symbol: event.target.value.toUpperCase() })} className="w-full rounded-2xl border border-[color:var(--border)] bg-white px-4 py-3 text-sm outline-none" placeholder="VFV" />
                   </label>
                   <label className="space-y-2">
-                    <span className="text-sm font-medium">Holding name</span>
-                    <input value={holding.holdingName} onChange={(event) => onManualHoldingChange(holding.id, { holdingName: event.target.value })} className="w-full rounded-2xl border border-[color:var(--border)] bg-white px-4 py-3 text-sm outline-none" placeholder="Auto-filled from normalization when available" />
+                    <span className="text-sm font-medium">{pick(language, "持仓名称", "Holding name")}</span>
+                    <input value={holding.holdingName} onChange={(event) => onManualHoldingChange(holding.id, { holdingName: event.target.value })} className="w-full rounded-2xl border border-[color:var(--border)] bg-white px-4 py-3 text-sm outline-none" placeholder={pick(language, "标准化成功后会自动填充", "Auto-filled from normalization when available")} />
                   </label>
                   <label className="space-y-2">
-                    <span className="text-sm font-medium">Asset class</span>
+                    <span className="text-sm font-medium">{pick(language, "资产类别", "Asset class")}</span>
                     <select value={holding.assetClass} onChange={(event) => onManualHoldingChange(holding.id, { assetClass: event.target.value as (typeof ASSET_CLASS_OPTIONS)[number] })} className="w-full rounded-2xl border border-[color:var(--border)] bg-white px-4 py-3 text-sm outline-none">
                       {ASSET_CLASS_OPTIONS.map((option) => (
-                        <option key={option} value={option}>{option}</option>
+                        <option key={option} value={option}>{getAssetClassLabel(option, language)}</option>
                       ))}
                     </select>
                   </label>
                   <label className="space-y-2">
-                    <span className="text-sm font-medium">Sector</span>
-                    <input value={holding.sector} onChange={(event) => onManualHoldingChange(holding.id, { sector: event.target.value })} className="w-full rounded-2xl border border-[color:var(--border)] bg-white px-4 py-3 text-sm outline-none" placeholder="Multi-sector" />
+                    <span className="text-sm font-medium">{pick(language, "行业", "Sector")}</span>
+                    <input value={holding.sector} onChange={(event) => onManualHoldingChange(holding.id, { sector: event.target.value })} className="w-full rounded-2xl border border-[color:var(--border)] bg-white px-4 py-3 text-sm outline-none" placeholder={pick(language, "多行业", "Multi-sector")} />
                   </label>
                   <label className="space-y-2">
-                    <span className="text-sm font-medium">Holding currency</span>
+                    <span className="text-sm font-medium">{pick(language, "持仓币种", "Holding currency")}</span>
                     <select
                       value={holding.currency}
                       onChange={(event) => onManualHoldingChange(holding.id, { currency: normalizeSupportedCurrency(event.target.value) })}
@@ -1761,35 +1826,35 @@ function StepProvideSource(props: {
                     </select>
                   </label>
                   <label className="space-y-2">
-                    <span className="text-sm font-medium">Shares</span>
+                    <span className="text-sm font-medium">{pick(language, "份额 / 股数", "Shares")}</span>
                     <input type="number" min="0" value={holding.quantity} onChange={(event) => onManualHoldingChange(holding.id, { quantity: event.target.value })} className="w-full rounded-2xl border border-[color:var(--border)] bg-white px-4 py-3 text-sm outline-none" placeholder="10" />
                   </label>
                   <label className="space-y-2">
-                    <span className="text-sm font-medium">Avg cost / share ({holding.currency})</span>
+                    <span className="text-sm font-medium">{pick(language, "平均成本 / 每股", "Avg cost / share")} ({holding.currency})</span>
                     <input type="number" min="0" value={holding.avgCostPerShareAmount} onChange={(event) => onManualHoldingChange(holding.id, { avgCostPerShareAmount: event.target.value })} className="w-full rounded-2xl border border-[color:var(--border)] bg-white px-4 py-3 text-sm outline-none" placeholder="105.25" />
                   </label>
                   <label className="space-y-2">
-                    <span className="text-sm font-medium">Current price ({holding.currency})</span>
+                    <span className="text-sm font-medium">{pick(language, "当前价格", "Current price")} ({holding.currency})</span>
                     <div className="flex gap-2">
-                      <input type="number" min="0" value={holding.currentPriceAmount} onChange={(event) => onManualHoldingChange(holding.id, { currentPriceAmount: event.target.value })} className="w-full rounded-2xl border border-[color:var(--border)] bg-white px-4 py-3 text-sm outline-none" placeholder="Fetch delayed quote or enter manually" />
+                      <input type="number" min="0" value={holding.currentPriceAmount} onChange={(event) => onManualHoldingChange(holding.id, { currentPriceAmount: event.target.value })} className="w-full rounded-2xl border border-[color:var(--border)] bg-white px-4 py-3 text-sm outline-none" placeholder={pick(language, "抓取延迟行情或手动输入", "Fetch delayed quote or enter manually")} />
                       <Button type="button" variant="secondary" onClick={() => void onManualHoldingQuoteFetch(holding.id)} leadingIcon={manualHoldingStatus[holding.id]?.quoteLoading ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <TrendingUp className="h-4 w-4" />}>
-                        Quote
+                        {pick(language, "行情", "Quote")}
                       </Button>
                     </div>
                     <p className="text-xs text-[color:var(--muted-foreground)]">
-                      Per-share or per-unit price. Use this when you know the latest quote.
+                      {pick(language, "这里填每股或每单位价格。如果你已经知道最新行情，就用这个输入。", "Per-share or per-unit price. Use this when you know the latest quote.")}
                     </p>
                   </label>
                   <label className="space-y-2">
-                    <span className="text-sm font-medium">Current market value ({holding.currency})</span>
-                    <input type="number" min="0" value={getManualHoldingDerivedMetrics(holding).computedMarketValueAmount > 0 ? getManualHoldingDerivedMetrics(holding).computedMarketValueAmount.toFixed(2) : ""} readOnly className="w-full rounded-2xl border border-[color:var(--border)] bg-slate-50 px-4 py-3 text-sm outline-none" placeholder="Calculated from shares x current price or override value" />
+                    <span className="text-sm font-medium">{pick(language, "当前市值", "Current market value")} ({holding.currency})</span>
+                    <input type="number" min="0" value={getManualHoldingDerivedMetrics(holding).computedMarketValueAmount > 0 ? getManualHoldingDerivedMetrics(holding).computedMarketValueAmount.toFixed(2) : ""} readOnly className="w-full rounded-2xl border border-[color:var(--border)] bg-slate-50 px-4 py-3 text-sm outline-none" placeholder={pick(language, "由股数 x 当前价格或 override 推导", "Calculated from shares x current price or override value")} />
                     <p className="text-xs text-[color:var(--muted-foreground)]">
-                      Auto-calculated from shares and current price. If you add an override below, that override becomes the total value used for gain/loss.
+                      {pick(language, "系统会根据股数和当前价格自动计算。如果你在下方填写 override，总值会以 override 为准并用于盈亏计算。", "Auto-calculated from shares and current price. If you add an override below, that override becomes the total value used for gain/loss.")}
                     </p>
                   </label>
                 </div>
                 <details className="rounded-2xl border border-[color:var(--border)] bg-white px-4 py-3">
-                  <summary className="cursor-pointer text-sm font-medium text-[color:var(--foreground)]">Advanced: Override total value</summary>
+                  <summary className="cursor-pointer text-sm font-medium text-[color:var(--foreground)]">{pick(language, "高级：覆盖总市值", "Advanced: Override total value")}</summary>
                   <div className="mt-3 space-y-2">
                     <input
                       type="number"
@@ -1797,16 +1862,16 @@ function StepProvideSource(props: {
                       value={holding.overrideMarketValueAmount}
                       onChange={(event) => onManualHoldingChange(holding.id, { overrideMarketValueAmount: event.target.value })}
                       className="w-full rounded-2xl border border-[color:var(--border)] bg-white px-4 py-3 text-sm outline-none"
-                      placeholder="Optional override total value"
+                      placeholder={pick(language, "可选：手动覆盖总市值", "Optional override total value")}
                     />
                     <p className="text-xs text-[color:var(--muted-foreground)]">
-                      Leave empty in normal use. Only fill this if you want to override the computed total position value.
+                      {pick(language, "正常情况下留空。只有当你明确想覆盖系统推导的总仓位价值时才填写。", "Leave empty in normal use. Only fill this if you want to override the computed total position value.")}
                     </p>
                   </div>
                 </details>
                 {manualHoldingSuggestions[holding.id]?.length ? (
                   <div className="space-y-2">
-                    <p className="text-xs uppercase tracking-[0.14em] text-[color:var(--muted-foreground)]">Search results</p>
+                    <p className="text-xs uppercase tracking-[0.14em] text-[color:var(--muted-foreground)]">{pick(language, "搜索结果", "Search results")}</p>
                     <div className="space-y-2">
                       {manualHoldingSuggestions[holding.id].slice(0, 5).map((result) => (
                         <button
@@ -1818,7 +1883,7 @@ function StepProvideSource(props: {
                           <div>
                             <p className="font-medium">{result.symbol} · {result.name}</p>
                             <p className="mt-1 text-sm text-[color:var(--muted-foreground)]">
-                              {result.exchange ?? "Unknown exchange"}{result.country ? ` · ${result.country}` : ""}{result.currency ? ` · ${result.currency}` : ""}
+                              {result.exchange ?? pick(language, "未知交易所", "Unknown exchange")}{result.country ? ` · ${result.country}` : ""}{result.currency ? ` · ${result.currency}` : ""}
                             </p>
                           </div>
                           <Badge variant="neutral">{result.type}</Badge>
@@ -1840,21 +1905,21 @@ function StepProvideSource(props: {
                 <div className="grid gap-3 md:grid-cols-3">
                   <InfoRow
                     icon={<Database className="mt-0.5 h-4 w-4 text-[color:var(--primary)]" />}
-                    text={`Derived cost basis: ${formatAmount(getManualHoldingDerivedMetrics(holding).costBasisAmount, holding.currency)}`}
+                    text={pick(language, `推导成本基础：${formatAmount(getManualHoldingDerivedMetrics(holding).costBasisAmount, holding.currency)}`, `Derived cost basis: ${formatAmount(getManualHoldingDerivedMetrics(holding).costBasisAmount, holding.currency)}`)}
                   />
                   <InfoRow
                     icon={<TrendingUp className="mt-0.5 h-4 w-4 text-[color:var(--primary)]" />}
-                    text={`Derived market value: ${formatAmount(getManualHoldingDerivedMetrics(holding).computedMarketValueAmount, holding.currency)}`}
+                    text={pick(language, `推导市值：${formatAmount(getManualHoldingDerivedMetrics(holding).computedMarketValueAmount, holding.currency)}`, `Derived market value: ${formatAmount(getManualHoldingDerivedMetrics(holding).computedMarketValueAmount, holding.currency)}`)}
                   />
                   <InfoRow
                     icon={<CheckCircle2 className="mt-0.5 h-4 w-4 text-[color:var(--success)]" />}
-                    text={`Derived gain/loss: ${formatPercent(getManualHoldingDerivedMetrics(holding).gainLossPct)}`}
+                    text={pick(language, `推导盈亏：${formatPercent(getManualHoldingDerivedMetrics(holding).gainLossPct)}`, `Derived gain/loss: ${formatPercent(getManualHoldingDerivedMetrics(holding).gainLossPct)}`)}
                   />
                 </div>
               </div>
             ))}
             <Button type="button" variant="secondary" onClick={onAddManualHolding}>
-              Add another holding
+              {pick(language, "再添加一个持仓", "Add another holding")}
             </Button>
           </div>
         </div>
@@ -1862,9 +1927,9 @@ function StepProvideSource(props: {
 
       {method === "continue-later" ? (
         <div className="rounded-[24px] border border-[color:var(--border)] bg-white p-5">
-          <p className="font-semibold">Continue later</p>
+          <p className="font-semibold">{pick(language, "稍后继续", "Continue later")}</p>
           <p className="mt-2 text-sm text-[color:var(--muted-foreground)]">
-            Confirming this path creates the account sleeve and a draft import job so the user can return later without losing context.
+            {pick(language, "确认这条路径后，系统会先创建账户壳层和 draft import job，方便你之后回来继续，不会丢上下文。", "Confirming this path creates the account sleeve and a draft import job so the user can return later without losing context.")}
           </p>
         </div>
       ) : null}
@@ -1873,6 +1938,7 @@ function StepProvideSource(props: {
 }
 
 function StepReviewAndConfirm({
+  language,
   accountType,
   method,
   institution,
@@ -1887,6 +1953,7 @@ function StepReviewAndConfirm({
   reviewActions,
   guidedCsvReviewState
 }: {
+  language: DisplayLanguage;
   accountType: GuidedAccountType | null;
   method: GuidedMethod | null;
   institution: string;
@@ -1904,65 +1971,65 @@ function StepReviewAndConfirm({
   return (
     <div className="space-y-4">
       <div className="rounded-[24px] border border-[color:var(--border)] bg-[color:var(--card-muted)] p-5">
-        <p className="text-xs uppercase tracking-[0.16em] text-[color:var(--muted-foreground)]">Review and confirm</p>
-        <p className="mt-2 text-lg font-semibold">{accountType ?? "Unspecified account"} via {method ?? "unspecified method"}</p>
+        <p className="text-xs uppercase tracking-[0.16em] text-[color:var(--muted-foreground)]">{pick(language, "复核并确认", "Review and confirm")}</p>
+        <p className="mt-2 text-lg font-semibold">{accountType ?? pick(language, "未指定账户", "Unspecified account")} {pick(language, "通过", "via")} {method ?? pick(language, "未指定方式", "unspecified method")}</p>
         <p className="mt-2 text-sm text-[color:var(--muted-foreground)]">
           {accountMode === "existing" && selectedExistingAccount
-            ? `Updating existing ${selectedExistingAccount.type} account ${selectedExistingAccount.nickname} at ${selectedExistingAccount.institution}. `
-            : `Institution: ${institution || "Not set"}. Nickname: ${nickname || "Not set"}. `}
-          Contribution room: {formatCad(contributionRoomCad)}.
+            ? pick(language, `将更新已有 ${selectedExistingAccount.type} 账户 ${selectedExistingAccount.nickname}（${selectedExistingAccount.institution}）。`, `Updating existing ${selectedExistingAccount.type} account ${selectedExistingAccount.nickname} at ${selectedExistingAccount.institution}. `)
+            : pick(language, `机构：${institution || "未设置"}。昵称：${nickname || "未设置"}。`, `Institution: ${institution || "Not set"}. Nickname: ${nickname || "Not set"}. `)}
+          {" "}{pick(language, "供款额度：", "Contribution room: ")}{formatCad(contributionRoomCad)}.
         </p>
       </div>
 
       <div className="grid gap-3 md:grid-cols-2">
         <InfoRow
           icon={<CheckCircle2 className="mt-0.5 h-4 w-4 text-[color:var(--success)]" />}
-          text={`Current market value baseline: ${formatAmount(initialMarketValueAmount, accountCurrency)}`}
+          text={pick(language, `当前市值基线：${formatAmount(initialMarketValueAmount, accountCurrency)}`, `Current market value baseline: ${formatAmount(initialMarketValueAmount, accountCurrency)}`)}
         />
         <InfoRow
           icon={<PencilLine className="mt-0.5 h-4 w-4 text-[color:var(--primary)]" />}
           text={method === "manual-entry"
-            ? `Manual entry will upsert ${manualHoldings.length} holdings into ${accountMode === "existing" ? "the existing account" : "the new account"}.`
-            : "CSV-specific data entry can continue after the account shell is created."}
+            ? pick(language, `手动录入会把 ${manualHoldings.length} 个持仓 upsert 到${accountMode === "existing" ? "已有账户" : "新账户"}。`, `Manual entry will upsert ${manualHoldings.length} holdings into ${accountMode === "existing" ? "the existing account" : "the new account"}.`)
+            : pick(language, "CSV 数据录入会在账户壳层创建后继续进行。", "CSV-specific data entry can continue after the account shell is created.")}
         />
       </div>
 
       {method === "single-account-csv" ? (
         <div className="space-y-3 rounded-[24px] border border-[color:var(--border)] bg-white p-5">
-          <p className="font-semibold">Guided CSV review</p>
+          <p className="font-semibold">{pick(language, "引导式 CSV 复核", "Guided CSV review")}</p>
           {guidedCsvReviewState ? (
             <>
               <div className="grid gap-3 md:grid-cols-4 text-sm text-[color:var(--muted-foreground)]">
-                <div>Accounts: {guidedCsvReviewState.summary.accountsImported}</div>
-                <div>Holdings: {guidedCsvReviewState.summary.holdingsImported}</div>
-                <div>Transactions: {guidedCsvReviewState.summary.transactionsImported}</div>
-                <div>Rows parsed: {guidedCsvReviewState.review.rowCount}</div>
+                <div>{pick(language, "账户：", "Accounts: ")}{guidedCsvReviewState.summary.accountsImported}</div>
+                <div>{pick(language, "持仓：", "Holdings: ")}{guidedCsvReviewState.summary.holdingsImported}</div>
+                <div>{pick(language, "交易：", "Transactions: ")}{guidedCsvReviewState.summary.transactionsImported}</div>
+                <div>{pick(language, "解析行数：", "Rows parsed: ")}{guidedCsvReviewState.review.rowCount}</div>
               </div>
               {guidedCsvReviewState.validationErrors.length > 0 ? (
                 <div className="space-y-2">
                   {guidedCsvReviewState.validationErrors.slice(0, 8).map((error) => (
                     <div key={`${error.rowNumber}-${error.message}`} className="rounded-xl border border-[#f0c9d0] bg-[#fff8f9] px-3 py-2 text-sm text-[#8e2433]">
-                      Row {error.rowNumber}{error.recordType ? ` (${error.recordType})` : ""}: {error.message}
+                      {pick(language, "第 ", "Row ")}{error.rowNumber}{error.recordType ? ` (${error.recordType})` : ""}: {error.message}
                     </div>
                   ))}
                 </div>
               ) : (
                 <InfoRow
                   icon={<CheckCircle2 className="mt-0.5 h-4 w-4 text-[color:var(--success)]" />}
-                  text="Validation passed. Confirm will merge this account CSV into the signed-in user's database records."
+                  text={pick(language, "校验通过。确认后会把这个账户 CSV 以 merge 方式写入当前登录用户的数据库记录。", "Validation passed. Confirm will merge this account CSV into the signed-in user's database records.")}
                 />
               )}
             </>
           ) : (
             <InfoRow
               icon={<ShieldAlert className="mt-0.5 h-4 w-4 text-[color:var(--warning)]" />}
-              text="No CSV review is available yet. Go back and validate the file first."
+              text={pick(language, "还没有可用的 CSV 复核结果。请先返回上一步校验文件。", "No CSV review is available yet. Go back and validate the file first.")}
             />
           )}
         </div>
       ) : (
         <div className="space-y-3 rounded-[24px] border border-[color:var(--border)] bg-white p-5">
-          <p className="font-semibold">What will happen on confirm</p>
+          <p className="font-semibold">{pick(language, "确认后会发生什么", "What will happen on confirm")}</p>
           <div className="space-y-2">
             {reviewActions.map((action) => (
               <InfoRow key={action} icon={<Database className="mt-0.5 h-4 w-4 text-[color:var(--primary)]" />} text={action} />
@@ -1973,13 +2040,16 @@ function StepReviewAndConfirm({
 
       <InfoRow
         icon={<ShieldAlert className="mt-0.5 h-4 w-4 text-[color:var(--warning)]" />}
-        text={latestJob ? `Latest recorded portfolio import: ${latestJob.fileName} (${latestJob.status}).` : "No prior portfolio import job exists yet for this signed-in user."}
+        text={latestJob
+          ? pick(language, `最近一次投资导入：${latestJob.fileName}（${latestJob.status}）。`, `Latest recorded portfolio import: ${latestJob.fileName} (${latestJob.status}).`)
+          : pick(language, "当前登录用户还没有历史投资导入任务。", "No prior portfolio import job exists yet for this signed-in user.")}
       />
     </div>
   );
 }
 
 function StepCompleteSetup({
+  language,
   accountType,
   method,
   institution,
@@ -1987,6 +2057,7 @@ function StepCompleteSetup({
   guidedResult,
   guidedCsvImportResult
 }: {
+  language: DisplayLanguage;
   accountType: GuidedAccountType | null;
   method: GuidedMethod | null;
   institution: string;
@@ -1997,10 +2068,10 @@ function StepCompleteSetup({
   return (
     <div className="space-y-4">
       <div className="rounded-[24px] border border-[color:var(--border)] bg-[color:var(--card-muted)] p-5">
-        <p className="text-xs uppercase tracking-[0.16em] text-[color:var(--muted-foreground)]">Wizard summary</p>
-        <p className="mt-2 text-lg font-semibold">{accountType ?? "Unspecified account"} via {method ?? "unspecified method"}</p>
+        <p className="text-xs uppercase tracking-[0.16em] text-[color:var(--muted-foreground)]">{pick(language, "向导总结", "Wizard summary")}</p>
+        <p className="mt-2 text-lg font-semibold">{accountType ?? pick(language, "未指定账户", "Unspecified account")} {pick(language, "通过", "via")} {method ?? pick(language, "未指定方式", "unspecified method")}</p>
         <p className="mt-2 text-sm text-[color:var(--muted-foreground)]">
-          {institution ? `Institution: ${institution}. ` : ""}{nickname ? `Nickname: ${nickname}.` : "No nickname set yet."}
+          {institution ? pick(language, `机构：${institution}。`, `Institution: ${institution}. `) : ""}{nickname ? pick(language, `昵称：${nickname}。`, `Nickname: ${nickname}.`) : pick(language, "还没有设置昵称。", "No nickname set yet.")}
         </p>
       </div>
 
@@ -2008,20 +2079,20 @@ function StepCompleteSetup({
         <div className="space-y-3 rounded-[24px] border border-[#b6d7c7] bg-[#eef8f1] p-5 text-sm text-[#21613f]">
           <div className="flex items-center gap-2 font-semibold">
             <CheckCircle2 className="h-4 w-4" />
-            Guided setup saved
+            {pick(language, "引导设置已保存", "Guided setup saved")}
           </div>
           <p>
-            Account created: {guidedResult.account.type} at {guidedResult.account.institution} ({guidedResult.account.nickname}).
+            {pick(language, `已创建账户：${guidedResult.account.institution} 的 ${guidedResult.account.type}（${guidedResult.account.nickname}）。`, `Account created: ${guidedResult.account.type} at ${guidedResult.account.institution} (${guidedResult.account.nickname}).`)}
           </p>
           {guidedResult.createdHoldingSymbol ? (
-            <p>Starter holding written: {guidedResult.createdHoldingSymbol}.</p>
+            <p>{pick(language, `已写入初始持仓：${guidedResult.createdHoldingSymbol}。`, `Starter holding written: ${guidedResult.createdHoldingSymbol}.`)}</p>
           ) : null}
           {guidedResult.importJob ? (
-            <p>Draft import job opened: {guidedResult.importJob.fileName}.</p>
+            <p>{pick(language, `已创建草稿导入任务：${guidedResult.importJob.fileName}。`, `Draft import job opened: ${guidedResult.importJob.fileName}.`)}</p>
           ) : null}
             {guidedResult.autoRecommendationRun ? (
               <p>
-                Recommendation baseline refreshed for {formatCad(guidedResult.autoRecommendationRun.contributionAmountCad)} in the planning base currency across {guidedResult.autoRecommendationRun.itemCount} items.
+                {pick(language, `已按规划基准币种刷新 ${formatCad(guidedResult.autoRecommendationRun.contributionAmountCad)} 的推荐基线，共 ${guidedResult.autoRecommendationRun.itemCount} 项。`, `Recommendation baseline refreshed for ${formatCad(guidedResult.autoRecommendationRun.contributionAmountCad)} in the planning base currency across ${guidedResult.autoRecommendationRun.itemCount} items.`)}
               </p>
             ) : null}
         </div>
@@ -2031,15 +2102,15 @@ function StepCompleteSetup({
         <div className="space-y-3 rounded-[24px] border border-[#b6d7c7] bg-[#eef8f1] p-5 text-sm text-[#21613f]">
           <div className="flex items-center gap-2 font-semibold">
             <CheckCircle2 className="h-4 w-4" />
-            Guided CSV import saved
+            {pick(language, "引导式 CSV 导入已保存", "Guided CSV import saved")}
           </div>
-          <p>Import job completed: {guidedCsvImportResult.job.fileName}.</p>
+          <p>{pick(language, `导入任务已完成：${guidedCsvImportResult.job.fileName}。`, `Import job completed: ${guidedCsvImportResult.job.fileName}.`)}</p>
           <p>
-            Imported {guidedCsvImportResult.summary.accountsImported} accounts, {guidedCsvImportResult.summary.holdingsImported} holdings, and {guidedCsvImportResult.summary.transactionsImported} transactions.
+            {pick(language, `已导入 ${guidedCsvImportResult.summary.accountsImported} 个账户、${guidedCsvImportResult.summary.holdingsImported} 个持仓和 ${guidedCsvImportResult.summary.transactionsImported} 条交易。`, `Imported ${guidedCsvImportResult.summary.accountsImported} accounts, ${guidedCsvImportResult.summary.holdingsImported} holdings, and ${guidedCsvImportResult.summary.transactionsImported} transactions.`)}
           </p>
             {guidedCsvImportResult.autoRecommendationRun ? (
               <p>
-                Recommendation baseline refreshed for {formatCad(guidedCsvImportResult.autoRecommendationRun.contributionAmountCad)} in the planning base currency across {guidedCsvImportResult.autoRecommendationRun.itemCount} items.
+                {pick(language, `已按规划基准币种刷新 ${formatCad(guidedCsvImportResult.autoRecommendationRun.contributionAmountCad)} 的推荐基线，共 ${guidedCsvImportResult.autoRecommendationRun.itemCount} 项。`, `Recommendation baseline refreshed for ${formatCad(guidedCsvImportResult.autoRecommendationRun.contributionAmountCad)} in the planning base currency across ${guidedCsvImportResult.autoRecommendationRun.itemCount} items.`)}
               </p>
             ) : null}
         </div>
@@ -2047,10 +2118,10 @@ function StepCompleteSetup({
 
       <div className="grid gap-3 md:grid-cols-2">
         <Button href="/settings" variant="secondary">
-          Continue to Investment Preferences
+          {pick(language, "继续前往投资偏好设置", "Continue to Investment Preferences")}
         </Button>
         <Button href="/dashboard" variant="secondary">
-          Return to Dashboard
+          {pick(language, "返回总览", "Return to Dashboard")}
         </Button>
       </div>
     </div>
@@ -2059,7 +2130,7 @@ function StepCompleteSetup({
 
 function LooSignal({ title, detail }: { title: string; detail: string }) {
   return (
-    <div className="rounded-[24px] border border-white/55 bg-white/44 p-4 backdrop-blur-md">
+    <div className="rounded-[24px] border border-white/62 bg-[linear-gradient(180deg,rgba(255,255,255,0.62),rgba(255,250,252,0.32))] p-4 shadow-[0_14px_30px_rgba(110,103,130,0.06)] backdrop-blur-md">
       <p className="text-sm font-medium text-[color:var(--muted-foreground)]">{title}</p>
       <p className="mt-3 text-base font-semibold text-[color:var(--foreground)]">{detail}</p>
     </div>

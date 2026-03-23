@@ -1,4 +1,4 @@
-import { hash } from "bcryptjs";
+﻿import { hash } from "bcryptjs";
 import { and, desc, eq } from "drizzle-orm";
 import { apiSuccess } from "@/lib/backend/contracts";
 import { ImportFieldMapping, ImportValidationError, ParsedCsvImport, parseImportCsv } from "@/lib/backend/csv-import";
@@ -6,7 +6,12 @@ import { getRepositories } from "@/lib/backend/repositories/factory";
 import {
   AllocationTarget,
   CashflowTransaction,
+  CitizenAddressTier,
+  CitizenGender,
+  CitizenProfile,
+  CitizenRank,
   CurrencyCode,
+  DisplayLanguage,
   GuidedAllocationAnswers,
   GuidedAllocationDraft,
   PreferenceProfile,
@@ -29,6 +34,7 @@ import { getDb } from "@/lib/db/client";
 import {
   allocationTargets,
   cashflowTransactions,
+  citizenProfiles,
   guidedAllocationDrafts,
   holdingPositions,
   importJobs,
@@ -58,6 +64,11 @@ export interface RegisterUserInput {
   email: string;
   password: string;
   displayName: string;
+  mode?: "standard" | "loo-zh";
+  gender?: CitizenGender;
+  birthDate?: string;
+  acceptLooTerms?: boolean;
+  displayLanguage?: DisplayLanguage;
 }
 
 export interface SaveGuidedAllocationDraftInput {
@@ -69,6 +80,16 @@ export interface SaveGuidedAllocationDraftInput {
 
 export interface UpdateDisplayCurrencyInput {
   currency: CurrencyCode;
+}
+
+export interface UpdateDisplayLanguageInput {
+  language: DisplayLanguage;
+}
+
+export interface UpdateCitizenOverrideInput {
+  rank?: CitizenRank | null;
+  addressTier?: CitizenAddressTier | null;
+  idCode?: string | null;
 }
 
 export interface CreateImportJobInput {
@@ -198,6 +219,156 @@ function getDefaultPreferenceInput(riskProfile: RiskProfile = "Balanced"): Prefe
   };
 }
 
+type CitizenTier = {
+  rank: CitizenRank;
+  addressTier: CitizenAddressTier;
+};
+
+function getCitizenTierByWealth(totalPortfolioCad: number): CitizenTier {
+  if (totalPortfolioCad < 5000) {
+    return { rank: "lowly-ox", addressTier: "cowshed" };
+  }
+  if (totalPortfolioCad < 10000) {
+    return { rank: "base-loo", addressTier: "suburbs" };
+  }
+  if (totalPortfolioCad < 20000) {
+    return { rank: "citizen", addressTier: "city" };
+  }
+  return { rank: "general", addressTier: "palace-gate" };
+}
+
+function getCitizenAvatarType(gender: CitizenGender | null) {
+  if (gender === "male") {
+    return "male" as const;
+  }
+  if (gender === "female") {
+    return "female" as const;
+  }
+  return "default" as const;
+}
+
+function buildCitizenIdCode(rank: CitizenRank) {
+  const poolByRank: Record<CitizenRank, string[]> = {
+    "lowly-ox": ["1042", "1827", "2314", "3471", "4128"],
+    "base-loo": ["5518", "5668", "5788", "6018", "6682"],
+    citizen: ["7788", "7866", "8088", "8188", "8688"],
+    general: ["8866", "8886", "8998", "9666", "9888"],
+    emperor: ["8888", "9999", "6666", "88888", "99999"]
+  };
+  const pool = poolByRank[rank];
+  const suffix = pool[Math.floor(Math.random() * pool.length)] ?? "1042";
+  const yearSuffix = new Date().getUTCFullYear().toString().slice(-2);
+  return `LOO${yearSuffix}${suffix}`;
+}
+
+async function getTotalPortfolioValueCad(userId: string) {
+  const accounts = await getRepositories().accounts.listByUserId(userId);
+  return round(accounts.reduce((sum, account) => sum + account.marketValueCad, 0));
+}
+
+function mapCitizenProfileRow(row: typeof citizenProfiles.$inferSelect): Omit<CitizenProfile, "effectiveRank" | "effectiveAddressTier" | "effectiveIdCode"> {
+  return {
+    id: row.id,
+    userId: row.userId,
+    citizenName: row.citizenName,
+    gender: (row.gender as CitizenGender | null) ?? null,
+    birthDate: row.birthDate,
+    avatarType: row.avatarType as CitizenProfile["avatarType"],
+    derivedRank: row.derivedRank as CitizenRank,
+    derivedAddressTier: row.derivedAddressTier as CitizenAddressTier,
+    derivedIdCode: row.derivedIdCode,
+    overrideRank: (row.overrideRank as CitizenRank | null) ?? null,
+    overrideAddressTier: (row.overrideAddressTier as CitizenAddressTier | null) ?? null,
+    overrideIdCode: row.overrideIdCode ?? null,
+    wealthScoreSnapshotCad: toNumber(row.wealthScoreSnapshotCad),
+    issuedAt: row.issuedAt.toISOString(),
+    updatedAt: row.updatedAt.toISOString()
+  };
+}
+
+function applyEffectiveCitizenValues(
+  citizen: Omit<CitizenProfile, "effectiveRank" | "effectiveAddressTier" | "effectiveIdCode">
+): CitizenProfile {
+  return {
+    ...citizen,
+    effectiveRank: citizen.overrideRank ?? citizen.derivedRank,
+    effectiveAddressTier: citizen.overrideAddressTier ?? citizen.derivedAddressTier,
+    effectiveIdCode: citizen.overrideIdCode ?? citizen.derivedIdCode
+  };
+}
+
+async function ensureCitizenProfile(userId: string, options?: {
+  citizenName?: string;
+  gender?: CitizenGender | null;
+  birthDate?: string | null;
+}) {
+  const db = getDb();
+  const existing = await db.query.citizenProfiles.findFirst({ where: eq(citizenProfiles.userId, userId) });
+  const wealthScoreSnapshotCad = await getTotalPortfolioValueCad(userId);
+  const tier = getCitizenTierByWealth(wealthScoreSnapshotCad);
+
+  if (!existing) {
+    const user = await getRepositories().users.getById(userId);
+    const [created] = await db
+      .insert(citizenProfiles)
+      .values({
+        userId,
+        citizenName: options?.citizenName?.trim() || user.displayName,
+        gender: options?.gender ?? null,
+        birthDate: options?.birthDate ?? null,
+        avatarType: getCitizenAvatarType(options?.gender ?? null),
+        derivedRank: tier.rank,
+        derivedAddressTier: tier.addressTier,
+        derivedIdCode: buildCitizenIdCode(tier.rank),
+        wealthScoreSnapshotCad: wealthScoreSnapshotCad.toFixed(2)
+      })
+      .returning();
+    return applyEffectiveCitizenValues(mapCitizenProfileRow(created));
+  }
+
+  const mapped = mapCitizenProfileRow(existing);
+  const nextDerivedRank = tier.rank;
+  const nextDerivedAddressTier = tier.addressTier;
+  const nextDerivedIdCode =
+    mapped.derivedRank === nextDerivedRank && mapped.derivedIdCode
+      ? mapped.derivedIdCode
+      : buildCitizenIdCode(nextDerivedRank);
+
+  const [updated] = await db
+    .update(citizenProfiles)
+    .set({
+      citizenName: options?.citizenName?.trim() || mapped.citizenName,
+      gender: options?.gender ?? mapped.gender,
+      birthDate: options?.birthDate ?? mapped.birthDate,
+      avatarType: getCitizenAvatarType(options?.gender ?? mapped.gender ?? null),
+      derivedRank: nextDerivedRank,
+      derivedAddressTier: nextDerivedAddressTier,
+      derivedIdCode: nextDerivedIdCode,
+      wealthScoreSnapshotCad: wealthScoreSnapshotCad.toFixed(2),
+      updatedAt: new Date()
+    })
+    .where(eq(citizenProfiles.id, existing.id))
+    .returning();
+
+  return applyEffectiveCitizenValues(mapCitizenProfileRow(updated));
+}
+
+function getAdminEmails() {
+  return (process.env.ADMIN_EMAILS ?? "")
+    .split(",")
+    .map((value) => value.trim().toLowerCase())
+    .filter(Boolean);
+}
+
+export async function isViewerAdmin(userId: string) {
+  const user = await getRepositories().users.getById(userId);
+  return getAdminEmails().includes(user.email.toLowerCase());
+}
+
+export async function getCitizenProfile(userId: string) {
+  return ensureCitizenProfile(userId);
+}
+
 function createEmptyRun(userId: string): RecommendationRun {
   return {
     id: "pending-run",
@@ -297,6 +468,16 @@ function transactionMatchKey(transaction: {
 function round(value: number, digits = 2) {
   const factor = 10 ** digits;
   return Math.round(value * factor) / factor;
+}
+
+function toNumber(value: string | number | null | undefined) {
+  if (typeof value === "number") {
+    return value;
+  }
+  if (typeof value === "string") {
+    return Number(value);
+  }
+  return 0;
 }
 
 function normalizeCurrencyCode(value: string): CurrencyCode {
@@ -518,7 +699,7 @@ export async function getPortfolioView(userId: string) {
   } as const;
 
   return apiSuccess({
-    ...buildPortfolioData({ accounts: userAccounts, holdings: userHoldings, profile, display }),
+    ...buildPortfolioData({ language: user.displayLanguage, accounts: userAccounts, holdings: userHoldings, profile, display }),
     context: {
       totalMarketValueCad: userAccounts.reduce((sum, account) => sum + account.marketValueCad, 0),
       topHoldingSymbol: [...userHoldings].sort((left, right) => right.marketValueCad - left.marketValueCad)[0]?.symbol ?? null
@@ -545,7 +726,7 @@ export async function getRecommendationView(userId: string) {
   } as const;
 
   return apiSuccess({
-    ...buildRecommendationsData({ profile, latestRun, display }),
+    ...buildRecommendationsData({ language: user.displayLanguage, profile, latestRun, display }),
     run: latestRun ?? createEmptyRun(userId)
   }, "database");
 }
@@ -564,7 +745,7 @@ export async function getSpendingView(userId: string) {
   } as const;
 
   return apiSuccess({
-    ...buildSpendingData({ transactions: userTransactions, profile, display }),
+    ...buildSpendingData({ language: user.displayLanguage, transactions: userTransactions, profile, display }),
     context: {
       transactionCount: userTransactions.length,
       latestBookedAt: [...userTransactions].sort((left, right) => right.bookedAt.localeCompare(left.bookedAt))[0]?.bookedAt ?? null
@@ -576,9 +757,16 @@ export async function updateDisplayCurrency(userId: string, input: UpdateDisplay
   return getRepositories().users.updateBaseCurrency(userId, input.currency);
 }
 
+export async function updateDisplayLanguage(userId: string, input: UpdateDisplayLanguageInput): Promise<UserProfile> {
+  return getRepositories().users.updateDisplayLanguage(userId, input.language);
+}
+
 export async function getImportView(userId: string) {
   const repositories = getRepositories();
-  const userAccounts = await repositories.accounts.listByUserId(userId);
+  const [user, userAccounts] = await Promise.all([
+    repositories.users.getById(userId),
+    repositories.accounts.listByUserId(userId)
+  ]);
   const db = getDb();
   const [latestPortfolioRow, latestSpendingRow] = await Promise.all([
     db.query.importJobs.findFirst({
@@ -612,7 +800,12 @@ export async function getImportView(userId: string) {
   } : null;
 
   return apiSuccess({
-    ...buildImportData({ latestPortfolioJob, latestSpendingJob, accounts: userAccounts }),
+    ...buildImportData({
+      latestPortfolioJob,
+      latestSpendingJob,
+      accounts: userAccounts,
+      language: user.displayLanguage
+    }),
     latestPortfolioJob,
     latestSpendingJob
   }, "database");
@@ -620,7 +813,10 @@ export async function getImportView(userId: string) {
 
 export async function getPreferenceView(userId: string) {
   const repositories = getRepositories();
-  const profile = await repositories.preferences.getByUserId(userId);
+  const [user, profile] = await Promise.all([
+    repositories.users.getById(userId),
+    repositories.preferences.getByUserId(userId)
+  ]);
   const db = getDb();
   const guidedDraftRow = await db.query.guidedAllocationDrafts.findFirst({
     where: eq(guidedAllocationDrafts.userId, userId)
@@ -638,10 +834,56 @@ export async function getPreferenceView(userId: string) {
   } satisfies GuidedAllocationDraft : null;
 
   return apiSuccess({
-    ...buildSettingsData(profile),
+    ...buildSettingsData(profile, user.displayLanguage),
     profile,
     guidedDraft
   }, "database");
+}
+
+export async function getCitizenProfileView(userId: string) {
+  const [viewer, citizen] = await Promise.all([
+    getRepositories().users.getById(userId),
+    getCitizenProfile(userId)
+  ]);
+
+  return apiSuccess({
+    viewer,
+    citizen,
+    isAdmin: getAdminEmails().includes(viewer.email.toLowerCase())
+  }, "database");
+}
+
+export async function updateCitizenProfileOverrides(
+  viewerId: string,
+  targetUserId: string,
+  input: UpdateCitizenOverrideInput
+) {
+  const viewer = await getRepositories().users.getById(viewerId);
+  if (!getAdminEmails().includes(viewer.email.toLowerCase())) {
+    throw new Error("Admin privileges are required to override citizen profile values.");
+  }
+
+  const db = getDb();
+  const existing = await db.query.citizenProfiles.findFirst({
+    where: eq(citizenProfiles.userId, targetUserId)
+  });
+
+  if (!existing) {
+    throw new Error("Citizen profile not found.");
+  }
+
+  const [updated] = await db
+    .update(citizenProfiles)
+    .set({
+      overrideRank: input.rank === undefined ? existing.overrideRank : input.rank,
+      overrideAddressTier: input.addressTier === undefined ? existing.overrideAddressTier : input.addressTier,
+      overrideIdCode: input.idCode === undefined ? existing.overrideIdCode : input.idCode,
+      updatedAt: new Date()
+    })
+    .where(eq(citizenProfiles.id, existing.id))
+    .returning();
+
+  return applyEffectiveCitizenValues(mapCitizenProfileRow(updated));
 }
 
 export async function saveGuidedAllocationDraft(
@@ -886,7 +1128,10 @@ export async function updatePreferenceProfile(userId: string, input: PreferenceP
   });
 }
 
-export async function registerUserAccount(input: RegisterUserInput): Promise<UserProfile> {
+export async function registerUserWithCitizenProfile(input: RegisterUserInput): Promise<{
+  user: UserProfile;
+  citizenProfile: CitizenProfile;
+}> {
   const db = getDb();
   const email = input.email.trim().toLowerCase();
   const displayName = input.displayName.trim();
@@ -898,15 +1143,17 @@ export async function registerUserAccount(input: RegisterUserInput): Promise<Use
 
   const passwordHash = await hash(input.password, 10);
   const defaultPreferences = getDefaultPreferenceInput();
+  const displayLanguage = input.displayLanguage ?? (input.mode === "loo-zh" ? "zh" : "en");
 
-  return db.transaction(async (tx) => {
+  const user = await db.transaction(async (tx) => {
     const [userRow] = await tx
       .insert(users)
       .values({
         email,
         passwordHash,
         displayName,
-        baseCurrency: "CAD"
+        baseCurrency: "CAD",
+        displayLanguage
       })
       .returning();
 
@@ -945,9 +1192,26 @@ export async function registerUserAccount(input: RegisterUserInput): Promise<Use
       id: userRow.id,
       email: userRow.email,
       displayName: userRow.displayName,
-      baseCurrency: userRow.baseCurrency as CurrencyCode
+      baseCurrency: userRow.baseCurrency as CurrencyCode,
+      displayLanguage: (userRow.displayLanguage as DisplayLanguage) ?? "zh"
     };
   });
+
+  const citizenProfile = await ensureCitizenProfile(user.id, {
+    citizenName: displayName,
+    gender: input.gender ?? null,
+    birthDate: input.birthDate ?? null
+  });
+
+  return {
+    user,
+    citizenProfile
+  };
+}
+
+export async function registerUserAccount(input: RegisterUserInput): Promise<UserProfile> {
+  const result = await registerUserWithCitizenProfile(input);
+  return result.user;
 }
 
 export async function createImportJob(userId: string, input: CreateImportJobInput): Promise<CreateImportJobResult> {
@@ -1743,3 +2007,4 @@ export async function createRecommendationRun(userId: string, input: CreateRecom
     };
   });
 }
+

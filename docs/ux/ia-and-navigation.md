@@ -97,6 +97,7 @@ Purpose:
 - Capture the preferences that power recommendations and health scoring
 
 Contains:
+- Profile / citizen archive
 - guided allocation setup
 - manual configuration
 - target allocation
@@ -112,6 +113,8 @@ Contains:
 - Recommendations uses those settings to generate funding guidance
 - Portfolio Health Score measures how well the current portfolio matches those settings
 - Dashboard summarizes the current state and routes the user to deeper views
+- In Chinese mode, login, registration, and Settings profile are wrapped in a Loo国 citizen identity experience
+- In English mode, authentication and profile remain standard Portfolio Manager flows
 
 ## Design Principles
 

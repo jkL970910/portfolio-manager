@@ -125,6 +125,11 @@ const contracts = {
       description: "Update the signed-in user's global display currency between CAD and USD for dashboard, portfolio, recommendations, and spending views."
     },
     {
+      path: "/api/settings/display-language",
+      methods: ["PATCH"],
+      description: "Update the global display language between Chinese and English, persisting the preference for signed-in users and also writing a cookie for unauthenticated entry surfaces."
+    },
+    {
       path: "/api/recommendations/runs",
       methods: ["POST"],
       description: "Generate a new recommendation run from current holdings and preferences."

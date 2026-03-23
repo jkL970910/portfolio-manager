@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { ChangeEvent, useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
@@ -7,6 +7,8 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { MascotAsset } from "@/components/brand/mascot-asset";
 import { assertApiData, getApiErrorMessage, safeJson } from "@/lib/client/api";
+import { getImportMappingGroupTitle, getImportPresetLabel } from "@/lib/i18n/import";
+import { DisplayLanguage, pick } from "@/lib/i18n/ui";
 
 const MAPPING_GROUPS = [
   { title: "Core", fields: ["record_type", "account_key"] },
@@ -207,10 +209,12 @@ function extractHoldingSymbolsForAudit(csvContent: string, mapping: Record<strin
 
 export function ImportJobPanel({
   latestJob,
-  workflow = "portfolio"
+  workflow = "portfolio",
+  language = "zh"
 }: {
   latestJob: { status: string; fileName: string; createdAt: string } | null;
   workflow?: "portfolio" | "spending";
+  language?: DisplayLanguage;
 }) {
   const router = useRouter();
   const endpoint = workflow === "portfolio" ? "/api/import/portfolio/jobs" : "/api/import/spending/jobs";
@@ -283,7 +287,7 @@ export function ImportJobPanel({
   }
 
   async function saveCurrentPreset() {
-    const label = window.prompt("Preset name");
+    const label = window.prompt(pick(language, "é¢„è®¾åç§°", "Preset name"));
     if (!label?.trim()) {
       return;
     }
@@ -296,7 +300,7 @@ export function ImportJobPanel({
     });
     const payload = await safeJson(response);
     if (!response.ok) {
-      setStatus({ type: "error", message: getApiErrorMessage(payload, "Failed to save preset.") });
+      setStatus({ type: "error", message: getApiErrorMessage(payload, pick(language, "ä¿å­˜æ˜ å°„é¢„è®¾å¤±è´¥ã€‚", "Failed to save preset.")) });
       return;
     }
     let savedPreset: PresetRecord;
@@ -304,10 +308,10 @@ export function ImportJobPanel({
       savedPreset = assertApiData<PresetRecord>(
         payload,
         (candidate) => typeof candidate === "object" && candidate !== null && "id" in candidate && "name" in candidate,
-        "Preset save succeeded but returned no usable preset payload."
+        pick(language, "é¢„è®¾ä¿å­˜æˆåŠŸï¼Œä½†æ²¡æœ‰è¿”å›žå¯ç”¨çš„é¢„è®¾æ•°æ®ã€‚", "Preset save succeeded but returned no usable preset payload.")
       );
     } catch {
-      setStatus({ type: "error", message: "Preset save succeeded but returned no usable preset payload." });
+      setStatus({ type: "error", message: pick(language, "é¢„è®¾ä¿å­˜æˆåŠŸï¼Œä½†æ²¡æœ‰è¿”å›žå¯ç”¨çš„é¢„è®¾æ•°æ®ã€‚", "Preset save succeeded but returned no usable preset payload.") });
       return;
     }
 
@@ -316,7 +320,7 @@ export function ImportJobPanel({
       return next;
     });
     setSelectedPresetKey(savedPreset.id);
-    setStatus({ type: "success", message: `Saved mapping preset "${savedPreset.name}".` });
+    setStatus({ type: "success", message: pick(language, `å·²ä¿å­˜æ˜ å°„é¢„è®¾â€œ${savedPreset.name}â€ã€‚`, `Saved mapping preset "${savedPreset.name}".`) });
   }
 
   async function renameSelectedPreset() {
@@ -324,7 +328,7 @@ export function ImportJobPanel({
       return;
     }
 
-    const nextName = window.prompt("Rename preset", selectedServerPreset.name);
+    const nextName = window.prompt(pick(language, "é‡å‘½åé¢„è®¾", "Rename preset"), selectedServerPreset.name);
     if (!nextName?.trim() || nextName.trim() === selectedServerPreset.name) {
       return;
     }
@@ -336,7 +340,7 @@ export function ImportJobPanel({
     });
     const payload = await safeJson(response);
     if (!response.ok) {
-      setStatus({ type: "error", message: getApiErrorMessage(payload, "Failed to rename preset.") });
+      setStatus({ type: "error", message: getApiErrorMessage(payload, pick(language, "é‡å‘½åé¢„è®¾å¤±è´¥ã€‚", "Failed to rename preset.")) });
       return;
     }
 
@@ -345,15 +349,15 @@ export function ImportJobPanel({
       renamedPreset = assertApiData<PresetRecord>(
         payload,
         (candidate) => typeof candidate === "object" && candidate !== null && "id" in candidate && "name" in candidate,
-        "Preset rename succeeded but returned no usable preset payload."
+        pick(language, "é¢„è®¾é‡å‘½åæˆåŠŸï¼Œä½†æ²¡æœ‰è¿”å›žå¯ç”¨çš„é¢„è®¾æ•°æ®ã€‚", "Preset rename succeeded but returned no usable preset payload.")
       );
     } catch {
-      setStatus({ type: "error", message: "Preset rename succeeded but returned no usable preset payload." });
+      setStatus({ type: "error", message: pick(language, "é¢„è®¾é‡å‘½åæˆåŠŸï¼Œä½†æ²¡æœ‰è¿”å›žå¯ç”¨çš„é¢„è®¾æ•°æ®ã€‚", "Preset rename succeeded but returned no usable preset payload.") });
       return;
     }
 
     setServerPresets((current) => current.map((preset) => preset.id === selectedServerPreset.id ? renamedPreset : preset));
-    setStatus({ type: "success", message: `Renamed preset to "${renamedPreset.name}".` });
+    setStatus({ type: "success", message: pick(language, `é¢„è®¾å·²é‡å‘½åä¸ºâ€œ${renamedPreset.name}â€ã€‚`, `Renamed preset to "${renamedPreset.name}".`) });
   }
 
   async function deleteSelectedPreset() {
@@ -361,7 +365,7 @@ export function ImportJobPanel({
       return;
     }
 
-    const confirmed = window.confirm(`Delete preset "${selectedServerPreset.name}"?`);
+    const confirmed = window.confirm(pick(language, `åˆ é™¤é¢„è®¾â€œ${selectedServerPreset.name}â€ï¼Ÿ`, `Delete preset "${selectedServerPreset.name}"?`));
     if (!confirmed) {
       return;
     }
@@ -371,14 +375,14 @@ export function ImportJobPanel({
     });
     const payload = await safeJson(response);
     if (!response.ok) {
-      setStatus({ type: "error", message: getApiErrorMessage(payload, "Failed to delete preset.") });
+      setStatus({ type: "error", message: getApiErrorMessage(payload, pick(language, "åˆ é™¤é¢„è®¾å¤±è´¥ã€‚", "Failed to delete preset.")) });
       return;
     }
 
     setServerPresets((current) => current.filter((preset) => preset.id !== selectedServerPreset.id));
     setSelectedPresetKey("auto-detect");
     applyPreset("auto-detect");
-    setStatus({ type: "success", message: `Deleted preset "${selectedServerPreset.name}".` });
+    setStatus({ type: "success", message: pick(language, `å·²åˆ é™¤é¢„è®¾â€œ${selectedServerPreset.name}â€ã€‚`, `Deleted preset "${selectedServerPreset.name}".`) });
   }
 
   async function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
@@ -405,7 +409,7 @@ export function ImportJobPanel({
       setStatus({ type: "idle", message: "" });
       applyPreset(selectedPresetKey === "canonical" ? "auto-detect" : selectedPresetKey, nextHeaders);
     } catch {
-      setStatus({ type: "error", message: "Failed to read the selected CSV file." });
+      setStatus({ type: "error", message: pick(language, "è¯»å–é€‰ä¸­çš„ CSV æ–‡ä»¶å¤±è´¥ã€‚", "Failed to read the selected CSV file.") });
     }
   }
 
@@ -434,7 +438,7 @@ export function ImportJobPanel({
     });
     const payload = await safeJson(response);
     if (!response.ok) {
-      setStatus({ type: "error", message: getApiErrorMessage(payload, "Validation failed.") });
+      setStatus({ type: "error", message: getApiErrorMessage(payload, pick(language, "æ ¡éªŒå¤±è´¥ã€‚", "Validation failed.")) });
       return;
     }
 
@@ -443,20 +447,20 @@ export function ImportJobPanel({
       result = assertApiData<ReviewState>(
         payload,
         (candidate) => typeof candidate === "object" && candidate !== null && "summary" in candidate && "review" in candidate && "validationErrors" in candidate,
-        "Validation succeeded but returned no usable review payload."
+        pick(language, "æ ¡éªŒæˆåŠŸï¼Œä½†æ²¡æœ‰è¿”å›žå¯ç”¨çš„å¯¼å…¥å¤æ ¸æ•°æ®ã€‚", "Validation succeeded but returned no usable review payload.")
       );
     } catch (error) {
-      setStatus({ type: "error", message: error instanceof Error ? error.message : "Validation failed." });
+      setStatus({ type: "error", message: error instanceof Error ? error.message : pick(language, "æ ¡éªŒå¤±è´¥ã€‚", "Validation failed.") });
       return;
     }
     setValidationErrors(result.validationErrors ?? []);
     setReviewState(result);
     if ((result.validationErrors ?? []).length > 0) {
-      setStatus({ type: "error", message: `Validation failed. ${result.validationErrors.length} row issues were found.` });
+      setStatus({ type: "error", message: pick(language, `æ ¡éªŒæœªé€šè¿‡ï¼Œå‘çŽ° ${result.validationErrors.length} è¡Œé—®é¢˜ã€‚`, `Validation failed. ${result.validationErrors.length} row issues were found.`) });
       return;
     }
     void runSymbolAudit(sanitizedFieldMapping);
-    setStatus({ type: "success", message: "Validation passed. Review the import summary below, then confirm." });
+    setStatus({ type: "success", message: pick(language, "æ ¡éªŒé€šè¿‡ï¼Œè¯·å…ˆæŸ¥çœ‹å¯¼å…¥æ‘˜è¦ï¼Œå†ç¡®è®¤å†™å…¥ã€‚", "Validation passed. Review the import summary below, then confirm.") });
   }
 
   async function runSymbolAudit(sanitizedFieldMapping: Record<string, string>) {
@@ -625,17 +629,19 @@ export function ImportJobPanel({
     <div className="space-y-4 rounded-[24px] border border-[color:var(--border)] bg-[color:var(--card-muted)] p-5">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <p className="font-semibold">Direct CSV import</p>
+          <p className="font-semibold">{pick(language, "ç›´æŽ¥ CSV å¯¼å…¥", "Direct CSV import")}</p>
           <p className="mt-1 text-sm text-[color:var(--muted-foreground)]">
-            Bulk import is a two-step flow: validate and review first, then confirm the database write.
+            {pick(language, "æ‰¹é‡å¯¼å…¥åˆ†ä¸¤æ­¥ï¼šå…ˆæ ¡éªŒå¹¶å¤æ ¸ï¼Œå†ç¡®è®¤å†™å…¥æ•°æ®åº“ã€‚", "Bulk import is a two-step flow: validate and review first, then confirm the database write.")}
           </p>
         </div>
-        {latestJob ? <Badge variant="neutral">Latest: {latestJob.status}</Badge> : <Badge variant="warning">No job yet</Badge>}
+        {latestJob
+          ? <Badge variant="neutral">{pick(language, "æœ€è¿‘ä¸€æ¬¡ï¼š", "Latest: ")}{latestJob.status}</Badge>
+          : <Badge variant="warning">{pick(language, "è¿˜æ²¡æœ‰å¯¼å…¥ä»»åŠ¡", "No job yet")}</Badge>}
       </div>
 
       <div className="grid gap-4 md:grid-cols-2">
         <label className="block space-y-2">
-          <span className="text-sm font-medium text-[color:var(--foreground)]">CSV file name</span>
+          <span className="text-sm font-medium text-[color:var(--foreground)]">{pick(language, "CSV æ–‡ä»¶å", "CSV file name")}</span>
           <input
             type="text"
             value={fileName}
@@ -645,20 +651,20 @@ export function ImportJobPanel({
         </label>
 
         <label className="block space-y-2">
-          <span className="text-sm font-medium text-[color:var(--foreground)]">Import mode</span>
+          <span className="text-sm font-medium text-[color:var(--foreground)]">{pick(language, "å¯¼å…¥æ¨¡å¼", "Import mode")}</span>
           <select
             value={importMode}
             onChange={(event) => setImportMode(event.target.value as "replace" | "merge")}
             className="w-full rounded-2xl border border-[color:var(--border)] bg-white px-4 py-3 text-sm outline-none"
           >
-            <option value="replace">Replace all current imported data</option>
-            <option value="merge">Merge into existing accounts, holdings, and transactions</option>
+            <option value="replace">{pick(language, "æ›¿æ¢å½“å‰å…¨éƒ¨å·²å¯¼å…¥æ•°æ®", "Replace all current imported data")}</option>
+            <option value="merge">{pick(language, "åˆå¹¶åˆ°çŽ°æœ‰è´¦æˆ·ã€æŒä»“å’Œäº¤æ˜“", "Merge into existing accounts, holdings, and transactions")}</option>
           </select>
         </label>
       </div>
 
       <label className="block space-y-2">
-        <span className="text-sm font-medium text-[color:var(--foreground)]">CSV upload</span>
+        <span className="text-sm font-medium text-[color:var(--foreground)]">{pick(language, "ä¸Šä¼  CSV", "CSV upload")}</span>
         <input
           type="file"
           accept=".csv,text/csv"
@@ -670,10 +676,10 @@ export function ImportJobPanel({
       <div className="rounded-2xl border border-dashed border-[color:var(--border)] bg-white px-4 py-4 text-sm text-[color:var(--muted-foreground)]">
         <div className="flex items-center gap-2 font-medium text-[color:var(--foreground)]">
           <FileText className="h-4 w-4" />
-          Local CSV template
+          {pick(language, "æœ¬åœ° CSV æ¨¡æ¿", "Local CSV template")}
         </div>
         <p className="mt-2">
-          Use <code>record_type</code> rows for <code>account</code>, <code>holding</code>, and <code>transaction</code>. Download the starter template at{" "}
+          {pick(language, "è¯·ä½¿ç”¨ ", "Use ")}<code>record_type</code>{pick(language, " åŒºåˆ† ", " rows for ")}<code>account</code>ã€<code>holding</code>{pick(language, " å’Œ ", ", and ")}<code>transaction</code>{pick(language, " ä¸‰ç±»è®°å½•ã€‚æ¨¡æ¿ä¸‹è½½åœ°å€ï¼š", ". Download the starter template at ")}{" "}
           <a href="/templates/portfolio-import-template.csv" className="font-medium text-[color:var(--primary)] underline">
             /templates/portfolio-import-template.csv
           </a>.
@@ -685,48 +691,48 @@ export function ImportJobPanel({
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-2">
               <ArrowRightLeft className="h-4 w-4 text-[color:var(--primary)]" />
-              <p className="font-medium">Field mapping presets</p>
+              <p className="font-medium">{pick(language, "å­—æ®µæ˜ å°„é¢„è®¾", "Field mapping presets")}</p>
             </div>
             <div className="flex flex-wrap gap-2">
               {selectedServerPreset ? (
                 <>
                   <Button type="button" variant="secondary" leadingIcon={<Pencil className="h-4 w-4" />} onClick={renameSelectedPreset}>
-                    Rename preset
+                    {pick(language, "é‡å‘½åé¢„è®¾", "Rename preset")}
                   </Button>
                   <Button type="button" variant="secondary" leadingIcon={<Trash2 className="h-4 w-4" />} onClick={deleteSelectedPreset}>
-                    Delete preset
+                    {pick(language, "åˆ é™¤é¢„è®¾", "Delete preset")}
                   </Button>
                 </>
               ) : null}
               <Button type="button" variant="secondary" leadingIcon={<Save className="h-4 w-4" />} onClick={saveCurrentPreset}>
-                Save current preset
+                {pick(language, "ä¿å­˜å½“å‰é¢„è®¾", "Save current preset")}
               </Button>
             </div>
           </div>
           <div className="grid gap-4 md:grid-cols-[1fr_auto]">
             <label className="space-y-2">
-              <span className="text-sm font-medium text-[color:var(--foreground)]">Preset</span>
+              <span className="text-sm font-medium text-[color:var(--foreground)]">{pick(language, "é¢„è®¾", "Preset")}</span>
               <select
                 value={selectedPresetKey}
                 onChange={(event) => applyPreset(event.target.value)}
                 className="w-full rounded-2xl border border-[color:var(--border)] bg-white px-4 py-3 text-sm outline-none"
               >
-                <option value="auto-detect">Auto-detect from headers</option>
+                <option value="auto-detect">{getImportPresetLabel("auto-detect", "Auto-detect from headers", language)}</option>
                 {presetOptions.map((preset) => (
                   <option key={preset.key} value={preset.key}>
-                    {preset.label}
+                    {getImportPresetLabel(preset.key, preset.label, language)}
                   </option>
                 ))}
               </select>
             </label>
             <div className="flex items-end">
-              <Badge variant="neutral">{headers.length} headers detected</Badge>
+              <Badge variant="neutral">{pick(language, `æ£€æµ‹åˆ° ${headers.length} ä¸ªè¡¨å¤´`, `${headers.length} headers detected`)}</Badge>
             </div>
           </div>
 
           {MAPPING_GROUPS.map((group) => (
-            <div key={group.title} className="space-y-3">
-              <p className="text-xs uppercase tracking-[0.14em] text-[color:var(--muted-foreground)]">{group.title}</p>
+            <div key={getImportMappingGroupTitle(group.title, language)} className="space-y-3">
+              <p className="text-xs uppercase tracking-[0.14em] text-[color:var(--muted-foreground)]">{getImportMappingGroupTitle(group.title, language)}</p>
               <div className="grid gap-3 md:grid-cols-2">
                 {group.fields.map((field) => (
                   <label key={field} className="space-y-2">
@@ -736,7 +742,7 @@ export function ImportJobPanel({
                       onChange={(event) => setFieldMapping((current) => ({ ...current, [field]: event.target.value }))}
                       className="w-full rounded-2xl border border-[color:var(--border)] bg-white px-4 py-3 text-sm outline-none"
                     >
-                      <option value="">Not mapped</option>
+                      <option value="">{pick(language, "æœªæ˜ å°„", "Not mapped")}</option>
                       {headers.map((header) => (
                         <option key={`${field}-${header}`} value={header}>
                           {header}
@@ -751,7 +757,7 @@ export function ImportJobPanel({
 
           {missingRequiredMappings.length > 0 ? (
             <div className="rounded-2xl border border-[#e7b0b8] bg-[#fff3f5] px-4 py-3 text-sm text-[#8e2433]">
-              Required mappings missing: {missingRequiredMappings.join(", ")}
+              {pick(language, "ç¼ºå°‘å¿…å¡«æ˜ å°„ï¼š", "Required mappings missing: ")}{missingRequiredMappings.join(", ")}
             </div>
           ) : null}
         </div>
@@ -761,8 +767,8 @@ export function ImportJobPanel({
         <div className="space-y-4 rounded-2xl border border-[color:var(--border)] bg-white p-4">
           <div className="flex items-center gap-2">
             <Eye className="h-4 w-4 text-[color:var(--primary)]" />
-            <p className="font-medium">CSV preview</p>
-            <Badge variant="neutral">First {preview.rows.length} rows</Badge>
+            <p className="font-medium">{pick(language, "CSV é¢„è§ˆ", "CSV preview")}</p>
+            <Badge variant="neutral">{pick(language, `å‰ ${preview.rows.length} è¡Œ`, `First ${preview.rows.length} rows`)}</Badge>
           </div>
           <div className="overflow-x-auto rounded-2xl border border-[color:var(--border)]">
             <table className="min-w-full text-left text-sm">
@@ -797,19 +803,19 @@ export function ImportJobPanel({
             <div className="space-y-3">
               <div className="flex items-center gap-2 font-medium text-[#21613f]">
                 <CheckCircle2 className="h-4 w-4" />
-                Review before import
+                {pick(language, "å¯¼å…¥å‰å¤æ ¸", "Review before import")}
               </div>
               <div className="grid gap-3 md:grid-cols-4 text-sm text-[#21613f]">
-                <div>Accounts: {reviewState.summary.accountsImported}</div>
-                <div>Holdings: {reviewState.summary.holdingsImported}</div>
-                <div>Transactions: {reviewState.summary.transactionsImported}</div>
-                <div>Rows parsed: {reviewState.review.rowCount}</div>
+                <div>{pick(language, "è´¦æˆ·ï¼š", "Accounts: ")}{reviewState.summary.accountsImported}</div>
+                <div>{pick(language, "æŒä»“ï¼š", "Holdings: ")}{reviewState.summary.holdingsImported}</div>
+                <div>{pick(language, "äº¤æ˜“ï¼š", "Transactions: ")}{reviewState.summary.transactionsImported}</div>
+                <div>{pick(language, "è§£æžè¡Œæ•°ï¼š", "Rows parsed: ")}{reviewState.review.rowCount}</div>
               </div>
               <p className="text-sm text-[#21613f]">
-                Mode: {reviewState.review.importMode}. Validation passed. Confirm to write these changes into the current signed-in user&apos;s database records.
+                {pick(language, "æ¨¡å¼ï¼š", "Mode: ")}{reviewState.review.importMode}. {pick(language, "æ ¡éªŒé€šè¿‡ã€‚ç¡®è®¤åŽä¼šæŠŠè¿™äº›ä¿®æ”¹å†™å…¥å½“å‰ç™»å½•ç”¨æˆ·çš„æ•°æ®åº“è®°å½•ã€‚", "Validation passed. Confirm to write these changes into the current signed-in user's database records.")}
               </p>
               <p className="text-sm text-[#21613f]">
-                Valuation rule: if a holding row includes <code>market_value</code>, that explicit total value is written and takes priority over any derived value from <code>quantity x last_price</code>.
+                {pick(language, "ä¼°å€¼è§„åˆ™ï¼šå¦‚æžœæŒä»“è¡ŒåŒ…å« ", "Valuation rule: if a holding row includes ")}<code>market_value</code>{pick(language, "ï¼Œç³»ç»Ÿä¼šä¼˜å…ˆå†™å…¥è¿™ä»½æ˜¾å¼æ€»å€¼ï¼Œè€Œä¸æ˜¯ä½¿ç”¨ ", ", that explicit total value is written and takes priority over any derived value from ")}<code>quantity x last_price</code>{pick(language, " æŽ¨å¯¼å€¼ã€‚", ".")}
               </p>
             </div>
             <div className="justify-self-start md:justify-self-end">
@@ -818,7 +824,7 @@ export function ImportJobPanel({
           </div>
           {symbolAudit?.records?.length ? (
             <div className="rounded-2xl border border-[#b6d7c7] bg-white px-4 py-3 text-sm text-[#21613f]">
-              <p className="font-medium">Final holdings that will be written</p>
+              <p className="font-medium">{pick(language, "æœ€ç»ˆå°†å†™å…¥çš„æŒä»“", "Final holdings that will be written")}</p>
               <div className="mt-2 flex flex-wrap gap-2">
                 {symbolAudit.records.slice(0, 8).map((record) => (
                   <Badge key={`final-write-${record.requestedSymbol}`} variant="success">
@@ -826,13 +832,13 @@ export function ImportJobPanel({
                   </Badge>
                 ))}
                 {symbolAudit.records.length > 8 ? (
-                  <Badge variant="neutral">+{symbolAudit.records.length - 8} more</Badge>
+                  <Badge variant="neutral">+{symbolAudit.records.length - 8} {pick(language, "ä¸ª", "more")}</Badge>
                 ) : null}
               </div>
             </div>
           ) : null}
           <Button type="button" onClick={confirmImport} disabled={isPending} leadingIcon={<Upload className="h-4 w-4" />}>
-            {isPending ? "Importing..." : "Confirm import"}
+            {isPending ? pick(language, "å¯¼å…¥ä¸­...", "Importing...") : pick(language, "ç¡®è®¤å¯¼å…¥", "Confirm import")}
           </Button>
         </div>
       ) : null}
@@ -843,8 +849,8 @@ export function ImportJobPanel({
             <div className="space-y-3">
               <div className="flex items-center gap-2 font-medium text-[color:var(--foreground)]">
                 <Eye className="h-4 w-4 text-[color:var(--primary)]" />
-                Symbol audit
-                {symbolAuditStatus.loading ? <Badge variant="warning">Running</Badge> : <Badge variant="neutral">Review aid</Badge>}
+                {pick(language, "ä»£ç å®¡è®¡", "Symbol audit")}
+                {symbolAuditStatus.loading ? <Badge variant="warning">{pick(language, "æ‰§è¡Œä¸­", "Running")}</Badge> : <Badge variant="neutral">{pick(language, "è¾…åŠ©å¤æ ¸", "Review aid")}</Badge>}
               </div>
               {symbolAuditStatus.message ? (
                 <p className="text-sm text-[color:var(--muted-foreground)]">{symbolAuditStatus.message}</p>
@@ -864,17 +870,17 @@ export function ImportJobPanel({
               {symbolAudit.records.map((record) => (
                 <div key={`${record.requestedSymbol}-${record.normalizedSymbol}`} className={`rounded-xl border px-4 py-3 text-sm ${record.hasWarning ? "border-[#f0c9d0] bg-[#fff8f9]" : "border-[color:var(--border)] bg-[color:var(--card-muted)]"}`}>
                   <div className="flex flex-wrap items-center justify-between gap-3">
-                    <div>
-                      <p className="font-medium">
+                          <div>
+                            <p className="font-medium">
                         {record.requestedSymbol} {"->"} {record.normalizedSymbol} - {record.name}
-                      </p>
-                      <p className="mt-1 text-[color:var(--muted-foreground)]">
-                        Provider: {record.provider}{record.quotePrice != null ? ` - Quote ${record.quotePrice.toFixed(2)}${record.delayed ? " (delayed)" : ""}` : " - No quote"}
-                      </p>
-                    </div>
-                    <Badge variant={record.hasWarning ? "warning" : "success"}>
-                      {record.hasWarning ? "Needs review" : "Looks good"}
-                    </Badge>
+                            </p>
+                            <p className="mt-1 text-[color:var(--muted-foreground)]">
+                        {pick(language, "æ¥æºï¼š", "Provider: ")}{record.provider}{record.quotePrice != null ? pick(language, ` Â· è¡Œæƒ… ${record.quotePrice.toFixed(2)}${record.delayed ? "ï¼ˆå»¶è¿Ÿï¼‰" : ""}`, ` - Quote ${record.quotePrice.toFixed(2)}${record.delayed ? " (delayed)" : ""}`) : pick(language, " Â· æ— å¯ç”¨è¡Œæƒ…", " - No quote")}
+                            </p>
+                          </div>
+                          <Badge variant={record.hasWarning ? "warning" : "success"}>
+                      {record.hasWarning ? pick(language, "éœ€è¦å¤æ ¸", "Needs review") : pick(language, "çœ‹èµ·æ¥æ­£å¸¸", "Looks good")}
+                          </Badge>
                   </div>
                   {record.warningMessage ? (
                     <p className={`mt-2 ${record.hasWarning ? "text-[#8e2433]" : "text-[color:var(--muted-foreground)]"}`}>
@@ -884,7 +890,7 @@ export function ImportJobPanel({
                   {record.hasWarning ? (
                     <div className="mt-3 grid gap-3 md:grid-cols-2">
                       <label className="space-y-2">
-                        <span className="text-xs font-medium uppercase tracking-[0.12em] text-[color:var(--muted-foreground)]">Override symbol</span>
+                        <span className="text-xs font-medium uppercase tracking-[0.12em] text-[color:var(--muted-foreground)]">{pick(language, "è¦†ç›–ä»£ç ", "Override symbol")}</span>
                         <input
                           value={symbolCorrections[record.requestedSymbol]?.symbol ?? record.normalizedSymbol}
                           onChange={(event) => setSymbolCorrections((current) => ({
@@ -898,7 +904,7 @@ export function ImportJobPanel({
                         />
                       </label>
                       <label className="space-y-2">
-                        <span className="text-xs font-medium uppercase tracking-[0.12em] text-[color:var(--muted-foreground)]">Override name</span>
+                        <span className="text-xs font-medium uppercase tracking-[0.12em] text-[color:var(--muted-foreground)]">{pick(language, "è¦†ç›–åç§°", "Override name")}</span>
                         <input
                           value={symbolCorrections[record.requestedSymbol]?.name ?? record.name}
                           onChange={(event) => setSymbolCorrections((current) => ({
@@ -914,7 +920,7 @@ export function ImportJobPanel({
                     </div>
                   ) : null}
                   <div className="mt-3 rounded-2xl border border-[color:var(--border)] bg-white px-4 py-3 text-sm text-[color:var(--muted-foreground)]">
-                    <span className="font-medium text-[color:var(--foreground)]">Final write:</span>{" "}
+                    <span className="font-medium text-[color:var(--foreground)]">{pick(language, "æœ€ç»ˆå†™å…¥ï¼š", "Final write:")}</span>{" "}
                     {(symbolCorrections[record.requestedSymbol]?.symbol ?? record.normalizedSymbol).toUpperCase()} - {symbolCorrections[record.requestedSymbol]?.name ?? record.name}
                   </div>
                 </div>
@@ -925,7 +931,7 @@ export function ImportJobPanel({
       ) : null}
 
       {latestJob ? (
-        <p className="text-sm text-[color:var(--muted-foreground)]">Latest job: {latestJob.fileName}</p>
+        <p className="text-sm text-[color:var(--muted-foreground)]">{pick(language, "æœ€è¿‘ä¸€æ¬¡ä»»åŠ¡ï¼š", "Latest job: ")}{latestJob.fileName}</p>
       ) : null}
 
       {status.type !== "idle" ? (
@@ -943,12 +949,12 @@ export function ImportJobPanel({
             <div className="space-y-3">
               <div className="flex items-center gap-2 font-medium text-[#8e2433]">
                 <AlertTriangle className="h-4 w-4" />
-                Import validation issues
+                {pick(language, "å¯¼å…¥æ ¡éªŒé—®é¢˜", "Import validation issues")}
               </div>
               <div className="space-y-2">
                 {validationErrors.slice(0, 12).map((error) => (
                   <div key={`${error.rowNumber}-${error.message}`} className="rounded-xl border border-[#f0c9d0] bg-white px-3 py-2 text-sm text-[#8e2433]">
-                    Row {error.rowNumber}{error.recordType ? ` (${error.recordType})` : ""}: {error.message}
+                    {pick(language, "ç¬¬ ", "Row ")}{error.rowNumber}{error.recordType ? ` (${error.recordType})` : ""}: {error.message}
                   </div>
                 ))}
               </div>
@@ -966,9 +972,10 @@ export function ImportJobPanel({
         disabled={isPending || !csvContent || missingRequiredMappings.length > 0}
         leadingIcon={<Upload className="h-4 w-4" />}
       >
-        Validate and review import
+        {pick(language, "æ ¡éªŒå¹¶å¤æ ¸å¯¼å…¥", "Validate and review import")}
       </Button>
     </div>
   );
 }
+
 

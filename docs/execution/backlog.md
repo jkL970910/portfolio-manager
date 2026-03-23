@@ -98,6 +98,7 @@ Help a self-directed investor:
 | 5 | Richer import review persistence | P1 | Import review is functional, but corrections are still too session-bound and light. |
 | 6 | Watchlist and target constraints workflow | P1 | Preference storage exists, but the UX and recommendation impact are still too shallow. |
 | 7 | Cloud-ready cache / worker boundaries | P1 | Current market-data cache is process-local and import/recommendation work is still synchronous. |
+| 8 | Chinese-mode citizen identity layer | P0-next | Login, registration, and profile now need a distinct Loo国 flow with citizen card issuance and admin override support. |
 
 ## Deprioritized / Deferred
 
@@ -121,6 +122,7 @@ Help a self-directed investor:
 | Portfolio diagnostics foundation | In Progress | 5 | 4 | 3 | 5 | Deepen next |
 | Funding recommendation engine v1 | Completed | 5 | 4 | 4 | 5 | Upgrade to v2 |
 | Guided allocation setup | Planned | 5 | 3 | 3 | 5 | Build next |
+| Chinese-mode citizen identity layer | Planned | 4 | 4 | 3 | 5 | Build now |
 | Recommendation explanation improvements | Planned | 4 | 2 | 2 | 5 | Build soon |
 | Portfolio health score and radar analysis | Planned | 4 | 3 | 3 | 4 | Build after explanation depth improves |
 | Spending overview and transactions | In Progress | 3 | 3 | 2 | 3 | Keep secondary |
@@ -135,11 +137,12 @@ Help a self-directed investor:
 ## Recommended Build Order From Here
 
 1. Guided allocation setup in Settings
-2. Recommendation engine v2 rules
-3. Recommendation explanation model and structured rationale output
-4. Portfolio health score and radar analysis
-5. Richer import review persistence and correction state
-6. Cloud-ready cache and async job boundaries
+2. Chinese-mode citizen identity layer
+3. Recommendation engine v2 rules
+4. Recommendation explanation model and structured rationale output
+5. Portfolio health score and radar analysis
+6. Richer import review persistence and correction state
+7. Cloud-ready cache and async job boundaries
 
 ## Key Trade-offs
 
@@ -154,6 +157,6 @@ Help a self-directed investor:
 Turn the next milestone into engineering tickets for:
 
 1. guided allocation setup in Settings
-2. recommendation engine v2 rules
-3. recommendation explanation improvements
+2. Chinese-mode citizen identity layer
+3. recommendation engine v2 rules
 

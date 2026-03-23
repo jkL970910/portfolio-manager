@@ -31,6 +31,16 @@ export const mockRepositories: BackendRepositories = {
         ...user,
         baseCurrency: currency
       };
+    },
+    async updateDisplayLanguage(userId, language) {
+      const user = findUserById(userId);
+      if (!user) {
+        throw new Error(`User not found for id ${userId}.`);
+      }
+      return {
+        ...user,
+        displayLanguage: language
+      };
     }
   },
   accounts: {

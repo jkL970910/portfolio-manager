@@ -102,17 +102,6 @@ components/
   - a table or workflow has no usable records yet
   - the product should keep a warm helper tone without inventing a page-specific empty card
 
-### `LiquidGlassShell`
-
-- File: [liquid-glass-shell.tsx](E:\Projects\Portfolio%20Manager\components\ui\liquid-glass-shell.tsx)
-- Purpose: bounded liquid-glass enhancement layer for small hero or navigation surfaces
-- Use when:
-  - a compact control or signal card needs a stronger iOS-style liquid treatment
-- Do not use for:
-  - dense tables
-  - full-page shells
-  - standard analytical cards that already work with the default frosted `Card`
-
 ## Navigation Components
 
 ### `TopNav`
@@ -131,6 +120,15 @@ components/
   - active currency state
   - API update
   - FX info hover/focus popover
+
+### `DisplayLanguageToggle`
+
+- File: [display-language-toggle.tsx](E:\Projects\Portfolio%20Manager\components\navigation\display-language-toggle.tsx)
+- Purpose: global UI language control for the Chinese `Loo国的财富宝库` theme and the English `Portfolio Manager` theme
+- Includes:
+  - circular flag buttons
+  - cookie + user preference update
+  - optimistic route refresh
 
 ### `FxInfoPopoverContent`
 
@@ -161,6 +159,40 @@ components/
 - Do not use inside:
   - dense tables
   - row-by-row diagnostics
+
+## Auth Components
+
+### `CitizenIdentityCard`
+
+- File: [citizen-identity-card.tsx](E:\Projects\Portfolio%20Manager\components\auth\citizen-identity-card.tsx)
+- Purpose: shared identity-card surface for the Chinese `Loo国` citizen flow
+- Use when:
+  - rendering the default citizen template on login
+  - rendering an issued citizen card after registration
+  - showing the active citizen archive in Settings
+
+### `LooTermsDialog`
+
+- File: [loo-terms-dialog.tsx](E:\Projects\Portfolio%20Manager\components\auth\loo-terms-dialog.tsx)
+- Purpose: shared modal for the Chinese-mode oath / terms copy
+- Use when:
+  - login and register require explicit acceptance of `Loo国条例`
+
+### `ChineseLoginPanel`
+
+- File: [chinese-login-panel.tsx](E:\Projects\Portfolio%20Manager\components\auth\chinese-login-panel.tsx)
+- Purpose: Chinese-mode identity-gate login panel that embeds credentials inside the default citizen card
+- Scope:
+  - Chinese mode only
+  - switches between default card and active citizen card based on session state
+
+### `ChineseRegisterPanel`
+
+- File: [chinese-register-panel.tsx](E:\Projects\Portfolio%20Manager\components\auth\chinese-register-panel.tsx)
+- Purpose: Chinese-mode citizen application workflow with terms acceptance and issuance modal
+- Scope:
+  - Chinese mode only
+  - creates the user and shows the issued citizen card before manual entry
 
 ## Layout Components
 
@@ -234,6 +266,8 @@ components/
 
 - [preferences-workbench.tsx](E:\Projects\Portfolio%20Manager\components\settings\preferences-workbench.tsx)
   - guided + manual investment preferences editor
+- [citizen-profile-panel.tsx](E:\Projects\Portfolio%20Manager\components\settings\citizen-profile-panel.tsx)
+  - Chinese-mode citizen archive and admin override surface inside Settings
 
 ## Next Components To Extract
 

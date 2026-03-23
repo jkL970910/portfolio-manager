@@ -36,7 +36,8 @@ function mapUser(row: typeof users.$inferSelect): UserProfile {
     id: row.id,
     email: row.email,
     displayName: row.displayName,
-    baseCurrency: row.baseCurrency as UserProfile["baseCurrency"]
+    baseCurrency: row.baseCurrency as UserProfile["baseCurrency"],
+    displayLanguage: (row.displayLanguage as UserProfile["displayLanguage"]) ?? "zh"
   };
 }
 
@@ -96,6 +97,21 @@ export const postgresRepositories: BackendRepositories = {
         .update(users)
         .set({
           baseCurrency: currency,
+          updatedAt: new Date()
+        })
+        .where(eq(users.id, userId))
+        .returning();
+      if (!row) {
+        throw new Error(`User not found for id ${userId}.`);
+      }
+      return mapUser(row);
+    },
+    async updateDisplayLanguage(userId, language) {
+      const db = getDb();
+      const [row] = await db
+        .update(users)
+        .set({
+          displayLanguage: language,
           updatedAt: new Date()
         })
         .where(eq(users.id, userId))

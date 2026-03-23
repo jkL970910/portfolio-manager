@@ -378,13 +378,14 @@ Allow the user to configure or generate investment preferences that drive recomm
 ### Sections
 
 1. Guided allocation setup
-2. Manual configuration
-3. Target allocation
-4. Account funding priorities
-5. Tax-aware placement preferences
-6. Cash buffer target
-7. Recommendation strategy
-8. Rebalancing tolerance
+2. Profile / citizen archive
+3. Manual configuration
+4. Target allocation
+5. Account funding priorities
+6. Tax-aware placement preferences
+7. Cash buffer target
+8. Recommendation strategy
+9. Rebalancing tolerance
 
 ---
 
@@ -393,6 +394,7 @@ Allow the user to configure or generate investment preferences that drive recomm
 Core entities:
 
 - User
+- Citizen Profile
 - Accounts
 - Holdings
 - Transactions
@@ -425,6 +427,7 @@ Planned enhancements:
 - Radar chart portfolio diagnostics
 - Dedicated spending page
 - Enhanced recommendation logic
+- Chinese-mode citizen identity layer
 
 ---
 

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { registerUserInputSchema } from "@/lib/backend/payload-schemas";
-import { registerUserAccount } from "@/lib/backend/services";
+import { registerUserWithCitizenProfile } from "@/lib/backend/services";
 
 export async function POST(request: NextRequest) {
   const body = await request.json();
@@ -10,8 +10,8 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const user = await registerUserAccount(parsed.data);
-    return NextResponse.json({ data: user }, { status: 201 });
+    const result = await registerUserWithCitizenProfile(parsed.data);
+    return NextResponse.json({ data: result }, { status: 201 });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Registration failed.";
     const status = /already exists/i.test(message) ? 409 : 500;

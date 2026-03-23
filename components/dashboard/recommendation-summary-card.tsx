@@ -3,8 +3,11 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { MascotAsset } from "@/components/brand/mascot-asset";
+import type { DisplayLanguage } from "@/lib/i18n/ui";
+import { pick } from "@/lib/i18n/ui";
 
 type RecommendationSummaryCardProps = {
+  language?: DisplayLanguage;
   title: string;
   subtitle: string;
   theme: string;
@@ -14,6 +17,7 @@ type RecommendationSummaryCardProps = {
 };
 
 export function RecommendationSummaryCard({
+  language = "zh",
   title,
   subtitle,
   theme,
@@ -29,7 +33,9 @@ export function RecommendationSummaryCard({
             <CardTitle>{title}</CardTitle>
             <p className="mt-1 text-sm text-[color:var(--muted-foreground)]">{subtitle}</p>
           </div>
-          <Badge variant={emphasized ? "warning" : "neutral"}>{emphasized ? "High Priority" : "Next Step"}</Badge>
+          <Badge variant={emphasized ? "warning" : "neutral"}>
+            {emphasized ? pick(language, "高优先级", "High Priority") : pick(language, "下一步", "Next Step")}
+          </Badge>
         </div>
       </CardHeader>
       <CardContent className="space-y-5">
@@ -47,14 +53,14 @@ export function RecommendationSummaryCard({
           <div className="mt-5 grid gap-3 md:grid-cols-2">
             {signals.map((signal) => (
               <div key={signal} className="rounded-[24px] border border-white/55 bg-white/44 p-4 backdrop-blur-md">
-                <p className="text-sm text-[color:var(--muted-foreground)]">Supporting signal</p>
+                <p className="text-sm text-[color:var(--muted-foreground)]">{pick(language, "支撑信号", "Supporting signal")}</p>
                 <p className="mt-2 text-sm font-medium text-[color:var(--foreground)]">{signal}</p>
               </div>
             ))}
           </div>
         </div>
         <Button href="/recommendations" className="w-full md:w-auto" trailingIcon={<ArrowRight className="h-4 w-4" />}>
-          View Detailed Recommendations
+          {pick(language, "查看完整推荐", "View Detailed Recommendations")}
         </Button>
       </CardContent>
     </Card>

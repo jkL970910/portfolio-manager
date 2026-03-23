@@ -8,6 +8,15 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { assertApiData, getApiErrorMessage, safeJson } from "@/lib/client/api";
+import {
+  getAccountTypeLabel,
+  getAssetClassLabel,
+  getRecommendationStrategyLabel,
+  getRiskProfileLabel,
+  getTransitionPreferenceLabel
+} from "@/lib/i18n/finance";
+import type { DisplayLanguage } from "@/lib/i18n/ui";
+import { pick } from "@/lib/i18n/ui";
 import { cn } from "@/lib/utils";
 
 const FIELD_CLASS_NAME =
@@ -199,81 +208,84 @@ function buildPayload(form: FormState) {
   };
 }
 
-function formatDraftSavedAt(value: string | null) {
+function formatDraftSavedAt(value: string | null, language: DisplayLanguage) {
   if (!value) {
-    return "Not saved yet";
+    return pick(language, "尚未保存", "Not saved yet");
   }
 
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) {
-    return "Not saved yet";
+    return pick(language, "尚未保存", "Not saved yet");
   }
 
-  return new Intl.DateTimeFormat("en-CA", {
+  return new Intl.DateTimeFormat(language === "zh" ? "zh-CN" : "en-CA", {
     dateStyle: "medium",
     timeStyle: "short"
   }).format(date);
 }
 
-function getManualSectionSummary(section: ManualSectionId, form: FormState, currentTargetTotal: number) {
+function getManualSectionSummary(section: ManualSectionId, form: FormState, currentTargetTotal: number, language: DisplayLanguage) {
   switch (section) {
     case "strategy":
-      return `${form.riskProfile} · ${form.transitionPreference} · ${form.recommendationStrategy}`;
+      return `${getRiskProfileLabel(form.riskProfile, language)} · ${getTransitionPreferenceLabel(form.transitionPreference, language)} · ${getRecommendationStrategyLabel(form.recommendationStrategy, language)}`;
     case "allocation":
-      return `${currentTargetTotal}% total across ${form.targetAllocation.length} sleeves`;
+      return pick(language, `${form.targetAllocation.length} 个资产袖口，共 ${currentTargetTotal}%`, `${currentTargetTotal}% total across ${form.targetAllocation.length} sleeves`);
     case "priority":
-      return form.accountFundingPriority.join(" -> ");
+      return form.accountFundingPriority.map((type) => getAccountTypeLabel(type, language)).join(" -> ");
     case "tax":
-      return form.taxAwarePlacement ? "Tax-aware placement enabled" : "Simple account-fit rules only";
+      return form.taxAwarePlacement
+        ? pick(language, "已启用税务感知放置", "Tax-aware placement enabled")
+        : pick(language, "仅使用简化账户匹配规则", "Simple account-fit rules only");
     case "watchlist": {
       const count = form.watchlistSymbols.split(",").map((item) => item.trim()).filter(Boolean).length;
-      return count > 0 ? `${count} tracked symbol${count === 1 ? "" : "s"}` : "No watchlist symbols yet";
+      return count > 0
+        ? pick(language, `${count} 个观察标的`, `${count} tracked symbol${count === 1 ? "" : "s"}`)
+        : pick(language, "还没有观察标的", "No watchlist symbols yet");
     }
     default:
       return "";
   }
 }
 
-function getManualSectionMeta(manualGroups: Array<{ title: string; description: string; badge?: string }>): ManualSectionMeta[] {
-  const [allocationGroup, priorityGroup, behaviorGroup, taxGroup] = manualGroups;
+function getManualSectionMeta(language: DisplayLanguage, manualGroups: Array<{ title: string; description: string; badge?: string }>): ManualSectionMeta[] {
+  const [, , , taxGroup] = manualGroups;
   return [
     {
       id: "strategy",
-      title: "Strategy controls",
-      description: behaviorGroup?.description ?? "Control risk, transition behavior, recommendation strategy, and planning buffer.",
-      badge: behaviorGroup?.badge
+      title: pick(language, "策略控制", "Strategy controls"),
+      description: pick(language, "控制风险、过渡方式、推荐策略和规划缓冲。", "Control risk, transition behavior, recommendation strategy, and planning buffer.")
     },
     {
       id: "allocation",
-      title: allocationGroup?.title ?? "Target allocation",
-      description: allocationGroup?.description ?? "Edit the target mix that anchors recommendations and health scoring.",
-      badge: allocationGroup?.badge
+      title: pick(language, "目标配置", "Target allocation"),
+      description: pick(language, "编辑作为推荐和健康评分锚点的目标配置。", "Edit the target mix that anchors recommendations and health scoring.")
     },
     {
       id: "priority",
-      title: priorityGroup?.title ?? "Account funding priorities",
-      description: priorityGroup?.description ?? "Set the contribution ladder used by the recommendation engine.",
-      badge: priorityGroup?.badge
+      title: pick(language, "账户资金优先级", "Account funding priorities"),
+      description: pick(language, "设置推荐引擎在投入资金时采用的账户顺序。", "Set the contribution ladder used by the recommendation engine.")
     },
     {
       id: "tax",
-      title: taxGroup?.title ?? "Tax-aware placement",
-      description: taxGroup?.description ?? "Keep higher-friction tax details collapsed until they are needed.",
+      title: pick(language, "税务感知的资产放置", "Tax-aware placement"),
+      description: pick(language, "把高摩擦的税务参数继续折叠，等真正需要时再展开。", "Keep higher-friction tax details collapsed until they are needed."),
       badge: taxGroup?.badge
     },
     {
       id: "watchlist",
-      title: "Watchlist and target constraints",
-      description: "Track symbols that should stay visible while you refine the recommendation engine inputs."
+      title: pick(language, "观察列表与约束", "Watchlist and target constraints"),
+      description: pick(language, "记录在你调整推荐输入时仍需持续关注的标的。", "Track symbols that should stay visible while you refine the recommendation engine inputs.")
     }
   ];
 }
 export function PreferencesWorkbench({
+  language = "zh",
   initialProfile,
   initialGuidedDraft,
   guidedQuestions,
   manualGroups
 }: {
+  language?: DisplayLanguage;
   initialProfile: PreferenceProfile;
   initialGuidedDraft: GuidedAllocationDraft | null;
   guidedQuestions: string[];
@@ -306,7 +318,7 @@ export function PreferencesWorkbench({
     [form.targetAllocation]
   );
   const guidedDraft = useMemo(() => buildGuidedDraft(guidedAnswers), [guidedAnswers]);
-  const manualSectionMeta = useMemo(() => getManualSectionMeta(manualGroups), [manualGroups]);
+  const manualSectionMeta = useMemo(() => getManualSectionMeta(language, manualGroups), [language, manualGroups]);
 
   function updateAllocation(assetClass: string, targetPct: number) {
     setForm((current) => ({
@@ -341,7 +353,10 @@ export function PreferencesWorkbench({
       rebalancingTolerancePct: guidedDraft.rebalancingTolerancePct
     }));
     setOpenManualSection("strategy");
-    setStatus({ type: "success", message: "Guided allocation draft loaded into manual configuration. Review the collapsed sections and save when ready." });
+    setStatus({
+      type: "success",
+      message: pick(language, "引导式配置草稿已加载到手动设置。检查折叠项后再保存。", "Guided allocation draft loaded into manual configuration. Review the collapsed sections and save when ready.")
+    });
   }
 
   function persistProfile(nextForm: FormState, successMessage: string) {
@@ -357,7 +372,7 @@ export function PreferencesWorkbench({
 
       const payload = await safeJson(response);
       if (!response.ok) {
-        setStatus({ type: "error", message: getApiErrorMessage(payload, "Failed to save preference profile.") });
+        setStatus({ type: "error", message: getApiErrorMessage(payload, pick(language, "保存偏好配置失败。", "Failed to save preference profile.")) });
         return;
       }
 
@@ -368,7 +383,7 @@ export function PreferencesWorkbench({
   }
 
   function saveProfile() {
-    persistProfile(form, "Preference profile saved to PostgreSQL.");
+    persistProfile(form, pick(language, "偏好配置已保存到 PostgreSQL。", "Preference profile saved to PostgreSQL."));
   }
 
   function saveGuidedDraft() {
@@ -396,7 +411,7 @@ export function PreferencesWorkbench({
 
       const payload = await safeJson(response);
       if (!response.ok) {
-        setStatus({ type: "error", message: getApiErrorMessage(payload, "Failed to save guided allocation draft.") });
+        setStatus({ type: "error", message: getApiErrorMessage(payload, pick(language, "保存引导草稿失败。", "Failed to save guided allocation draft.")) });
         return;
       }
 
@@ -404,15 +419,15 @@ export function PreferencesWorkbench({
         const savedDraft = assertApiData<GuidedAllocationDraft>(
           payload,
           (candidate) => typeof candidate === "object" && candidate !== null && "updatedAt" in candidate,
-          "Guided allocation draft save succeeded but returned no usable draft payload."
+          pick(language, "引导草稿保存成功，但返回结果缺少可用的草稿数据。", "Guided allocation draft save succeeded but returned no usable draft payload.")
         );
         setGuidedDraftSavedAt(savedDraft.updatedAt);
       } catch (error) {
-        setStatus({ type: "error", message: error instanceof Error ? error.message : "Failed to save guided allocation draft." });
+        setStatus({ type: "error", message: error instanceof Error ? error.message : pick(language, "保存引导草稿失败。", "Failed to save guided allocation draft.") });
         return;
       }
 
-      setStatus({ type: "success", message: "Guided allocation draft saved separately from the live preference profile." });
+      setStatus({ type: "success", message: pick(language, "引导草稿已独立保存，不会覆盖当前生效的偏好配置。", "Guided allocation draft saved separately from the live preference profile.") });
       router.refresh();
     });
   }
@@ -429,7 +444,7 @@ export function PreferencesWorkbench({
       recommendationStrategy: guidedDraft.recommendationStrategy,
       rebalancingTolerancePct: guidedDraft.rebalancingTolerancePct
     };
-    persistProfile(nextForm, "Guided allocation draft applied and saved to PostgreSQL.");
+    persistProfile(nextForm, pick(language, "引导草稿已应用并保存到 PostgreSQL。", "Guided allocation draft applied and saved to PostgreSQL."));
   }
 
   function goToNextGuidedStep() {
@@ -454,23 +469,23 @@ export function PreferencesWorkbench({
       <div className="grid gap-6 xl:grid-cols-2">
         <Card className="bg-[linear-gradient(180deg,rgba(255,255,255,0.66),rgba(255,255,255,0.46))]">
           <CardHeader>
-            <CardTitle>Guided Allocation Setup</CardTitle>
+            <CardTitle>{pick(language, "引导式配置", "Guided Allocation Setup")}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-5">
             <div className="rounded-[24px] border border-white/55 bg-white/38 p-5 backdrop-blur-md">
               <div className="flex items-center justify-between gap-4">
                 <div>
-                  <Badge variant="primary">For newer users</Badge>
-                  <p className="mt-3 text-lg font-semibold">Step through the setup one answer at a time</p>
+                  <Badge variant="primary">{pick(language, "适合新手", "For newer users")}</Badge>
+                  <p className="mt-3 text-lg font-semibold">{pick(language, "一步一步回答问题，再看生成草稿。", "Step through the setup one answer at a time")}</p>
                   <p className="mt-2 text-sm text-[color:var(--muted-foreground)]">
-                    This flow behaves like onboarding now. Answer one question, move forward, then review the draft before you apply anything.
+                    {pick(language, "这个流程现在更像 onboarding。每次只回答一个问题，最后统一审阅草稿，再决定是否应用。", "This flow behaves like onboarding now. Answer one question, move forward, then review the draft before you apply anything.")}
                   </p>
                 </div>
                 <div className="rounded-full border border-white/55 bg-white/64 px-3 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-[color:var(--muted-foreground)]">
                   {GUIDED_STEP_META[guidedStep].title}
                 </div>
               </div>
-              <p className="mt-3 text-xs text-[color:var(--muted-foreground)]">Last saved draft: {formatDraftSavedAt(guidedDraftSavedAt)}</p>
+              <p className="mt-3 text-xs text-[color:var(--muted-foreground)]">{pick(language, "上次保存草稿：", "Last saved draft: ")}{formatDraftSavedAt(guidedDraftSavedAt, language)}</p>
             </div>
 
             <div className="grid gap-2 sm:grid-cols-5">
@@ -503,6 +518,7 @@ export function PreferencesWorkbench({
 
             <GuidedStepPanel
               step={guidedStep}
+              language={language}
               guidedQuestions={guidedQuestions}
               guidedAnswers={guidedAnswers}
               setGuidedAnswers={setGuidedAnswers}
@@ -519,13 +535,17 @@ export function PreferencesWorkbench({
 
         <Card className="bg-[linear-gradient(180deg,rgba(255,255,255,0.66),rgba(255,255,255,0.46))]">
           <CardHeader>
-            <CardTitle>Manual Configuration</CardTitle>
+            <CardTitle>{pick(language, "手动配置", "Manual Configuration")}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="rounded-[24px] border border-white/55 bg-white/38 p-5 backdrop-blur-md">
-              <p className="font-semibold">Current profile</p>
+              <p className="font-semibold">{pick(language, "当前配置", "Current profile")}</p>
               <p className="mt-1 text-sm text-[color:var(--muted-foreground)]">
-                {form.riskProfile} risk, {form.transitionPreference} transition, {form.recommendationStrategy} recommendation strategy.
+                {pick(
+                  language,
+                  `${getRiskProfileLabel(form.riskProfile, language)}，${getTransitionPreferenceLabel(form.transitionPreference, language)}，${getRecommendationStrategyLabel(form.recommendationStrategy, language)}。`,
+                  `${getRiskProfileLabel(form.riskProfile, language)} risk, ${getTransitionPreferenceLabel(form.transitionPreference, language)} transition, ${getRecommendationStrategyLabel(form.recommendationStrategy, language)} recommendation strategy.`
+                )}
               </p>
             </div>
 
@@ -537,47 +557,47 @@ export function PreferencesWorkbench({
                     key={section.id}
                     title={section.title}
                     description={section.description}
-                    summary={getManualSectionSummary(section.id, form, currentTargetTotal)}
+                    summary={getManualSectionSummary(section.id, form, currentTargetTotal, language)}
                     badge={section.badge}
                     open={isOpen}
                     onToggle={() => setOpenManualSection(section.id)}
                   >
                     {section.id === "strategy" ? (
                       <div className="grid gap-4 md:grid-cols-2">
-                        <Field label="Risk profile">
+                        <Field label={pick(language, "风险档位", "Risk profile")}>
                           <select
                             value={form.riskProfile}
                             onChange={(event) => setForm((current) => ({ ...current, riskProfile: event.target.value as PreferenceProfile["riskProfile"] }))}
                             className={FIELD_CLASS_NAME}
                           >
-                            <option value="Conservative">Conservative</option>
-                            <option value="Balanced">Balanced</option>
-                            <option value="Growth">Growth</option>
+                            <option value="Conservative">{pick(language, "保守", "Conservative")}</option>
+                            <option value="Balanced">{pick(language, "平衡", "Balanced")}</option>
+                            <option value="Growth">{pick(language, "成长", "Growth")}</option>
                           </select>
                         </Field>
-                        <Field label="Transition preference">
+                        <Field label={pick(language, "过渡方式", "Transition preference")}>
                           <select
                             value={form.transitionPreference}
                             onChange={(event) => setForm((current) => ({ ...current, transitionPreference: event.target.value as PreferenceProfile["transitionPreference"] }))}
                             className={FIELD_CLASS_NAME}
                           >
-                            <option value="stay-close">Stay close to current holdings</option>
-                            <option value="gradual">Gradually transition to target</option>
-                            <option value="direct">Move directly toward target</option>
+                            <option value="stay-close">{pick(language, "尽量贴近现有持仓", "Stay close to current holdings")}</option>
+                            <option value="gradual">{pick(language, "逐步过渡到目标", "Gradually transition to target")}</option>
+                            <option value="direct">{pick(language, "直接向目标靠拢", "Move directly toward target")}</option>
                           </select>
                         </Field>
-                        <Field label="Recommendation strategy">
+                        <Field label={pick(language, "推荐策略", "Recommendation strategy")}>
                           <select
                             value={form.recommendationStrategy}
                             onChange={(event) => setForm((current) => ({ ...current, recommendationStrategy: event.target.value as PreferenceProfile["recommendationStrategy"] }))}
                             className={FIELD_CLASS_NAME}
                           >
-                            <option value="balanced">Balanced</option>
-                            <option value="tax-aware">Tax-aware</option>
-                            <option value="target-first">Target-first</option>
+                            <option value="balanced">{pick(language, "平衡", "Balanced")}</option>
+                            <option value="tax-aware">{pick(language, "税务感知", "Tax-aware")}</option>
+                            <option value="target-first">{pick(language, "目标优先", "Target-first")}</option>
                           </select>
                         </Field>
-                        <Field label="Rebalancing tolerance %">
+                        <Field label={pick(language, "再平衡容忍度 %", "Rebalancing tolerance %")}>
                           <input
                             type="number"
                             min={0}
@@ -587,7 +607,7 @@ export function PreferencesWorkbench({
                             className={FIELD_CLASS_NAME}
                           />
                         </Field>
-                        <Field label="Cash buffer target (planning base, CAD)">
+                        <Field label={pick(language, "现金缓冲目标（规划基准，CAD）", "Cash buffer target (planning base, CAD)")}>
                           <input
                             type="number"
                             min={0}
@@ -602,7 +622,7 @@ export function PreferencesWorkbench({
                             checked={form.taxAwarePlacement}
                             onChange={(event) => setForm((current) => ({ ...current, taxAwarePlacement: event.target.checked }))}
                           />
-                          Tax-aware asset placement
+                          {pick(language, "启用税务感知的资产放置", "Tax-aware asset placement")}
                         </label>
                       </div>
                     ) : null}
@@ -610,12 +630,12 @@ export function PreferencesWorkbench({
                     {section.id === "allocation" ? (
                       <div className="space-y-4">
                         <div className="flex items-center justify-between gap-4">
-                          <p className="text-sm text-[color:var(--muted-foreground)]">The total must sum to 100. Current total: {currentTargetTotal}%.</p>
+                          <p className="text-sm text-[color:var(--muted-foreground)]">{pick(language, `总和必须等于 100，当前总计：${currentTargetTotal}%。`, `The total must sum to 100. Current total: ${currentTargetTotal}%.`)}</p>
                           <Badge variant={currentTargetTotal === 100 ? "success" : "warning"}>{currentTargetTotal}%</Badge>
                         </div>
                         <div className="grid gap-3 md:grid-cols-2">
                           {form.targetAllocation.map((target) => (
-                            <Field key={target.assetClass} label={target.assetClass}>
+                            <Field key={target.assetClass} label={getAssetClassLabel(target.assetClass, language)}>
                               <input
                                 type="number"
                                 min={0}
@@ -633,16 +653,16 @@ export function PreferencesWorkbench({
                     {section.id === "priority" ? (
                       <div className="grid gap-3 md:grid-cols-3">
                         {[0, 1, 2].map((index) => (
-                          <Field key={index} label={`Priority ${index + 1}`}>
+                          <Field key={index} label={pick(language, `优先级 ${index + 1}`, `Priority ${index + 1}`)}>
                             <select
                               value={form.accountFundingPriority[index] ?? "Taxable"}
                               onChange={(event) => updatePriority(index, event.target.value as PreferenceProfile["accountFundingPriority"][number])}
                               className={FIELD_CLASS_NAME}
                             >
-                              <option value="TFSA">TFSA</option>
-                              <option value="RRSP">RRSP</option>
-                              <option value="FHSA">FHSA</option>
-                              <option value="Taxable">Taxable</option>
+                              <option value="TFSA">{getAccountTypeLabel("TFSA", language)}</option>
+                              <option value="RRSP">{getAccountTypeLabel("RRSP", language)}</option>
+                              <option value="FHSA">{getAccountTypeLabel("FHSA", language)}</option>
+                              <option value="Taxable">{getAccountTypeLabel("Taxable", language)}</option>
                             </select>
                           </Field>
                         ))}
@@ -651,17 +671,17 @@ export function PreferencesWorkbench({
 
                     {section.id === "tax" ? (
                       <div className="rounded-[22px] border border-white/55 bg-white/34 px-4 py-4 text-sm text-[color:var(--muted-foreground)]">
-                        Province and marginal tax bracket remain collapsed until the product needs deeper tax modeling. For now this toggle controls whether the engine favors tax-aware placement heuristics.
+                        {pick(language, "省份和边际税率等更重的税务参数继续保持折叠，等产品进入更深税务建模时再展开。当前这项只控制引擎是否优先使用税务感知的账户放置启发式。", "Province and marginal tax bracket remain collapsed until the product needs deeper tax modeling. For now this toggle controls whether the engine favors tax-aware placement heuristics.")}
                       </div>
                     ) : null}
 
                     {section.id === "watchlist" ? (
-                      <Field label="Watchlist symbols">
+                      <Field label={pick(language, "观察列表代码", "Watchlist symbols")}>
                         <input
                           type="text"
                           value={form.watchlistSymbols}
                           onChange={(event) => setForm((current) => ({ ...current, watchlistSymbols: event.target.value }))}
-                          placeholder="XEF, VCN, CASH"
+                          placeholder={pick(language, "XEF, VCN, CASH", "XEF, VCN, CASH")}
                           className={FIELD_CLASS_NAME}
                         />
                       </Field>
@@ -672,7 +692,7 @@ export function PreferencesWorkbench({
             </div>
 
             <Button type="button" className="w-full" trailingIcon={<ArrowRight className="h-4 w-4" />} onClick={saveProfile} disabled={isPending}>
-              {isPending ? "Saving..." : "Save preference profile"}
+              {isPending ? pick(language, "保存中...", "Saving...") : pick(language, "保存偏好配置", "Save preference profile")}
             </Button>
           </CardContent>
         </Card>
@@ -683,6 +703,7 @@ export function PreferencesWorkbench({
 
 function GuidedStepPanel({
   step,
+  language,
   guidedQuestions,
   guidedAnswers,
   setGuidedAnswers,
@@ -695,6 +716,7 @@ function GuidedStepPanel({
   isPending
 }: {
   step: number;
+  language: DisplayLanguage;
   guidedQuestions: string[];
   guidedAnswers: GuidedAllocationAnswers;
   setGuidedAnswers: React.Dispatch<React.SetStateAction<GuidedAllocationAnswers>>;
@@ -707,6 +729,12 @@ function GuidedStepPanel({
   isPending: boolean;
 }) {
   const onFinalReview = step === GUIDED_STEP_META.length - 1;
+  const guidedQuestionCopy = [
+    pick(language, "你的主要目标和投资期限是什么？", "What is your primary goal and time horizon?"),
+    pick(language, "你能接受多大的组合波动？", "How much volatility can you tolerate?"),
+    pick(language, "推荐引擎应该优先优化什么？", "What should the engine optimize first?"),
+    pick(language, "你希望保留多少现金缓冲？", "How much cash buffer should stay available?")
+  ];
 
   return (
     <Card className="bg-[linear-gradient(135deg,rgba(240,143,178,0.14),rgba(111,141,246,0.1),rgba(255,255,255,0.24))]">
@@ -714,85 +742,87 @@ function GuidedStepPanel({
         {!onFinalReview ? (
           <>
             <div className="space-y-2">
-              <p className="text-sm font-medium uppercase tracking-[0.16em] text-[color:var(--muted-foreground)]">Question {step + 1} of 4</p>
-              <p className="text-xl font-semibold text-[color:var(--foreground)]">{guidedQuestions[step] ?? GUIDED_STEP_META[step].label}</p>
+              <p className="text-sm font-medium uppercase tracking-[0.16em] text-[color:var(--muted-foreground)]">
+                {pick(language, `问题 ${step + 1} / 4`, `Question ${step + 1} of 4`)}
+              </p>
+              <p className="text-xl font-semibold text-[color:var(--foreground)]">{guidedQuestionCopy[step] ?? guidedQuestions[step] ?? GUIDED_STEP_META[step].label}</p>
             </div>
 
             {step === 0 ? (
               <div className="grid gap-3 md:grid-cols-2">
-                <Field label="Primary goal">
+                <Field label={pick(language, "主要目标", "Primary goal")}>
                   <select
                     value={guidedAnswers.goal}
                     onChange={(event) => setGuidedAnswers((current) => ({ ...current, goal: event.target.value as GuidedAllocationAnswers["goal"] }))}
                     className={FIELD_CLASS_NAME}
                   >
-                    <option value="retirement">Retirement growth</option>
-                    <option value="home">Home purchase</option>
-                    <option value="wealth">General long-term wealth</option>
-                    <option value="capital-preservation">Capital preservation</option>
+                    <option value="retirement">{pick(language, "退休增长", "Retirement growth")}</option>
+                    <option value="home">{pick(language, "买房准备", "Home purchase")}</option>
+                    <option value="wealth">{pick(language, "长期财富积累", "General long-term wealth")}</option>
+                    <option value="capital-preservation">{pick(language, "资本保全", "Capital preservation")}</option>
                   </select>
                 </Field>
-                <Field label="Time horizon">
+                <Field label={pick(language, "投资期限", "Time horizon")}>
                   <select
                     value={guidedAnswers.horizon}
                     onChange={(event) => setGuidedAnswers((current) => ({ ...current, horizon: event.target.value as GuidedAllocationAnswers["horizon"] }))}
                     className={FIELD_CLASS_NAME}
                   >
-                    <option value="short">Under 3 years</option>
-                    <option value="medium">3 to 7 years</option>
-                    <option value="long">7+ years</option>
+                    <option value="short">{pick(language, "3 年以内", "Under 3 years")}</option>
+                    <option value="medium">{pick(language, "3 到 7 年", "3 to 7 years")}</option>
+                    <option value="long">{pick(language, "7 年以上", "7+ years")}</option>
                   </select>
                 </Field>
               </div>
             ) : null}
 
             {step === 1 ? (
-              <Field label="Drawdown tolerance">
+              <Field label={pick(language, "回撤容忍度", "Drawdown tolerance")}>
                 <select
                   value={guidedAnswers.volatility}
                   onChange={(event) => setGuidedAnswers((current) => ({ ...current, volatility: event.target.value as GuidedAllocationAnswers["volatility"] }))}
                   className={FIELD_CLASS_NAME}
                 >
-                  <option value="low">Low - avoid large swings</option>
-                  <option value="medium">Medium - moderate volatility is acceptable</option>
-                  <option value="high">High - comfortable with equity-heavy swings</option>
+                  <option value="low">{pick(language, "低 - 尽量避免大波动", "Low - avoid large swings")}</option>
+                  <option value="medium">{pick(language, "中 - 可以接受适度波动", "Medium - moderate volatility is acceptable")}</option>
+                  <option value="high">{pick(language, "高 - 能接受权益仓位带来的波动", "High - comfortable with equity-heavy swings")}</option>
                 </select>
               </Field>
             ) : null}
             {step === 2 ? (
-              <Field label="What should the engine optimize for first?">
+              <Field label={pick(language, "引擎应该优先优化什么？", "What should the engine optimize for first?")}>
                 <select
                   value={guidedAnswers.priority}
                   onChange={(event) => setGuidedAnswers((current) => ({ ...current, priority: event.target.value as GuidedAllocationAnswers["priority"] }))}
                   className={FIELD_CLASS_NAME}
                 >
-                  <option value="tax-efficiency">Tax efficiency first</option>
-                  <option value="balanced">Balanced recommendation behavior</option>
-                  <option value="stay-close">Stay closer to current holdings</option>
+                  <option value="tax-efficiency">{pick(language, "优先税务效率", "Tax efficiency first")}</option>
+                  <option value="balanced">{pick(language, "保持平衡", "Balanced recommendation behavior")}</option>
+                  <option value="stay-close">{pick(language, "尽量贴近现有持仓", "Stay closer to current holdings")}</option>
                 </select>
               </Field>
             ) : null}
 
             {step === 3 ? (
-              <Field label="Cash reserve target">
+              <Field label={pick(language, "现金保留偏好", "Cash reserve target")}>
                 <select
                   value={guidedAnswers.cashNeed}
                   onChange={(event) => setGuidedAnswers((current) => ({ ...current, cashNeed: event.target.value as GuidedAllocationAnswers["cashNeed"] }))}
                   className={FIELD_CLASS_NAME}
                 >
-                  <option value="low">Low - deploy most capital</option>
-                  <option value="medium">Medium - keep a moderate buffer</option>
-                  <option value="high">High - preserve more cash</option>
+                  <option value="low">{pick(language, "低 - 尽量让资金投入组合", "Low - deploy most capital")}</option>
+                  <option value="medium">{pick(language, "中 - 保留适度缓冲", "Medium - keep a moderate buffer")}</option>
+                  <option value="high">{pick(language, "高 - 保留更多现金", "High - preserve more cash")}</option>
                 </select>
               </Field>
             ) : null}
 
             <div className="flex items-center justify-between gap-3 border-t border-white/40 pt-2">
               <Button type="button" variant="ghost" onClick={onPrevious} disabled={step === 0} leadingIcon={<ArrowLeft className="h-4 w-4" />}>
-                Back
+                {pick(language, "返回", "Back")}
               </Button>
               <Button type="button" onClick={onNext} trailingIcon={<ArrowRight className="h-4 w-4" />}>
-                Continue
+                {pick(language, "继续", "Continue")}
               </Button>
             </div>
           </>
@@ -800,30 +830,30 @@ function GuidedStepPanel({
           <>
             <div className="flex items-start justify-between gap-4">
               <div>
-                <p className="text-sm font-medium uppercase tracking-[0.16em] text-[color:var(--muted-foreground)]">Review guided draft</p>
-                <p className="mt-2 text-xl font-semibold">Suggested starting allocation: {guidedDraft.targetMixLabel}</p>
+                <p className="text-sm font-medium uppercase tracking-[0.16em] text-[color:var(--muted-foreground)]">{pick(language, "审阅引导草稿", "Review guided draft")}</p>
+                <p className="mt-2 text-xl font-semibold">{pick(language, `建议的起始配置：${guidedDraft.targetMixLabel}`, `Suggested starting allocation: ${guidedDraft.targetMixLabel}`)}</p>
               </div>
-              <Badge variant="success">Editable draft</Badge>
+              <Badge variant="success">{pick(language, "可编辑草稿", "Editable draft")}</Badge>
             </div>
 
             <div className="grid gap-3 md:grid-cols-2">
               {guidedDraft.targetAllocation.map((target) => (
                 <div key={target.assetClass} className="rounded-[24px] border border-white/55 bg-white/42 px-4 py-3 text-sm backdrop-blur-md">
-                  <span className="font-medium">{target.assetClass}</span>
+                  <span className="font-medium">{getAssetClassLabel(target.assetClass, language)}</span>
                   <span className="float-right">{target.targetPct}%</span>
                 </div>
               ))}
             </div>
 
             <div className="grid gap-4 md:grid-cols-2">
-              <InfoBlock label="Risk profile" value={guidedDraft.riskProfile} />
-              <InfoBlock label="Account priority" value={guidedDraft.accountFundingPriority.join(" -> ")} />
-              <InfoBlock label="Recommendation strategy" value={guidedDraft.recommendationStrategy} />
-              <InfoBlock label="Cash buffer target" value={`${guidedDraft.cashBufferTargetCad.toLocaleString("en-CA")} in planning base CAD`} />
+              <InfoBlock label={pick(language, "风险档位", "Risk profile")} value={getRiskProfileLabel(guidedDraft.riskProfile, language)} />
+              <InfoBlock label={pick(language, "账户优先级", "Account priority")} value={guidedDraft.accountFundingPriority.map((type) => getAccountTypeLabel(type, language)).join(" -> ")} />
+              <InfoBlock label={pick(language, "推荐策略", "Recommendation strategy")} value={getRecommendationStrategyLabel(guidedDraft.recommendationStrategy, language)} />
+              <InfoBlock label={pick(language, "现金缓冲目标", "Cash buffer target")} value={pick(language, `${guidedDraft.cashBufferTargetCad.toLocaleString("en-CA")}（规划基准 CAD）`, `${guidedDraft.cashBufferTargetCad.toLocaleString("en-CA")} in planning base CAD`)} />
             </div>
 
             <div className="space-y-2">
-              <p className="text-sm font-medium text-[color:var(--foreground)]">Assumptions</p>
+              <p className="text-sm font-medium text-[color:var(--foreground)]">{pick(language, "关键假设", "Assumptions")}</p>
               {guidedDraft.assumptions.map((assumption) => (
                 <div key={assumption} className="rounded-2xl border border-[color:var(--border)] bg-white px-4 py-3 text-sm text-[color:var(--muted-foreground)]">
                   {assumption}
@@ -832,7 +862,7 @@ function GuidedStepPanel({
             </div>
 
             <div className="space-y-2">
-              <p className="text-sm font-medium text-[color:var(--foreground)]">Why this draft was suggested</p>
+              <p className="text-sm font-medium text-[color:var(--foreground)]">{pick(language, "为什么会给出这份草稿", "Why this draft was suggested")}</p>
               {guidedDraft.rationale.map((item) => (
                 <div key={item} className="rounded-2xl border border-[color:var(--border)] bg-white px-4 py-3 text-sm text-[color:var(--muted-foreground)]">
                   {item}
@@ -842,20 +872,20 @@ function GuidedStepPanel({
 
             <div className="grid gap-3 sm:grid-cols-2">
               <Button type="button" variant="secondary" onClick={onApplyToManual}>
-                Apply to manual configuration
+                {pick(language, "应用到手动配置", "Apply to manual configuration")}
               </Button>
               <Button type="button" variant="secondary" leadingIcon={<Save className="h-4 w-4" />} onClick={onSaveDraft} disabled={isPending}>
-                {isPending ? "Saving draft..." : "Save guided draft"}
+                {isPending ? pick(language, "保存草稿中...", "Saving draft...") : pick(language, "保存引导草稿", "Save guided draft")}
               </Button>
             </div>
             <div className="grid gap-3 sm:grid-cols-1">
               <Button type="button" onClick={onApplyAndSave} disabled={isPending}>
-                {isPending ? "Saving guided draft..." : "Apply and save profile"}
+                {isPending ? pick(language, "保存中...", "Saving guided draft...") : pick(language, "应用并保存配置", "Apply and save profile")}
               </Button>
             </div>
             <div className="flex items-center justify-between gap-3 border-t border-white/40 pt-2">
               <Button type="button" variant="ghost" onClick={onPrevious} leadingIcon={<ArrowLeft className="h-4 w-4" />}>
-                Back
+                {pick(language, "返回", "Back")}
               </Button>
             </div>
           </>

@@ -25,6 +25,22 @@ const MASCOT_ASSETS = {
   miniSticker: {
     src: "/mascot/mini-sticker.png",
     alt: "Mini mascot sticker"
+  },
+  looEmperor: {
+    src: "/mascot/Loo_King.jpg",
+    alt: "Loo emperor mascot"
+  },
+  citizenMale: {
+    src: "/mascot/Loo_male.jpg",
+    alt: "Male citizen mascot"
+  },
+  citizenFemale: {
+    src: "/mascot/Loo_female.jpg",
+    alt: "Female citizen mascot"
+  },
+  citizenDefault: {
+    src: "/mascot/mini-sticker.png",
+    alt: "Default citizen mascot"
   }
 } as const;
 

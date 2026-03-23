@@ -8,9 +8,9 @@ const buttonVariants = cva(
   {
     variants: {
       variant: {
-        primary: "border-white/45 bg-[linear-gradient(135deg,rgba(240,143,178,0.92),rgba(111,141,246,0.88))] text-white shadow-[var(--shadow-card)] hover:-translate-y-0.5 hover:border-white/60 hover:opacity-95 hover:shadow-[0_16px_32px_rgba(111,141,246,0.18)]",
-        secondary: "border-white/55 bg-white/42 text-[color:var(--foreground)] backdrop-blur-xl hover:-translate-y-0.5 hover:bg-white/56 hover:shadow-[var(--shadow-card)]",
-        ghost: "border-transparent bg-transparent text-[color:var(--foreground)] hover:bg-white/36 hover:backdrop-blur-lg"
+        primary: "border-white/48 bg-[linear-gradient(135deg,rgba(240,143,178,0.9),rgba(111,141,246,0.84))] text-white shadow-[0_14px_30px_rgba(111,141,246,0.14)] hover:-translate-y-0.5 hover:border-white/62 hover:opacity-95 hover:shadow-[0_18px_34px_rgba(111,141,246,0.16)]",
+        secondary: "border-white/60 bg-white/46 text-[color:var(--foreground)] backdrop-blur-xl shadow-[0_10px_24px_rgba(110,103,130,0.06)] hover:-translate-y-0.5 hover:bg-white/58 hover:shadow-[0_14px_28px_rgba(110,103,130,0.08)]",
+        ghost: "border-transparent bg-transparent text-[color:var(--foreground)] hover:bg-white/32 hover:backdrop-blur-lg"
       }
     },
     defaultVariants: {

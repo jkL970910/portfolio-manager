@@ -18,6 +18,7 @@ export interface UserRepository {
   getById(userId: EntityId): Promise<UserProfile>;
   findByEmail(email: string): Promise<AuthUserRecord | null>;
   updateBaseCurrency(userId: EntityId, currency: UserProfile["baseCurrency"]): Promise<UserProfile>;
+  updateDisplayLanguage(userId: EntityId, language: UserProfile["displayLanguage"]): Promise<UserProfile>;
 }
 
 export interface AccountRepository {

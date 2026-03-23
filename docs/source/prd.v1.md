@@ -6,6 +6,8 @@ This PRD defines the first shippable version of Portfolio Manager, a web applica
 
 This version is not a full personal finance replacement. It is a portfolio decision-support product with light wealth and spending visibility that supports the contribution workflow.
 
+In Chinese mode, the product also adds a branded Loo国 citizen identity layer for login, registration, and profile display. This changes onboarding and profile presentation, but does not replace the underlying account system.
+
 ## 2. Contacts
 
 | Name | Role | Comment |
@@ -33,6 +35,7 @@ Why now:
 - spreadsheet-based portfolio review is slow and error-prone
 - import-first MVPs are now practical without waiting for bank-grade integrations
 - beginners need help setting a target allocation before recommendation systems feel trustworthy
+- the Chinese-language experience now needs a distinct branded identity layer without breaking the standard English product flow
 
 ## 4. Objective
 
@@ -167,6 +170,13 @@ Page roles:
 - Import: account setup, CSV upload, field mapping, correction flow
 - Settings: investment preferences, guided allocation setup, account priorities, recommendation behavior
 
+Chinese-mode identity layer:
+
+- Login becomes "enter Loo国"
+- Registration becomes "apply to join Loo国"
+- Settings includes a citizen profile section with an ID-card presentation
+- English mode keeps the standard Portfolio Manager auth and profile flow
+
 ### 7.3 Key Features
 
 #### Feature 1: Account and Holdings Import
@@ -272,6 +282,20 @@ Acceptance criteria:
   - Account Efficiency
   - Position Concentration
   - Risk Alignment
+
+#### Feature 10: Chinese-Mode Citizen Identity Layer
+
+Description:
+- Add a Chinese-only branded citizen identity layer for login, registration, and profile display
+- Registration issues a Loo国 citizen card and stores a citizen profile
+- Login and Settings can display the citizen card and effective rank information
+
+Acceptance criteria:
+- Chinese login page can render an ID-card style login form inside the default citizen template
+- Chinese registration flow captures citizen name, gender, and birth date, plus agreement to Loo国 terms
+- Registration success shows an issued citizen card modal before the user manually enters the product
+- Settings includes a citizen profile section with effective rank, address, and citizen ID
+- English mode remains a standard Portfolio Manager auth/profile flow without Loo国 narration
 
 ### 7.4 Technology
 

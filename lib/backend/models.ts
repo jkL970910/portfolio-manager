@@ -1,5 +1,10 @@
 export type EntityId = string;
 export type CurrencyCode = "CAD" | "USD";
+export type DisplayLanguage = "zh" | "en";
+export type CitizenGender = "male" | "female";
+export type CitizenRank = "lowly-ox" | "base-loo" | "citizen" | "general" | "emperor";
+export type CitizenAddressTier = "cowshed" | "suburbs" | "city" | "palace-gate" | "bedchamber";
+export type CitizenAvatarType = "default" | "male" | "female" | "emperor";
 
 export type AccountType = "TFSA" | "RRSP" | "FHSA" | "Taxable";
 export type RiskProfile = "Conservative" | "Balanced" | "Growth";
@@ -16,6 +21,28 @@ export interface UserProfile {
   email: string;
   displayName: string;
   baseCurrency: CurrencyCode;
+  displayLanguage: DisplayLanguage;
+}
+
+export interface CitizenProfile {
+  id: EntityId;
+  userId: EntityId;
+  citizenName: string;
+  gender: CitizenGender | null;
+  birthDate: string | null;
+  avatarType: CitizenAvatarType;
+  derivedRank: CitizenRank;
+  derivedAddressTier: CitizenAddressTier;
+  derivedIdCode: string;
+  overrideRank: CitizenRank | null;
+  overrideAddressTier: CitizenAddressTier | null;
+  overrideIdCode: string | null;
+  effectiveRank: CitizenRank;
+  effectiveAddressTier: CitizenAddressTier;
+  effectiveIdCode: string;
+  wealthScoreSnapshotCad: number;
+  issuedAt: string;
+  updatedAt: string;
 }
 
 export interface InvestmentAccount {

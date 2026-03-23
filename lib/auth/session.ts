@@ -1,13 +1,14 @@
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { getRepositories } from "@/lib/backend/repositories/factory";
-import type { CurrencyCode } from "@/lib/backend/models";
+import type { CurrencyCode, DisplayLanguage } from "@/lib/backend/models";
 
 export interface Viewer {
   id: string;
   email: string;
   displayName: string;
   baseCurrency: CurrencyCode;
+  displayLanguage: DisplayLanguage;
 }
 
 export async function getViewerOrNull(): Promise<Viewer | null> {
@@ -24,7 +25,8 @@ export async function getViewerOrNull(): Promise<Viewer | null> {
     id: viewer.id,
     email: viewer.email,
     displayName: viewer.displayName,
-    baseCurrency: viewer.baseCurrency
+    baseCurrency: viewer.baseCurrency,
+    displayLanguage: viewer.displayLanguage
   };
 }
 

@@ -16,7 +16,7 @@ Use it before building or changing any product UI. The goal is consistency, not 
 
 ## Core Direction
 
-- Visual direction: iOS-16-inspired liquid glass layered over a pastel wealth dashboard
+- Visual direction: iOS-16-inspired frosted glass layered over a pastel wealth dashboard
 - Layout style: dense but readable dashboards, clear visual grouping, low-noise surfaces
 - Interaction style: explicit, calm, low motion, polished transitions
 - Mascot strategy: use an original Loo companion presence in branding, onboarding, empty states, and summaries; do not insert mascot noise into dense analytical tables
@@ -93,7 +93,7 @@ Use it before building or changing any product UI. The goal is consistency, not 
 - Header padding: `px-6 pt-6`
 - Content padding: `px-6 pb-6 pt-4`
 - Keep card interiors structured; avoid dumping unrelated sections into a single card
-- Liquid glass shader effects are opt-in accent treatments, not the default card surface
+- Shader-driven liquid treatments are not part of the active system; default to CSS frosted glass surfaces
 
 ### Badge
 
@@ -106,7 +106,7 @@ Use it before building or changing any product UI. The goal is consistency, not 
 - Use pill navigation with clear active state
 - Global display-currency explanation belongs in the toggle popover, not repeated in page bodies
 - Header remains sticky and slightly compresses on scroll
-- If `LiquidGlassShell` is used in navigation, keep it to small bounded controls only
+- Navigation should use CSS-based frosted pills and popovers, not third-party shader glass
 
 ### Finance-Specific UI
 
@@ -139,7 +139,7 @@ Before creating a new component:
 - Do not hard-code `CAD` into user-facing labels unless the field is genuinely CAD-based
 - Do not use decorative gradients, glows, or motion that reduce data clarity
 - Do not mix surface depths randomly
-- Do not replace all analytical cards with shader-driven liquid glass; reserve it for small emphasis surfaces
+- Do not introduce third-party shader glass into the default product surfaces; favor CSS blur, soft borders, and restrained shadows
 
 ## New Component Checklist
 

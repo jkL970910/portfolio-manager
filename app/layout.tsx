@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import { Nunito_Sans } from "next/font/google";
+import { buildMetadataCopy } from "@/lib/i18n/ui";
+import { getRequestDisplayLanguage } from "@/lib/i18n/server";
 import "./globals.css";
 
 const nunitoSans = Nunito_Sans({
@@ -8,18 +10,24 @@ const nunitoSans = Nunito_Sans({
   weight: ["300", "400", "500", "600", "700", "800"]
 });
 
-export const metadata: Metadata = {
-  title: "Loo国的财富宝库",
-  description: "A softer glassmorphism wealth dashboard for portfolio analysis, spending visibility, and recommendation workflows."
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const language = await getRequestDisplayLanguage();
+  const copy = buildMetadataCopy(language);
+  return {
+    title: copy.title,
+    description: copy.description
+  };
+}
 
-export default function RootLayout({
+export default async function RootLayout({
   children
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const language = await getRequestDisplayLanguage();
+
   return (
-    <html lang="en">
+    <html lang={language === "zh" ? "zh-CN" : "en"}>
       <body className={`${nunitoSans.variable} font-[family:var(--font-nunito-sans)] antialiased`}>
         {children}
       </body>
