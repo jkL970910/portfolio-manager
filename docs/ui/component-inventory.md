@@ -26,6 +26,7 @@
 | MascotAsset | stable | [mascot-asset.tsx](E:\Projects\Portfolio%20Manager\components\brand\mascot-asset.tsx) | Wrapper for user-supplied mascot images stored in `public/mascot` |
 | CitizenIdentityCard | stable | [citizen-identity-card.tsx](E:\Projects\Portfolio%20Manager\components\auth\citizen-identity-card.tsx) | Shared structured ID-card surface for the Chinese Loo国 citizen flow, with embedded auth-field support and visual stamps |
 | LooTermsDialog | stable | [loo-terms-dialog.tsx](E:\Projects\Portfolio%20Manager\components\auth\loo-terms-dialog.tsx) | Shared terms / oath modal for Chinese-mode auth |
+| LooApprovalDialog | stable | [loo-approval-dialog.tsx](E:\Projects\Portfolio%20Manager\components\auth\loo-approval-dialog.tsx) | Shared Chinese-mode approval / issuance modal used for citizen registration results |
 | AppShell | stable | [app-shell.tsx](E:\Projects\Portfolio%20Manager\components\layout\app-shell.tsx) | Shared page shell |
 | FloatingHeaderFrame | stable | [floating-header-frame.tsx](E:\Projects\Portfolio%20Manager\components\layout\floating-header-frame.tsx) | Shared sticky header behavior |
 | LineChartCard | stable | [line-chart.tsx](E:\Projects\Portfolio%20Manager\components\charts\line-chart.tsx) | Shared trend chart shell |
@@ -47,7 +48,7 @@
 | RecommendationRunPanel | domain | [recommendation-run-panel.tsx](E:\Projects\Portfolio%20Manager\components\recommendations\recommendation-run-panel.tsx) | Recommendation generation action |
 | PreferencesWorkbench | domain | [preferences-workbench.tsx](E:\Projects\Portfolio%20Manager\components\settings\preferences-workbench.tsx) | Guided + manual settings workflow |
 | ChineseLoginPanel | domain | [chinese-login-panel.tsx](E:\Projects\Portfolio%20Manager\components\auth\chinese-login-panel.tsx) | Chinese-mode citizen identity gate for login |
-| ChineseRegisterPanel | domain | [chinese-register-panel.tsx](E:\Projects\Portfolio%20Manager\components\auth\chinese-register-panel.tsx) | Chinese-mode citizen application flow with gender preview and Loo皇 approval / rejection modals |
+| ChineseRegisterPanel | domain | [chinese-register-panel.tsx](E:\Projects\Portfolio%20Manager\components\auth\chinese-register-panel.tsx) | Chinese-mode citizen application flow with gender cards and shared Loo皇 approval / rejection dialogs |
 | CitizenProfilePanel | domain | [citizen-profile-panel.tsx](E:\Projects\Portfolio%20Manager\components\settings\citizen-profile-panel.tsx) | Chinese-mode citizen archive with admin override controls |
 
 ## Extraction Candidates

@@ -183,6 +183,14 @@ components/
 - Use when:
   - login and register require explicit acceptance of `Loo国条例`
 
+### `LooApprovalDialog`
+
+- File: [loo-approval-dialog.tsx](E:\Projects\Portfolio%20Manager\components\auth\loo-approval-dialog.tsx)
+- Purpose: shared approval / issuance modal for Chinese-mode `Loo国` auth flows
+- Use when:
+  - registration succeeds and a citizen ID must be issued
+  - registration or review fails and the user needs a branded rejection surface
+
 ### `ChineseLoginPanel`
 
 - File: [chinese-login-panel.tsx](E:\Projects\Portfolio%20Manager\components\auth\chinese-login-panel.tsx)

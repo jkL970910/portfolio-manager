@@ -72,9 +72,7 @@ export function CitizenIdentityCard({
                 <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-[color:var(--muted-foreground)]">
                   {language === "zh" ? "公民姓名" : "Citizen name"}
                 </p>
-                <h3 className="mt-2 text-[28px] font-semibold tracking-[-0.04em] text-[color:var(--foreground)]">
-                  {title}
-                </h3>
+                <h3 className="mt-2 text-[28px] font-semibold tracking-[-0.04em] text-[color:var(--foreground)]">{title}</h3>
               </div>
 
               <div className="grid gap-3 sm:grid-cols-2">
@@ -126,17 +124,13 @@ export function CitizenIdentityCard({
               <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-[color:var(--muted-foreground)]">
                 {issueLabel ?? (language === "zh" ? "发证时间" : "Issued")}
               </p>
-              <p className="mt-2 text-sm font-semibold text-[color:var(--foreground)]">
-                {issueValue ?? "--"}
-              </p>
+              <p className="mt-2 text-sm font-semibold text-[color:var(--foreground)]">{issueValue ?? "--"}</p>
             </div>
             <div className="rounded-[18px] bg-white/58 px-4 py-3 backdrop-blur-xl">
               <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-[color:var(--muted-foreground)]">
                 {language === "zh" ? "公民编号" : "Citizen ID"}
               </p>
-              <p className="mt-2 text-sm font-bold tracking-[0.18em] text-[color:var(--foreground)]">
-                {idCode}
-              </p>
+              <p className="mt-2 text-sm font-bold tracking-[0.18em] text-[color:var(--foreground)]">{idCode}</p>
             </div>
           </div>
         </div>
@@ -164,9 +158,7 @@ function FieldBlock({
 
   return (
     <div className={cn("rounded-[22px] border border-white/70 px-4 py-3 shadow-[0_12px_22px_rgba(110,103,130,0.06)]", backgrounds[tint])}>
-      <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-[color:var(--muted-foreground)]">
-        {label}
-      </p>
+      <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-[color:var(--muted-foreground)]">{label}</p>
       <p className="mt-2 text-sm font-semibold text-[color:var(--foreground)]">{value}</p>
     </div>
   );
