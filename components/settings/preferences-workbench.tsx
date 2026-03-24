@@ -73,6 +73,8 @@ type ManualSectionMeta = {
   badge?: string;
 };
 
+type WorkspaceMode = "current" | "guided" | "manual";
+
 function getGuidedStepMeta(language: DisplayLanguage) {
   return [
     { id: 0, title: pick(language, "步骤 1", "Step 1"), label: pick(language, "目标与期限", "Goal & horizon") },
@@ -190,7 +192,7 @@ function buildGuidedDraft(answers: GuidedAllocationAnswers): GuidedDraft {
   };
 }
 
-function buildPayload(form: FormState) {
+function buildPayload(form: FormState, source: PreferenceProfile["source"] = "manual") {
   return {
     riskProfile: form.riskProfile,
     targetAllocation: form.targetAllocation.map((target) => ({
@@ -202,6 +204,7 @@ function buildPayload(form: FormState) {
     cashBufferTargetCad: Number(form.cashBufferTargetCad),
     transitionPreference: form.transitionPreference,
     recommendationStrategy: form.recommendationStrategy,
+    source,
     rebalancingTolerancePct: Number(form.rebalancingTolerancePct),
     watchlistSymbols: form.watchlistSymbols
       .split(",")
@@ -224,6 +227,15 @@ function formatDraftSavedAt(value: string | null, language: DisplayLanguage) {
     dateStyle: "medium",
     timeStyle: "short"
   }).format(date);
+}
+
+function getProfileSourceLabel(
+  source: PreferenceProfile["source"],
+  language: DisplayLanguage
+) {
+  return source === "guided"
+    ? pick(language, "引导式配置", "Guided setup")
+    : pick(language, "手动配置", "Manual configuration");
 }
 
 function getManualSectionSummary(section: ManualSectionId, form: FormState, currentTargetTotal: number, language: DisplayLanguage) {
@@ -321,6 +333,7 @@ export function PreferencesWorkbench({
   const [guidedDraftSavedAt, setGuidedDraftSavedAt] = useState<string | null>(() => initialGuidedDraft?.updatedAt ?? null);
   const [guidedStep, setGuidedStep] = useState(0);
   const [openManualSection, setOpenManualSection] = useState<ManualSectionId>("overview");
+  const [activeWorkspace, setActiveWorkspace] = useState<WorkspaceMode>("current");
 
   const currentTargetTotal = useMemo(
     () => form.targetAllocation.reduce((sum, target) => sum + Number(target.targetPct || 0), 0),
@@ -329,6 +342,8 @@ export function PreferencesWorkbench({
   const guidedDraft = useMemo(() => buildGuidedDraft(guidedAnswers), [guidedAnswers]);
   const manualSectionMeta = useMemo(() => getManualSectionMeta(language, manualGroups), [language, manualGroups]);
   const guidedStepMeta = useMemo(() => getGuidedStepMeta(language), [language]);
+  const liveProfileSavedAt = useMemo(() => formatDraftSavedAt(initialProfile.updatedAt ?? null, language), [initialProfile.updatedAt, language]);
+  const liveProfileSource = useMemo(() => getProfileSourceLabel(initialProfile.source ?? "manual", language), [initialProfile.source, language]);
 
   function updateAllocation(assetClass: string, targetPct: number) {
     setForm((current) => ({
@@ -363,13 +378,14 @@ export function PreferencesWorkbench({
       rebalancingTolerancePct: guidedDraft.rebalancingTolerancePct
     }));
     setOpenManualSection("overview");
+    setActiveWorkspace("manual");
     setStatus({
       type: "success",
       message: pick(language, "引导式配置草稿已加载到手动设置。检查折叠项后再保存。", "Guided allocation draft loaded into manual configuration. Review the collapsed sections and save when ready.")
     });
   }
 
-  function persistProfile(nextForm: FormState, successMessage: string) {
+  function persistProfile(nextForm: FormState, successMessage: string, source: PreferenceProfile["source"] = "manual") {
     setStatus({ type: "idle", message: "" });
     startTransition(async () => {
       const response = await fetch("/api/settings/preferences", {
@@ -377,7 +393,7 @@ export function PreferencesWorkbench({
         headers: {
           "Content-Type": "application/json"
         },
-        body: JSON.stringify(buildPayload(nextForm))
+        body: JSON.stringify(buildPayload(nextForm, source))
       });
 
       const payload = await safeJson(response);
@@ -387,6 +403,7 @@ export function PreferencesWorkbench({
       }
 
       setForm(nextForm);
+      setActiveWorkspace("current");
       setStatus({ type: "success", message: successMessage });
       router.refresh();
     });
@@ -454,7 +471,7 @@ export function PreferencesWorkbench({
       recommendationStrategy: guidedDraft.recommendationStrategy,
       rebalancingTolerancePct: guidedDraft.rebalancingTolerancePct
     };
-    persistProfile(nextForm, pick(language, "引导草稿已应用并保存到 PostgreSQL。", "Guided allocation draft applied and saved to PostgreSQL."));
+    persistProfile(nextForm, pick(language, "引导草稿已应用并保存到 PostgreSQL。", "Guided allocation draft applied and saved to PostgreSQL."), "guided");
   }
 
   function goToNextGuidedStep() {
@@ -476,7 +493,113 @@ export function PreferencesWorkbench({
         </div>
       ) : null}
 
-      <div className="grid gap-6 xl:grid-cols-2">
+      <div className="space-y-6">
+        <Card className="bg-[linear-gradient(180deg,rgba(255,255,255,0.66),rgba(255,255,255,0.46))]">
+          <CardContent className="space-y-5 px-5 py-5">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <p className="text-sm font-semibold text-[color:var(--foreground)]">{pick(language, "配置工作区", "Configuration workspace")}</p>
+                <p className="mt-1 text-sm text-[color:var(--muted-foreground)]">
+                  {pick(language, "先看当前生效配置，再在需要时切换到引导式或手动编辑。", "Start from the current profile, then switch into guided or manual editing only when needed.")}
+                </p>
+              </div>
+              <div className="inline-flex rounded-full border border-white/60 bg-white/52 p-1 backdrop-blur-xl">
+                {[
+                  { id: "current" as const, label: pick(language, "当前配置", "Current setup") },
+                  { id: "guided" as const, label: pick(language, "引导式配置", "Guided setup") },
+                  { id: "manual" as const, label: pick(language, "手动配置", "Manual setup") }
+                ].map((mode) => (
+                  <button
+                    key={mode.id}
+                    type="button"
+                    onClick={() => setActiveWorkspace(mode.id)}
+                    className={cn(
+                      "rounded-full px-4 py-2 text-sm font-medium transition-colors",
+                      activeWorkspace === mode.id
+                        ? "bg-white text-[color:var(--foreground)] shadow-[var(--shadow-card)]"
+                        : "text-[color:var(--muted-foreground)] hover:text-[color:var(--foreground)]"
+                    )}
+                  >
+                    {mode.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {activeWorkspace === "current" ? (
+              <div className="grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
+                <div className="rounded-[24px] border border-white/55 bg-white/38 p-5 backdrop-blur-md">
+                  <p className="font-semibold text-[color:var(--foreground)]">{pick(language, "当前生效配置", "Current profile")}</p>
+                  <p className="mt-2 text-sm leading-7 text-[color:var(--muted-foreground)]">
+                    {pick(
+                      language,
+                      `${getRiskProfileLabel(form.riskProfile, language)} ? ${getTransitionPreferenceLabel(form.transitionPreference, language)} ? ${getRecommendationStrategyLabel(form.recommendationStrategy, language)}`,
+                      `${getRiskProfileLabel(form.riskProfile, language)} risk, ${getTransitionPreferenceLabel(form.transitionPreference, language)} transition, ${getRecommendationStrategyLabel(form.recommendationStrategy, language)} recommendation strategy.`
+                    )}
+                  </p>
+                  <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                    <div className="rounded-[22px] border border-white/55 bg-white/42 px-4 py-3 backdrop-blur-md">
+                      <p className="text-sm text-[color:var(--muted-foreground)]">{pick(language, "最近保存", "Last saved")}</p>
+                      <p className="mt-2 text-sm font-semibold text-[color:var(--foreground)]">{liveProfileSavedAt}</p>
+                    </div>
+                    <div className="rounded-[22px] border border-white/55 bg-white/42 px-4 py-3 backdrop-blur-md">
+                      <p className="text-sm text-[color:var(--muted-foreground)]">{pick(language, "当前配置来源", "Current setup source")}</p>
+                      <p className="mt-2 text-sm font-semibold text-[color:var(--foreground)]">{liveProfileSource}</p>
+                    </div>
+                  </div>
+                  {guidedDraftSavedAt ? (
+                    <p className="mt-4 text-sm text-[color:var(--muted-foreground)]">
+                      {pick(language, "最近保存的引导草稿：", "Latest guided draft: ")}
+                      {formatDraftSavedAt(guidedDraftSavedAt, language)}
+                    </p>
+                  ) : null}
+                  <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                    <div className="rounded-[22px] border border-white/55 bg-white/42 px-4 py-3 backdrop-blur-md">
+                      <p className="text-sm text-[color:var(--muted-foreground)]">{pick(language, "目标配置", "Target mix")}</p>
+                      <p className="mt-2 text-sm font-semibold text-[color:var(--foreground)]">{currentTargetTotal}% / {form.targetAllocation.length} {pick(language, "个资产袖口", "sleeves")}</p>
+                    </div>
+                    <div className="rounded-[22px] border border-white/55 bg-white/42 px-4 py-3 backdrop-blur-md">
+                      <p className="text-sm text-[color:var(--muted-foreground)]">{pick(language, "资金优先顺序", "Funding order")}</p>
+                      <p className="mt-2 text-sm font-semibold text-[color:var(--foreground)]">{form.accountFundingPriority.map((type) => getAccountTypeLabel(type, language)).join(" -> ")}</p>
+                    </div>
+                    <div className="rounded-[22px] border border-white/55 bg-white/42 px-4 py-3 backdrop-blur-md">
+                      <p className="text-sm text-[color:var(--muted-foreground)]">{pick(language, "现金缓冲", "Cash buffer")}</p>
+                      <p className="mt-2 text-sm font-semibold text-[color:var(--foreground)]">{pick(language, `${form.cashBufferTargetCad.toLocaleString("en-CA")}（规划基准 CAD）`, `${form.cashBufferTargetCad.toLocaleString("en-CA")} CAD`)}</p>
+                    </div>
+                    <div className="rounded-[22px] border border-white/55 bg-white/42 px-4 py-3 backdrop-blur-md">
+                      <p className="text-sm text-[color:var(--muted-foreground)]">{pick(language, "税务感知放置", "Tax-aware placement")}</p>
+                      <p className="mt-2 text-sm font-semibold text-[color:var(--foreground)]">{form.taxAwarePlacement ? pick(language, "已启用", "Enabled") : pick(language, "未启用", "Disabled")}</p>
+                    </div>
+                  </div>
+                </div>
+                <div className="grid gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setActiveWorkspace("guided")}
+                    className="rounded-[24px] border border-white/55 bg-white/42 px-5 py-5 text-left backdrop-blur-md transition-colors hover:bg-white/56"
+                  >
+                    <p className="text-sm font-semibold text-[color:var(--foreground)]">{pick(language, "重新走引导式配置", "Restart guided setup")}</p>
+                    <p className="mt-2 text-sm leading-7 text-[color:var(--muted-foreground)]">
+                      {pick(language, "重新回答问题、生成新的草稿，然后再决定是否替换当前生效配置。", "Walk through the questions again, generate a new draft, then decide whether to replace the current setup.")}
+                    </p>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setActiveWorkspace("manual")}
+                    className="rounded-[24px] border border-white/55 bg-white/42 px-5 py-5 text-left backdrop-blur-md transition-colors hover:bg-white/56"
+                  >
+                    <p className="text-sm font-semibold text-[color:var(--foreground)]">{pick(language, "进入手动配置", "Open manual setup")}</p>
+                    <p className="mt-2 text-sm leading-7 text-[color:var(--muted-foreground)]">
+                      {pick(language, "直接编辑当前生效配置。从总概述开始，只展开你现在真正需要修改的细节组。", "Edit the current profile directly. Start from the overview, then open only the detail groups you need.")}
+                    </p>
+                  </button>
+                </div>
+              </div>
+            ) : null}
+          </CardContent>
+        </Card>
+
+        {activeWorkspace === "guided" ? (
         <Card className="bg-[linear-gradient(180deg,rgba(255,255,255,0.66),rgba(255,255,255,0.46))]">
           <CardHeader>
             <CardTitle>{pick(language, "引导式配置", "Guided Allocation Setup")}</CardTitle>
@@ -543,7 +666,9 @@ export function PreferencesWorkbench({
             />
           </CardContent>
         </Card>
+        ) : null}
 
+        {activeWorkspace === "manual" ? (
         <Card className="bg-[linear-gradient(180deg,rgba(255,255,255,0.66),rgba(255,255,255,0.46))]">
           <CardHeader>
             <CardTitle>{pick(language, "手动配置", "Manual Configuration")}</CardTitle>
@@ -739,6 +864,7 @@ export function PreferencesWorkbench({
             </Button>
           </CardContent>
         </Card>
+        ) : null}
       </div>
     </div>
   );

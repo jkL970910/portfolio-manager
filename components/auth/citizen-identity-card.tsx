@@ -1,8 +1,7 @@
 ﻿"use client";
 
 import Image from "next/image";
-import { useEffect, useRef, useState, type ReactNode } from "react";
-import { X } from "lucide-react";
+import type { ReactNode } from "react";
 import type { CitizenAddressTier, CitizenRank, DisplayLanguage } from "@/lib/backend/models";
 import { MascotAsset, type MascotAssetName } from "@/components/brand/mascot-asset";
 import { Badge } from "@/components/ui/badge";
@@ -14,7 +13,7 @@ type CitizenField = {
   value: string;
 };
 
-type ActiveStamp = "rank" | "address" | null;
+type StampType = "rank" | "address";
 
 export function CitizenIdentityCard({
   title,
@@ -30,8 +29,8 @@ export function CitizenIdentityCard({
   language = "zh",
   rankVisualSrc,
   addressVisualSrc,
-  rankValue,
-  addressTier
+  stampInteraction = "static",
+  onStampSelect
 }: {
   title: string;
   subtitle?: string;
@@ -48,40 +47,14 @@ export function CitizenIdentityCard({
   addressVisualSrc?: string | null;
   rankValue?: CitizenRank | null;
   addressTier?: CitizenAddressTier | null;
+  stampInteraction?: "static" | "modal";
+  onStampSelect?: (stamp: StampType) => void;
 }) {
   const leadingFields = fields.slice(0, 2);
   const trailingFields = fields.slice(2, 4);
-  const rootRef = useRef<HTMLDivElement | null>(null);
-  const [activeStamp, setActiveStamp] = useState<ActiveStamp>(null);
-
-  useEffect(() => {
-    function handlePointerDown(event: MouseEvent) {
-      if (!rootRef.current) {
-        return;
-      }
-      if (!rootRef.current.contains(event.target as Node)) {
-        setActiveStamp(null);
-      }
-    }
-
-    document.addEventListener("mousedown", handlePointerDown);
-    return () => document.removeEventListener("mousedown", handlePointerDown);
-  }, []);
-
-  useEffect(() => {
-    function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") {
-        setActiveStamp(null);
-      }
-    }
-
-    document.addEventListener("keydown", handleKeyDown);
-    return () => document.removeEventListener("keydown", handleKeyDown);
-  }, []);
 
   return (
     <div
-      ref={rootRef}
       className={cn(
         "relative overflow-hidden rounded-[34px] bg-[linear-gradient(135deg,rgba(156,204,255,0.55),rgba(248,205,229,0.62),rgba(255,234,199,0.54))] p-[2px] shadow-[0_22px_48px_rgba(96,88,120,0.16)]",
         className
@@ -131,10 +104,8 @@ export function CitizenIdentityCard({
                     src={rankVisualSrc}
                     alt="Citizen rank visual"
                     title={pick(language, "身份等级", "Citizen rank")}
-                    description={getRankFlavorText(rankValue, language)}
-                    open={activeStamp === "rank"}
-                    onToggle={() => setActiveStamp((current) => (current === "rank" ? null : "rank"))}
-                    language={language}
+                    interactive={stampInteraction === "modal"}
+                    onSelect={onStampSelect ? () => onStampSelect("rank") : undefined}
                   />
                 ) : null}
                 {addressVisualSrc ? (
@@ -143,10 +114,8 @@ export function CitizenIdentityCard({
                     src={addressVisualSrc}
                     alt="Citizen address visual"
                     title={pick(language, "Loo国住址", "Loo residence")}
-                    description={getAddressFlavorText(addressTier, language)}
-                    open={activeStamp === "address"}
-                    onToggle={() => setActiveStamp((current) => (current === "address" ? null : "address"))}
-                    language={language}
+                    interactive={stampInteraction === "modal"}
+                    onSelect={onStampSelect ? () => onStampSelect("address") : undefined}
                   />
                 ) : null}
               </div>
@@ -217,104 +186,32 @@ function StampTrigger({
   src,
   alt,
   title,
-  description,
-  open,
-  onToggle,
-  language
+  interactive,
+  onSelect
 }: {
   side: "left" | "right";
   src: string;
   alt: string;
   title: string;
-  description: string;
-  open: boolean;
-  onToggle: () => void;
-  language: DisplayLanguage;
+  interactive: boolean;
+  onSelect?: () => void;
 }) {
   return (
     <div className={cn("group/stamp absolute -bottom-3 z-20", side === "left" ? "left-5" : "right-5")}>
       <button
         type="button"
-        onClick={onToggle}
+        onClick={interactive ? onSelect : undefined}
         className={cn(
-          "rounded-full border-2 border-white/90 bg-[linear-gradient(135deg,rgba(255,255,255,0.94),rgba(255,243,247,0.88))] px-2 py-2 shadow-[0_12px_24px_rgba(110,103,130,0.16)] transition-transform duration-150 hover:scale-110 focus-visible:scale-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--ring)]",
-          open ? "scale-110" : ""
+          "rounded-full border-2 border-white/90 bg-[linear-gradient(135deg,rgba(255,255,255,0.94),rgba(255,243,247,0.88))] px-2 py-2 shadow-[0_12px_24px_rgba(110,103,130,0.16)] transition-transform duration-150 hover:scale-110 focus-visible:scale-110 focus-visible:outline-none",
+          interactive ? "cursor-pointer focus-visible:ring-2 focus-visible:ring-[color:var(--ring)]" : "cursor-default"
         )}
         aria-label={title}
-        aria-expanded={open}
+        aria-haspopup={interactive ? "dialog" : undefined}
       >
         <div className="h-10 w-10 overflow-hidden rounded-full">
           <Image src={src} alt={alt} width={80} height={80} className="h-full w-full object-cover" unoptimized />
         </div>
       </button>
-      {open ? (
-        <div
-          className={cn(
-            "absolute bottom-[calc(100%+14px)] z-30 w-64 rounded-[24px] border border-white/72 bg-white/90 p-4 text-left shadow-[0_20px_40px_rgba(110,103,130,0.14)] backdrop-blur-2xl",
-            side === "left" ? "left-0" : "right-0"
-          )}
-        >
-          <div
-            className={cn(
-              "absolute top-full h-3 w-3 -translate-y-1/2 rotate-45 border-b border-r border-white/72 bg-white/90",
-              side === "left" ? "left-8" : "right-8"
-            )}
-          />
-          <div className="flex items-start gap-3">
-            <div className="h-16 w-16 overflow-hidden rounded-[18px] border border-white/70 bg-white/72 shadow-[0_10px_20px_rgba(110,103,130,0.08)]">
-              <Image src={src} alt={alt} width={128} height={128} className="h-full w-full object-cover" unoptimized />
-            </div>
-            <div className="min-w-0 flex-1">
-              <div className="flex items-start justify-between gap-2">
-                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[color:var(--muted-foreground)]">{title}</p>
-                <button
-                  type="button"
-                  onClick={onToggle}
-                  className="inline-flex h-6 w-6 items-center justify-center rounded-full border border-white/70 bg-white/72 text-[color:var(--muted-foreground)] transition-colors hover:text-[color:var(--foreground)]"
-                  aria-label={pick(language, "关闭说明", "Close details")}
-                >
-                  <X className="h-3.5 w-3.5" />
-                </button>
-              </div>
-              <p className="mt-2 text-sm leading-6 text-[color:var(--foreground)]">{description}</p>
-            </div>
-          </div>
-        </div>
-      ) : null}
     </div>
   );
-}
-
-function getRankFlavorText(rank: CitizenRank | null | undefined, language: DisplayLanguage) {
-  switch (rank) {
-    case "lowly-ox":
-      return pick(language, "刚入籍的基层公民，目前多在牛棚劳作，离真正的宝库核心还很远。", "A newly admitted citizen still working from the outer barn, far from the vault core.");
-    case "base-loo":
-      return pick(language, "已经离开牛棚，搬进了 Loo国郊区，开始拥有更稳定的国库资格。", "Past the barn phase and now living in the Loo suburbs with a steadier place in the treasury.");
-    case "citizen":
-      return pick(language, "正式 Loo国子民，可以在城内安家，也更接近核心财富配置权。", "A full citizen of Loo with city access and a stronger place in the capital allocation order.");
-    case "general":
-      return pick(language, "Loo皇大将军，已被视为宝库核心战力，距离皇殿只差一步。", "A Grand General of Loo, treated as core treasury strength and one step from the palace.");
-    case "emperor":
-      return pick(language, "由管理员特批的最高等级，拥有 Loo皇级别的专属身份与最稀缺编号。", "The admin-only highest class, carrying emperor-level status and the rarest ID numbers.");
-    default:
-      return pick(language, "这枚章记录你当前在 Loo国的身份等级。", "This stamp shows your current rank inside Loo.");
-  }
-}
-
-function getAddressFlavorText(addressTier: CitizenAddressTier | null | undefined, language: DisplayLanguage) {
-  switch (addressTier) {
-    case "cowshed":
-      return pick(language, "宝库之外的起点住址，说明当前资产还停留在最早期的观察阶段。", "The outer starting address, used when assets are still at the earliest stage.");
-    case "suburbs":
-      return pick(language, "Loo国郊区，说明你已通过最基础的资产门槛。", "The Loo suburbs, showing that you have crossed the initial wealth threshold.");
-    case "city":
-      return pick(language, "Loo国城内，代表你已经是稳定的国库居民。", "Inner Loo City, marking you as a stable resident of the treasury.");
-    case "palace-gate":
-      return pick(language, "Loo皇殿前，意味着你的资产规模已经接近核心层。", "Before the palace gate, meaning your assets are now near the inner core.");
-    case "bedchamber":
-      return pick(language, "Loo皇寝宫，仅向最高等级开放。", "The Emperor's Chamber, reserved for the highest class only.");
-    default:
-      return pick(language, "这枚住址章会随着你的资产等级自动变化。", "This residence stamp changes automatically with your wealth tier.");
-  }
 }

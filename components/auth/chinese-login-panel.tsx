@@ -87,7 +87,7 @@ export function ChineseLoginPanel({
     >
       <div className="space-y-4">
         <p className="text-sm leading-7 text-[color:var(--muted-foreground)]">
-          想要使用 Loo国宝库，就必须先成为 Loo国公民。
+          只有Loo国公民才能使用伟大Loo皇提供的金库。
         </p>
         {error ? (
           <div className="rounded-[20px] border border-[#f1bcc8] bg-white/66 px-4 py-3 text-sm text-[#a34a64]">

@@ -15,6 +15,7 @@ export const preferenceProfileInputSchema = z.object({
   cashBufferTargetCad: z.number().min(0).max(1000000),
   transitionPreference: z.enum(["stay-close", "gradual", "direct"]),
   recommendationStrategy: z.enum(["tax-aware", "target-first", "balanced"]),
+  source: z.enum(["manual", "guided"]).optional(),
   rebalancingTolerancePct: z.number().int().min(0).max(50),
   watchlistSymbols: z.array(z.string().trim().min(1).max(32)).max(20)
 }).superRefine((value, context) => {

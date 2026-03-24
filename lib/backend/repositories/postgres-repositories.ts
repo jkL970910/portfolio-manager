@@ -204,8 +204,10 @@ export const postgresRepositories: BackendRepositories = {
         cashBufferTargetCad: toNumber(profileRow.cashBufferTargetCad),
         transitionPreference: profileRow.transitionPreference as PreferenceProfile["transitionPreference"],
         recommendationStrategy: profileRow.recommendationStrategy as PreferenceProfile["recommendationStrategy"],
+        source: (profileRow.source as PreferenceProfile["source"]) ?? "manual",
         rebalancingTolerancePct: profileRow.rebalancingTolerancePct,
-        watchlistSymbols: profileRow.watchlistSymbols as string[]
+        watchlistSymbols: profileRow.watchlistSymbols as string[],
+        updatedAt: profileRow.updatedAt.toISOString()
       };
     }
   },

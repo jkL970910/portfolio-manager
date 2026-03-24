@@ -10,6 +10,7 @@ export type AccountType = "TFSA" | "RRSP" | "FHSA" | "Taxable";
 export type RiskProfile = "Conservative" | "Balanced" | "Growth";
 export type TransitionPreference = "stay-close" | "gradual" | "direct";
 export type RecommendationStrategy = "tax-aware" | "target-first" | "balanced";
+export type PreferenceProfileSource = "manual" | "guided";
 export type GuidedAllocationGoal = "retirement" | "home" | "wealth" | "capital-preservation";
 export type GuidedAllocationHorizon = "short" | "medium" | "long";
 export type GuidedAllocationVolatility = "low" | "medium" | "high";
@@ -106,8 +107,10 @@ export interface PreferenceProfile {
   cashBufferTargetCad: number;
   transitionPreference: TransitionPreference;
   recommendationStrategy: RecommendationStrategy;
+  source?: PreferenceProfileSource | null;
   rebalancingTolerancePct: number;
   watchlistSymbols: string[];
+  updatedAt?: string | null;
 }
 
 export interface GuidedAllocationAnswers {

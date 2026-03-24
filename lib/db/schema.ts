@@ -106,6 +106,7 @@ export const preferenceProfiles = pgTable("preference_profiles", {
   cashBufferTargetCad: numeric("cash_buffer_target_cad", { precision: 14, scale: 2 }).notNull(),
   transitionPreference: varchar("transition_preference", { length: 32 }).notNull(),
   recommendationStrategy: varchar("recommendation_strategy", { length: 32 }).notNull(),
+  source: varchar("source", { length: 16 }).notNull().default("manual"),
   rebalancingTolerancePct: integer("rebalancing_tolerance_pct").notNull(),
   watchlistSymbols: jsonb("watchlist_symbols").notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),

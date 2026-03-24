@@ -96,6 +96,12 @@ Use this when you want to onboard one account at a time.
 8. Review parsed counts and row-level issues
 9. Click `Confirm guided setup` to run the real merge import
 
+Template:
+
+```text
+/templates/single-account-import-template.csv
+```
+
 #### Manual Entry
 
 Use this when you want to add holdings without a broker export.
@@ -306,4 +312,5 @@ From these, the importer can derive:
 - gain/loss percentage
 
 This is a better foundation for future live-price integrations and reduces manual entry mistakes.
+
 

@@ -15,6 +15,7 @@ import {
   GuidedAllocationAnswers,
   GuidedAllocationDraft,
   PreferenceProfile,
+  PreferenceProfileSource,
   RecommendationRun,
   RiskProfile,
   TransitionPreference,
@@ -56,6 +57,7 @@ export interface PreferenceProfileInput {
   cashBufferTargetCad: number;
   transitionPreference: TransitionPreference;
   recommendationStrategy: RecommendationStrategy;
+  source?: PreferenceProfileSource;
   rebalancingTolerancePct: number;
   watchlistSymbols: string[];
 }
@@ -214,6 +216,7 @@ function getDefaultPreferenceInput(riskProfile: RiskProfile = "Balanced"): Prefe
     cashBufferTargetCad: 10000,
     transitionPreference: "gradual",
     recommendationStrategy: "balanced",
+    source: "manual",
     rebalancingTolerancePct: 5,
     watchlistSymbols: []
   };
@@ -354,10 +357,20 @@ async function ensureCitizenProfile(userId: string, options?: {
 }
 
 function getAdminEmails() {
-  return (process.env.ADMIN_EMAILS ?? "")
+  const configured = (process.env.ADMIN_EMAILS ?? "")
     .split(",")
     .map((value) => value.trim().toLowerCase())
     .filter(Boolean);
+
+  if (configured.length > 0) {
+    return configured;
+  }
+
+  if (process.env.NODE_ENV !== "production") {
+    return ["jiekun@example.com", "casey@example.com"];
+  }
+
+  return [];
 }
 
 export async function isViewerAdmin(userId: string) {
@@ -1094,6 +1107,7 @@ export async function updatePreferenceProfile(userId: string, input: PreferenceP
         cashBufferTargetCad: input.cashBufferTargetCad.toFixed(2),
         transitionPreference: input.transitionPreference,
         recommendationStrategy: input.recommendationStrategy,
+        source: input.source ?? "manual",
         rebalancingTolerancePct: input.rebalancingTolerancePct,
         watchlistSymbols: input.watchlistSymbols,
         updatedAt: new Date()
@@ -1122,8 +1136,10 @@ export async function updatePreferenceProfile(userId: string, input: PreferenceP
       cashBufferTargetCad: input.cashBufferTargetCad,
       transitionPreference: input.transitionPreference,
       recommendationStrategy: input.recommendationStrategy,
+      source: input.source ?? "manual",
       rebalancingTolerancePct: input.rebalancingTolerancePct,
-      watchlistSymbols: input.watchlistSymbols
+      watchlistSymbols: input.watchlistSymbols,
+      updatedAt: new Date().toISOString()
     };
   });
 }
@@ -1167,6 +1183,7 @@ export async function registerUserWithCitizenProfile(input: RegisterUserInput): 
         cashBufferTargetCad: defaultPreferences.cashBufferTargetCad.toFixed(2),
         transitionPreference: defaultPreferences.transitionPreference,
         recommendationStrategy: defaultPreferences.recommendationStrategy,
+        source: defaultPreferences.source ?? "manual",
         rebalancingTolerancePct: defaultPreferences.rebalancingTolerancePct,
         watchlistSymbols: defaultPreferences.watchlistSymbols
       })

@@ -6,6 +6,7 @@ import {
   ArrowRight,
   CheckCircle2,
   Database,
+  Download,
   Eye,
   FolderInput,
   LoaderCircle,
@@ -1661,6 +1662,24 @@ function StepProvideSource(props: {
             <p className="mt-2 text-sm text-[color:var(--muted-foreground)]">
               {pick(language, "上传一个账户专用的 CSV，先复核解析结果，再在确认时用 merge 模式写入。", "Upload one account-specific CSV, review the parsed rows, then the wizard will run a merge-mode import on confirm.")}
             </p>
+            <div className="mt-4 flex flex-col gap-3 rounded-2xl border border-[color:var(--border)] bg-[color:var(--card-muted)] p-4 sm:flex-row sm:items-center sm:justify-between">
+              <div className="space-y-1">
+                <p className="text-sm font-medium text-[color:var(--foreground)]">
+                  {pick(language, "没有现成导出文件？先下载单账户模板。", "No broker export yet? Start with the single-account template.")}
+                </p>
+                <p className="text-sm text-[color:var(--muted-foreground)]">
+                  {pick(language, "模板只包含一个账户的 account 行和对应 holding 行，适合逐个账户补录。", "The template includes one account row and its holding rows so you can onboard one account at a time.")}
+                </p>
+              </div>
+              <Button
+                href={"/templates/single-account-import-template.csv"}
+                variant="secondary"
+                className="shrink-0"
+                leadingIcon={<Download className="size-4" />}
+              >
+                {pick(language, "下载单账户模板", "Download single-account template")}
+              </Button>
+            </div>
           </div>
           <label className="space-y-2">
             <span className="text-sm font-medium">{pick(language, "上传 CSV", "CSV upload")}</span>
@@ -2136,5 +2155,6 @@ function LooSignal({ title, detail }: { title: string; detail: string }) {
     </div>
   );
 }
+
 
 

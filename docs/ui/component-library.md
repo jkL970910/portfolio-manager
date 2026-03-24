@@ -176,8 +176,19 @@ components/
   - uses a structured ID-card layout inspired by the Figma citizen card template
   - supports embedded children so login/register inputs can live inside the card body
   - supports rank and address visual stamps when matching mascot assets exist
-  - rank and address stamps scale on hover and open richer click popovers with enlarged visuals and world-building copy
-  - only one lore popover should be open at a time, and `Esc` should dismiss it
+  - login and register should keep stamps decorative-only, with hover-scale affordance but no lore popover
+  - Settings owns the deeper lore interaction by opening a centered modal card from the stamp click target
+
+### `CitizenLoreDialog`
+
+- File: [citizen-lore-dialog.tsx](E:\Projects\Portfolio%20Manager\components\settings\citizen-lore-dialog.tsx)
+- Purpose: centered modal card for citizen rank and residence explanations
+- Use when:
+  - a Settings-level citizen stamp needs deeper world-building copy and an enlarged visual
+- Rules:
+  - only one lore dialog should be open at a time
+  - `Esc` and backdrop click must dismiss it
+  - do not reuse it on login/register where auth flow should stay lightweight
 
 ### `LooTermsDialog`
 

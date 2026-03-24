@@ -265,6 +265,7 @@ export const preferenceProfiles: PreferenceProfile[] = [
     cashBufferTargetCad: 12000,
     transitionPreference: "gradual",
     recommendationStrategy: "balanced",
+    source: "manual",
     rebalancingTolerancePct: 4,
     watchlistSymbols: ["XBB", "VCN", "XEF"]
   },
