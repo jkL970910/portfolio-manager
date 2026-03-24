@@ -2,7 +2,6 @@
   AlertTriangle,
   ArrowRight,
   CircleDollarSign,
-  ExternalLink,
   MoveUpRight,
   ShieldCheck,
   TrendingUp
@@ -14,6 +13,7 @@ import { MascotAsset } from "@/components/brand/mascot-asset";
 import { RecommendationSummaryCard } from "@/components/dashboard/recommendation-summary-card";
 import { DonutChartCard } from "@/components/charts/donut-chart";
 import { LineChartCard } from "@/components/charts/line-chart";
+import { RadarPreviewCard } from "@/components/charts/radar-preview";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -85,31 +85,16 @@ export default async function DashboardPage() {
         {data.metrics.slice(0, 3).map((metric) => (
           <MetricCard key={metric.label} label={metric.label} value={metric.value} detail={metric.detail} icon={getMetricIcon(metric.label)} />
         ))}
-        <Card className="bg-[linear-gradient(180deg,rgba(255,255,255,0.66),rgba(255,255,255,0.46))]">
-          <CardHeader className="space-y-3">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[color:var(--muted-foreground)]">{pick(language, "组合健康评分", "Portfolio Health Score")}</p>
-            <Badge variant="neutral">{pick(language, "P1 推出", "Coming in P1")}</Badge>
-          </CardHeader>
-          <CardContent className="space-y-3 pt-2">
-            <div className="grid grid-cols-[96px_1fr] items-center gap-4">
-              <div className="flex h-24 w-24 items-center justify-center rounded-full border border-white/55 bg-[radial-gradient(circle_at_center,rgba(240,143,178,0.2),rgba(255,255,255,0.32)_70%)]">
-                <div className="relative h-16 w-16">
-                  <div className="absolute inset-0 rotate-45 border border-[color:var(--primary)]/35" />
-                  <div className="absolute left-1/2 top-0 h-full w-px -translate-x-1/2 bg-[color:var(--primary)]/20" />
-                  <div className="absolute top-1/2 h-px w-full -translate-y-1/2 bg-[color:var(--primary)]/20" />
-                </div>
-              </div>
-              <div className="space-y-2">
-                <p className="text-[13px] leading-6 text-[color:var(--muted-foreground)]">
-                  {pick(language, "这个分数会衡量组合与目标配置、分散度、账户效率、持仓集中度和风险画像的匹配程度。", "This score will measure how closely your portfolio matches your target allocation, diversification goals, account efficiency, position concentration, and risk profile.")}
-                </p>
-                <Button href="/portfolio" variant="ghost" className="h-auto justify-start px-0 py-0 text-[13px] text-[color:var(--primary)]">
-                  {pick(language, "去组合页预览", "Preview in Portfolio")} <ExternalLink className="h-3.5 w-3.5" />
-                </Button>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+        <RadarPreviewCard
+          title={pick(language, "组合健康评分", "Portfolio Health Score")}
+          status={`${data.healthScore.score}/100 · ${data.healthScore.status}`}
+          description={pick(
+            language,
+            `当前最强维度是 ${data.healthScore.strongestDimension}，最弱维度是 ${data.healthScore.weakestDimension}。`,
+            `Strongest dimension: ${data.healthScore.strongestDimension}. Weakest dimension: ${data.healthScore.weakestDimension}.`
+          )}
+          data={data.healthPreview}
+        />
       </div>
 
       <Card className="border-white/50 bg-[linear-gradient(135deg,rgba(240,143,178,0.18),rgba(111,141,246,0.1),rgba(255,255,255,0.28))]">
@@ -132,7 +117,7 @@ export default async function DashboardPage() {
           title={pick(language, "组合概览", "Portfolio overview")}
           description={pick(language, "账户、配置偏离和当前持仓会先告诉你组合处在什么状态，再决定是否进入更深分析。", "Accounts, allocation drift, and current holdings surface the state of the portfolio before the user opens the deeper analysis pages.")}
         />
-        <div className="grid gap-4 xl:grid-cols-2">
+          <div className="grid gap-4 xl:grid-cols-2">
           <Card>
             <CardHeader>
               <div className="flex items-center justify-between gap-3">
@@ -254,6 +239,18 @@ export default async function DashboardPage() {
             </CardContent>
           </Card>
         </div>
+        <Card>
+          <CardHeader>
+            <CardTitle>{pick(language, "健康评分解读", "Health Score Readout")}</CardTitle>
+          </CardHeader>
+          <CardContent className="grid gap-3 md:grid-cols-3">
+            {data.healthScore.highlights.map((highlight) => (
+              <div key={highlight} className="rounded-[24px] border border-white/55 bg-white/34 p-4 text-sm text-[color:var(--muted-foreground)] backdrop-blur-md">
+                {highlight}
+              </div>
+            ))}
+          </CardContent>
+        </Card>
         <RecommendationSummaryCard
           language={language}
           title={pick(language, "推荐摘要", "Recommendation Summary")}

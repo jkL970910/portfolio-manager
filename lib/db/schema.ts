@@ -140,7 +140,11 @@ export const recommendationRuns = pgTable("recommendation_runs", {
   id: uuid("id").defaultRandom().primaryKey(),
   userId: uuid("user_id").notNull().references(() => users.id),
   contributionAmountCad: numeric("contribution_amount_cad", { precision: 14, scale: 2 }).notNull(),
+  engineVersion: varchar("engine_version", { length: 16 }),
+  objective: varchar("objective", { length: 32 }),
+  confidenceScore: numeric("confidence_score", { precision: 6, scale: 2 }),
   assumptions: jsonb("assumptions").notNull(),
+  notes: jsonb("notes"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow()
 });
 
@@ -150,8 +154,17 @@ export const recommendationItems = pgTable("recommendation_items", {
   assetClass: varchar("asset_class", { length: 64 }).notNull(),
   amountCad: numeric("amount_cad", { precision: 14, scale: 2 }).notNull(),
   targetAccountType: varchar("target_account_type", { length: 24 }).notNull(),
+  securitySymbol: varchar("security_symbol", { length: 32 }),
+  securityName: varchar("security_name", { length: 160 }),
+  securityScore: numeric("security_score", { precision: 6, scale: 2 }),
+  allocationGapBeforePct: numeric("allocation_gap_before_pct", { precision: 7, scale: 2 }),
+  allocationGapAfterPct: numeric("allocation_gap_after_pct", { precision: 7, scale: 2 }),
+  accountFitScore: numeric("account_fit_score", { precision: 6, scale: 2 }),
+  taxFitScore: numeric("tax_fit_score", { precision: 6, scale: 2 }),
+  fxFrictionPenaltyBps: integer("fx_friction_penalty_bps"),
   tickerOptions: jsonb("ticker_options").notNull(),
   explanation: text("explanation").notNull(),
+  rationale: jsonb("rationale"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow()
 });
 

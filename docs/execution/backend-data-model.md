@@ -96,7 +96,11 @@
 - id
 - user_id
 - contribution_amount_cad
+- engine_version nullable
+- objective nullable
+- confidence_score nullable
 - assumptions
+- notes nullable
 - created_at
 
 ### recommendation_items
@@ -105,13 +109,23 @@
 - asset_class
 - amount_cad
 - target_account_type
+- security_symbol nullable
+- security_name nullable
+- security_score nullable
+- allocation_gap_before_pct nullable
+- allocation_gap_after_pct nullable
+- account_fit_score nullable
+- tax_fit_score nullable
+- fx_friction_penalty_bps nullable
 - ticker_options
 - explanation
+- rationale nullable
 - created_at
 
 ## Notes
 - `preference_profiles` are currently mutable per user and not yet versioned.
 - `recommendation_runs` should be immutable snapshots.
+- recommendation v2 now persists structured placement and scoring metadata so the UI can explain why a sleeve, account, and security were chosen.
 - spending summaries should be derived from `transactions`, not stored separately at first.
 - portfolio dashboard metrics should be computed from accounts, holdings, transactions, and preferences.
 - import mapping presets are now durable user-level resources stored in the database.

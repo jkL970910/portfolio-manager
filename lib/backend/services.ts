@@ -31,6 +31,7 @@ import {
   buildSettingsData,
   buildSpendingData
 } from "@/lib/backend/view-builders";
+import { buildRecommendationV2 } from "@/lib/backend/recommendation-v2";
 import { getDb } from "@/lib/db/client";
 import {
   allocationTargets,
@@ -46,7 +47,7 @@ import {
   recommendationRuns,
   users
 } from "@/lib/db/schema";
-import type { ImportJob, ImportMappingPreset, InvestmentAccount, HoldingPosition } from "@/lib/backend/models";
+import type { ImportJob, ImportMappingPreset, InvestmentAccount } from "@/lib/backend/models";
 import { convertCurrencyAmount, getFxRate } from "@/lib/market-data/fx";
 
 export interface PreferenceProfileInput {
@@ -388,53 +389,16 @@ function createEmptyRun(userId: string): RecommendationRun {
     userId,
     contributionAmountCad: 0,
     createdAt: new Date().toISOString(),
+    engineVersion: "v2",
+    objective: "target-tracking",
+    confidenceScore: null,
     assumptions: [
       "No recommendation run has been generated yet.",
       "Import holdings and save preferences to unlock a ranked funding plan."
     ],
+    notes: [],
     items: []
   };
-}
-
-const TICKER_OPTIONS_BY_ASSET_CLASS: Record<string, string[]> = {
-  "Canadian Equity": ["VCN", "XIC"],
-  "US Equity": ["VFV", "XUU"],
-  "International Equity": ["XEF", "VIU"],
-  "Fixed Income": ["XBB", "ZAG"],
-  Cash: ["CASH", "PSA"]
-};
-
-function getCurrentAllocationFromHoldings(holdings: HoldingPosition[]) {
-  const total = holdings.reduce((sum, holding) => sum + holding.marketValueCad, 0);
-  const byAssetClass = new Map<string, number>();
-  for (const holding of holdings) {
-    byAssetClass.set(holding.assetClass, (byAssetClass.get(holding.assetClass) ?? 0) + holding.marketValueCad);
-  }
-
-  return {
-    total,
-    allocation: new Map(
-      [...byAssetClass.entries()].map(([assetClass, value]) => [assetClass, total > 0 ? (value / total) * 100 : 0])
-    )
-  };
-}
-
-function getRecommendedAccountType(accounts: InvestmentAccount[], profile: PreferenceProfile, assetClass: string): AccountType {
-  const eligible = profile.accountFundingPriority.find((type) =>
-    accounts.some((account) => account.type === type && (account.contributionRoomCad ?? 0) > 0)
-  );
-
-  if (eligible) {
-    return eligible;
-  }
-
-  if (assetClass === "Cash") {
-    return accounts.find((account) => account.type === "FHSA")?.type
-      ?? accounts.find((account) => account.type === "TFSA")?.type
-      ?? "Taxable";
-  }
-
-  return accounts[0]?.type ?? "Taxable";
 }
 
 function getAutoRecommendationAmount(profile: PreferenceProfile, transactions: CashflowTransaction[]) {
@@ -1930,7 +1894,8 @@ export async function refreshPortfolioQuotes(userId: string): Promise<RefreshPor
 
 export async function createRecommendationRun(userId: string, input: CreateRecommendationRunInput): Promise<RecommendationRun> {
   const repositories = getRepositories();
-  const [accounts, holdings, profile] = await Promise.all([
+  const [user, accounts, holdings, profile] = await Promise.all([
+    repositories.users.getById(userId),
     repositories.accounts.listByUserId(userId),
     repositories.holdings.listByUserId(userId),
     repositories.preferences.getByUserId(userId)
@@ -1940,34 +1905,13 @@ export async function createRecommendationRun(userId: string, input: CreateRecom
     throw new Error("Import accounts and holdings before generating a recommendation run.");
   }
 
-  const { allocation: currentAllocation } = getCurrentAllocationFromHoldings(holdings);
-  const targetAllocation = profile.targetAllocation.length > 0 ? profile.targetAllocation : DEFAULT_TARGETS_BY_RISK[profile.riskProfile];
-
-  const underweights = targetAllocation
-    .map((target) => ({
-      assetClass: target.assetClass,
-      gapPct: Math.max(0, target.targetPct - (currentAllocation.get(target.assetClass) ?? 0))
-    }))
-    .filter((target) => target.gapPct > 0)
-    .sort((left, right) => right.gapPct - left.gapPct)
-    .slice(0, 3);
-
-  const priorities = underweights.length > 0
-    ? underweights
-    : targetAllocation
-      .slice()
-      .sort((left, right) => right.targetPct - left.targetPct)
-      .slice(0, 3)
-      .map((target) => ({ assetClass: target.assetClass, gapPct: target.targetPct }));
-
-  const totalGap = priorities.reduce((sum, item) => sum + item.gapPct, 0) || 1;
-  const assumptions = [
-    `Recommendation uses the ${profile.riskProfile.toLowerCase()} target allocation and current asset-class drift.`,
-    `Contribution ladder honors ${profile.accountFundingPriority.join(" -> ")} before lower-priority accounts.`,
-    profile.taxAwarePlacement
-      ? "Tax-aware placement is enabled, so sheltered room is favored when account fit is comparable."
-      : "Tax-aware placement is disabled, so the run prioritizes target fit over tax sheltering."
-  ];
+  const recommendation = buildRecommendationV2({
+    accounts,
+    holdings,
+    profile,
+    contributionAmountCad: input.contributionAmountCad,
+    language: user.displayLanguage
+  });
 
   const db = getDb();
   return db.transaction(async (tx) => {
@@ -1976,30 +1920,15 @@ export async function createRecommendationRun(userId: string, input: CreateRecom
       .values({
         userId,
         contributionAmountCad: input.contributionAmountCad.toFixed(2),
-        assumptions
+        engineVersion: recommendation.engineVersion,
+        objective: recommendation.objective,
+        confidenceScore: recommendation.confidenceScore?.toFixed(2) ?? null,
+        assumptions: recommendation.assumptions,
+        notes: recommendation.notes ?? []
       })
       .returning();
 
-    const items = priorities.map((priority, index) => {
-      const normalizedShare = priority.gapPct / totalGap;
-      const rawAmount = index === priorities.length - 1
-        ? input.contributionAmountCad - priorities.slice(0, -1).reduce((sum, item) => {
-            const share = item.gapPct / totalGap;
-            return sum + Math.round(input.contributionAmountCad * share);
-          }, 0)
-        : Math.round(input.contributionAmountCad * normalizedShare);
-      const amountCad = Math.max(rawAmount, 0);
-      const targetAccountType = getRecommendedAccountType(accounts, profile, priority.assetClass);
-      const tickerOptions = TICKER_OPTIONS_BY_ASSET_CLASS[priority.assetClass] ?? ["VCN", "XIC"];
-
-      return {
-        assetClass: priority.assetClass,
-        amountCad,
-        targetAccountType,
-        tickerOptions,
-        explanation: `${priority.assetClass} is currently underweight relative to the configured target, so this run allocates ${amountCad.toLocaleString("en-CA")} CAD to ${targetAccountType}.`
-      };
-    });
+    const items = recommendation.items;
 
     if (items.length > 0) {
       await tx.insert(recommendationItems).values(
@@ -2008,8 +1937,17 @@ export async function createRecommendationRun(userId: string, input: CreateRecom
           assetClass: item.assetClass,
           amountCad: item.amountCad.toFixed(2),
           targetAccountType: item.targetAccountType,
+          securitySymbol: item.securitySymbol ?? null,
+          securityName: item.securityName ?? null,
+          securityScore: item.securityScore?.toFixed(2) ?? null,
+          allocationGapBeforePct: item.allocationGapBeforePct?.toFixed(2) ?? null,
+          allocationGapAfterPct: item.allocationGapAfterPct?.toFixed(2) ?? null,
+          accountFitScore: item.accountFitScore?.toFixed(2) ?? null,
+          taxFitScore: item.taxFitScore?.toFixed(2) ?? null,
+          fxFrictionPenaltyBps: item.fxFrictionPenaltyBps ?? null,
           tickerOptions: item.tickerOptions,
-          explanation: item.explanation
+          explanation: item.explanation,
+          rationale: item.rationale ?? null
         }))
       );
     }
@@ -2019,7 +1957,11 @@ export async function createRecommendationRun(userId: string, input: CreateRecom
       userId,
       contributionAmountCad: input.contributionAmountCad,
       createdAt: runRow.createdAt.toISOString(),
-      assumptions,
+      engineVersion: recommendation.engineVersion,
+      objective: recommendation.objective,
+      confidenceScore: recommendation.confidenceScore,
+      assumptions: recommendation.assumptions,
+      notes: recommendation.notes,
       items
     };
   });

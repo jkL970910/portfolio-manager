@@ -4,6 +4,7 @@ import { getPortfolioView } from "@/lib/backend/services";
 import { AppShell } from "@/components/layout/app-shell";
 import { DonutChartCard } from "@/components/charts/donut-chart";
 import { LineChartCard } from "@/components/charts/line-chart";
+import { RadarPreviewCard } from "@/components/charts/radar-preview";
 import { HoldingTable } from "@/components/portfolio/holding-table";
 import { QuickActionCard } from "@/components/portfolio/quick-action-card";
 import { RefreshPricesPanel } from "@/components/portfolio/refresh-prices-panel";
@@ -65,6 +66,16 @@ export default async function PortfolioPage() {
         </div>
 
         <div className="space-y-6">
+          <RadarPreviewCard
+            title={pick(language, "组合健康评分", "Portfolio Health Score")}
+            status={`${data.healthScore.score}/100 · ${data.healthScore.status}`}
+            description={pick(
+              language,
+              `当前最强维度是 ${data.healthScore.strongestDimension}，最弱维度是 ${data.healthScore.weakestDimension}。`,
+              `Strongest dimension: ${data.healthScore.strongestDimension}. Weakest dimension: ${data.healthScore.weakestDimension}.`
+            )}
+            data={data.healthScore.radar}
+          />
           <Card>
             <CardHeader>
               <CardTitle>{pick(language, "快捷动作", "Quick Actions")}</CardTitle>
@@ -86,6 +97,11 @@ export default async function PortfolioPage() {
               <CardTitle>{pick(language, "通往推荐页", "Bridge to Recommendations")}</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
+              {data.healthScore.highlights.map((highlight) => (
+                <div key={highlight} className="rounded-[24px] border border-white/55 bg-white/38 p-4 text-sm text-[color:var(--muted-foreground)] backdrop-blur-md">
+                  {highlight}
+                </div>
+              ))}
               {data.summaryPoints.map((point) => (
                 <div key={point} className="rounded-[24px] border border-white/55 bg-white/38 p-4 text-sm text-[color:var(--muted-foreground)] backdrop-blur-md">
                   {point}

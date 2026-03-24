@@ -1251,6 +1251,7 @@ export function ImportExperience({
                     nickname={nickname}
                     guidedResult={guidedResult}
                     guidedCsvImportResult={guidedCsvImportResult}
+                    onAddAnotherAccount={() => resetGuidedState("guided")}
                   />
                 ) : null}
 
@@ -1260,19 +1261,21 @@ export function ImportExperience({
                   </div>
                 ) : null}
 
-                <div className="flex flex-wrap justify-between gap-3 border-t border-[color:var(--border)] pt-4">
-                  <Button type="button" variant="secondary" onClick={goToPreviousStep} disabled={currentStep === 1 || isPending}>
-                    {pick(language, "返回", "Back")}
-                  </Button>
-                  <Button
-                    type="button"
-                    onClick={goToNextStep}
-                    disabled={!canAdvance || currentStep === 5 || isPending}
-                    trailingIcon={currentStep < 5 ? <ArrowRight className="h-4 w-4" /> : undefined}
-                  >
-                    {continueButtonLabel}
-                  </Button>
-                </div>
+                {currentStep !== 5 ? (
+                  <div className="flex flex-wrap justify-between gap-3 border-t border-[color:var(--border)] pt-4">
+                    <Button type="button" variant="secondary" onClick={goToPreviousStep} disabled={currentStep === 1 || isPending}>
+                      {pick(language, "返回", "Back")}
+                    </Button>
+                    <Button
+                      type="button"
+                      onClick={goToNextStep}
+                      disabled={!canAdvance || isPending}
+                      trailingIcon={currentStep < 5 ? <ArrowRight className="h-4 w-4" /> : undefined}
+                    >
+                      {continueButtonLabel}
+                    </Button>
+                  </div>
+                ) : null}
               </CardContent>
             </Card>
 
@@ -1393,31 +1396,21 @@ function StepChooseAccountType({
             className={`rounded-[24px] border p-5 text-left transition-colors ${accountType === option.type ? "border-[color:var(--primary)] bg-[color:var(--primary-soft)]" : "border-[color:var(--border)] bg-white"}`}
           >
             <p className="text-lg font-semibold">{getAccountTypeLabel(option.type, language)}</p>
-            <p className="mt-2 text-sm text-[color:var(--foreground)]">
-              {pick(
-                language,
-                option.type === "TFSA"
-                  ? "免税增长账户"
-                  : option.type === "RRSP"
-                    ? "退休优先的递延税账户"
-                    : option.type === "FHSA"
-                      ? "面向购房目标的账户"
-                      : "灵活的应税账户",
-                option.caption
-              )}
-            </p>
             <p className="mt-2 text-sm text-[color:var(--muted-foreground)]">
               {pick(
                 language,
                 option.type === "TFSA"
-                  ? "对大多数首次配置的用户来说是很好的默认起点。"
+                  ? "适合作为多数用户的第一个免税投资壳层。"
                   : option.type === "RRSP"
-                    ? "当长期退休储蓄是主要目标时更适合。"
+                    ? "适合长期退休资金主导的账户结构。"
                     : option.type === "FHSA"
-                      ? "当中短期购房目标很重要时更适合。"
-                      : "当注册账户额度已基本用完时可以考虑。",
-                option.detail
+                      ? "适合围绕购房目标来整理早期资产。"
+                      : "适合在注册账户额度之外继续放置灵活资金。",
+                option.caption
               )}
+            </p>
+            <p className="mt-3 text-xs uppercase tracking-[0.14em] text-[color:var(--muted-foreground)]">
+              {pick(language, option.detail, option.detail)}
             </p>
           </button>
         ))}
@@ -2074,7 +2067,8 @@ function StepCompleteSetup({
   institution,
   nickname,
   guidedResult,
-  guidedCsvImportResult
+  guidedCsvImportResult,
+  onAddAnotherAccount
 }: {
   language: DisplayLanguage;
   accountType: GuidedAccountType | null;
@@ -2083,6 +2077,7 @@ function StepCompleteSetup({
   nickname: string;
   guidedResult: GuidedImportResult | null;
   guidedCsvImportResult: GuidedCsvImportResult | null;
+  onAddAnotherAccount: () => void;
 }) {
   return (
     <div className="space-y-4">
@@ -2135,7 +2130,10 @@ function StepCompleteSetup({
         </div>
       ) : null}
 
-      <div className="grid gap-3 md:grid-cols-2">
+      <div className="grid gap-3 md:grid-cols-3">
+        <Button type="button" variant="secondary" onClick={onAddAnotherAccount}>
+          {pick(language, "继续添加另一个账户", "Add another account")}
+        </Button>
         <Button href="/settings" variant="secondary">
           {pick(language, "继续前往投资偏好设置", "Continue to Investment Preferences")}
         </Button>
@@ -2155,6 +2153,8 @@ function LooSignal({ title, detail }: { title: string; detail: string }) {
     </div>
   );
 }
+
+
 
 
 

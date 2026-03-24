@@ -15,17 +15,17 @@ const contracts = {
     {
       path: "/api/dashboard",
       method: "GET",
-      description: "Dashboard view model with summary cards, overview modules, and recommendation summary."
+      description: "Dashboard view model with summary cards, recommendation summary, and portfolio health score preview."
     },
     {
       path: "/api/portfolio",
       method: "GET",
-      description: "Portfolio analytics view with performance, exposures, holdings, and recommendation bridge context."
+      description: "Portfolio analytics view with performance, exposures, holdings, recommendation bridge context, and detailed health score diagnostics."
     },
     {
       path: "/api/recommendations",
       method: "GET",
-      description: "Recommendation view with transparent inputs, ranked items, notes, and latest run metadata."
+      description: "Recommendation view with transparent inputs, structured ranked items, V2 confidence metadata, and latest run rationale."
     },
     {
       path: "/api/spending",
@@ -132,7 +132,7 @@ const contracts = {
     {
       path: "/api/recommendations/runs",
       methods: ["POST"],
-      description: "Generate a new recommendation run from current holdings and preferences."
+      description: "Generate a new V2 recommendation run from current holdings and preferences, including structured rationale and placement metadata."
     },
     {
       path: "/api/portfolio/refresh-prices",

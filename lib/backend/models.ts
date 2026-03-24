@@ -138,6 +138,31 @@ export interface RecommendationItem {
   targetAccountType: AccountType;
   tickerOptions: string[];
   explanation: string;
+  securitySymbol?: string;
+  securityName?: string;
+  securityScore?: number;
+  allocationGapBeforePct?: number;
+  allocationGapAfterPct?: number;
+  accountFitScore?: number;
+  taxFitScore?: number;
+  fxFrictionPenaltyBps?: number;
+  rationale?: {
+    assetClass: string;
+    targetPct: number;
+    currentPct: number;
+    gapBeforePct: number;
+    gapAfterPct: number;
+    selectedAccountType: AccountType;
+    selectedSecurity: string;
+    selectedSecurityName: string;
+    accountFitScore: number;
+    taxFitScore: number;
+    securityScore: number;
+    fxPolicy: string;
+    fxPenaltyBps: number;
+    minTradeApplied: boolean;
+    watchlistMatched: boolean;
+  };
 }
 
 export interface RecommendationRun {
@@ -145,8 +170,12 @@ export interface RecommendationRun {
   userId: EntityId;
   contributionAmountCad: number;
   createdAt: string;
+  engineVersion?: string | null;
+  objective?: string | null;
+  confidenceScore?: number | null;
   items: RecommendationItem[];
   assumptions: string[];
+  notes?: string[];
 }
 
 export interface ImportJob {

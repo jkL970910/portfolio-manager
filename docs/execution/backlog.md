@@ -91,14 +91,13 @@ Help a self-directed investor:
 
 | Rank | Feature | Priority | Why now |
 |---|---|---|---|
-| 1 | Guided allocation setup in Settings | P0-next | The current settings page still expects too much manual portfolio knowledge from beginners. |
-| 2 | Recommendation engine v2 | P0-next | The current engine works, but it is still a v1 drift allocator with shallow tax/account-fit logic. |
-| 3 | Recommendation explanation improvements | P1 | Recommendation trust will plateau without more structured rationale. |
-| 4 | Portfolio health score and radar analysis | P1 | The placeholder exists, but the real scoring output is still missing. |
-| 5 | Richer import review persistence | P1 | Import review is functional, but corrections are still too session-bound and light. |
-| 6 | Watchlist and target constraints workflow | P1 | Preference storage exists, but the UX and recommendation impact are still too shallow. |
-| 7 | Cloud-ready cache / worker boundaries | P1 | Current market-data cache is process-local and import/recommendation work is still synchronous. |
-| 8 | Chinese-mode citizen identity layer | P0-next | Login, registration, and profile now need a distinct Loo国 flow with citizen card issuance and admin override support. |
+| 1 | Recommendation engine v2 | P0-next | The current engine works, but it is still a v1 drift allocator with shallow tax/account-fit logic. |
+| 2 | Recommendation explanation improvements | P0-next | Trust will plateau unless each suggestion has structured rationale and a clearer audit trail. |
+| 3 | Portfolio health score and radar analysis | P1 | The placeholder exists, but the real scoring output is still missing. |
+| 4 | Richer import review persistence | P1 | Import review is functional, but corrections are still too session-bound and light. |
+| 5 | Watchlist and target constraints workflow | P1 | Preference storage exists, but the UX and recommendation impact are still too shallow. |
+| 6 | Cloud-ready cache / worker boundaries | P1 | Current market-data cache is process-local and import/recommendation work is still synchronous. |
+| 7 | Citizen/profile admin workflow | P1 | The citizen layer exists, but admin override and profile management are still minimal. |
 
 ## Deprioritized / Deferred
 
@@ -121,8 +120,9 @@ Help a self-directed investor:
 | Unified portfolio dashboard | Completed | 5 | 3 | 2 | 5 | Keep stable |
 | Portfolio diagnostics foundation | In Progress | 5 | 4 | 3 | 5 | Deepen next |
 | Funding recommendation engine v1 | Completed | 5 | 4 | 4 | 5 | Upgrade to v2 |
-| Guided allocation setup | Planned | 5 | 3 | 3 | 5 | Build next |
-| Chinese-mode citizen identity layer | Planned | 4 | 4 | 3 | 5 | Build now |
+| Guided allocation setup | Completed | 5 | 3 | 3 | 5 | Keep stable |
+| Chinese-mode citizen identity layer | Completed | 4 | 4 | 3 | 5 | Keep stable |
+| Recommendation engine v2 | Planned | 5 | 4 | 4 | 5 | Build next |
 | Recommendation explanation improvements | Planned | 4 | 2 | 2 | 5 | Build soon |
 | Portfolio health score and radar analysis | Planned | 4 | 3 | 3 | 4 | Build after explanation depth improves |
 | Spending overview and transactions | In Progress | 3 | 3 | 2 | 3 | Keep secondary |
@@ -136,12 +136,12 @@ Help a self-directed investor:
 
 ## Recommended Build Order From Here
 
-1. Guided allocation setup in Settings
-2. Chinese-mode citizen identity layer
-3. Recommendation engine v2 rules
-4. Recommendation explanation model and structured rationale output
-5. Portfolio health score and radar analysis
-6. Richer import review persistence and correction state
+1. Recommendation engine v2 foundation and scoring model
+2. Recommendation explanation model and structured rationale output
+3. Portfolio health score and radar analysis
+4. Richer import review persistence and correction state
+5. Watchlist and target constraints workflow
+6. Citizen/profile admin workflow expansion
 7. Cloud-ready cache and async job boundaries
 
 ## Key Trade-offs
@@ -156,7 +156,9 @@ Help a self-directed investor:
 
 Turn the next milestone into engineering tickets for:
 
-1. guided allocation setup in Settings
-2. Chinese-mode citizen identity layer
-3. recommendation engine v2 rules
+1. recommendation engine v2 foundation and scoring model
+2. recommendation explanation model and structured rationale output
+3. portfolio health score and radar analysis
+
+
 

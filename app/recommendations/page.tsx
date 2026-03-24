@@ -72,6 +72,20 @@ export default async function RecommendationsPage() {
               <CardTitle>{pick(language, "计算方式", "How this is calculated")}</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
+              <div className="grid gap-3 sm:grid-cols-3">
+                <div className="rounded-[24px] border border-white/55 bg-white/34 p-4 backdrop-blur-md">
+                  <p className="text-xs uppercase tracking-[0.16em] text-[color:var(--muted-foreground)]">{pick(language, "引擎版本", "Engine version")}</p>
+                  <p className="mt-2 font-semibold">{data.engine.version}</p>
+                </div>
+                <div className="rounded-[24px] border border-white/55 bg-white/34 p-4 backdrop-blur-md">
+                  <p className="text-xs uppercase tracking-[0.16em] text-[color:var(--muted-foreground)]">{pick(language, "目标函数", "Objective")}</p>
+                  <p className="mt-2 font-semibold">{data.engine.objective}</p>
+                </div>
+                <div className="rounded-[24px] border border-white/55 bg-white/34 p-4 backdrop-blur-md">
+                  <p className="text-xs uppercase tracking-[0.16em] text-[color:var(--muted-foreground)]">{pick(language, "置信度", "Confidence")}</p>
+                  <p className="mt-2 font-semibold">{data.engine.confidence}</p>
+                </div>
+              </div>
               {data.explainer.map((point) => (
                 <div key={point} className="rounded-[24px] border border-white/55 bg-white/34 p-4 text-sm text-[color:var(--muted-foreground)] backdrop-blur-md">
                   {point}
@@ -103,7 +117,12 @@ export default async function RecommendationsPage() {
                       <p className="text-sm text-[color:var(--muted-foreground)]">{priority.account}</p>
                     </div>
                   </div>
-                  <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                  <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                    <div className="rounded-[24px] border border-white/55 bg-white/34 p-4 backdrop-blur-md">
+                      <p className="text-xs uppercase tracking-[0.16em] text-[color:var(--muted-foreground)]">{pick(language, "主表达标的", "Lead security")}</p>
+                      <p className="mt-2 font-medium">{priority.security}</p>
+                      <p className="mt-2 text-sm text-[color:var(--muted-foreground)]">{priority.gapSummary}</p>
+                    </div>
                     <div className="rounded-[24px] border border-white/55 bg-white/34 p-4 backdrop-blur-md">
                       <p className="text-xs uppercase tracking-[0.16em] text-[color:var(--muted-foreground)]">{pick(language, "Ticker 备选", "Ticker options")}</p>
                       <p className="mt-2 font-medium">{priority.tickers}</p>
@@ -111,6 +130,7 @@ export default async function RecommendationsPage() {
                     <div className="rounded-[24px] border border-white/55 bg-white/34 p-4 backdrop-blur-md">
                       <p className="text-xs uppercase tracking-[0.16em] text-[color:var(--muted-foreground)]">{pick(language, "账户匹配", "Account fit")}</p>
                       <p className="mt-2 font-medium">{priority.accountFit}</p>
+                      <p className="mt-2 text-sm text-[color:var(--muted-foreground)]">{priority.scoreline}</p>
                     </div>
                   </div>
                 </div>

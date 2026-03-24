@@ -227,13 +227,26 @@ export const postgresRepositories: BackendRepositories = {
         userId: run.userId,
         contributionAmountCad: toNumber(run.contributionAmountCad),
         createdAt: run.createdAt.toISOString(),
+        engineVersion: run.engineVersion ?? null,
+        objective: run.objective ?? null,
+        confidenceScore: run.confidenceScore == null ? null : toNumber(run.confidenceScore),
         assumptions: run.assumptions as string[],
+        notes: (run.notes as string[] | null) ?? [],
         items: items.map((item) => ({
           assetClass: item.assetClass,
           amountCad: toNumber(item.amountCad),
           targetAccountType: item.targetAccountType as RecommendationRun["items"][number]["targetAccountType"],
           tickerOptions: item.tickerOptions as string[],
-          explanation: item.explanation
+          explanation: item.explanation,
+          securitySymbol: item.securitySymbol ?? undefined,
+          securityName: item.securityName ?? undefined,
+          securityScore: item.securityScore == null ? undefined : toNumber(item.securityScore),
+          allocationGapBeforePct: item.allocationGapBeforePct == null ? undefined : toNumber(item.allocationGapBeforePct),
+          allocationGapAfterPct: item.allocationGapAfterPct == null ? undefined : toNumber(item.allocationGapAfterPct),
+          accountFitScore: item.accountFitScore == null ? undefined : toNumber(item.accountFitScore),
+          taxFitScore: item.taxFitScore == null ? undefined : toNumber(item.taxFitScore),
+          fxFrictionPenaltyBps: item.fxFrictionPenaltyBps ?? undefined,
+          rationale: (item.rationale as RecommendationRun["items"][number]["rationale"] | null) ?? undefined
         }))
       };
     }

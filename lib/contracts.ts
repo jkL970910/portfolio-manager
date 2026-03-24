@@ -42,6 +42,13 @@ export interface DashboardData {
   investableCash: string;
   spendingCategories: { name: string; value: string }[];
   healthPreview: { dimension: string; value: number }[];
+  healthScore: {
+    score: number;
+    status: string;
+    strongestDimension: string;
+    weakestDimension: string;
+    highlights: string[];
+  };
   recommendation: {
     theme: string;
     subtitle: string;
@@ -64,6 +71,14 @@ export interface PortfolioData {
     freshness: string;
     coverage: string;
   };
+  healthScore: {
+    score: number;
+    status: string;
+    radar: { dimension: string; value: number }[];
+    highlights: string[];
+    strongestDimension: string;
+    weakestDimension: string;
+  };
   holdings: {
     symbol: string;
     account: string;
@@ -84,6 +99,11 @@ export interface RecommendationsData {
     fxNote: string;
   };
   contributionAmount: string;
+  engine: {
+    version: string;
+    objective: string;
+    confidence: string;
+  };
   inputs: { label: string; value: string }[];
   explainer: string[];
   priorities: {
@@ -91,8 +111,11 @@ export interface RecommendationsData {
     description: string;
     amount: string;
     account: string;
+    security: string;
     tickers: string;
     accountFit: string;
+    scoreline: string;
+    gapSummary: string;
   }[];
   notes: string[];
 }

@@ -18,6 +18,7 @@ import {
   RiskProfile,
   UserProfile
 } from "@/lib/backend/models";
+import { buildPortfolioHealthSummary } from "@/lib/backend/portfolio-health";
 import {
   getAccountTypeLabel,
   getAssetClassLabel,
@@ -148,10 +149,6 @@ function formatSignedPercent(value: number, digits = 0) {
   return `${value > 0 ? "+" : ""}${value.toFixed(digits)}%`;
 }
 
-function clamp(value: number, min: number, max: number) {
-  return Math.min(Math.max(value, min), max);
-}
-
 function round(value: number, digits = 0) {
   const factor = 10 ** digits;
   return Math.round(value * factor) / factor;
@@ -269,33 +266,6 @@ function buildSpendingSummary(transactions: CashflowTransaction[], cashBufferTar
     savingsRate: round(savingsRate, 1),
     categories: categoryTotals
   };
-}
-
-function getHealthPreview(
-  currentAllocation: Map<string, number>,
-  targetAllocation: Map<string, number>,
-  holdings: HoldingPosition[],
-  profile: PreferenceProfile,
-  language: DisplayLanguage
-) {
-  const allocationGap = [...targetAllocation.entries()].map(([assetClass, targetPct]) => Math.abs((currentAllocation.get(assetClass) ?? 0) - targetPct));
-  const allocationScore = clamp(100 - sum(allocationGap) * 1.8, 32, 92);
-  const largestHolding = holdings.sort((left, right) => right.weightPct - left.weightPct)[0]?.weightPct ?? 0;
-  const concentrationScore = clamp(100 - largestHolding * 2.2, 28, 88);
-  const representedClasses = [...currentAllocation.values()].filter((value) => value >= 5).length;
-  const diversificationScore = clamp(45 + representedClasses * 10, 40, 86);
-  const efficiencyScore = clamp(profile.taxAwarePlacement ? 76 : 60, 48, 90);
-  const fixedIncomeGap = Math.abs((currentAllocation.get("Fixed Income") ?? 0) - (targetAllocation.get("Fixed Income") ?? 0));
-  const riskPenalty = profile.riskProfile === "Growth" ? 8 : profile.riskProfile === "Conservative" ? 4 : 0;
-  const riskAlignmentScore = clamp(82 - fixedIncomeGap * 2 - riskPenalty, 40, 90);
-
-  return [
-    { dimension: pick(language, "配置贴合", "Allocation"), value: round(allocationScore, 0) },
-    { dimension: pick(language, "分散度", "Diversification"), value: round(diversificationScore, 0) },
-    { dimension: pick(language, "账户效率", "Efficiency"), value: round(efficiencyScore, 0) },
-    { dimension: pick(language, "集中度", "Concentration"), value: round(concentrationScore, 0) },
-    { dimension: pick(language, "风险匹配", "Risk Fit"), value: round(riskAlignmentScore, 0) }
-  ];
 }
 
 function getRecommendationTheme(
@@ -582,6 +552,7 @@ export function buildDashboardData(args: {
   const availableRoom = sum(accounts.map((account) => account.contributionRoomCad ?? 0));
   const currentAllocation = getCurrentAllocation(holdings);
   const targetAllocation = getTargetAllocation(profile);
+  const health = buildPortfolioHealthSummary({ accounts, holdings, profile, language });
   const drift = [...targetAllocation.entries()]
     .map(([assetClass, targetPct]) => ({
       assetClass,
@@ -615,8 +586,8 @@ export function buildDashboardData(args: {
       },
       {
         label: pick(language, "组合健康分", "Portfolio Health Score"),
-        value: "P1",
-        detail: pick(language, "评分逻辑落地后将开放完整雷达图。", "Preview radar ships after scoring logic")
+        value: `${health.score}`,
+        detail: health.status
       }
     ],
     accounts: [...accounts]
@@ -667,7 +638,14 @@ export function buildDashboardData(args: {
       name: getCategoryLabel(name, language),
       value: formatDisplayCurrency(value, display)
     })),
-    healthPreview: getHealthPreview(currentAllocation, targetAllocation, holdings, profile, language),
+    healthPreview: health.radar,
+    healthScore: {
+      score: health.score,
+      status: health.status,
+      strongestDimension: `${health.strongestDimension.label} ${health.strongestDimension.value}`,
+      weakestDimension: `${health.weakestDimension.label} ${health.weakestDimension.value}`,
+      highlights: health.highlights
+    },
     recommendation
   };
 }
@@ -682,6 +660,7 @@ export function buildPortfolioData(args: {
   const { language, accounts, holdings, profile, display } = args;
   const currentAllocation = getCurrentAllocation(holdings);
   const targetAllocation = getTargetAllocation(profile);
+  const health = buildPortfolioHealthSummary({ accounts, holdings, profile, language });
   const totalPortfolio = sum(accounts.map((account) => account.marketValueCad));
   const performanceBase = getSixMonthSeries(totalPortfolio || 1, profile).map((point) => point.value);
   const baseline = performanceBase[0] || 1;
@@ -721,6 +700,14 @@ export function buildPortfolioData(args: {
     })),
     sectorExposure,
     quoteStatus: getPortfolioQuoteStatus(holdings, language),
+    healthScore: {
+      score: health.score,
+      status: health.status,
+      radar: health.radar,
+      highlights: health.highlights,
+      strongestDimension: `${health.strongestDimension.label} ${health.strongestDimension.value}`,
+      weakestDimension: `${health.weakestDimension.label} ${health.weakestDimension.value}`
+    },
     holdings: [...holdings]
       .sort((left, right) => right.marketValueCad - left.marketValueCad)
       .map((holding) => ({
@@ -770,6 +757,19 @@ export function buildRecommendationsData(args: {
   return {
     displayContext: buildDisplayContext(display, language),
     contributionAmount: formatDisplayCurrency(latestRun?.contributionAmountCad ?? 0, display),
+    engine: {
+      version: latestRun?.engineVersion?.toUpperCase() ?? "V2",
+      objective: latestRun?.objective
+        ? pick(
+          language,
+          latestRun.objective === "target-tracking" ? "目标跟踪" : latestRun.objective,
+          latestRun.objective === "target-tracking" ? "Target-tracking" : latestRun.objective
+        )
+        : pick(language, "目标跟踪", "Target-tracking"),
+      confidence: latestRun?.confidenceScore != null
+        ? `${latestRun.confidenceScore.toFixed(0)}/100`
+        : pick(language, "待生成", "Pending")
+    },
     inputs: [
       { label: pick(language, "目标配置", "Target allocation"), value: `${equityTarget} / ${fixedIncomeTarget} / ${cashTarget}` },
       { label: pick(language, "账户优先级", "Account priority"), value: formatAccountPriorityOrder(profile.accountFundingPriority, language) },
@@ -788,8 +788,29 @@ export function buildRecommendationsData(args: {
       description: getRecommendationItemExplanation(item, display, language),
       amount: formatDisplayCurrency(item.amountCad, display),
       account: getAccountTypeLabel(item.targetAccountType, language),
+      security: item.securitySymbol && item.securityName
+        ? `${item.securitySymbol} - ${item.securityName}`
+        : item.tickerOptions[0] ?? pick(language, "待选标的", "Pending security"),
       tickers: item.tickerOptions.join(", "),
-      accountFit: getAccountTypeFit(item.targetAccountType, language)
+      accountFit: item.accountFitScore != null
+        ? pick(
+          language,
+          `${getAccountTypeFit(item.targetAccountType, language)} 匹配分 ${item.accountFitScore.toFixed(0)}/100`,
+          `${getAccountTypeFit(item.targetAccountType, language)} Score ${item.accountFitScore.toFixed(0)}/100`
+        )
+        : getAccountTypeFit(item.targetAccountType, language),
+      scoreline: pick(
+        language,
+        `标的分 ${item.securityScore?.toFixed(0) ?? "--"} / 账户分 ${item.accountFitScore?.toFixed(0) ?? "--"}`,
+        `Security ${item.securityScore?.toFixed(0) ?? "--"} / Account ${item.accountFitScore?.toFixed(0) ?? "--"}`
+      ),
+      gapSummary: item.allocationGapBeforePct != null && item.allocationGapAfterPct != null
+        ? pick(
+          language,
+          `偏离从 ${item.allocationGapBeforePct.toFixed(1)}% 收敛到 ${item.allocationGapAfterPct.toFixed(1)}%`,
+          `Gap narrows from ${item.allocationGapBeforePct.toFixed(1)}% to ${item.allocationGapAfterPct.toFixed(1)}%`
+        )
+        : pick(language, "等待生成后展示偏离变化。", "Gap change appears after generation.")
     })),
     notes: [
       profile.taxAwarePlacement
@@ -799,7 +820,8 @@ export function buildRecommendationsData(args: {
         language,
         `当前策略：${getRecommendationStrategyLabel(profile.recommendationStrategy, language)}。再平衡容忍度为 ${profile.rebalancingTolerancePct}%。`,
         `Current strategy: ${getRecommendationStrategyLabel(profile.recommendationStrategy, language)}. Rebalancing tolerance is ${profile.rebalancingTolerancePct}%.`
-      )
+      ),
+      ...(latestRun?.notes ?? [])
     ]
   };
 }
