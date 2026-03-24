@@ -599,6 +599,7 @@ export function buildDashboardData(args: {
         return right.marketValueCad - left.marketValueCad;
       })
       .map((account, index) => ({
+        id: account.id,
         name: account.type,
         caption: getAccountCaption(account.type, language),
         value: formatMoneyForDisplay(account.marketValueAmount, account.currency ?? "CAD", account.marketValueCad, display),
@@ -621,6 +622,7 @@ export function buildDashboardData(args: {
       .sort((left, right) => right.marketValueCad - left.marketValueCad)
       .slice(0, 3)
       .map((holding) => ({
+        id: holding.id,
         symbol: holding.symbol,
         name: holding.name,
         account: accounts.find((account) => account.id === holding.accountId)?.type ?? pick(language, "账户", "Account"),
@@ -706,12 +708,18 @@ export function buildPortfolioData(args: {
       radar: health.radar,
       highlights: health.highlights,
       strongestDimension: `${health.strongestDimension.label} ${health.strongestDimension.value}`,
-      weakestDimension: `${health.weakestDimension.label} ${health.weakestDimension.value}`
+      weakestDimension: `${health.weakestDimension.label} ${health.weakestDimension.value}`,
+      dimensions: health.dimensions,
+      actionQueue: health.actionQueue,
+      accountDrilldown: health.accountDrilldown,
+      holdingDrilldown: health.holdingDrilldown
     },
     holdings: [...holdings]
       .sort((left, right) => right.marketValueCad - left.marketValueCad)
       .map((holding) => ({
+        id: holding.id,
         symbol: holding.symbol,
+        accountId: holding.accountId,
         account: (() => {
           const accountType = accounts.find((account) => account.id === holding.accountId)?.type;
           return accountType ? getAccountTypeLabel(accountType, language) : pick(language, "账户", "Account");
@@ -745,14 +753,110 @@ export function buildRecommendationsData(args: {
   language: DisplayLanguage;
   profile: PreferenceProfile;
   latestRun: RecommendationRun | null;
+  scenarioRuns?: RecommendationRun[];
   display: DisplayContext;
 }): RecommendationsData {
-  const { language, profile, latestRun, display } = args;
+  const { language, profile, latestRun, scenarioRuns = [], display } = args;
   const equityTarget = sum(profile.targetAllocation
     .filter((target) => target.assetClass !== "Fixed Income" && target.assetClass !== "Cash")
     .map((target) => target.targetPct));
   const fixedIncomeTarget = profile.targetAllocation.find((target) => target.assetClass === "Fixed Income")?.targetPct ?? 0;
   const cashTarget = profile.targetAllocation.find((target) => target.assetClass === "Cash")?.targetPct ?? 0;
+  const baselineItems = latestRun?.items ?? [];
+
+  const buildScenarioDiffs = (scenarioRun: RecommendationRun, scenarioIndex: number) => {
+    if (baselineItems.length === 0) {
+      return [
+        pick(
+          language,
+          "当前还没有已保存的 recommendation run，因此这里仅展示这个金额下的独立求解结果。",
+          "There is no saved recommendation run yet, so this card only shows the standalone solve at this amount."
+        )
+      ];
+    }
+
+    if (scenarioRun.contributionAmountCad === latestRun?.contributionAmountCad) {
+      return [
+        pick(
+          language,
+          "这是当前页面使用的基准 run，可把它作为其余场景的对照组。",
+          "This is the baseline run currently shown on the page and acts as the control for the other scenarios."
+        )
+      ];
+    }
+
+    const diffs: string[] = [];
+    const baselineTop = baselineItems[0];
+    const scenarioTop = scenarioRun.items[0];
+
+    if (baselineTop && scenarioTop && (baselineTop.assetClass !== scenarioTop.assetClass || baselineTop.targetAccountType !== scenarioTop.targetAccountType)) {
+      diffs.push(
+        pick(
+          language,
+          `第一优先级从 ${getAssetClassLabel(baselineTop.assetClass, language)} -> ${getAccountTypeLabel(baselineTop.targetAccountType, language)}，切换成了 ${getAssetClassLabel(scenarioTop.assetClass, language)} -> ${getAccountTypeLabel(scenarioTop.targetAccountType, language)}。`,
+          `The top priority shifts from ${getAssetClassLabel(baselineTop.assetClass, language)} -> ${getAccountTypeLabel(baselineTop.targetAccountType, language)} to ${getAssetClassLabel(scenarioTop.assetClass, language)} -> ${getAccountTypeLabel(scenarioTop.targetAccountType, language)}.`
+        )
+      );
+    } else {
+      diffs.push(
+        pick(
+          language,
+          "第一优先级保持不变，当前金额变化主要体现在分配额度上。",
+          "The top priority stays the same, so the amount change mainly affects sizing rather than ranking."
+        )
+      );
+    }
+
+    const baselineMap = new Map(baselineItems.map((item) => [item.assetClass, item]));
+    const accountShift = scenarioRun.items.find((item) => {
+      const baseline = baselineMap.get(item.assetClass);
+      return baseline && baseline.targetAccountType !== item.targetAccountType;
+    });
+    if (accountShift) {
+      const baseline = baselineMap.get(accountShift.assetClass)!;
+      diffs.push(
+        pick(
+          language,
+          `${getAssetClassLabel(accountShift.assetClass, language)} 的账户去向从 ${getAccountTypeLabel(baseline.targetAccountType, language)} 调整为 ${getAccountTypeLabel(accountShift.targetAccountType, language)}。`,
+          `${getAssetClassLabel(accountShift.assetClass, language)} shifts from ${getAccountTypeLabel(baseline.targetAccountType, language)} to ${getAccountTypeLabel(accountShift.targetAccountType, language)}.`
+        )
+      );
+    }
+
+    const newAsset = scenarioRun.items.find((item) => !baselineMap.has(item.assetClass));
+    if (newAsset) {
+      diffs.push(
+        pick(
+          language,
+          `${getAssetClassLabel(newAsset.assetClass, language)} 进入了这档金额下的优先队列。`,
+          `${getAssetClassLabel(newAsset.assetClass, language)} enters the priority queue at this contribution size.`
+        )
+      );
+    }
+
+    const removedAsset = baselineItems.find((item) => !scenarioRun.items.some((candidate) => candidate.assetClass === item.assetClass));
+    if (removedAsset) {
+      diffs.push(
+        pick(
+          language,
+          `${getAssetClassLabel(removedAsset.assetClass, language)} 在这档金额下暂时退出前三优先级。`,
+          `${getAssetClassLabel(removedAsset.assetClass, language)} falls out of the top priorities at this contribution size.`
+        )
+      );
+    }
+
+    if (diffs.length === 1 && scenarioIndex !== 1) {
+      diffs.push(
+        pick(
+          language,
+          "说明当前策略对投入规模相对稳定，可以把它理解为资金放大/缩小时的同一路径扩缩。",
+          "This suggests the current strategy is fairly stable across contribution sizes and mainly scales the same path up or down."
+        )
+      );
+    }
+
+    return diffs.slice(0, 3);
+  };
 
   return {
     displayContext: buildDisplayContext(display, language),
@@ -783,34 +887,151 @@ export function buildRecommendationsData(args: {
           pick(language, "账户额度和目标偏差会共同决定资产类别的优先级。", "Account room and target drift are used to rank asset classes."),
           pick(language, "只有在引擎先确定账户和资产袖口后，才会出现 ticker 选项。", "Ticker options appear only after the engine identifies the preferred account and asset sleeve.")
         ],
-    priorities: (latestRun?.items ?? []).map((item) => ({
-      assetClass: getAssetClassLabel(item.assetClass, language),
-      description: getRecommendationItemExplanation(item, display, language),
-      amount: formatDisplayCurrency(item.amountCad, display),
-      account: getAccountTypeLabel(item.targetAccountType, language),
-      security: item.securitySymbol && item.securityName
+    priorities: (latestRun?.items ?? []).map((item, index) => {
+      const leadSecurity = item.securitySymbol && item.securityName
         ? `${item.securitySymbol} - ${item.securityName}`
-        : item.tickerOptions[0] ?? pick(language, "待选标的", "Pending security"),
-      tickers: item.tickerOptions.join(", "),
-      accountFit: item.accountFitScore != null
-        ? pick(
+        : item.tickerOptions[0] ?? pick(language, "待选标的", "Pending security");
+      const alternatives = item.tickerOptions.filter((symbol) => symbol !== item.securitySymbol);
+      return {
+        id: `${item.assetClass}-${item.securitySymbol ?? item.tickerOptions[0] ?? index}`,
+        assetClass: getAssetClassLabel(item.assetClass, language),
+        description: getRecommendationItemExplanation(item, display, language),
+        amount: formatDisplayCurrency(item.amountCad, display),
+        account: getAccountTypeLabel(item.targetAccountType, language),
+        security: leadSecurity,
+        tickers: item.tickerOptions.join(", "),
+        accountFit: item.accountFitScore != null
+          ? pick(
+            language,
+            `${getAccountTypeFit(item.targetAccountType, language)} 匹配分 ${item.accountFitScore.toFixed(0)}/100`,
+            `${getAccountTypeFit(item.targetAccountType, language)} Score ${item.accountFitScore.toFixed(0)}/100`
+          )
+          : getAccountTypeFit(item.targetAccountType, language),
+        scoreline: pick(
           language,
-          `${getAccountTypeFit(item.targetAccountType, language)} 匹配分 ${item.accountFitScore.toFixed(0)}/100`,
-          `${getAccountTypeFit(item.targetAccountType, language)} Score ${item.accountFitScore.toFixed(0)}/100`
-        )
-        : getAccountTypeFit(item.targetAccountType, language),
-      scoreline: pick(
+          `标的分 ${item.securityScore?.toFixed(0) ?? "--"} / 账户分 ${item.accountFitScore?.toFixed(0) ?? "--"} / 税务分 ${item.taxFitScore?.toFixed(0) ?? "--"}`,
+          `Security ${item.securityScore?.toFixed(0) ?? "--"} / Account ${item.accountFitScore?.toFixed(0) ?? "--"} / Tax ${item.taxFitScore?.toFixed(0) ?? "--"}`
+        ),
+        gapSummary: item.allocationGapBeforePct != null && item.allocationGapAfterPct != null
+          ? pick(
+            language,
+            `偏离从 ${item.allocationGapBeforePct.toFixed(1)}% 收敛到 ${item.allocationGapAfterPct.toFixed(1)}%`,
+            `Gap narrows from ${item.allocationGapBeforePct.toFixed(1)}% to ${item.allocationGapAfterPct.toFixed(1)}%`
+          )
+          : pick(language, "等待生成后展示偏离变化。", "Gap change appears after generation."),
+        alternatives: alternatives.length > 0
+          ? alternatives
+          : [pick(language, "当前没有更高分的备选标的。", "No stronger alternative security is available right now.")],
+        whyThis: [
+          item.rationale
+            ? pick(
+              language,
+              `${getAssetClassLabel(item.assetClass, language)} 当前落后目标 ${item.rationale.gapBeforePct.toFixed(1)}%。`,
+              `${getAssetClassLabel(item.assetClass, language)} is currently ${item.rationale.gapBeforePct.toFixed(1)}% below target.`
+            )
+            : pick(language, "系统优先补足当前最大的配置缺口。", "The engine prioritizes the largest current allocation gap."),
+          pick(
+            language,
+            `${getAccountTypeLabel(item.targetAccountType, language)} 在当前约束下给出了最优账户匹配。`,
+            `${getAccountTypeLabel(item.targetAccountType, language)} produced the strongest account fit under the current constraints.`
+          ),
+          item.rationale?.existingHoldingSymbol && item.rationale.existingHoldingRiskContributionPct != null
+            ? pick(
+              language,
+              `${item.rationale.existingHoldingSymbol} 已经大约贡献了 ${item.rationale.existingHoldingRiskContributionPct.toFixed(0)}% 的组合风险，因此这条路径优先把新钱引向更能分散风险的账户与标的。`,
+              `${item.rationale.existingHoldingSymbol} already contributes about ${item.rationale.existingHoldingRiskContributionPct.toFixed(0)}% of total portfolio risk, so this path redirects new money toward an account and security combination that spreads risk out instead of reinforcing it.`
+            )
+            : pick(
+              language,
+              "这条路径除了补足配置缺口，也在主动避免把新钱继续堆进当前最重的风险来源。",
+              "This path not only closes the allocation gap, it also avoids stacking fresh money onto the current heaviest risk source."
+            ),
+          item.rationale?.watchlistMatched
+            ? pick(language, "主表达标的同时命中了你的观察列表。", "The lead security also matched your watchlist.")
+            : pick(language, "主表达标的是在当前候选池里得分最高的实现方式。", "The lead security is the highest-scoring expression in the current candidate set.")
+        ],
+        whyNot: [
+          alternatives.length > 0
+            ? pick(language, `备选 ${alternatives.join(" / ")} 的综合分低于当前首选。`, `Alternatives ${alternatives.join(" / ")} scored below the current lead security.`)
+            : pick(language, "当前没有明显更好的同类备选。", "No clearly stronger alternative is available in this sleeve."),
+          item.rationale?.existingHoldingSymbol && item.rationale.existingHoldingRiskContributionPct != null
+            ? pick(
+              language,
+              `${item.rationale.existingHoldingSymbol} 已经大约贡献了 ${item.rationale.existingHoldingRiskContributionPct.toFixed(0)}% 的组合风险，因此系统不会继续优先往同一风险来源加码。`,
+              `${item.rationale.existingHoldingSymbol} already contributes about ${item.rationale.existingHoldingRiskContributionPct.toFixed(0)}% of total portfolio risk, so the engine avoids doubling down on the same risk source.`
+            )
+            : pick(language, "系统会回避已经在当前袖口内过度集中的风险来源。", "The engine avoids leaning even harder into risk sources that are already concentrated inside the sleeve."),
+          (item.fxFrictionPenaltyBps ?? 0) > 0
+            ? pick(language, `跨币种摩擦约 ${item.fxFrictionPenaltyBps} bps，因此部分 USD 方案被下调。`, `Cross-currency friction of about ${item.fxFrictionPenaltyBps} bps pushed some USD ideas lower.`)
+            : pick(language, "当前路径没有显著的 FX 摩擦负担。", "This path does not carry a material FX friction cost.")
+        ],
+        constraints: [
+          {
+            label: pick(language, "配置缺口", "Allocation gap"),
+            detail: item.allocationGapBeforePct != null && item.allocationGapAfterPct != null
+              ? pick(
+                language,
+                `从 ${item.allocationGapBeforePct.toFixed(1)}% 收敛到 ${item.allocationGapAfterPct.toFixed(1)}%。`,
+                `Narrows from ${item.allocationGapBeforePct.toFixed(1)}% to ${item.allocationGapAfterPct.toFixed(1)}%.`
+              )
+              : pick(language, "等待下一次 run 更新。", "Will update on the next run."),
+            variant: "success" as const
+          },
+          {
+            label: pick(language, "税务/账户放置", "Tax / account placement"),
+            detail: pick(
+              language,
+              `${getAccountTypeLabel(item.targetAccountType, language)} 账户分 ${item.accountFitScore?.toFixed(0) ?? "--"}，税务分 ${item.taxFitScore?.toFixed(0) ?? "--"}。`,
+              `${getAccountTypeLabel(item.targetAccountType, language)} scores ${item.accountFitScore?.toFixed(0) ?? "--"} on account fit and ${item.taxFitScore?.toFixed(0) ?? "--"} on tax fit.`
+            ),
+            variant: profile.taxAwarePlacement ? "success" : "neutral"
+          },
+          {
+            label: pick(language, "FX 摩擦", "FX friction"),
+            detail: (item.fxFrictionPenaltyBps ?? 0) > 0
+              ? pick(language, `当前方案承担约 ${item.fxFrictionPenaltyBps} bps 的 FX 成本。`, `This path absorbs about ${item.fxFrictionPenaltyBps} bps of FX cost.`)
+              : pick(language, "当前方案没有显著 FX 惩罚。", "This path avoids material FX friction."),
+            variant: (item.fxFrictionPenaltyBps ?? 0) > 0 ? "warning" : "success"
+          }
+        ],
+        execution: [
+          { label: pick(language, "建议金额", "Suggested amount"), value: formatDisplayCurrency(item.amountCad, display) },
+          {
+            label: pick(language, "主表达标的", "Lead security"),
+            value: item.securitySymbol ?? item.tickerOptions[0] ?? pick(language, "待选", "Pending")
+          },
+          {
+            label: pick(language, "账户去向", "Target account"),
+            value: getAccountTypeLabel(item.targetAccountType, language)
+          },
+          {
+            label: pick(language, "执行提示", "Execution note"),
+            value: item.rationale?.minTradeApplied
+              ? pick(language, "当前金额较小，建议与下一笔资金合并执行。", "This is a small trade; consider batching it with the next contribution.")
+              : pick(language, "当前金额已足够形成独立执行动作。", "The current amount is large enough to stand on its own.")
+          }
+        ]
+      };
+    }),
+    scenarios: scenarioRuns.map((scenarioRun, scenarioIndex) => ({
+      id: `scenario-${scenarioRun.contributionAmountCad}-${scenarioIndex}`,
+      label: scenarioIndex === 0
+        ? pick(language, "轻投入", "Light contribution")
+        : scenarioIndex === scenarioRuns.length - 1
+          ? pick(language, "加倍投入", "Double-sized contribution")
+          : pick(language, "当前投入", "Current contribution"),
+      amount: formatDisplayCurrency(scenarioRun.contributionAmountCad, display),
+      summary: pick(
         language,
-        `标的分 ${item.securityScore?.toFixed(0) ?? "--"} / 账户分 ${item.accountFitScore?.toFixed(0) ?? "--"}`,
-        `Security ${item.securityScore?.toFixed(0) ?? "--"} / Account ${item.accountFitScore?.toFixed(0) ?? "--"}`
+        "这一组是重新求解后的对照结果，用来判断不同投入规模下的动作顺序和账户去向是否保持稳定。",
+        "This set is re-solved from the engine so you can see whether the action order and account routing stay stable at different contribution sizes."
       ),
-      gapSummary: item.allocationGapBeforePct != null && item.allocationGapAfterPct != null
-        ? pick(
-          language,
-          `偏离从 ${item.allocationGapBeforePct.toFixed(1)}% 收敛到 ${item.allocationGapAfterPct.toFixed(1)}%`,
-          `Gap narrows from ${item.allocationGapBeforePct.toFixed(1)}% to ${item.allocationGapAfterPct.toFixed(1)}%`
-        )
-        : pick(language, "等待生成后展示偏离变化。", "Gap change appears after generation.")
+      diffs: buildScenarioDiffs(scenarioRun, scenarioIndex),
+      allocations: scenarioRun.items.map((item) => ({
+        assetClass: getAssetClassLabel(item.assetClass, language),
+        amount: formatDisplayCurrency(item.amountCad, display),
+        account: getAccountTypeLabel(item.targetAccountType, language)
+      }))
     })),
     notes: [
       profile.taxAwarePlacement

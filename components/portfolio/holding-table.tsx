@@ -2,6 +2,7 @@ import { Badge } from "@/components/ui/badge";
 import { EmptyStatePanel } from "@/components/ui/empty-state-panel";
 
 type HoldingTableRow = {
+  id: string;
   symbol: string;
   account: string;
   lastPrice: string;
@@ -10,6 +11,8 @@ type HoldingTableRow = {
   weight: string;
   gainLoss: string;
   signal: string;
+  highlighted?: boolean;
+  highlightLabel?: string;
 };
 
 export function HoldingTable({ holdings }: { holdings: HoldingTableRow[] }) {
@@ -29,8 +32,22 @@ export function HoldingTable({ holdings }: { holdings: HoldingTableRow[] }) {
         </thead>
         <tbody>
           {holdings.map((holding) => (
-            <tr key={`${holding.account}-${holding.symbol}`} className="border-t border-white/45">
-              <td className="py-4 font-medium text-[color:var(--foreground)]">{holding.symbol}</td>
+            <tr
+              key={holding.id}
+              className={holding.highlighted
+                ? "border-t border-[rgba(232,121,249,0.35)] bg-[linear-gradient(135deg,rgba(255,255,255,0.7),rgba(245,214,235,0.42),rgba(212,226,255,0.34))]"
+                : "border-t border-white/45"}
+            >
+              <td className="py-4 font-medium text-[color:var(--foreground)]">
+                <div className="flex flex-col gap-2">
+                  <span>{holding.symbol}</span>
+                  {holding.highlightLabel ? (
+                    <span className="inline-flex w-fit rounded-full border border-[rgba(232,121,249,0.22)] bg-[rgba(255,255,255,0.82)] px-2.5 py-1 text-xs font-medium text-[color:var(--foreground)]">
+                      {holding.highlightLabel}
+                    </span>
+                  ) : null}
+                </div>
+              </td>
               <td className="py-4 text-[color:var(--muted-foreground)]">{holding.account}</td>
               <td className="py-4">{holding.lastPrice}</td>
               <td className="py-4">

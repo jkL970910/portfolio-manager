@@ -251,12 +251,18 @@ components/
 
 - File: [donut-chart.tsx](E:\Projects\Portfolio%20Manager\components\charts\donut-chart.tsx)
 - Purpose: allocation and distribution breakdowns
+- Supports:
+  - optional active slice emphasis
+  - optional active legend badge for deep-linked account focus
 
 ### `RadarPreview`
 
 - File: [radar-preview.tsx](E:\Projects\Portfolio%20Manager\components\charts\radar-preview.tsx)
 - Purpose: small health-score preview surface
 - Current status: limited preview usage, not full analysis component yet
+- Supports:
+  - optional CTA href
+  - optional CTA label
 
 ## Domain Components
 
@@ -280,15 +286,30 @@ components/
 
 - [quick-action-card.tsx](E:\Projects\Portfolio%20Manager\components\portfolio\quick-action-card.tsx)
   - reusable quick action surface for analytical sidebars
+  - now supports optional `href` so sidebar actions can jump into deeper analysis surfaces
 - [holding-table.tsx](E:\Projects\Portfolio%20Manager\components\portfolio\holding-table.tsx)
   - reusable holdings detail table with freshness badges
+  - supports optional highlighted rows when health drill-down cards deep-link back into `/portfolio`
 - [refresh-prices-panel.tsx](E:\Projects\Portfolio%20Manager\components\portfolio\refresh-prices-panel.tsx)
   - batch quote refresh workflow
+- [health-dimension-card.tsx](E:\Projects\Portfolio%20Manager\components\portfolio\health-dimension-card.tsx)
+  - detailed health-score breakdown card for a single dimension
+- [health-action-queue.tsx](E:\Projects\Portfolio%20Manager\components\portfolio\health-action-queue.tsx)
+  - ordered action list used by the health detail page
+- [health-drilldown-card.tsx](E:\Projects\Portfolio%20Manager\components\portfolio\health-drilldown-card.tsx)
+  - account-level and holding-level diagnostic card used by the health detail page
+  - each drill-down card can deep-link back into `/portfolio`, where the matching rows should remain visually highlighted
+  - supports a card-level contribution amount switcher so the user can compare which dimension would improve first under different next-contribution sizes
 
 ### Recommendations
 
 - [recommendation-run-panel.tsx](E:\Projects\Portfolio%20Manager\components\recommendations\recommendation-run-panel.tsx)
   - generate recommendation run action panel
+- [recommendation-detail-card.tsx](E:\Projects\Portfolio%20Manager\components\recommendations\recommendation-detail-card.tsx)
+  - expanded recommendation explanation surface with a unified decision trace, alternatives, constraint trace, and execution detail
+  - defaults to the first three decision steps and can expand into the full trace on demand
+- [scenario-compare-card.tsx](E:\Projects\Portfolio%20Manager\components\recommendations\scenario-compare-card.tsx)
+  - re-solved scenario compare surface with change-summary text versus the current recommendation run
 
 ### Settings
 

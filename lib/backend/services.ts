@@ -686,9 +686,11 @@ export async function getPortfolioView(userId: string) {
 
 export async function getRecommendationView(userId: string) {
   const repositories = getRepositories();
-  const [user, profile] = await Promise.all([
+  const [user, profile, accounts, holdings] = await Promise.all([
     repositories.users.getById(userId),
-    repositories.preferences.getByUserId(userId)
+    repositories.preferences.getByUserId(userId),
+    repositories.accounts.listByUserId(userId),
+    repositories.holdings.listByUserId(userId)
   ]);
   let latestRun: RecommendationRun | null = null;
   try {
@@ -697,13 +699,46 @@ export async function getRecommendationView(userId: string) {
     latestRun = null;
   }
 
+  const scenarioAmounts = latestRun && latestRun.contributionAmountCad > 0
+    ? [...new Set([
+      Math.max(500, Math.round((latestRun.contributionAmountCad * 0.5) / 500) * 500),
+      latestRun.contributionAmountCad,
+      Math.max(1000, Math.round((latestRun.contributionAmountCad * 2) / 500) * 500)
+    ])]
+    : [];
+
+  const scenarioRuns = latestRun && accounts.length > 0 && holdings.length > 0
+    ? scenarioAmounts.map((amountCad, index) => {
+      const scenarioRecommendation = buildRecommendationV2({
+        accounts,
+        holdings,
+        profile,
+        contributionAmountCad: amountCad,
+        language: user.displayLanguage
+      });
+
+      return {
+        id: `scenario-${amountCad}-${index}`,
+        userId,
+        contributionAmountCad: amountCad,
+        createdAt: latestRun.createdAt,
+        engineVersion: scenarioRecommendation.engineVersion,
+        objective: scenarioRecommendation.objective,
+        confidenceScore: scenarioRecommendation.confidenceScore,
+        assumptions: scenarioRecommendation.assumptions,
+        notes: scenarioRecommendation.notes,
+        items: scenarioRecommendation.items
+      } satisfies RecommendationRun;
+    })
+    : [];
+
   const display = {
     currency: user.baseCurrency,
     cadToDisplayRate: await getFxRate("CAD", user.baseCurrency)
   } as const;
 
   return apiSuccess({
-    ...buildRecommendationsData({ language: user.displayLanguage, profile, latestRun, display }),
+    ...buildRecommendationsData({ language: user.displayLanguage, profile, latestRun, scenarioRuns, display }),
     run: latestRun ?? createEmptyRun(userId)
   }, "database");
 }

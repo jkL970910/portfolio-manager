@@ -13,10 +13,39 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { SectionHeading } from "@/components/ui/section-heading";
 import { pick } from "@/lib/i18n/ui";
 
-export default async function PortfolioPage() {
+export default async function PortfolioPage({
+  searchParams
+}: {
+  searchParams?: Promise<{ account?: string; holding?: string }>;
+}) {
   const viewer = await requireViewer();
   const language = viewer.displayLanguage;
   const { data } = await getPortfolioView(viewer.id);
+  const filters = (await searchParams) ?? {};
+  const filteredHoldings = (filters.holding
+    ? data.holdings.filter((holding) => holding.id === filters.holding)
+    : filters.account
+      ? data.holdings.filter((holding) => holding.accountId === filters.account)
+      : data.holdings)
+    .map((holding) => ({
+      ...holding,
+      highlighted: Boolean(filters.holding || filters.account),
+      highlightLabel: filters.holding
+        ? pick(language, "来自健康评分明细的重点持仓", "Highlighted from health detail")
+        : filters.account
+          ? pick(language, "来自健康评分明细的重点账户", "Highlighted from health detail")
+          : undefined
+    }));
+  const activeFilterLabel = filters.holding
+    ? pick(language, "当前只显示一个重点持仓。", "Currently focused on one holding.")
+    : filters.account
+      ? pick(language, "当前只显示一个账户下的持仓。", "Currently focused on a single account.")
+      : null;
+  const activeAccount = filters.account
+    ? data.accountAllocation.find((entry) => entry.name === filteredHoldings[0]?.account)
+    : filters.holding
+      ? data.accountAllocation.find((entry) => entry.name === filteredHoldings[0]?.account)
+      : null;
 
   return (
     <AppShell
@@ -52,7 +81,15 @@ export default async function PortfolioPage() {
           />
           <LineChartCard title={pick(language, "近 6 个月表现", "6-Month Performance")} description={pick(language, "收益走势从首页移到这里，让总览页保持更轻。", "Performance history moved here from Dashboard to keep the overview page lighter.")} data={data.performance} dataKey="value" color="#152238" />
           <div className="grid gap-4 2xl:grid-cols-2">
-            <DonutChartCard title={pick(language, "账户分布", "Account Allocation")} description={pick(language, "按账户拆分当前敞口。", "Account-level exposure split.")} data={data.accountAllocation} />
+            <DonutChartCard
+              title={pick(language, "账户分布", "Account Allocation")}
+              description={pick(language, "按账户拆分当前敞口。", "Account-level exposure split.")}
+              data={data.accountAllocation}
+              activeName={activeAccount?.name}
+              activeLabel={activeAccount
+                ? pick(language, "当前过滤命中账户", "Matched account")
+                : undefined}
+            />
             <DonutChartCard title={pick(language, "行业暴露", "Sector Exposure")} description={pick(language, "按当前持仓查看行业集中度。", "Sector concentration by current holdings.")} data={data.sectorExposure} />
           </div>
           <Card>
@@ -60,7 +97,20 @@ export default async function PortfolioPage() {
               <CardTitle>{pick(language, "持仓明细", "Holdings Detail")}</CardTitle>
             </CardHeader>
             <CardContent>
-              <HoldingTable holdings={data.holdings} />
+              {activeFilterLabel ? (
+                <div className="mb-4 flex flex-col gap-3 rounded-[24px] border border-white/55 bg-white/38 p-4 backdrop-blur-md sm:flex-row sm:items-center sm:justify-between">
+                  <div className="space-y-1">
+                    <p className="text-sm text-[color:var(--muted-foreground)]">{activeFilterLabel}</p>
+                    <p className="text-xs text-[color:var(--muted-foreground)]">
+                      {pick(language, "命中的持仓已在表格中高亮显示，方便从健康评分视图回看具体对象。", "Matched holdings are highlighted below so the health detail deep-link stays visually obvious.")}
+                    </p>
+                  </div>
+                  <Button href="/portfolio" variant="secondary">
+                    {pick(language, "清除过滤", "Clear filter")}
+                  </Button>
+                </div>
+              ) : null}
+              <HoldingTable holdings={filteredHoldings} />
             </CardContent>
           </Card>
         </div>
@@ -75,6 +125,8 @@ export default async function PortfolioPage() {
               `Strongest dimension: ${data.healthScore.strongestDimension}. Weakest dimension: ${data.healthScore.weakestDimension}.`
             )}
             data={data.healthScore.radar}
+            href="/portfolio/health"
+            ctaLabel={pick(language, "打开健康评分详情", "Open health score detail")}
           />
           <Card>
             <CardHeader>
@@ -86,9 +138,9 @@ export default async function PortfolioPage() {
                 freshness={data.quoteStatus.freshness}
                 coverage={data.quoteStatus.coverage}
               />
-              <QuickActionCard icon={<ShieldAlert className="h-4 w-4" />} title={pick(language, "查看集中度风险", "Review Concentration Risk")} description={pick(language, "检查哪些持仓正在推高单一标的暴露。", "Inspect the positions driving the highest single-name exposure.")} />
+              <QuickActionCard icon={<ShieldAlert className="h-4 w-4" />} title={pick(language, "查看集中度风险", "Review Concentration Risk")} description={pick(language, "检查哪些持仓正在推高单一标的暴露。", "Inspect the positions driving the highest single-name exposure.")} href="/portfolio/health" />
               <QuickActionCard icon={<PieChart className="h-4 w-4" />} title={pick(language, "查看配置缺口", "Inspect Allocation Gaps")} description={pick(language, "在投入新资金前，先看清最大的高配和低配资产类。", "See the biggest underweight and overweight classes before funding.")} />
-              <QuickActionCard icon={<CircleGauge className="h-4 w-4" />} title={pick(language, "打开推荐驱动因素", "Open Recommendation Drivers")} description={pick(language, "追踪哪些组合信号正在推动当前建议。", "Trace which portfolio signals are pushing the current recommendation.")} />
+              <QuickActionCard icon={<CircleGauge className="h-4 w-4" />} title={pick(language, "打开推荐驱动因素", "Open Recommendation Drivers")} description={pick(language, "追踪哪些组合信号正在推动当前建议。", "Trace which portfolio signals are pushing the current recommendation.")} href="/recommendations" />
               <QuickActionCard icon={<BarChart3 className="h-4 w-4" />} title={pick(language, "查看行业暴露", "View Sector Exposure")} description={pick(language, "识别过度集中的行业或主题敞口。", "Surface over-indexed sectors and thematic concentration.")} />
             </CardContent>
           </Card>

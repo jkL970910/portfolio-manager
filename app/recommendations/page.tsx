@@ -4,6 +4,8 @@ import { requireViewer } from "@/lib/auth/session";
 import { getRecommendationView } from "@/lib/backend/services";
 import { AppShell } from "@/components/layout/app-shell";
 import { RecommendationRunPanel } from "@/components/recommendations/recommendation-run-panel";
+import { RecommendationDetailCard } from "@/components/recommendations/recommendation-detail-card";
+import { ScenarioCompareCard } from "@/components/recommendations/scenario-compare-card";
 import { EmptyStatePanel } from "@/components/ui/empty-state-panel";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -103,37 +105,7 @@ export default async function RecommendationsPage() {
             </CardHeader>
             <CardContent className="space-y-4">
               {data.priorities.map((priority, index) => (
-                <div key={priority.assetClass} className="rounded-[24px] border border-white/55 bg-white/42 p-5 backdrop-blur-md">
-                  <div className="flex items-center justify-between gap-4">
-                    <div>
-                      <div className="flex items-center gap-3">
-                    <Badge variant="primary">#{index + 1}</Badge>
-                        <p className="text-lg font-semibold">{priority.assetClass}</p>
-                      </div>
-                      <p className="mt-2 text-sm text-[color:var(--muted-foreground)]">{priority.description}</p>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-2xl font-semibold">{priority.amount}</p>
-                      <p className="text-sm text-[color:var(--muted-foreground)]">{priority.account}</p>
-                    </div>
-                  </div>
-                  <div className="mt-4 grid gap-3 sm:grid-cols-3">
-                    <div className="rounded-[24px] border border-white/55 bg-white/34 p-4 backdrop-blur-md">
-                      <p className="text-xs uppercase tracking-[0.16em] text-[color:var(--muted-foreground)]">{pick(language, "主表达标的", "Lead security")}</p>
-                      <p className="mt-2 font-medium">{priority.security}</p>
-                      <p className="mt-2 text-sm text-[color:var(--muted-foreground)]">{priority.gapSummary}</p>
-                    </div>
-                    <div className="rounded-[24px] border border-white/55 bg-white/34 p-4 backdrop-blur-md">
-                      <p className="text-xs uppercase tracking-[0.16em] text-[color:var(--muted-foreground)]">{pick(language, "Ticker 备选", "Ticker options")}</p>
-                      <p className="mt-2 font-medium">{priority.tickers}</p>
-                    </div>
-                    <div className="rounded-[24px] border border-white/55 bg-white/34 p-4 backdrop-blur-md">
-                      <p className="text-xs uppercase tracking-[0.16em] text-[color:var(--muted-foreground)]">{pick(language, "账户匹配", "Account fit")}</p>
-                      <p className="mt-2 font-medium">{priority.accountFit}</p>
-                      <p className="mt-2 text-sm text-[color:var(--muted-foreground)]">{priority.scoreline}</p>
-                    </div>
-                  </div>
-                </div>
+                <RecommendationDetailCard key={priority.id} language={language} index={index} priority={priority} />
               ))}
               {data.priorities.length === 0 ? (
                 <EmptyStatePanel
@@ -143,6 +115,9 @@ export default async function RecommendationsPage() {
               ) : null}
             </CardContent>
           </Card>
+          {data.scenarios.length > 0 ? (
+            <ScenarioCompareCard language={language} scenarios={data.scenarios} />
+          ) : null}
           <div className="grid gap-4 lg:grid-cols-2">
             <Card>
               <CardHeader>
@@ -152,10 +127,10 @@ export default async function RecommendationsPage() {
                 <div className="rounded-[24px] border border-white/55 bg-white/36 p-4 backdrop-blur-md">
                   <div className="flex items-center gap-2 font-medium">
                     <ShieldCheck className="h-4 w-4 text-[color:var(--success)]" />
-                    {pick(language, "置信度：中高", "Confidence: medium-high")}
+                    {pick(language, `置信度：${data.engine.confidence}`, `Confidence: ${data.engine.confidence}`)}
                   </div>
                   <p className="mt-2 text-sm text-[color:var(--muted-foreground)]">
-                    {pick(language, "基于你当前保存的偏好、组合偏离和账户空间生成。", "Based on your configured preferences, current drift, and account room.")}
+                    {pick(language, "这代表当前 run 在配置偏离、账户适配和标的选择之间的综合把握度。它是解释型信号，不是执行保证。", "This reflects the engine's combined confidence across drift reduction, account placement, and security choice. It is an explanatory signal, not an execution guarantee.")}
                   </p>
                 </div>
                 {data.notes.map((note) => (

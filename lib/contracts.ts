@@ -12,6 +12,7 @@ export interface DashboardData {
   };
   metrics: MetricCard[];
   accounts: {
+    id: string;
     name: string;
     caption: string;
     value: string;
@@ -27,6 +28,7 @@ export interface DashboardData {
   }[];
   assetMix: { name: string; value: number }[];
   topHoldings: {
+    id: string;
     symbol: string;
     name: string;
     account: string;
@@ -78,9 +80,49 @@ export interface PortfolioData {
     highlights: string[];
     strongestDimension: string;
     weakestDimension: string;
+    dimensions: {
+      id: string;
+      label: string;
+      score: number;
+      status: string;
+      summary: string;
+      drivers: string[];
+      actions: string[];
+    }[];
+    actionQueue: string[];
+    accountDrilldown: {
+      id: string;
+      label: string;
+      href?: string;
+      score: number;
+      status: string;
+      summary: string;
+      impactHints?: {
+        amount: number;
+        hint: string;
+      }[];
+      drivers: string[];
+      actions: string[];
+    }[];
+    holdingDrilldown: {
+      id: string;
+      label: string;
+      href?: string;
+      score: number;
+      status: string;
+      summary: string;
+      impactHints?: {
+        amount: number;
+        hint: string;
+      }[];
+      drivers: string[];
+      actions: string[];
+    }[];
   };
   holdings: {
+    id: string;
     symbol: string;
+    accountId: string;
     account: string;
     lastPrice: string;
     lastUpdated: string;
@@ -107,6 +149,7 @@ export interface RecommendationsData {
   inputs: { label: string; value: string }[];
   explainer: string[];
   priorities: {
+    id: string;
     assetClass: string;
     description: string;
     amount: string;
@@ -116,6 +159,30 @@ export interface RecommendationsData {
     accountFit: string;
     scoreline: string;
     gapSummary: string;
+    alternatives: string[];
+    whyThis: string[];
+    whyNot: string[];
+    constraints: {
+      label: string;
+      detail: string;
+      variant: "success" | "warning" | "neutral";
+    }[];
+    execution: {
+      label: string;
+      value: string;
+    }[];
+  }[];
+  scenarios: {
+    id: string;
+    label: string;
+    amount: string;
+    summary: string;
+    diffs: string[];
+    allocations: {
+      assetClass: string;
+      amount: string;
+      account: string;
+    }[];
   }[];
   notes: string[];
 }

@@ -162,6 +162,9 @@ export interface RecommendationItem {
     fxPenaltyBps: number;
     minTradeApplied: boolean;
     watchlistMatched: boolean;
+    existingHoldingSymbol?: string;
+    existingHoldingWeightPct?: number;
+    existingHoldingRiskContributionPct?: number;
   };
 }
 

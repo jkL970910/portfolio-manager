@@ -94,6 +94,8 @@ export default async function DashboardPage() {
             `Strongest dimension: ${data.healthScore.strongestDimension}. Weakest dimension: ${data.healthScore.weakestDimension}.`
           )}
           data={data.healthPreview}
+          href="/portfolio/health"
+          ctaLabel={pick(language, "打开健康评分详情", "Open health score detail")}
         />
       </div>
 
@@ -129,7 +131,7 @@ export default async function DashboardPage() {
             </CardHeader>
             <CardContent className="space-y-4">
               {data.accounts.map((account) => (
-                <div key={account.name} className="flex items-center justify-between rounded-[24px] border border-white/55 bg-white/36 p-4 backdrop-blur-md">
+                <div key={account.id} className="flex items-center justify-between rounded-[24px] border border-white/55 bg-white/36 p-4 backdrop-blur-md">
                   <div>
                     <div className="flex items-center gap-2">
                       <p className="font-medium">{account.name}</p>
@@ -180,7 +182,7 @@ export default async function DashboardPage() {
             </CardHeader>
             <CardContent className="space-y-3">
               {data.topHoldings.map((holding) => (
-                <div key={holding.symbol} className="flex items-center justify-between rounded-[24px] border border-white/55 bg-white/36 p-4 backdrop-blur-md">
+                <div key={holding.id} className="flex items-center justify-between rounded-[24px] border border-white/55 bg-white/36 p-4 backdrop-blur-md">
                   <div>
                     <p className="font-medium">
                       {holding.symbol} <span className="text-sm text-[color:var(--muted-foreground)]">{holding.name}</span>

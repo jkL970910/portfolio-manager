@@ -10,12 +10,16 @@ export function RadarPreviewCard({
   title,
   status,
   description,
-  data
+  data,
+  href = "/portfolio",
+  ctaLabel = "Preview analysis"
 }: {
   title: string;
   status: string;
   description: string;
   data: Array<{ dimension: string; value: number }>;
+  href?: string;
+  ctaLabel?: string;
 }) {
   const [isMounted, setIsMounted] = useState(false);
 
@@ -46,8 +50,8 @@ export function RadarPreviewCard({
             <div className="h-full rounded-full bg-[color:var(--card-muted)]" />
           )}
         </div>
-        <Button href="/portfolio" variant="secondary" className="w-full">
-          Preview analysis
+        <Button href={href} variant="secondary" className="w-full">
+          {ctaLabel}
         </Button>
       </CardContent>
     </Card>

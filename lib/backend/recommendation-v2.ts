@@ -1,4 +1,4 @@
-import {
+﻿import {
   AccountType,
   CurrencyCode,
   HoldingPosition,
@@ -6,7 +6,7 @@ import {
   PreferenceProfile,
   RecommendationRun
 } from "@/lib/backend/models";
-import { getAssetClassLabel, getAccountTypeLabel } from "@/lib/i18n/finance";
+import { getAssetClassLabel, getAccountTypeLabel, getRiskProfileLabel } from "@/lib/i18n/finance";
 import type { DisplayLanguage } from "@/lib/i18n/ui";
 import { pick } from "@/lib/i18n/ui";
 
@@ -128,6 +128,14 @@ function getCurrentAllocationFromHoldings(holdings: HoldingPosition[]) {
   };
 }
 
+const ASSET_CLASS_RISK_WEIGHTS: Record<string, number> = {
+  "Canadian Equity": 1,
+  "US Equity": 1.12,
+  "International Equity": 1.08,
+  "Fixed Income": 0.42,
+  Cash: 0.08
+};
+
 function inferFxPolicy(accounts: InvestmentAccount[], holdings: HoldingPosition[]): FxPolicy {
   const hasUsdAccount = accounts.some((account) => (account.currency ?? "CAD") === "USD");
   const hasUsdHoldings = holdings.some((holding) => (holding.currency ?? "CAD") === "USD");
@@ -218,17 +226,17 @@ function buildRunNotes(profile: PreferenceProfile, fxPolicy: FxPolicy, language:
   return [
     pick(
       language,
-      `???? ${profile.riskProfile} ????,????????????????????`,
+      `当前 run 以 ${getRiskProfileLabel(profile.riskProfile, language)} 风险档位为起点，优先补足最明显的配置缺口。`,
       `This run uses the ${profile.riskProfile.toLowerCase()} target allocation and prioritizes the widest portfolio gaps.`
     ),
     pick(
       language,
-      `??????? ${profile.accountFundingPriority.map((type) => getAccountTypeLabel(type, language)).join(" -> ")},??????????`,
+      `账户放置遵循 ${profile.accountFundingPriority.map((type) => getAccountTypeLabel(type, language)).join(" -> ")}，并结合账户匹配与税务感知评分。`,
       `Account placement follows ${profile.accountFundingPriority.map((type) => getAccountTypeLabel(type, language)).join(" -> ")} with tax-aware scoring.`
     ),
     fxPolicy.hasUsdFundingPath
-      ? pick(language, "??? USD ????,?????????????", "A USD funding path is available, so cross-currency friction is penalized less aggressively.")
-      : pick(language, "???? USD ????,????????????? FX ?????", "No USD funding path was detected, so cross-currency ideas carry a higher FX friction penalty.")
+      ? pick(language, "已检测到 USD 入金路径，因此跨币种方案只会受到较轻的 FX 惩罚。", "A USD funding path is available, so cross-currency ideas carry only a light FX penalty.")
+      : pick(language, "未检测到 USD 入金路径，因此跨币种方案会承担更高的 FX 摩擦惩罚。", "No USD funding path was detected, so cross-currency ideas carry a higher FX friction penalty.")
   ];
 }
 
@@ -243,6 +251,17 @@ export function buildRecommendationV2(args: {
   const { total, allocation } = getCurrentAllocationFromHoldings(holdings);
   const targetAllocation = getTargetAllocation(profile);
   const fxPolicy = inferFxPolicy(accounts, holdings);
+  const holdingRiskContributionRaw = holdings.map((holding) => ({
+    holding,
+    weightedRisk: holding.weightPct * (ASSET_CLASS_RISK_WEIGHTS[holding.assetClass] ?? 1)
+  }));
+  const totalHoldingWeightedRisk = holdingRiskContributionRaw.reduce((sum, item) => sum + item.weightedRisk, 0) || 1;
+  const holdingRiskContribution = new Map(
+    holdingRiskContributionRaw.map((item) => [
+      item.holding.symbol.toUpperCase(),
+      round((item.weightedRisk / totalHoldingWeightedRisk) * 100, 1)
+    ])
+  );
 
   const targetGaps = targetAllocation
     .map((target) => {
@@ -296,6 +315,9 @@ export function buildRecommendationV2(args: {
     const postTradeGapPct = projectedValue > 0
       ? round(priority.targetPct - (((currentAssetValue + rawAmount) / projectedValue) * 100), 2)
       : 0;
+    const existingHolding = holdings
+      .filter((holding) => holding.assetClass === priority.assetClass)
+      .sort((left, right) => right.weightPct - left.weightPct)[0];
     return {
       assetClass: priority.assetClass,
       amountCad: rawAmount,
@@ -303,7 +325,7 @@ export function buildRecommendationV2(args: {
       tickerOptions: topTickers,
       explanation: pick(
         language,
-        `${getAssetClassLabel(priority.assetClass, language)} ?????????,????? ${rawAmount.toLocaleString("en-CA")} CAD ?? ${getAccountTypeLabel(best.placement.account.type, language)},???? ${best.security.candidate.symbol}?`,
+        `${getAssetClassLabel(priority.assetClass, language)} 仍然落后于目标配置，因此把 ${rawAmount.toLocaleString("en-CA")} CAD 优先放进 ${getAccountTypeLabel(best.placement.account.type, language)}，并由 ${best.security.candidate.symbol} 作为主表达标的。`,
         `${getAssetClassLabel(priority.assetClass, language)} remains under target, so ${rawAmount.toLocaleString("en-CA")} CAD is routed into ${getAccountTypeLabel(best.placement.account.type, language)}, led by ${best.security.candidate.symbol}.`
       ),
       securitySymbol: best.security.candidate.symbol,
@@ -329,7 +351,10 @@ export function buildRecommendationV2(args: {
         fxPolicy: fxPolicy.hasUsdFundingPath ? "usd-funded" : "retail-fx",
         fxPenaltyBps: best.security.fxPenaltyBps,
         minTradeApplied: rawAmount < 500,
-        watchlistMatched: profile.watchlistSymbols.includes(best.security.candidate.symbol)
+        watchlistMatched: profile.watchlistSymbols.includes(best.security.candidate.symbol),
+        existingHoldingSymbol: existingHolding?.symbol,
+        existingHoldingWeightPct: existingHolding?.weightPct,
+        existingHoldingRiskContributionPct: existingHolding ? holdingRiskContribution.get(existingHolding.symbol.toUpperCase()) ?? undefined : undefined
       }
     };
   });
@@ -345,11 +370,11 @@ export function buildRecommendationV2(args: {
     confidenceScore,
     assumptions: buildRunNotes(profile, fxPolicy, language),
     notes: [
-      pick(language, "?????????????,????????", "This version only allocates new money and does not suggest sell-side rebalancing."),
-      pick(language, "??????????????????,?????????", "Account fit and tax-location currently use a heuristic matrix and can be refined further."),
+      pick(language, "当前版本只处理新增资金，不会主动给出卖出型再平衡建议。", "This version only allocates new money and does not suggest sell-side rebalancing."),
+      pick(language, "账户匹配和税务放置目前仍然基于启发式矩阵，后续还可以继续精细化。", "Account fit and tax-location currently use a heuristic matrix and can be refined further."),
       fxPolicy.hasUsdFundingPath
-        ? pick(language, "????? USD ????,USD ????????????", "USD securities are not automatically excluded because a USD funding path is available.")
-        : pick(language, "?????? USD ????,USD ???????? FX ?????", "USD securities carry higher FX friction because no USD funding path was detected.")
+        ? pick(language, "由于存在 USD 入金路径，USD 标的不被自动排除，但仍会保留轻度 FX 成本评估。", "USD securities are not automatically excluded because a USD funding path is available.")
+        : pick(language, "由于没有检测到 USD 入金路径，USD 标的会承担更高的 FX 摩擦惩罚。", "USD securities carry higher FX friction because no USD funding path was detected.")
     ],
     items
   };
@@ -358,3 +383,4 @@ export function buildRecommendationV2(args: {
 export function getAccountPlacementMatrix() {
   return ACCOUNT_FIT_MATRIX;
 }
+
