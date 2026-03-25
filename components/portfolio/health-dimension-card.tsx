@@ -33,9 +33,18 @@ export function HealthDimensionCard({
             <p className="mt-2 text-sm leading-7 text-[color:var(--muted-foreground)]">{dimension.summary}</p>
           </div>
         </div>
-        <Badge variant={dimension.score >= 82 ? "success" : dimension.score >= 68 ? "neutral" : "warning"}>
-          {dimension.score}/100
-        </Badge>
+        <div className="flex flex-col items-end gap-2">
+          <p className="text-xs uppercase tracking-[0.16em] text-[color:var(--muted-foreground)]">当前状态</p>
+          <Badge variant={dimension.score >= 82 ? "success" : dimension.score >= 68 ? "neutral" : "warning"}>
+            {dimension.status}
+          </Badge>
+          <span
+            title="这个分数只是方便系统排序和比较，不是绝对评级。真正更值得看的是上面的状态和下面的解释。"
+            className="cursor-help border-b border-dotted border-[color:var(--muted-foreground)] text-xs text-[color:var(--muted-foreground)]"
+          >
+            {dimension.score}/100
+          </span>
+        </div>
       </CardHeader>
       <CardContent className="grid gap-4 xl:grid-cols-3">
         <div className="space-y-3">

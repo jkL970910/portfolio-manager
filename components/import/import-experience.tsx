@@ -27,7 +27,7 @@ import { InfoRow } from "@/components/ui/info-row";
 import { extractCsvHeaders, previewCsvContent, type ImportFieldMapping } from "@/lib/backend/csv-import";
 import { assertApiData, getApiErrorMessage, safeJson } from "@/lib/client/api";
 import { getAccountTypeLabel, getAssetClassLabel } from "@/lib/i18n/finance";
-import { getImportMappingGroupTitle, getImportPresetLabel } from "@/lib/i18n/import";
+import { getImportFieldMeta, getImportMappingGroupTitle, getImportPresetLabel } from "@/lib/i18n/import";
 import { DisplayLanguage, pick } from "@/lib/i18n/ui";
 
 type ImportMode = "guided" | "direct";
@@ -1698,13 +1698,13 @@ function StepProvideSource(props: {
           {guidedCsvHeaders.length > 0 ? (
             <div className="space-y-4 rounded-2xl border border-[color:var(--border)] bg-[color:var(--card-muted)] p-4">
             <div className="flex items-center justify-between gap-3">
-                <p className="font-medium">{pick(language, "字段映射", "Field mapping")}</p>
+                <p className="font-medium">{pick(language, "先把表头对上", "Field mapping")}</p>
                 <Button type="button" variant="secondary" leadingIcon={<Save className="h-4 w-4" />} onClick={onSaveGuidedPreset}>
                   {pick(language, "保存当前预设", "Save current preset")}
                 </Button>
               </div>
               <label className="space-y-2">
-                <span className="text-sm font-medium">{pick(language, "映射预设", "Mapping preset")}</span>
+                <span className="text-sm font-medium">{pick(language, "先套一个常用对照表", "Mapping preset")}</span>
                 <select
                   value={guidedCsvSelectedPresetKey}
                   onChange={(event) => onGuidedCsvPresetChange(event.target.value)}
@@ -1722,9 +1722,17 @@ function StepProvideSource(props: {
                 <div key={group.title} className="space-y-3">
                   <p className="text-xs uppercase tracking-[0.14em] text-[color:var(--muted-foreground)]">{getImportMappingGroupTitle(group.title, language)}</p>
                   <div className="grid gap-3 md:grid-cols-2">
-                    {group.fields.map((field) => (
+                    {group.fields.map((field) => {
+                      const fieldMeta = getImportFieldMeta(field, language);
+                      return (
                       <label key={field} className="space-y-2">
-                        <span className="text-sm font-medium">{field}</span>
+                        <div className="space-y-1">
+                          <span className="text-sm font-medium">{fieldMeta.label}</span>
+                          <p className="text-xs leading-6 text-[color:var(--muted-foreground)]">
+                            <code className="mr-1 rounded bg-[color:var(--card-muted)] px-1.5 py-0.5 text-[11px]">{field}</code>
+                            {fieldMeta.help}
+                          </p>
+                        </div>
                         <select
                           value={guidedCsvFieldMapping[field] ?? ""}
                           onChange={(event) => onGuidedCsvFieldMappingChange(field, event.target.value)}
@@ -1735,17 +1743,17 @@ function StepProvideSource(props: {
                             <option key={`${field}-${header}`} value={header}>
                               {header}
                             </option>
-                          ))}
+                            ))}
                         </select>
                       </label>
-                    ))}
+                    )})}
                   </div>
                 </div>
               ))}
 
               {guidedCsvMissingRequiredMappings.length > 0 ? (
                 <div className="rounded-2xl border border-[#e7b0b8] bg-[#fff3f5] px-4 py-3 text-sm text-[#8e2433]">
-                  {pick(language, "缺少必填映射：", "Required mappings missing: ")}{guidedCsvMissingRequiredMappings.join(", ")}
+                  {pick(language, "还有这些关键列没对上：", "These required fields are still missing: ")}{guidedCsvMissingRequiredMappings.join(", ")}
                 </div>
               ) : null}
 
@@ -1756,6 +1764,9 @@ function StepProvideSource(props: {
                     <p className="font-medium">{pick(language, "预览", "Preview")}</p>
                     <Badge variant="neutral">{pick(language, `前 ${guidedCsvPreview.rows.length} 行`, `First ${guidedCsvPreview.rows.length} rows`)}</Badge>
                   </div>
+                  <p className="text-sm leading-7 text-[color:var(--muted-foreground)]">
+                    {pick(language, "快速检查方法：先确认账户编号和记录类型没接错，再看代码、股数、总市值这些关键列是不是都对到了你文件里的真实表头。", "Quick check: confirm account key and record type first, then make sure symbol, quantity, and market value point to the real headers in your file.")}
+                  </p>
                   <div className="overflow-x-auto rounded-2xl border border-[color:var(--border)] bg-white">
                     <table className="min-w-full text-left text-sm">
                       <thead className="bg-[color:var(--card-muted)]">

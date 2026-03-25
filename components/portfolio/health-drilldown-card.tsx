@@ -113,7 +113,9 @@ export function HealthDrilldownCard({
                   <Badge variant={item.score >= 82 ? "success" : item.score >= 68 ? "neutral" : "warning"}>
                     {item.score}/100
                   </Badge>
-                  <span className="text-sm text-[color:var(--muted-foreground)]">{item.status}</span>
+                  <span className="text-sm text-[color:var(--muted-foreground)]">
+                    {item.status}
+                  </span>
                 </div>
               </div>
               <div className="mt-4 grid gap-4 xl:grid-cols-2">

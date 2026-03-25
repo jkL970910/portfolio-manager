@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { extractCsvHeaders, previewCsvContent } from "@/lib/backend/csv-import";
 import { assertApiData, getApiErrorMessage, safeJson } from "@/lib/client/api";
-import { getImportMappingGroupTitle } from "@/lib/i18n/import";
+import { getImportFieldMeta, getImportMappingGroupTitle } from "@/lib/i18n/import";
 import { DisplayLanguage, pick } from "@/lib/i18n/ui";
 
 const MAPPING_GROUPS = [
@@ -271,9 +271,17 @@ export function SpendingImportPanel({
             <div key={group.title} className="space-y-3">
               <p className="text-xs uppercase tracking-[0.14em] text-[color:var(--muted-foreground)]">{group.title}</p>
               <div className="grid gap-3 md:grid-cols-2">
-                {group.fields.map((field) => (
+                {group.fields.map((field) => {
+                  const fieldMeta = getImportFieldMeta(field, language);
+                  return (
                   <label key={field} className="space-y-2">
-                    <span className="text-sm font-medium text-[color:var(--foreground)]">{field}</span>
+                    <div className="space-y-1">
+                      <span className="text-sm font-medium text-[color:var(--foreground)]">{fieldMeta.label}</span>
+                      <p className="text-xs leading-6 text-[color:var(--muted-foreground)]">
+                        <code className="mr-1 rounded bg-[color:var(--card-muted)] px-1.5 py-0.5 text-[11px]">{field}</code>
+                        {fieldMeta.help}
+                      </p>
+                    </div>
                     <select
                       value={fieldMapping[field] ?? ""}
                       onChange={(event) => setFieldMapping((current) => ({ ...current, [field]: event.target.value }))}
@@ -285,14 +293,14 @@ export function SpendingImportPanel({
                       ))}
                     </select>
                   </label>
-                ))}
+                )})}
               </div>
             </div>
           ))}
 
           {missingRequiredMappings.length > 0 ? (
             <div className="rounded-2xl border border-[#e7b0b8] bg-[#fff3f5] px-4 py-3 text-sm text-[#8e2433]">
-              {pick(language, "缺少必填映射：", "Required mappings missing: ")}{missingRequiredMappings.join(", ")}
+              {pick(language, "还有这些关键列没对上：", "These required fields are still missing: ")}{missingRequiredMappings.join(", ")}
             </div>
           ) : null}
         </div>
@@ -305,6 +313,9 @@ export function SpendingImportPanel({
             <p className="font-medium">{pick(language, "CSV 预览", "CSV preview")}</p>
             <Badge variant="neutral">{pick(language, `前 ${preview.rows.length} 行`, `First ${preview.rows.length} rows`)}</Badge>
           </div>
+          <p className="text-sm leading-7 text-[color:var(--muted-foreground)]">
+            {pick(language, "快速检查方法：先看日期、商户、金额这三列有没有对上，再确认 inflow / outflow 方向列没有接错。", "Quick check: confirm the date, merchant, and amount columns first, then make sure inflow / outflow is mapped correctly.")}
+          </p>
           <div className="overflow-x-auto rounded-2xl border border-[color:var(--border)]">
             <table className="min-w-full text-left text-sm">
               <thead className="bg-[color:var(--card-muted)]">

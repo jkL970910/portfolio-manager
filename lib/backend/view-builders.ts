@@ -277,12 +277,12 @@ function getRecommendationTheme(
   const lead = run?.items[0];
   if (!lead) {
     return {
-      theme: pick(language, "完成导入和偏好设置后即可生成建议", "Complete import and preference setup to generate recommendations"),
-      subtitle: pick(language, "当前还没有生成 recommendation run。", "No recommendation run has been generated yet."),
-      reason: pick(language, "当持仓、账户和目标配置都可用时，引擎才能开始排序下一笔资金的优先去向。", "Once holdings, accounts, and allocation preferences are available, the engine can rank contribution priorities."),
+      theme: pick(language, "先把数据补齐，系统才能告诉你下一步钱更适合放哪里", "The system needs your data and preferences before it can suggest a next step"),
+      subtitle: pick(language, "现在还没有可用的下一步建议。", "There is no usable next-step recommendation yet."),
+      reason: pick(language, "等你把账户、持仓和目标配置补齐以后，系统才知道下一笔钱更适合先放哪里。", "Once your accounts, holdings, and target mix are in place, the system can start suggesting where new money likely helps first."),
       signals: [
-        pick(language, "至少导入一个账户和一个持仓，才能解锁组合诊断。", "Import at least one account and one holding to unlock portfolio diagnostics."),
-        pick(language, "先保存投资偏好，让推荐引擎拥有目标配置基线。", "Save investment preferences so the recommendation engine has a target allocation baseline.")
+        pick(language, "至少先导入一个账户和一笔持仓，系统才看得懂你现在的组合。", "Import at least one account and one holding so the system can understand the current portfolio."),
+        pick(language, "再把你的投资偏好存下来，系统才知道你想把组合慢慢调成什么样。", "Then save your preferences so the system knows what kind of mix you want to move toward.")
       ]
     };
   }
@@ -295,8 +295,8 @@ function getRecommendationTheme(
     ),
     subtitle: pick(
       language,
-      `下一笔 ${formatDisplayCurrency(run.contributionAmountCad, context)} 资金的优先建议`,
-      `Leading recommendation for the next ${formatDisplayCurrency(run.contributionAmountCad, context)} contribution`
+      `如果你现在准备投入 ${formatDisplayCurrency(run.contributionAmountCad, context)}，系统会先看这条路。`,
+      `If you are putting in ${formatDisplayCurrency(run.contributionAmountCad, context)} next, this is the path the system would check first.`
     ),
     reason: getRecommendationItemExplanation(lead, context, language),
     signals: getRecommendationAssumptions(profile, language).slice(0, 2)
@@ -374,14 +374,14 @@ function getPortfolioQuoteStatus(holdings: HoldingPosition[], language: DisplayL
   const coverage = holdings.length > 0
     ? pick(
       language,
-      `${quotedHoldings.length}/${holdings.length} 个持仓已有 provider 行情价格`,
-      `${quotedHoldings.length}/${holdings.length} holdings have provider-backed prices`
+      `${quotedHoldings.length}/${holdings.length} 笔持仓已经拿到可参考的价格`,
+      `${quotedHoldings.length}/${holdings.length} holdings already have usable prices`
     )
-    : pick(language, "当前没有可刷新行情的持仓", "No holdings available for quote refresh");
+    : pick(language, "现在还没有可更新价格的持仓", "There are no holdings with refreshable prices yet");
 
   if (quotedHoldings.length === 0) {
     return {
-      lastRefreshed: pick(language, "尚未刷新行情", "No quote refresh yet"),
+      lastRefreshed: pick(language, "还没更新过价格", "No price refresh yet"),
       freshness: pick(language, "未知", "Unknown"),
       coverage
     };
@@ -469,24 +469,24 @@ function getRecommendationAssumptions(profile: PreferenceProfile, language: Disp
   return [
     pick(
       language,
-      `这次建议会先看你自己设的目标配置，再看你现在哪些资产配少了、哪些配多了。`,
-      `Recommendation uses the ${profile.riskProfile.toLowerCase()} target allocation and current asset-class drift.`
+      "系统会先对照你自己设的目标配置，再看你现在哪些资产配少了、哪些配多了。",
+      "The system first compares your current mix with the target mix you set."
     ),
     pick(
       language,
-      `系统也会一起看你想优先用哪些账户，当前顺序是 ${formatAccountPriorityOrder(profile.accountFundingPriority, language)}。`,
-      `Account priority order is ${formatAccountPriorityOrder(profile.accountFundingPriority, language)}.`
+      `系统也会一起看你想先用哪些账户。你现在的顺序是 ${formatAccountPriorityOrder(profile.accountFundingPriority, language)}。`,
+      `It also considers which accounts you prefer to use first. Your current order is ${formatAccountPriorityOrder(profile.accountFundingPriority, language)}.`
     ),
     profile.taxAwarePlacement
       ? pick(
         language,
-        "你已经开启税务感知放置，所以系统会优先选更适合长期放这类资产的账户。",
-        "Tax-aware placement is enabled, so sheltered room is favored when account fit is comparable."
+        "你已经打开“尽量放对账户”这个选项，所以系统会更在意这笔钱长期放在哪类账户更顺手。",
+        "You have account placement guidance turned on, so the system pays more attention to which account is a better long-term home."
       )
       : pick(
         language,
-        "你还没开启税务感知放置，所以这次主要先看配置缺口和账户额度。",
-        "Tax-aware placement is disabled, so the run prioritizes target fit over tax sheltering."
+        "你还没打开“尽量放对账户”这个选项，所以这次会更先看配置缺口和账户额度。",
+        "Account placement guidance is off, so the run leans more on allocation gaps and room availability."
       )
   ];
 }
@@ -758,13 +758,13 @@ export function buildPortfolioData(args: {
           `${getAssetClassLabel(mainGap[0], language)} 现在和你的目标差得最远，最该先补。`,
           `${getAssetClassLabel(mainGap[0], language)} is the clearest allocation gap versus the configured target.`
         )
-        : pick(language, "先设置目标配置，才能解锁偏差分析。", "Set a target allocation to unlock drift analysis."),
+        : pick(language, "先把目标配置设好，系统才能看出哪一块配得不够。", "Set a target mix first so the system can see which sleeve is missing the most."),
       largestHolding
         ? pick(language, `${largestHolding.symbol} 是你现在最大的一笔仓位，所以它对集中度影响也最大。`, `${largestHolding.symbol} is the largest position and drives the current concentration score.`)
-        : pick(language, "先导入持仓，才能解锁集中度分析。", "Import holdings to unlock concentration analysis."),
+        : pick(language, "先导入持仓，系统才能看出是不是有几笔仓位已经太重。", "Import holdings first so the system can tell whether a few positions are getting too heavy."),
       accounts.some((account) => account.type === "Taxable")
-        ? pick(language, "你已经开始用到应税账户，所以钱放在哪类账户里会更影响长期结果。", "Taxable capital remains available as a secondary funding sleeve after sheltered room is consumed.")
-        : pick(language, "你现在大部分资产还在受保护账户里，所以账户放置逻辑相对简单。", "Sheltered accounts dominate the current portfolio, which keeps account placement simpler.")
+        ? pick(language, "你已经开始用到应税账户，所以钱先放哪个账户，对长期结果会更有影响。", "You are already using taxable accounts, so where new money goes matters more over the long run.")
+        : pick(language, "你现在大部分钱还在受保护账户里，所以账户放置还算比较简单。", "Most of the money is still inside sheltered accounts, so account placement is still fairly straightforward.")
     ]
   };
 }
@@ -789,8 +789,8 @@ export function buildRecommendationsData(args: {
       return [
         pick(
           language,
-          "当前还没有已保存的 recommendation run，因此这里仅展示这个金额下的独立求解结果。",
-          "There is no saved recommendation run yet, so this card only shows the standalone solve at this amount."
+          "现在还没有可对照的主建议，所以这里只展示这个金额下系统单独算出来的结果。",
+          "There is no saved baseline recommendation yet, so this card only shows the standalone result for this amount."
         )
       ];
     }
@@ -799,8 +799,8 @@ export function buildRecommendationsData(args: {
       return [
         pick(
           language,
-          "这是当前页面使用的基准 run，可把它作为其余场景的对照组。",
-          "This is the baseline run currently shown on the page and acts as the control for the other scenarios."
+          "这一组就是你现在正在看的主建议，其他金额都会拿它来对照着看。",
+          "This is the current recommendation shown on the page, and the other amounts are compared against it."
         )
       ];
     }
@@ -848,8 +848,8 @@ export function buildRecommendationsData(args: {
       diffs.push(
         pick(
           language,
-          `${getAssetClassLabel(newAsset.assetClass, language)} 进入了这档金额下的优先队列。`,
-          `${getAssetClassLabel(newAsset.assetClass, language)} enters the priority queue at this contribution size.`
+          `${getAssetClassLabel(newAsset.assetClass, language)} 在这档金额下开始变得值得优先处理。`,
+          `${getAssetClassLabel(newAsset.assetClass, language)} becomes worth prioritizing at this contribution size.`
         )
       );
     }
@@ -869,8 +869,8 @@ export function buildRecommendationsData(args: {
       diffs.push(
         pick(
           language,
-          "说明当前策略对投入规模相对稳定，可以把它理解为资金放大/缩小时的同一路径扩缩。",
-          "This suggests the current strategy is fairly stable across contribution sizes and mainly scales the same path up or down."
+          "说明金额变大或变小时，系统的大方向没有变，只是在同一路线上放大或缩小。",
+          "This suggests the overall path stays similar as the amount changes, and the system is mostly scaling the same idea up or down."
         )
       );
     }
@@ -886,10 +886,10 @@ export function buildRecommendationsData(args: {
       objective: latestRun?.objective
         ? pick(
           language,
-          latestRun.objective === "target-tracking" ? "目标跟踪" : latestRun.objective,
-          latestRun.objective === "target-tracking" ? "Target-tracking" : latestRun.objective
+          latestRun.objective === "target-tracking" ? "先补离目标最远的缺口" : latestRun.objective,
+          latestRun.objective === "target-tracking" ? "Close the biggest target gap first" : latestRun.objective
         )
-        : pick(language, "目标跟踪", "Target-tracking"),
+        : pick(language, "先补离目标最远的缺口", "Close the biggest target gap first"),
       confidence: latestRun?.confidenceScore != null
         ? `${latestRun.confidenceScore.toFixed(0)}/100`
         : pick(language, "待生成", "Pending")
@@ -903,9 +903,9 @@ export function buildRecommendationsData(args: {
     explainer: latestRun?.assumptions?.length
       ? getRecommendationAssumptions(profile, language)
       : [
-          pick(language, "当持仓和目标配置可用后，系统才会生成建议。", "Recommendations are generated once holdings and target allocation are available."),
-          pick(language, "账户额度和目标偏差会共同决定资产类别的优先级。", "Account room and target drift are used to rank asset classes."),
-          pick(language, "只有在引擎先确定账户和资产袖口后，才会出现 ticker 选项。", "Ticker options appear only after the engine identifies the preferred account and asset sleeve.")
+          pick(language, "系统会先看你现在已经持有什么，再对照你自己设的目标配置。", "The system first looks at what you already hold and compares it with your target mix."),
+          pick(language, "哪一类资产差得最远，通常就会先排到前面。", "The asset sleeve furthest from target usually moves to the front of the queue."),
+          pick(language, "系统会先决定钱放哪个账户更顺手，再从候选标的里挑一个更合适的。", "The system first chooses the best account home, then picks a security inside that sleeve.")
         ],
     priorities: (latestRun?.items ?? []).map((item, index) => {
       const leadSecurity = item.securitySymbol && item.securityName
@@ -923,14 +923,14 @@ export function buildRecommendationsData(args: {
         accountFit: item.accountFitScore != null
           ? pick(
             language,
-            `${getAccountTypeFit(item.targetAccountType, language)} 匹配分 ${item.accountFitScore.toFixed(0)}/100`,
-            `${getAccountTypeFit(item.targetAccountType, language)} Score ${item.accountFitScore.toFixed(0)}/100`
+            `${getAccountTypeFit(item.targetAccountType, language)} 大致顺手度 ${item.accountFitScore.toFixed(0)}/100`,
+            `${getAccountTypeFit(item.targetAccountType, language)} Rough fit ${item.accountFitScore.toFixed(0)}/100`
           )
           : getAccountTypeFit(item.targetAccountType, language),
         scoreline: pick(
           language,
-          `标的分 ${item.securityScore?.toFixed(0) ?? "--"} / 账户分 ${item.accountFitScore?.toFixed(0) ?? "--"} / 税务分 ${item.taxFitScore?.toFixed(0) ?? "--"}`,
-          `Security ${item.securityScore?.toFixed(0) ?? "--"} / Account ${item.accountFitScore?.toFixed(0) ?? "--"} / Tax ${item.taxFitScore?.toFixed(0) ?? "--"}`
+          `标的合适度 ${item.securityScore?.toFixed(0) ?? "--"} / 账户顺手度 ${item.accountFitScore?.toFixed(0) ?? "--"} / 税务友好度 ${item.taxFitScore?.toFixed(0) ?? "--"}`,
+          `Security fit ${item.securityScore?.toFixed(0) ?? "--"} / Account fit ${item.accountFitScore?.toFixed(0) ?? "--"} / Tax fit ${item.taxFitScore?.toFixed(0) ?? "--"}`
         ),
         gapSummary: item.allocationGapBeforePct != null && item.allocationGapAfterPct != null
           ? pick(
@@ -1001,8 +1001,8 @@ export function buildRecommendationsData(args: {
             label: pick(language, "税务/账户放置", "Tax / account placement"),
             detail: pick(
               language,
-              `${getAccountTypeLabel(item.targetAccountType, language)} 账户分 ${item.accountFitScore?.toFixed(0) ?? "--"}，税务分 ${item.taxFitScore?.toFixed(0) ?? "--"}。`,
-              `${getAccountTypeLabel(item.targetAccountType, language)} scores ${item.accountFitScore?.toFixed(0) ?? "--"} on account fit and ${item.taxFitScore?.toFixed(0) ?? "--"} on tax fit.`
+              `${getAccountTypeLabel(item.targetAccountType, language)} 这一条放起来更顺手，账户顺手度 ${item.accountFitScore?.toFixed(0) ?? "--"}，税务友好度 ${item.taxFitScore?.toFixed(0) ?? "--"}。`,
+              `${getAccountTypeLabel(item.targetAccountType, language)} looks like a smoother home here, with account fit ${item.accountFitScore?.toFixed(0) ?? "--"} and tax fit ${item.taxFitScore?.toFixed(0) ?? "--"}.`
             ),
             variant: profile.taxAwarePlacement ? "success" : "neutral"
           },
@@ -1043,8 +1043,8 @@ export function buildRecommendationsData(args: {
       amount: formatDisplayCurrency(scenarioRun.contributionAmountCad, display),
       summary: pick(
         language,
-        "这一组是重新求解后的对照结果，用来判断不同投入规模下的动作顺序和账户去向是否保持稳定。",
-        "This set is re-solved from the engine so you can see whether the action order and account routing stay stable at different contribution sizes."
+        "这组不是按比例放大缩小，而是系统按这个金额重新算了一遍，用来看看金额变了以后，下一步该怎么投会不会变。",
+        "This is a fresh solve at this amount, so you can see whether a different contribution size would change the next step."
       ),
       diffs: buildScenarioDiffs(scenarioRun, scenarioIndex),
       allocations: scenarioRun.items.map((item) => ({
@@ -1055,12 +1055,12 @@ export function buildRecommendationsData(args: {
     })),
     notes: [
       profile.taxAwarePlacement
-        ? pick(language, "税务感知放置目前通过账户匹配规则体现，基于你的配置偏好，不代表保证的税务最优解。", "Tax-aware placement is expressed as account fit based on your configured preferences, not guaranteed tax optimization.")
-        : pick(language, "当前未启用税务感知放置，因此建议会优先考虑配置贴合而不是税务保护。", "Tax-aware placement is disabled, so recommendations prioritize allocation fit over tax sheltering."),
+        ? pick(language, "系统会顺手考虑这笔钱放在哪类账户更合适，但这还不是正式税务建议。", "The system also considers which account type is a better home for the money, but this is not formal tax advice.")
+        : pick(language, "你现在没打开“尽量放对账户”这个选项，所以系统会更看重先补配置缺口。", "Account placement guidance is off, so the system leans more heavily on closing the biggest allocation gap first."),
       pick(
         language,
-        `当前策略：${getRecommendationStrategyLabel(profile.recommendationStrategy, language)}。再平衡容忍度为 ${profile.rebalancingTolerancePct}%。`,
-        `Current strategy: ${getRecommendationStrategyLabel(profile.recommendationStrategy, language)}. Rebalancing tolerance is ${profile.rebalancingTolerancePct}%.`
+        `你现在选的是“${getRecommendationStrategyLabel(profile.recommendationStrategy, language)}”。当偏离大到大约 ${profile.rebalancingTolerancePct}% 时，系统会更积极地提醒你调整。`,
+        `Your current strategy is "${getRecommendationStrategyLabel(profile.recommendationStrategy, language)}". Once drift moves beyond about ${profile.rebalancingTolerancePct}%, the system becomes more willing to nudge changes.`
       ),
       ...sanitizeRecommendationNotes(latestRun?.notes)
     ]

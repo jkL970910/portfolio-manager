@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { MascotAsset } from "@/components/brand/mascot-asset";
 import { assertApiData, getApiErrorMessage, safeJson } from "@/lib/client/api";
-import { getImportMappingGroupTitle, getImportPresetLabel } from "@/lib/i18n/import";
+import { getImportFieldMeta, getImportMappingGroupTitle, getImportPresetLabel } from "@/lib/i18n/import";
 import { DisplayLanguage, pick } from "@/lib/i18n/ui";
 
 const MAPPING_GROUPS = [
@@ -742,9 +742,17 @@ export function ImportJobPanel({
             <div key={getImportMappingGroupTitle(group.title, language)} className="space-y-3">
               <p className="text-xs uppercase tracking-[0.14em] text-[color:var(--muted-foreground)]">{getImportMappingGroupTitle(group.title, language)}</p>
               <div className="grid gap-3 md:grid-cols-2">
-                {group.fields.map((field) => (
+                {group.fields.map((field) => {
+                  const fieldMeta = getImportFieldMeta(field, language);
+                  return (
                   <label key={field} className="space-y-2">
-                    <span className="text-sm font-medium text-[color:var(--foreground)]">{field}</span>
+                    <div className="space-y-1">
+                      <span className="text-sm font-medium text-[color:var(--foreground)]">{fieldMeta.label}</span>
+                      <p className="text-xs leading-6 text-[color:var(--muted-foreground)]">
+                        <code className="mr-1 rounded bg-[color:var(--card-muted)] px-1.5 py-0.5 text-[11px]">{field}</code>
+                        {fieldMeta.help}
+                      </p>
+                    </div>
                     <select
                       value={fieldMapping[field] ?? ""}
                       onChange={(event) => setFieldMapping((current) => ({ ...current, [field]: event.target.value }))}
@@ -758,7 +766,7 @@ export function ImportJobPanel({
                       ))}
                     </select>
                   </label>
-                ))}
+                )})}
               </div>
             </div>
           ))}
@@ -778,6 +786,9 @@ export function ImportJobPanel({
             <p className="font-medium">{pick(language, "CSV 预览", "CSV preview")}</p>
             <Badge variant="neutral">{pick(language, `前 ${preview.rows.length} 行`, `First ${preview.rows.length} rows`)}</Badge>
           </div>
+          <p className="text-sm leading-7 text-[color:var(--muted-foreground)]">
+            {pick(language, "快速检查方法：先看第一列是不是账户 / 持仓 / 交易这三种记录，再看金额、代码、账户编号这些关键列有没有对到正确表头。", "Quick check: make sure the first column really marks account / holding / transaction rows, then confirm key fields like amount, symbol, and account key are mapped to the right headers.")}
+          </p>
           <div className="overflow-x-auto rounded-2xl border border-[color:var(--border)]">
             <table className="min-w-full text-left text-sm">
               <thead className="bg-[color:var(--card-muted)]">

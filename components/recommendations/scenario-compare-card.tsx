@@ -1,3 +1,5 @@
+﻿"use client";
+
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { DisplayLanguage } from "@/lib/i18n/ui";
 import { pick } from "@/lib/i18n/ui";
@@ -23,7 +25,7 @@ export function ScenarioCompareCard({
   return (
     <Card>
       <CardHeader>
-        <CardTitle>{pick(language, "不同投入规模对照", "Scenario compare")}</CardTitle>
+        <CardTitle>{pick(language, "如果投入金额变了，会怎么变", "What changes if the contribution amount changes")}</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
         {scenarios.map((scenario) => (
@@ -35,7 +37,7 @@ export function ScenarioCompareCard({
                 {scenario.diffs.length > 0 ? (
                   <div className="mt-3 rounded-[20px] border border-white/55 bg-white/44 px-4 py-3 backdrop-blur-md">
                     <p className="text-xs uppercase tracking-[0.16em] text-[color:var(--muted-foreground)]">
-                      {pick(language, "相对当前 run 的变化", "What changes vs current run")}
+                      {pick(language, "和你现在这组建议相比", "Compared with the current recommendation")}
                     </p>
                     <ul className="mt-3 space-y-2 text-sm leading-7 text-[color:var(--foreground)]">
                       {scenario.diffs.map((diff, index) => (
@@ -50,7 +52,7 @@ export function ScenarioCompareCard({
               </div>
               <div className="rounded-[20px] border border-white/55 bg-white/44 px-4 py-3 text-right backdrop-blur-md">
                 <p className="text-xs uppercase tracking-[0.16em] text-[color:var(--muted-foreground)]">
-                  {pick(language, "投入金额", "Amount")}
+                  {pick(language, "这次假设投入", "Assumed contribution")}
                 </p>
                 <p className="mt-2 font-semibold text-[color:var(--foreground)]">{scenario.amount}</p>
               </div>
@@ -63,7 +65,9 @@ export function ScenarioCompareCard({
                 >
                   <p className="text-sm font-semibold text-[color:var(--foreground)]">{allocation.assetClass}</p>
                   <p className="mt-2 text-base font-semibold text-[color:var(--foreground)]">{allocation.amount}</p>
-                  <p className="mt-2 text-sm text-[color:var(--muted-foreground)]">{allocation.account}</p>
+                  <p className="mt-2 text-sm text-[color:var(--muted-foreground)]">
+                    {pick(language, "大致会先放进", "Likely goes into")} {allocation.account}
+                  </p>
                 </div>
               ))}
             </div>

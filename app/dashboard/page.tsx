@@ -28,11 +28,11 @@ export default async function DashboardPage() {
   const { data } = await getDashboardView(viewer.id);
   const hasRecommendationRun = !data.recommendation.theme.startsWith("Complete import");
   const recommendationAlertTitle = hasRecommendationRun
-    ? pick(language, "检测到 3 条高优先级建议", "3 high-priority recommendations detected")
-    : pick(language, "还没有推荐结果", "No recommendation run yet");
+    ? pick(language, "有几处值得先看", "A few things are worth looking at first")
+    : pick(language, "还没有下一步建议", "No next-step recommendation yet");
   const recommendationAlertDetail = hasRecommendationRun
-    ? pick(language, "当前组合存在需要优先处理的配置缺口。", "Your portfolio has allocation gaps that should be addressed.")
-    : pick(language, "先导入持仓并保存偏好，系统才会生成第一条资金配置建议。", "Import holdings and save your preferences to generate the first ranked funding plan.");
+    ? pick(language, "系统看到你的组合里有几个缺口，下一笔钱先补哪里会更清楚。", "The system sees a few gaps in the portfolio and can now point to where new money likely helps most.")
+    : pick(language, "先把持仓和偏好补齐，系统才能告诉你下一笔钱更适合先放哪里。", "Import holdings and save your preferences before the system can suggest where the next contribution should go.");
 
   return (
     <AppShell
@@ -48,10 +48,10 @@ export default async function DashboardPage() {
             <Badge variant="primary">{pick(language, "Loo 的今日宝库巡检", "Loo's daily vault check")}</Badge>
             <div className="space-y-3">
               <h2 className="text-[30px] font-semibold tracking-[-0.04em] text-[color:var(--foreground)]">
-                先看财富温度，再决定下一步配置。
+                {pick(language, "先看现在是什么情况，再决定下一笔钱往哪放。", "First see what is going on, then decide where the next dollar should go.")}
               </h2>
               <p className="max-w-3xl text-sm leading-7 text-[color:var(--muted-foreground)]">
-                这一页保留概览，不把细节塞满。组合健康、账户空间、消费节奏和推荐摘要会先告诉你哪里值得先看。
+                {pick(language, "这一页只放最重要的概览，不把细节全堆进来。你会先看到组合哪里偏了、账户还有多少空间、最近花钱节奏怎样，以及系统为什么开始偏向某条建议。", "This page keeps only the most important overview in view. You see where the portfolio is off target, how much room is left, how spending has been going, and why the system is leaning toward a certain suggestion.")}
               </p>
             </div>
             <div className="flex flex-wrap gap-3">
@@ -69,13 +69,15 @@ export default async function DashboardPage() {
               <div className="space-y-3 pt-8">
                 <MascotAsset name="dashboardSmirk" className="h-[220px] w-[200px]" sizes="200px" />
                 <div className="max-w-[220px] rounded-[22px] border border-white/62 bg-[linear-gradient(180deg,rgba(255,255,255,0.78),rgba(255,248,251,0.64))] px-4 py-3 text-sm font-medium leading-6 text-[color:var(--foreground)] shadow-[0_14px_30px_rgba(110,103,130,0.07)] backdrop-blur-xl">
-                  {hasRecommendationRun ? "今天先补缺口, 别急着追热点。" : "先把数据和偏好补齐, 路线就会清楚很多。"}
+                  {hasRecommendationRun
+                    ? pick(language, "今天先把最大的缺口补上，别急着追热点。", "Today, start with the biggest gap instead of chasing whatever looks hot.")
+                    : pick(language, "先把数据和偏好补齐，下一步该怎么投才会更清楚。", "Fill in the data and preferences first so the next step becomes clearer.")}
                 </div>
               </div>
             </div>
             <div className="grid gap-3">
-              <WelcomeSignal title="今日重点" detail={hasRecommendationRun ? "优先处理配置缺口" : "先完成导入与偏好设置"} icon={<ShieldCheck className="h-4 w-4" />} />
-              <WelcomeSignal title="节奏提醒" detail={data.savingsPattern} icon={<TrendingUp className="h-4 w-4" />} />
+              <WelcomeSignal title={pick(language, "今天先看这个", "Start here")} detail={hasRecommendationRun ? pick(language, "先补最明显的配置缺口", "Fill the clearest allocation gap first") : pick(language, "先完成导入和偏好设置", "Finish import and preferences first")} icon={<ShieldCheck className="h-4 w-4" />} />
+              <WelcomeSignal title={pick(language, "节奏提醒", "Money rhythm")} detail={data.savingsPattern} icon={<TrendingUp className="h-4 w-4" />} />
             </div>
           </div>
         </CardContent>
@@ -86,16 +88,16 @@ export default async function DashboardPage() {
           <MetricCard key={metric.label} label={metric.label} value={metric.value} detail={metric.detail} icon={getMetricIcon(metric.label)} />
         ))}
         <RadarPreviewCard
-          title={pick(language, "组合健康评分", "Portfolio Health Score")}
+          title={pick(language, "组合现在大概稳不稳", "How stable the portfolio looks right now")}
           status={`${data.healthScore.score}/100 · ${data.healthScore.status}`}
           description={pick(
             language,
-            `当前最强维度是 ${data.healthScore.strongestDimension}，最弱维度是 ${data.healthScore.weakestDimension}。`,
-            `Strongest dimension: ${data.healthScore.strongestDimension}. Weakest dimension: ${data.healthScore.weakestDimension}.`
+            `现在做得最好的是 ${data.healthScore.strongestDimension}，最需要先修的是 ${data.healthScore.weakestDimension}。`,
+            `Best area right now: ${data.healthScore.strongestDimension}. The area that needs attention first: ${data.healthScore.weakestDimension}.`
           )}
           data={data.healthPreview}
           href="/portfolio/health"
-          ctaLabel={pick(language, "打开健康评分详情", "Open health score detail")}
+          ctaLabel={pick(language, "去看组合哪里需要先修", "See what needs attention first")}
         />
       </div>
 
@@ -117,7 +119,7 @@ export default async function DashboardPage() {
       <div className="space-y-6">
         <SectionHeading
           title={pick(language, "组合概览", "Portfolio overview")}
-          description={pick(language, "账户、配置偏离和当前持仓会先告诉你组合处在什么状态，再决定是否进入更深分析。", "Accounts, allocation drift, and current holdings surface the state of the portfolio before the user opens the deeper analysis pages.")}
+          description={pick(language, "先看账户里有多少钱、哪些资产偏了、哪些仓位最重，再决定要不要进入更深分析。", "Start with how the money is spread, which sleeves are off target, and which positions are doing most of the driving before opening deeper analysis.")}
         />
           <div className="grid gap-4 xl:grid-cols-2">
           <Card>
@@ -150,9 +152,9 @@ export default async function DashboardPage() {
           <Card>
             <CardHeader>
               <div className="flex items-center justify-between gap-3">
-                <CardTitle>{pick(language, "配置偏离", "Allocation Drift")}</CardTitle>
+                <CardTitle>{pick(language, "哪些地方偏离目标最多", "Where the portfolio is furthest from target")}</CardTitle>
                 <Button href="/portfolio" variant="ghost" className="h-auto px-0 py-0 text-[13px] text-[color:var(--primary)]">
-                  {pick(language, "查看完整分析", "View full analysis")} <MoveUpRight className="h-3.5 w-3.5" />
+                  {pick(language, "看完整拆解", "See the full breakdown")} <MoveUpRight className="h-3.5 w-3.5" />
                 </Button>
               </div>
             </CardHeader>
@@ -170,7 +172,7 @@ export default async function DashboardPage() {
           </Card>
         </div>
         <div className="grid gap-4 xl:grid-cols-2">
-          <DonutChartCard title={pick(language, "资产配置", "Asset Mix")} description={pick(language, "推荐引擎当前使用的资产分布。", "Current allocation split used by the recommendation engine.")} data={data.assetMix} />
+          <DonutChartCard title={pick(language, "钱现在大致放在哪里", "Where the money roughly sits today")} description={pick(language, "先看你现在的资产分布，再理解系统为什么偏向某条建议。", "See the current mix first, then it becomes easier to understand why the system leans toward a specific path.")} data={data.assetMix} />
           <Card>
             <CardHeader>
               <div className="flex items-center justify-between gap-3">
@@ -242,9 +244,9 @@ export default async function DashboardPage() {
           </Card>
         </div>
         <Card>
-          <CardHeader>
-            <CardTitle>{pick(language, "健康评分解读", "Health Score Readout")}</CardTitle>
-          </CardHeader>
+            <CardHeader>
+              <CardTitle>{pick(language, "一句话看组合问题", "Quick read on the portfolio")}</CardTitle>
+            </CardHeader>
           <CardContent className="grid gap-3 md:grid-cols-3">
             {data.healthScore.highlights.map((highlight) => (
               <div key={highlight} className="rounded-[24px] border border-white/55 bg-white/34 p-4 text-sm text-[color:var(--muted-foreground)] backdrop-blur-md">

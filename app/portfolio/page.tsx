@@ -57,18 +57,18 @@ export default async function PortfolioPage({
     <AppShell
       viewer={viewer}
       title={pick(language, "宝库结构", "Portfolio")}
-      description={pick(language, "这里是更深的分析层。收益走势、账户分布、持仓细节和集中度信号都在这里展开。", "This is the deeper analytical surface. Performance history, account structure, holding detail, and concentration signals all live here.")}
+      description={pick(language, "这里把组合拆开给你看：钱放在哪里、哪一块偏得最多、哪几笔仓位最值得先盯住。", "This page breaks the portfolio into plain pieces: where the money sits, what is furthest from target, and which positions are worth watching first.")}
     >
       <Card className="overflow-hidden bg-[linear-gradient(135deg,rgba(255,255,255,0.68),rgba(246,218,230,0.5),rgba(221,232,255,0.44))]">
         <CardContent className="grid gap-6 px-6 py-6 md:grid-cols-[1.2fr_0.8fr] md:items-center">
           <div className="space-y-4">
-            <div className="inline-flex rounded-full border border-white/60 bg-white/44 px-4 py-2 text-sm font-medium text-[color:var(--foreground)] backdrop-blur-md">{pick(language, "Loo 的结构分析台", "Loo's portfolio lab")}</div>
+            <div className="inline-flex rounded-full border border-white/60 bg-white/44 px-4 py-2 text-sm font-medium text-[color:var(--foreground)] backdrop-blur-md">{pick(language, "Loo 帮你拆开看组合", "Loo helps break the portfolio down")}</div>
             <div className="space-y-3">
               <h2 className="text-[30px] font-semibold tracking-[-0.04em] text-[color:var(--foreground)]">
-                看组合长什么样，再判断推荐有没有说服力。
+                {pick(language, "先看组合现在长什么样，再决定要不要照着建议走。", "First see what the portfolio looks like, then decide whether the recommendation makes sense.")}
               </h2>
               <p className="max-w-3xl text-sm leading-7 text-[color:var(--muted-foreground)]">
-                这一页故意更重。表现走势、集中度、账户分布和最新价格刷新都放在这里，不挤回首页。
+                {pick(language, "这一页会比首页更细。你可以在这里看清楚钱分散得够不够、哪些仓位太重、以及价格是不是有点旧。", "This page is more detailed than the dashboard. Use it to see whether the money is spread out enough, which positions are getting too large, and whether prices are getting stale.")}
               </p>
             </div>
           </div>
@@ -82,21 +82,21 @@ export default async function PortfolioPage({
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1.45fr)_320px]">
         <div className="space-y-6">
           <SectionHeading
-            title={pick(language, "表现与结构", "Performance and structure")}
-            description={pick(language, "组合页承担更重的分析任务。收益走势和结构性图表都放在这里，而不是挤回首页。", "The Portfolio page is the analytical surface. It carries the heavier charts that do not belong on the overview page.")}
+            title={pick(language, "先看钱放在哪里", "Start with where the money sits")}
+            description={pick(language, "先看走势、账户分布和行业暴露，再决定要不要继续往下钻。", "Start with performance, account spread, and sector exposure before drilling deeper.")}
           />
-          <LineChartCard title={pick(language, "近 6 个月表现", "6-Month Performance")} description={pick(language, "收益走势从首页移到这里，让总览页保持更轻。", "Performance history moved here from Dashboard to keep the overview page lighter.")} data={data.performance} dataKey="value" color="#152238" />
+          <LineChartCard title={pick(language, "近 6 个月大概怎么走", "How it has moved over the last 6 months")} description={pick(language, "先看整体是稳着往上，还是波动比较大。", "Use this to see whether the portfolio has been moving steadily or swinging around more than you expected.")} data={data.performance} dataKey="value" color="#152238" />
           <div className="grid gap-4 2xl:grid-cols-2">
             <DonutChartCard
-              title={pick(language, "账户分布", "Account Allocation")}
-              description={pick(language, "按账户拆分当前敞口。", "Account-level exposure split.")}
+              title={pick(language, "钱分散在什么账户里", "Which accounts currently hold the money")}
+              description={pick(language, "先看是不是有某一类账户吃得太重。", "Use this to check whether one account type is carrying too much of the portfolio.")}
               data={data.accountAllocation}
               activeName={activeAccount?.name}
               activeLabel={activeAccount
                 ? pick(language, "当前过滤命中账户", "Matched account")
                 : undefined}
             />
-            <DonutChartCard title={pick(language, "行业暴露", "Sector Exposure")} description={pick(language, "按当前持仓查看行业集中度。", "Sector concentration by current holdings.")} data={data.sectorExposure} />
+            <DonutChartCard title={pick(language, "钱现在压在哪些行业上", "Which sectors are carrying the most weight")} description={pick(language, "如果只压在少数行业上，组合会更容易一起涨跌。", "If only a few sectors dominate, the whole portfolio is more likely to swing together.")} data={data.sectorExposure} />
           </div>
           <Card>
             <CardHeader>
@@ -116,23 +116,23 @@ export default async function PortfolioPage({
                   </Button>
                 </div>
               ) : null}
-              <HoldingTable holdings={filteredHoldings} />
+              <HoldingTable holdings={filteredHoldings} language={language} />
             </CardContent>
           </Card>
         </div>
 
         <div className="space-y-6">
           <RadarPreviewCard
-            title={pick(language, "组合健康评分", "Portfolio Health Score")}
+            title={pick(language, "组合现在大概稳不稳", "How stable the portfolio looks right now")}
             status={`${data.healthScore.score}/100 · ${data.healthScore.status}`}
             description={pick(
               language,
-              `当前最强维度是 ${data.healthScore.strongestDimension}，最弱维度是 ${data.healthScore.weakestDimension}。`,
-              `Strongest dimension: ${data.healthScore.strongestDimension}. Weakest dimension: ${data.healthScore.weakestDimension}.`
+              `现在做得最好的是 ${data.healthScore.strongestDimension}，最需要先修的是 ${data.healthScore.weakestDimension}。`,
+              `Best area right now: ${data.healthScore.strongestDimension}. The area that needs attention first: ${data.healthScore.weakestDimension}.`
             )}
             data={data.healthScore.radar}
             href="/portfolio/health"
-            ctaLabel={pick(language, "打开健康评分详情", "Open health score detail")}
+            ctaLabel={pick(language, "去看组合哪里需要先修", "See what needs attention first")}
           />
           <Card>
             <CardHeader>
@@ -144,10 +144,10 @@ export default async function PortfolioPage({
                 freshness={data.quoteStatus.freshness}
                 coverage={data.quoteStatus.coverage}
               />
-              <QuickActionCard icon={<ShieldAlert className="h-4 w-4" />} title={pick(language, "查看集中度风险", "Review Concentration Risk")} description={pick(language, "检查哪些持仓正在推高单一标的暴露。", "Inspect the positions driving the highest single-name exposure.")} href="/portfolio/health" />
-              <QuickActionCard icon={<PieChart className="h-4 w-4" />} title={pick(language, "查看配置缺口", "Inspect Allocation Gaps")} description={pick(language, "看清哪类资产配少了、哪类已经偏多，下一笔钱才知道先补哪里。", "See what is underweight or overweight before deciding where the next contribution should go.")} />
-              <QuickActionCard icon={<CircleGauge className="h-4 w-4" />} title={pick(language, "查看推荐为什么这么给", "See why this recommendation was chosen")} description={pick(language, "把推荐背后的理由翻成人话，看看系统为什么把钱引到这条路。", "Open the recommendation reasoning and see why the system chose this path.")} href="/recommendations" />
-              <QuickActionCard icon={<BarChart3 className="h-4 w-4" />} title={pick(language, "查看行业暴露", "View Sector Exposure")} description={pick(language, "看哪些行业已经压得太重，别让组合只靠少数主题涨跌。", "See which sectors are already heavy so the portfolio is not driven by only a few themes.")} />
+              <QuickActionCard icon={<ShieldAlert className="h-4 w-4" />} title={pick(language, "先查是不是太集中", "Check whether the portfolio is too concentrated")} description={pick(language, "如果少数几笔仓位太重，组合会更容易一起涨跌。", "If only a few positions are too heavy, the whole portfolio becomes easier to swing around.")} href="/portfolio/health" />
+              <QuickActionCard icon={<PieChart className="h-4 w-4" />} title={pick(language, "看看哪一块最缺", "See which sleeve is furthest from target")} description={pick(language, "先看哪类资产配得还不够，下一笔钱才知道先补哪里。", "See which sleeve is most off target before deciding where the next contribution should go.")} />
+              <QuickActionCard icon={<CircleGauge className="h-4 w-4" />} title={pick(language, "看看系统为什么这么建议", "See why the system leans this way")} description={pick(language, "把推荐背后的理由翻成人话，再决定要不要照着走。", "Open the reasoning in plain language before deciding whether to follow it.")} href="/recommendations" />
+              <QuickActionCard icon={<BarChart3 className="h-4 w-4" />} title={pick(language, "看看是不是压在少数行业上", "Check whether a few sectors dominate")} description={pick(language, "如果钱只压在少数行业，组合会更容易一起受影响。", "If too much money sits in only a few sectors, the portfolio is more likely to move as one.")} />
             </CardContent>
           </Card>
           <Card>

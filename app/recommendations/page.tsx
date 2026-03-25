@@ -17,6 +17,22 @@ export default async function RecommendationsPage() {
   const viewer = await requireViewer();
   const language = viewer.displayLanguage;
   const { data } = await getRecommendationView(viewer.id);
+  const confidenceReasons = [
+    ...data.explainer.slice(0, 2),
+    pick(
+      language,
+      `当前系统把握度是 ${data.engine.confidence}。你可以把它理解成：这条建议和你现在的目标、账户和限制大体是对得上的。`,
+      `Current confidence is ${data.engine.confidence}. Read that as: this path still lines up with your goals, accounts, and active constraints reasonably well.`
+    )
+  ];
+  const confidenceWatchouts = [
+    pick(
+      language,
+      "这不是收益保证。它只是告诉你：按当前信息来看，这条路比较说得通。",
+      "This is not a return guarantee. It only means the path looks reasonable given what the system knows now."
+    ),
+    ...data.notes
+  ];
 
   return (
     <AppShell
@@ -51,6 +67,24 @@ export default async function RecommendationsPage() {
             description={pick(language, "先把你现在的偏好、账户顺序和投入金额摆出来，这样你更容易看懂系统为什么这么分配。", "Show the current preferences, account order, and amount first so the recommendation is easier to understand.")}
           />
           <Card>
+            <CardContent className="space-y-3 px-6 py-5">
+              <p className="text-sm font-semibold text-[color:var(--foreground)]">
+                {pick(language, "第一次看这页，先看这三块", "If this is your first pass, start with these three")}
+              </p>
+              <div className="grid gap-3 sm:grid-cols-3">
+                {[
+                  pick(language, "先看这次准备投多少钱。", "Start with the amount you plan to invest."),
+                  pick(language, "再看系统优先补哪一类资产。", "Then check which sleeve the system wants to top up first."),
+                  pick(language, "最后看为什么选这条路、哪些地方还要你自己判断。", "Finish by reading why this path won and what still needs your judgment.")
+                ].map((tip) => (
+                  <div key={tip} className="rounded-[20px] border border-white/55 bg-white/34 p-4 text-sm leading-7 text-[color:var(--muted-foreground)] backdrop-blur-md">
+                    {tip}
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
             <CardHeader>
               <CardTitle>{pick(language, "这次准备投入多少", "Planned contribution")}</CardTitle>
             </CardHeader>
@@ -76,15 +110,15 @@ export default async function RecommendationsPage() {
             <CardContent className="space-y-3">
               <div className="grid gap-3 sm:grid-cols-3">
                 <div className="rounded-[24px] border border-white/55 bg-white/34 p-4 backdrop-blur-md">
-                  <p className="text-xs uppercase tracking-[0.16em] text-[color:var(--muted-foreground)]">{pick(language, "引擎版本", "Engine version")}</p>
+                  <p className="text-xs uppercase tracking-[0.16em] text-[color:var(--muted-foreground)]">{pick(language, "现在用的是哪套规则", "Which rule set is being used")}</p>
                   <p className="mt-2 font-semibold">{data.engine.version}</p>
                 </div>
                 <div className="rounded-[24px] border border-white/55 bg-white/34 p-4 backdrop-blur-md">
-                  <p className="text-xs uppercase tracking-[0.16em] text-[color:var(--muted-foreground)]">{pick(language, "主要目标", "Primary goal")}</p>
+                  <p className="text-xs uppercase tracking-[0.16em] text-[color:var(--muted-foreground)]">{pick(language, "这次系统先想补什么", "What the system is fixing first")}</p>
                   <p className="mt-2 font-semibold">{data.engine.objective}</p>
                 </div>
                 <div className="rounded-[24px] border border-white/55 bg-white/34 p-4 backdrop-blur-md">
-                  <p className="text-xs uppercase tracking-[0.16em] text-[color:var(--muted-foreground)]">{pick(language, "置信度", "Confidence")}</p>
+                  <p className="text-xs uppercase tracking-[0.16em] text-[color:var(--muted-foreground)]">{pick(language, "这条路现在有多说得通", "How reasonable this path looks right now")}</p>
                   <p className="mt-2 font-semibold">{data.engine.confidence}</p>
                 </div>
               </div>
@@ -130,14 +164,33 @@ export default async function RecommendationsPage() {
                     {pick(language, `系统把握度：${data.engine.confidence}`, `Confidence: ${data.engine.confidence}`)}
                   </div>
                   <p className="mt-2 text-sm text-[color:var(--muted-foreground)]">
-                    {pick(language, "这个分数只是告诉你：系统觉得这条建议现在有多站得住脚。它不是收益保证，也不是必须照做的命令。", "This reflects how solid the current recommendation looks. It is not a return guarantee or an execution command.")}
+                    {pick(language, "这个数字只是在说：按你现在给的信息，这条建议大体说得通。它不是收益保证，也不是必须照做的命令。", "This only means the recommendation broadly makes sense given the information available today. It is not a return guarantee or an execution command.")}
                   </p>
                 </div>
-                {data.notes.map((note) => (
-                  <div key={note} className="rounded-[24px] border border-white/55 bg-white/34 p-4 text-sm leading-7 text-[color:var(--muted-foreground)] backdrop-blur-md">
-                    {note}
+                <div className="rounded-[24px] border border-white/55 bg-white/34 p-4 backdrop-blur-md">
+                  <p className="text-sm font-semibold text-[color:var(--foreground)]">
+                    {pick(language, "为什么系统觉得这条路还算站得住", "Why the system thinks this path is reasonably solid")}
+                  </p>
+                  <div className="mt-3 space-y-3">
+                    {confidenceReasons.map((reason) => (
+                      <div key={reason} className="rounded-[20px] border border-white/55 bg-white/42 p-4 text-sm leading-7 text-[color:var(--muted-foreground)]">
+                        {reason}
+                      </div>
+                    ))}
                   </div>
-                ))}
+                </div>
+                <div className="rounded-[24px] border border-[rgba(240,143,178,0.22)] bg-[linear-gradient(135deg,rgba(255,255,255,0.78),rgba(245,214,235,0.26),rgba(255,239,224,0.2))] p-4 backdrop-blur-md">
+                  <p className="text-sm font-semibold text-[color:var(--foreground)]">
+                    {pick(language, "哪些地方还要你自己再判断", "What still needs your own judgment")}
+                  </p>
+                  <div className="mt-3 space-y-3">
+                    {confidenceWatchouts.map((note) => (
+                      <div key={note} className="rounded-[20px] border border-white/55 bg-white/46 p-4 text-sm leading-7 text-[color:var(--muted-foreground)]">
+                        {note}
+                      </div>
+                    ))}
+                  </div>
+                </div>
               </CardContent>
             </Card>
             <Card>

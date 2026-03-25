@@ -499,33 +499,38 @@ export function buildPortfolioHealthSummary(args: {
         status: getDimensionStatus(groupedScore, language),
         summary: pick(
           language,
-          `${getAccountTypeLabel(accountType, language)} 这一整类账户现在一共放了大约 ${sharePct.toFixed(1)}% 的资产，整体账户匹配分约 ${weightedFit.toFixed(0)}/100。`,
-          `${getAccountTypeLabel(accountType, language)} currently holds about ${sharePct.toFixed(1)}% of the portfolio with an account-fit score near ${weightedFit.toFixed(0)}/100.`
+          `${getAccountTypeLabel(accountType, language)} 这一类账户里，现在大约放了你 ${sharePct.toFixed(1)}% 的钱。`,
+          `${getAccountTypeLabel(accountType, language)} currently holds about ${sharePct.toFixed(1)}% of the portfolio.`
         ),
         impactHints: buildImpactHints(
           language,
           (_amount, amountLabel) => weightedFit < 70
             ? pick(
               language,
-              `如果下一笔 ${amountLabel} 不再继续往 ${getAccountTypeLabel(accountType, language)} 这类账户里放，而是分到更合适的账户类型，最先改善的通常会是账户效率。`,
+              `如果下一笔 ${amountLabel} 先别继续放进 ${getAccountTypeLabel(accountType, language)}，而是换到更合适的账户类型，通常最先改善的是“钱放错地方”的问题。`,
               `If the next ${amountLabel} is redirected away from ${getAccountTypeLabel(accountType, language)} into a better-fitting account type, account efficiency should improve first.`
             )
             : pick(
               language,
-              `如果下一笔 ${amountLabel} 还继续堆在 ${getAccountTypeLabel(accountType, language)} 里，通常会先让这类账户变得更拥挤。`,
+              `如果下一笔 ${amountLabel} 还继续往 ${getAccountTypeLabel(accountType, language)} 里放，这一类账户会更拥挤。`,
               `If the next ${amountLabel} keeps landing in ${getAccountTypeLabel(accountType, language)}, crowding inside that account type is likely to worsen first.`
             )
         ),
         drivers: [
           pick(
             language,
-            `这一类账户共有 ${accountsOfType.length} 个，里面一共有 ${groupedHoldings.length} 笔持仓。`,
+            `你现在一共有 ${accountsOfType.length} 个这类账户，里面放着 ${groupedHoldings.length} 笔持仓。`,
             `This account type includes ${accountsOfType.length} accounts and ${groupedHoldings.length} holdings.`
+          ),
+          pick(
+            language,
+            `如果按“放得顺不顺手”粗略看，这一类账户大约是 ${weightedFit.toFixed(0)}/100，属于 ${weightedFit < 70 ? "偏不顺手" : "还算顺手"}。`,
+            `This account type scores about ${weightedFit.toFixed(0)}/100 on rough fit.`
           ),
           topHoldingInGroup
             ? pick(
               language,
-              `这一类账户里最大的持仓是 ${topHoldingInGroup.symbol}，大约占你全部资产的 ${topHoldingInGroup.weightPct.toFixed(1)}%。`,
+              `这里面最大的一笔是 ${topHoldingInGroup.symbol}，大约占你全部资产的 ${topHoldingInGroup.weightPct.toFixed(1)}%。`,
               `The largest holding inside this account type is ${topHoldingInGroup.symbol}, representing about ${topHoldingInGroup.weightPct.toFixed(1)}% of the total portfolio.`
             )
             : pick(language, "这一类账户目前还没有足够的持仓明细。", "This account type does not yet have enough holding detail.")
@@ -534,12 +539,12 @@ export function buildPortfolioHealthSummary(args: {
           weightedFit < 70
             ? pick(
               language,
-              `后续新增资金别优先堆在 ${getAccountTypeLabel(accountType, language)} 里，先看看有没有更合适的账户类别。`,
+              `后续新增资金先别默认放进 ${getAccountTypeLabel(accountType, language)}，先看看别的账户类型是不是更合适。`,
               `Do not prioritize ${getAccountTypeLabel(accountType, language)} for the next contribution; check whether another account type fits better.`
             )
             : pick(
               language,
-              `这类账户整体还算合理，后面主要注意别把太多新钱继续集中到这里。`,
+              `这类账户整体还算合理，后面主要注意别把太多新钱一直往这里堆。`,
               `${getAccountTypeLabel(accountType, language)} is broadly fine overall; the main risk is adding too much more money into it.`
             )
         ]
@@ -562,7 +567,7 @@ export function buildPortfolioHealthSummary(args: {
         status: getDimensionStatus(holdingScore, language),
         summary: pick(
           language,
-          `${holding.symbol} 当前占组合 ${holding.weightPct.toFixed(1)}%，近似风险贡献约 ${holdingRisk.toFixed(0)}%，账户适配度约 ${(fit * 100).toFixed(0)}/100。`,
+          `${holding.symbol} 现在大约占你组合的 ${holding.weightPct.toFixed(1)}%，而且它对整体波动的影响偏重。`,
           `${holding.symbol} currently represents ${holding.weightPct.toFixed(1)}% of the portfolio, contributes about ${holdingRisk.toFixed(0)}% of estimated risk, and carries an account-fit score near ${(fit * 100).toFixed(0)}/100.`
         ),
         impactHints: buildImpactHints(
@@ -570,41 +575,46 @@ export function buildPortfolioHealthSummary(args: {
           (_amount, amountLabel) => holding.weightPct >= 12 || holdingRisk >= 18
             ? pick(
               language,
-              `如果下一笔 ${amountLabel} 不再继续补向 ${holding.symbol}，而是分流到其他袖口，最先改善的通常会是集中度和风险平衡。`,
+              `如果下一笔 ${amountLabel} 先别继续加到 ${holding.symbol}，最先改善的通常会是“仓位太重”和“风险太集中”这两个问题。`,
               `If the next ${amountLabel} avoids adding to ${holding.symbol} and is redirected into other sleeves, concentration and risk balance should improve first.`
             )
             : fit < 0.7
               ? pick(
                 language,
-                `如果下一笔 ${amountLabel} 继续补这类资产，但改放到更适配的账户，最先改善的通常会是账户效率。`,
+                `如果下一笔 ${amountLabel} 还想补这类资产，但改放到更合适的账户里，最先改善的通常会是“钱放错地方”的问题。`,
                 `If the next ${amountLabel} still adds this sleeve but moves into a better-fitting account, account efficiency should improve first.`
               )
               : pick(
                 language,
-                `如果下一笔 ${amountLabel} 优先补足其他缺口而不是继续加 ${holding.symbol}，最先改善的通常会是配置贴合。`,
+                `如果下一笔 ${amountLabel} 先去补别的缺口，而不是继续加 ${holding.symbol}，最先改善的通常会是整体配置更贴近目标。`,
                 `If the next ${amountLabel} goes toward other gaps instead of adding more ${holding.symbol}, allocation fit should improve first.`
               )
         ),
         drivers: [
           pick(
             language,
-            `资产类别：${getAssetClassLabel(holding.assetClass, language)}；账户：${getAccountTypeLabel(account?.type ?? "Taxable", language)}。`,
+            `它属于 ${getAssetClassLabel(holding.assetClass, language)}，现在放在 ${getAccountTypeLabel(account?.type ?? "Taxable", language)} 里。`,
             `Asset class: ${getAssetClassLabel(holding.assetClass, language)}; account: ${getAccountTypeLabel(account?.type ?? "Taxable", language)}.`
           ),
           pick(
             language,
-            `近似风险贡献约为 ${holdingRisk.toFixed(0)}%，说明这笔仓位对整体波动的影响不只取决于名义市值。`,
+            `粗略估算下来，它大约贡献了 ${holdingRisk.toFixed(0)}% 的组合风险，这表示它对整体波动的影响比表面仓位更重。`,
             `Estimated risk contribution is about ${holdingRisk.toFixed(0)}%, which means its impact on total volatility is not just a function of market value.`
+          ),
+          pick(
+            language,
+            `如果按“放得顺不顺手”粗略看，它当前大约是 ${(fit * 100).toFixed(0)}/100。`,
+            `Its rough account-fit score is about ${(fit * 100).toFixed(0)}/100.`
           ),
           holding.weightPct >= 12
             ? pick(
               language,
-              "这笔仓位已经足够大，会直接拉低组合集中度分数。",
+              "这笔仓位已经很大了，再继续加会让组合更像押单一方向。",
               "This position is large enough to pull down the concentration score directly."
             )
             : pick(
               language,
-              "这笔仓位的主要问题不是体量，而是它与整体配置的关系。",
+              "这笔仓位现在不一定太大，主要还是看它和整体配置顺不顺。",
               "The main issue here is less size and more how the sleeve fits the overall mix."
             )
         ],
@@ -612,18 +622,18 @@ export function buildPortfolioHealthSummary(args: {
           holding.weightPct >= 12
             ? pick(
               language,
-              `暂缓继续加仓 ${holding.symbol}，优先把新增资金引导到其他袖口。`,
+              `先别继续往 ${holding.symbol} 上加钱，新增资金优先分去别的方向。`,
               `Pause further adds to ${holding.symbol} and direct fresh money into other sleeves first.`
             )
             : fit < 0.7
               ? pick(
                 language,
-                `后续如继续补这类资产，优先考虑放到更适配的账户，而不是继续放在当前账户。`,
+                `如果后面还想补这类资产，优先换个更合适的账户，不要继续放在现在这个账户里。`,
                 `If you keep adding this sleeve, move the next contribution into a better-fitting account instead of reusing the current one.`
               )
               : pick(
                 language,
-                `当前可把 ${holding.symbol} 当成观察项，不必优先处理。`,
+                `现在先把 ${holding.symbol} 当成观察项，不需要第一个处理它。`,
                 `Treat ${holding.symbol} as a monitor item rather than an urgent fix.`
               )
         ]

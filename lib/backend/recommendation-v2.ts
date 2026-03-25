@@ -370,11 +370,11 @@ export function buildRecommendationV2(args: {
     confidenceScore,
     assumptions: buildRunNotes(profile, fxPolicy, language),
     notes: [
-      pick(language, "当前版本只处理新增资金，不会主动给出卖出型再平衡建议。", "This version only allocates new money and does not suggest sell-side rebalancing."),
-      pick(language, "账户匹配和税务放置目前仍然基于启发式矩阵，后续还可以继续精细化。", "Account fit and tax-location currently use a heuristic matrix and can be refined further."),
+      pick(language, "这一版只帮你安排新增的钱，不会主动建议你先卖出旧持仓。", "This version only plans new money and does not ask you to sell old holdings first."),
+      pick(language, "账户匹配和税务放置现在还是规则型判断，后面还能继续变得更细。", "Account fit and tax placement are still rule-based and can get more detailed later."),
       fxPolicy.hasUsdFundingPath
-        ? pick(language, "由于存在 USD 入金路径，USD 标的不被自动排除，但仍会保留轻度 FX 成本评估。", "USD securities are not automatically excluded because a USD funding path is available.")
-        : pick(language, "由于没有检测到 USD 入金路径，USD 标的会承担更高的 FX 摩擦惩罚。", "USD securities carry higher FX friction because no USD funding path was detected.")
+        ? pick(language, "因为你有 USD 入金路径，系统不会自动回避美股，只会轻度考虑换汇成本。", "Because a USD funding path is available, the engine does not automatically avoid USD securities.")
+        : pick(language, "因为系统没看到稳定的 USD 入金路径，美股方案会更容易被换汇成本压低。", "Because no stable USD funding path was detected, USD ideas are pushed down more by FX drag.")
     ],
     items
   };

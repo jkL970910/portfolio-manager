@@ -1,4 +1,4 @@
-import { ArrowRight, ShieldCheck } from "lucide-react";
+﻿import { ArrowRight, ShieldCheck } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -26,7 +26,13 @@ export function RecommendationSummaryCard({
   emphasized = false
 }: RecommendationSummaryCardProps) {
   return (
-    <Card className={emphasized ? "border-white/60 bg-[linear-gradient(135deg,rgba(240,143,178,0.12),rgba(111,141,246,0.08),rgba(255,255,255,0.28))]" : undefined}>
+    <Card
+      className={
+        emphasized
+          ? "border-white/60 bg-[linear-gradient(135deg,rgba(240,143,178,0.12),rgba(111,141,246,0.08),rgba(255,255,255,0.28))]"
+          : undefined
+      }
+    >
       <CardHeader>
         <div className="flex items-start justify-between gap-4">
           <div>
@@ -34,7 +40,7 @@ export function RecommendationSummaryCard({
             <p className="mt-1 text-sm text-[color:var(--muted-foreground)]">{subtitle}</p>
           </div>
           <Badge variant={emphasized ? "warning" : "neutral"}>
-            {emphasized ? pick(language, "高优先级", "High Priority") : pick(language, "下一步", "Next Step")}
+            {emphasized ? pick(language, "这条要先看", "Look at this first") : pick(language, "下一步可以看", "Worth checking next")}
           </Badge>
         </div>
       </CardHeader>
@@ -53,14 +59,14 @@ export function RecommendationSummaryCard({
           <div className="mt-5 grid gap-3 md:grid-cols-2">
             {signals.map((signal) => (
               <div key={signal} className="rounded-[24px] border border-white/55 bg-white/44 p-4 backdrop-blur-md">
-                <p className="text-sm text-[color:var(--muted-foreground)]">{pick(language, "支撑信号", "Supporting signal")}</p>
+                <p className="text-sm text-[color:var(--muted-foreground)]">{pick(language, "系统为什么会想到这里", "Why the system leans this way")}</p>
                 <p className="mt-2 text-sm font-medium text-[color:var(--foreground)]">{signal}</p>
               </div>
             ))}
           </div>
         </div>
         <Button href="/recommendations" className="w-full md:w-auto" trailingIcon={<ArrowRight className="h-4 w-4" />}>
-          {pick(language, "查看完整推荐", "View Detailed Recommendations")}
+          {pick(language, "去看完整建议", "Open full recommendation")}
         </Button>
       </CardContent>
     </Card>

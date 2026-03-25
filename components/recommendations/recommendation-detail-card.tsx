@@ -70,30 +70,30 @@ function getShortDecisionTag(language: DisplayLanguage, text: string, variant: "
   }
 
   return variant === "success"
-    ? pick(language, "支持当前方案", "Back this path")
-    : pick(language, "压低其他方案", "Push down others");
+    ? pick(language, "这点在给它加分", "This helps the idea")
+    : pick(language, "这点让别的路掉下去", "This weakens alternatives");
 }
 
 function getHelpTerms(language: DisplayLanguage): HelpTerm[] {
   return [
     {
-      label: pick(language, "支持", "Support"),
+      label: pick(language, "为什么它加分", "Why this adds confidence"),
       detail: pick(
         language,
-        "表示这一条是在给当前建议加分，也就是系统为什么把这条路排在前面。",
-        "This point is helping the current path rank higher."
+        "表示这一条是在帮当前建议排到前面，也就是系统为什么觉得它更顺手。",
+        "This is one of the reasons the current path ranks higher."
       )
     },
     {
-      label: pick(language, "约束", "Constraint"),
+      label: pick(language, "为什么别的路被压下去", "Why other paths drop"),
       detail: pick(
         language,
-        "表示系统在压低别的方案，通常是因为风险更高、账户不合适，或者成本更重。",
-        "This point is pushing other paths down because risk, account fit, or cost looks worse."
+        "表示系统把别的方案往后排，通常是因为风险更高、账户不顺手，或者额外成本更重。",
+        "This explains why competing paths rank lower, usually because of higher risk, weaker account fit, or extra cost."
       )
     },
     {
-      label: pick(language, "账户匹配", "Account fit"),
+      label: pick(language, "账户顺手度", "Account fit"),
       detail: pick(
         language,
         "看这笔钱放进哪个账户更顺手，会一起考虑账户类型、额度和放置效率。",
@@ -101,14 +101,45 @@ function getHelpTerms(language: DisplayLanguage): HelpTerm[] {
       )
     },
     {
-      label: pick(language, "FX 摩擦", "FX friction"),
+      label: pick(language, "换汇成本", "FX friction"),
       detail: pick(
         language,
-        "看跨币种交易会不会多出明显换汇成本。成本越高，这条路越容易被压低。",
+        "看跨币种交易会不会多出明显换汇成本。成本越高，这条路越容易被系统往后放。",
         "Shows whether cross-currency conversion adds noticeable drag."
       )
     }
   ];
+}
+
+function groupConstraints(
+  constraints: RecommendationDetailCardProps["priority"]["constraints"],
+  language: DisplayLanguage
+) {
+  const confirmed = constraints.filter((item) => item.variant !== "warning");
+  const watch = constraints.filter((item) => item.variant === "warning");
+
+  return [
+    {
+      id: "confirmed",
+      title: pick(language, "这条路为什么站得住", "Why this path holds up"),
+      description: pick(
+        language,
+        "这些点说明这条建议不是碰巧排在前面，而是真的比较顺手。",
+        "These checks explain why this path ranks well instead of landing there by accident."
+      ),
+      items: confirmed
+    },
+    {
+      id: "watch",
+      title: pick(language, "执行前要留意什么", "What to watch before acting"),
+      description: pick(
+        language,
+        "这些不一定会拦住你，但执行前最好先知道。",
+        "These do not always block the idea, but they are the first things to keep in mind."
+      ),
+      items: watch
+    }
+  ].filter((group) => group.items.length > 0);
 }
 
 export function RecommendationDetailCard({
@@ -127,13 +158,13 @@ export function RecommendationDetailCard({
   const decisionTrace = useMemo<DecisionStep[]>(
     () => [
       ...priority.whyThis.map((item) => ({
-        kind: pick(language, "为什么选这条路", "Why this path won"),
+        kind: pick(language, "系统为什么先选这条路", "Why this path came first"),
         variant: "success" as const,
         text: item,
         shortTag: getShortDecisionTag(language, item, "success")
       })),
       ...priority.whyNot.map((item) => ({
-        kind: pick(language, "为什么没选别的", "Why other paths lost"),
+        kind: pick(language, "系统为什么没先选别的", "Why other paths were not first"),
         variant: "warning" as const,
         text: item,
         shortTag: getShortDecisionTag(language, item, "warning")
@@ -143,6 +174,7 @@ export function RecommendationDetailCard({
   );
 
   const helpTerms = useMemo(() => getHelpTerms(language), [language]);
+  const constraintGroups = useMemo(() => groupConstraints(priority.constraints, language), [language, priority.constraints]);
   const shouldCollapseTrace = decisionTrace.length > 3;
   const visibleTrace = shouldCollapseTrace && !isTraceExpanded ? decisionTrace.slice(0, 3) : decisionTrace;
 
@@ -165,8 +197,8 @@ export function RecommendationDetailCard({
             <div className="grid gap-3 md:grid-cols-2 2xl:grid-cols-4">
               <SummaryBlock label={pick(language, "准备买什么", "Lead security")} value={priority.security} />
               <SummaryBlock label={pick(language, "这笔是在补什么", "Allocation gap")} value={priority.gapSummary} />
-              <SummaryBlock label={pick(language, "放进哪个账户更合适", "Account fit")} value={priority.accountFit} />
-              <SummaryBlock label={pick(language, "系统综合打分", "Score line")} value={priority.scoreline} />
+              <SummaryBlock label={pick(language, "放进哪个账户更顺手", "Best account home")} value={priority.accountFit} />
+              <SummaryBlock label={pick(language, "系统怎么看这条建议", "How the system rates it")} value={priority.scoreline} />
             </div>
           </div>
 
@@ -208,12 +240,12 @@ export function RecommendationDetailCard({
                 <div className="flex flex-col gap-4">
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                     <div className="space-y-2">
-                      <p className="text-sm font-semibold text-[color:var(--foreground)]">{pick(language, "决策轨迹", "Decision trace")}</p>
+                      <p className="text-sm font-semibold text-[color:var(--foreground)]">{pick(language, "系统是怎么想到这条路的", "How the system got here")}</p>
                       <p className="text-sm leading-7 text-[color:var(--muted-foreground)]">
                         {pick(
                           language,
-                          "这一段把“为什么选这条路、为什么没选别的”串成一条解释链，小白也能顺着看懂。",
-                          "This turns the recommendation into one readable explanation chain."
+                          "这一段把“为什么先选它、为什么别的没排到前面”串成一条解释链，顺着看就能知道系统怎么想的。",
+                          "This section turns the recommendation into one readable chain so you can see how the system got here."
                         )}
                       </p>
                     </div>
@@ -225,8 +257,8 @@ export function RecommendationDetailCard({
                         className="shrink-0"
                       >
                         {isTraceExpanded
-                          ? pick(language, "收起决策轨迹", "Collapse decision trace")
-                          : pick(language, "展开完整决策轨迹", "Show full decision trace")}
+                          ? pick(language, "收起这段解释", "Collapse this explanation")
+                          : pick(language, "展开完整解释", "Show the full explanation")}
                       </Button>
                     ) : null}
                   </div>
@@ -259,8 +291,8 @@ export function RecommendationDetailCard({
                         </div>
                         <Badge variant={step.variant === "success" ? "success" : "warning"}>
                           {step.variant === "success"
-                            ? pick(language, "支持", "Support")
-                            : pick(language, "约束", "Constraint")}
+                            ? pick(language, "在加分", "Adds confidence")
+                            : pick(language, "在压低别的路", "Pushes alternatives down")}
                         </Badge>
                       </div>
                     </div>
@@ -270,25 +302,36 @@ export function RecommendationDetailCard({
             </div>
 
             <div className="space-y-4">
-              <div className="rounded-[24px] border border-white/55 bg-white/36 p-4 backdrop-blur-md">
-                <p className="text-sm font-semibold text-[color:var(--foreground)]">{pick(language, "系统还考虑了这些限制", "Other checks the system considered")}</p>
-                <div className="mt-4 space-y-3">
-                  {priority.constraints.map((constraint) => (
-                    <div
-                      key={`${priority.id}-${constraint.label}`}
-                      className="rounded-[20px] border border-white/55 bg-white/42 px-4 py-3 backdrop-blur-md"
-                    >
-                      <div className="flex items-start justify-between gap-3">
-                        <div>
-                          <p className="text-sm font-medium text-[color:var(--foreground)]">{constraint.label}</p>
-                          <p className="mt-1 text-sm leading-7 text-[color:var(--muted-foreground)]">{constraint.detail}</p>
+              {constraintGroups.map((group) => (
+                <div key={`${priority.id}-${group.id}`} className="rounded-[24px] border border-white/55 bg-white/36 p-4 backdrop-blur-md">
+                  <div className="space-y-2">
+                    <p className="text-sm font-semibold text-[color:var(--foreground)]">{group.title}</p>
+                    <p className="text-sm leading-7 text-[color:var(--muted-foreground)]">{group.description}</p>
+                  </div>
+                  <div className="mt-4 space-y-3">
+                    {group.items.map((constraint) => (
+                      <div
+                        key={`${priority.id}-${group.id}-${constraint.label}`}
+                        className="rounded-[20px] border border-white/55 bg-white/42 px-4 py-3 backdrop-blur-md"
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <p className="text-sm font-medium text-[color:var(--foreground)]">{constraint.label}</p>
+                            <p className="mt-1 text-sm leading-7 text-[color:var(--muted-foreground)]">{constraint.detail}</p>
+                          </div>
+                          <Badge variant={constraint.variant}>
+                            {constraint.variant === "success"
+                              ? pick(language, "看起来没问题", "Looks good")
+                              : constraint.variant === "warning"
+                                ? pick(language, "这里要留意", "Watch this")
+                                : pick(language, "顺手补充", "Extra context")}
+                          </Badge>
                         </div>
-                        <Badge variant={constraint.variant}>{constraint.variant === "success" ? pick(language, "通过", "OK") : constraint.variant === "warning" ? pick(language, "留意", "Watch") : pick(language, "信息", "Info")}</Badge>
                       </div>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
                 </div>
-              </div>
+              ))}
 
               <div className="rounded-[24px] border border-white/55 bg-white/36 p-4 backdrop-blur-md">
                 <p className="text-sm font-semibold text-[color:var(--foreground)]">{pick(language, "如果你真的要执行，先看这些", "Before you act, check this")}</p>
