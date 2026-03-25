@@ -58,6 +58,18 @@ type AccountScore = {
   fxPenaltyBps: number;
 };
 
+function isAccountEligibleForContribution(account: InvestmentAccount) {
+  if (account.type === "Taxable") {
+    return true;
+  }
+
+  if (account.contributionRoomCad == null) {
+    return true;
+  }
+
+  return account.contributionRoomCad > 0;
+}
+
 const SECURITY_UNIVERSE: Record<string, SecurityCandidate[]> = {
   "Canadian Equity": [
     { symbol: "VCN", name: "Vanguard FTSE Canada All Cap Index ETF", assetClass: "Canadian Equity", currency: "CAD", expenseBps: 6, liquidityScore: 94, tags: ["broad-market"] },
@@ -155,7 +167,9 @@ function scoreAccountPlacement(
   securityCurrency: CurrencyCode,
   fxPolicy: FxPolicy
 ): AccountScore {
-  const orderedAccounts = [...accounts].sort((left, right) => {
+  const eligibleAccounts = accounts.filter(isAccountEligibleForContribution);
+  const scoringPool = eligibleAccounts.length > 0 ? eligibleAccounts : accounts;
+  const orderedAccounts = [...scoringPool].sort((left, right) => {
     const leftRank = profile.accountFundingPriority.indexOf(left.type);
     const rightRank = profile.accountFundingPriority.indexOf(right.type);
     return (leftRank === -1 ? 99 : leftRank) - (rightRank === -1 ? 99 : rightRank);
@@ -163,7 +177,7 @@ function scoreAccountPlacement(
 
   const scores = orderedAccounts.map((account) => {
     const baseScore = ACCOUNT_FIT_MATRIX[assetClass]?.[account.type] ?? 0.45;
-    const roomPenalty = account.type !== "Taxable" && (account.contributionRoomCad ?? 0) <= 0 ? 0.28 : 0;
+    const roomPenalty = account.type !== "Taxable" && account.contributionRoomCad != null && account.contributionRoomCad <= 0 ? 0.28 : 0;
     const priorityBoost = Math.max(0, 0.08 - Math.max(profile.accountFundingPriority.indexOf(account.type), 0) * 0.02);
     const taxBoost = profile.taxAwarePlacement ? 0.04 : 0;
     const accountCurrency = account.currency ?? "CAD";

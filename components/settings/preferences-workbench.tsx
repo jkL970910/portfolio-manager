@@ -819,21 +819,30 @@ export function PreferencesWorkbench({
                     ) : null}
 
                     {section.id === "priority" ? (
-                      <div className="grid gap-3 md:grid-cols-3">
-                        {[0, 1, 2].map((index) => (
-                          <Field key={index} label={pick(language, `优先级 ${index + 1}`, `Priority ${index + 1}`)}>
-                            <select
-                              value={form.accountFundingPriority[index] ?? "Taxable"}
-                              onChange={(event) => updatePriority(index, event.target.value as PreferenceProfile["accountFundingPriority"][number])}
-                              className={FIELD_CLASS_NAME}
-                            >
-                              <option value="TFSA">{getAccountTypeLabel("TFSA", language)}</option>
-                              <option value="RRSP">{getAccountTypeLabel("RRSP", language)}</option>
-                              <option value="FHSA">{getAccountTypeLabel("FHSA", language)}</option>
-                              <option value="Taxable">{getAccountTypeLabel("Taxable", language)}</option>
-                            </select>
-                          </Field>
-                        ))}
+                      <div className="space-y-3">
+                        <div className="grid gap-3 md:grid-cols-3">
+                          {[0, 1, 2].map((index) => (
+                            <Field key={index} label={pick(language, `优先级 ${index + 1}`, `Priority ${index + 1}`)}>
+                              <select
+                                value={form.accountFundingPriority[index] ?? "Taxable"}
+                                onChange={(event) => updatePriority(index, event.target.value as PreferenceProfile["accountFundingPriority"][number])}
+                                className={FIELD_CLASS_NAME}
+                              >
+                                <option value="TFSA">{getAccountTypeLabel("TFSA", language)}</option>
+                                <option value="RRSP">{getAccountTypeLabel("RRSP", language)}</option>
+                                <option value="FHSA">{getAccountTypeLabel("FHSA", language)}</option>
+                                <option value="Taxable">{getAccountTypeLabel("Taxable", language)}</option>
+                              </select>
+                            </Field>
+                          ))}
+                        </div>
+                        <div className="rounded-[22px] border border-white/55 bg-white/34 px-4 py-4 text-sm text-[color:var(--muted-foreground)]">
+                          {pick(
+                            language,
+                            "这里保存的是你希望先用哪些账户的顺序。真正生成推荐时，如果某类受保护账户额度已经用完，系统会自动把它暂时跳过。",
+                            "This saves the order you prefer to fund accounts. During recommendation runs, the system will temporarily skip sheltered accounts whose room is already exhausted."
+                          )}
+                        </div>
                       </div>
                     ) : null}
 

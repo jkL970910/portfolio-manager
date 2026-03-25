@@ -74,6 +74,14 @@ Output:
 - eligible securities
 - constraint-hit metadata
 
+Rule clarification:
+
+- for new-money recommendations, sheltered accounts with `available room <= 0` must drop out of the usable placement order for that run
+- the saved preference order still matters, but it must only be applied inside the subset of accounts that are actually usable for the current contribution
+- the frontend should therefore distinguish between:
+  - the user’s saved account order
+  - the usable order for this specific contribution
+
 ### Layer B: Allocation Optimizer
 
 Purpose:

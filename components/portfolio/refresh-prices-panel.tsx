@@ -57,7 +57,7 @@ export function RefreshPricesPanel({
       }
       setStatus({
         type: "success",
-        message: `Refreshed ${result.refreshedHoldingCount} holdings across ${result.sampledSymbolCount} symbols.${result.missingQuoteCount > 0 ? ` Missing quotes for ${result.missingQuoteCount} symbols.` : ""}`
+        message: `Refreshed ${result.refreshedHoldingCount} holdings across ${result.sampledSymbolCount} symbols.${result.missingQuoteCount > 0 ? ` No new quote came back for ${result.missingQuoteCount} symbols, so some rows may still be showing older cached prices.` : ""}`
       });
       router.refresh();
     });
@@ -80,6 +80,9 @@ export function RefreshPricesPanel({
         <p><span className="font-medium text-[color:var(--foreground)]">Last refreshed:</span> {lastRefreshed}</p>
         <p className="mt-1"><span className="font-medium text-[color:var(--foreground)]">Freshness:</span> {freshness}</p>
         <p className="mt-1"><span className="font-medium text-[color:var(--foreground)]">Coverage:</span> {coverage}</p>
+        <p className="mt-2 text-xs leading-6">
+          Cached prices can still look recent on individual rows even when this refresh did not return a new quote for every symbol.
+        </p>
       </div>
       <Button type="button" variant="secondary" onClick={refreshPrices} disabled={isPending} leadingIcon={<RefreshCcw className={`h-4 w-4 ${isPending ? "animate-spin" : ""}`} />}>
         {isPending ? "Refreshing prices..." : "Refresh prices"}

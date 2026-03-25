@@ -738,7 +738,7 @@ export async function getRecommendationView(userId: string) {
   } as const;
 
   return apiSuccess({
-    ...buildRecommendationsData({ language: user.displayLanguage, profile, latestRun, scenarioRuns, display }),
+    ...buildRecommendationsData({ language: user.displayLanguage, profile, accounts, latestRun, scenarioRuns, display }),
     run: latestRun ?? createEmptyRun(userId)
   }, "database");
 }

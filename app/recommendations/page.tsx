@@ -96,7 +96,16 @@ export default async function RecommendationsPage() {
               </div>
               <div className="grid gap-3 sm:grid-cols-2">
                 {data.inputs.map((input) => (
-                  <div key={input.label} className="rounded-[24px] border border-white/55 bg-white/34 p-4 backdrop-blur-md">
+                  <div
+                    key={input.label}
+                    className={
+                      input.tone === "warning"
+                        ? "rounded-[24px] border border-[rgba(240,166,121,0.32)] bg-[linear-gradient(135deg,rgba(255,255,255,0.78),rgba(255,239,224,0.46),rgba(255,255,255,0.38))] p-4 backdrop-blur-md"
+                        : input.tone === "muted"
+                          ? "rounded-[24px] border border-white/45 bg-white/24 p-4 opacity-80 backdrop-blur-md"
+                          : "rounded-[24px] border border-white/55 bg-white/34 p-4 backdrop-blur-md"
+                    }
+                  >
                     <p className="text-sm text-[color:var(--muted-foreground)]">{input.label}</p>
                     <p className="mt-2 font-semibold">{input.value}</p>
                   </div>

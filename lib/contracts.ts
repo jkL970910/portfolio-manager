@@ -225,7 +225,7 @@ export interface RecommendationsData {
     objective: string;
     confidence: string;
   };
-  inputs: { label: string; value: string }[];
+  inputs: { label: string; value: string; tone?: "default" | "muted" | "warning" }[];
   explainer: string[];
   priorities: {
     id: string;

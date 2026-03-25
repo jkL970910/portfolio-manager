@@ -337,7 +337,8 @@ function getRecommendationTheme(
   run: RecommendationRun | null,
   context: DisplayContext,
   language: DisplayLanguage,
-  profile: PreferenceProfile
+  profile: PreferenceProfile,
+  accounts: InvestmentAccount[]
 ) {
   const lead = run?.items[0];
   if (!lead) {
@@ -364,7 +365,7 @@ function getRecommendationTheme(
       `If you are putting in ${formatDisplayCurrency(run.contributionAmountCad, context)} next, this is the path the system would check first.`
     ),
     reason: getRecommendationItemExplanation(lead, context, language),
-    signals: getRecommendationAssumptions(profile, language).slice(0, 2)
+    signals: getRecommendationAssumptions(profile, accounts, language).slice(0, 2)
   };
 }
 
@@ -523,6 +524,28 @@ function formatAccountPriorityOrder(priorityOrder: InvestmentAccount["type"][], 
   return priorityOrder.map((type) => getAccountTypeLabel(type, language)).join(" -> ");
 }
 
+function getEffectiveAccountPriorityOrder(accounts: InvestmentAccount[], priorityOrder: InvestmentAccount["type"][]) {
+  const accountTypes = new Set(accounts.map((account) => account.type));
+  const availableShelteredTypes = new Set(
+    accounts
+      .filter((account) => account.type === "Taxable" || account.contributionRoomCad == null || account.contributionRoomCad > 0)
+      .map((account) => account.type)
+  );
+
+  return priorityOrder.filter((type) => accountTypes.has(type) && availableShelteredTypes.has(type));
+}
+
+function getExhaustedPriorityTypes(accounts: InvestmentAccount[], priorityOrder: InvestmentAccount["type"][]) {
+  const accountTypes = new Set(accounts.map((account) => account.type));
+  const availableShelteredTypes = new Set(
+    accounts
+      .filter((account) => account.type === "Taxable" || account.contributionRoomCad == null || account.contributionRoomCad > 0)
+      .map((account) => account.type)
+  );
+
+  return priorityOrder.filter((type) => accountTypes.has(type) && !availableShelteredTypes.has(type));
+}
+
 function formatHoldingPrice(amount: number | null | undefined, currency: CurrencyCode | null | undefined, amountCad: number | null | undefined, display: DisplayContext, language: DisplayLanguage) {
   if (amountCad != null && amountCad > 0) {
     return formatMoneyForDisplay(amount ?? amountCad, currency ?? "CAD", amountCad, display);
@@ -530,7 +553,9 @@ function formatHoldingPrice(amount: number | null | undefined, currency: Currenc
   return pick(language, "暂无价格", "Not priced");
 }
 
-function getRecommendationAssumptions(profile: PreferenceProfile, language: DisplayLanguage) {
+function getRecommendationAssumptions(profile: PreferenceProfile, accounts: InvestmentAccount[], language: DisplayLanguage) {
+  const effectiveOrder = getEffectiveAccountPriorityOrder(accounts, profile.accountFundingPriority);
+  const exhaustedTypes = getExhaustedPriorityTypes(accounts, profile.accountFundingPriority);
   return [
     pick(
       language,
@@ -539,9 +564,18 @@ function getRecommendationAssumptions(profile: PreferenceProfile, language: Disp
     ),
     pick(
       language,
-      `系统也会一起看你想先用哪些账户。你现在的顺序是 ${formatAccountPriorityOrder(profile.accountFundingPriority, language)}。`,
-      `It also considers which accounts you prefer to use first. Your current order is ${formatAccountPriorityOrder(profile.accountFundingPriority, language)}.`
+      `系统也会一起看你想先用哪些账户。这次真正还能用的顺序是 ${formatAccountPriorityOrder(effectiveOrder, language)}。`,
+      `It also considers which accounts you prefer to use first. The usable order for this contribution is ${formatAccountPriorityOrder(effectiveOrder, language)}.`
     ),
+    ...(exhaustedTypes.length > 0
+      ? [
+          pick(
+            language,
+            `${formatAccountPriorityOrder(exhaustedTypes, language)} 这次先不排前面，因为对应额度已经用完了。`,
+            `${formatAccountPriorityOrder(exhaustedTypes, language)} drops back for this contribution because the available room is already used up.`
+          )
+        ]
+      : []),
     profile.taxAwarePlacement
       ? pick(
         language,
@@ -649,7 +683,7 @@ export function buildDashboardData(args: {
     .slice(0, 3);
   const spending = buildSpendingSummary(transactions, profile.cashBufferTargetCad);
   const accountPriorityOrder = profile.accountFundingPriority;
-  const recommendation = getRecommendationTheme(latestRun, display, language, profile);
+  const recommendation = getRecommendationTheme(latestRun, display, language, profile, accounts);
 
   return {
     displayContext: buildDisplayContext(display, language),
@@ -946,17 +980,20 @@ export function buildPortfolioData(args: {
 export function buildRecommendationsData(args: {
   language: DisplayLanguage;
   profile: PreferenceProfile;
+  accounts: InvestmentAccount[];
   latestRun: RecommendationRun | null;
   scenarioRuns?: RecommendationRun[];
   display: DisplayContext;
 }): RecommendationsData {
-  const { language, profile, latestRun, scenarioRuns = [], display } = args;
+  const { language, profile, accounts, latestRun, scenarioRuns = [], display } = args;
   const equityTarget = sum(profile.targetAllocation
     .filter((target) => target.assetClass !== "Fixed Income" && target.assetClass !== "Cash")
     .map((target) => target.targetPct));
   const fixedIncomeTarget = profile.targetAllocation.find((target) => target.assetClass === "Fixed Income")?.targetPct ?? 0;
   const cashTarget = profile.targetAllocation.find((target) => target.assetClass === "Cash")?.targetPct ?? 0;
   const baselineItems = latestRun?.items ?? [];
+  const effectiveAccountPriorityOrder = getEffectiveAccountPriorityOrder(accounts, profile.accountFundingPriority);
+  const exhaustedPriorityTypes = getExhaustedPriorityTypes(accounts, profile.accountFundingPriority);
 
   const buildScenarioDiffs = (scenarioRun: RecommendationRun, scenarioIndex: number) => {
     if (baselineItems.length === 0) {
@@ -1070,12 +1107,24 @@ export function buildRecommendationsData(args: {
     },
     inputs: [
       { label: pick(language, "目标配置", "Target allocation"), value: `${equityTarget} / ${fixedIncomeTarget} / ${cashTarget}` },
-      { label: pick(language, "账户优先级", "Account priority"), value: formatAccountPriorityOrder(profile.accountFundingPriority, language) },
+      { label: pick(language, "你设的账户顺序", "Saved account order"), value: formatAccountPriorityOrder(profile.accountFundingPriority, language), tone: exhaustedPriorityTypes.length > 0 ? "muted" : "default" },
+      { label: pick(language, "这次还能用的顺序", "Usable order for this contribution"), value: effectiveAccountPriorityOrder.length > 0 ? formatAccountPriorityOrder(effectiveAccountPriorityOrder, language) : pick(language, "当前只剩应税账户可用", "Only taxable room is effectively available right now") },
+      ...(exhaustedPriorityTypes.length > 0
+        ? [{
+            label: pick(language, "这次先不排前面的账户", "De-prioritized for this contribution"),
+            value: pick(
+              language,
+              `${formatAccountPriorityOrder(exhaustedPriorityTypes, language)}（额度已满）`,
+              `${formatAccountPriorityOrder(exhaustedPriorityTypes, language)} (room exhausted)`
+            ),
+            tone: "warning" as const
+          }]
+        : []),
       { label: pick(language, "税务感知放置", "Tax-aware placement"), value: profile.taxAwarePlacement ? pick(language, "已启用", "Enabled") : pick(language, "未启用", "Disabled") },
       { label: pick(language, "过渡偏好", "Transition preference"), value: getTransitionPreferenceLabel(profile.transitionPreference, language) }
     ],
     explainer: latestRun?.assumptions?.length
-      ? getRecommendationAssumptions(profile, language)
+      ? getRecommendationAssumptions(profile, accounts, language)
       : [
           pick(language, "系统会先看你现在已经持有什么，再对照你自己设的目标配置。", "The system first looks at what you already hold and compares it with your target mix."),
           pick(language, "哪一类资产差得最远，通常就会先排到前面。", "The asset sleeve furthest from target usually moves to the front of the queue."),

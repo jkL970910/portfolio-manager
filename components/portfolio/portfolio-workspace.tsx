@@ -112,6 +112,10 @@ export function PortfolioWorkspace({ data, language, initialFilters }: Portfolio
   }
 
   function handleSelectAccount(accountId: string, accountTypeId: string) {
+    if (activeAccountId === accountId && !activeHoldingId) {
+      handleSelectOverall();
+      return;
+    }
     setActiveAccountId(accountId);
     setActiveAccountTypeId(accountTypeId);
     setActiveHoldingId(null);
@@ -119,7 +123,10 @@ export function PortfolioWorkspace({ data, language, initialFilters }: Portfolio
   }
 
   function handleFocusHoldings(accountId: string, accountTypeId: string) {
-    handleSelectAccount(accountId, accountTypeId);
+    setActiveAccountId(accountId);
+    setActiveAccountTypeId(accountTypeId);
+    setActiveHoldingId(null);
+    syncUrl({ account: accountId, accountType: null, holding: null });
     requestAnimationFrame(() => {
       holdingsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     });

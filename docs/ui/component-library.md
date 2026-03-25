@@ -314,6 +314,8 @@ components/
 - [account-overview-card.tsx](E:\Projects\Portfolio%20Manager\components\portfolio\account-overview-card.tsx)
   - primary account-instance summary card used at the top of the portfolio workspace
   - shows unique account naming, institution, currency, portfolio share, top holdings, and room summary
+  - clicking the card body toggles that account context on and off
+  - the secondary button is reserved for jumping down to the holdings table, not for changing the page context semantics
 - [account-breakdown-panel.tsx](E:\Projects\Portfolio%20Manager\components\portfolio\account-breakdown-panel.tsx)
   - sticky right-rail account-instance donut summary that follows the currently selected account context
   - relies on slice hover detail instead of permanently mounted legend labels
@@ -349,6 +351,13 @@ components/
   - adds short plain-language trace tags plus hover/focus glossary chips for core terms such as account fit and FX friction
 - [scenario-compare-card.tsx](E:\Projects\Portfolio%20Manager\components\recommendations\scenario-compare-card.tsx)
   - re-solved scenario compare surface with change-summary text versus the current recommendation run
+- [recommendations/page.tsx](E:\Projects\Portfolio%20Manager\app\recommendations\page.tsx)
+  - the top input summary must distinguish between:
+    - the saved account funding order
+    - the usable order for the current contribution
+  - if a sheltered account has `available room <= 0`, do not present it as the first usable path for that run
+  - exhausted sheltered accounts should be called out in plain language instead of forcing the user to infer the problem from deeper recommendation details
+  - exhausted account-order rows should render as a weaker or warning-style summary instead of looking equivalent to fully usable account paths
 
 ### Settings
 
