@@ -110,127 +110,66 @@ export function PortfolioWorkspace({ data, language, initialFilters }: Portfolio
     syncUrl({ account: null, accountType: null, holding: null });
   }
 
-  function handleSelectAccount(accountId: string, accountTypeId: string, options?: { scrollTop?: boolean }) {
+  function handleSelectAccount(accountId: string, accountTypeId: string) {
     setActiveAccountId(accountId);
     setActiveAccountTypeId(accountTypeId);
     setActiveHoldingId(null);
     syncUrl({ account: accountId, accountType: null, holding: null });
-    if (options?.scrollTop ?? true) {
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    }
   }
 
   function handleFocusHoldings(accountId: string, accountTypeId: string) {
-    handleSelectAccount(accountId, accountTypeId, { scrollTop: false });
+    handleSelectAccount(accountId, accountTypeId);
     requestAnimationFrame(() => {
       holdingsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     });
   }
 
   return (
-    <div className="grid gap-6 xl:grid-cols-[minmax(0,1.3fr)_360px]">
+    <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
       <div className="space-y-6">
-        <div className="grid gap-6 xl:grid-cols-[minmax(0,1.15fr)_minmax(300px,0.85fr)]">
-          <LineChartCard
-            title={
-              activeAccountContext
-                ? pick(language, `${activeAccountContext.name} 近 6 个月大概怎么走`, `How ${activeAccountContext.name} has moved over the last 6 months`)
-                : pick(language, '近 6 个月大概怎么走', 'How it has moved over the last 6 months')
-            }
-            description={
-              activeAccountContext
-                ? pick(language, '这里先看这个账户自己大概是稳着往上，还是波动比较大。', 'Start by checking whether this account has been moving steadily or swinging around more than expected.')
-                : pick(language, '先看整体是稳着往上，还是波动比较大。', 'Use this to see whether the portfolio has been moving steadily or swinging around more than you expected.')
-            }
-            data={currentPerformance}
-            dataKey="value"
-            color="#152238"
-          />
-          <div className="space-y-6">
-            <RadarPreviewCard
-              title={currentStatusTitle}
-              status={`${currentHealth.score}/100 · ${currentHealth.status}`}
-              description={currentStatusDescription}
-              data={currentHealth.radar}
-              href={currentHealthHref}
-              ctaLabel={
-                activeAccountId
-                  ? pick(language, '去看这个账户哪里需要先修', 'See what this account needs first')
-                  : pick(language, '去看组合哪里需要先修', 'See what needs attention first')
-              }
-            />
-            <Card>
-              <CardHeader>
-                <CardTitle>
-                  {activeAccountId
-                    ? pick(language, '你现在正在看这个账户', 'You are now looking at this account')
-                    : pick(language, '你现在正在看整体组合', 'You are now looking at the full portfolio')}
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {activeAccount ? (
-                  <>
-                    <div className="rounded-[22px] border border-white/55 bg-white/40 p-4 text-sm text-[color:var(--muted-foreground)]">
-                      <p className="font-semibold text-[color:var(--foreground)]">{activeAccount.name}</p>
-                      <p className="mt-2">{activeAccount.share}</p>
-                    </div>
-                    <Button type="button" variant="secondary" className="w-full" leadingIcon={<RotateCcw className="h-4 w-4" />} onClick={handleSelectOverall}>
-                      {pick(language, '回到整体组合', 'Back to full portfolio')}
-                    </Button>
-                  </>
-                ) : (
-                  <div className="rounded-[22px] border border-white/55 bg-white/40 p-4 text-sm text-[color:var(--muted-foreground)]">
-                    {pick(language, '现在看到的是所有账户加总后的整体情况。想单独看某个账户时，直接点下面的账户卡。', 'You are looking at the full portfolio. Click an account card below if you want to focus on one account.')}
-                  </div>
-                )}
-                {currentSummaryPoints.map((point) => (
-                  <div key={point} className="rounded-[22px] border border-white/55 bg-white/40 p-4 text-sm text-[color:var(--muted-foreground)]">
-                    {point}
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
-          </div>
-        </div>
+        <LineChartCard
+          title={
+            activeAccountContext
+              ? pick(language, `${activeAccountContext.name} 近 6 个月大概怎么走`, `How ${activeAccountContext.name} has moved over the last 6 months`)
+              : pick(language, '近 6 个月大概怎么走', 'How it has moved over the last 6 months')
+          }
+          description={
+            activeAccountContext
+              ? pick(language, '这里先看这个账户自己大概是稳着往上，还是波动比较大。', 'Start by checking whether this account has been moving steadily or swinging around more than expected.')
+              : pick(language, '先看整体是稳着往上，还是波动比较大。', 'Use this to see whether the portfolio has been moving steadily or swinging around more than you expected.')
+          }
+          data={currentPerformance}
+          dataKey="value"
+          color="#152238"
+        />
 
         <SectionHeading
           title={pick(language, '再看账户结构', 'Then look at the account structure')}
-          description={pick(language, '先点一个真实账户，把曲线、健康和持仓都切过去。卡片按钮只负责带你跳到下面的持仓表。', 'Click a real account to switch the whole page context. The button inside a card only jumps you down to the holdings table.')}
+          description={pick(language, '点账户卡本身会切换整页上下文；卡片按钮只负责把你带到下面的持仓表。', 'Clicking an account card switches the whole page context; the card button only jumps you down to the holdings table.')}
         />
-        <div className="grid gap-4 xl:grid-cols-[minmax(0,1.15fr)_minmax(340px,0.85fr)]">
-          <div className="grid gap-4 md:grid-cols-2">
-            {data.accountCards.map((account) => (
-              <AccountOverviewCard
-                key={account.id}
-                language={language}
-                name={account.name}
-                typeLabel={account.typeLabel}
-                institution={account.institution}
-                currency={account.currency}
-                value={account.value}
-                share={account.share}
-                room={account.room}
-                topHoldings={account.topHoldings}
-                highlighted={Boolean((activeAccountId && account.id === activeAccountId) || (!activeAccountId && activeAccountTypeId && account.typeId === activeAccountTypeId))}
-                onSelect={() => handleSelectAccount(account.id, account.typeId)}
-                onViewHoldings={() => handleFocusHoldings(account.id, account.typeId)}
-              />
-            ))}
-          </div>
-          <div className="xl:sticky xl:top-28 xl:self-start">
-            <AccountBreakdownPanel
+        <div className="space-y-4">
+          {data.accountCards.map((account) => (
+            <AccountOverviewCard
+              key={account.id}
               language={language}
-              accountTypeAllocation={data.accountTypeAllocation}
-              accountInstanceAllocation={data.accountInstanceAllocation}
-              activeAccountTypeId={activeAccountTypeId ?? undefined}
-              activeAccountId={activeAccountId ?? undefined}
+              name={account.name}
+              typeLabel={account.typeLabel}
+              institution={account.institution}
+              currency={account.currency}
+              value={account.value}
+              share={account.share}
+              room={account.room}
+              topHoldings={account.topHoldings}
+              highlighted={Boolean((activeAccountId && account.id === activeAccountId) || (!activeAccountId && activeAccountTypeId && account.typeId === activeAccountTypeId))}
+              onSelect={() => handleSelectAccount(account.id, account.typeId)}
+              onViewHoldings={() => handleFocusHoldings(account.id, account.typeId)}
             />
-          </div>
+          ))}
         </div>
 
         <SectionHeading
           title={pick(language, '最后再看持仓明细', 'Finally drill into the holdings')}
-          description={pick(language, '这里会跟着你当前选中的整体/账户一起变化。', 'This table follows the overall or account context you have selected above.')}
+          description={pick(language, '这里会跟着你当前选中的整体或账户一起变化。', 'This table follows the overall or account context you have selected above.')}
         />
         <div ref={holdingsRef}>
           <Card>
@@ -255,12 +194,9 @@ export function PortfolioWorkspace({ data, language, initialFilters }: Portfolio
                             : null}
                     </p>
                     <p className="text-xs text-[color:var(--muted-foreground)]">
-                      {pick(language, '如果想回到整体，点上面的“回到整体组合”就行。', 'Use the button above to go back to the full portfolio.')}
+                      {pick(language, '如果想回到整体，点右侧栏里的“回到整体组合”就行。', 'Use the button in the right sidebar to go back to the full portfolio.')}
                     </p>
                   </div>
-                  <Button type="button" variant="secondary" onClick={handleSelectOverall}>
-                    {pick(language, '回到整体组合', 'Back to full portfolio')}
-                  </Button>
                 </div>
               ) : null}
               <HoldingTable holdings={filteredHoldings} language={language} />
@@ -269,7 +205,58 @@ export function PortfolioWorkspace({ data, language, initialFilters }: Portfolio
         </div>
       </div>
 
-      <div className="space-y-6">
+      <aside className="space-y-6 xl:sticky xl:top-28 xl:self-start">
+        <Card>
+          <CardHeader>
+            <CardTitle>
+              {activeAccountId
+                ? pick(language, '你现在正在看这个账户', 'You are now looking at this account')
+                : pick(language, '你现在正在看整体组合', 'You are now looking at the full portfolio')}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {activeAccount ? (
+              <>
+                <div className="rounded-[22px] border border-white/55 bg-white/40 p-4 text-sm text-[color:var(--muted-foreground)]">
+                  <p className="font-semibold text-[color:var(--foreground)]">{activeAccount.name}</p>
+                  <p className="mt-2">{activeAccount.share}</p>
+                </div>
+                <Button type="button" variant="secondary" className="w-full" leadingIcon={<RotateCcw className="h-4 w-4" />} onClick={handleSelectOverall}>
+                  {pick(language, '回到整体组合', 'Back to full portfolio')}
+                </Button>
+              </>
+            ) : (
+              <div className="rounded-[22px] border border-white/55 bg-white/40 p-4 text-sm text-[color:var(--muted-foreground)]">
+                {pick(language, '现在看到的是所有账户加总后的整体情况。想单独看某个账户时，直接点左侧的账户卡。', 'You are looking at the full portfolio. Click an account card on the left if you want to focus on one account.')}
+              </div>
+            )}
+            {currentSummaryPoints.map((point) => (
+              <div key={point} className="rounded-[22px] border border-white/55 bg-white/40 p-4 text-sm text-[color:var(--muted-foreground)]">
+                {point}
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+
+        <RadarPreviewCard
+          title={currentStatusTitle}
+          status={`${currentHealth.score}/100 · ${currentHealth.status}`}
+          description={currentStatusDescription}
+          data={currentHealth.radar}
+          href={currentHealthHref}
+          ctaLabel={
+            activeAccountId
+              ? pick(language, '去看这个账户哪里需要先修', 'See what this account needs first')
+              : pick(language, '去看组合哪里需要先修', 'See what needs attention first')
+          }
+        />
+
+        <AccountBreakdownPanel
+          language={language}
+          accountInstanceAllocation={data.accountInstanceAllocation}
+          activeAccountId={activeAccountId ?? undefined}
+        />
+
         <Card>
           <CardHeader>
             <CardTitle>{pick(language, '你现在可以继续打开这些地方', 'From here, you can open these next')}</CardTitle>
@@ -295,7 +282,7 @@ export function PortfolioWorkspace({ data, language, initialFilters }: Portfolio
             </Button>
           </CardContent>
         </Card>
-      </div>
+      </aside>
     </div>
   );
 }

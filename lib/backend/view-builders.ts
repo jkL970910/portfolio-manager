@@ -632,6 +632,7 @@ export function buildDashboardData(args: {
 }): DashboardData {
   const { viewer, accounts, holdings, transactions, profile, latestRun, display } = args;
   const language = viewer.displayLanguage;
+  const { typeLabelMap, instanceLabelMap } = buildAccountLabelMaps(accounts, language);
   const totalPortfolio = sum(accounts.map((account) => account.marketValueCad));
   const availableRoom = sum(accounts.map((account) => account.contributionRoomCad ?? 0));
   const currentAllocation = getCurrentAllocation(holdings);
@@ -684,8 +685,12 @@ export function buildDashboardData(args: {
       })
       .map((account, index) => ({
         id: account.id,
-        name: account.type,
-        caption: getAccountCaption(account.type, language),
+        name: instanceLabelMap.get(account.id) ?? account.nickname,
+        caption: pick(
+          language,
+          `${typeLabelMap.get(account.id) ?? account.type} · ${getAccountCaption(account.type, language)}`,
+          `${typeLabelMap.get(account.id) ?? account.type} · ${getAccountCaption(account.type, language)}`
+        ),
         value: formatMoneyForDisplay(account.marketValueAmount, account.currency ?? "CAD", account.marketValueCad, display),
         room: formatRoomDetail(account, display, language),
         badge: getAccountBadgeLabel(index, accountPriorityOrder.includes(account.type), language),
@@ -709,7 +714,7 @@ export function buildDashboardData(args: {
         id: holding.id,
         symbol: holding.symbol,
         name: holding.name,
-        account: accounts.find((account) => account.id === holding.accountId)?.type ?? pick(language, "账户", "Account"),
+        account: instanceLabelMap.get(holding.accountId) ?? pick(language, "账户", "Account"),
         lastPrice: formatHoldingPrice(holding.lastPriceAmount, holding.currency, holding.lastPriceCad, display, language),
         lastUpdated: formatHoldingLastUpdated(holding.updatedAt, language),
         freshnessVariant: getHoldingFreshnessVariant(holding.updatedAt),

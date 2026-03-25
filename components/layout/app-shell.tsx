@@ -2,6 +2,7 @@
 import type { Viewer } from "@/lib/auth/session";
 import { FloatingHeaderFrame } from "@/components/layout/floating-header-frame";
 import { TopNav } from "@/components/navigation/top-nav";
+import { ScrollToTopButton } from "@/components/layout/scroll-to-top-button";
 import { pick } from "@/lib/i18n/ui";
 import { getFxRate } from "@/lib/market-data/fx";
 
@@ -98,6 +99,7 @@ export async function AppShell({
         </section>
         {children}
       </main>
+      <ScrollToTopButton />
     </div>
   );
 }

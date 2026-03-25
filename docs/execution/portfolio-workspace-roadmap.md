@@ -166,3 +166,12 @@ Phase 1 is done when:
 2. Portfolio shows account cards clearly enough that users can understand account structure before opening the holding table
 3. account distribution visualizations can distinguish between account category and concrete account instance
 4. the Portfolio page feels account-aware, not only holding-aware
+
+
+## Phase 1 Layout Decisions
+
+- Portfolio uses a two-column workspace: a wide primary column for trend, account rows, and holdings; a sticky right rail for context, health preview, account donut, and next-page actions.
+- The account donut no longer exposes a local type/account toggle. It always represents real account instances and follows the currently selected account.
+- Account cards use a single-row layout so long account lists do not create empty grid gaps.
+- Clicking an account card changes the page context without forcing a scroll jump; the in-card button is the only control that jumps to the holdings table.
+- A global floating scroll-to-top control is available across pages through AppShell.

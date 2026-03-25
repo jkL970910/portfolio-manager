@@ -240,6 +240,15 @@ components/
 - Purpose: scroll-aware wrapper for the floating header
 - Responsibility: compact header visuals after scroll threshold
 
+### `ScrollToTopButton`
+
+- File: [scroll-to-top-button.tsx](E:\Projects\Portfolio%20Manager\components\layout\scroll-to-top-button.tsx)
+- Purpose: fixed global return-to-top control for long analytical pages
+- Rules:
+  - stays hidden near the top of the page
+  - appears after meaningful scroll depth
+  - returns the current page to the top smoothly
+
 ## Chart Components
 
 ### `LineChartCard`
