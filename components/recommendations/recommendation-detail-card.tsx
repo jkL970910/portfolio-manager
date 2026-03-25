@@ -1,11 +1,11 @@
-"use client";
+'use client';
 
-import { useMemo, useState } from "react";
-import { ChevronDown, ChevronUp, Info } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { pick, type DisplayLanguage } from "@/lib/i18n/ui";
+import { useMemo, useState } from 'react';
+import { ChevronDown, ChevronUp, Info } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
+import { pick, type DisplayLanguage } from '@/lib/i18n/ui';
 
 type RecommendationDetailCardProps = {
   language: DisplayLanguage;
@@ -27,7 +27,7 @@ type RecommendationDetailCardProps = {
     constraints: {
       label: string;
       detail: string;
-      variant: "success" | "warning" | "neutral";
+      variant: 'success' | 'warning' | 'neutral';
     }[];
     execution: {
       label: string;
@@ -39,10 +39,10 @@ type RecommendationDetailCardProps = {
 };
 
 type DecisionStep = {
-  kind: string;
-  variant: "success" | "warning";
-  text: string;
+  tone: 'positive' | 'caution';
+  label: string;
   shortTag: string;
+  text: string;
 };
 
 type HelpTerm = {
@@ -50,92 +50,76 @@ type HelpTerm = {
   detail: string;
 };
 
-function getShortDecisionTag(language: DisplayLanguage, text: string, variant: "success" | "warning") {
+function getShortDecisionTag(language: DisplayLanguage, text: string, tone: 'positive' | 'caution') {
   const normalized = text.toLowerCase();
 
-  if (text.includes("账户") || normalized.includes("account")) {
-    return pick(language, "找对账户", "Right account");
+  if (text.includes('账户') || normalized.includes('account')) {
+    return pick(language, '放对账户', 'Right account');
   }
-  if (text.includes("风险") || text.includes("集中") || normalized.includes("risk") || normalized.includes("concentration")) {
-    return pick(language, "分散风险", "Spread risk");
+  if (text.includes('风险') || text.includes('集中') || normalized.includes('risk') || normalized.includes('concentration')) {
+    return pick(language, '别再加重风险', 'Reduce concentration');
   }
-  if (text.includes("标的") || text.includes("候选") || normalized.includes("security") || normalized.includes("candidate")) {
-    return pick(language, "挑主标的", "Pick the lead");
+  if (text.includes('标的') || text.includes('候选') || normalized.includes('security') || normalized.includes('candidate')) {
+    return pick(language, '主标的更顺手', 'Best security');
   }
-  if (text.includes("FX") || text.includes("币种") || normalized.includes("fx") || normalized.includes("currency")) {
-    return pick(language, "少交换汇成本", "Limit FX drag");
+  if (text.includes('FX') || text.includes('币种') || normalized.includes('fx') || normalized.includes('currency')) {
+    return pick(language, '少一点换汇成本', 'Less FX drag');
   }
-  if (text.includes("目标") || text.includes("缺口") || normalized.includes("target") || normalized.includes("gap")) {
-    return pick(language, "先补缺口", "Close the gap");
+  if (text.includes('目标') || text.includes('缺口') || normalized.includes('target') || normalized.includes('gap')) {
+    return pick(language, '先补最大缺口', 'Close the gap');
   }
 
-  return variant === "success"
-    ? pick(language, "这点在给它加分", "This helps the idea")
-    : pick(language, "这点让别的路掉下去", "This weakens alternatives");
+  return tone === 'positive'
+    ? pick(language, '这点在帮它排前面', 'Helps it rank first')
+    : pick(language, '这点让别的路往后排', 'Pushes others back');
 }
 
 function getHelpTerms(language: DisplayLanguage): HelpTerm[] {
   return [
     {
-      label: pick(language, "为什么它加分", "Why this adds confidence"),
+      label: pick(language, '什么叫放对账户', 'What “right account” means'),
       detail: pick(
         language,
-        "表示这一条是在帮当前建议排到前面，也就是系统为什么觉得它更顺手。",
-        "This is one of the reasons the current path ranks higher."
+        '系统会一起看账户类型、额度和放置效率，挑一个更适合接这笔钱的位置。',
+        'The system checks account type, room, and placement efficiency to choose the better home for the contribution.'
       )
     },
     {
-      label: pick(language, "为什么别的路被压下去", "Why other paths drop"),
+      label: pick(language, '为什么会提到换汇成本', 'Why FX cost shows up'),
       detail: pick(
         language,
-        "表示系统把别的方案往后排，通常是因为风险更高、账户不顺手，或者额外成本更重。",
-        "This explains why competing paths rank lower, usually because of higher risk, weaker account fit, or extra cost."
-      )
-    },
-    {
-      label: pick(language, "账户顺手度", "Account fit"),
-      detail: pick(
-        language,
-        "看这笔钱放进哪个账户更顺手，会一起考虑账户类型、额度和放置效率。",
-        "Shows which account is the best home for the contribution."
-      )
-    },
-    {
-      label: pick(language, "换汇成本", "FX friction"),
-      detail: pick(
-        language,
-        "看跨币种交易会不会多出明显换汇成本。成本越高，这条路越容易被系统往后放。",
-        "Shows whether cross-currency conversion adds noticeable drag."
+        '如果一条路会额外触发明显换汇，系统通常会把它往后排，除非它真的更值得。',
+        'If a path adds noticeable FX drag, the system usually pushes it back unless the trade-off is clearly worth it.'
       )
     }
   ];
 }
 
 function groupConstraints(
-  constraints: RecommendationDetailCardProps["priority"]["constraints"],
+  constraints: RecommendationDetailCardProps['priority']['constraints'],
   language: DisplayLanguage
 ) {
-  const confirmed = constraints.filter((item) => item.variant !== "warning");
-  const watch = constraints.filter((item) => item.variant === "warning");
+  const confirmed = constraints.filter((item) => item.variant !== 'warning');
+  const watch = constraints.filter((item) => item.variant === 'warning');
 
   return [
     {
-      id: "confirmed",
-      title: pick(language, "这条路为什么站得住", "Why this path holds up"),
+      id: 'confirmed',
+      title: pick(language, '这条路为什么站得住', 'Why this path still holds up'),
       description: pick(
         language,
-        "这些点说明这条建议不是碰巧排在前面，而是真的比较顺手。",
-        "These checks explain why this path ranks well instead of landing there by accident."
+        '这些点说明它不是碰巧排在前面，而是真的比较顺手。',
+        'These checks explain why it is not randomly first and still looks workable.'
       ),
       items: confirmed
     },
     {
-      id: "watch",
-      title: pick(language, "执行前要留意什么", "What to watch before acting"),
+      id: 'watch',
+      title: pick(language, '执行前要留意什么', 'What to watch before acting'),
       description: pick(
         language,
-        "这些不一定会拦住你，但执行前最好先知道。",
-        "These do not always block the idea, but they are the first things to keep in mind."
+        '这些点不一定会拦住你，但最好先知道。',
+        'These do not always block the idea, but you should know them before acting.'
       ),
       items: watch
     }
@@ -158,16 +142,16 @@ export function RecommendationDetailCard({
   const decisionTrace = useMemo<DecisionStep[]>(
     () => [
       ...priority.whyThis.map((item) => ({
-        kind: pick(language, "系统为什么先选这条路", "Why this path came first"),
-        variant: "success" as const,
-        text: item,
-        shortTag: getShortDecisionTag(language, item, "success")
+        tone: 'positive' as const,
+        label: pick(language, '系统为什么先选这条路', 'Why this path comes first'),
+        shortTag: getShortDecisionTag(language, item, 'positive'),
+        text: item
       })),
       ...priority.whyNot.map((item) => ({
-        kind: pick(language, "系统为什么没先选别的", "Why other paths were not first"),
-        variant: "warning" as const,
-        text: item,
-        shortTag: getShortDecisionTag(language, item, "warning")
+        tone: 'caution' as const,
+        label: pick(language, '系统为什么没先选别的', 'Why other paths were not first'),
+        shortTag: getShortDecisionTag(language, item, 'caution'),
+        text: item
       }))
     ],
     [language, priority.whyNot, priority.whyThis]
@@ -180,59 +164,61 @@ export function RecommendationDetailCard({
 
   return (
     <Card className="overflow-hidden">
-      <CardContent className="space-y-4 px-5 py-5">
-        <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
-          <div className="min-w-0 flex-1 space-y-4">
-            <div className="flex flex-wrap items-start gap-3">
+      <CardContent className="space-y-5 px-5 py-5">
+        <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_240px]">
+          <div className="space-y-4">
+            <div className="flex flex-wrap items-center gap-3">
               <Badge variant="primary">#{index + 1}</Badge>
-              <div className="min-w-0 flex-1 space-y-2">
-                <div className="flex flex-wrap items-center gap-2">
-                  <h3 className="text-lg font-semibold text-[color:var(--foreground)]">{priority.assetClass}</h3>
-                  <Badge variant="neutral">{priority.security}</Badge>
-                </div>
-                <p className="text-sm leading-7 text-[color:var(--muted-foreground)]">{priority.description}</p>
-              </div>
+              <h3 className="text-2xl font-semibold text-[color:var(--foreground)]">{priority.assetClass}</h3>
             </div>
 
-            <div className="grid gap-3 md:grid-cols-2 2xl:grid-cols-4">
-              <SummaryBlock label={pick(language, "准备买什么", "Lead security")} value={priority.security} />
-              <SummaryBlock label={pick(language, "这笔是在补什么", "Allocation gap")} value={priority.gapSummary} />
-              <SummaryBlock label={pick(language, "放进哪个账户更顺手", "Best account home")} value={priority.accountFit} />
-              <SummaryBlock label={pick(language, "系统怎么看这条建议", "How the system rates it")} value={priority.scoreline} />
+            <div className="rounded-[24px] border border-white/55 bg-white/38 px-5 py-4 backdrop-blur-md">
+              <p className="text-xs uppercase tracking-[0.16em] text-[color:var(--muted-foreground)]">
+                {pick(language, '准备买什么', 'Lead security')}
+              </p>
+              <p className="mt-3 text-lg font-semibold leading-8 text-[color:var(--foreground)]">{priority.security}</p>
+            </div>
+
+            <p className="text-base leading-8 text-[color:var(--muted-foreground)]">{priority.description}</p>
+
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+              <SummaryBlock label={pick(language, '这笔是在补什么', 'What this is fixing')} value={priority.gapSummary} />
+              <SummaryBlock label={pick(language, '先放去哪', 'Best account home')} value={priority.accountFit} />
+              <SummaryBlock label={pick(language, '系统怎么看这条建议', 'How the system sees it')} value={priority.scoreline} />
             </div>
           </div>
 
-          <div className="w-full rounded-[24px] border border-white/55 bg-white/40 p-4 text-right backdrop-blur-md sm:w-[248px]">
-            <p className="text-sm text-[color:var(--muted-foreground)]">{pick(language, "这笔建议投多少", "Suggested amount")}</p>
-            <p className="mt-2 text-3xl font-semibold text-[color:var(--foreground)]">{priority.amount}</p>
-            <p className="mt-2 text-sm text-[color:var(--muted-foreground)]">{priority.account}</p>
+          <div className="rounded-[24px] border border-white/55 bg-white/42 p-5 text-right backdrop-blur-md">
+            <p className="text-sm text-[color:var(--muted-foreground)]">{pick(language, '这笔建议投多少', 'Suggested amount')}</p>
+            <p className="mt-2 text-4xl font-semibold text-[color:var(--foreground)]">{priority.amount}</p>
+            <p className="mt-3 text-sm text-[color:var(--muted-foreground)]">{priority.account}</p>
             <Button
               type="button"
               variant="secondary"
               onClick={handleToggle}
-              className="mt-4 w-full justify-between"
+              className="mt-5 w-full justify-between"
               trailingIcon={isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
             >
               {isExpanded
-                ? pick(language, "收起这条建议的细节", "Hide recommendation detail")
-                : pick(language, "看这条建议是怎么来的", "Show recommendation detail")}
+                ? pick(language, '收起这条建议的细节', 'Hide recommendation detail')
+                : pick(language, '看这条建议为什么排第一', 'Why this recommendation ranks first')}
             </Button>
           </div>
         </div>
 
         {isExpanded ? (
-          <div className="grid gap-4 xl:grid-cols-[1.05fr_0.95fr]">
+          <div className="grid gap-4 xl:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)]">
             <div className="space-y-4">
               <div className="grid gap-3 md:grid-cols-2">
                 <DetailBlock
-                  label={pick(language, "这次优先买它", "Lead security")}
+                  label={pick(language, '如果按这条建议去投', 'If you follow this path')}
                   value={priority.security}
                   detail={priority.gapSummary}
                 />
                 <DetailBlock
-                  label={pick(language, "还有哪些可选标的", "Ticker alternatives")}
+                  label={pick(language, '还有哪些可选标的', 'Other usable tickers')}
                   value={priority.tickers}
-                  detail={priority.alternatives.join(" · ")}
+                  detail={priority.alternatives.join(' · ')}
                 />
               </div>
 
@@ -240,25 +226,20 @@ export function RecommendationDetailCard({
                 <div className="flex flex-col gap-4">
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                     <div className="space-y-2">
-                      <p className="text-sm font-semibold text-[color:var(--foreground)]">{pick(language, "系统是怎么想到这条路的", "How the system got here")}</p>
+                      <p className="text-sm font-semibold text-[color:var(--foreground)]">{pick(language, '系统是怎么想到这条路的', 'How the system got here')}</p>
                       <p className="text-sm leading-7 text-[color:var(--muted-foreground)]">
                         {pick(
                           language,
-                          "这一段把“为什么先选它、为什么别的没排到前面”串成一条解释链，顺着看就能知道系统怎么想的。",
-                          "This section turns the recommendation into one readable chain so you can see how the system got here."
+                          '顺着看下面这几步，你就能知道系统为什么先选它、为什么别的路排在后面。',
+                          'Read the steps below in order and you will see why this path moved ahead of the others.'
                         )}
                       </p>
                     </div>
                     {shouldCollapseTrace ? (
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        onClick={() => setIsTraceExpanded((current) => !current)}
-                        className="shrink-0"
-                      >
+                      <Button type="button" variant="ghost" onClick={() => setIsTraceExpanded((current) => !current)} className="shrink-0">
                         {isTraceExpanded
-                          ? pick(language, "收起这段解释", "Collapse this explanation")
-                          : pick(language, "展开完整解释", "Show the full explanation")}
+                          ? pick(language, '收起完整解释', 'Collapse full explanation')
+                          : pick(language, '展开完整解释', 'Show full explanation')}
                       </Button>
                     ) : null}
                   </div>
@@ -272,10 +253,7 @@ export function RecommendationDetailCard({
 
                 <div className="mt-4 space-y-3">
                   {visibleTrace.map((step, traceIndex) => (
-                    <div
-                      key={`${priority.id}-trace-${traceIndex}`}
-                      className="rounded-[22px] border border-white/55 bg-white/44 px-4 py-3 backdrop-blur-md"
-                    >
+                    <div key={`${priority.id}-trace-${traceIndex}`} className="rounded-[22px] border border-white/55 bg-white/44 px-4 py-3 backdrop-blur-md">
                       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                         <div className="flex items-start gap-3">
                           <div className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-white/70 text-sm font-semibold text-[color:var(--foreground)]">
@@ -283,16 +261,16 @@ export function RecommendationDetailCard({
                           </div>
                           <div className="space-y-2">
                             <div className="flex flex-wrap items-center gap-2">
-                              <p className="text-sm font-semibold text-[color:var(--foreground)]">{step.kind}</p>
-                              <Badge variant={step.variant === "success" ? "success" : "warning"}>{step.shortTag}</Badge>
+                              <p className="text-sm font-semibold text-[color:var(--foreground)]">{step.label}</p>
+                              <Badge variant={step.tone === 'positive' ? 'success' : 'warning'}>{step.shortTag}</Badge>
                             </div>
                             <p className="text-sm leading-7 text-[color:var(--muted-foreground)]">{step.text}</p>
                           </div>
                         </div>
-                        <Badge variant={step.variant === "success" ? "success" : "warning"}>
-                          {step.variant === "success"
-                            ? pick(language, "在加分", "Adds confidence")
-                            : pick(language, "在压低别的路", "Pushes alternatives down")}
+                        <Badge variant={step.tone === 'positive' ? 'success' : 'warning'}>
+                          {step.tone === 'positive'
+                            ? pick(language, '在给它加分', 'Adds support')
+                            : pick(language, '在压低别的路', 'Pushes others back')}
                         </Badge>
                       </div>
                     </div>
@@ -310,21 +288,18 @@ export function RecommendationDetailCard({
                   </div>
                   <div className="mt-4 space-y-3">
                     {group.items.map((constraint) => (
-                      <div
-                        key={`${priority.id}-${group.id}-${constraint.label}`}
-                        className="rounded-[20px] border border-white/55 bg-white/42 px-4 py-3 backdrop-blur-md"
-                      >
+                      <div key={`${priority.id}-${group.id}-${constraint.label}`} className="rounded-[20px] border border-white/55 bg-white/42 px-4 py-3 backdrop-blur-md">
                         <div className="flex items-start justify-between gap-3">
                           <div>
                             <p className="text-sm font-medium text-[color:var(--foreground)]">{constraint.label}</p>
                             <p className="mt-1 text-sm leading-7 text-[color:var(--muted-foreground)]">{constraint.detail}</p>
                           </div>
                           <Badge variant={constraint.variant}>
-                            {constraint.variant === "success"
-                              ? pick(language, "看起来没问题", "Looks good")
-                              : constraint.variant === "warning"
-                                ? pick(language, "这里要留意", "Watch this")
-                                : pick(language, "顺手补充", "Extra context")}
+                            {constraint.variant === 'success'
+                              ? pick(language, '看起来没问题', 'Looks fine')
+                              : constraint.variant === 'warning'
+                                ? pick(language, '这里要留意', 'Watch this')
+                                : pick(language, '顺手补充', 'Extra context')}
                           </Badge>
                         </div>
                       </div>
@@ -334,7 +309,7 @@ export function RecommendationDetailCard({
               ))}
 
               <div className="rounded-[24px] border border-white/55 bg-white/36 p-4 backdrop-blur-md">
-                <p className="text-sm font-semibold text-[color:var(--foreground)]">{pick(language, "如果你真的要执行，先看这些", "Before you act, check this")}</p>
+                <p className="text-sm font-semibold text-[color:var(--foreground)]">{pick(language, '如果你真的要执行，先看这些', 'Before you act, check this')}</p>
                 <div className="mt-4 grid gap-3 sm:grid-cols-2">
                   {priority.execution.map((item) => (
                     <DetailBlock key={`${priority.id}-${item.label}`} label={item.label} value={item.value} />
@@ -353,7 +328,7 @@ function SummaryBlock({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-[20px] border border-white/55 bg-white/36 px-4 py-3 backdrop-blur-md">
       <p className="text-sm text-[color:var(--muted-foreground)]">{label}</p>
-      <p className="mt-2 font-semibold text-[color:var(--foreground)]">{value}</p>
+      <p className="mt-2 text-base font-semibold leading-8 text-[color:var(--foreground)]">{value}</p>
     </div>
   );
 }
@@ -362,7 +337,7 @@ function DetailBlock({ label, value, detail }: { label: string; value: string; d
   return (
     <div className="rounded-[20px] border border-white/55 bg-white/36 px-4 py-3 backdrop-blur-md">
       <p className="text-sm text-[color:var(--muted-foreground)]">{label}</p>
-      <p className="mt-2 font-semibold text-[color:var(--foreground)]">{value}</p>
+      <p className="mt-2 text-lg font-semibold leading-8 text-[color:var(--foreground)]">{value}</p>
       {detail ? <p className="mt-2 text-sm leading-7 text-[color:var(--muted-foreground)]">{detail}</p> : null}
     </div>
   );

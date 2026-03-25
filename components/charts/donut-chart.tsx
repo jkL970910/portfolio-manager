@@ -1,6 +1,8 @@
-﻿'use client';
+'use client';
 
-import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from 'recharts';
+import type { ReactNode } from 'react';
+import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip, type TooltipProps } from 'recharts';
+import type { NameType, ValueType } from 'recharts/types/component/DefaultTooltipContent';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
 const COLORS = ['#1947E5', '#2563EB', '#5B8CFF', '#0F9F6E', '#C98412', '#F08FB2', '#6F8DF6'];
@@ -17,13 +19,19 @@ export function DonutChartCard({
   description,
   data,
   activeId,
-  headerActions
+  headerActions,
+  helperText,
+  noDataText,
+  activeFocusLabel
 }: {
   title: string;
   description: string;
   data: DonutDatum[];
   activeId?: string;
-  headerActions?: React.ReactNode;
+  headerActions?: ReactNode;
+  helperText?: string;
+  noDataText?: string;
+  activeFocusLabel?: string;
 }) {
   const hasData = data.length > 0;
 
@@ -38,12 +46,12 @@ export function DonutChartCard({
           {headerActions ? <div className="shrink-0">{headerActions}</div> : null}
         </div>
       </CardHeader>
-      <CardContent className="grid gap-6 xl:grid-cols-1 2xl:grid-cols-[minmax(220px,0.9fr)_minmax(210px,1.1fr)]">
-        <div className="h-[220px] min-w-0">
+      <CardContent className="space-y-4">
+        <div className="mx-auto h-[280px] max-w-[320px]">
           {hasData ? (
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
-                <Pie data={data} dataKey="value" nameKey="name" innerRadius={58} outerRadius={84} paddingAngle={4}>
+                <Pie data={data} dataKey="value" nameKey="name" innerRadius={72} outerRadius={104} paddingAngle={5}>
                   {data.map((entry, index) => {
                     const entryId = entry.id ?? entry.name;
                     const isActive = entryId === activeId;
@@ -51,61 +59,64 @@ export function DonutChartCard({
                       <Cell
                         key={entryId}
                         fill={COLORS[index % COLORS.length]}
-                        stroke={isActive ? 'rgba(232,121,249,0.88)' : 'rgba(255,255,255,0.75)'}
-                        strokeWidth={isActive ? 4 : 1.5}
-                        opacity={activeId && !isActive ? 0.38 : 1}
+                        stroke={isActive ? 'rgba(232,121,249,0.88)' : 'rgba(255,255,255,0.8)'}
+                        strokeWidth={isActive ? 5 : 2}
+                        opacity={activeId && !isActive ? 0.42 : 1}
                       />
                     );
                   })}
                 </Pie>
-                <Tooltip />
+                <Tooltip content={<DonutTooltip data={data} activeId={activeId} activeFocusLabel={activeFocusLabel} />} />
               </PieChart>
             </ResponsiveContainer>
           ) : (
             <div className="flex h-full items-center justify-center rounded-[24px] bg-[color:var(--card-muted)] px-6 text-center text-sm text-[color:var(--muted-foreground)]">
-              No allocation data yet. Import accounts to populate this chart.
+              {noDataText ?? 'No allocation data yet. Import accounts to populate this chart.'}
             </div>
           )}
         </div>
-        <div className="space-y-3">
-          {hasData ? (
-            data.map((entry, index) => {
-              const entryId = entry.id ?? entry.name;
-              const isActive = entryId === activeId;
-              return (
-                <div key={entryId} className="group relative" tabIndex={0}>
-                  <div
-                    className={isActive
-                      ? 'flex items-center justify-between rounded-2xl border border-[rgba(232,121,249,0.35)] bg-[linear-gradient(135deg,rgba(255,255,255,0.72),rgba(245,214,235,0.42),rgba(212,226,255,0.32))] px-4 py-3'
-                      : 'flex items-center justify-between rounded-2xl border border-[color:var(--border)] bg-white/22 px-4 py-3'}
-                  >
-                    <div className="flex min-w-0 items-center gap-3">
-                      <span className="h-3 w-3 shrink-0 rounded-full" style={{ backgroundColor: COLORS[index % COLORS.length] }} />
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-medium text-[color:var(--foreground)]">{entry.name}</p>
-                        {entry.detail ? <p className="truncate text-xs text-[color:var(--muted-foreground)]">{entry.detail}</p> : null}
-                      </div>
-                    </div>
-                    <span className="shrink-0 text-sm text-[color:var(--muted-foreground)]">{entry.value}%</span>
-                  </div>
-                  <div className="pointer-events-none absolute inset-x-3 top-full z-30 mt-2 hidden rounded-[22px] border border-white/65 bg-[linear-gradient(135deg,rgba(255,255,255,0.94),rgba(245,214,235,0.78),rgba(212,226,255,0.72))] p-4 text-sm shadow-[0_20px_40px_rgba(15,23,42,0.12)] backdrop-blur-xl group-hover:block group-focus-within:block">
-                    <div className="flex items-center gap-2">
-                      <span className="h-3 w-3 rounded-full" style={{ backgroundColor: COLORS[index % COLORS.length] }} />
-                      <p className="font-semibold text-[color:var(--foreground)]">{entry.name}</p>
-                    </div>
-                    {entry.detail ? <p className="mt-3 text-[color:var(--muted-foreground)]">{entry.detail}</p> : null}
-                    <p className="mt-3 text-[color:var(--foreground)]">{entry.value}%</p>
-                  </div>
-                </div>
-              );
-            })
-          ) : (
-            <div className="rounded-2xl border border-[color:var(--border)] p-4 text-sm text-[color:var(--muted-foreground)]">
-              No category breakdown is available yet.
-            </div>
-          )}
-        </div>
+
+        {hasData ? (
+          <div className="rounded-[20px] border border-white/55 bg-white/30 px-4 py-3 text-xs leading-6 text-[color:var(--muted-foreground)] backdrop-blur-md">
+            {helperText ?? 'Hover a slice to see which account it represents and roughly how much of the portfolio sits there.'}
+          </div>
+        ) : null}
       </CardContent>
     </Card>
+  );
+}
+
+function DonutTooltip(
+  props: TooltipProps<ValueType, NameType> & { data: DonutDatum[]; activeId?: string; activeFocusLabel?: string }
+) {
+  const { active, data, activeId, activeFocusLabel } = props;
+  const payload = (props as TooltipProps<ValueType, NameType> & { payload?: Array<{ payload?: DonutDatum }> }).payload;
+
+  if (!active || !payload?.length) {
+    return null;
+  }
+
+  const raw = payload[0]?.payload as DonutDatum | undefined;
+  if (!raw) {
+    return null;
+  }
+
+  const entryId = raw.id ?? raw.name;
+  const colorIndex = data.findIndex((item) => (item.id ?? item.name) === entryId);
+  const color = COLORS[(colorIndex >= 0 ? colorIndex : 0) % COLORS.length];
+  const isActive = entryId === activeId;
+
+  return (
+    <div className="w-[260px] rounded-[22px] border border-white/65 bg-[linear-gradient(135deg,rgba(255,255,255,0.96),rgba(245,214,235,0.82),rgba(212,226,255,0.76))] p-4 text-sm shadow-[0_20px_40px_rgba(15,23,42,0.12)] backdrop-blur-xl">
+      <div className="flex items-center gap-2">
+        <span className="h-3 w-3 rounded-full" style={{ backgroundColor: color }} />
+        <p className="font-semibold text-[color:var(--foreground)]">{raw.name}</p>
+      </div>
+      {raw.detail ? <p className="mt-3 text-[color:var(--muted-foreground)]">{raw.detail}</p> : null}
+      <p className="mt-3 text-[color:var(--foreground)]">{raw.value}%</p>
+      {isActive ? (
+        <p className="mt-2 text-xs font-medium text-[color:var(--primary)]">{activeFocusLabel ?? 'Current account focus'}</p>
+      ) : null}
+    </div>
   );
 }

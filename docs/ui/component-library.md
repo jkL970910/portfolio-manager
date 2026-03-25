@@ -275,11 +275,12 @@ components/
   - optional active slice emphasis
   - optional detail text per slice
   - optional header actions such as local view toggles
-  - hover / focus legend popups with the full slice label, detail text, and share
+  - slice hover tooltip with the full label, detail text, share, and optional current-focus hint
+  - optional helper copy below the chart
 - Rules:
   - the surface must allow overflow so slice detail popups are not clipped by the card boundary
-  - active-context labels should not be mounted as always-visible chips inside the card
-  - legend popups should open inside the card flow so the rail does not grow a horizontal scrollbar
+  - do not keep a permanent right-side legend list inside sticky rails
+  - keep the chart visually centered and let hover/focus reveal the detail
 
 ### `RadarPreview`
 
@@ -315,7 +316,7 @@ components/
   - shows unique account naming, institution, currency, portfolio share, top holdings, and room summary
 - [account-breakdown-panel.tsx](E:\Projects\Portfolio%20Manager\components\portfolio\account-breakdown-panel.tsx)
   - sticky right-rail account-instance donut summary that follows the currently selected account context
-  - relies on hover / focus detail popups instead of permanently mounted active-account chips
+  - relies on slice hover detail instead of permanently mounted legend labels
 - [quick-action-card.tsx](E:\Projects\Portfolio%20Manager\components\portfolio\quick-action-card.tsx)
   - reusable quick action surface for analytical sidebars
   - now supports optional `href` so sidebar actions can jump into deeper analysis surfaces
@@ -342,9 +343,10 @@ components/
   - controller layer for ranked recommendation cards
   - keeps only one recommendation expanded at a time so the page height stays bounded
 - [recommendation-detail-card.tsx](E:\Projects\Portfolio%20Manager\components\recommendations\recommendation-detail-card.tsx)
-  - compact recommendation summary card with on-demand expansion into the unified decision trace, alternatives, constraint trace, and execution detail
+  - compact recommendation summary card with a short top summary, a single amount rail, and a cleaner expanded layout
   - defaults to the first three decision steps and can expand into the full trace on demand
-  - adds short plain-language trace tags plus hover/focus glossary chips for core terms such as support, constraint, account fit, and FX friction
+  - keeps long Chinese copy out of narrow multi-column stacks
+  - adds short plain-language trace tags plus hover/focus glossary chips for core terms such as account fit and FX friction
 - [scenario-compare-card.tsx](E:\Projects\Portfolio%20Manager\components\recommendations\scenario-compare-card.tsx)
   - re-solved scenario compare surface with change-summary text versus the current recommendation run
 
