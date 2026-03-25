@@ -254,6 +254,8 @@ components/
 - Supports:
   - optional active slice emphasis
   - optional active legend badge for deep-linked account focus
+  - optional detail text per slice
+  - optional header actions such as local view toggles
 
 ### `RadarPreview`
 
@@ -284,6 +286,12 @@ components/
 
 ### Portfolio
 
+- [account-overview-card.tsx](E:\Projects\Portfolio%20Manager\components\portfolio\account-overview-card.tsx)
+  - primary account-instance summary card used at the top of the portfolio workspace
+  - shows unique account naming, institution, currency, portfolio share, top holdings, and room summary
+- [account-breakdown-panel.tsx](E:\Projects\Portfolio%20Manager\components\portfolio\account-breakdown-panel.tsx)
+  - local controller for switching the shared donut chart between account-type view and specific-account view
+  - keeps repeated TFSA / FHSA accounts readable without adding a second chart block
 - [quick-action-card.tsx](E:\Projects\Portfolio%20Manager\components\portfolio\quick-action-card.tsx)
   - reusable quick action surface for analytical sidebars
   - now supports optional `href` so sidebar actions can jump into deeper analysis surfaces

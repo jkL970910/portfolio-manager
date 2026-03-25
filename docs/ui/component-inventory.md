@@ -32,6 +32,8 @@
 | LineChartCard | stable | [line-chart.tsx](E:\Projects\Portfolio%20Manager\components\charts\line-chart.tsx) | Shared trend chart shell |
 | DonutChartCard | stable | [donut-chart.tsx](E:\Projects\Portfolio%20Manager\components\charts\donut-chart.tsx) | Shared donut chart shell |
 | RadarPreview | stable | [radar-preview.tsx](E:\Projects\Portfolio%20Manager\components\charts\radar-preview.tsx) | Shared preview chart with optional CTA destination and label |
+| AccountOverviewCard | stable | [account-overview-card.tsx](E:\Projects\Portfolio%20Manager\components\portfolio\account-overview-card.tsx) | Shared portfolio account-instance summary card with unique account naming, portfolio share, and top-holdings preview |
+| AccountBreakdownPanel | stable | [account-breakdown-panel.tsx](E:\Projects\Portfolio%20Manager\components\portfolio\account-breakdown-panel.tsx) | Shared portfolio breakdown controller that switches the donut chart between account-type and specific-account views |
 | QuickActionCard | stable | [quick-action-card.tsx](E:\Projects\Portfolio%20Manager\components\portfolio\quick-action-card.tsx) | Shared analytical sidebar action card with optional deep-link support |
 | HoldingTable | stable | [holding-table.tsx](E:\Projects\Portfolio%20Manager\components\portfolio\holding-table.tsx) | Shared holdings detail table with optional deep-link highlight state |
 | DonutChartCard | stable | [donut-chart.tsx](E:\Projects\Portfolio%20Manager\components\charts\donut-chart.tsx) | Shared donut chart shell with optional active-slice emphasis for deep-linked account focus |

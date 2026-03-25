@@ -176,6 +176,71 @@ function groupBy<T>(items: T[], getKey: (item: T) => string, getValue: (item: T)
   return map;
 }
 
+function getAccountNickname(account: InvestmentAccount) {
+  return account.nickname.trim();
+}
+
+function buildAccountLabelMaps(accounts: InvestmentAccount[], language: DisplayLanguage) {
+  const typeLabelMap = new Map(accounts.map((account) => [account.id, getAccountTypeLabel(account.type, language)]));
+  const nicknameCounts = new Map<string, number>();
+
+  for (const account of accounts) {
+    const nickname = getAccountNickname(account);
+    nicknameCounts.set(nickname, (nicknameCounts.get(nickname) ?? 0) + 1);
+  }
+
+  const initialLabels = accounts.map((account) => {
+    const nickname = getAccountNickname(account);
+    const typeLabel = typeLabelMap.get(account.id) ?? account.type;
+    const isGenericNickname = !nickname || nickname === account.type || nickname === typeLabel;
+    const hasDuplicateNickname = (nicknameCounts.get(nickname) ?? 0) > 1;
+
+    return {
+      account,
+      label: isGenericNickname || hasDuplicateNickname
+        ? `${account.institution} ${typeLabel}`
+        : nickname
+    };
+  });
+
+  const labelCounts = new Map<string, number>();
+  for (const item of initialLabels) {
+    labelCounts.set(item.label, (labelCounts.get(item.label) ?? 0) + 1);
+  }
+
+  const secondaryLabels = initialLabels.map((item) => ({
+    account: item.account,
+    label: (labelCounts.get(item.label) ?? 0) > 1
+      ? `${item.label} · ${item.account.currency ?? "CAD"}`
+      : item.label
+  }));
+
+  const finalCounts = new Map<string, number>();
+  const finalRanks = new Map<string, number>();
+  for (const item of secondaryLabels) {
+    finalCounts.set(item.label, (finalCounts.get(item.label) ?? 0) + 1);
+  }
+
+  const instanceLabelMap = new Map<string, string>();
+  const instanceDetailMap = new Map<string, string>();
+  for (const item of secondaryLabels) {
+    const rank = (finalRanks.get(item.label) ?? 0) + 1;
+    finalRanks.set(item.label, rank);
+    const finalLabel = (finalCounts.get(item.label) ?? 0) > 1 ? `${item.label} · ${rank}` : item.label;
+    instanceLabelMap.set(item.account.id, finalLabel);
+    instanceDetailMap.set(
+      item.account.id,
+      pick(
+        language,
+        `${typeLabelMap.get(item.account.id)} · ${item.account.institution} · ${item.account.currency ?? "CAD"}`,
+        `${typeLabelMap.get(item.account.id)} · ${item.account.institution} · ${item.account.currency ?? "CAD"}`
+      )
+    );
+  }
+
+  return { typeLabelMap, instanceLabelMap, instanceDetailMap };
+}
+
 function getCurrentAllocation(holdings: HoldingPosition[]) {
   const total = sum(holdings.map((holding) => holding.marketValueCad));
   if (!total) {
@@ -679,6 +744,7 @@ export function buildPortfolioData(args: {
   display: DisplayContext;
 }): PortfolioData {
   const { language, accounts, holdings, profile, display } = args;
+  const { typeLabelMap, instanceLabelMap, instanceDetailMap } = buildAccountLabelMaps(accounts, language);
   const currentAllocation = getCurrentAllocation(holdings);
   const targetAllocation = getTargetAllocation(profile);
   const health = buildPortfolioHealthSummary({ accounts, holdings, profile, language });
@@ -708,6 +774,112 @@ export function buildPortfolioData(args: {
 
   const largestHolding = [...holdings].sort((left, right) => right.weightPct - left.weightPct)[0];
   const mainGap = [...driftMap.entries()].sort((left, right) => Math.abs(right[1]) - Math.abs(left[1]))[0];
+  const accountTypeAllocation = [...groupBy(accounts, (account) => account.type, (account) => account.marketValueCad).entries()]
+    .sort((left, right) => right[1] - left[1])
+    .map(([accountType, value]) => {
+      const accountCount = accounts.filter((account) => account.type === accountType).length;
+      return {
+        id: accountType,
+        name: getAccountTypeLabel(accountType as InvestmentAccount["type"], language),
+        value: totalPortfolio > 0 ? round((value / totalPortfolio) * 100, 0) : 0,
+        detail: pick(language, `${accountCount} 个账户`, `${accountCount} account${accountCount > 1 ? "s" : ""}`)
+      };
+    });
+  const accountInstanceAllocation = [...accounts]
+    .sort((left, right) => right.marketValueCad - left.marketValueCad)
+    .map((account) => ({
+      id: account.id,
+      name: instanceLabelMap.get(account.id) ?? account.nickname,
+      value: totalPortfolio > 0 ? round((account.marketValueCad / totalPortfolio) * 100, 0) : 0,
+      detail: instanceDetailMap.get(account.id)
+    }));
+  const accountCards = [...accounts]
+    .sort((left, right) => right.marketValueCad - left.marketValueCad)
+    .map((account) => {
+      const accountHoldings = holdings
+        .filter((holding) => holding.accountId === account.id)
+        .sort((left, right) => right.marketValueCad - left.marketValueCad);
+      return {
+        id: account.id,
+        name: instanceLabelMap.get(account.id) ?? account.nickname,
+        typeId: account.type,
+        typeLabel: typeLabelMap.get(account.id) ?? account.type,
+        institution: account.institution,
+        currency: account.currency ?? "CAD",
+        value: formatDisplayCurrency(account.marketValueCad, display),
+        share: totalPortfolio > 0
+          ? pick(language, `大约占组合 ${formatCompactPercent((account.marketValueCad / totalPortfolio) * 100, 0)}`, `About ${formatCompactPercent((account.marketValueCad / totalPortfolio) * 100, 0)} of the portfolio`)
+          : pick(language, "还没有资产", "No assets yet"),
+        room: account.contributionRoomCad !== null
+          ? pick(
+            language,
+            `规划基准 CAD 剩余额度 ${formatMoney(account.contributionRoomCad, "CAD")}`,
+            `${formatMoney(account.contributionRoomCad, "CAD")} of planning-base CAD room left`
+          )
+          : pick(language, "这类账户不单独追踪额度", "This account type does not track room here"),
+        topHoldings: accountHoldings.slice(0, 3).map((holding) => holding.symbol),
+        href: `/portfolio?account=${account.id}`
+      };
+    });
+  const accountContexts = [...accounts]
+    .sort((left, right) => right.marketValueCad - left.marketValueCad)
+    .map((account) => {
+      const accountHoldings = holdings.filter((holding) => holding.accountId === account.id);
+      const accountHealth = buildPortfolioHealthSummary({
+        accounts: [account],
+        holdings: accountHoldings,
+        profile,
+        language
+      });
+      const accountTotal = account.marketValueCad || 1;
+      return {
+        id: account.id,
+        name: instanceLabelMap.get(account.id) ?? account.nickname,
+        typeId: account.type,
+        typeLabel: typeLabelMap.get(account.id) ?? account.type,
+        performance: getSixMonthSeries(accountTotal, profile, getMonthLabels(language)).map((point) => ({
+          label: point.label,
+          value: round((point.value / (getSixMonthSeries(accountTotal, profile)[0]?.value || 1)) * 100, 1)
+        })),
+        healthScore: {
+          score: accountHealth.score,
+          status: accountHealth.status,
+          radar: accountHealth.radar,
+          highlights: accountHealth.highlights,
+          strongestDimension: `${accountHealth.strongestDimension.label} ${accountHealth.strongestDimension.value}`,
+          weakestDimension: `${accountHealth.weakestDimension.label} ${accountHealth.weakestDimension.value}`
+        },
+        healthDetail: {
+          score: accountHealth.score,
+          status: accountHealth.status,
+          radar: accountHealth.radar,
+          highlights: accountHealth.highlights,
+          strongestDimension: `${accountHealth.strongestDimension.label} ${accountHealth.strongestDimension.value}`,
+          weakestDimension: `${accountHealth.weakestDimension.label} ${accountHealth.weakestDimension.value}`,
+          dimensions: accountHealth.dimensions,
+          actionQueue: accountHealth.actionQueue,
+          accountDrilldown: accountHealth.accountDrilldown,
+          holdingDrilldown: accountHealth.holdingDrilldown
+        },
+        summaryPoints: [
+          pick(
+            language,
+            `${instanceLabelMap.get(account.id) ?? account.nickname} 里现在大约装了 ${formatCompactPercent(totalPortfolio > 0 ? (account.marketValueCad / totalPortfolio) * 100 : 0, 0)} 的组合。`,
+            `${instanceLabelMap.get(account.id) ?? account.nickname} currently holds about ${formatCompactPercent(totalPortfolio > 0 ? (account.marketValueCad / totalPortfolio) * 100 : 0, 0)} of the portfolio.`
+          ),
+          accountHoldings[0]
+            ? pick(
+              language,
+              `这类账户里当前最重的持仓是 ${accountHoldings.sort((left, right) => right.marketValueCad - left.marketValueCad)[0]?.symbol}。`,
+              `${accountHoldings.sort((left, right) => right.marketValueCad - left.marketValueCad)[0]?.symbol} is currently the largest holding in this account.`
+            )
+            : pick(language, "这个账户里暂时还没有持仓。", "There are no holdings in this account yet."),
+          account.contributionRoomCad !== null
+            ? pick(language, `这一类账户还剩 ${formatMoney(account.contributionRoomCad, "CAD")} 的规划基准额度。`, `This account still has ${formatMoney(account.contributionRoomCad, "CAD")} of planning-base room left.`)
+            : pick(language, "这类账户这里不单独追踪额度。", "This account type does not track contribution room here.")
+        ]
+      };
+    });
 
   return {
     displayContext: buildDisplayContext(display, language),
@@ -715,10 +887,10 @@ export function buildPortfolioData(args: {
       label: point.label,
       value: round((performanceBase[index] / baseline) * 100, 1)
     })),
-    accountAllocation: accounts.map((account) => ({
-      name: getAccountTypeLabel(account.type, language),
-      value: totalPortfolio > 0 ? round((account.marketValueCad / totalPortfolio) * 100, 0) : 0
-    })),
+    accountTypeAllocation,
+    accountInstanceAllocation,
+    accountCards,
+    accountContexts,
     sectorExposure,
     quoteStatus: getPortfolioQuoteStatus(holdings, language),
     healthScore: {
@@ -740,10 +912,7 @@ export function buildPortfolioData(args: {
         symbol: holding.symbol,
         accountId: holding.accountId,
         accountType: accounts.find((account) => account.id === holding.accountId)?.type ?? "Taxable",
-        account: (() => {
-          const accountType = accounts.find((account) => account.id === holding.accountId)?.type;
-          return accountType ? getAccountTypeLabel(accountType, language) : pick(language, "账户", "Account");
-        })(),
+        account: instanceLabelMap.get(holding.accountId) ?? pick(language, "账户", "Account"),
         lastPrice: formatHoldingPrice(holding.lastPriceAmount, holding.currency, holding.lastPriceCad, display, language),
         lastUpdated: formatHoldingLastUpdated(holding.updatedAt, language),
         freshnessVariant: getHoldingFreshnessVariant(holding.updatedAt),

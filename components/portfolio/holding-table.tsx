@@ -1,4 +1,4 @@
-import { Badge } from "@/components/ui/badge";
+﻿import { Badge } from "@/components/ui/badge";
 import { EmptyStatePanel } from "@/components/ui/empty-state-panel";
 import type { DisplayLanguage } from "@/lib/i18n/ui";
 import { pick } from "@/lib/i18n/ui";
@@ -30,12 +30,12 @@ export function HoldingTable({
         <thead className="text-[color:var(--muted-foreground)]">
           <tr>
             <th className="pb-3 font-medium">{pick(language, "持仓", "Holding")}</th>
-            <th className="pb-3 font-medium">{pick(language, "在哪个账户里", "Account")}</th>
+            <th className="pb-3 font-medium">{pick(language, "放在哪个账户里", "Account")}</th>
             <th className="pb-3 font-medium">{pick(language, "最近价格", "Last price")}</th>
             <th className="pb-3 font-medium">{pick(language, "上次更新", "Last updated")}</th>
             <th className="pb-3 font-medium">{pick(language, "占组合多少", "Weight")}</th>
             <th className="pb-3 font-medium">{pick(language, "盈亏", "Gain / loss")}</th>
-            <th className="pb-3 font-medium">{pick(language, "现在怎么看这笔", "What this means now")}</th>
+            <th className="pb-3 font-medium">{pick(language, "现在先怎么看这笔", "What this means now")}</th>
           </tr>
         </thead>
         <tbody>

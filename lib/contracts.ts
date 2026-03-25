@@ -66,7 +66,84 @@ export interface PortfolioData {
     fxNote: string;
   };
   performance: { label: string; value: number }[];
-  accountAllocation: { name: string; value: number }[];
+  accountTypeAllocation: { id: string; name: string; value: number; detail?: string }[];
+  accountInstanceAllocation: { id: string; name: string; value: number; detail?: string }[];
+  accountCards: {
+    id: string;
+    name: string;
+    typeId: string;
+    typeLabel: string;
+    institution: string;
+    currency: string;
+    value: string;
+    share: string;
+    room: string;
+    topHoldings: string[];
+    href: string;
+  }[];
+  accountContexts: {
+    id: string;
+    name: string;
+    typeId: string;
+    typeLabel: string;
+    performance: { label: string; value: number }[];
+    healthScore: {
+      score: number;
+      status: string;
+      radar: { dimension: string; value: number }[];
+      highlights: string[];
+      strongestDimension: string;
+      weakestDimension: string;
+    };
+    healthDetail: {
+      score: number;
+      status: string;
+      radar: { dimension: string; value: number }[];
+      highlights: string[];
+      strongestDimension: string;
+      weakestDimension: string;
+      dimensions: {
+        id: string;
+        label: string;
+        score: number;
+        status: string;
+        summary: string;
+        drivers: string[];
+        consequences: string[];
+        actions: string[];
+      }[];
+      actionQueue: string[];
+      accountDrilldown: {
+        id: string;
+        label: string;
+        href?: string;
+        score: number;
+        status: string;
+        summary: string;
+        impactHints?: {
+          amount: number;
+          hint: string;
+        }[];
+        drivers: string[];
+        actions: string[];
+      }[];
+      holdingDrilldown: {
+        id: string;
+        label: string;
+        href?: string;
+        score: number;
+        status: string;
+        summary: string;
+        impactHints?: {
+          amount: number;
+          hint: string;
+        }[];
+        drivers: string[];
+        actions: string[];
+      }[];
+    };
+    summaryPoints: string[];
+  }[];
   sectorExposure: { name: string; value: number }[];
   quoteStatus: {
     lastRefreshed: string;
