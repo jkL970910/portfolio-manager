@@ -11,6 +11,7 @@ import { RadarPreviewCard } from '@/components/charts/radar-preview';
 import { AccountOverviewCard } from '@/components/portfolio/account-overview-card';
 import { AccountBreakdownPanel } from '@/components/portfolio/account-breakdown-panel';
 import { HoldingTable } from '@/components/portfolio/holding-table';
+import { StickyRail } from '@/components/layout/sticky-rail';
 import { RefreshPricesPanel } from '@/components/portfolio/refresh-prices-panel';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -205,7 +206,7 @@ export function PortfolioWorkspace({ data, language, initialFilters }: Portfolio
         </div>
       </div>
 
-      <aside className="space-y-6 xl:sticky xl:top-28 xl:self-start">
+      <StickyRail>
         <Card>
           <CardHeader>
             <CardTitle>
@@ -282,7 +283,7 @@ export function PortfolioWorkspace({ data, language, initialFilters }: Portfolio
             </Button>
           </CardContent>
         </Card>
-      </aside>
+      </StickyRail>
     </div>
   );
 }

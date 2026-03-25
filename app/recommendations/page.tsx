@@ -4,6 +4,7 @@ import { requireViewer } from "@/lib/auth/session";
 import { getRecommendationView } from "@/lib/backend/services";
 import { AppShell } from "@/components/layout/app-shell";
 import { RecommendationRunPanel } from "@/components/recommendations/recommendation-run-panel";
+import { StickyRail } from "@/components/layout/sticky-rail";
 import { RecommendationPriorityStack } from "@/components/recommendations/recommendation-priority-stack";
 import { ScenarioCompareCard } from "@/components/recommendations/scenario-compare-card";
 import { EmptyStatePanel } from "@/components/ui/empty-state-panel";
@@ -61,7 +62,7 @@ export default async function RecommendationsPage() {
       </Card>
 
       <div className="grid gap-6 xl:grid-cols-[0.9fr_1.1fr]">
-        <div className="space-y-6 xl:sticky xl:top-28 xl:self-start">
+        <StickyRail>
           <SectionHeading
             title={pick(language, "这次推荐是按什么算的", "What this recommendation is based on")}
             description={pick(language, "先把你现在的偏好、账户顺序和投入金额摆出来，这样你更容易看懂系统为什么这么分配。", "Show the current preferences, account order, and amount first so the recommendation is easier to understand.")}
@@ -130,7 +131,7 @@ export default async function RecommendationsPage() {
             </CardContent>
           </Card>
           <RecommendationRunPanel initialContributionAmount={data.run.contributionAmountCad || 5000} language={language} />
-        </div>
+        </StickyRail>
 
         <div className="space-y-6">
           <Card>

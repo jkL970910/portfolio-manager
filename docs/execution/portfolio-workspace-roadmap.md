@@ -172,6 +172,9 @@ Phase 1 is done when:
 
 - Portfolio uses a two-column workspace: a wide primary column for trend, account rows, and holdings; a sticky right rail for context, health preview, account donut, and next-page actions.
 - The account donut no longer exposes a local type/account toggle. It always represents real account instances and follows the currently selected account.
+- The account donut lives inside the sticky right rail and uses hover / focus popups for detailed slice labels, so the active-account hint does not permanently stretch the card.
 - Account cards use a single-row layout so long account lists do not create empty grid gaps.
 - Clicking an account card changes the page context without forcing a scroll jump; the in-card button is the only control that jumps to the holdings table.
 - A global floating scroll-to-top control is available across pages through AppShell.
+- Sticky right rails should scroll independently when their own content exceeds viewport height, instead of forcing the whole page to the bottom before lower rail modules become reachable.
+- Sticky rails should clear the full floating header and top-nav stack on first paint, and their native scrollbars should stay visually hidden.

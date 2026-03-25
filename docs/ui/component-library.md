@@ -249,6 +249,17 @@ components/
   - appears after meaningful scroll depth
   - returns the current page to the top smoothly
 
+### `StickyRail`
+
+- File: [sticky-rail.tsx](E:\Projects\Portfolio%20Manager\components\layout\sticky-rail.tsx)
+- Purpose: shared desktop sticky side rail wrapper for long analytical pages
+- Rules:
+  - remains sticky below the floating header
+  - scrolls independently when its own content becomes taller than the viewport
+  - should sit low enough to clear the full floating header + nav stack on first paint
+  - keeps native rail scrollbars visually hidden
+  - should be reused anywhere a right-side analytical rail needs to stay visible without forcing the whole page to bottom out first
+
 ## Chart Components
 
 ### `LineChartCard`
@@ -262,9 +273,13 @@ components/
 - Purpose: allocation and distribution breakdowns
 - Supports:
   - optional active slice emphasis
-  - optional active legend badge for deep-linked account focus
   - optional detail text per slice
   - optional header actions such as local view toggles
+  - hover / focus legend popups with the full slice label, detail text, and share
+- Rules:
+  - the surface must allow overflow so slice detail popups are not clipped by the card boundary
+  - active-context labels should not be mounted as always-visible chips inside the card
+  - legend popups should open inside the card flow so the rail does not grow a horizontal scrollbar
 
 ### `RadarPreview`
 
@@ -299,8 +314,8 @@ components/
   - primary account-instance summary card used at the top of the portfolio workspace
   - shows unique account naming, institution, currency, portfolio share, top holdings, and room summary
 - [account-breakdown-panel.tsx](E:\Projects\Portfolio%20Manager\components\portfolio\account-breakdown-panel.tsx)
-  - local controller for switching the shared donut chart between account-type view and specific-account view
-  - keeps repeated TFSA / FHSA accounts readable without adding a second chart block
+  - sticky right-rail account-instance donut summary that follows the currently selected account context
+  - relies on hover / focus detail popups instead of permanently mounted active-account chips
 - [quick-action-card.tsx](E:\Projects\Portfolio%20Manager\components\portfolio\quick-action-card.tsx)
   - reusable quick action surface for analytical sidebars
   - now supports optional `href` so sidebar actions can jump into deeper analysis surfaces
