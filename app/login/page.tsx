@@ -38,7 +38,7 @@ export default async function LoginPage({
             <div className="pointer-events-none absolute right-[-24px] top-[20px] h-44 w-44 rounded-full bg-[radial-gradient(circle,rgba(139,168,255,0.18),rgba(139,168,255,0))] blur-3xl" />
             <div className="relative z-10 space-y-5">
               <Badge variant="primary">Loo皇审查处</Badge>
-              <h1 className="text-[34px] font-semibold tracking-[-0.04em] text-[color:var(--foreground)]">想要使用 Loo国宝库，就必须先成为 Loo国公民。</h1>
+              <h1 className="text-[34px] font-semibold tracking-[-0.04em] text-[color:var(--foreground)]">只有Loo国公民才能使用伟大Loo皇掌柜的金库。</h1>
               <p className="max-w-2xl text-sm leading-7 text-[color:var(--muted-foreground)]">
                 这里不是普通登录页，而是进入宝库之前的身份审查口。未持证公民先去申请加入，已经持证的公民则出示身份证后进入 Loo国。
               </p>

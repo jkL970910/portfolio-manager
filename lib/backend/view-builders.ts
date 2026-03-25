@@ -311,14 +311,14 @@ function getSignalForHolding(holding: HoldingPosition, driftMap: Map<string, num
   if (gap < -4) {
     return pick(
       language,
-      `该资产袖口相对目标仍低配 ${formatCompactPercent(Math.abs(gap), 0)}。`,
+      `这类资产现在配得还不够，离你的目标还差 ${formatCompactPercent(Math.abs(gap), 0)}。`,
       `This sleeve remains underweight by ${formatCompactPercent(Math.abs(gap), 0)} versus target.`
     );
   }
   if (holding.weightPct >= 15) {
-    return pick(language, "这笔核心仓位承担了组合中相当显著的一部分风险。", "Core position is carrying a meaningful share of total portfolio risk.");
+    return pick(language, "这笔仓位已经很大了，对整个组合风险影响很重。", "Core position is carrying a meaningful share of total portfolio risk.");
   }
-  return pick(language, "它支持当前组合结构，但不是主要偏差来源。", "Supports the current portfolio mix without driving the main gaps.");
+  return pick(language, "这笔仓位目前没有明显拖后腿，但也不是最该优先处理的地方。", "Supports the current portfolio mix without driving the main gaps.");
 }
 
 function formatHoldingLastUpdated(value: string | null | undefined, language: DisplayLanguage) {
@@ -348,6 +348,25 @@ function getHoldingFreshnessVariant(value?: string | null): "success" | "warning
     return "warning";
   }
   return "neutral";
+}
+
+function sanitizeRecommendationNotes(notes: string[] | null | undefined) {
+  return (notes ?? []).filter((note) => {
+    const normalized = note.trim();
+    if (!normalized) {
+      return false;
+    }
+
+    if (/[?]{4,}/.test(normalized)) {
+      return false;
+    }
+
+    if (/[�Â]/.test(normalized)) {
+      return false;
+    }
+
+    return true;
+  });
 }
 
 function getPortfolioQuoteStatus(holdings: HoldingPosition[], language: DisplayLanguage) {
@@ -450,23 +469,23 @@ function getRecommendationAssumptions(profile: PreferenceProfile, language: Disp
   return [
     pick(
       language,
-      `建议基于${getRiskProfileLabel(profile.riskProfile, language)}目标配置和当前资产类别偏差生成。`,
+      `这次建议会先看你自己设的目标配置，再看你现在哪些资产配少了、哪些配多了。`,
       `Recommendation uses the ${profile.riskProfile.toLowerCase()} target allocation and current asset-class drift.`
     ),
     pick(
       language,
-      `账户优先级顺序为 ${formatAccountPriorityOrder(profile.accountFundingPriority, language)}。`,
+      `系统也会一起看你想优先用哪些账户，当前顺序是 ${formatAccountPriorityOrder(profile.accountFundingPriority, language)}。`,
       `Account priority order is ${formatAccountPriorityOrder(profile.accountFundingPriority, language)}.`
     ),
     profile.taxAwarePlacement
       ? pick(
         language,
-        "已启用税务感知放置，因此在账户匹配接近时会优先考虑受保护额度。",
+        "你已经开启税务感知放置，所以系统会优先选更适合长期放这类资产的账户。",
         "Tax-aware placement is enabled, so sheltered room is favored when account fit is comparable."
       )
       : pick(
         language,
-        "当前未启用税务感知放置，因此本轮优先考虑目标配置贴合而不是税务保护。",
+        "你还没开启税务感知放置，所以这次主要先看配置缺口和账户额度。",
         "Tax-aware placement is disabled, so the run prioritizes target fit over tax sheltering."
       )
   ];
@@ -481,7 +500,7 @@ function getRecommendationItemExplanation(
   const accountType = getAccountTypeLabel(item.targetAccountType, language);
   return pick(
     language,
-    `${assetClass} 当前相对目标配置仍处于低配，因此本轮建议向 ${accountType} 分配 ${formatDisplayCurrency(item.amountCad, display)}。`,
+    `${assetClass} 现在配得还不够，所以这笔 ${formatDisplayCurrency(item.amountCad, display)} 会先放到 ${accountType} 里。`,
     `${assetClass} is currently underweight relative to the configured target, so this run allocates ${formatDisplayCurrency(item.amountCad, display)} to ${accountType}.`
   );
 }
@@ -720,6 +739,7 @@ export function buildPortfolioData(args: {
         id: holding.id,
         symbol: holding.symbol,
         accountId: holding.accountId,
+        accountType: accounts.find((account) => account.id === holding.accountId)?.type ?? "Taxable",
         account: (() => {
           const accountType = accounts.find((account) => account.id === holding.accountId)?.type;
           return accountType ? getAccountTypeLabel(accountType, language) : pick(language, "账户", "Account");
@@ -735,16 +755,16 @@ export function buildPortfolioData(args: {
       mainGap
         ? pick(
           language,
-          `${getAssetClassLabel(mainGap[0], language)} 是当前相对目标配置最明显的偏差来源。`,
+          `${getAssetClassLabel(mainGap[0], language)} 现在和你的目标差得最远，最该先补。`,
           `${getAssetClassLabel(mainGap[0], language)} is the clearest allocation gap versus the configured target.`
         )
         : pick(language, "先设置目标配置，才能解锁偏差分析。", "Set a target allocation to unlock drift analysis."),
       largestHolding
-        ? pick(language, `${largestHolding.symbol} 是当前最大仓位，并显著影响集中度评分。`, `${largestHolding.symbol} is the largest position and drives the current concentration score.`)
+        ? pick(language, `${largestHolding.symbol} 是你现在最大的一笔仓位，所以它对集中度影响也最大。`, `${largestHolding.symbol} is the largest position and drives the current concentration score.`)
         : pick(language, "先导入持仓，才能解锁集中度分析。", "Import holdings to unlock concentration analysis."),
       accounts.some((account) => account.type === "Taxable")
-        ? pick(language, "当受保护账户额度用尽后，应税账户仍可作为第二注资层。", "Taxable capital remains available as a secondary funding sleeve after sheltered room is consumed.")
-        : pick(language, "当前组合主要集中在受保护账户中，因此账户放置逻辑会更简单。", "Sheltered accounts dominate the current portfolio, which keeps account placement simpler.")
+        ? pick(language, "你已经开始用到应税账户，所以钱放在哪类账户里会更影响长期结果。", "Taxable capital remains available as a secondary funding sleeve after sheltered room is consumed.")
+        : pick(language, "你现在大部分资产还在受保护账户里，所以账户放置逻辑相对简单。", "Sheltered accounts dominate the current portfolio, which keeps account placement simpler.")
     ]
   };
 }
@@ -915,7 +935,7 @@ export function buildRecommendationsData(args: {
         gapSummary: item.allocationGapBeforePct != null && item.allocationGapAfterPct != null
           ? pick(
             language,
-            `偏离从 ${item.allocationGapBeforePct.toFixed(1)}% 收敛到 ${item.allocationGapAfterPct.toFixed(1)}%`,
+            `如果按这条建议去投，这个缺口会从 ${item.allocationGapBeforePct.toFixed(1)}% 缩小到 ${item.allocationGapAfterPct.toFixed(1)}%`,
             `Gap narrows from ${item.allocationGapBeforePct.toFixed(1)}% to ${item.allocationGapAfterPct.toFixed(1)}%`
           )
           : pick(language, "等待生成后展示偏离变化。", "Gap change appears after generation."),
@@ -926,13 +946,13 @@ export function buildRecommendationsData(args: {
           item.rationale
             ? pick(
               language,
-              `${getAssetClassLabel(item.assetClass, language)} 当前落后目标 ${item.rationale.gapBeforePct.toFixed(1)}%。`,
+              `${getAssetClassLabel(item.assetClass, language)} 现在比你的目标少了大约 ${item.rationale.gapBeforePct.toFixed(1)} 个百分点。`,
               `${getAssetClassLabel(item.assetClass, language)} is currently ${item.rationale.gapBeforePct.toFixed(1)}% below target.`
             )
             : pick(language, "系统优先补足当前最大的配置缺口。", "The engine prioritizes the largest current allocation gap."),
           pick(
             language,
-            `${getAccountTypeLabel(item.targetAccountType, language)} 在当前约束下给出了最优账户匹配。`,
+            `${getAccountTypeLabel(item.targetAccountType, language)} 是这笔钱当前最合适的落点。`,
             `${getAccountTypeLabel(item.targetAccountType, language)} produced the strongest account fit under the current constraints.`
           ),
           item.rationale?.existingHoldingSymbol && item.rationale.existingHoldingRiskContributionPct != null
@@ -963,7 +983,7 @@ export function buildRecommendationsData(args: {
             : pick(language, "系统会回避已经在当前袖口内过度集中的风险来源。", "The engine avoids leaning even harder into risk sources that are already concentrated inside the sleeve."),
           (item.fxFrictionPenaltyBps ?? 0) > 0
             ? pick(language, `跨币种摩擦约 ${item.fxFrictionPenaltyBps} bps，因此部分 USD 方案被下调。`, `Cross-currency friction of about ${item.fxFrictionPenaltyBps} bps pushed some USD ideas lower.`)
-            : pick(language, "当前路径没有显著的 FX 摩擦负担。", "This path does not carry a material FX friction cost.")
+            : pick(language, "这条路基本不会额外增加明显的换汇成本。", "This path does not carry a material FX friction cost.")
         ],
         constraints: [
           {
@@ -971,7 +991,7 @@ export function buildRecommendationsData(args: {
             detail: item.allocationGapBeforePct != null && item.allocationGapAfterPct != null
               ? pick(
                 language,
-                `从 ${item.allocationGapBeforePct.toFixed(1)}% 收敛到 ${item.allocationGapAfterPct.toFixed(1)}%。`,
+                `按这条建议执行后，这个缺口会从 ${item.allocationGapBeforePct.toFixed(1)}% 缩小到 ${item.allocationGapAfterPct.toFixed(1)}%。`,
                 `Narrows from ${item.allocationGapBeforePct.toFixed(1)}% to ${item.allocationGapAfterPct.toFixed(1)}%.`
               )
               : pick(language, "等待下一次 run 更新。", "Will update on the next run."),
@@ -989,8 +1009,8 @@ export function buildRecommendationsData(args: {
           {
             label: pick(language, "FX 摩擦", "FX friction"),
             detail: (item.fxFrictionPenaltyBps ?? 0) > 0
-              ? pick(language, `当前方案承担约 ${item.fxFrictionPenaltyBps} bps 的 FX 成本。`, `This path absorbs about ${item.fxFrictionPenaltyBps} bps of FX cost.`)
-              : pick(language, "当前方案没有显著 FX 惩罚。", "This path avoids material FX friction."),
+              ? pick(language, `这条方案大约会承担 ${item.fxFrictionPenaltyBps} bps 的换汇成本。`, `This path absorbs about ${item.fxFrictionPenaltyBps} bps of FX cost.`)
+              : pick(language, "这条方案基本没有明显的换汇额外成本。", "This path avoids material FX friction."),
             variant: (item.fxFrictionPenaltyBps ?? 0) > 0 ? "warning" : "success"
           }
         ],
@@ -1042,7 +1062,7 @@ export function buildRecommendationsData(args: {
         `当前策略：${getRecommendationStrategyLabel(profile.recommendationStrategy, language)}。再平衡容忍度为 ${profile.rebalancingTolerancePct}%。`,
         `Current strategy: ${getRecommendationStrategyLabel(profile.recommendationStrategy, language)}. Rebalancing tolerance is ${profile.rebalancingTolerancePct}%.`
       ),
-      ...(latestRun?.notes ?? [])
+      ...sanitizeRecommendationNotes(latestRun?.notes)
     ]
   };
 }

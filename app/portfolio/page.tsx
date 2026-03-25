@@ -16,7 +16,7 @@ import { pick } from "@/lib/i18n/ui";
 export default async function PortfolioPage({
   searchParams
 }: {
-  searchParams?: Promise<{ account?: string; holding?: string }>;
+  searchParams?: Promise<{ account?: string; accountType?: string; holding?: string }>;
 }) {
   const viewer = await requireViewer();
   const language = viewer.displayLanguage;
@@ -24,20 +24,26 @@ export default async function PortfolioPage({
   const filters = (await searchParams) ?? {};
   const filteredHoldings = (filters.holding
     ? data.holdings.filter((holding) => holding.id === filters.holding)
+    : filters.accountType
+      ? data.holdings.filter((holding) => holding.accountType === filters.accountType)
     : filters.account
       ? data.holdings.filter((holding) => holding.accountId === filters.account)
       : data.holdings)
     .map((holding) => ({
       ...holding,
-      highlighted: Boolean(filters.holding || filters.account),
+      highlighted: Boolean(filters.holding || filters.account || filters.accountType),
       highlightLabel: filters.holding
         ? pick(language, "来自健康评分明细的重点持仓", "Highlighted from health detail")
+        : filters.accountType
+          ? pick(language, "来自健康评分明细的重点账户类别", "Highlighted from health detail")
         : filters.account
           ? pick(language, "来自健康评分明细的重点账户", "Highlighted from health detail")
           : undefined
     }));
   const activeFilterLabel = filters.holding
     ? pick(language, "当前只显示一个重点持仓。", "Currently focused on one holding.")
+    : filters.accountType
+      ? pick(language, `当前只显示 ${filters.accountType} 这类账户下的持仓。`, `Currently focused on ${filters.accountType} holdings.`)
     : filters.account
       ? pick(language, "当前只显示一个账户下的持仓。", "Currently focused on a single account.")
       : null;
@@ -67,8 +73,8 @@ export default async function PortfolioPage({
             </div>
           </div>
           <div className="grid gap-3 sm:grid-cols-2">
-            <PortfolioSignal title="分析重点" detail="集中度、偏离、持仓 freshness" />
-            <PortfolioSignal title="下一步动作" detail="看清结构后再打开配置建议" />
+            <PortfolioSignal title={pick(language, "先看什么", "What to look at first")} detail={pick(language, "先看仓位会不会太集中、哪类资产配得不够，以及价格是不是太旧。", "Start with concentration, allocation gaps, and whether quotes are stale.")} />
+            <PortfolioSignal title={pick(language, "看完以后做什么", "What to do next")} detail={pick(language, "先看清组合，再决定要不要打开配置建议。", "Understand the portfolio first, then decide whether to open funding recommendations.")} />
           </div>
         </CardContent>
       </Card>
@@ -139,14 +145,14 @@ export default async function PortfolioPage({
                 coverage={data.quoteStatus.coverage}
               />
               <QuickActionCard icon={<ShieldAlert className="h-4 w-4" />} title={pick(language, "查看集中度风险", "Review Concentration Risk")} description={pick(language, "检查哪些持仓正在推高单一标的暴露。", "Inspect the positions driving the highest single-name exposure.")} href="/portfolio/health" />
-              <QuickActionCard icon={<PieChart className="h-4 w-4" />} title={pick(language, "查看配置缺口", "Inspect Allocation Gaps")} description={pick(language, "在投入新资金前，先看清最大的高配和低配资产类。", "See the biggest underweight and overweight classes before funding.")} />
-              <QuickActionCard icon={<CircleGauge className="h-4 w-4" />} title={pick(language, "打开推荐驱动因素", "Open Recommendation Drivers")} description={pick(language, "追踪哪些组合信号正在推动当前建议。", "Trace which portfolio signals are pushing the current recommendation.")} href="/recommendations" />
-              <QuickActionCard icon={<BarChart3 className="h-4 w-4" />} title={pick(language, "查看行业暴露", "View Sector Exposure")} description={pick(language, "识别过度集中的行业或主题敞口。", "Surface over-indexed sectors and thematic concentration.")} />
+              <QuickActionCard icon={<PieChart className="h-4 w-4" />} title={pick(language, "查看配置缺口", "Inspect Allocation Gaps")} description={pick(language, "看清哪类资产配少了、哪类已经偏多，下一笔钱才知道先补哪里。", "See what is underweight or overweight before deciding where the next contribution should go.")} />
+              <QuickActionCard icon={<CircleGauge className="h-4 w-4" />} title={pick(language, "查看推荐为什么这么给", "See why this recommendation was chosen")} description={pick(language, "把推荐背后的理由翻成人话，看看系统为什么把钱引到这条路。", "Open the recommendation reasoning and see why the system chose this path.")} href="/recommendations" />
+              <QuickActionCard icon={<BarChart3 className="h-4 w-4" />} title={pick(language, "查看行业暴露", "View Sector Exposure")} description={pick(language, "看哪些行业已经压得太重，别让组合只靠少数主题涨跌。", "See which sectors are already heavy so the portfolio is not driven by only a few themes.")} />
             </CardContent>
           </Card>
           <Card>
             <CardHeader>
-              <CardTitle>{pick(language, "通往推荐页", "Bridge to Recommendations")}</CardTitle>
+              <CardTitle>{pick(language, "看完组合后下一步", "What to open next")}</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
               {data.healthScore.highlights.map((highlight) => (
@@ -160,7 +166,7 @@ export default async function PortfolioPage({
                 </div>
               ))}
               <Button href="/recommendations" className="w-full" trailingIcon={<ArrowRight className="h-4 w-4" />}>
-                {pick(language, "打开资金配置建议", "Open funding recommendations")}
+                {pick(language, "去看下一笔钱怎么投", "Open funding recommendations")}
               </Button>
             </CardContent>
           </Card>

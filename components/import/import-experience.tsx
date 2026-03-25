@@ -140,32 +140,66 @@ const ACCOUNT_OPTIONS: Array<{
   type: GuidedAccountType;
   caption: string;
   detail: string;
+  captionZh: string;
+  detailZh: string;
 }> = [
-  { type: "TFSA", caption: "Tax-free growth sleeve", detail: "Good default for most first-time users." },
-  { type: "RRSP", caption: "Retirement-focused sheltered account", detail: "Useful when long-horizon retirement savings dominate." },
-  { type: "FHSA", caption: "Home purchase sleeve", detail: "Use when the near-term housing goal matters." },
-  { type: "Taxable", caption: "Flexible capital account", detail: "Use when sheltered room is already consumed." }
+  {
+    type: "TFSA",
+    caption: "Tax-free growth sleeve",
+    detail: "Good default for most first-time users.",
+    captionZh: "适合长期增长的免税账户",
+    detailZh: "大多数第一次开始整理组合的人，都可以先从 TFSA 开始。"
+  },
+  {
+    type: "RRSP",
+    caption: "Retirement-focused sheltered account",
+    detail: "Useful when long-horizon retirement savings dominate.",
+    captionZh: "更偏退休储蓄的注册账户",
+    detailZh: "如果这笔钱主要是为退休准备，通常会优先考虑 RRSP。"
+  },
+  {
+    type: "FHSA",
+    caption: "Home purchase sleeve",
+    detail: "Use when the near-term housing goal matters.",
+    captionZh: "围绕买房目标的账户",
+    detailZh: "如果你近几年想买房，这类账户更值得单独整理。"
+  },
+  {
+    type: "Taxable",
+    caption: "Flexible capital account",
+    detail: "Use when sheltered room is already consumed.",
+    captionZh: "额度用完后继续放钱的灵活账户",
+    detailZh: "当注册账户额度不够时，可以把剩下的钱先放在这里。"
+  }
 ];
 
 const METHOD_OPTIONS: Array<{
   value: GuidedMethod;
   title: string;
   detail: string;
+  titleZh: string;
+  detailZh: string;
 }> = [
   {
     value: "single-account-csv",
     title: "Upload one account CSV",
-    detail: "Best when you want to onboard one account at a time and inspect each step."
+    detail: "Best when you want to onboard one account at a time and inspect each step.",
+    titleZh: "上传单个账户的 CSV",
+    detailZh: "适合一笔一笔地整理账户，先看清解析结果，再决定是否导入。"
   },
   {
     value: "manual-entry",
     title: "Enter holdings manually",
-    detail: "Useful for a small starter portfolio or when the broker export is messy."
+    detail: "Useful for a small starter portfolio or when the broker export is messy.",
+    titleZh: "手动填写持仓",
+    detailZh: "适合小型起步组合，或 broker 导出的表格比较乱的时候。"
   },
   {
     value: "continue-later",
     title: "Skip for now",
-    detail: "Capture the account type now and finish the data import later."
+    detail: "Capture the account type now and finish the data import later.",
+    titleZh: "先记下账户，稍后再补数据",
+    detailZh: "先把账户外壳建好，等你准备好数据后再回来补。"
   }
 ];
 
@@ -1082,7 +1116,7 @@ export function ImportExperience({
             <WorkflowOptionCard
               title={pick(language, "投资组合导入", "Portfolio Import")}
               badge={pick(language, "账户 + 持仓", "Accounts + holdings")}
-              detail={pick(language, "投资账户和持仓可走引导式入库，也可直接 CSV 导入。这条路径后续会自然扩展到 broker 集成。", "Use guided onboarding or direct CSV import for investment accounts and holdings. This path is allowed to evolve into broker integrations later.")}
+              detail={pick(language, "这条路专门处理投资账户和持仓。你可以一步步引导录入，也可以直接上传 CSV。", "Use this path for investment accounts and holdings. You can either walk through the guided flow or upload a CSV directly.")}
               active={workflowView === "portfolio"}
               onClick={() => {
                 setWorkflowView("portfolio");
@@ -1092,7 +1126,7 @@ export function ImportExperience({
             <WorkflowOptionCard
               title={pick(language, "消费导入", "Spending Import")}
               badge={pick(language, "交易流水", "Transactions")}
-              detail={pick(language, "把消费流水独立成单独入口，后续接银行、信用卡或聚合器 API 时，不会影响投资导入逻辑。", "Keep spending transactions on their own ingestion path so future bank, card, or aggregator APIs can plug in without changing portfolio import logic.")}
+              detail={pick(language, "这条路只处理消费流水和现金流，不会和投资持仓混在一起。", "Use this path for spending and cash-flow records so they stay separate from portfolio data.")}
               active={workflowView === "spending"}
               onClick={() => setWorkflowView("spending")}
             />
@@ -1110,14 +1144,14 @@ export function ImportExperience({
               <WorkflowOptionCard
                 title={pick(language, "引导式设置", "Guided setup")}
                 badge={pick(language, "推荐", "Recommended")}
-                detail={pick(language, "按步骤完成账户类型、数据来源、校验和交接。", "Walk through account type, data source choice, validation, and handoff one step at a time.")}
+                detail={pick(language, "系统会一步步带你选账户、选数据来源、看复核结果，再确认写入。", "Walk through account choice, data source, review, and final confirmation one step at a time.")}
                 active={mode === "guided"}
                 onClick={() => resetGuidedState("guided")}
               />
               <WorkflowOptionCard
                 title={pick(language, "直接 CSV 导入", "Direct CSV import")}
                 badge={pick(language, "批量", "Bulk")}
-                detail={pick(language, "如果 broker 导出里已经包含账户和持仓信息，适合一次性校验并导入。", "Best when your broker export already contains account and holding data and you want to validate it in one pass.")}
+                detail={pick(language, "如果你的 broker 导出已经把账户和持仓都带上了，用这条路最快。", "Use this when your broker export already includes both account and holding data.")}
                 active={mode === "direct"}
                 onClick={() => setMode("direct")}
               />
@@ -1286,11 +1320,11 @@ export function ImportExperience({
               <CardContent className="space-y-3">
                 <InfoRow
                   icon={<FolderInput className="mt-0.5 h-4 w-4 text-[color:var(--primary)]" />}
-                  text={pick(language, "引导式流程先按账户思考，再处理 CSV 结构，更适合新用户一步步梳理。", "Guided setup is account-first. It helps the user think in account sleeves before thinking in CSV structure.")}
+                  text={pick(language, "这条引导会先帮你想清楚‘这是哪个账户’，再去处理文件和字段。", "Guided setup keeps the user account-first before thinking about CSV structure.")}
                 />
                 <InfoRow
                   icon={<Database className="mt-0.5 h-4 w-4 text-[color:var(--primary)]" />}
-                  text={pick(language, "如果你已经有完整 broker 导出，仍然可以直接 CSV 导入。引导式路径会把账户级 onboarding 数据先写入后端。", "Direct CSV import remains available for one-file broker exports. Guided setup now writes account-level onboarding data to the backend.")}
+                  text={pick(language, "如果你已经有完整导出文件，仍然可以直接走 CSV；引导式只是更适合第一次整理账户的人。", "Direct CSV import is still available for full broker exports; guided setup is just easier for first-time onboarding.")}
                 />
                 <InfoRow
                   icon={<CheckCircle2 className="mt-0.5 h-4 w-4 text-[color:var(--success)]" />}
@@ -1298,7 +1332,7 @@ export function ImportExperience({
                 />
                 <InfoRow
                   icon={<ShieldAlert className="mt-0.5 h-4 w-4 text-[color:var(--warning)]" />}
-                  text={pick(language, "第 4 步是真实的复核确认，第 5 步会展示实际写入当前登录用户的数据结果。", "Step 4 is now a real review and confirm state. Step 5 reflects what was actually written for the signed-in user.")}
+                  text={pick(language, "第 4 步会先让你确认写入内容，第 5 步再告诉你这次实际存进了什么。", "Step 4 is the real review state, and step 5 shows what was actually written.")}
                 />
               </CardContent>
             </Card>
@@ -1317,7 +1351,7 @@ export function ImportExperience({
                 <p className="text-xs uppercase tracking-[0.16em] text-[color:var(--muted-foreground)]">{pick(language, "适用场景", "When to use this")}</p>
                 <p className="mt-2 text-lg font-semibold">{pick(language, "一个文件，多个账户", "One file, many accounts")}</p>
                 <p className="mt-2 text-sm text-[color:var(--muted-foreground)]">
-                  {pick(language, "如果你的 broker 导出已经包含账户和持仓数据，这条路径适合一次完成校验、预览、映射和导入。", "Use this path when your broker export already contains account and holding data and you want to validate, preview, map, and import everything in one pass.")}
+                  {pick(language, "如果文件里已经带上账户和持仓，这条路可以一次看完、校验完、再导入。", "Use this path when one file already contains both accounts and holdings and you want to review everything in one pass.")}
                 </p>
               </div>
               <ImportJobPanel latestJob={latestPortfolioJob} workflow="portfolio" language={language} />
@@ -1330,7 +1364,7 @@ export function ImportExperience({
             <CardContent className="space-y-3">
               <InfoRow
                 icon={<Database className="mt-0.5 h-4 w-4 text-[color:var(--primary)]" />}
-                text={pick(language, "持仓估值规则：如果 CSV 行包含 market_value，系统会优先采用显式总值，而不是 quantity x last_price 的推导值。", "Holding valuation rule: if a CSV row includes market_value, that explicit total value is used and overrides any derived value from quantity x last_price.")}
+                text={pick(language, "估值规则很简单：如果文件里已经给了总市值，系统就直接用总市值；否则才用股数乘价格去算。", "If a CSV row already includes total market value, the system uses that total first; otherwise it derives the value from shares and price.")}
               />
               {portfolioSuccessStates.map((item) => (
                 <InfoRow key={item} icon={<CheckCircle2 className="mt-0.5 h-4 w-4 text-[color:var(--success)]" />} text={item} />
@@ -1351,7 +1385,7 @@ export function ImportExperience({
                 <p className="text-xs uppercase tracking-[0.16em] text-[color:var(--muted-foreground)]">{pick(language, "适用场景", "When to use this")}</p>
                 <p className="mt-2 text-lg font-semibold">{pick(language, "以交易流水为先", "Transaction-first import")}</p>
                 <p className="mt-2 text-sm text-[color:var(--muted-foreground)]">
-                  {pick(language, "这条路径只处理消费和现金流记录。它把流水导入和投资导入彻底分开，为后续银行或信用卡 API 预留清晰边界。", "Use this path for spending and cash-flow records only. It keeps transaction ingestion separate from portfolio ingestion and leaves a clean boundary for future bank or card APIs.")}
+                  {pick(language, "这条路只处理消费和现金流水，不会把投资持仓一起带进来。", "Use this path for spending and cash-flow records only, separate from portfolio ingestion.")}
                 </p>
               </div>
               <SpendingImportPanel latestJob={latestSpendingJob} language={language} />
@@ -1385,7 +1419,7 @@ function StepChooseAccountType({
   return (
     <div className="space-y-4">
       <p className="text-sm text-[color:var(--muted-foreground)]">
-        {pick(language, "先选要入库的第一个账户壳层。这样引导范围更聚焦，也更适合新用户一步步完成。", "Start by selecting the first account sleeve you want to onboard. This keeps the guided flow narrow and easier for new users.")}
+        {pick(language, "先选你这次要整理的第一个账户。范围收窄以后，更容易一步步做完。", "Start with the first account you want to onboard. Keeping the scope narrow makes the flow easier.")}
       </p>
       <div className="grid gap-3 md:grid-cols-2">
         {ACCOUNT_OPTIONS.map((option) => (
@@ -1397,20 +1431,10 @@ function StepChooseAccountType({
           >
             <p className="text-lg font-semibold">{getAccountTypeLabel(option.type, language)}</p>
             <p className="mt-2 text-sm text-[color:var(--muted-foreground)]">
-              {pick(
-                language,
-                option.type === "TFSA"
-                  ? "适合作为多数用户的第一个免税投资壳层。"
-                  : option.type === "RRSP"
-                    ? "适合长期退休资金主导的账户结构。"
-                    : option.type === "FHSA"
-                      ? "适合围绕购房目标来整理早期资产。"
-                      : "适合在注册账户额度之外继续放置灵活资金。",
-                option.caption
-              )}
+              {pick(language, option.captionZh, option.caption)}
             </p>
             <p className="mt-3 text-xs uppercase tracking-[0.14em] text-[color:var(--muted-foreground)]">
-              {pick(language, option.detail, option.detail)}
+              {pick(language, option.detailZh, option.detail)}
             </p>
           </button>
         ))}
@@ -1431,7 +1455,7 @@ function StepChooseMethod({
   return (
     <div className="space-y-4">
       <p className="text-sm text-[color:var(--muted-foreground)]">
-        {pick(language, "决定这个账户是通过单账户 CSV、手动录入，还是先跳过以后再补。", "Decide whether this account should come from a single-account CSV, be entered manually, or be skipped and completed later.")}
+        {pick(language, "接下来决定这个账户的数据怎么进来：上传 CSV、手动填写，或者先记下账户稍后再补。", "Choose whether this account comes from a CSV, manual entry, or should be filled in later.")}
       </p>
       <div className="grid gap-3">
         {METHOD_OPTIONS.map((option) => (
@@ -1442,26 +1466,10 @@ function StepChooseMethod({
             className={`rounded-[24px] border p-5 text-left transition-colors ${method === option.value ? "border-[color:var(--primary)] bg-[color:var(--primary-soft)]" : "border-[color:var(--border)] bg-white"}`}
           >
             <p className="text-lg font-semibold">
-              {pick(
-                language,
-                option.value === "single-account-csv"
-                  ? "上传单账户 CSV"
-                  : option.value === "manual-entry"
-                    ? "手动录入持仓"
-                    : "先跳过，稍后补充",
-                option.title
-              )}
+              {pick(language, option.titleZh, option.title)}
             </p>
             <p className="mt-2 text-sm text-[color:var(--muted-foreground)]">
-              {pick(
-                language,
-                option.value === "single-account-csv"
-                  ? "适合一边引导一边检查，只处理一个账户。"
-                  : option.value === "manual-entry"
-                    ? "适合小型起步组合，或 broker 导出比较混乱的时候。"
-                    : "先把账户壳层记下来，数据导入以后再补。",
-                option.detail
-              )}
+              {pick(language, option.detailZh, option.detail)}
             </p>
           </button>
         ))}
@@ -1653,15 +1661,15 @@ function StepProvideSource(props: {
           <div>
             <p className="font-semibold">{pick(language, "单账户 CSV 路径", "Single-account CSV path")}</p>
             <p className="mt-2 text-sm text-[color:var(--muted-foreground)]">
-              {pick(language, "上传一个账户专用的 CSV，先复核解析结果，再在确认时用 merge 模式写入。", "Upload one account-specific CSV, review the parsed rows, then the wizard will run a merge-mode import on confirm.")}
+              {pick(language, "先上传这个账户专用的 CSV，看清系统读到了什么，再决定是否正式写入。", "Upload one account-specific CSV, review what the system parsed, then decide whether to write it in.")}
             </p>
             <div className="mt-4 flex flex-col gap-3 rounded-2xl border border-[color:var(--border)] bg-[color:var(--card-muted)] p-4 sm:flex-row sm:items-center sm:justify-between">
               <div className="space-y-1">
                 <p className="text-sm font-medium text-[color:var(--foreground)]">
-                  {pick(language, "没有现成导出文件？先下载单账户模板。", "No broker export yet? Start with the single-account template.")}
+                  {pick(language, "如果你手上没有现成导出文件，可以先下载模板自己补。", "If you do not have a broker export yet, start with the single-account template.")}
                 </p>
                 <p className="text-sm text-[color:var(--muted-foreground)]">
-                  {pick(language, "模板只包含一个账户的 account 行和对应 holding 行，适合逐个账户补录。", "The template includes one account row and its holding rows so you can onboard one account at a time.")}
+                  {pick(language, "模板里只放一个账户和它对应的持仓，适合一户一户慢慢补。", "The template includes one account row and its holding rows so you can onboard one account at a time.")}
                 </p>
               </div>
               <Button
@@ -1784,7 +1792,7 @@ function StepProvideSource(props: {
           <div>
             <p className="font-semibold">{pick(language, "手动录入路径", "Manual entry path")}</p>
             <p className="mt-2 text-sm text-[color:var(--muted-foreground)]">
-              {pick(language, "如果你想把一个或多个持仓写入新账户或已有账户，就用这条路径。盈亏会由成本基础和计算后的市值自动推导；只有在你明确想覆盖推导值时，才使用 override。", "Use this when you want to add one or more holdings into a new or existing account. Gain/loss is derived from cost basis and the computed market value. Only use an override when you deliberately want to replace the computed total value.")}
+              {pick(language, "如果你想把几笔持仓直接补进账户，就走这条路。系统会自动帮你算总市值和盈亏，只有你明确想改掉它时，才需要填 override。", "Use this when you want to add one or more holdings into a new or existing account. Gain/loss is derived automatically unless you deliberately override the total value.")}
             </p>
           </div>
           <div className="space-y-4">
@@ -1854,14 +1862,14 @@ function StepProvideSource(props: {
                       </Button>
                     </div>
                     <p className="text-xs text-[color:var(--muted-foreground)]">
-                      {pick(language, "这里填每股或每单位价格。如果你已经知道最新行情，就用这个输入。", "Per-share or per-unit price. Use this when you know the latest quote.")}
+                      {pick(language, "这里填的是每股价格。如果你已经知道最新行情，直接填这里就行。", "This field is the current per-share price. Use it when you already know the latest quote.")}
                     </p>
                   </label>
                   <label className="space-y-2">
                     <span className="text-sm font-medium">{pick(language, "当前市值", "Current market value")} ({holding.currency})</span>
                     <input type="number" min="0" value={getManualHoldingDerivedMetrics(holding).computedMarketValueAmount > 0 ? getManualHoldingDerivedMetrics(holding).computedMarketValueAmount.toFixed(2) : ""} readOnly className="w-full rounded-2xl border border-[color:var(--border)] bg-slate-50 px-4 py-3 text-sm outline-none" placeholder={pick(language, "由股数 x 当前价格或 override 推导", "Calculated from shares x current price or override value")} />
                     <p className="text-xs text-[color:var(--muted-foreground)]">
-                      {pick(language, "系统会根据股数和当前价格自动计算。如果你在下方填写 override，总值会以 override 为准并用于盈亏计算。", "Auto-calculated from shares and current price. If you add an override below, that override becomes the total value used for gain/loss.")}
+                      {pick(language, "系统会自动用股数乘价格来算总市值。如果你在下面手动改总值，后面的盈亏也会跟着按你改的值来算。", "The system auto-calculates market value from shares and price. If you override it below, gain/loss will use your override instead.")}
                     </p>
                   </label>
                 </div>
@@ -1877,7 +1885,7 @@ function StepProvideSource(props: {
                       placeholder={pick(language, "可选：手动覆盖总市值", "Optional override total value")}
                     />
                     <p className="text-xs text-[color:var(--muted-foreground)]">
-                      {pick(language, "正常情况下留空。只有当你明确想覆盖系统推导的总仓位价值时才填写。", "Leave empty in normal use. Only fill this if you want to override the computed total position value.")}
+                      {pick(language, "正常情况下这里留空就行。只有你确定系统算出来的总值不对时，才手动改。", "Leave this empty in normal use. Only fill it if you deliberately want to replace the computed total value.")}
                     </p>
                   </div>
                 </details>
@@ -1941,7 +1949,7 @@ function StepProvideSource(props: {
         <div className="rounded-[24px] border border-[color:var(--border)] bg-white p-5">
           <p className="font-semibold">{pick(language, "稍后继续", "Continue later")}</p>
           <p className="mt-2 text-sm text-[color:var(--muted-foreground)]">
-            {pick(language, "确认这条路径后，系统会先创建账户壳层和 draft import job，方便你之后回来继续，不会丢上下文。", "Confirming this path creates the account sleeve and a draft import job so the user can return later without losing context.")}
+            {pick(language, "如果你现在还没准备好数据，系统会先记下这个账户，等你下次回来时还能接着做。", "Confirming this path creates the account sleeve and a draft import job so you can return later without losing context.")}
           </p>
         </div>
       ) : null}
@@ -2002,7 +2010,7 @@ function StepReviewAndConfirm({
           icon={<PencilLine className="mt-0.5 h-4 w-4 text-[color:var(--primary)]" />}
           text={method === "manual-entry"
             ? pick(language, `手动录入会把 ${manualHoldings.length} 个持仓 upsert 到${accountMode === "existing" ? "已有账户" : "新账户"}。`, `Manual entry will upsert ${manualHoldings.length} holdings into ${accountMode === "existing" ? "the existing account" : "the new account"}.`)
-            : pick(language, "CSV 数据录入会在账户壳层创建后继续进行。", "CSV-specific data entry can continue after the account shell is created.")}
+            : pick(language, "这个账户会先建起来，CSV 里的详细数据可以下一步再补。", "The account shell will be created first and CSV-specific data can continue afterward.")}
         />
       </div>
 
@@ -2028,14 +2036,14 @@ function StepReviewAndConfirm({
               ) : (
                 <InfoRow
                   icon={<CheckCircle2 className="mt-0.5 h-4 w-4 text-[color:var(--success)]" />}
-                  text={pick(language, "校验通过。确认后会把这个账户 CSV 以 merge 方式写入当前登录用户的数据库记录。", "Validation passed. Confirm will merge this account CSV into the signed-in user's database records.")}
+                  text={pick(language, "校验已经通过。你点确认后，这个账户里的数据会并入当前登录用户的宝库记录。", "Validation passed. Confirm will merge this account CSV into the signed-in user's database records.")}
                 />
               )}
             </>
           ) : (
             <InfoRow
               icon={<ShieldAlert className="mt-0.5 h-4 w-4 text-[color:var(--warning)]" />}
-              text={pick(language, "还没有可用的 CSV 复核结果。请先返回上一步校验文件。", "No CSV review is available yet. Go back and validate the file first.")}
+              text={pick(language, "这里还没有可确认的结果。先回上一步把文件跑一遍校验。", "No CSV review is available yet. Go back and validate the file first.")}
             />
           )}
         </div>

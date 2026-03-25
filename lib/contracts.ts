@@ -87,6 +87,7 @@ export interface PortfolioData {
       status: string;
       summary: string;
       drivers: string[];
+      consequences: string[];
       actions: string[];
     }[];
     actionQueue: string[];
@@ -123,6 +124,7 @@ export interface PortfolioData {
     id: string;
     symbol: string;
     accountId: string;
+    accountType: string;
     account: string;
     lastPrice: string;
     lastUpdated: string;

@@ -1,4 +1,4 @@
-import { ArrowRight } from "lucide-react";
+import { ArrowLeft, ArrowRight } from "lucide-react";
 import { requireViewer } from "@/lib/auth/session";
 import { getPortfolioView } from "@/lib/backend/services";
 import { AppShell } from "@/components/layout/app-shell";
@@ -29,8 +29,13 @@ export default async function PortfolioHealthPage() {
       <Card className="overflow-hidden bg-[linear-gradient(135deg,rgba(255,255,255,0.68),rgba(246,218,230,0.52),rgba(221,232,255,0.46))]">
         <CardContent className="grid gap-6 px-6 py-6 md:grid-cols-[1.1fr_0.9fr] md:items-center">
           <div className="space-y-4">
-            <div className="inline-flex rounded-full border border-white/60 bg-white/44 px-4 py-2 text-sm font-medium text-[color:var(--foreground)] backdrop-blur-md">
-              {pick(language, "组合健康诊断台", "Portfolio health lab")}
+            <div className="flex flex-wrap items-center gap-3">
+              <Button href="/portfolio" variant="secondary" leadingIcon={<ArrowLeft className="h-4 w-4" />}>
+                {pick(language, "返回组合页", "Back to portfolio")}
+              </Button>
+              <div className="inline-flex rounded-full border border-white/60 bg-white/44 px-4 py-2 text-sm font-medium text-[color:var(--foreground)] backdrop-blur-md">
+                {pick(language, "组合健康诊断台", "Portfolio health lab")}
+              </div>
             </div>
             <div className="space-y-3">
               <h2 className="text-[30px] font-semibold tracking-[-0.04em] text-[color:var(--foreground)]">
@@ -124,8 +129,10 @@ export default async function PortfolioHealthPage() {
             <HealthDimensionCard
               key={dimension.id}
               dimension={dimension}
-              driversLabel={pick(language, "驱动因素", "Drivers")}
-              actionsLabel={pick(language, "下一步动作", "Actions")}
+              summaryLabel={pick(language, "一句话理解", "Plain-language summary")}
+              driversLabel={pick(language, "问题在哪里", "What is driving this")}
+              consequencesLabel={pick(language, "如果不处理", "If you leave it alone")}
+              actionsLabel={pick(language, "现在先做什么", "What to do next")}
             />
           ))}
         </div>

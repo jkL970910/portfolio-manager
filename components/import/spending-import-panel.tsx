@@ -145,7 +145,7 @@ export function SpendingImportPanel({
       });
       return;
     }
-    setStatus({ type: "success", message: pick(language, "校验通过，请先确认交易数量和预览结果，再执行写入。", "Validation passed. Review transaction counts and confirm the write.") });
+    setStatus({ type: "success", message: pick(language, "校验通过。先看看系统读到了多少条流水，再决定要不要正式写入。", "Validation passed. Review transaction counts and confirm the write.") });
   }
 
   function confirmImport() {
@@ -190,7 +190,7 @@ export function SpendingImportPanel({
         type: "success",
         message: pick(
           language,
-          `${modeLabel} ${result.job.fileName} 中的 ${result.summary.transactionsImported} 条交易流水。投资账户和持仓不会被修改。`,
+          `${modeLabel} ${result.job.fileName} 里的 ${result.summary.transactionsImported} 条交易流水。投资账户和持仓不会被改动。`,
           `${modeLabel} ${result.summary.transactionsImported} transactions from ${result.job.fileName}. Portfolio holdings were left unchanged.`
         )
       });
@@ -205,7 +205,7 @@ export function SpendingImportPanel({
         <div>
           <p className="font-semibold">{pick(language, "消费流水 CSV 导入", "Transaction CSV import")}</p>
           <p className="mt-1 text-sm text-[color:var(--muted-foreground)]">
-            {pick(language, "这条工作流只导入消费流水。它不会创建持仓，也不会覆盖投资账户。", "This workflow imports spending records only. It does not create holdings and it does not overwrite portfolio accounts.")}
+            {pick(language, "这条路只处理消费流水，不会新建持仓，也不会动你的投资账户。", "This workflow imports spending records only. It does not create holdings and it does not overwrite portfolio accounts.")}
           </p>
         </div>
         {latestJob
@@ -238,7 +238,7 @@ export function SpendingImportPanel({
       </div>
 
       <label className="block space-y-2">
-        <span className="text-sm font-medium text-[color:var(--foreground)]">{pick(language, "ä¸Šä¼  CSV", "CSV upload")}</span>
+        <span className="text-sm font-medium text-[color:var(--foreground)]">{pick(language, "上传 CSV", "CSV upload")}</span>
         <input
           type="file"
           accept=".csv,text/csv"
@@ -253,7 +253,7 @@ export function SpendingImportPanel({
           {pick(language, "消费流水模板", "Spending CSV template")}
         </div>
         <p className="mt-2">
-          {pick(language, "可从这里下载起始模板：", "Download the starter template at")}{" "}
+          {pick(language, "如果你还没有整理好的文件，可以先从这个模板开始：", "Download the starter template at")}{" "}
           <a href="/templates/spending-import-template.csv" className="font-medium text-[color:var(--primary)] underline">
             /templates/spending-import-template.csv
           </a>.
@@ -332,12 +332,12 @@ export function SpendingImportPanel({
         <div className="space-y-3 rounded-2xl border border-[#b6d7c7] bg-[#eef8f1] p-4">
           <div className="flex items-center gap-2 font-medium text-[#21613f]">
             <CheckCircle2 className="h-4 w-4" />
-            {pick(language, "导入前复核", "Review before import")}
+            {pick(language, "导入前先看一眼", "Review before import")}
           </div>
           <div className="grid gap-3 md:grid-cols-4 text-sm text-[#21613f]">
             <div>{pick(language, "交易流水：", "Transactions: ")}{reviewState.summary.transactionsImported}</div>
             <div>{pick(language, "解析行数：", "Rows parsed: ")}{reviewState.review.rowCount}</div>
-            <div>{pick(language, "模式：", "Mode: ")}{reviewState.review.importMode}</div>
+            <div>{pick(language, "写入方式：", "Mode: ")}{reviewState.review.importMode}</div>
             <div>{pick(language, "持仓影响：0", "Holdings touched: 0")}</div>
           </div>
           <p className="text-sm text-[#21613f]">

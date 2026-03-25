@@ -4,7 +4,9 @@ import { Badge } from "@/components/ui/badge";
 export function HealthDimensionCard({
   dimension,
   driversLabel,
-  actionsLabel
+  consequencesLabel,
+  actionsLabel,
+  summaryLabel
 }: {
   dimension: {
     id: string;
@@ -13,28 +15,42 @@ export function HealthDimensionCard({
     status: string;
     summary: string;
     drivers: string[];
+    consequences: string[];
     actions: string[];
   };
   driversLabel: string;
+  consequencesLabel: string;
   actionsLabel: string;
+  summaryLabel: string;
 }) {
   return (
     <Card>
       <CardHeader className="flex flex-row items-start justify-between gap-4">
         <div>
           <CardTitle>{dimension.label}</CardTitle>
-          <p className="mt-2 text-sm leading-7 text-[color:var(--muted-foreground)]">{dimension.summary}</p>
+          <div className="mt-3 rounded-[22px] border border-white/55 bg-white/34 px-4 py-3 backdrop-blur-md">
+            <p className="text-xs uppercase tracking-[0.16em] text-[color:var(--muted-foreground)]">{summaryLabel}</p>
+            <p className="mt-2 text-sm leading-7 text-[color:var(--muted-foreground)]">{dimension.summary}</p>
+          </div>
         </div>
         <Badge variant={dimension.score >= 82 ? "success" : dimension.score >= 68 ? "neutral" : "warning"}>
           {dimension.score}/100
         </Badge>
       </CardHeader>
-      <CardContent className="grid gap-4 xl:grid-cols-2">
+      <CardContent className="grid gap-4 xl:grid-cols-3">
         <div className="space-y-3">
           <p className="text-sm font-semibold text-[color:var(--foreground)]">{driversLabel}</p>
           {dimension.drivers.map((driver, index) => (
             <div key={`${dimension.id}-driver-${index}`} className="rounded-[24px] border border-white/55 bg-white/36 px-4 py-3 text-sm leading-7 text-[color:var(--muted-foreground)] backdrop-blur-md">
               {driver}
+            </div>
+          ))}
+        </div>
+        <div className="space-y-3">
+          <p className="text-sm font-semibold text-[color:var(--foreground)]">{consequencesLabel}</p>
+          {dimension.consequences.map((consequence, index) => (
+            <div key={`${dimension.id}-consequence-${index}`} className="rounded-[24px] border border-[rgba(240,143,178,0.22)] bg-[linear-gradient(135deg,rgba(255,255,255,0.76),rgba(245,214,235,0.28),rgba(255,239,224,0.22))] px-4 py-3 text-sm leading-7 text-[color:var(--muted-foreground)] backdrop-blur-md">
+              {consequence}
             </div>
           ))}
         </div>

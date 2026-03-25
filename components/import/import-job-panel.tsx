@@ -467,7 +467,11 @@ export function ImportJobPanel({
     const allSymbols = extractHoldingSymbolsForAudit(csvContent, sanitizedFieldMapping);
     if (allSymbols.length === 0) {
       setSymbolAudit(null);
-      setSymbolAuditStatus({ loading: false, message: "No holding symbols were found for symbol audit.", error: "" });
+      setSymbolAuditStatus({
+        loading: false,
+        message: pick(language, "这份文件里还没有可复核的持仓代码。", "No holding symbols were found for review."),
+        error: ""
+      });
       return;
     }
 
@@ -520,9 +524,9 @@ export function ImportJobPanel({
           : sampledSymbols[index];
         const quote = quoteMap.get(normalizedSymbol) ?? quoteMap.get(sampledSymbols[index]);
         const warningMessage = normalizedSymbol !== sampledSymbols[index]
-          ? `Normalized from ${sampledSymbols[index]} to ${normalizedSymbol}.`
+          ? pick(language, `系统把 ${sampledSymbols[index]} 统一成了 ${normalizedSymbol}。`, `Normalized ${sampledSymbols[index]} to ${normalizedSymbol}.`)
           : quote == null || !Number.isFinite(quote.price) || quote.price <= 0
-            ? "No usable quote was returned for this symbol."
+            ? pick(language, "这条代码暂时没拿到可用价格。", "No usable quote was returned for this symbol.")
             : null;
 
         return {
@@ -552,7 +556,11 @@ export function ImportJobPanel({
       );
       setSymbolAuditStatus({
         loading: false,
-        message: `Symbol audit checked ${sampledSymbols.length} of ${allSymbols.length} unique holding symbols.`,
+        message: pick(
+          language,
+          `代码复核已检查 ${allSymbols.length} 个唯一持仓代码中的前 ${sampledSymbols.length} 个。`,
+          `Symbol audit checked ${sampledSymbols.length} of ${allSymbols.length} unique holding symbols.`
+        ),
         error: ""
       });
     } catch (error) {
@@ -560,7 +568,7 @@ export function ImportJobPanel({
       setSymbolAuditStatus({
         loading: false,
         message: "",
-        error: error instanceof Error ? error.message : "Symbol audit failed."
+        error: error instanceof Error ? error.message : pick(language, "代码复核失败。", "Symbol audit failed.")
       });
     }
   }
@@ -631,7 +639,7 @@ export function ImportJobPanel({
         <div>
           <p className="font-semibold">{pick(language, "直接 CSV 导入", "Direct CSV import")}</p>
           <p className="mt-1 text-sm text-[color:var(--muted-foreground)]">
-            {pick(language, "批量导入分两步：先校验并复核，再确认写入数据库。", "Bulk import is a two-step flow: validate and review first, then confirm the database write.")}
+            {pick(language, "先让系统读一遍文件，把可疑的地方标出来；你看过没问题以后，再点确认正式写入。", "First let the system read the file and flag anything suspicious. Then confirm the final write.")}
           </p>
         </div>
         {latestJob
@@ -664,7 +672,7 @@ export function ImportJobPanel({
       </div>
 
       <label className="block space-y-2">
-        <span className="text-sm font-medium text-[color:var(--foreground)]">{pick(language, "ä¸Šä¼  CSV", "CSV upload")}</span>
+        <span className="text-sm font-medium text-[color:var(--foreground)]">{pick(language, "上传 CSV", "CSV upload")}</span>
         <input
           type="file"
           accept=".csv,text/csv"
@@ -679,7 +687,7 @@ export function ImportJobPanel({
           {pick(language, "本地 CSV 模板", "Local CSV template")}
         </div>
         <p className="mt-2">
-          {pick(language, "请使用 ", "Use ")}<code>record_type</code>{pick(language, " 区分 ", " rows for ")}<code>account</code>ã€<code>holding</code>{pick(language, " 和 ", ", and ")}<code>transaction</code>{pick(language, " 三类记录。模板下载地址：", ". Download the starter template at ")}{" "}
+          {pick(language, "这份模板会把 ", "This template separates ")}<code>account</code>、<code>holding</code>{pick(language, " 和 ", ", and ")}<code>transaction</code>{pick(language, " 三类记录分开写。下载地址：", " rows into different record types. Download it here:")}{" "}
           <a href="/templates/portfolio-import-template.csv" className="font-medium text-[color:var(--primary)] underline">
             /templates/portfolio-import-template.csv
           </a>.
@@ -691,7 +699,7 @@ export function ImportJobPanel({
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-2">
               <ArrowRightLeft className="h-4 w-4 text-[color:var(--primary)]" />
-              <p className="font-medium">{pick(language, "字段映射预设", "Field mapping presets")}</p>
+              <p className="font-medium">{pick(language, "常用表头对照", "Saved field mappings")}</p>
             </div>
             <div className="flex flex-wrap gap-2">
               {selectedServerPreset ? (
@@ -711,7 +719,7 @@ export function ImportJobPanel({
           </div>
           <div className="grid gap-4 md:grid-cols-[1fr_auto]">
             <label className="space-y-2">
-              <span className="text-sm font-medium text-[color:var(--foreground)]">{pick(language, "预设", "Preset")}</span>
+              <span className="text-sm font-medium text-[color:var(--foreground)]">{pick(language, "先套一个常用对照表", "Start from a saved mapping")}</span>
               <select
                 value={selectedPresetKey}
                 onChange={(event) => applyPreset(event.target.value)}
@@ -726,7 +734,7 @@ export function ImportJobPanel({
               </select>
             </label>
             <div className="flex items-end">
-              <Badge variant="neutral">{pick(language, `检测到 ${headers.length} 个表头`, `${headers.length} headers detected`)}</Badge>
+              <Badge variant="neutral">{pick(language, `系统读到 ${headers.length} 个表头`, `${headers.length} headers detected`)}</Badge>
             </div>
           </div>
 
@@ -757,7 +765,7 @@ export function ImportJobPanel({
 
           {missingRequiredMappings.length > 0 ? (
             <div className="rounded-2xl border border-[#e7b0b8] bg-[#fff3f5] px-4 py-3 text-sm text-[#8e2433]">
-              {pick(language, "缺少必填映射：", "Required mappings missing: ")}{missingRequiredMappings.join(", ")}
+              {pick(language, "还有这些关键列没对上：", "These required fields are still missing: ")}{missingRequiredMappings.join(", ")}
             </div>
           ) : null}
         </div>
@@ -812,10 +820,10 @@ export function ImportJobPanel({
                 <div>{pick(language, "解析行数：", "Rows parsed: ")}{reviewState.review.rowCount}</div>
               </div>
               <p className="text-sm text-[#21613f]">
-                {pick(language, "模式：", "Mode: ")}{reviewState.review.importMode}. {pick(language, "校验通过。确认后会把这些修改写入当前登录用户的数据库记录。", "Validation passed. Confirm to write these changes into the current signed-in user's database records.")}
+                {pick(language, "这次会按", "This run will use ")}{reviewState.review.importMode} {pick(language, "模式写入。你点确认后，这些数据就会真正存进当前登录用户的宝库里。", "mode. Confirm will write these changes into the signed-in user's account.")}
               </p>
               <p className="text-sm text-[#21613f]">
-                {pick(language, "估值规则：如果持仓行包含 ", "Valuation rule: if a holding row includes ")}<code>market_value</code>{pick(language, "，系统会优先写入这份显式总值，而不是使用 ", ", that explicit total value is written and takes priority over any derived value from ")}<code>quantity x last_price</code>{pick(language, " 推导值。", ".")}
+                {pick(language, "估值规则很简单：如果文件里已经给了总市值，系统就直接用总市值；否则才用 ", "If the file already includes total market value, the system uses it directly; otherwise it falls back to ")}<code>quantity x last_price</code>{pick(language, " 去算。", ".")}
               </p>
             </div>
             <div className="justify-self-start md:justify-self-end">
@@ -824,7 +832,7 @@ export function ImportJobPanel({
           </div>
           {symbolAudit?.records?.length ? (
             <div className="rounded-2xl border border-[#b6d7c7] bg-white px-4 py-3 text-sm text-[#21613f]">
-              <p className="font-medium">{pick(language, "最终将写入的持仓", "Final holdings that will be written")}</p>
+              <p className="font-medium">{pick(language, "最后会写进这些持仓", "Final holdings that will be written")}</p>
               <div className="mt-2 flex flex-wrap gap-2">
                 {symbolAudit.records.slice(0, 8).map((record) => (
                   <Badge key={`final-write-${record.requestedSymbol}`} variant="success">
@@ -849,8 +857,8 @@ export function ImportJobPanel({
             <div className="space-y-3">
               <div className="flex items-center gap-2 font-medium text-[color:var(--foreground)]">
                 <Eye className="h-4 w-4 text-[color:var(--primary)]" />
-                {pick(language, "代码审计", "Symbol audit")}
-                {symbolAuditStatus.loading ? <Badge variant="warning">{pick(language, "执行中", "Running")}</Badge> : <Badge variant="neutral">{pick(language, "辅助复核", "Review aid")}</Badge>}
+                {pick(language, "持仓代码复核", "Symbol review")}
+                {symbolAuditStatus.loading ? <Badge variant="warning">{pick(language, "检查中", "Running")}</Badge> : <Badge variant="neutral">{pick(language, "帮你复核", "Review aid")}</Badge>}
               </div>
               {symbolAuditStatus.message ? (
                 <p className="text-sm text-[color:var(--muted-foreground)]">{symbolAuditStatus.message}</p>
@@ -875,11 +883,11 @@ export function ImportJobPanel({
                         {record.requestedSymbol} {"->"} {record.normalizedSymbol} - {record.name}
                             </p>
                             <p className="mt-1 text-[color:var(--muted-foreground)]">
-                        {pick(language, "来源：", "Provider: ")}{record.provider}{record.quotePrice != null ? pick(language, ` · 行情 ${record.quotePrice.toFixed(2)}${record.delayed ? "（延迟）" : ""}`, ` - Quote ${record.quotePrice.toFixed(2)}${record.delayed ? " (delayed)" : ""}`) : pick(language, " · 无可用行情", " - No quote")}
+                        {pick(language, "来源：", "Provider: ")}{record.provider}{record.quotePrice != null ? pick(language, ` · 价格 ${record.quotePrice.toFixed(2)}${record.delayed ? "（延迟）" : ""}`, ` - Quote ${record.quotePrice.toFixed(2)}${record.delayed ? " (delayed)" : ""}`) : pick(language, " · 没有可用价格", " - No quote")}
                             </p>
                           </div>
                           <Badge variant={record.hasWarning ? "warning" : "success"}>
-                      {record.hasWarning ? pick(language, "需要复核", "Needs review") : pick(language, "看起来正常", "Looks good")}
+                      {record.hasWarning ? pick(language, "建议你看一眼", "Needs review") : pick(language, "这条看起来正常", "Looks good")}
                           </Badge>
                   </div>
                   {record.warningMessage ? (
@@ -890,7 +898,7 @@ export function ImportJobPanel({
                   {record.hasWarning ? (
                     <div className="mt-3 grid gap-3 md:grid-cols-2">
                       <label className="space-y-2">
-                        <span className="text-xs font-medium uppercase tracking-[0.12em] text-[color:var(--muted-foreground)]">{pick(language, "覆盖代码", "Override symbol")}</span>
+                        <span className="text-xs font-medium uppercase tracking-[0.12em] text-[color:var(--muted-foreground)]">{pick(language, "手动改代码", "Override symbol")}</span>
                         <input
                           value={symbolCorrections[record.requestedSymbol]?.symbol ?? record.normalizedSymbol}
                           onChange={(event) => setSymbolCorrections((current) => ({
@@ -904,7 +912,7 @@ export function ImportJobPanel({
                         />
                       </label>
                       <label className="space-y-2">
-                        <span className="text-xs font-medium uppercase tracking-[0.12em] text-[color:var(--muted-foreground)]">{pick(language, "覆盖名称", "Override name")}</span>
+                        <span className="text-xs font-medium uppercase tracking-[0.12em] text-[color:var(--muted-foreground)]">{pick(language, "手动改名称", "Override name")}</span>
                         <input
                           value={symbolCorrections[record.requestedSymbol]?.name ?? record.name}
                           onChange={(event) => setSymbolCorrections((current) => ({
@@ -920,7 +928,7 @@ export function ImportJobPanel({
                     </div>
                   ) : null}
                   <div className="mt-3 rounded-2xl border border-[color:var(--border)] bg-white px-4 py-3 text-sm text-[color:var(--muted-foreground)]">
-                    <span className="font-medium text-[color:var(--foreground)]">{pick(language, "最终写入：", "Final write:")}</span>{" "}
+                    <span className="font-medium text-[color:var(--foreground)]">{pick(language, "最后会写成：", "Final write:")}</span>{" "}
                     {(symbolCorrections[record.requestedSymbol]?.symbol ?? record.normalizedSymbol).toUpperCase()} - {symbolCorrections[record.requestedSymbol]?.name ?? record.name}
                   </div>
                 </div>
@@ -949,7 +957,7 @@ export function ImportJobPanel({
             <div className="space-y-3">
               <div className="flex items-center gap-2 font-medium text-[#8e2433]">
                 <AlertTriangle className="h-4 w-4" />
-                {pick(language, "导入校验问题", "Import validation issues")}
+                {pick(language, "这些地方还需要你先修一下", "Import validation issues")}
               </div>
               <div className="space-y-2">
                 {validationErrors.slice(0, 12).map((error) => (
@@ -972,7 +980,7 @@ export function ImportJobPanel({
         disabled={isPending || !csvContent || missingRequiredMappings.length > 0}
         leadingIcon={<Upload className="h-4 w-4" />}
       >
-        {pick(language, "校验并复核导入", "Validate and review import")}
+        {pick(language, "先看看这份文件会写进什么", "Preview what this file will write")}
       </Button>
     </div>
   );

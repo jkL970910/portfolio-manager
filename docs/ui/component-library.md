@@ -298,6 +298,7 @@ components/
   - ordered action list used by the health detail page
 - [health-drilldown-card.tsx](E:\Projects\Portfolio%20Manager\components\portfolio\health-drilldown-card.tsx)
   - account-level and holding-level diagnostic card used by the health detail page
+  - account drill-down is grouped by account type, not by individual account nickname
   - each drill-down card can deep-link back into `/portfolio`, where the matching rows should remain visually highlighted
   - supports a card-level contribution amount switcher so the user can compare which dimension would improve first under different next-contribution sizes
 
@@ -305,9 +306,13 @@ components/
 
 - [recommendation-run-panel.tsx](E:\Projects\Portfolio%20Manager\components\recommendations\recommendation-run-panel.tsx)
   - generate recommendation run action panel
+- [recommendation-priority-stack.tsx](E:\Projects\Portfolio%20Manager\components\recommendations\recommendation-priority-stack.tsx)
+  - controller layer for ranked recommendation cards
+  - keeps only one recommendation expanded at a time so the page height stays bounded
 - [recommendation-detail-card.tsx](E:\Projects\Portfolio%20Manager\components\recommendations\recommendation-detail-card.tsx)
-  - expanded recommendation explanation surface with a unified decision trace, alternatives, constraint trace, and execution detail
+  - compact recommendation summary card with on-demand expansion into the unified decision trace, alternatives, constraint trace, and execution detail
   - defaults to the first three decision steps and can expand into the full trace on demand
+  - adds short plain-language trace tags plus hover/focus glossary chips for core terms such as support, constraint, account fit, and FX friction
 - [scenario-compare-card.tsx](E:\Projects\Portfolio%20Manager\components\recommendations\scenario-compare-card.tsx)
   - re-solved scenario compare surface with change-summary text versus the current recommendation run
 

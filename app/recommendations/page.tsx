@@ -4,7 +4,7 @@ import { requireViewer } from "@/lib/auth/session";
 import { getRecommendationView } from "@/lib/backend/services";
 import { AppShell } from "@/components/layout/app-shell";
 import { RecommendationRunPanel } from "@/components/recommendations/recommendation-run-panel";
-import { RecommendationDetailCard } from "@/components/recommendations/recommendation-detail-card";
+import { RecommendationPriorityStack } from "@/components/recommendations/recommendation-priority-stack";
 import { ScenarioCompareCard } from "@/components/recommendations/scenario-compare-card";
 import { EmptyStatePanel } from "@/components/ui/empty-state-panel";
 import { Badge } from "@/components/ui/badge";
@@ -38,25 +38,25 @@ export default async function RecommendationsPage() {
             </div>
           </div>
           <div className="grid gap-3 sm:grid-cols-2">
-            <RecommendationSignal title={pick(language, "输入层", "Inputs")} detail={pick(language, "目标、账户、金额与偏好", "Targets, accounts, amount, and preferences")} />
-            <RecommendationSignal title={pick(language, "输出层", "Outputs")} detail={pick(language, "资产类优先级、账户匹配与说明", "Asset priorities, account fit, and rationale")} />
+            <RecommendationSignal title={pick(language, "系统先看什么", "Inputs")} detail={pick(language, "你的目标、账户、投入金额和偏好。", "Targets, accounts, amount, and preferences")} />
+            <RecommendationSignal title={pick(language, "最后会给你什么", "Outputs")} detail={pick(language, "先买哪类资产、放哪个账户、为什么这么做。", "Asset priorities, account fit, and rationale")} />
           </div>
         </CardContent>
       </Card>
 
       <div className="grid gap-6 xl:grid-cols-[0.9fr_1.1fr]">
-        <div className="space-y-6">
+        <div className="space-y-6 xl:sticky xl:top-28 xl:self-start">
           <SectionHeading
-            title={pick(language, "输入与假设", "Inputs and assumptions")}
-            description={pick(language, "推荐结果会锚定到用户保存的偏好、账户优先级和目标配置。", "Recommendations are anchored to the user's configured preferences, account priorities, and allocation targets.")}
+            title={pick(language, "这次推荐是按什么算的", "What this recommendation is based on")}
+            description={pick(language, "先把你现在的偏好、账户顺序和投入金额摆出来，这样你更容易看懂系统为什么这么分配。", "Show the current preferences, account order, and amount first so the recommendation is easier to understand.")}
           />
           <Card>
             <CardHeader>
-              <CardTitle>{pick(language, "投入设置", "Contribution Setup")}</CardTitle>
+              <CardTitle>{pick(language, "这次准备投入多少", "Planned contribution")}</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="rounded-[24px] border border-white/55 bg-white/38 p-4 backdrop-blur-md">
-                <p className="text-sm text-[color:var(--muted-foreground)]">{pick(language, "投入金额", "Contribution amount")}</p>
+                  <p className="text-sm text-[color:var(--muted-foreground)]">{pick(language, "这次打算投入", "Planned amount")}</p>
                 <p className="mt-2 text-3xl font-semibold">{data.contributionAmount}</p>
               </div>
               <div className="grid gap-3 sm:grid-cols-2">
@@ -71,7 +71,7 @@ export default async function RecommendationsPage() {
           </Card>
           <Card>
             <CardHeader>
-              <CardTitle>{pick(language, "计算方式", "How this is calculated")}</CardTitle>
+              <CardTitle>{pick(language, "系统大致怎么想", "How the system is thinking")}</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
               <div className="grid gap-3 sm:grid-cols-3">
@@ -80,7 +80,7 @@ export default async function RecommendationsPage() {
                   <p className="mt-2 font-semibold">{data.engine.version}</p>
                 </div>
                 <div className="rounded-[24px] border border-white/55 bg-white/34 p-4 backdrop-blur-md">
-                  <p className="text-xs uppercase tracking-[0.16em] text-[color:var(--muted-foreground)]">{pick(language, "目标函数", "Objective")}</p>
+                  <p className="text-xs uppercase tracking-[0.16em] text-[color:var(--muted-foreground)]">{pick(language, "主要目标", "Primary goal")}</p>
                   <p className="mt-2 font-semibold">{data.engine.objective}</p>
                 </div>
                 <div className="rounded-[24px] border border-white/55 bg-white/34 p-4 backdrop-blur-md">
@@ -89,7 +89,7 @@ export default async function RecommendationsPage() {
                 </div>
               </div>
               {data.explainer.map((point) => (
-                <div key={point} className="rounded-[24px] border border-white/55 bg-white/34 p-4 text-sm text-[color:var(--muted-foreground)] backdrop-blur-md">
+                <div key={point} className="rounded-[24px] border border-white/55 bg-white/34 p-4 text-sm leading-7 text-[color:var(--muted-foreground)] backdrop-blur-md">
                   {point}
                 </div>
               ))}
@@ -104,9 +104,9 @@ export default async function RecommendationsPage() {
               <CardTitle>{pick(language, "资金配置优先级", "Ranked Funding Priorities")}</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              {data.priorities.map((priority, index) => (
-                <RecommendationDetailCard key={priority.id} language={language} index={index} priority={priority} />
-              ))}
+              {data.priorities.length > 0 ? (
+                <RecommendationPriorityStack language={language} priorities={data.priorities} />
+              ) : null}
               {data.priorities.length === 0 ? (
                 <EmptyStatePanel
                   title={pick(language, "还没有推荐结果", "No recommendation run is available yet")}
@@ -121,20 +121,20 @@ export default async function RecommendationsPage() {
           <div className="grid gap-4 lg:grid-cols-2">
             <Card>
               <CardHeader>
-                <CardTitle>{pick(language, "置信度与说明", "Confidence and notes")}</CardTitle>
+                <CardTitle>{pick(language, "这条建议有多稳", "How reliable this looks")}</CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
                 <div className="rounded-[24px] border border-white/55 bg-white/36 p-4 backdrop-blur-md">
                   <div className="flex items-center gap-2 font-medium">
                     <ShieldCheck className="h-4 w-4 text-[color:var(--success)]" />
-                    {pick(language, `置信度：${data.engine.confidence}`, `Confidence: ${data.engine.confidence}`)}
+                    {pick(language, `系统把握度：${data.engine.confidence}`, `Confidence: ${data.engine.confidence}`)}
                   </div>
                   <p className="mt-2 text-sm text-[color:var(--muted-foreground)]">
-                    {pick(language, "这代表当前 run 在配置偏离、账户适配和标的选择之间的综合把握度。它是解释型信号，不是执行保证。", "This reflects the engine's combined confidence across drift reduction, account placement, and security choice. It is an explanatory signal, not an execution guarantee.")}
+                    {pick(language, "这个分数只是告诉你：系统觉得这条建议现在有多站得住脚。它不是收益保证，也不是必须照做的命令。", "This reflects how solid the current recommendation looks. It is not a return guarantee or an execution command.")}
                   </p>
                 </div>
                 {data.notes.map((note) => (
-                  <div key={note} className="rounded-[24px] border border-white/55 bg-white/34 p-4 text-sm text-[color:var(--muted-foreground)] backdrop-blur-md">
+                  <div key={note} className="rounded-[24px] border border-white/55 bg-white/34 p-4 text-sm leading-7 text-[color:var(--muted-foreground)] backdrop-blur-md">
                     {note}
                   </div>
                 ))}
@@ -142,12 +142,12 @@ export default async function RecommendationsPage() {
             </Card>
             <Card>
               <CardHeader>
-                <CardTitle>{pick(language, "下一步动作", "Next actions")}</CardTitle>
+                <CardTitle>{pick(language, "看完以后做什么", "What to do next")}</CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
-                <ActionRow label={pick(language, "查看组合驱动因素", "Review portfolio drivers")} href="/portfolio" />
-                <ActionRow label={pick(language, "调整投资偏好", "Adjust investment preferences")} href="/settings" />
-                <ActionRow label={pick(language, "回到首页摘要", "Revisit dashboard summary")} href="/dashboard" />
+                <ActionRow label={pick(language, "回组合页对照着看", "Review this in portfolio")} href="/portfolio" />
+                <ActionRow label={pick(language, "如果不满意，就去改偏好", "Adjust your preferences")} href="/settings" />
+                <ActionRow label={pick(language, "回首页看整体变化", "Back to the dashboard")} href="/dashboard" />
               </CardContent>
             </Card>
           </div>
@@ -156,10 +156,12 @@ export default async function RecommendationsPage() {
               <div className="flex items-start gap-3">
                 <Info className="mt-0.5 h-5 w-5 text-[color:var(--primary)]" />
                 <p className="text-sm text-[color:var(--muted-foreground)]">
-                  {pick(language, "这一层是规划支持，不是黑箱执行器。后端组合逻辑以后可以升级，但不需要推翻当前 UI 合约。", "This workflow is planning support. Backend portfolio logic can later replace these rules without changing the UI contracts.")}
+                  {pick(language, "这页是在帮你把下一笔钱怎么投想清楚，不是在替你自动下单。你可以先看懂，再决定要不要照着做。", "This page helps you think through the next contribution. It does not trade automatically for you.")}
                 </p>
               </div>
-              <Button variant="secondary">{pick(language, "准备执行交接", "Prepare execution handoff")}</Button>
+              <Button href="/portfolio" variant="secondary">
+                {pick(language, "前往组合页复核", "Review in portfolio")}
+              </Button>
             </CardContent>
           </Card>
         </div>
