@@ -70,6 +70,40 @@ Still pending:
 - broker integrations and raw file storage
 - deeper review and correction workflow for invalid imports
 
+Updated now:
+
+- guided allocation setup in Settings
+- recommendation engine v2 foundation
+- portfolio health score and radar detail
+
+Next build focus:
+
+- portfolio workspace phase 1
+- account detail and holding detail surfaces
+- account and holding edit workflows
+- replay-based historical performance
+
+## Portfolio workspace build path
+
+1. Fix account readability first
+   - repeated TFSA / FHSA / RRSP instances must stop collapsing into ambiguous labels
+   - Portfolio needs account cards before deeper edit flows
+
+2. Add concrete detail destinations
+   - account detail page
+   - holding detail page
+   - recommendation and health-score pages should deep-link into these surfaces
+
+3. Add repair workflows
+   - account metadata edit
+   - holding edit
+   - merge duplicate accounts with explicit preview and confirmation
+
+4. Replace synthetic trend lines only after the structural model is ready
+   - event-backed portfolio history
+   - security price history
+   - replay-backed snapshots
+
 ## Supporting docs
 - `docs/execution/backend-architecture.md`
 - `docs/execution/backend-data-model.md`

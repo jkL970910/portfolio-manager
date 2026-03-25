@@ -211,6 +211,46 @@ Acceptance criteria:
 - System highlights concentration risk based on configurable thresholds
 - System shows allocation summaries and 6-month portfolio performance in the Portfolio view
 
+#### Feature 3A: Portfolio Workspace
+
+Description:
+- Upgrade Portfolio from a holdings-only diagnostics surface into an account-and-holding workspace
+
+Acceptance criteria:
+- Portfolio clearly distinguishes repeated account types such as multiple TFSA or FHSA accounts
+- User can understand the difference between account category and concrete account instance
+- Portfolio can surface account-first views before forcing the user into holding-level detail
+
+#### Feature 3B: Account Detail and Holding Detail
+
+Description:
+- Add drill-down pages for accounts and holdings
+
+Acceptance criteria:
+- User can open one account and inspect its value, holdings, and role inside the broader portfolio
+- User can open one holding and inspect its basic security information, portfolio role, and price trend
+- Recommendation and health-score views can route the user into these concrete detail surfaces
+
+#### Feature 3C: Account and Holding Edit Workflows
+
+Description:
+- Allow users to repair imported portfolio structure
+
+Acceptance criteria:
+- User can edit account metadata
+- User can edit holding metadata
+- User can move a holding across accounts
+- User can merge duplicate accounts with preview and confirmation
+
+#### Feature 3D: Real Historical Portfolio Performance
+
+Description:
+- Replace synthetic trend lines with replayed historical portfolio values
+
+Acceptance criteria:
+- Dashboard and Portfolio trends are built from replayed portfolio/account/holding history
+- Time series follow imported positions and historical price data rather than placeholder curves
+
 #### Feature 4: Funding Recommendation Engine v1
 
 Description:

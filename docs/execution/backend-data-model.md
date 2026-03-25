@@ -44,6 +44,10 @@
 - created_at
 - updated_at
 
+Notes:
+- `account_id` is currently the only strong bridge between account and holding detail.
+- the product still lacks dedicated account-merge metadata and holding edit history.
+
 ### cashflow_transactions
 - id
 - user_id
@@ -129,3 +133,108 @@
 - spending summaries should be derived from `transactions`, not stored separately at first.
 - portfolio dashboard metrics should be computed from accounts, holdings, transactions, and preferences.
 - import mapping presets are now durable user-level resources stored in the database.
+- current dashboard and portfolio trend charts still rely on synthetic series, not replayed historical portfolio values.
+
+## Planned additions for portfolio workspace
+
+### Phase 1: account-centric portfolio foundation
+
+No hard schema expansion is strictly required for the first UI phase, but the following model rules must be applied consistently:
+
+- account display naming must distinguish:
+  - account category (`TFSA`, `RRSP`, `FHSA`, `Taxable`)
+  - account instance (`Wealthsimple TFSA`, `Questrade TFSA`, `TFSA · USD`, etc.)
+- repeated account types must remain distinguishable in charts and cards
+- portfolio view models must support:
+  - account-category aggregation
+  - account-instance breakdown
+
+### Phase 2: account and holding detail surfaces
+
+Likely additions:
+
+#### security_master
+- symbol
+- name
+- exchange
+- currency
+- sector
+- asset_class
+- icon_url nullable
+- provider_source nullable
+- updated_at
+
+Purpose:
+- support richer holding detail pages
+- support icon/logo rendering
+- centralize security display metadata
+
+### Phase 3: edit and repair workflows
+
+Likely additions:
+
+#### account_merge_logs
+- id
+- user_id
+- source_account_id
+- target_account_id
+- merged_at
+- summary_json
+
+Purpose:
+- preserve auditability for account merge flows
+
+#### holding_edit_logs
+- id
+- user_id
+- holding_id
+- changed_fields_json
+- created_at
+
+Purpose:
+- preserve auditability for holding edits and account reassignment
+
+### Phase 4: real historical performance
+
+Required additions:
+
+#### portfolio_events
+- id
+- user_id
+- account_id
+- symbol nullable
+- event_type
+- quantity nullable
+- price_amount nullable
+- currency nullable
+- booked_at
+- effective_at
+- source
+- created_at
+
+Purpose:
+- create a replayable source of truth for historical position changes
+
+#### security_price_history
+- symbol
+- date
+- close
+- adjusted_close nullable
+- currency
+- source
+
+Purpose:
+- provide daily historical prices for replayed valuation
+
+#### portfolio_snapshots
+- id
+- user_id
+- snapshot_date
+- total_value_cad
+- account_breakdown_json
+- holding_breakdown_json
+- source_version
+- created_at
+
+Purpose:
+- persist replayed daily portfolio values for dashboard and portfolio charts

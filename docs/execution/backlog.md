@@ -91,13 +91,14 @@ Help a self-directed investor:
 
 | Rank | Feature | Priority | Why now |
 |---|---|---|---|
-| 1 | Recommendation engine v2 | P0-next | The current engine works, but it is still a v1 drift allocator with shallow tax/account-fit logic. |
-| 2 | Recommendation explanation improvements | P0-next | Trust will plateau unless each suggestion has structured rationale and a clearer audit trail. |
-| 3 | Portfolio health score and radar analysis | P1 | The placeholder exists, but the real scoring output is still missing. |
-| 4 | Richer import review persistence | P1 | Import review is functional, but corrections are still too session-bound and light. |
-| 5 | Watchlist and target constraints workflow | P1 | Preference storage exists, but the UX and recommendation impact are still too shallow. |
-| 6 | Cloud-ready cache / worker boundaries | P1 | Current market-data cache is process-local and import/recommendation work is still synchronous. |
-| 7 | Citizen/profile admin workflow | P1 | The citizen layer exists, but admin override and profile management are still minimal. |
+| 1 | Portfolio workspace phase 1 | P0-next | Users still cannot clearly read account structure, distinguish repeated account types, or navigate Portfolio from an account-first mental model. |
+| 2 | Account detail and holding detail surfaces | P0-next | Health score and recommendations now need concrete account and holding drill-down destinations. |
+| 3 | Account and holding edit workflows | P1 | Users can inspect the portfolio but still cannot repair duplicate accounts, wrong account mapping, or holding placement mistakes. |
+| 4 | Real historical performance | P1 | Portfolio and dashboard trend lines still rely on synthetic history instead of replayed portfolio events. |
+| 5 | Richer import review persistence | P1 | Import review is functional, but corrections are still too session-bound and light. |
+| 6 | Watchlist and target constraints workflow | P1 | Preference storage exists, but the UX and recommendation impact are still too shallow. |
+| 7 | Cloud-ready cache / worker boundaries | P1 | Current market-data cache is process-local and import/recommendation work is still synchronous. |
+| 8 | Citizen/profile admin workflow | P1 | The citizen layer exists, but admin override and profile management are still minimal. |
 
 ## Deprioritized / Deferred
 
@@ -118,13 +119,17 @@ Help a self-directed investor:
 | Account and holdings import foundation | Completed | 5 | 4 | 3 | 5 | Keep stable |
 | Investment preferences settings | Completed | 5 | 3 | 3 | 5 | Keep stable |
 | Unified portfolio dashboard | Completed | 5 | 3 | 2 | 5 | Keep stable |
-| Portfolio diagnostics foundation | In Progress | 5 | 4 | 3 | 5 | Deepen next |
-| Funding recommendation engine v1 | Completed | 5 | 4 | 4 | 5 | Upgrade to v2 |
+| Portfolio diagnostics foundation | Completed | 5 | 4 | 3 | 5 | Keep stable |
+| Funding recommendation engine v1 | Completed | 5 | 4 | 4 | 5 | Keep as baseline |
 | Guided allocation setup | Completed | 5 | 3 | 3 | 5 | Keep stable |
 | Chinese-mode citizen identity layer | Completed | 4 | 4 | 3 | 5 | Keep stable |
-| Recommendation engine v2 | Planned | 5 | 4 | 4 | 5 | Build next |
-| Recommendation explanation improvements | Planned | 4 | 2 | 2 | 5 | Build soon |
-| Portfolio health score and radar analysis | Planned | 4 | 3 | 3 | 4 | Build after explanation depth improves |
+| Recommendation engine v2 | Completed | 5 | 4 | 4 | 5 | Keep deepening |
+| Recommendation explanation improvements | Completed | 4 | 2 | 2 | 5 | Keep refining |
+| Portfolio health score and radar analysis | Completed | 4 | 3 | 3 | 4 | Keep refining |
+| Portfolio workspace phase 1 | Planned | 5 | 3 | 2 | 5 | Build next |
+| Account detail and holding detail surfaces | Planned | 5 | 4 | 3 | 5 | Build after phase 1 |
+| Account and holding edit workflows | Planned | 5 | 4 | 4 | 5 | Build after detail surfaces |
+| Real historical performance | Planned | 5 | 5 | 4 | 5 | Build after edit foundation |
 | Spending overview and transactions | In Progress | 3 | 3 | 2 | 3 | Keep secondary |
 | Richer import review persistence | Planned | 4 | 3 | 3 | 4 | Build soon |
 | Watchlist and target constraints workflow | Planned | 3 | 2 | 2 | 4 | Build after guided setup |
@@ -136,13 +141,14 @@ Help a self-directed investor:
 
 ## Recommended Build Order From Here
 
-1. Recommendation engine v2 foundation and scoring model
-2. Recommendation explanation model and structured rationale output
-3. Portfolio health score and radar analysis
-4. Richer import review persistence and correction state
-5. Watchlist and target constraints workflow
-6. Citizen/profile admin workflow expansion
-7. Cloud-ready cache and async job boundaries
+1. Portfolio workspace phase 1
+2. Account detail and holding detail surfaces
+3. Account and holding edit workflows
+4. Real historical performance
+5. Richer import review persistence and correction state
+6. Watchlist and target constraints workflow
+7. Citizen/profile admin workflow expansion
+8. Cloud-ready cache and async job boundaries
 
 ## Key Trade-offs
 
@@ -151,14 +157,16 @@ Help a self-directed investor:
 - Keep CSV import as the primary ingestion path until broker integrations are clearly justified.
 - Use market-data selectively and cache aggressively to protect provider quotas.
 - Add sophistication only where it materially improves trust, correctness, or repeat usage.
+- Fix account readability before adding more analytics layers.
+- Prefer account-first and holding-first drilldowns over adding more summary cards.
 
 ## Immediate Next Execution Step
 
 Turn the next milestone into engineering tickets for:
 
-1. recommendation engine v2 foundation and scoring model
-2. recommendation explanation model and structured rationale output
-3. portfolio health score and radar analysis
+1. portfolio workspace phase 1
+2. account detail and holding detail surfaces
+3. account and holding edit workflows
 
 
 

@@ -192,6 +192,26 @@ Analyze portfolio structure and identify structural risks.
 - Concentration alerts
 - 6-month performance analysis
 
+## 7.2A Portfolio Workspace
+
+Purpose:
+
+Turn Portfolio into a workspace where users can understand account structure, drill into one account or holding, and eventually repair imported portfolio structure.
+
+### Required capabilities
+
+- account-first portfolio reading
+- clear distinction between account categories and concrete account instances
+- account detail surface
+- holding detail surface
+- future account merge and holding edit workflows
+
+### Why it matters
+
+- recommendation and health-score explanations need concrete account and holding destinations
+- repeated TFSA / FHSA / RRSP accounts are otherwise ambiguous
+- users must be able to inspect and fix portfolio structure, not only import it
+
 ## 7.3 Investment Preferences
 
 Purpose:
@@ -325,6 +345,7 @@ Provide detailed portfolio analysis.
 
 ### Sections
 
+- account card list
 - Holdings detail
 - Account allocation
 - Sector exposure
@@ -332,6 +353,8 @@ Provide detailed portfolio analysis.
 - Gain/loss
 - 6-month performance
 - Future portfolio health score detail
+- future account detail page
+- future holding detail page
 
 ---
 
@@ -428,6 +451,8 @@ Planned enhancements:
 - Dedicated spending page
 - Enhanced recommendation logic
 - Chinese-mode citizen identity layer
+- Portfolio workspace phase 1
+- account detail and holding detail pages
 
 ---
 
@@ -439,6 +464,9 @@ Future advanced capabilities:
 - Rebalancing optimizer
 - Historical portfolio scoring
 - Market signal integration
+- account merge workflows
+- holding edit workflows
+- replay-based historical portfolio performance
 
 ---
 

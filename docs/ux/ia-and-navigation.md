@@ -38,16 +38,24 @@ Rules:
 ### Portfolio
 
 Purpose:
-- Provide deep analysis of the current portfolio
+- Provide a portfolio workspace that starts with account structure and supports deeper account and holding drill-down
 
 Contains:
+- account card list
 - holdings detail
 - account allocation
 - sector exposure
 - concentration risk
 - gain/loss
 - 6-month performance
-- future health-score detail
+- health-score detail
+- future account detail page
+- future holding detail page
+
+Rules:
+- repeated account types must remain distinguishable
+- account category and account instance are different concepts and should both be supported
+- account-first reading comes before raw holding-table density
 
 ### Recommendations
 
@@ -112,6 +120,7 @@ Contains:
 - Settings defines the target allocation and strategy
 - Recommendations uses those settings to generate funding guidance
 - Portfolio Health Score measures how well the current portfolio matches those settings
+- Portfolio should provide the concrete account and holding destinations that health-score and recommendation explanations point to
 - Dashboard summarizes the current state and routes the user to deeper views
 - In Chinese mode, login, registration, and Settings profile are wrapped in a Loo国 citizen identity experience
 - In English mode, authentication and profile remain standard Portfolio Manager flows
@@ -120,6 +129,7 @@ Contains:
 
 - Dashboard is overview, not analysis overload
 - Recommendations is detailed, not summary-only
+- Portfolio must feel like a workspace, not only a diagnostics page
 - Spending supports the investing workflow, not the other way around
 - Settings must make the recommendation engine feel transparent, not black-box
 
