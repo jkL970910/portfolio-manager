@@ -60,9 +60,11 @@ Rules:
 - dashboard account rows should also deep-link directly into account detail, not behave like passive summaries
 - dashboard and portfolio account rows should both use a clear whole-row hover affordance so users can tell the full row is clickable before they commit
 - holding detail is the primary drill-down destination from symbol links inside holdings tables
+- security detail is the primary drill-down destination from recommendation lead/alternative symbols, even when the user does not already hold the symbol
 - dashboard top-holding rows should also deep-link into holding detail, not stop at overview-level cards
 - health-score holding drilldowns should open concrete holding detail pages when the diagnosis is about a specific position
 - recommendation cards should deep-link into concrete holding detail when the explanation explicitly references an already-heavy existing position
+- recommendation cards should deep-link into a security detail page when the user wants to inspect a recommended symbol before buying it
 - portfolio and holding surfaces must distinguish between:
   - share of total portfolio
   - share inside the current account

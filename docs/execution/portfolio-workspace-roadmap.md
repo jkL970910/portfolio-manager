@@ -95,11 +95,13 @@ User value:
 Current delivery status:
 - account detail page is now implemented at `/portfolio/account/[accountId]`
 - holding detail page is now implemented at `/portfolio/holding/[holdingId]`
+- security detail page is now implemented at `/portfolio/security/[symbol]`
 - Portfolio account rows now expose a concrete account-detail entry point
 - holding symbols in the holdings table now deep-link into holding detail
 - dashboard top-holding rows now deep-link directly into holding detail instead of stopping at summary cards
 - health-score holding drilldowns now open concrete holding detail pages, so problem diagnosis has a direct object-level destination
 - recommendation detail cards can now deep-link into an existing heavy holding when the explanation is explicitly about not adding more to that position
+- recommendation detail cards can now also deep-link into a security detail page for the lead or alternative symbol, even before the user holds it
 - holding detail now includes:
   - security identity facts
   - quote-source facts
@@ -119,9 +121,15 @@ Scope:
 - moving holdings across accounts
 - account merge flow with preview and confirmation
 - edit audit trail
+- holding classification repair:
+  - security type
+  - exchange
+  - market sector
+  - asset class override when imported classification is wrong or unresolved
 
 User value:
 - users can clean up real-life broker/account structure without deleting and re-importing everything
+- users can fix `Unknown` or incorrect holding metadata so downstream health and recommendation logic stays trustworthy
 
 ### Phase 4: Real historical performance
 

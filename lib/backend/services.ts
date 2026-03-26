@@ -26,6 +26,7 @@ import {
 import {
   buildPortfolioAccountDetailData,
   buildPortfolioHoldingDetailData,
+  buildPortfolioSecurityDetailData,
   buildDashboardData,
   buildImportData,
   buildPortfolioData,
@@ -947,6 +948,87 @@ export async function getPortfolioHoldingDetailView(userId: string, holdingId: s
       detail: pick(user.displayLanguage, "这里看的分母是你全部投资资产。", "This uses your full invested portfolio as the denominator.")
     }
   ];
+  data.marketData = getHoldingDetailMarketDataSummary({
+    language: user.displayLanguage,
+    quote,
+    resolution
+  });
+
+  return apiSuccess({ data }, "database");
+}
+
+export async function getPortfolioSecurityDetailView(userId: string, symbol: string) {
+  const repositories = getRepositories();
+  const [user, userAccounts, userHoldings, profile] = await Promise.all([
+    repositories.users.getById(userId),
+    repositories.accounts.listByUserId(userId),
+    repositories.holdings.listByUserId(userId),
+    repositories.preferences.getByUserId(userId)
+  ]);
+
+  const display = {
+    currency: user.baseCurrency,
+    cadToDisplayRate: await getFxRate("CAD", user.baseCurrency)
+  } as const;
+
+  const data = buildPortfolioSecurityDetailData({
+    language: user.displayLanguage,
+    accounts: userAccounts,
+    holdings: userHoldings,
+    profile,
+    display,
+    symbol
+  });
+
+  if (!data) {
+    return apiSuccess({ data }, "database");
+  }
+
+  const [resolutionResponse, quoteResponse] = await Promise.all([
+    resolveSecurity(data.security.symbol).catch(() => ({
+      result: {
+        symbol: data.security.symbol,
+        name: data.security.name,
+        exchange: null,
+        micCode: null,
+        compositeFigi: null,
+        shareClassFigi: null,
+        securityType: null,
+        marketSector: null,
+        provider: "fallback" as const
+      }
+    })),
+    getSecurityQuote(data.security.symbol).catch(() => ({
+      result: {
+        symbol: data.security.symbol,
+        price: 0,
+        currency: data.security.currency,
+        timestamp: new Date().toISOString(),
+        provider: "fallback" as const,
+        delayed: true
+      }
+    }))
+  ]);
+
+  const resolution = resolutionResponse.result;
+  const quote = quoteResponse.result;
+
+  data.security.name = resolution.name ?? data.security.name;
+  data.security.securityType = formatSecurityTypeLabel(resolution.securityType);
+  data.security.exchange = resolution.exchange ?? pick(user.displayLanguage, "未知交易所", "Unknown exchange");
+  data.security.marketSector = resolution.marketSector
+    ? formatSecurityTypeLabel(resolution.marketSector)
+    : pick(user.displayLanguage, "未知市场", "Unknown market");
+  data.security.lastPrice = quote.price > 0
+    ? `${quote.currency ?? "N/A"} ${quote.price.toFixed(2)}`
+    : data.security.lastPrice;
+  data.security.quoteTimestamp = new Date(quote.timestamp).toLocaleString(user.displayLanguage === "zh" ? "zh-CN" : "en-CA", {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit"
+  });
+  data.security.freshnessVariant = quote.delayed ? "warning" : "success";
   data.marketData = getHoldingDetailMarketDataSummary({
     language: user.displayLanguage,
     quote,

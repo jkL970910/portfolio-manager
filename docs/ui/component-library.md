@@ -278,7 +278,8 @@ components/
 - File: [holding-table.tsx](E:\Projects\Portfolio%20Manager\components\portfolio\holding-table.tsx)
 - Purpose: detailed holdings table used in portfolio and account detail surfaces
 - Supports:
-  - deep-link symbol entry into holding detail
+  - deep-link entry into holding detail from the full symbol block (icon + symbol + name)
+  - hover lift / inline affordance so users can tell a holding row leads to detail
   - filtered / highlighted states
   - keeps native rail scrollbars visually hidden
   - should be reused anywhere a right-side analytical rail needs to stay visible without forcing the whole page to bottom out first
@@ -294,6 +295,14 @@ components/
 - Use when:
   - rendering a holding detail hero
   - showing a holding row or account surface without depending on external logos
+
+### `PortfolioSecurityDetailPage`
+
+- File: [page.tsx](E:\Projects\Portfolio%20Manager\app\portfolio\security\[symbol]\page.tsx)
+- Purpose: read-only security detail surface for recommended or already-held symbols
+- Rules:
+  - should work even when the user does not already own the symbol
+  - should show a reference trend, identity facts, quote-source facts, and any related holdings already inside the portfolio
 
 ## Chart Components
 
@@ -391,6 +400,7 @@ components/
   - defaults to the first three decision steps and can expand into the full trace on demand
   - keeps long Chinese copy out of narrow multi-column stacks
   - adds short plain-language trace tags plus hover/focus glossary chips for core terms such as account fit and FX friction
+  - the lead symbol and any alternative symbols should deep-link into the shared security detail page
   - can expose a direct link into an already-heavy existing holding when the recommendation is explicitly avoiding further concentration there
 - [scenario-compare-card.tsx](E:\Projects\Portfolio%20Manager\components\recommendations\scenario-compare-card.tsx)
   - re-solved scenario compare surface with change-summary text versus the current recommendation run

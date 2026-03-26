@@ -303,6 +303,54 @@ export interface PortfolioHoldingDetailData {
   };
 }
 
+export interface PortfolioSecurityDetailData {
+  displayContext: {
+    currency: "CAD" | "USD";
+    fxRateLabel: string;
+    fxNote: string;
+  };
+  security: {
+    symbol: string;
+    name: string;
+    assetClass: string;
+    sector: string;
+    currency: string;
+    securityType: string;
+    exchange: string;
+    marketSector: string;
+    lastPrice: string;
+    quoteTimestamp: string;
+    freshnessVariant: "success" | "warning" | "neutral";
+  };
+  facts: {
+    label: string;
+    value: string;
+    detail?: string;
+  }[];
+  marketData: {
+    summary: string;
+    notes: string[];
+    facts: {
+      label: string;
+      value: string;
+      detail?: string;
+    }[];
+  };
+  performance: { label: string; value: number }[];
+  summaryPoints: string[];
+  relatedHoldings: {
+    id: string;
+    symbol: string;
+    name: string;
+    account: string;
+    href: string;
+    value: string;
+    portfolioShare: string;
+    accountShare: string;
+    gainLoss: string;
+  }[];
+}
+
 export interface RecommendationsData {
   displayContext: {
     currency: "CAD" | "USD";
@@ -324,11 +372,16 @@ export interface RecommendationsData {
     amount: string;
     account: string;
     security: string;
+    securityHref?: string;
     tickers: string;
     accountFit: string;
     scoreline: string;
     gapSummary: string;
     alternatives: string[];
+    alternativeLinks?: {
+      label: string;
+      href: string;
+    }[];
     whyThis: string[];
     whyNot: string[];
     constraints: {

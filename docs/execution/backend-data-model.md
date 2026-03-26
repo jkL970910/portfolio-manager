@@ -194,6 +194,55 @@ Purpose:
 Purpose:
 - preserve auditability for holding edits and account reassignment
 
+#### holding_classification_overrides
+- id
+- user_id
+- holding_id
+- security_type nullable
+- exchange nullable
+- market_sector nullable
+- asset_class nullable
+- source default `user_override`
+- created_at
+- updated_at
+
+Purpose:
+- let users repair incomplete or wrong holding metadata without re-importing the entire account
+- improve recommendation and health-score accuracy when provider resolution returns `Unknown`
+- preserve the distinction between provider-derived classification and user-confirmed classification
+
+Planned controlled vocab lists:
+- security type:
+  - `Common Stock`
+  - `ETF`
+  - `Mutual Fund`
+  - `ADR`
+  - `Index`
+  - `Crypto`
+  - `Forex`
+  - `Unknown`
+- exchange:
+  - `TSX`
+  - `TSXV`
+  - `Cboe Canada`
+  - `NYSE`
+  - `NASDAQ`
+  - `NYSE Arca`
+  - `OTC`
+  - `LSE`
+  - `TSE`
+  - `Other / Manual`
+- asset class:
+  - `Canadian Equity`
+  - `US Equity`
+  - `International Equity`
+  - `Fixed Income`
+  - `Cash`
+
+Model note:
+- `Unknown securityType` or `Unknown exchange` mainly weakens display quality, market context, and future FX/exchange logic.
+- `Unknown assetClass` is materially more dangerous because recommendation v2 and portfolio health both rely on `assetClass` as a primary input.
+
 ### Phase 4: real historical performance
 
 Required additions:

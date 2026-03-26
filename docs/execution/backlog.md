@@ -87,7 +87,7 @@ Help a self-directed investor:
 
 | Rank | Feature | Priority | Why now |
 |---|---|---|---|
-| 1 | Account and holding edit workflows | P0-next | Users can now inspect accounts and holdings in detail, but still cannot repair duplicate accounts, wrong account mapping, or holding placement mistakes. |
+| 1 | Account and holding edit workflows | P0-next | Users can now inspect accounts and holdings in detail, but still cannot repair duplicate accounts, wrong account mapping, holding placement mistakes, or unknown security classification. |
 | 2 | Real historical performance | P1 | Portfolio and dashboard trend lines still rely on synthetic history instead of replayed portfolio events. |
 | 3 | Richer import review persistence | P1 | Import review is functional, but corrections are still too session-bound and light. |
 | 4 | Watchlist and target constraints workflow | P1 | Preference storage exists, but the UX and recommendation impact are still too shallow. |
@@ -122,7 +122,7 @@ Help a self-directed investor:
 | Portfolio health score and radar analysis | Completed | 4 | 3 | 3 | 4 | Keep refining |
 | Portfolio workspace phase 1 | Completed | 5 | 3 | 2 | 5 | Keep stable |
 | Account detail and holding detail surfaces | Completed | 5 | 4 | 3 | 5 | Keep stable |
-| Account and holding edit workflows | Planned | 5 | 4 | 4 | 5 | Build after detail surfaces |
+| Account and holding edit workflows | Planned | 5 | 4 | 4 | 5 | Build after detail surfaces, including classification repair for unknown holdings |
 | Real historical performance | Planned | 5 | 5 | 4 | 5 | Build after edit foundation |
 | Spending overview and transactions | In Progress | 3 | 3 | 2 | 3 | Keep secondary |
 | Richer import review persistence | Planned | 4 | 3 | 3 | 4 | Build soon |

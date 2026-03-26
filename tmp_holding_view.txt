@@ -1,0 +1,42 @@
+    healthScore: accountContext.healthDetail,
+    holdings: portfolio.holdings.filter((holding) => holding.accountId === accountId)
+  };
+}
+
+export function buildPortfolioHoldingDetailData(args: {
+  language: DisplayLanguage;
+  accounts: InvestmentAccount[];
+  holdings: HoldingPosition[];
+  profile: PreferenceProfile;
+  display: DisplayContext;
+  holdingId: string;
+}): PortfolioHoldingDetailData | null {
+  const { language, accounts, holdings, profile, display, holdingId } = args;
+  const portfolio = buildPortfolioData({ language, accounts, holdings, profile, display });
+  const health = buildPortfolioHealthSummary({ accounts, holdings, profile, language });
+  const rawHolding = holdings.find((holding) => holding.id === holdingId);
+  const viewHolding = portfolio.holdings.find((holding) => holding.id === holdingId);
+
+  if (!rawHolding || !viewHolding) {
+    return null;
+  }
+
+  const account = accounts.find((entry) => entry.id === rawHolding.accountId);
+  const accountCard = portfolio.accountCards.find((entry) => entry.id === rawHolding.accountId);
+  const accountTotalCad = sum(holdings.filter((holding) => holding.accountId === rawHolding.accountId).map((holding) => holding.marketValueCad));
+  const accountSharePct = accountTotalCad > 0 ? round((rawHolding.marketValueCad / accountTotalCad) * 100, 1) : 0;
+  const assetClassTargetPct = getTargetAllocation(profile).get(rawHolding.assetClass) ?? 0;
+  const assetClassCurrentPct = getCurrentAllocation(holdings).get(rawHolding.assetClass) ?? 0;
+  const holdingHealth = health.holdingDrilldown.find((item) => item.id === holdingId);
+
+  return {
+    displayContext: portfolio.displayContext,
+    holding: {
+      id: viewHolding.id,
+      symbol: viewHolding.symbol,
+      name: viewHolding.name,
+      assetClass: getAssetClassLabel(viewHolding.assetClass, language),
+      sector: getSectorLabel(viewHolding.sector, language),
+      currency: rawHolding.currency ?? "CAD",
+      accountId: rawHolding.accountId,
+      accountName: viewHolding.account,

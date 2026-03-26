@@ -1,0 +1,250 @@
+        }),
+        detail: pick(language, "????????????????", "This is the timestamp returned with the current quote.")
+      },
+      {
+        label: pick(language, "????", "Quote source"),
+        value: quote.provider === "twelve-data" ? "Twelve Data" : pick(language, "????", "Fallback"),
+        detail: pick(language, quote.delayed ? "??????????" : "??????????", quote.delayed ? "Currently treated as delayed market data." : "Currently treated as the latest available quote.")
+      },
+      {
+        label: pick(language, "??????", "Security identity source"),
+        value: resolution.provider === "openfigi" ? "OpenFIGI" : pick(language, "????", "Fallback"),
+        detail: pick(language, "??????????????????", "Name, exchange, and security type prefer this source when available.")
+      }
+    ]
+  };
+}
+
+export async function getPortfolioAccountDetailView(userId: string, accountId: string) {
+  const repositories = getRepositories();
+  const [user, userAccounts, userHoldings, profile] = await Promise.all([
+    repositories.users.getById(userId),
+    repositories.accounts.listByUserId(userId),
+    repositories.holdings.listByUserId(userId),
+    repositories.preferences.getByUserId(userId)
+  ]);
+
+  const display = {
+    currency: user.baseCurrency,
+    cadToDisplayRate: await getFxRate("CAD", user.baseCurrency)
+  } as const;
+
+  const data = buildPortfolioAccountDetailData({
+    language: user.displayLanguage,
+    accounts: userAccounts,
+    holdings: userHoldings,
+    profile,
+    display,
+    accountId
+  });
+
+  if (!data) {
+    return apiSuccess({ data }, "database");
+  }
+
+  const accountHoldings = userHoldings.filter((holding) => holding.accountId === accountId);
+  const freshestUpdatedAt = accountHoldings
+    .map((holding) => holding.updatedAt)
+    .filter((value): value is string => Boolean(value))
+    .sort()
+    .at(-1);
+  const quotedHoldingCount = accountHoldings.filter((holding) => (holding.lastPriceCad ?? 0) > 0).length;
+  const dominantAssetClass = [...new Map(
+    accountHoldings.map((holding) => [holding.assetClass, 0])
+  ).keys()]
+    .map((assetClass) => ({
+      assetClass,
+      valueCad: accountHoldings
+        .filter((holding) => holding.assetClass === assetClass)
+        .reduce((sum, holding) => sum + holding.marketValueCad, 0)
+    }))
+    .sort((left, right) => right.valueCad - left.valueCad)[0];
+  const topHolding = [...accountHoldings].sort((left, right) => right.marketValueCad - left.marketValueCad)[0];
+
+  data.facts = [
+    {
+      label: pick(user.displayLanguage, "????????", "Holdings inside this account"),
+      value: String(accountHoldings.length),
+      detail: pick(user.displayLanguage, "?????????????????????", "This counts the number of separate positions currently sitting in the account.")
+    },
+    {
+      label: pick(user.displayLanguage, "???????", "Biggest sleeve inside this account"),
+      value: dominantAssetClass
+        ? pick(user.displayLanguage, `${dominantAssetClass.assetClass} ??`, `${dominantAssetClass.assetClass} is the largest sleeve`)
+        : pick(user.displayLanguage, "?????", "Not enough data yet"),
+      detail: dominantAssetClass
+        ? pick(user.displayLanguage, "??????????????????????", "This gives a quick read on whether the account is leaning too heavily into one sleeve.")
+        : pick(user.displayLanguage, "?????????,??????????", "This becomes more useful after more holdings are imported.")
+    },
+    {
+      label: pick(user.displayLanguage, "????????", "Largest holding here"),
+      value: topHolding ? topHolding.symbol : pick(user.displayLanguage, "???", "None yet"),
+      detail: topHolding
+        ? pick(user.displayLanguage, "??????,???????????????", "Start with this position when checking whether the account is getting too concentrated.")
+        : pick(user.displayLanguage, "????????????????", "There is no identifiable lead holding in this account yet.")
+    },
+    {
+      label: pick(user.displayLanguage, "??????????", "Latest price refresh in this account"),
+      value: freshestUpdatedAt
+        ? new Date(freshestUpdatedAt).toLocaleString(user.displayLanguage === "zh" ? "zh-CN" : "en-CA", {
+          month: "short",
+          day: "numeric",
+          hour: "numeric",
+          minute: "2-digit"
+        })
+        : pick(user.displayLanguage, "?????", "Not refreshed yet"),
+      detail: pick(
+        user.displayLanguage,
+        `?????? ${quotedHoldingCount}/${accountHoldings.length} ?????????????`,
+        `${quotedHoldingCount}/${accountHoldings.length} holdings in this account already have usable prices.`
+      )
+    }
+  ];
+
+  return apiSuccess({ data }, "database");
+}
+
+export async function getPortfolioHoldingDetailView(userId: string, holdingId: string) {
+  const repositories = getRepositories();
+  const [user, userAccounts, userHoldings, profile] = await Promise.all([
+    repositories.users.getById(userId),
+    repositories.accounts.listByUserId(userId),
+    repositories.holdings.listByUserId(userId),
+    repositories.preferences.getByUserId(userId)
+  ]);
+
+  const display = {
+    currency: user.baseCurrency,
+    cadToDisplayRate: await getFxRate("CAD", user.baseCurrency)
+  } as const;
+
+  const data = buildPortfolioHoldingDetailData({
+    language: user.displayLanguage,
+    accounts: userAccounts,
+    holdings: userHoldings,
+    profile,
+    display,
+    holdingId
+  });
+
+  if (!data) {
+    return apiSuccess({ data }, "database");
+  }
+
+  const [resolutionResponse, quoteResponse] = await Promise.all([
+    resolveSecurity(data.holding.symbol).catch(() => ({
+      result: {
+        symbol: data.holding.symbol,
+        name: data.holding.name,
+        exchange: null,
+        micCode: null,
+        compositeFigi: null,
+        shareClassFigi: null,
+        securityType: null,
+        marketSector: null,
+        provider: "fallback" as const
+      }
+    })),
+    getSecurityQuote(data.holding.symbol).catch(() => ({
+      result: {
+        symbol: data.holding.symbol,
+        price: 0,
+        currency: data.holding.currency,
+        timestamp: new Date().toISOString(),
+        provider: "fallback" as const,
+        delayed: true
+      }
+    }))
+  ]);
+
+  const resolution = resolutionResponse.result;
+  const quote = quoteResponse.result;
+
+  data.holding.securityType = formatSecurityTypeLabel(resolution.securityType);
+  data.holding.exchange = resolution.exchange ?? pick(user.displayLanguage, "?????", "Unknown exchange");
+  data.holding.marketSector = resolution.marketSector
+    ? formatSecurityTypeLabel(resolution.marketSector)
+    : pick(user.displayLanguage, "????", "Unknown market");
+  data.facts = [
+    {
+      label: pick(user.displayLanguage, "??????", "Security type"),
+      value: data.holding.securityType,
+      detail: pick(user.displayLanguage, "????? ETF???????,????????????", "Identify whether this is an ETF, stock, or something else before deciding whether it still fits.")
+    },
+    {
+      label: pick(user.displayLanguage, "???????", "Primary exchange"),
+      value: data.holding.exchange,
+      detail: pick(user.displayLanguage, "???????????????????", "This helps with market context and any future FX implications.")
+    },
+    {
+      label: pick(user.displayLanguage, "??????", "Position inside this account"),
+      value: data.holding.accountShare,
+      detail: pick(user.displayLanguage, "????????????,???????", "This uses the current account as the denominator, not the whole portfolio.")
+    },
+    {
+      label: pick(user.displayLanguage, "????????", "Position inside the full portfolio"),
+      value: data.holding.portfolioShare,
+      detail: pick(user.displayLanguage, "???????????????", "This uses your full invested portfolio as the denominator.")
+    }
+  ];
+  data.marketData = getHoldingDetailMarketDataSummary({
+    language: user.displayLanguage,
+    quote,
+    resolution
+  });
+
+  return apiSuccess({ data }, "database");
+}
+
+export async function getRecommendationView(userId: string) {
+  const repositories = getRepositories();
+  const [user, profile, accounts, holdings] = await Promise.all([
+    repositories.users.getById(userId),
+    repositories.preferences.getByUserId(userId),
+    repositories.accounts.listByUserId(userId),
+    repositories.holdings.listByUserId(userId)
+  ]);
+  let latestRun: RecommendationRun | null = null;
+  try {
+    latestRun = await repositories.recommendations.getLatestByUserId(userId);
+  } catch {
+    latestRun = null;
+  }
+
+  const scenarioAmounts = latestRun && latestRun.contributionAmountCad > 0
+    ? [...new Set([
+      Math.max(500, Math.round((latestRun.contributionAmountCad * 0.5) / 500) * 500),
+      latestRun.contributionAmountCad,
+      Math.max(1000, Math.round((latestRun.contributionAmountCad * 2) / 500) * 500)
+    ])]
+    : [];
+
+  const scenarioRuns = latestRun && accounts.length > 0 && holdings.length > 0
+    ? scenarioAmounts.map((amountCad, index) => {
+      const scenarioRecommendation = buildRecommendationV2({
+        accounts,
+        holdings,
+        profile,
+        contributionAmountCad: amountCad,
+        language: user.displayLanguage
+      });
+
+      return {
+        id: `scenario-${amountCad}-${index}`,
+        userId,
+        contributionAmountCad: amountCad,
+        createdAt: latestRun.createdAt,
+        engineVersion: scenarioRecommendation.engineVersion,
+        objective: scenarioRecommendation.objective,
+        confidenceScore: scenarioRecommendation.confidenceScore,
+        assumptions: scenarioRecommendation.assumptions,
+        notes: scenarioRecommendation.notes,
+        items: scenarioRecommendation.items
+      } satisfies RecommendationRun;
+    })
+    : [];
+
+  const display = {
+    currency: user.baseCurrency,
+    cadToDisplayRate: await getFxRate("CAD", user.baseCurrency)
+  } as const;

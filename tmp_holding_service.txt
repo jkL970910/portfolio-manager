@@ -1,0 +1,110 @@
+    }
+  ];
+
+  return apiSuccess({ data }, "database");
+}
+
+export async function getPortfolioHoldingDetailView(userId: string, holdingId: string) {
+  const repositories = getRepositories();
+  const [user, userAccounts, userHoldings, profile] = await Promise.all([
+    repositories.users.getById(userId),
+    repositories.accounts.listByUserId(userId),
+    repositories.holdings.listByUserId(userId),
+    repositories.preferences.getByUserId(userId)
+  ]);
+
+  const display = {
+    currency: user.baseCurrency,
+    cadToDisplayRate: await getFxRate("CAD", user.baseCurrency)
+  } as const;
+
+  const data = buildPortfolioHoldingDetailData({
+    language: user.displayLanguage,
+    accounts: userAccounts,
+    holdings: userHoldings,
+    profile,
+    display,
+    holdingId
+  });
+
+  if (!data) {
+    return apiSuccess({ data }, "database");
+  }
+
+  const [resolutionResponse, quoteResponse] = await Promise.all([
+    resolveSecurity(data.holding.symbol).catch(() => ({
+      result: {
+        symbol: data.holding.symbol,
+        name: data.holding.name,
+        exchange: null,
+        micCode: null,
+        compositeFigi: null,
+        shareClassFigi: null,
+        securityType: null,
+        marketSector: null,
+        provider: "fallback" as const
+      }
+    })),
+    getSecurityQuote(data.holding.symbol).catch(() => ({
+      result: {
+        symbol: data.holding.symbol,
+        price: 0,
+        currency: data.holding.currency,
+        timestamp: new Date().toISOString(),
+        provider: "fallback" as const,
+        delayed: true
+      }
+    }))
+  ]);
+
+  const resolution = resolutionResponse.result;
+  const quote = quoteResponse.result;
+
+  data.holding.securityType = formatSecurityTypeLabel(resolution.securityType);
+  data.holding.exchange = resolution.exchange ?? pick(user.displayLanguage, "?????", "Unknown exchange");
+  data.holding.marketSector = resolution.marketSector
+    ? formatSecurityTypeLabel(resolution.marketSector)
+    : pick(user.displayLanguage, "????", "Unknown market");
+  data.facts = [
+    {
+      label: pick(user.displayLanguage, "??????", "Security type"),
+      value: data.holding.securityType,
+      detail: pick(user.displayLanguage, "????? ETF???????,????????????", "Identify whether this is an ETF, stock, or something else before deciding whether it still fits.")
+    },
+    {
+      label: pick(user.displayLanguage, "???????", "Primary exchange"),
+      value: data.holding.exchange,
+      detail: pick(user.displayLanguage, "???????????????????", "This helps with market context and any future FX implications.")
+    },
+    {
+      label: pick(user.displayLanguage, "??????", "Position inside this account"),
+      value: data.holding.accountShare,
+      detail: pick(user.displayLanguage, "????????????,???????", "This uses the current account as the denominator, not the whole portfolio.")
+    },
+    {
+      label: pick(user.displayLanguage, "????????", "Position inside the full portfolio"),
+      value: data.holding.portfolioShare,
+      detail: pick(user.displayLanguage, "???????????????", "This uses your full invested portfolio as the denominator.")
+    }
+  ];
+  data.marketData = getHoldingDetailMarketDataSummary({
+    language: user.displayLanguage,
+    quote,
+    resolution
+  });
+
+  return apiSuccess({ data }, "database");
+}
+
+export async function getRecommendationView(userId: string) {
+  const repositories = getRepositories();
+  const [user, profile, accounts, holdings] = await Promise.all([
+    repositories.users.getById(userId),
+    repositories.preferences.getByUserId(userId),
+    repositories.accounts.listByUserId(userId),
+    repositories.holdings.listByUserId(userId)
+  ]);
+  let latestRun: RecommendationRun | null = null;
+  try {
+    latestRun = await repositories.recommendations.getLatestByUserId(userId);
+  } catch {

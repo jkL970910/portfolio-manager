@@ -3,6 +3,7 @@
   ImportData,
   PortfolioAccountDetailData,
   PortfolioHoldingDetailData,
+  PortfolioSecurityDetailData,
   PortfolioData,
   RecommendationsData,
   SettingsData,
@@ -652,7 +653,7 @@ function getManualGroups(profile: PreferenceProfile, language: DisplayLanguage):
       description: profile.taxAwarePlacement
         ? pick(language, "已经打开。系统会更认真地判断钱放在哪类账户里更顺手。", "Tax-aware placement is enabled. Advanced province and marginal bracket fields can stay collapsed by default.")
         : pick(language, "现在关闭。系统会更直接地先补配置缺口。", "Tax-aware placement is disabled. The engine will favor simpler account-fit rules."),
-      badge: pick(language, "??", "Advanced")
+      badge: pick(language, "高级", "Advanced")
     }
   ];
 }
@@ -751,7 +752,7 @@ export function buildDashboardData(args: {
         id: holding.id,
         symbol: holding.symbol,
         name: holding.name,
-        account: instanceLabelMap.get(holding.accountId) ?? pick(language, "??", "Account"),
+        account: instanceLabelMap.get(holding.accountId) ?? pick(language, "账户", "Account"),
         href: `/portfolio/holding/${holding.id}`,
         lastPrice: formatHoldingPrice(holding.lastPriceAmount, holding.currency, holding.lastPriceCad, display, language),
         lastUpdated: formatHoldingLastUpdated(holding.updatedAt, language),
@@ -812,7 +813,7 @@ export function buildPortfolioData(args: {
   }));
   const sectorRemainder = round(100 - sum(sectorExposure.map((item) => item.value)), 0);
   if (sectorRemainder > 0) {
-    sectorExposure.push({ name: pick(language, "??", "Other"), value: sectorRemainder });
+    sectorExposure.push({ name: pick(language, "其他", "Other"), value: sectorRemainder });
   }
 
   const largestHolding = [...holdings].sort((left, right) => right.weightPct - left.weightPct)[0];
@@ -1130,6 +1131,147 @@ export function buildPortfolioHoldingDetailData(args: {
     }
   };
 }
+
+export function buildPortfolioSecurityDetailData(args: {
+  language: DisplayLanguage;
+  accounts: InvestmentAccount[];
+  holdings: HoldingPosition[];
+  profile: PreferenceProfile;
+  display: DisplayContext;
+  symbol: string;
+}): PortfolioSecurityDetailData | null {
+  const { language, accounts, holdings, profile, display, symbol } = args;
+  const normalizedSymbol = symbol.trim().toUpperCase();
+  const portfolio = buildPortfolioData({ language, accounts, holdings, profile, display });
+  const matchingHoldings = holdings.filter((holding) => holding.symbol.trim().toUpperCase() === normalizedSymbol);
+  const matchingViewHoldings = portfolio.holdings.filter((holding) => holding.symbol.trim().toUpperCase() === normalizedSymbol);
+  const referenceHolding = matchingHoldings[0];
+  const referenceViewHolding = matchingViewHoldings[0];
+
+  const totalValueCad = sum(matchingHoldings.map((holding) => holding.marketValueCad));
+  const totalPortfolioCad = sum(holdings.map((holding) => holding.marketValueCad));
+  const accountCount = new Set(matchingHoldings.map((holding) => holding.accountId)).size;
+  const latestUpdatedAt = matchingHoldings
+    .map((holding) => holding.updatedAt)
+    .filter((value): value is string => Boolean(value))
+    .sort()
+    .at(-1);
+  const assetClassTargetPct = referenceHolding
+    ? getTargetAllocation(profile).get(referenceHolding.assetClass) ?? 0
+    : 0;
+  const assetClassCurrentPct = referenceHolding
+    ? getCurrentAllocation(holdings).get(referenceHolding.assetClass) ?? 0
+    : 0;
+
+  return {
+    displayContext: portfolio.displayContext,
+    security: {
+      symbol: normalizedSymbol,
+      name: referenceHolding?.name ?? normalizedSymbol,
+      assetClass: referenceHolding
+        ? getAssetClassLabel(referenceHolding.assetClass, language)
+        : pick(language, "未知资产类别", "Unknown sleeve"),
+      sector: referenceHolding
+        ? getSectorLabel(referenceHolding.sector, language)
+        : pick(language, "未知行业", "Unknown sector"),
+      currency: referenceHolding?.currency ?? "CAD",
+      securityType: pick(language, "正在识别", "Resolving"),
+      exchange: pick(language, "正在识别", "Resolving"),
+      marketSector: pick(language, "正在识别", "Resolving"),
+      lastPrice: referenceViewHolding?.lastPrice ?? pick(language, "还没拿到价格", "No quote yet"),
+      quoteTimestamp: referenceViewHolding?.lastUpdated ?? pick(language, "还没刷新过", "Not refreshed yet"),
+      freshnessVariant: referenceViewHolding?.freshnessVariant ?? "neutral"
+    },
+    facts: [
+      {
+        label: pick(language, "现在大约值多少", "Estimated current value"),
+        value: totalValueCad > 0 ? formatDisplayCurrency(totalValueCad, display) : pick(language, "你现在还没持有它", "You do not hold it yet"),
+        detail: totalValueCad > 0
+          ? pick(language, "这里会把你账户里同一代码的仓位合在一起看。", "This combines all of your positions in the same symbol.")
+          : pick(language, "这是推荐页里的候选标的详情，还没在你的账户里形成持仓。", "This is a recommendation candidate and is not yet a live position in your accounts.")
+      },
+      {
+        label: pick(language, "占整个组合多少", "Share of total portfolio"),
+        value: totalPortfolioCad > 0 ? formatCompactPercent((totalValueCad / totalPortfolioCad) * 100, 1) : "0%",
+        detail: totalValueCad > 0
+          ? pick(language, "分母是你全部投资资产。", "This uses your full invested portfolio as the denominator.")
+          : pick(language, "因为你现在还没持有它，所以这里会先是 0%。", "Because you do not hold it yet, this starts at 0%.")
+      },
+      {
+        label: pick(language, "现在分散在几个账户", "How many accounts hold it"),
+        value: String(accountCount),
+        detail: accountCount > 0
+          ? pick(language, "这样能看出这支标的是集中放在一个账户，还是分散在多个账户里。", "This shows whether the symbol sits in one account or is spread across several.")
+          : pick(language, "还没有任何账户持有它。", "No account holds it yet.")
+      },
+      {
+        label: pick(language, "最近一次价格时间", "Latest quote timestamp"),
+        value: latestUpdatedAt
+          ? new Date(latestUpdatedAt).toLocaleString(language === "zh" ? "zh-CN" : "en-CA", {
+              month: "short",
+              day: "numeric",
+              hour: "numeric",
+              minute: "2-digit"
+            })
+          : pick(language, "还没刷新过", "Not refreshed yet"),
+        detail: pick(language, "这是你当前缓存里最近一次成功拿到这支标的价格的时间。", "This is the latest successful cached quote timestamp for this symbol.")
+      }
+    ],
+    marketData: {
+      summary: pick(
+        language,
+        "这里会把这支标的是什么、主要在哪个市场、最近大概是什么价格整理出来，方便你决定要不要真的按推荐去买。",
+        "This page pulls together what the security is, where it mainly trades, and roughly where its latest price sits before you decide whether to act."
+      ),
+      notes: [
+        pick(language, "如果你已经持有这支标的，下面也会列出它在不同账户里的分布。", "If you already hold this symbol, the page also shows how it is distributed across your accounts."),
+        pick(language, "6 个月走势目前还是参考曲线，不是完整历史回放。", "The 6-month trend is still a reference curve, not a full replayed history.")
+      ],
+      facts: []
+    },
+    performance: getSixMonthSeries(totalValueCad || 1, profile, getMonthLabels(language)).map((point, index, series) => ({
+      label: point.label,
+      value: round((point.value / (series[0]?.value || 1)) * 100, 1)
+    })),
+    summaryPoints: [
+      totalValueCad > 0
+        ? pick(
+            language,
+            `${normalizedSymbol} 现在一共大约占你整个组合 ${totalPortfolioCad > 0 ? formatCompactPercent((totalValueCad / totalPortfolioCad) * 100, 1) : "0%"}。`,
+            `${normalizedSymbol} currently makes up about ${totalPortfolioCad > 0 ? formatCompactPercent((totalValueCad / totalPortfolioCad) * 100, 1) : "0%"} of the full portfolio.`
+          )
+        : pick(language, `${normalizedSymbol} 现在还是推荐候选，还没变成你组合里的真实持仓。`, `${normalizedSymbol} is currently a recommendation candidate and not yet a live position in your portfolio.`),
+      referenceHolding
+        ? pick(
+            language,
+            `它归在 ${getAssetClassLabel(referenceHolding.assetClass, language)}。你给这类资产设的目标大约是 ${assetClassTargetPct.toFixed(1)}%，现在实际大约是 ${assetClassCurrentPct.toFixed(1)}%。`,
+            `It sits inside ${getAssetClassLabel(referenceHolding.assetClass, language)}. Your target for this sleeve is about ${assetClassTargetPct.toFixed(1)}%, and the current portfolio mix is about ${assetClassCurrentPct.toFixed(1)}%.`
+          )
+        : pick(language, "等你真正持有它以后，这里会告诉你它在目标配置里属于哪一类资产。", "Once you actually hold it, this page will tell you which sleeve it belongs to in your target mix."),
+      accountCount > 1
+        ? pick(language, "这支标的现在分散在多个账户里，判断它是否过重要一起看。", "This symbol is spread across multiple accounts, so concentration should be judged across all of them together.")
+        : accountCount === 1
+          ? pick(language, "这支标的目前只出现在一个账户里，看起来会更直接。", "This symbol currently sits in one account, which makes it easier to inspect.")
+          : pick(language, "你现在还没持有它，所以这页更像是一张候选标的说明卡。", "You do not hold it yet, so this page works more like a candidate-security brief.")
+    ],
+    relatedHoldings: matchingViewHoldings.map((holding) => {
+      const rawHolding = matchingHoldings.find((entry) => entry.id === holding.id);
+      return {
+        id: holding.id,
+        symbol: holding.symbol,
+        name: holding.name,
+        account: holding.account,
+        href: holding.href,
+        value: rawHolding
+          ? formatMoneyForDisplay(rawHolding.marketValueAmount, rawHolding.currency ?? "CAD", rawHolding.marketValueCad, display)
+          : pick(language, "暂时未知", "Unknown"),
+        portfolioShare: holding.portfolioShare,
+        accountShare: holding.accountShare,
+        gainLoss: holding.gainLoss
+      };
+    })
+  };
+}
 export function buildRecommendationsData(args: {
   language: DisplayLanguage;
   profile: PreferenceProfile;
@@ -1295,6 +1437,7 @@ export function buildRecommendationsData(args: {
         amount: formatDisplayCurrency(item.amountCad, display),
         account: getAccountTypeLabel(item.targetAccountType, language),
         security: leadSecurity,
+        securityHref: item.securitySymbol ? `/portfolio/security/${encodeURIComponent(item.securitySymbol)}` : undefined,
         tickers: item.tickerOptions.join(", "),
         accountFit: item.accountFitScore != null
           ? pick(
@@ -1318,6 +1461,10 @@ export function buildRecommendationsData(args: {
         alternatives: alternatives.length > 0
           ? alternatives
           : [pick(language, "现在没有更像样的备选标的。", "No stronger alternative security is available right now.")],
+        alternativeLinks: alternatives.map((symbol) => ({
+          label: symbol,
+          href: `/portfolio/security/${encodeURIComponent(symbol)}`
+        })),
         whyThis: [
           item.rationale
             ? pick(
@@ -1383,7 +1530,7 @@ export function buildRecommendationsData(args: {
             variant: profile.taxAwarePlacement ? "success" : "neutral"
           },
           {
-            label: pick(language, "FX ??", "FX friction"),
+            label: pick(language, "FX 成本", "FX friction"),
             detail: (item.fxFrictionPenaltyBps ?? 0) > 0
               ? pick(language, `这条路大约会吃掉 ${item.fxFrictionPenaltyBps} bps 的换汇成本。`, `This path absorbs about ${item.fxFrictionPenaltyBps} bps of FX cost.`)
               : pick(language, "这条路基本避开了明显的换汇成本。", "This path avoids material FX friction."),
@@ -1563,7 +1710,7 @@ export function buildImportData(args: {
       },
       {
         label: pick(language, "导入方式", "Import method"),
-        title: pick(language, "?? CSV ??", "CSV upload first"),
+        title: pick(language, "先用 CSV 导入", "CSV upload first"),
         description: pick(language, "先走 CSV，能先把流程跑通，也方便后面再补 broker 直连。", "Keeps MVP friction low while we define stable broker integrations.")
       },
       {
@@ -1632,6 +1779,10 @@ export function buildSettingsData(profile: PreferenceProfile, language: DisplayL
     manualGroups: getManualGroups(profile, language)
   };
 }
+
+
+
+
 
 
 

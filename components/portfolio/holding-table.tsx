@@ -1,4 +1,5 @@
-﻿import Link from "next/link";
+import Link from "next/link";
+import { ArrowUpRight } from "lucide-react";
 import { SecurityMark } from "@/components/portfolio/security-mark";
 import { Badge } from "@/components/ui/badge";
 import { EmptyStatePanel } from "@/components/ui/empty-state-panel";
@@ -53,24 +54,44 @@ export function HoldingTable({
                 : "border-t border-white/45"}
             >
               <td className="py-4 font-medium text-[color:var(--foreground)]">
-                <div className="flex items-start gap-3">
-                  <SecurityMark symbol={holding.symbol} assetClass={holding.assetClass} />
-                  <div className="flex flex-col gap-2">
-                    {holding.href ? (
-                      <Link href={holding.href} className="font-semibold text-[color:var(--foreground)] transition hover:text-[color:var(--secondary)]">
-                        {holding.symbol}
-                      </Link>
-                    ) : (
+                {holding.href ? (
+                  <Link
+                    href={holding.href}
+                    className="group flex items-start gap-3 rounded-[18px] border border-transparent px-2 py-2 transition-[background-color,border-color,box-shadow,color] duration-200 hover:border-white/60 hover:bg-white/42 hover:shadow-[0_10px_22px_rgba(110,103,130,0.06)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--ring)]"
+                  >
+                    <SecurityMark symbol={holding.symbol} assetClass={holding.assetClass} />
+                    <div className="flex flex-col gap-2">
+                      <div className="flex items-center gap-2">
+                        <span className="font-semibold text-[color:var(--foreground)] transition group-hover:text-[color:var(--secondary)]">
+                          {holding.symbol}
+                        </span>
+                          <ArrowUpRight className="h-3.5 w-3.5 text-[color:var(--muted-foreground)] transition-transform duration-200 group-hover:-translate-y-px group-hover:translate-x-px" />
+                        <span className="text-[11px] font-medium text-[color:var(--muted-foreground)]">
+                          {pick(language, "点开详情", "Open detail")}
+                        </span>
+                      </div>
+                      <span className="text-xs font-medium text-[color:var(--muted-foreground)]">{holding.name}</span>
+                      {holding.highlightLabel ? (
+                        <span className="inline-flex w-fit rounded-full border border-[rgba(232,121,249,0.22)] bg-[rgba(255,255,255,0.82)] px-2.5 py-1 text-xs font-medium text-[color:var(--foreground)]">
+                          {holding.highlightLabel}
+                        </span>
+                      ) : null}
+                    </div>
+                  </Link>
+                ) : (
+                  <div className="flex items-start gap-3">
+                    <SecurityMark symbol={holding.symbol} assetClass={holding.assetClass} />
+                    <div className="flex flex-col gap-2">
                       <span>{holding.symbol}</span>
-                    )}
-                    <span className="text-xs font-medium text-[color:var(--muted-foreground)]">{holding.name}</span>
-                    {holding.highlightLabel ? (
-                      <span className="inline-flex w-fit rounded-full border border-[rgba(232,121,249,0.22)] bg-[rgba(255,255,255,0.82)] px-2.5 py-1 text-xs font-medium text-[color:var(--foreground)]">
-                        {holding.highlightLabel}
-                      </span>
-                    ) : null}
+                      <span className="text-xs font-medium text-[color:var(--muted-foreground)]">{holding.name}</span>
+                      {holding.highlightLabel ? (
+                        <span className="inline-flex w-fit rounded-full border border-[rgba(232,121,249,0.22)] bg-[rgba(255,255,255,0.82)] px-2.5 py-1 text-xs font-medium text-[color:var(--foreground)]">
+                          {holding.highlightLabel}
+                        </span>
+                      ) : null}
+                    </div>
                   </div>
-                </div>
+                )}
               </td>
               <td className="py-4 text-[color:var(--muted-foreground)]">{holding.account}</td>
               <td className="py-4">{holding.lastPrice}</td>

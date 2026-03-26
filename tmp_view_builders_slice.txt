@@ -1,0 +1,200 @@
+          `${getAssetClassLabel(mainGap[0], language)} is the clearest allocation gap versus the configured target.`
+        )
+        : pick(language, "????????,????????????", "Set a target mix first so the system can see which sleeve is missing the most."),
+      largestHolding
+        ? pick(language, `${largestHolding.symbol} ?????????,??????????`, `${largestHolding.symbol} is the largest position and drives the current concentration score.`)
+        : pick(language, "???????,?????????????", "Import holdings first so the system can tell whether a few positions are getting too heavy."),
+      accounts.some((account) => account.type === "Taxable")
+        ? pick(language, "???????????,??????????????????", "You are already using taxable accounts, so where new money goes matters more over the long run.")
+        : pick(language, "????????????,?????????????", "Most of the money is still inside sheltered accounts, so account placement is still fairly straightforward.")
+    ]
+  };
+}
+
+
+export function buildPortfolioAccountDetailData(args: {
+  language: DisplayLanguage;
+  accounts: InvestmentAccount[];
+  holdings: HoldingPosition[];
+  profile: PreferenceProfile;
+  display: DisplayContext;
+  accountId: string;
+}): PortfolioAccountDetailData | null {
+  const { language, accounts, holdings, profile, display, accountId } = args;
+  const portfolio = buildPortfolioData({ language, accounts, holdings, profile, display });
+  const accountCard = portfolio.accountCards.find((account) => account.id === accountId);
+  const accountContext = portfolio.accountContexts.find((account) => account.id === accountId);
+
+  if (!accountCard || !accountContext) {
+    return null;
+  }
+
+  const rawHoldings = holdings.filter((holding) => holding.accountId === accountId);
+  const accountTotalCad = sum(rawHoldings.map((holding) => holding.marketValueCad));
+  const allocation = [...groupBy(rawHoldings, (holding) => holding.assetClass, (holding) => holding.marketValueCad).entries()]
+    .sort((left, right) => right[1] - left[1])
+    .map(([assetClass, value]) => ({
+      name: getAssetClassLabel(assetClass, language),
+      value: accountTotalCad > 0 ? round((value / accountTotalCad) * 100, 0) : 0
+    }));
+
+  return {
+    displayContext: portfolio.displayContext,
+    account: {
+      id: accountCard.id,
+      name: accountCard.name,
+      typeId: accountCard.typeId,
+      typeLabel: accountCard.typeLabel,
+      institution: accountCard.institution,
+      currency: accountCard.currency,
+      value: accountCard.value,
+      portfolioShare: accountCard.share,
+      room: accountCard.room,
+      topHoldings: accountCard.topHoldings,
+      summaryPoints: accountContext.summaryPoints
+    },
+    facts: [],
+    performance: accountContext.performance,
+    allocation,
+    healthScore: accountContext.healthDetail,
+    holdings: portfolio.holdings.filter((holding) => holding.accountId === accountId)
+  };
+}
+
+export function buildPortfolioHoldingDetailData(args: {
+  language: DisplayLanguage;
+  accounts: InvestmentAccount[];
+  holdings: HoldingPosition[];
+  profile: PreferenceProfile;
+  display: DisplayContext;
+  holdingId: string;
+}): PortfolioHoldingDetailData | null {
+  const { language, accounts, holdings, profile, display, holdingId } = args;
+  const portfolio = buildPortfolioData({ language, accounts, holdings, profile, display });
+  const health = buildPortfolioHealthSummary({ accounts, holdings, profile, language });
+  const rawHolding = holdings.find((holding) => holding.id === holdingId);
+  const viewHolding = portfolio.holdings.find((holding) => holding.id === holdingId);
+
+  if (!rawHolding || !viewHolding) {
+    return null;
+  }
+
+  const account = accounts.find((entry) => entry.id === rawHolding.accountId);
+  const accountCard = portfolio.accountCards.find((entry) => entry.id === rawHolding.accountId);
+  const accountTotalCad = sum(holdings.filter((holding) => holding.accountId === rawHolding.accountId).map((holding) => holding.marketValueCad));
+  const accountSharePct = accountTotalCad > 0 ? round((rawHolding.marketValueCad / accountTotalCad) * 100, 1) : 0;
+  const assetClassTargetPct = getTargetAllocation(profile).get(rawHolding.assetClass) ?? 0;
+  const assetClassCurrentPct = getCurrentAllocation(holdings).get(rawHolding.assetClass) ?? 0;
+  const holdingHealth = health.holdingDrilldown.find((item) => item.id === holdingId);
+
+  return {
+    displayContext: portfolio.displayContext,
+    holding: {
+      id: viewHolding.id,
+      symbol: viewHolding.symbol,
+      name: viewHolding.name,
+      assetClass: getAssetClassLabel(viewHolding.assetClass, language),
+      sector: getSectorLabel(viewHolding.sector, language),
+      currency: rawHolding.currency ?? "CAD",
+      accountId: rawHolding.accountId,
+      accountName: viewHolding.account,
+      accountType: account ? getAccountTypeLabel(account.type, language) : pick(language, "??", "Account"),
+      accountHref: `/portfolio/account/${rawHolding.accountId}`,
+      value: formatMoneyForDisplay(rawHolding.marketValueAmount, rawHolding.currency ?? "CAD", rawHolding.marketValueCad, display),
+      lastPrice: viewHolding.lastPrice,
+      lastUpdated: viewHolding.lastUpdated,
+      freshnessVariant: viewHolding.freshnessVariant,
+      portfolioShare: viewHolding.portfolioShare,
+      accountShare: viewHolding.accountShare,
+      gainLoss: viewHolding.gainLoss,
+      securityType: pick(language, "????", "Resolving"),
+      exchange: pick(language, "????", "Resolving"),
+      marketSector: pick(language, "????", "Resolving")
+    },
+    facts: [],
+    marketData: {
+      summary: pick(language, "???????????????????,????????????????", "This page tries to pull a fresh quote and security identity so you can confirm what this is and what it roughly looks like right now."),
+      notes: [
+        pick(language, "???????????,????? 6 ?????????", "Full historical replay is not wired in yet, so treat the 6-month chart as reference context.")
+      ],
+      facts: []
+    },
+    performance: getSixMonthSeries(rawHolding.marketValueCad || 1, profile, getMonthLabels(language)).map((point, index, series) => ({
+      label: point.label,
+      value: round((point.value / (series[0]?.value || 1)) * 100, 1)
+    })),
+    portfolioRole: [
+      pick(
+        language,
+        `${rawHolding.symbol} ?????????? ${rawHolding.weightPct.toFixed(1)}%,? ${accountCard?.name ?? pick(language, "????", "the current account")} ???? ${accountSharePct.toFixed(1)}%?`,
+        `${rawHolding.symbol} currently represents about ${rawHolding.weightPct.toFixed(1)}% of the full portfolio and about ${accountSharePct.toFixed(1)}% of ${accountCard?.name ?? "the current account"}.`
+      ),
+      pick(
+        language,
+        `??? ${getAssetClassLabel(rawHolding.assetClass, language)}?????????????? ${assetClassTargetPct.toFixed(1)}%,??????? ${assetClassCurrentPct.toFixed(1)}%?`,
+        `It belongs to ${getAssetClassLabel(rawHolding.assetClass, language)}. Your target for this sleeve is about ${assetClassTargetPct.toFixed(1)}%, and the current mix is about ${assetClassCurrentPct.toFixed(1)}%.`
+      ),
+      viewHolding.signal
+    ],
+    healthSummary: {
+      score: holdingHealth?.score ?? 68,
+      status: holdingHealth?.status ?? pick(language, "??", "Usable"),
+      summary: holdingHealth?.summary ?? pick(language, "????????????????????", "The system does not currently treat this holding as the most urgent issue."),
+      drivers: holdingHealth?.drivers ?? [
+        pick(language, "??????????????????", "Start with how large this position is in the full portfolio and inside its account."),
+        pick(language, "?????????,?????????????????????", "Then check which sleeve it belongs to and whether that sleeve is already over- or under-filled.")
+      ],
+      actions: holdingHealth?.actions ?? [
+        pick(language, "??????????,??????,??????????????", "If nothing stands out yet, leave it alone for now and review it again with the next contribution.")
+      ]
+    }
+  };
+}
+export function buildRecommendationsData(args: {
+  language: DisplayLanguage;
+  profile: PreferenceProfile;
+  accounts: InvestmentAccount[];
+  latestRun: RecommendationRun | null;
+  scenarioRuns?: RecommendationRun[];
+  display: DisplayContext;
+}): RecommendationsData {
+  const { language, profile, accounts, latestRun, scenarioRuns = [], display } = args;
+  const equityTarget = sum(profile.targetAllocation
+    .filter((target) => target.assetClass !== "Fixed Income" && target.assetClass !== "Cash")
+    .map((target) => target.targetPct));
+  const fixedIncomeTarget = profile.targetAllocation.find((target) => target.assetClass === "Fixed Income")?.targetPct ?? 0;
+  const cashTarget = profile.targetAllocation.find((target) => target.assetClass === "Cash")?.targetPct ?? 0;
+  const baselineItems = latestRun?.items ?? [];
+  const effectiveAccountPriorityOrder = getEffectiveAccountPriorityOrder(accounts, profile.accountFundingPriority);
+  const exhaustedPriorityTypes = getExhaustedPriorityTypes(accounts, profile.accountFundingPriority);
+
+  const buildScenarioDiffs = (scenarioRun: RecommendationRun, scenarioIndex: number) => {
+    if (baselineItems.length === 0) {
+      return [
+        pick(
+          language,
+          "???????????,??????????????????",
+          "There is no saved baseline recommendation yet, so this card only shows the standalone result for this amount."
+        )
+      ];
+    }
+
+    if (scenarioRun.contributionAmountCad === latestRun?.contributionAmountCad) {
+      return [
+        pick(
+          language,
+          "????????????????,????????????",
+          "This is the current recommendation shown on the page, and the other amounts are compared against it."
+        )
+      ];
+    }
+
+    const diffs: string[] = [];
+    const baselineTop = baselineItems[0];
+    const scenarioTop = scenarioRun.items[0];
+
+    if (baselineTop && scenarioTop && (baselineTop.assetClass !== scenarioTop.assetClass || baselineTop.targetAccountType !== scenarioTop.targetAccountType)) {
+      diffs.push(
+        pick(
+          language,
+          `????? ${getAssetClassLabel(baselineTop.assetClass, language)} -> ${getAccountTypeLabel(baselineTop.targetAccountType, language)},??? ${getAssetClassLabel(scenarioTop.assetClass, language)} -> ${getAccountTypeLabel(scenarioTop.targetAccountType, language)}?`,

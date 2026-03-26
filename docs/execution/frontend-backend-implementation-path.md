@@ -96,14 +96,17 @@ Next build focus:
 Current state:
 - account detail page implemented
 - holding detail page implemented
+- security detail page implemented for recommended and already-held symbols
 - dashboard top-holding rows now deep-link into holding detail
 - health-score holding drilldowns now deep-link into holding detail
 - recommendation detail can now open a referenced already-heavy holding directly
+- recommendation detail can now also open a security detail page for the recommended lead or alternative symbol
 - next gap is no longer inspection, but account/holding edit and repair workflows
 
 3. Add repair workflows
    - account metadata edit
    - holding edit
+   - holding classification repair for unknown or wrong security metadata
    - merge duplicate accounts with explicit preview and confirmation
 
 4. Replace synthetic trend lines only after the structural model is ready

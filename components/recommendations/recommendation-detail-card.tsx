@@ -1,7 +1,9 @@
 'use client';
 
+import Link from 'next/link';
 import { useMemo, useState } from 'react';
-import { ChevronDown, ChevronUp, Info } from 'lucide-react';
+import type { ReactNode } from 'react';
+import { ArrowUpRight, ChevronDown, ChevronUp, Info } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -17,11 +19,16 @@ type RecommendationDetailCardProps = {
     amount: string;
     account: string;
     security: string;
+    securityHref?: string;
     tickers: string;
     accountFit: string;
     scoreline: string;
     gapSummary: string;
     alternatives: string[];
+    alternativeLinks?: {
+      label: string;
+      href: string;
+    }[];
     whyThis: string[];
     whyNot: string[];
     constraints: {
@@ -177,12 +184,28 @@ export function RecommendationDetailCard({
               <h3 className="text-2xl font-semibold text-[color:var(--foreground)]">{priority.assetClass}</h3>
             </div>
 
-            <div className="rounded-[24px] border border-white/55 bg-white/38 px-5 py-4 backdrop-blur-md">
-              <p className="text-xs uppercase tracking-[0.16em] text-[color:var(--muted-foreground)]">
-                {pick(language, '这次优先买它', 'Lead security')}
-              </p>
-              <p className="mt-3 text-lg font-semibold leading-8 text-[color:var(--foreground)]">{priority.security}</p>
-            </div>
+            {priority.securityHref ? (
+              <Link
+                href={priority.securityHref}
+                className="group block rounded-[24px] border border-white/55 bg-white/38 px-5 py-4 backdrop-blur-md transition hover:border-[rgba(240,143,178,0.32)] hover:bg-white/56"
+              >
+                <p className="text-xs uppercase tracking-[0.16em] text-[color:var(--muted-foreground)]">
+                  {pick(language, '这次优先买它', 'Lead security')}
+                </p>
+                <div className="mt-3 flex items-start justify-between gap-3">
+                  <p className="text-lg font-semibold leading-8 text-[color:var(--foreground)]">{priority.security}</p>
+                  <ArrowUpRight className="mt-1 h-4 w-4 shrink-0 text-[color:var(--primary)] transition group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
+                </div>
+                <p className="mt-2 text-sm text-[color:var(--muted-foreground)]">{pick(language, '点开看这支标的的更多信息', 'Open the full security brief')}</p>
+              </Link>
+            ) : (
+              <div className="rounded-[24px] border border-white/55 bg-white/38 px-5 py-4 backdrop-blur-md">
+                <p className="text-xs uppercase tracking-[0.16em] text-[color:var(--muted-foreground)]">
+                  {pick(language, '这次优先买它', 'Lead security')}
+                </p>
+                <p className="mt-3 text-lg font-semibold leading-8 text-[color:var(--foreground)]">{priority.security}</p>
+              </div>
+            )}
 
             <p className="text-base leading-8 text-[color:var(--muted-foreground)]">{priority.description}</p>
           </div>
@@ -209,7 +232,24 @@ export function RecommendationDetailCard({
           <SummaryBlock label={pick(language, '这笔是在补什么', 'What this is fixing')} value={priority.gapSummary} />
           <SummaryBlock label={pick(language, '先放去哪', 'Best account home')} value={priority.accountFit} />
           <SummaryBlock label={pick(language, '系统怎么看这条建议', 'How the system sees it')} value={priority.scoreline} />
-          <SummaryBlock label={pick(language, '还有哪些能选', 'Other usable tickers')} value={alternativesText} />
+          <SummaryBlock
+            label={pick(language, '还有哪些能选', 'Other usable tickers')}
+            value={alternativesText}
+            footer={priority.alternativeLinks?.length ? (
+              <div className="mt-3 flex flex-wrap gap-2">
+                {priority.alternativeLinks.map((item) => (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    className="inline-flex items-center gap-1 rounded-full border border-white/60 bg-white/52 px-3 py-1.5 text-xs font-medium text-[color:var(--foreground)] transition hover:border-[rgba(240,143,178,0.32)] hover:bg-white/72"
+                  >
+                    {item.label}
+                    <ArrowUpRight className="h-3.5 w-3.5 text-[color:var(--primary)]" />
+                  </Link>
+                ))}
+              </div>
+            ) : null}
+          />
         </div>
 
         {isExpanded ? (
@@ -220,11 +260,27 @@ export function RecommendationDetailCard({
                   label={pick(language, '如果按这条建议去投', 'If you follow this path')}
                   value={priority.security}
                   detail={priority.gapSummary}
+                  href={priority.securityHref}
+                  hrefLabel={priority.securityHref ? pick(language, '点开看这支标的', 'Open this security') : undefined}
                 />
                 <DetailBlock
                   label={pick(language, '还有哪些可以替代它', 'What could replace it')}
                   value={alternativesText}
                   detail={pick(language, '这些也能做同样的事，只是系统暂时没把它们排到最前面。', 'These can do a similar job, but the system did not rank them first this time.')}
+                  footer={priority.alternativeLinks?.length ? (
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {priority.alternativeLinks.map((item) => (
+                        <Link
+                          key={`${priority.id}-${item.href}`}
+                          href={item.href}
+                          className="inline-flex items-center gap-1 rounded-full border border-white/60 bg-white/52 px-3 py-1.5 text-xs font-medium text-[color:var(--foreground)] transition hover:border-[rgba(240,143,178,0.32)] hover:bg-white/72"
+                        >
+                          {item.label}
+                          <ArrowUpRight className="h-3.5 w-3.5 text-[color:var(--primary)]" />
+                        </Link>
+                      ))}
+                    </div>
+                  ) : null}
                 />
               </div>
 
@@ -339,21 +395,54 @@ export function RecommendationDetailCard({
   );
 }
 
-function SummaryBlock({ label, value }: { label: string; value: string }) {
+function SummaryBlock({
+  label,
+  value,
+  footer
+}: {
+  label: string;
+  value: string;
+  footer?: ReactNode;
+}) {
   return (
     <div className="rounded-[20px] border border-white/55 bg-white/36 px-4 py-3 backdrop-blur-md">
       <p className="text-sm text-[color:var(--muted-foreground)]">{label}</p>
       <p className="mt-2 text-base font-semibold leading-8 text-[color:var(--foreground)]">{value}</p>
+      {footer}
     </div>
   );
 }
 
-function DetailBlock({ label, value, detail }: { label: string; value: string; detail?: string }) {
+function DetailBlock({
+  label,
+  value,
+  detail,
+  href,
+  hrefLabel,
+  footer
+}: {
+  label: string;
+  value: string;
+  detail?: string;
+  href?: string;
+  hrefLabel?: string;
+  footer?: ReactNode;
+}) {
   return (
     <div className="rounded-[20px] border border-white/55 bg-white/36 px-4 py-3 backdrop-blur-md">
       <p className="text-sm text-[color:var(--muted-foreground)]">{label}</p>
       <p className="mt-2 text-lg font-semibold leading-8 text-[color:var(--foreground)]">{value}</p>
       {detail ? <p className="mt-2 text-sm leading-7 text-[color:var(--muted-foreground)]">{detail}</p> : null}
+      {href && hrefLabel ? (
+        <Link
+          href={href}
+          className="mt-3 inline-flex items-center gap-1 text-sm font-medium text-[color:var(--primary)] transition hover:opacity-80"
+        >
+          {hrefLabel}
+          <ArrowUpRight className="h-4 w-4" />
+        </Link>
+      ) : null}
+      {footer}
     </div>
   );
 }
