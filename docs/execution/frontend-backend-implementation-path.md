@@ -78,7 +78,6 @@ Updated now:
 
 Next build focus:
 
-- portfolio workspace phase 1
 - account detail and holding detail surfaces
 - account and holding edit workflows
 - replay-based historical performance
@@ -93,6 +92,11 @@ Next build focus:
    - account detail page
    - holding detail page
    - recommendation and health-score pages should deep-link into these surfaces
+
+Current state:
+- account detail page implemented
+- holding detail page implemented
+- next gap is no longer inspection, but account/holding edit and repair workflows
 
 3. Add repair workflows
    - account metadata edit

@@ -36,7 +36,7 @@ import type { DisplayLanguage } from "@/lib/i18n/ui";
 import { pick } from "@/lib/i18n/ui";
 
 const MONTH_LABELS_EN = ["Oct", "Nov", "Dec", "Jan", "Feb", "Mar"];
-const MONTH_LABELS_ZH = ["10?", "11?", "12?", "1?", "2?", "3?"];
+const MONTH_LABELS_ZH = ["10月", "11月", "12月", "1月", "2月", "3月"];
 const PRIORITY_BADGE_VARIANTS = {
   first: "primary",
   second: "success",
@@ -44,42 +44,42 @@ const PRIORITY_BADGE_VARIANTS = {
 } as const;
 
 const ACCOUNT_CAPTIONS: Record<InvestmentAccount["type"], { zh: string; en: string }> = {
-  TFSA: { zh: "??????", en: "Tax-free growth sleeve" },
-  RRSP: { zh: "??????", en: "Long-horizon retirement sleeve" },
-  FHSA: { zh: "??????", en: "Home down-payment sleeve" },
-  Taxable: { zh: "??????", en: "Flexible capital account" }
+  TFSA: { zh: "免税增长账户", en: "Tax-free growth sleeve" },
+  RRSP: { zh: "退休长期账户", en: "Long-horizon retirement sleeve" },
+  FHSA: { zh: "买房目标账户", en: "Home down-payment sleeve" },
+  Taxable: { zh: "灵活应税账户", en: "Flexible capital account" }
 };
 
 const ACCOUNT_TYPE_FIT: Record<InvestmentAccount["type"], { zh: string; en: string }> = {
   TFSA: {
-    zh: "???????????,??????????????",
+    zh: "一般更适合长期免税复利，也适合放第二顺位的新增资金。",
     en: "Generally suitable for tax-free compounding and secondary funding priorities."
   },
   RRSP: {
-    zh: "???????????????????",
+    zh: "一般更适合长期封存的钱，常用来放退休相关配置。",
     en: "Commonly preferred for sheltered long-horizon allocations."
   },
   FHSA: {
-    zh: "?????????????,????????",
+    zh: "如果买房目标还在，且额度没用完，通常会排在前面。",
     en: "Commonly preferred when home-goal room remains available."
   },
   Taxable: {
-    zh: "??????????,????????????????",
+    zh: "当免税额度用得差不多，或你需要更灵活时，才会更多用到它。",
     en: "Fallback account once sheltered room is consumed or flexibility is needed."
   }
 };
 
 const RISK_DETAILS: Record<RiskProfile, { zh: string; en: string }> = {
   Conservative: {
-    zh: "?????,???????????????",
+    zh: "整体偏稳，愿意多放固定收益和现金。",
     en: "Defensive profile with more income and cash tolerance."
   },
   Balanced: {
-    zh: "???????????????????",
+    zh: "整体比较均衡，和你设的目标还算接近。",
     en: "Within configured tolerance band."
   },
   Growth: {
-    zh: "?????????????????",
+    zh: "股票比例更高，波动也会更明显。",
     en: "Higher equity exposure than target comfort band."
   }
 };
@@ -128,11 +128,11 @@ function buildDisplayContext(context: DisplayContext, language: DisplayLanguage)
   return {
     currency: context.currency,
     fxRateLabel: context.currency === "CAD"
-      ? pick(language, "????????????? CAD?", "Base analytics and display are in CAD.")
+      ? pick(language, "当前页面统一按 CAD 展示。", "Base analytics and display are in CAD.")
       : `1 CAD = ${fxRate.toFixed(4)} USD`,
     fxNote: context.currency === "CAD"
-      ? pick(language, "CAD ????????USD ??????????????,????????? CAD ????", "CAD is the active display currency. USD-native positions retain their own price inputs, while portfolio analytics stay normalized in CAD.")
-      : pick(language, "USD ???????????????? CAD ???,??????? USD/CAD ????? USD ???", "USD is the active display currency. Portfolio analytics remain normalized in CAD and are converted into USD for display using the latest cached USD/CAD FX rate.")
+      ? pick(language, "现在按 CAD 看全局数据。就算某些持仓本来是 USD 计价，组合分析也会先统一折成 CAD。", "CAD is the active display currency. USD-native positions retain their own price inputs, while portfolio analytics stay normalized in CAD.")
+      : pick(language, "现在按 USD 看页面金额。底层分析还是先按 CAD 算，再用最新缓存汇率换成 USD 给你看。", "USD is the active display currency. Portfolio analytics remain normalized in CAD and are converted into USD for display using the latest cached USD/CAD FX rate.")
   };
 }
 
@@ -345,12 +345,12 @@ function getRecommendationTheme(
   const lead = run?.items[0];
   if (!lead) {
     return {
-      theme: pick(language, "??????,?????????????????", "The system needs your data and preferences before it can suggest a next step"),
-      subtitle: pick(language, "??????????????", "There is no usable next-step recommendation yet."),
-      reason: pick(language, "?????????????????,?????????????????", "Once your accounts, holdings, and target mix are in place, the system can start suggesting where new money likely helps first."),
+      theme: pick(language, "还不能给你下一步建议", "The system needs your data and preferences before it can suggest a next step"),
+      subtitle: pick(language, "先把账户、持仓和偏好补齐。", "There is no usable next-step recommendation yet."),
+      reason: pick(language, "只要账户、持仓和目标配置都准备好，系统就能开始判断下一笔钱先补哪里。", "Once your accounts, holdings, and target mix are in place, the system can start suggesting where new money likely helps first."),
       signals: [
-        pick(language, "??????????????,?????????????", "Import at least one account and one holding so the system can understand the current portfolio."),
-        pick(language, "???????????,??????????????????", "Then save your preferences so the system knows what kind of mix you want to move toward.")
+        pick(language, "先导入至少一个账户和一笔持仓，让系统知道你现在有什么。", "Import at least one account and one holding so the system can understand the current portfolio."),
+        pick(language, "再保存你的偏好，系统才知道你想往什么配置靠。", "Then save your preferences so the system knows what kind of mix you want to move toward.")
       ]
     };
   }
@@ -358,12 +358,12 @@ function getRecommendationTheme(
   return {
     theme: pick(
       language,
-      `${getAccountTypeLabel(lead.targetAccountType, language)} ? ${getAssetClassLabel(lead.assetClass, language)}`,
+      `${getAccountTypeLabel(lead.targetAccountType, language)} 先补 ${getAssetClassLabel(lead.assetClass, language)}`,
       `${getAssetClassLabel(lead.assetClass, language)} in ${getAccountTypeLabel(lead.targetAccountType, language)}`
     ),
     subtitle: pick(
       language,
-      `????????? ${formatDisplayCurrency(run.contributionAmountCad, context)},?????????`,
+      `如果你下一笔准备投入 ${formatDisplayCurrency(run.contributionAmountCad, context)}，系统现在会先看这条路。`,
       `If you are putting in ${formatDisplayCurrency(run.contributionAmountCad, context)} next, this is the path the system would check first.`
     ),
     reason: getRecommendationItemExplanation(lead, context, language),
@@ -374,24 +374,24 @@ function getRecommendationTheme(
 function getSignalForHolding(holding: HoldingPosition, driftMap: Map<string, number>, language: DisplayLanguage) {
   const gap = driftMap.get(holding.assetClass) ?? 0;
   if (holding.symbol === "CASH" && holding.weightPct > 8) {
-    return pick(language, "???????????????", "Cash drag is still elevated relative to the target mix.");
+    return pick(language, "现金留得还是偏多，拖慢了整体配置。", "Cash drag is still elevated relative to the target mix.");
   }
   if (gap < -4) {
     return pick(
       language,
-      `???????????,??????? ${formatCompactPercent(Math.abs(gap), 0)}?`,
+      `这类资产现在还配得不够，离目标大约还差 ${formatCompactPercent(Math.abs(gap), 0)}。`,
       `This sleeve remains underweight by ${formatCompactPercent(Math.abs(gap), 0)} versus target.`
     );
   }
   if (holding.weightPct >= 15) {
-    return pick(language, "?????????,????????????", "Core position is carrying a meaningful share of total portfolio risk.");
+    return pick(language, "这笔仓位已经很重了，对整体波动影响也比较大。", "Core position is carrying a meaningful share of total portfolio risk.");
   }
-  return pick(language, "?????????????,??????????????", "Supports the current portfolio mix without driving the main gaps.");
+  return pick(language, "它现在还算放得顺，没有成为组合的主要问题。", "Supports the current portfolio mix without driving the main gaps.");
 }
 
 function formatHoldingLastUpdated(value: string | null | undefined, language: DisplayLanguage) {
   if (!value) {
-    return pick(language, "????", "Not refreshed");
+    return pick(language, "还没拿到价格", "Not refreshed");
   }
 
   return new Date(value).toLocaleString(language === "zh" ? "zh-CN" : "en-CA", {
@@ -442,15 +442,15 @@ function getPortfolioQuoteStatus(holdings: HoldingPosition[], language: DisplayL
   const coverage = holdings.length > 0
     ? pick(
       language,
-      `${quotedHoldings.length}/${holdings.length} ?????????????`,
+      `${quotedHoldings.length}/${holdings.length} 笔持仓已经拿到可参考价格`,
       `${quotedHoldings.length}/${holdings.length} holdings already have usable prices`
     )
-    : pick(language, "?????????????", "There are no holdings with refreshable prices yet");
+    : pick(language, "现在还没有可刷新的持仓价格。", "There are no holdings with refreshable prices yet");
 
   if (quotedHoldings.length === 0) {
     return {
-      lastRefreshed: pick(language, "???????", "No price refresh yet"),
-      freshness: pick(language, "??", "Unknown"),
+      lastRefreshed: pick(language, "还没有刷新过价格", "No price refresh yet"),
+      freshness: pick(language, "暂时未知", "Unknown"),
       coverage
     };
   }
@@ -462,10 +462,10 @@ function getPortfolioQuoteStatus(holdings: HoldingPosition[], language: DisplayL
   const ageMs = Date.now() - latestUpdatedAt.getTime();
   const ageMinutes = Math.max(0, Math.round(ageMs / 60000));
   const freshness = ageMinutes <= 30
-    ? pick(language, "?????,??", "Fresh within cache window")
+    ? pick(language, "较新，可以直接参考", "Fresh within cache window")
     : ageMinutes <= 180
-      ? pick(language, "??,?????", "Stale but still usable")
-      : pick(language, "????", "Refresh recommended");
+      ? pick(language, "稍微旧一点，但还能参考", "Stale but still usable")
+      : pick(language, "建议再刷新一次", "Refresh recommended");
 
   return {
     lastRefreshed: latestUpdatedAt.toLocaleString(language === "zh" ? "zh-CN" : "en-CA", {
@@ -503,23 +503,23 @@ function getAccountTypeFit(type: InvestmentAccount["type"], language: DisplayLan
 
 function formatRoomDetail(account: InvestmentAccount, display: DisplayContext, language: DisplayLanguage) {
   if (account.contributionRoomCad == null) {
-    return pick(language, "???????", "No tax shelter");
+    return pick(language, "这类账户没有免税额度概念", "No tax shelter");
   }
   return pick(
     language,
-    `?? ${formatDisplayCurrency(account.contributionRoomCad, display)} ??`,
+    `还剩 ${formatDisplayCurrency(account.contributionRoomCad, display)} 可用额度`,
     `${formatDisplayCurrency(account.contributionRoomCad, display)} room left`
   );
 }
 
 function getAccountBadgeLabel(index: number, includedInPriority: boolean, language: DisplayLanguage) {
   if (index === 0) {
-    return pick(language, "??", "Priority");
+    return pick(language, "优先", "Priority");
   }
   if (includedInPriority) {
-    return pick(language, "????", "Tax fit");
+    return pick(language, "账户匹配", "Tax fit");
   }
-  return pick(language, "??", "Review");
+  return pick(language, "复核", "Review");
 }
 
 function formatAccountPriorityOrder(priorityOrder: InvestmentAccount["type"][], language: DisplayLanguage) {
@@ -552,7 +552,7 @@ function formatHoldingPrice(amount: number | null | undefined, currency: Currenc
   if (amountCad != null && amountCad > 0) {
     return formatMoneyForDisplay(amount ?? amountCad, currency ?? "CAD", amountCad, display);
   }
-  return pick(language, "????", "Not priced");
+  return pick(language, "暂时没有价格", "Not priced");
 }
 
 function getRecommendationAssumptions(profile: PreferenceProfile, accounts: InvestmentAccount[], language: DisplayLanguage) {
@@ -561,19 +561,19 @@ function getRecommendationAssumptions(profile: PreferenceProfile, accounts: Inve
   return [
     pick(
       language,
-      "???????????????,???????????????????",
+      "系统会先拿你现在的持仓，去对照你自己设的目标配置。",
       "The system first compares your current mix with the target mix you set."
     ),
     pick(
       language,
-      `??????????????????????????? ${formatAccountPriorityOrder(effectiveOrder, language)}?`,
+      `系统也会参考你想先用哪些账户。这次真正还能先用的是 ${formatAccountPriorityOrder(effectiveOrder, language)}。`,
       `It also considers which accounts you prefer to use first. The usable order for this contribution is ${formatAccountPriorityOrder(effectiveOrder, language)}.`
     ),
     ...(exhaustedTypes.length > 0
       ? [
           pick(
             language,
-            `${formatAccountPriorityOrder(exhaustedTypes, language)} ???????,????????????`,
+            `${formatAccountPriorityOrder(exhaustedTypes, language)} 这次会先往后排，因为额度已经用完了。`,
             `${formatAccountPriorityOrder(exhaustedTypes, language)} drops back for this contribution because the available room is already used up.`
           )
         ]
@@ -581,12 +581,12 @@ function getRecommendationAssumptions(profile: PreferenceProfile, accounts: Inve
     profile.taxAwarePlacement
       ? pick(
         language,
-        "?????“??????”????,???????????????????????",
+        "你打开了账户放置引导，所以系统会更在意钱放在哪个账户里更顺手。",
         "You have account placement guidance turned on, so the system pays more attention to which account is a better long-term home."
       )
       : pick(
         language,
-        "?????“??????”????,??????????????????",
+        "你没有打开账户放置引导，所以系统会更直接地先补最大的配置缺口。",
         "Account placement guidance is off, so the run leans more on allocation gaps and room availability."
       )
   ];
@@ -601,7 +601,7 @@ function getRecommendationItemExplanation(
   const accountType = getAccountTypeLabel(item.targetAccountType, language);
   return pick(
     language,
-    `${assetClass} ???????,???? ${formatDisplayCurrency(item.amountCad, display)} ???? ${accountType} ??`,
+    `${assetClass} 现在配得还不够，所以这次会先把 ${formatDisplayCurrency(item.amountCad, display)} 放进 ${accountType}。`,
     `${assetClass} is currently underweight relative to the configured target, so this run allocates ${formatDisplayCurrency(item.amountCad, display)} to ${accountType}.`
   );
 }
@@ -609,49 +609,49 @@ function getRecommendationItemExplanation(
 function getGuidedQuestions(profile: PreferenceProfile, language: DisplayLanguage) {
   if (profile.riskProfile === "Growth") {
     return [
-      pick(language, "???????????,????????", "How important is the home goal compared with long-term portfolio growth?"),
-      pick(language, "???????,???????????????", "How much short-term volatility can you tolerate before changing course?"),
-      pick(language, "????????,?????????????????", "Should the engine prioritize sheltered room before broader drift correction?"),
-      pick(language, "???????,????????????", "How much cash should remain available for shorter-term milestones?")
+      pick(language, "买房目标和长期增长相比，对你来说哪个更重要？", "How important is the home goal compared with long-term portfolio growth?"),
+      pick(language, "如果组合短期波动变大，你大概能接受到什么程度？", "How much short-term volatility can you tolerate before changing course?"),
+      pick(language, "这套推荐是先顾账户额度，还是先补配置缺口？", "Should the engine prioritize sheltered room before broader drift correction?"),
+      pick(language, "你希望手头大概留多少现金，来应对近期开销？", "How much cash should remain available for shorter-term milestones?")
     ];
   }
 
   return [
-    pick(language, "?????????????????", "What is your primary financial goal and time horizon?"),
-    pick(language, "????????????????", "How comfortable are you with portfolio volatility and drawdowns?"),
-    pick(language, "??????????,???????????", "Should the engine prioritize tax efficiency or staying close to current holdings?"),
-    pick(language, "??????????,???????????????", "Should recommendations preserve a larger cash buffer for upcoming spending?")
+    pick(language, "你这笔钱主要是为了什么，打算放多久？", "What is your primary financial goal and time horizon?"),
+    pick(language, "如果组合回撤或波动变大，你大概能接受多少？", "How comfortable are you with portfolio volatility and drawdowns?"),
+    pick(language, "你更在意长期税务效率，还是更想贴近现在的持仓结构？", "Should the engine prioritize tax efficiency or staying close to current holdings?"),
+    pick(language, "为了应对近期开销，你要不要多留一点现金缓冲？", "Should recommendations preserve a larger cash buffer for upcoming spending?")
   ];
 }
 
 function getManualGroups(profile: PreferenceProfile, language: DisplayLanguage): SettingsData["manualGroups"] {
   return [
     {
-      title: pick(language, "?????????", "Risk profile and target allocation"),
+      title: pick(language, "风险和目标配置", "Risk profile and target allocation"),
       description: pick(
         language,
-        `?????${getRiskProfileLabel(profile.riskProfile, language)},??? ${sortTargetsForDisplay(profile.targetAllocation).length} ????????`,
+        `你现在是${getRiskProfileLabel(profile.riskProfile, language)}，一共设了 ${sortTargetsForDisplay(profile.targetAllocation).length} 类目标配置。`,
         `Current profile is ${profile.riskProfile.toLowerCase()} with ${sortTargetsForDisplay(profile.targetAllocation).length} target sleeves configured.`
       )
     },
     {
-      title: pick(language, "???????", "Account funding priorities"),
-      description: pick(language, `????:${profile.accountFundingPriority.join(" -> ")}`, `Current order: ${profile.accountFundingPriority.join(" -> ")}`),
-      badge: pick(language, "???", "Sortable")
+      title: pick(language, "账户使用顺序", "Account funding priorities"),
+      description: pick(language, `你保存的顺序是：${profile.accountFundingPriority.join(" -> ")}`, `Current order: ${profile.accountFundingPriority.join(" -> ")}`),
+      badge: pick(language, "可调整", "Sortable")
     },
     {
-      title: pick(language, "????", "Recommendation behavior"),
+      title: pick(language, "推荐怎么偏向", "Recommendation behavior"),
       description: pick(
         language,
-        `???????${getTransitionPreferenceLabel(profile.transitionPreference, language)},???${getRecommendationStrategyLabel(profile.recommendationStrategy, language)}?`,
+        `现在更偏向${getTransitionPreferenceLabel(profile.transitionPreference, language)}，推荐方式是${getRecommendationStrategyLabel(profile.recommendationStrategy, language)}。`,
         `Transition is ${profile.transitionPreference}, strategy is ${profile.recommendationStrategy}.`
       )
     },
     {
-      title: pick(language, "??????", "Tax-aware placement"),
+      title: pick(language, "账户放置引导", "Tax-aware placement"),
       description: profile.taxAwarePlacement
-        ? pick(language, "??????????????????????????????", "Tax-aware placement is enabled. Advanced province and marginal bracket fields can stay collapsed by default.")
-        : pick(language, "??????????????????????????????", "Tax-aware placement is disabled. The engine will favor simpler account-fit rules."),
+        ? pick(language, "已经打开。系统会更认真地判断钱放在哪类账户里更顺手。", "Tax-aware placement is enabled. Advanced province and marginal bracket fields can stay collapsed by default.")
+        : pick(language, "现在关闭。系统会更直接地先补配置缺口。", "Tax-aware placement is disabled. The engine will favor simpler account-fit rules."),
       badge: pick(language, "??", "Advanced")
     }
   ];
@@ -691,22 +691,22 @@ export function buildDashboardData(args: {
     displayContext: buildDisplayContext(display, language),
     metrics: [
       {
-        label: pick(language, "???", "Total Portfolio"),
+        label: pick(language, "总资产", "Total Portfolio"),
         value: formatDisplayCurrency(totalPortfolio, display),
-        detail: pick(language, `${accounts.length} ??????`, `${accounts.length} accounts connected`)
+        detail: pick(language, `你现在一共连了 ${accounts.length} 个账户`, `${accounts.length} accounts connected`)
       },
       {
-        label: pick(language, "????", "Available Room"),
+        label: pick(language, "可用额度", "Available Room"),
         value: formatDisplayCurrency(availableRoom, display),
-        detail: pick(language, "TFSA?RRSP ? FHSA ??????", "TFSA, RRSP, and FHSA contribution room remaining")
+        detail: pick(language, "这里合并了 TFSA、RRSP 和 FHSA 还能继续放的钱。", "TFSA, RRSP, and FHSA contribution room remaining")
       },
       {
-        label: pick(language, "????", "Portfolio Risk"),
+        label: pick(language, "风险风格", "Portfolio Risk"),
         value: getRiskProfileLabel(profile.riskProfile, language),
         detail: getRiskDetail(profile.riskProfile, language)
       },
       {
-        label: pick(language, "?????", "Portfolio Health Score"),
+        label: pick(language, "组合健康分", "Portfolio Health Score"),
         value: `${health.score}`,
         detail: health.status
       }
@@ -823,7 +823,7 @@ export function buildPortfolioData(args: {
         id: accountType,
         name: getAccountTypeLabel(accountType as InvestmentAccount["type"], language),
         value: totalPortfolio > 0 ? round((value / totalPortfolio) * 100, 0) : 0,
-        detail: pick(language, `${accountCount} ???`, `${accountCount} account${accountCount > 1 ? "s" : ""}`)
+        detail: pick(language, `${accountCount} 个账户`, `${accountCount} account${accountCount > 1 ? "s" : ""}`)
       };
     });
   const accountInstanceAllocation = [...accounts]
@@ -849,15 +849,15 @@ export function buildPortfolioData(args: {
         currency: account.currency ?? "CAD",
         value: formatDisplayCurrency(account.marketValueCad, display),
         share: totalPortfolio > 0
-          ? pick(language, `????? ${formatCompactPercent((account.marketValueCad / totalPortfolio) * 100, 0)}`, `About ${formatCompactPercent((account.marketValueCad / totalPortfolio) * 100, 0)} of the portfolio`)
-          : pick(language, "?????", "No assets yet"),
+          ? pick(language, `大约占组合 ${formatCompactPercent((account.marketValueCad / totalPortfolio) * 100, 0)}`, `About ${formatCompactPercent((account.marketValueCad / totalPortfolio) * 100, 0)} of the portfolio`)
+          : pick(language, "还没有资产", "No assets yet"),
         room: account.contributionRoomCad !== null
           ? pick(
             language,
-            `???? CAD ???? ${formatMoney(account.contributionRoomCad, "CAD")}`,
+            `按规划基准 CAD 还剩 ${formatMoney(account.contributionRoomCad, "CAD")}`,
             `${formatMoney(account.contributionRoomCad, "CAD")} of planning-base CAD room left`
           )
-          : pick(language, "???????????", "This account type does not track room here"),
+          : pick(language, "这类账户这里不记录额度。", "This account type does not track room here"),
         topHoldings: accountHoldings.slice(0, 3).map((holding) => holding.symbol),
         href: `/portfolio?account=${account.id}`
       };
@@ -905,19 +905,19 @@ export function buildPortfolioData(args: {
         summaryPoints: [
           pick(
             language,
-            `${instanceLabelMap.get(account.id) ?? account.nickname} ??????? ${formatCompactPercent(totalPortfolio > 0 ? (account.marketValueCad / totalPortfolio) * 100 : 0, 0)} ????`,
+            `${instanceLabelMap.get(account.id) ?? account.nickname} 现在大约装了你 ${formatCompactPercent(totalPortfolio > 0 ? (account.marketValueCad / totalPortfolio) * 100 : 0, 0)} 的组合。`,
             `${instanceLabelMap.get(account.id) ?? account.nickname} currently holds about ${formatCompactPercent(totalPortfolio > 0 ? (account.marketValueCad / totalPortfolio) * 100 : 0, 0)} of the portfolio.`
           ),
           accountHoldings[0]
             ? pick(
               language,
-              `????????????? ${accountHoldings.sort((left, right) => right.marketValueCad - left.marketValueCad)[0]?.symbol}?`,
+              `这个账户里现在最重的持仓是 ${accountHoldings.sort((left, right) => right.marketValueCad - left.marketValueCad)[0]?.symbol}。`,
               `${accountHoldings.sort((left, right) => right.marketValueCad - left.marketValueCad)[0]?.symbol} is currently the largest holding in this account.`
             )
-            : pick(language, "?????????????", "There are no holdings in this account yet."),
+            : pick(language, "这个账户里现在还没有持仓。", "There are no holdings in this account yet."),
           account.contributionRoomCad !== null
-            ? pick(language, `??????? ${formatMoney(account.contributionRoomCad, "CAD")} ????????`, `This account still has ${formatMoney(account.contributionRoomCad, "CAD")} of planning-base room left.`)
-            : pick(language, "??????????????", "This account type does not track contribution room here.")
+            ? pick(language, `这个账户按规划基准还剩 ${formatMoney(account.contributionRoomCad, "CAD")} 可用额度。`, `This account still has ${formatMoney(account.contributionRoomCad, "CAD")} of planning-base room left.`)
+            : pick(language, "这类账户这里没有额度概念。", "This account type does not track contribution room here.")
         ]
       };
     });
@@ -969,16 +969,16 @@ export function buildPortfolioData(args: {
       mainGap
         ? pick(
           language,
-          `${getAssetClassLabel(mainGap[0], language)} ???????????,?????`,
+          `${getAssetClassLabel(mainGap[0], language)} 现在和目标差得最远，最该先补。`,
           `${getAssetClassLabel(mainGap[0], language)} is the clearest allocation gap versus the configured target.`
         )
-        : pick(language, "????????,??????????????", "Set a target mix first so the system can see which sleeve is missing the most."),
+        : pick(language, "先把目标配置设好，系统才能看出哪一类最缺。", "Set a target mix first so the system can see which sleeve is missing the most."),
       largestHolding
-        ? pick(language, `${largestHolding.symbol} ???????????,?????????????`, `${largestHolding.symbol} is the largest position and drives the current concentration score.`)
-        : pick(language, "?????,???????????????????", "Import holdings first so the system can tell whether a few positions are getting too heavy."),
+        ? pick(language, `${largestHolding.symbol} 是你现在最大的仓位，对集中度影响也最大。`, `${largestHolding.symbol} is the largest position and drives the current concentration score.`)
+        : pick(language, "先把持仓导进来，系统才能看出会不会太集中。", "Import holdings first so the system can tell whether a few positions are getting too heavy."),
       accounts.some((account) => account.type === "Taxable")
-        ? pick(language, "???????????,?????????,???????????", "You are already using taxable accounts, so where new money goes matters more over the long run.")
-        : pick(language, "???????????????,?????????????", "Most of the money is still inside sheltered accounts, so account placement is still fairly straightforward.")
+        ? pick(language, "你已经开始用应税账户了，所以新钱放哪类账户会更影响长期结果。", "You are already using taxable accounts, so where new money goes matters more over the long run.")
+        : pick(language, "大部分钱还在受保护账户里，所以账户放置目前还算简单。", "Most of the money is still inside sheltered accounts, so account placement is still fairly straightforward.")
     ]
   };
 }
@@ -1132,7 +1132,7 @@ export function buildRecommendationsData(args: {
       return [
         pick(
           language,
-          "????????????,???????????????????????",
+          "现在没有可对照的旧推荐，所以这里只单看这一档投入会怎么分配。",
           "There is no saved baseline recommendation yet, so this card only shows the standalone result for this amount."
         )
       ];
@@ -1142,7 +1142,7 @@ export function buildRecommendationsData(args: {
       return [
         pick(
           language,
-          "???????????????,??????????????",
+          "这一档就是你当前页面正在看的结果，其它档位都拿它来做对比。",
           "This is the current recommendation shown on the page, and the other amounts are compared against it."
         )
       ];
@@ -1156,7 +1156,7 @@ export function buildRecommendationsData(args: {
       diffs.push(
         pick(
           language,
-          `?????? ${getAssetClassLabel(baselineTop.assetClass, language)} -> ${getAccountTypeLabel(baselineTop.targetAccountType, language)},???? ${getAssetClassLabel(scenarioTop.assetClass, language)} -> ${getAccountTypeLabel(scenarioTop.targetAccountType, language)}?`,
+          `第一优先从 ${getAssetClassLabel(baselineTop.assetClass, language)} -> ${getAccountTypeLabel(baselineTop.targetAccountType, language)}，变成了 ${getAssetClassLabel(scenarioTop.assetClass, language)} -> ${getAccountTypeLabel(scenarioTop.targetAccountType, language)}。`,
           `The top priority shifts from ${getAssetClassLabel(baselineTop.assetClass, language)} -> ${getAccountTypeLabel(baselineTop.targetAccountType, language)} to ${getAssetClassLabel(scenarioTop.assetClass, language)} -> ${getAccountTypeLabel(scenarioTop.targetAccountType, language)}.`
         )
       );
@@ -1164,7 +1164,7 @@ export function buildRecommendationsData(args: {
       diffs.push(
         pick(
           language,
-          "?????????,?????????????????",
+          "第一优先没变，说明金额变化主要影响的是大小，不是方向。",
           "The top priority stays the same, so the amount change mainly affects sizing rather than ranking."
         )
       );
@@ -1180,7 +1180,7 @@ export function buildRecommendationsData(args: {
       diffs.push(
         pick(
           language,
-          `${getAssetClassLabel(accountShift.assetClass, language)} ?????? ${getAccountTypeLabel(baseline.targetAccountType, language)} ??? ${getAccountTypeLabel(accountShift.targetAccountType, language)}?`,
+          `${getAssetClassLabel(accountShift.assetClass, language)} 这类资产从 ${getAccountTypeLabel(baseline.targetAccountType, language)} 改到了 ${getAccountTypeLabel(accountShift.targetAccountType, language)}。`,
           `${getAssetClassLabel(accountShift.assetClass, language)} shifts from ${getAccountTypeLabel(baseline.targetAccountType, language)} to ${getAccountTypeLabel(accountShift.targetAccountType, language)}.`
         )
       );
@@ -1191,7 +1191,7 @@ export function buildRecommendationsData(args: {
       diffs.push(
         pick(
           language,
-          `${getAssetClassLabel(newAsset.assetClass, language)} ?????????????????`,
+          `${getAssetClassLabel(newAsset.assetClass, language)} 在这档投入下开始值得优先补。`,
           `${getAssetClassLabel(newAsset.assetClass, language)} becomes worth prioritizing at this contribution size.`
         )
       );
@@ -1202,7 +1202,7 @@ export function buildRecommendationsData(args: {
       diffs.push(
         pick(
           language,
-          `${getAssetClassLabel(removedAsset.assetClass, language)} ????????????????`,
+          `${getAssetClassLabel(removedAsset.assetClass, language)} 在这档投入下掉出了前三优先。`,
           `${getAssetClassLabel(removedAsset.assetClass, language)} falls out of the top priorities at this contribution size.`
         )
       );
@@ -1212,7 +1212,7 @@ export function buildRecommendationsData(args: {
       diffs.push(
         pick(
           language,
-          "??????????,?????????,??????????????",
+          "整体方向没有明显变，系统主要是在放大或缩小同一套思路。",
           "This suggests the overall path stays similar as the amount changes, and the system is mostly scaling the same idea up or down."
         )
       );
@@ -1229,43 +1229,43 @@ export function buildRecommendationsData(args: {
       objective: latestRun?.objective
         ? pick(
           language,
-          latestRun.objective === "target-tracking" ? "??????????" : latestRun.objective,
+          latestRun.objective === "target-tracking" ? "先补离目标最远的缺口" : latestRun.objective,
           latestRun.objective === "target-tracking" ? "Close the biggest target gap first" : latestRun.objective
         )
-        : pick(language, "??????????", "Close the biggest target gap first"),
+        : pick(language, "先补离目标最远的缺口", "Close the biggest target gap first"),
       confidence: latestRun?.confidenceScore != null
         ? `${latestRun.confidenceScore.toFixed(0)}/100`
-        : pick(language, "???", "Pending")
+        : pick(language, "待生成", "Pending")
     },
     inputs: [
-      { label: pick(language, "????", "Target allocation"), value: `${equityTarget} / ${fixedIncomeTarget} / ${cashTarget}` },
-      { label: pick(language, "???????", "Saved account order"), value: formatAccountPriorityOrder(profile.accountFundingPriority, language), tone: exhaustedPriorityTypes.length > 0 ? "muted" : "default" },
-      { label: pick(language, "????????", "Usable order for this contribution"), value: effectiveAccountPriorityOrder.length > 0 ? formatAccountPriorityOrder(effectiveAccountPriorityOrder, language) : pick(language, "??????????", "Only taxable room is effectively available right now") },
+      { label: pick(language, "目标配置", "Target allocation"), value: `${equityTarget} / ${fixedIncomeTarget} / ${cashTarget}` },
+      { label: pick(language, "你设的账户顺序", "Saved account order"), value: formatAccountPriorityOrder(profile.accountFundingPriority, language), tone: exhaustedPriorityTypes.length > 0 ? "muted" : "default" },
+      { label: pick(language, "这次还能用的顺序", "Usable order for this contribution"), value: effectiveAccountPriorityOrder.length > 0 ? formatAccountPriorityOrder(effectiveAccountPriorityOrder, language) : pick(language, "现在基本只剩应税账户还能继续放", "Only taxable room is effectively available right now") },
       ...(exhaustedPriorityTypes.length > 0
         ? [{
-            label: pick(language, "??????????", "De-prioritized for this contribution"),
+            label: pick(language, "这次先不排前面的账户", "De-prioritized for this contribution"),
             value: pick(
               language,
-              `${formatAccountPriorityOrder(exhaustedPriorityTypes, language)}(????)`,
+              `${formatAccountPriorityOrder(exhaustedPriorityTypes, language)}（额度已满）`,
               `${formatAccountPriorityOrder(exhaustedPriorityTypes, language)} (room exhausted)`
             ),
             tone: "warning" as const
           }]
         : []),
-      { label: pick(language, "??????", "Tax-aware placement"), value: profile.taxAwarePlacement ? pick(language, "???", "Enabled") : pick(language, "???", "Disabled") },
-      { label: pick(language, "????", "Transition preference"), value: getTransitionPreferenceLabel(profile.transitionPreference, language) }
+      { label: pick(language, "账户放置引导", "Tax-aware placement"), value: profile.taxAwarePlacement ? pick(language, "已打开", "Enabled") : pick(language, "未打开", "Disabled") },
+      { label: pick(language, "过渡偏好", "Transition preference"), value: getTransitionPreferenceLabel(profile.transitionPreference, language) }
     ],
     explainer: latestRun?.assumptions?.length
       ? getRecommendationAssumptions(profile, accounts, language)
       : [
-          pick(language, "??????????????,?????????????", "The system first looks at what you already hold and compares it with your target mix."),
-          pick(language, "?????????,??????????", "The asset sleeve furthest from target usually moves to the front of the queue."),
-          pick(language, "???????????????,???????????????", "The system first chooses the best account home, then picks a security inside that sleeve.")
+          pick(language, "系统会先看你现在持有什么，再和目标配置做对照。", "The system first looks at what you already hold and compares it with your target mix."),
+          pick(language, "离目标差得最远的那一类，通常会先排到前面。", "The asset sleeve furthest from target usually moves to the front of the queue."),
+          pick(language, "系统会先决定钱放进哪个账户更顺手，再挑具体标的。", "The system first chooses the best account home, then picks a security inside that sleeve.")
         ],
     priorities: (latestRun?.items ?? []).map((item, index) => {
       const leadSecurity = item.securitySymbol && item.securityName
         ? `${item.securitySymbol} - ${item.securityName}`
-        : item.tickerOptions[0] ?? pick(language, "????", "Pending security");
+        : item.tickerOptions[0] ?? pick(language, "还没确定标的", "Pending security");
       const alternatives = item.tickerOptions.filter((symbol) => symbol !== item.securitySymbol);
       return {
         id: `${item.assetClass}-${item.securitySymbol ?? item.tickerOptions[0] ?? index}`,
@@ -1278,85 +1278,85 @@ export function buildRecommendationsData(args: {
         accountFit: item.accountFitScore != null
           ? pick(
             language,
-            `${getAccountTypeFit(item.targetAccountType, language)} ????? ${item.accountFitScore.toFixed(0)}/100`,
+            `${getAccountTypeFit(item.targetAccountType, language)} 大致顺手度 ${item.accountFitScore.toFixed(0)}/100`,
             `${getAccountTypeFit(item.targetAccountType, language)} Rough fit ${item.accountFitScore.toFixed(0)}/100`
           )
           : getAccountTypeFit(item.targetAccountType, language),
         scoreline: pick(
           language,
-          `????? ${item.securityScore?.toFixed(0) ?? "--"} / ????? ${item.accountFitScore?.toFixed(0) ?? "--"} / ????? ${item.taxFitScore?.toFixed(0) ?? "--"}`,
+          `标的合适度 ${item.securityScore?.toFixed(0) ?? "--"} / 账户顺手度 ${item.accountFitScore?.toFixed(0) ?? "--"} / 税务友好度 ${item.taxFitScore?.toFixed(0) ?? "--"}`,
           `Security fit ${item.securityScore?.toFixed(0) ?? "--"} / Account fit ${item.accountFitScore?.toFixed(0) ?? "--"} / Tax fit ${item.taxFitScore?.toFixed(0) ?? "--"}`
         ),
         gapSummary: item.allocationGapBeforePct != null && item.allocationGapAfterPct != null
           ? pick(
             language,
-            `?????????,?????? ${item.allocationGapBeforePct.toFixed(1)}% ??? ${item.allocationGapAfterPct.toFixed(1)}%`,
+            `如果按这条路去投，这个缺口会从 ${item.allocationGapBeforePct.toFixed(1)}% 缩到 ${item.allocationGapAfterPct.toFixed(1)}%。`,
             `Gap narrows from ${item.allocationGapBeforePct.toFixed(1)}% to ${item.allocationGapAfterPct.toFixed(1)}%`
           )
-          : pick(language, "????????????", "Gap change appears after generation."),
+          : pick(language, "重新生成后，这里会显示缺口缩小了多少。", "Gap change appears after generation."),
         alternatives: alternatives.length > 0
           ? alternatives
-          : [pick(language, "?????????????", "No stronger alternative security is available right now.")],
+          : [pick(language, "现在没有更像样的备选标的。", "No stronger alternative security is available right now.")],
         whyThis: [
           item.rationale
             ? pick(
               language,
-              `${getAssetClassLabel(item.assetClass, language)} ??????????? ${item.rationale.gapBeforePct.toFixed(1)} ?????`,
+              `${getAssetClassLabel(item.assetClass, language)} 现在离目标还差 ${item.rationale.gapBeforePct.toFixed(1)} 个百分点。`,
               `${getAssetClassLabel(item.assetClass, language)} is currently ${item.rationale.gapBeforePct.toFixed(1)}% below target.`
             )
-            : pick(language, "????????????????", "The engine prioritizes the largest current allocation gap."),
+            : pick(language, "系统会先补现在最明显的配置缺口。", "The engine prioritizes the largest current allocation gap."),
           pick(
             language,
-            `${getAccountTypeLabel(item.targetAccountType, language)} ?????????????`,
+            `${getAccountTypeLabel(item.targetAccountType, language)} 在当前条件下是更顺手的账户。`,
             `${getAccountTypeLabel(item.targetAccountType, language)} produced the strongest account fit under the current constraints.`
           ),
           item.rationale?.existingHoldingSymbol && item.rationale.existingHoldingRiskContributionPct != null
             ? pick(
               language,
-              `${item.rationale.existingHoldingSymbol} ??????? ${item.rationale.existingHoldingRiskContributionPct.toFixed(0)}% ?????,??????????????????????????`,
+              `${item.rationale.existingHoldingSymbol} 已经贡献了大约 ${item.rationale.existingHoldingRiskContributionPct.toFixed(0)}% 的组合风险，所以系统不想再把新钱继续压到同一处。`,
               `${item.rationale.existingHoldingSymbol} already contributes about ${item.rationale.existingHoldingRiskContributionPct.toFixed(0)}% of total portfolio risk, so this path redirects new money toward an account and security combination that spreads risk out instead of reinforcing it.`
             )
             : pick(
               language,
-              "????????????,???????????????????????",
+              "这条路不只是在补缺口，也是在避免把新钱继续堆到现在最重的风险来源上。",
               "This path not only closes the allocation gap, it also avoids stacking fresh money onto the current heaviest risk source."
             ),
           item.rationale?.watchlistMatched
-            ? pick(language, "?????????????????", "The lead security also matched your watchlist.")
-            : pick(language, "???????????????????????", "The lead security is the highest-scoring expression in the current candidate set.")
+            ? pick(language, "这支主标的也刚好符合你的关注名单。", "The lead security also matched your watchlist.")
+            : pick(language, "在当前候选池里，它是最顺手的主标的。", "The lead security is the highest-scoring expression in the current candidate set.")
         ],
         whyNot: [
           alternatives.length > 0
-            ? pick(language, `?? ${alternatives.join(" / ")} ???????????`, `Alternatives ${alternatives.join(" / ")} scored below the current lead security.`)
-            : pick(language, "??????????????", "No clearly stronger alternative is available in this sleeve."),
+            ? pick(language, `${alternatives.join(" / ")} 这些备选都没有当前主标的顺手。`, `Alternatives ${alternatives.join(" / ")} scored below the current lead security.`)
+            : pick(language, "现在没有明显更强的备选。", "No clearly stronger alternative is available in this sleeve."),
           item.rationale?.existingHoldingSymbol && item.rationale.existingHoldingRiskContributionPct != null
             ? pick(
               language,
-              `${item.rationale.existingHoldingSymbol} ??????? ${item.rationale.existingHoldingRiskContributionPct.toFixed(0)}% ?????,????????????????????`,
+              `${item.rationale.existingHoldingSymbol} 已经贡献了大约 ${item.rationale.existingHoldingRiskContributionPct.toFixed(0)}% 的组合风险，所以系统不会继续优先加它。`,
               `${item.rationale.existingHoldingSymbol} already contributes about ${item.rationale.existingHoldingRiskContributionPct.toFixed(0)}% of total portfolio risk, so the engine avoids doubling down on the same risk source.`
             )
-            : pick(language, "???????????????????????", "The engine avoids leaning even harder into risk sources that are already concentrated inside the sleeve."),
+            : pick(language, "系统会尽量回避已经太集中的风险来源。", "The engine avoids leaning even harder into risk sources that are already concentrated inside the sleeve."),
           (item.fxFrictionPenaltyBps ?? 0) > 0
-            ? pick(language, `?????? ${item.fxFrictionPenaltyBps} bps,???? USD ??????`, `Cross-currency friction of about ${item.fxFrictionPenaltyBps} bps pushed some USD ideas lower.`)
-            : pick(language, "???????????????????", "This path does not carry a material FX friction cost.")
+            ? pick(language, `这条路大约要多承担 ${item.fxFrictionPenaltyBps} bps 的换汇成本，所以部分 USD 想法被往后压了。`, `Cross-currency friction of about ${item.fxFrictionPenaltyBps} bps pushed some USD ideas lower.`)
+            : pick(language, "这条路没有明显的换汇成本压力。", "This path does not carry a material FX friction cost.")
         ],
         constraints: [
           {
-            label: pick(language, "????", "Allocation gap"),
+            label: pick(language, "配置缺口", "Allocation gap"),
             detail: item.allocationGapBeforePct != null && item.allocationGapAfterPct != null
               ? pick(
                 language,
-                `????????,?????? ${item.allocationGapBeforePct.toFixed(1)}% ??? ${item.allocationGapAfterPct.toFixed(1)}%?`,
+                `按这条建议执行后，缺口会从 ${item.allocationGapBeforePct.toFixed(1)}% 缩到 ${item.allocationGapAfterPct.toFixed(1)}%。`,
                 `Narrows from ${item.allocationGapBeforePct.toFixed(1)}% to ${item.allocationGapAfterPct.toFixed(1)}%.`
               )
-              : pick(language, "????? run ???", "Will update on the next run."),
+              : pick(language, "下次重新生成后，这里会更新。", "Will update on the next run."),
             variant: "success" as const
           },
           {
-            label: pick(language, "??/????", "Tax / account placement"),
+            label: pick(language, "账户放哪里更顺", "Tax / account placement"),
             detail: pick(
               language,
-              `${getAccountTypeLabel(item.targetAccountType, language)} ?????????,????? ${item.accountFitScore?.toFixed(0) ?? "--"},????? ${item.taxFitScore?.toFixed(0) ?? "--"}?`,
+              `${getAccountTypeLabel(item.targetAccountType, language)} 看起来更顺手，账户顺手度 ${item.accountFitScore?.toFixed(0) ?? "--"}，税务友好度 ${item.taxFitScore?.toFixed(0) ?? "--"}。`,
               `${getAccountTypeLabel(item.targetAccountType, language)} looks like a smoother home here, with account fit ${item.accountFitScore?.toFixed(0) ?? "--"} and tax fit ${item.taxFitScore?.toFixed(0) ?? "--"}.`
             ),
             variant: profile.taxAwarePlacement ? "success" : "neutral"
@@ -1364,26 +1364,26 @@ export function buildRecommendationsData(args: {
           {
             label: pick(language, "FX ??", "FX friction"),
             detail: (item.fxFrictionPenaltyBps ?? 0) > 0
-              ? pick(language, `????????? ${item.fxFrictionPenaltyBps} bps ??????`, `This path absorbs about ${item.fxFrictionPenaltyBps} bps of FX cost.`)
-              : pick(language, "??????????????????", "This path avoids material FX friction."),
+              ? pick(language, `这条路大约会吃掉 ${item.fxFrictionPenaltyBps} bps 的换汇成本。`, `This path absorbs about ${item.fxFrictionPenaltyBps} bps of FX cost.`)
+              : pick(language, "这条路基本避开了明显的换汇成本。", "This path avoids material FX friction."),
             variant: (item.fxFrictionPenaltyBps ?? 0) > 0 ? "warning" : "success"
           }
         ],
         execution: [
-          { label: pick(language, "????", "Suggested amount"), value: formatDisplayCurrency(item.amountCad, display) },
+          { label: pick(language, "建议金额", "Suggested amount"), value: formatDisplayCurrency(item.amountCad, display) },
           {
-            label: pick(language, "?????", "Lead security"),
-            value: item.securitySymbol ?? item.tickerOptions[0] ?? pick(language, "??", "Pending")
+            label: pick(language, "主标的", "Lead security"),
+            value: item.securitySymbol ?? item.tickerOptions[0] ?? pick(language, "待定", "Pending")
           },
           {
-            label: pick(language, "????", "Target account"),
+            label: pick(language, "先放去哪", "Target account"),
             value: getAccountTypeLabel(item.targetAccountType, language)
           },
           {
-            label: pick(language, "????", "Execution note"),
+            label: pick(language, "执行提醒", "Execution note"),
             value: item.rationale?.minTradeApplied
-              ? pick(language, "??????,?????????????", "This is a small trade; consider batching it with the next contribution.")
-              : pick(language, "????????????????", "The current amount is large enough to stand on its own.")
+              ? pick(language, "这笔比较小，可以考虑和下一笔一起做。", "This is a small trade; consider batching it with the next contribution.")
+              : pick(language, "这笔金额已经够单独执行。", "The current amount is large enough to stand on its own.")
           }
         ]
       };
@@ -1391,14 +1391,14 @@ export function buildRecommendationsData(args: {
     scenarios: scenarioRuns.map((scenarioRun, scenarioIndex) => ({
       id: `scenario-${scenarioRun.contributionAmountCad}-${scenarioIndex}`,
       label: scenarioIndex === 0
-        ? pick(language, "???", "Light contribution")
+        ? pick(language, "轻投入", "Light contribution")
         : scenarioIndex === scenarioRuns.length - 1
-          ? pick(language, "????", "Double-sized contribution")
-          : pick(language, "????", "Current contribution"),
+          ? pick(language, "加倍投入", "Double-sized contribution")
+          : pick(language, "当前投入", "Current contribution"),
       amount: formatDisplayCurrency(scenarioRun.contributionAmountCad, display),
       summary: pick(
         language,
-        "???????????,???????????????,??????????,????????????",
+        "这里会按不同投入金额重新跑一遍，让你看清金额变了以后，优先顺序会不会跟着变。",
         "This is a fresh solve at this amount, so you can see whether a different contribution size would change the next step."
       ),
       diffs: buildScenarioDiffs(scenarioRun, scenarioIndex),
@@ -1410,11 +1410,11 @@ export function buildRecommendationsData(args: {
     })),
     notes: [
       profile.taxAwarePlacement
-        ? pick(language, "???????????????????,????????????", "The system also considers which account type is a better home for the money, but this is not formal tax advice.")
-        : pick(language, "??????“??????”????,???????????????", "Account placement guidance is off, so the system leans more heavily on closing the biggest allocation gap first."),
+        ? pick(language, "系统也会看钱放在哪类账户更顺手，但这不是正式税务建议。", "The system also considers which account type is a better home for the money, but this is not formal tax advice.")
+        : pick(language, "你没打开账户放置引导，所以系统会更直接地先补最大缺口。", "Account placement guidance is off, so the system leans more heavily on closing the biggest allocation gap first."),
       pick(
         language,
-        `??????“${getRecommendationStrategyLabel(profile.recommendationStrategy, language)}”???????? ${profile.rebalancingTolerancePct}% ?,?????????????`,
+        `你现在用的是“${getRecommendationStrategyLabel(profile.recommendationStrategy, language)}”。当偏离大到 ${profile.rebalancingTolerancePct}% 左右时，系统会更愿意主动调整。`,
         `Your current strategy is "${getRecommendationStrategyLabel(profile.recommendationStrategy, language)}". Once drift moves beyond about ${profile.rebalancingTolerancePct}%, the system becomes more willing to nudge changes.`
       ),
       ...sanitizeRecommendationNotes(latestRun?.notes)
@@ -1434,35 +1434,35 @@ export function buildSpendingData(args: {
     .sort((left, right) => right.bookedAt.localeCompare(left.bookedAt))
     .slice(0, 10);
   const discipline = spending.savingsRate >= 30
-    ? pick(language, "??", "Stable")
+    ? pick(language, "稳", "Stable")
     : spending.savingsRate >= 20
-      ? pick(language, "??", "Watch")
-      : pick(language, "???", "At risk");
+      ? pick(language, "留意", "Watch")
+      : pick(language, "偏紧", "At risk");
 
   return {
     displayContext: buildDisplayContext(display, language),
     metrics: [
       {
-        label: pick(language, "????", "Monthly spend"),
+        label: pick(language, "本月支出", "Monthly spend"),
         value: formatDisplayCurrency(spending.outflowTotal, display),
-        detail: pick(language, "????????", "Current month outflow total")
+        detail: pick(language, "这是当前月份已经流出去的钱。", "Current month outflow total")
       },
       {
-        label: pick(language, "???", "Savings rate"),
+        label: pick(language, "结余率", "Savings rate"),
         value: formatCompactPercent(spending.savingsRate, 1),
-        detail: pick(language, "????????????", "Based on current month inflows and outflows")
+        detail: pick(language, "按这个月的流入和流出粗略算出来。", "Based on current month inflows and outflows")
       },
       {
-        label: pick(language, "?????", "Investable cash"),
+        label: pick(language, "可继续投资的钱", "Investable cash"),
         value: formatDisplayCurrency(spending.investableCash, display),
-        detail: pick(language, "????????????????", "Monthly inflow minus spending and buffer reserve")
+        detail: pick(language, "等于本月流入减去支出，再扣掉你想保留的现金缓冲。", "Monthly inflow minus spending and buffer reserve")
       },
       {
-        label: pick(language, "????", "Cash discipline"),
+        label: pick(language, "现金纪律", "Cash discipline"),
         value: discipline,
         detail: pick(
           language,
-          `??????? ${formatDisplayCurrency(profile.cashBufferTargetCad, display)}`,
+          `你设的现金缓冲目标是 ${formatDisplayCurrency(profile.cashBufferTargetCad, display)}`,
           `Cash buffer target is ${formatDisplayCurrency(profile.cashBufferTargetCad, display)}`
         )
       }
@@ -1492,95 +1492,95 @@ export function buildImportData(args: {
   return {
     portfolioSteps: [
       {
-        title: pick(language, "??????", "Choose account type"),
-        description: pick(language, "???????,???????????", "Start with the account structure, not a long form.")
+        title: pick(language, "先选账户类型", "Choose account type"),
+        description: pick(language, "先把账户桶选对，再往下填细节，不要一开始就看长表单。", "Start with the account structure, not a long form.")
       },
       {
-        title: pick(language, "??????", "Choose import method"),
-        description: pick(language, "??? CSV,???? broker ???", "CSV import first, account integrations later.")
+        title: pick(language, "再选导入方式", "Choose import method"),
+        description: pick(language, "现在先走 CSV，后面再接 broker 集成。", "CSV import first, account integrations later.")
       },
       {
-        title: pick(language, "??????", "Provide account data"),
-        description: pick(language, "??????,???????????????????", "Enter account details, room, and starter holding context before any write.")
+        title: pick(language, "把账户信息补齐", "Provide account data"),
+        description: pick(language, "先把账户信息、额度和初始持仓补齐，确认没问题再写入。", "Enter account details, room, and starter holding context before any write.")
       },
       {
-        title: pick(language, "?????", "Review and confirm"),
+        title: pick(language, "先检查再确认", "Review and confirm"),
         description: latestPortfolioJob
           ? pick(
             language,
-            `??????????? ${latestPortfolioJob.status}???????????????`,
+            `最近一次导入现在是 ${latestPortfolioJob.status}，先把要写进去的内容看清楚。`,
             `Latest portfolio import is ${latestPortfolioJob.status}. Confirm what should be written next.`
           )
           : pick(
             language,
-            "????????,????????????????",
+            "先把账户和持仓会怎么写进去看清楚，再正式确认。",
             "Review the exact account and holding actions before writing them to the database."
           )
       },
       {
-        title: pick(language, "????", "Complete setup"),
-        description: pick(language, "???????,??????????????", "Confirm the saved result, then continue to preferences or the dashboard.")
+        title: pick(language, "完成这轮设置", "Complete setup"),
+        description: pick(language, "确认保存结果以后，你可以继续去设置偏好，或者回到首页。", "Confirm the saved result, then continue to preferences or the dashboard.")
       }
     ],
     portfolioSetupCards: [
       {
-        label: pick(language, "????", "Account type"),
+        label: pick(language, "账户类型", "Account type"),
         title: accounts.length > 0
           ? `${accounts.map((account) => getAccountTypeLabel(account.type, language)).join(" / ")}`
           : `${getAccountTypeLabel("TFSA", language)} / ${getAccountTypeLabel("RRSP", language)} / ${getAccountTypeLabel("Taxable", language)} / ${getAccountTypeLabel("FHSA", language)}`,
-        description: pick(language, "???????,?????????", "Pick the right account bucket before asking for institution detail.")
+        description: pick(language, "先把账户桶选对，再往下填机构和账户细节。", "Pick the right account bucket before asking for institution detail.")
       },
       {
-        label: pick(language, "????", "Import method"),
+        label: pick(language, "导入方式", "Import method"),
         title: pick(language, "?? CSV ??", "CSV upload first"),
-        description: pick(language, "? broker ?????,??? MVP ???????", "Keeps MVP friction low while we define stable broker integrations.")
+        description: pick(language, "先走 CSV，能先把流程跑通，也方便后面再补 broker 直连。", "Keeps MVP friction low while we define stable broker integrations.")
       },
       {
-        label: pick(language, "????", "Field mapping"),
+        label: pick(language, "字段对照", "Field mapping"),
         title: latestPortfolioJob
-          ? pick(language, `????:${latestPortfolioJob.fileName}`, `Current file: ${latestPortfolioJob.fileName}`)
-          : pick(language, "????????", "Review account and holding columns"),
-        description: pick(language, "????????,???????????????", "Mapping stays explicit so the user trusts the imported portfolio data.")
+          ? pick(language, `当前文件：${latestPortfolioJob.fileName}`, `Current file: ${latestPortfolioJob.fileName}`)
+          : pick(language, "先看看账户和持仓列怎么对上", "Review account and holding columns"),
+        description: pick(language, "字段对照保持明确，用户才会相信导进来的数据没有对错列。", "Mapping stays explicit so the user trusts the imported portfolio data.")
       },
       {
-        label: pick(language, "????", "Preference handoff"),
-        title: pick(language, "????????", "Move into Investment Preferences"),
-        description: pick(language, "?????,??????????????????", "The import flow hands off cleanly into target allocation and account priorities.")
+        label: pick(language, "偏好交接", "Preference handoff"),
+        title: pick(language, "接着去设投资偏好", "Move into Investment Preferences"),
+        description: pick(language, "导入完成后，可以顺着去设目标配置和账户顺序。", "The import flow hands off cleanly into target allocation and account priorities.")
       }
     ],
     portfolioSuccessStates: [
-      pick(language, "?????????????????????", "Imported holdings can be grouped by account and asset class."),
-      pick(language, "??????????????????????", "Invalid or unknown rows are flagged before the portfolio view updates."),
-      pick(language, "????????????????", "On completion the user can move directly to Dashboard or Recommendations.")
+      pick(language, "导入后的持仓会按账户和资产类别整理好。", "Imported holdings can be grouped by account and asset class."),
+      pick(language, "有问题或认不出的行，会先标出来，不会直接写进组合页。", "Invalid or unknown rows are flagged before the portfolio view updates."),
+      pick(language, "完成以后，你可以直接去首页或推荐页继续看下一步。", "On completion the user can move directly to Dashboard or Recommendations.")
     ],
     spendingSetupCards: [
       {
-        label: pick(language, "???", "Workflow"),
-        title: pick(language, "??????", "Transaction import"),
-        description: pick(language, "?????????????,???? workflow ?????", "Import spending records separately from portfolio holdings so each workflow can evolve independently.")
+        label: pick(language, "流程", "Workflow"),
+        title: pick(language, "导入消费流水", "Transaction import"),
+        description: pick(language, "消费流水和投资持仓分开处理，后面各自扩展时不会互相牵连。", "Import spending records separately from portfolio holdings so each workflow can evolve independently.")
       },
       {
-        label: pick(language, "???", "Supported rows"),
+        label: pick(language, "支持内容", "Supported rows"),
         title: latestSpendingJob
-          ? pick(language, `????:${latestSpendingJob.fileName}`, `Latest file: ${latestSpendingJob.fileName}`)
-          : pick(language, "??? transaction ?", "Transaction rows only"),
-        description: pick(language, "????????????????/?????", "Focus on spending transactions, categories, merchants, and inflow/outflow direction.")
+          ? pick(language, `最近文件：${latestSpendingJob.fileName}`, `Latest file: ${latestSpendingJob.fileName}`)
+          : pick(language, "只处理交易流水", "Transaction rows only"),
+        description: pick(language, "这里主要看交易、分类、商户和流入流出方向。", "Focus on spending transactions, categories, merchants, and inflow/outflow direction.")
       },
       {
-        label: pick(language, "??", "Review"),
-        title: pick(language, "??????", "Validate before write"),
-        description: pick(language, "???????,??????????", "Run preview and validation first, then confirm the transaction write.")
+        label: pick(language, "复核", "Review"),
+        title: pick(language, "先检查再写入", "Validate before write"),
+        description: pick(language, "先跑预览和校验，确认没问题以后再正式写入。", "Run preview and validation first, then confirm the transaction write.")
       },
       {
-        label: pick(language, "????", "Future integrations"),
-        title: pick(language, "? Provider ????", "Provider-ready boundary"),
-        description: pick(language, "????????,???? bank ? card API ?? CSV,?????????", "This path is isolated so bank or card APIs can replace CSV later without affecting portfolio import.")
+        label: pick(language, "后续扩展", "Future integrations"),
+        title: pick(language, "给未来的 Provider 留好边界", "Provider-ready boundary"),
+        description: pick(language, "这条路先用 CSV，后面就算换成 bank 或 card API，也不会影响投资导入。", "This path is isolated so bank or card APIs can replace CSV later without affecting portfolio import.")
       }
     ],
     spendingSuccessStates: [
-      pick(language, "????????? Spending ???????????????", "Imported transactions flow into Spending metrics, category breakdowns, and recent transaction history."),
-      pick(language, "???????????? recommendation runs?", "Transaction-only imports do not overwrite holdings or recommendation runs."),
-      pick(language, "????????? CSV ???? bank ? card provider,??????????", "This workflow can later swap CSV for bank or card provider integrations without changing the portfolio import path.")
+      pick(language, "导入后的流水会进入 Spending 页面，更新分类、指标和最近交易。", "Imported transactions flow into Spending metrics, category breakdowns, and recent transaction history."),
+      pick(language, "只导消费流水，不会改动你的持仓和推荐结果。", "Transaction-only imports do not overwrite holdings or recommendation runs."),
+      pick(language, "以后就算把 CSV 换成 bank 或 card provider，这条路也能平滑替换。", "This workflow can later swap CSV for bank or card provider integrations without changing the portfolio import path.")
     ],
     existingAccounts: accounts.map((account) => ({
       id: account.id,

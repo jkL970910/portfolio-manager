@@ -256,7 +256,27 @@ components/
 - Rules:
   - remains sticky below the floating header
   - scrolls independently when its own content becomes taller than the viewport
-  - should sit low enough to clear the full floating header + nav stack on first paint
+  - when the rail itself reaches the top or bottom, wheel scrolling should continue the main page instead of trapping the pointer
+- should sit low enough to clear the full floating header + nav stack on first paint
+
+## Portfolio Components
+
+### `AccountOverviewCard`
+
+- File: [account-overview-card.tsx](E:\Projects\Portfolio%20Manager\components\portfolio\account-overview-card.tsx)
+- Purpose: single-row account summary surface inside the Portfolio workspace
+- Supports:
+  - click-to-switch account context
+  - separate holdings-jump action
+  - dedicated account-detail entry point
+
+### `HoldingTable`
+
+- File: [holding-table.tsx](E:\Projects\Portfolio%20Manager\components\portfolio\holding-table.tsx)
+- Purpose: detailed holdings table used in portfolio and account detail surfaces
+- Supports:
+  - deep-link symbol entry into holding detail
+  - filtered / highlighted states
   - keeps native rail scrollbars visually hidden
   - should be reused anywhere a right-side analytical rail needs to stay visible without forcing the whole page to bottom out first
 

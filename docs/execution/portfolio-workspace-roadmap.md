@@ -92,6 +92,13 @@ User value:
 - user can click into one account or one holding and understand it
 - recommendation and health-score explanations now have concrete destinations
 
+Current delivery status:
+- account detail page is now implemented at `/portfolio/account/[accountId]`
+- holding detail page is now implemented at `/portfolio/holding/[holdingId]`
+- Portfolio account rows now expose a concrete account-detail entry point
+- holding symbols in the holdings table now deep-link into holding detail
+- Phase 2 currently covers read-only inspection only; edit and merge remain Phase 3
+
 ### Phase 3: Edit and repair workflows
 
 Goal:

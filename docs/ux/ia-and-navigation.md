@@ -42,6 +42,8 @@ Purpose:
 
 Contains:
 - account card list
+- account detail page
+- holding detail page
 - holdings detail
 - account allocation
 - sector exposure
@@ -49,13 +51,13 @@ Contains:
 - gain/loss
 - 6-month performance
 - health-score detail
-- future account detail page
-- future holding detail page
 
 Rules:
 - repeated account types must remain distinguishable
 - account category and account instance are different concepts and should both be supported
 - account-first reading comes before raw holding-table density
+- account detail is the primary drill-down destination from account rows
+- holding detail is the primary drill-down destination from symbol links inside holdings tables
 
 ### Recommendations
 

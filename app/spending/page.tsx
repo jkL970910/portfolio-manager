@@ -16,7 +16,11 @@ export default async function SpendingPage() {
     <AppShell
       viewer={viewer}
       title={pick(language, "消费流水", "Spending")}
-      description={pick(language, "这里专门看现金流和日常交易。它的重点不是精细记账，而是帮你看清最近花了多少、剩下多少还能继续投。", "This page is for cash flow and day-to-day transactions. The goal is not heavy bookkeeping. It is to help you see how much you spent recently and how much may still be available to invest.")}
+      description={pick(
+        language,
+        "这里专门看现金流和日常交易。重点不是做重记账，而是帮你看清最近花了多少、还有多少大概能继续投。",
+        "This page is for cash flow and day-to-day transactions. The goal is not heavy bookkeeping. It is to help you see how much you spent recently and how much may still be available to invest."
+      )}
     >
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         {data.metrics.map((metric) => (
@@ -31,6 +35,7 @@ export default async function SpendingPage() {
           </Card>
         ))}
       </div>
+
       <div className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
         <LineChartCard
           title={pick(language, "最近几个月花钱大概怎么走", "How spending has moved in recent months")}
@@ -39,6 +44,7 @@ export default async function SpendingPage() {
           dataKey="value"
           color="#be3b49"
         />
+
         <Card>
           <CardHeader>
             <CardTitle>{pick(language, "钱主要花在了哪里", "Where most of the money went")}</CardTitle>
@@ -58,6 +64,7 @@ export default async function SpendingPage() {
           </CardContent>
         </Card>
       </div>
+
       <Card>
         <CardHeader>
           <CardTitle>{pick(language, "最近都发生了哪些交易", "Recent transactions")}</CardTitle>

@@ -168,6 +168,7 @@ export function PortfolioWorkspace({ data, language, initialFilters }: Portfolio
               share={account.share}
               room={account.room}
               topHoldings={account.topHoldings}
+              detailHref={`/portfolio/account/${account.id}`}
               highlighted={Boolean((activeAccountId && account.id === activeAccountId) || (!activeAccountId && activeAccountTypeId && account.typeId === activeAccountTypeId))}
               onSelect={() => handleSelectAccount(account.id, account.typeId)}
               onViewHoldings={() => handleFocusHoldings(account.id, account.typeId)}
