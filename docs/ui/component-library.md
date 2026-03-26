@@ -347,6 +347,10 @@ components/
 - [holding-table.tsx](E:\Projects\Portfolio%20Manager\components\portfolio\holding-table.tsx)
   - reusable holdings detail table with freshness badges
   - supports optional highlighted rows when health drill-down cards deep-link back into `/portfolio`
+  - the share column must distinguish between:
+    - share of total portfolio
+    - share inside the current account
+  - do not collapse those two meanings into one generic "weight" label
 - [refresh-prices-panel.tsx](E:\Projects\Portfolio%20Manager\components\portfolio\refresh-prices-panel.tsx)
   - batch quote refresh workflow
 - [health-dimension-card.tsx](E:\Projects\Portfolio%20Manager\components\portfolio\health-dimension-card.tsx)

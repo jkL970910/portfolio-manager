@@ -65,7 +65,12 @@ export default async function PortfolioAccountDetailPage({
           </div>
           <div className="grid gap-3 sm:grid-cols-2">
             <StatBlock icon={<Wallet className="h-4 w-4" />} label={pick(language, "这个账户现在有多少", "Current account value")} value={detail.account.value} />
-            <StatBlock icon={<CircleGauge className="h-4 w-4" />} label={pick(language, "大约占整个组合多少", "Share of portfolio")} value={detail.account.share} />
+            <StatBlock
+              icon={<CircleGauge className="h-4 w-4" />}
+              label={pick(language, "这个账户占整个组合多少", "Share of total portfolio")}
+              value={detail.account.portfolioShare}
+              detail={pick(language, "这里看的分母是你全部投资资产，不只是这个账户。", "This compares the account with your full invested portfolio, not just this account.")}
+            />
             <StatBlock icon={<Wallet className="h-4 w-4" />} label={pick(language, "账户币种", "Account currency")} value={detail.account.currency} />
             <StatBlock icon={<Wallet className="h-4 w-4" />} label={pick(language, "额度和状态", "Room and status")} value={detail.account.room} />
           </div>

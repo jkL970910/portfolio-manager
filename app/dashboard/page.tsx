@@ -6,6 +6,7 @@
   ShieldCheck,
   TrendingUp
 } from "lucide-react";
+import Link from "next/link";
 import { requireViewer } from "@/lib/auth/session";
 import { getDashboardView } from "@/lib/backend/services";
 import { AppShell } from "@/components/layout/app-shell";
@@ -133,7 +134,11 @@ export default async function DashboardPage() {
             </CardHeader>
             <CardContent className="space-y-4">
               {data.accounts.map((account) => (
-                <div key={account.id} className="flex items-center justify-between rounded-[24px] border border-white/55 bg-white/36 p-4 backdrop-blur-md">
+                <Link
+                  key={account.id}
+                  href={account.href}
+                  className="flex items-center justify-between rounded-[24px] border border-white/55 bg-white/36 p-4 backdrop-blur-md transition hover:bg-white/48 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--ring)]"
+                >
                   <div>
                     <div className="flex items-center gap-2">
                       <p className="font-medium">{account.name}</p>
@@ -143,9 +148,12 @@ export default async function DashboardPage() {
                   </div>
                   <div className="text-right">
                     <p className="text-lg font-semibold">{account.value}</p>
-                    <Badge variant={account.badgeVariant}>{account.badge}</Badge>
+                    <div className="mt-2 inline-flex items-center gap-2">
+                      <Badge variant={account.badgeVariant}>{account.badge}</Badge>
+                      <MoveUpRight className="h-3.5 w-3.5 text-[color:var(--muted-foreground)]" />
+                    </div>
                   </div>
-                </div>
+                </Link>
               ))}
             </CardContent>
           </Card>
@@ -205,6 +213,7 @@ export default async function DashboardPage() {
                   </div>
                   <div className="text-right">
                     <p className="font-semibold">{holding.weight}</p>
+                    <p className="text-sm text-[color:var(--muted-foreground)]">{pick(language, "约占整个组合", "Of total portfolio")}</p>
                     <p className="text-sm text-[color:var(--muted-foreground)]">{holding.value}</p>
                   </div>
                 </div>

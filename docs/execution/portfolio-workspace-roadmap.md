@@ -183,6 +183,10 @@ Phase 1 is done when:
 - Account cards use a single-row layout so long account lists do not create empty grid gaps.
 - Clicking an account card changes the page context without forcing a scroll jump; the in-card button is the only control that jumps to the holdings table.
 - Clicking the already selected account card returns the workspace to the full-portfolio context.
+- Dashboard account rows should open account detail directly, instead of behaving like passive summaries.
+- Share labels must stay explicit across portfolio, account detail, and holding detail:
+  - share of total portfolio
+  - share inside the current account
 - A global floating scroll-to-top control is available across pages through AppShell.
 - Sticky right rails should scroll independently when their own content exceeds viewport height, instead of forcing the whole page to the bottom before lower rail modules become reachable.
 - Sticky rails should clear the full floating header and top-nav stack on first paint, and their native scrollbars should stay visually hidden.

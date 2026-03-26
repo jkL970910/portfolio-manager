@@ -734,7 +734,8 @@ export function buildDashboardData(args: {
           ? PRIORITY_BADGE_VARIANTS.first
           : accountPriorityOrder.includes(account.type)
             ? PRIORITY_BADGE_VARIANTS.second
-            : PRIORITY_BADGE_VARIANTS.later
+            : PRIORITY_BADGE_VARIANTS.later,
+        href: `/portfolio/account/${account.id}`
       })),
     drift: drift.map((item) => ({
       assetClass: getAssetClassLabel(item.assetClass, language),
@@ -849,7 +850,7 @@ export function buildPortfolioData(args: {
         currency: account.currency ?? "CAD",
         value: formatDisplayCurrency(account.marketValueCad, display),
         share: totalPortfolio > 0
-          ? pick(language, `大约占组合 ${formatCompactPercent((account.marketValueCad / totalPortfolio) * 100, 0)}`, `About ${formatCompactPercent((account.marketValueCad / totalPortfolio) * 100, 0)} of the portfolio`)
+          ? pick(language, `大约占整个组合 ${formatCompactPercent((account.marketValueCad / totalPortfolio) * 100, 0)}`, `About ${formatCompactPercent((account.marketValueCad / totalPortfolio) * 100, 0)} of the full portfolio`)
           : pick(language, "还没有资产", "No assets yet"),
         room: account.contributionRoomCad !== null
           ? pick(
@@ -859,7 +860,7 @@ export function buildPortfolioData(args: {
           )
           : pick(language, "这类账户这里不记录额度。", "This account type does not track room here"),
         topHoldings: accountHoldings.slice(0, 3).map((holding) => holding.symbol),
-        href: `/portfolio?account=${account.id}`
+        href: `/portfolio/account/${account.id}`
       };
     });
   const accountContexts = [...accounts]
@@ -948,23 +949,29 @@ export function buildPortfolioData(args: {
     },
     holdings: [...holdings]
       .sort((left, right) => right.marketValueCad - left.marketValueCad)
-      .map((holding) => ({
-        id: holding.id,
-        symbol: holding.symbol,
-        name: holding.name,
-        assetClass: holding.assetClass,
-        sector: holding.sector,
-        accountId: holding.accountId,
-        accountType: accounts.find((account) => account.id === holding.accountId)?.type ?? "Taxable",
-        account: instanceLabelMap.get(holding.accountId) ?? pick(language, "账户", "Account"),
-        href: `/portfolio/holding/${holding.id}`,
-        lastPrice: formatHoldingPrice(holding.lastPriceAmount, holding.currency, holding.lastPriceCad, display, language),
-        lastUpdated: formatHoldingLastUpdated(holding.updatedAt, language),
-        freshnessVariant: getHoldingFreshnessVariant(holding.updatedAt),
-        weight: formatCompactPercent(holding.weightPct, 1),
-        gainLoss: formatSignedPercent(holding.gainLossPct, 1),
-        signal: getSignalForHolding(holding, driftMap, language)
-      })),
+      .map((holding) => {
+        const accountHoldings = holdings.filter((entry) => entry.accountId === holding.accountId);
+        const accountTotalCad = sum(accountHoldings.map((entry) => entry.marketValueCad));
+        const accountSharePct = accountTotalCad > 0 ? (holding.marketValueCad / accountTotalCad) * 100 : 0;
+        return {
+          id: holding.id,
+          symbol: holding.symbol,
+          name: holding.name,
+          assetClass: holding.assetClass,
+          sector: holding.sector,
+          accountId: holding.accountId,
+          accountType: accounts.find((account) => account.id === holding.accountId)?.type ?? "Taxable",
+          account: instanceLabelMap.get(holding.accountId) ?? pick(language, "账户", "Account"),
+          href: `/portfolio/holding/${holding.id}`,
+          lastPrice: formatHoldingPrice(holding.lastPriceAmount, holding.currency, holding.lastPriceCad, display, language),
+          lastUpdated: formatHoldingLastUpdated(holding.updatedAt, language),
+          freshnessVariant: getHoldingFreshnessVariant(holding.updatedAt),
+          portfolioShare: formatCompactPercent(holding.weightPct, 1),
+          accountShare: formatCompactPercent(accountSharePct, 1),
+          gainLoss: formatSignedPercent(holding.gainLossPct, 1),
+          signal: getSignalForHolding(holding, driftMap, language)
+        };
+      }),
     summaryPoints: [
       mainGap
         ? pick(
@@ -1020,7 +1027,7 @@ export function buildPortfolioAccountDetailData(args: {
       institution: accountCard.institution,
       currency: accountCard.currency,
       value: accountCard.value,
-      share: accountCard.share,
+      portfolioShare: accountCard.share,
       room: accountCard.room,
       topHoldings: accountCard.topHoldings,
       summaryPoints: accountContext.summaryPoints
@@ -1075,7 +1082,8 @@ export function buildPortfolioHoldingDetailData(args: {
       lastPrice: viewHolding.lastPrice,
       lastUpdated: viewHolding.lastUpdated,
       freshnessVariant: viewHolding.freshnessVariant,
-      weight: viewHolding.weight,
+      portfolioShare: viewHolding.portfolioShare,
+      accountShare: viewHolding.accountShare,
       gainLoss: viewHolding.gainLoss
     },
     performance: getSixMonthSeries(rawHolding.marketValueCad || 1, profile, getMonthLabels(language)).map((point, index, series) => ({

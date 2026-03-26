@@ -15,7 +15,8 @@ type HoldingTableRow = {
   lastPrice: string;
   lastUpdated: string;
   freshnessVariant: "success" | "warning" | "neutral";
-  weight: string;
+  portfolioShare: string;
+  accountShare: string;
   gainLoss: string;
   signal: string;
   highlighted?: boolean;
@@ -38,7 +39,7 @@ export function HoldingTable({
             <th className="pb-3 font-medium">{pick(language, "放在哪个账户里", "Account")}</th>
             <th className="pb-3 font-medium">{pick(language, "最近价格", "Last price")}</th>
             <th className="pb-3 font-medium">{pick(language, "上次更新", "Last updated")}</th>
-            <th className="pb-3 font-medium">{pick(language, "占组合多少", "Weight")}</th>
+            <th className="pb-3 font-medium">{pick(language, "大概占多少", "Share")}</th>
             <th className="pb-3 font-medium">{pick(language, "盈亏", "Gain / loss")}</th>
             <th className="pb-3 font-medium">{pick(language, "现在先怎么看这笔", "What this means now")}</th>
           </tr>
@@ -85,7 +86,18 @@ export function HoldingTable({
                   </Badge>
                 </div>
               </td>
-              <td className="py-4">{holding.weight}</td>
+              <td className="py-4">
+                <div className="space-y-1 text-sm">
+                  <div>
+                    <span className="text-[color:var(--muted-foreground)]">{pick(language, "占整个组合", "Of total portfolio")}</span>
+                    <span className="ml-2 font-medium text-[color:var(--foreground)]">{holding.portfolioShare}</span>
+                  </div>
+                  <div>
+                    <span className="text-[color:var(--muted-foreground)]">{pick(language, "占这个账户", "Inside this account")}</span>
+                    <span className="ml-2 font-medium text-[color:var(--foreground)]">{holding.accountShare}</span>
+                  </div>
+                </div>
+              </td>
               <td className="py-4">{holding.gainLoss}</td>
               <td className="py-4 text-[color:var(--muted-foreground)]">{holding.signal}</td>
             </tr>

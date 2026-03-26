@@ -19,6 +19,7 @@ export interface DashboardData {
     room: string;
     badge: string;
     badgeVariant: "primary" | "success" | "warning" | "neutral";
+    href: string;
   }[];
   drift: {
     assetClass: string;
@@ -210,7 +211,8 @@ export interface PortfolioData {
     lastPrice: string;
     lastUpdated: string;
     freshnessVariant: "success" | "warning" | "neutral";
-    weight: string;
+    portfolioShare: string;
+    accountShare: string;
     gainLoss: string;
     signal: string;
   }[];
@@ -231,7 +233,7 @@ export interface PortfolioAccountDetailData {
     institution: string;
     currency: string;
     value: string;
-    share: string;
+    portfolioShare: string;
     room: string;
     topHoldings: string[];
     summaryPoints: string[];
@@ -263,7 +265,8 @@ export interface PortfolioHoldingDetailData {
     lastPrice: string;
     lastUpdated: string;
     freshnessVariant: "success" | "warning" | "neutral";
-    weight: string;
+    portfolioShare: string;
+    accountShare: string;
     gainLoss: string;
   };
   performance: { label: string; value: number }[];

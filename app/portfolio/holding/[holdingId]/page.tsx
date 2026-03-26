@@ -61,9 +61,20 @@ export default async function PortfolioHoldingDetailPage({
               </div>
             </div>
           </div>
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
             <StatBlock icon={<Landmark className="h-4 w-4" />} label={pick(language, "这笔现在值多少", "Current value")} value={detail.holding.value} />
-            <StatBlock icon={<Landmark className="h-4 w-4" />} label={pick(language, "占整个组合多少", "Share of portfolio")} value={detail.holding.weight} />
+            <StatBlock
+              icon={<Landmark className="h-4 w-4" />}
+              label={pick(language, "占整个组合多少", "Share of total portfolio")}
+              value={detail.holding.portfolioShare}
+              detail={pick(language, "分母是你全部投资资产，所以这里是这笔持仓在全局里的分量。", "This uses the full invested portfolio as the denominator, so it shows the position's global share.")}
+            />
+            <StatBlock
+              icon={<Landmark className="h-4 w-4" />}
+              label={pick(language, "占这个账户多少", "Share inside this account")}
+              value={detail.holding.accountShare}
+              detail={pick(language, "这里只看它在当前账户里占了多大一块。", "This only measures how large the position is inside the current account.")}
+            />
             <StatBlock icon={<Landmark className="h-4 w-4" />} label={pick(language, "最近价格", "Last price")} value={detail.holding.lastPrice} />
             <StatBlock icon={<Landmark className="h-4 w-4" />} label={pick(language, "当前盈亏", "Gain / loss")} value={detail.holding.gainLoss} />
           </div>

@@ -57,7 +57,11 @@ Rules:
 - account category and account instance are different concepts and should both be supported
 - account-first reading comes before raw holding-table density
 - account detail is the primary drill-down destination from account rows
+- dashboard account rows should also deep-link directly into account detail, not behave like passive summaries
 - holding detail is the primary drill-down destination from symbol links inside holdings tables
+- portfolio and holding surfaces must distinguish between:
+  - share of total portfolio
+  - share inside the current account
 
 ### Recommendations
 
