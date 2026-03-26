@@ -17,10 +17,12 @@ function getLetters(symbol: string) {
 export function SecurityMark({
   symbol,
   assetClass,
+  hint,
   className
 }: {
   symbol: string;
   assetClass?: string;
+  hint?: string;
   className?: string;
 }) {
   const tone = (assetClass && TONES[assetClass]) || 'bg-[linear-gradient(135deg,#d9e4ff,#f5d6eb)] text-[color:var(--foreground)]';
@@ -29,12 +31,17 @@ export function SecurityMark({
     <div
       aria-hidden="true"
       className={cn(
-        'flex h-11 w-11 shrink-0 items-center justify-center rounded-[16px] border border-white/70 text-xs font-semibold tracking-[0.14em] shadow-[var(--shadow-card)]',
+        'relative flex h-11 w-11 shrink-0 items-center justify-center rounded-[16px] border border-white/70 text-xs font-semibold tracking-[0.14em] shadow-[var(--shadow-card)]',
         tone,
         className
       )}
     >
       {getLetters(symbol)}
+      {hint ? (
+        <span className="absolute -bottom-1.5 left-1/2 inline-flex -translate-x-1/2 rounded-full border border-white/70 bg-white/88 px-1.5 py-0.5 text-[9px] font-semibold tracking-[0.08em] text-[color:var(--foreground)] shadow-[var(--shadow-soft)]">
+          {hint}
+        </span>
+      ) : null}
     </div>
   );
 }

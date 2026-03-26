@@ -47,7 +47,12 @@ export default async function PortfolioHoldingDetailPage({
               </Link>
             </div>
             <div className="flex items-start gap-4">
-              <SecurityMark symbol={detail.holding.symbol} assetClass={detail.holding.assetClass} className="h-14 w-14 rounded-[18px] text-sm" />
+              <SecurityMark
+                symbol={detail.holding.symbol}
+                assetClass={detail.holding.assetClass}
+                hint={detail.holding.securityType === "Unknown" ? undefined : detail.holding.securityType.slice(0, 3).toUpperCase()}
+                className="h-16 w-16 rounded-[20px] text-sm"
+              />
               <div className="space-y-2">
                 <div>
                   <h2 className="text-[30px] font-semibold tracking-[-0.04em] text-[color:var(--foreground)]">{detail.holding.symbol}</h2>
@@ -56,6 +61,8 @@ export default async function PortfolioHoldingDetailPage({
                 <div className="flex flex-wrap items-center gap-2 text-sm text-[color:var(--muted-foreground)]">
                   <span className="inline-flex rounded-full border border-white/60 bg-white/44 px-3 py-1">{detail.holding.assetClass}</span>
                   <span className="inline-flex rounded-full border border-white/60 bg-white/44 px-3 py-1">{detail.holding.sector}</span>
+                  <span className="inline-flex rounded-full border border-white/60 bg-white/44 px-3 py-1">{detail.holding.securityType}</span>
+                  <span className="inline-flex rounded-full border border-white/60 bg-white/44 px-3 py-1">{detail.holding.exchange}</span>
                   <span className="inline-flex rounded-full border border-white/60 bg-white/44 px-3 py-1">{detail.holding.accountName}</span>
                 </div>
               </div>
@@ -83,13 +90,47 @@ export default async function PortfolioHoldingDetailPage({
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
         <div className="space-y-6">
+          <SectionHeading
+            title={pick(language, "先认清这是什么标的", "Start by identifying the security")}
+            description={pick(language, "先把它是什么、主要在哪个市场、在你账户里占多大看清楚，再往下看走势和建议。", "Clarify what it is, where it trades, and how large it is inside your account before moving into trend and guidance.")}
+          />
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            {detail.facts.map((fact, index) => (
+              <StatBlock key={`holding-fact-${index}`} icon={<Landmark className="h-4 w-4" />} label={fact.label} value={fact.value} detail={fact.detail} />
+            ))}
+          </div>
+
           <LineChartCard
-            title={pick(language, `${detail.holding.symbol} 近 6 个月大概怎么走`, `How ${detail.holding.symbol} has moved over the last 6 months`)}
-            description={pick(language, "这里先看这笔持仓自己最近大概是稳着走，还是波动比较大。", "Start by checking whether this position has been moving steadily or swinging more than expected.")}
+            title={pick(language, `${detail.holding.symbol} 近 6 个月参考走势`, `Reference 6-month view for ${detail.holding.symbol}`)}
+            description={pick(language, "这里先给你一个参考走势，帮你判断这笔持仓最近大概是稳着走，还是波动比较大。完整历史回放后面再补。", "This gives you a reference view so you can quickly judge whether the position has been steadier or more volatile recently. Full historical replay comes later.")}
             data={detail.performance}
             dataKey="value"
             color="#152238"
           />
+
+          <SectionHeading
+            title={pick(language, "现在拿到的价格靠不靠谱", "How trustworthy the current quote looks")}
+            description={pick(language, "这里会说明这页当前拿到的价格来自哪里、是不是延迟行情，以及哪些地方还需要你自己判断。", "This explains where the current quote came from, whether it is delayed, and where your own judgment still matters.")}
+          />
+          <Card>
+            <CardContent className="space-y-4 px-6 py-6">
+              <div className="rounded-[24px] border border-white/55 bg-white/36 p-4 text-sm leading-7 text-[color:var(--muted-foreground)] backdrop-blur-md">
+                {detail.marketData.summary}
+              </div>
+              <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                {detail.marketData.facts.map((fact, index) => (
+                  <StatBlock key={`holding-market-fact-${index}`} icon={<Landmark className="h-4 w-4" />} label={fact.label} value={fact.value} detail={fact.detail} />
+                ))}
+              </div>
+              <div className="grid gap-3">
+                {detail.marketData.notes.map((note, index) => (
+                  <div key={`holding-market-note-${index}`} className="rounded-[24px] border border-white/55 bg-white/36 p-4 text-sm leading-7 text-[color:var(--muted-foreground)] backdrop-blur-md">
+                    {note}
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
 
           <SectionHeading
             title={pick(language, "这笔持仓在组合里扮演什么角色", "What this holding is doing in the portfolio")}

@@ -51,6 +51,9 @@ import {
 } from "@/lib/db/schema";
 import type { ImportJob, ImportMappingPreset, InvestmentAccount } from "@/lib/backend/models";
 import { convertCurrencyAmount, getFxRate } from "@/lib/market-data/fx";
+import { getSecurityQuote, resolveSecurity } from "@/lib/market-data/service";
+import type { SecurityQuote, SecurityResolution } from "@/lib/market-data/types";
+import { pick } from "@/lib/i18n/ui";
 
 export interface PreferenceProfileInput {
   riskProfile: RiskProfile;
@@ -686,6 +689,92 @@ export async function getPortfolioView(userId: string) {
   }, "database");
 }
 
+function formatSecurityTypeLabel(value?: string | null) {
+  if (!value) {
+    return "Unknown";
+  }
+
+  return value
+    .replace(/[_-]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/\b\w/g, (character) => character.toUpperCase());
+}
+
+function getHoldingDetailMarketDataSummary(params: {
+  language: DisplayLanguage;
+  quote: SecurityQuote;
+  resolution: SecurityResolution;
+}) {
+  const { language, quote, resolution } = params;
+  const providerLabel = quote.provider === "twelve-data"
+    ? "Twelve Data"
+    : resolution.provider === "openfigi"
+      ? "OpenFIGI"
+      : "fallback";
+
+  return {
+    summary: pick(
+      language,
+      quote.price > 0
+        ? `现在这页拿到了一笔可参考价格，来自 ${providerLabel}。它更适合帮你确认这笔持仓现在值多少钱，不代表完整历史回放已经接好。`
+        : "这页暂时没拿到一笔新的可参考价格，所以价格区会继续显示你上次成功拿到的缓存结果。",
+      quote.price > 0
+        ? `This page pulled a usable quote from ${providerLabel}. It helps you confirm what the position looks like right now, but it is not a full historical replay yet.`
+        : "A fresh quote was not available for this page, so the price area continues to rely on the last usable cached value."
+    ),
+    notes: [
+      pick(
+        language,
+        quote.delayed
+          ? "这里拿到的是延迟行情，适合看方向和大致位置，不适合当作精确成交价。"
+          : "这里拿到的是当前可用报价，可以用来快速核对这笔持仓。",
+        quote.delayed
+          ? "This quote is delayed. It is useful for direction and context, but not as an execution price."
+          : "This is the latest available quote and is suitable for a quick position check."
+      ),
+      pick(
+        language,
+        resolution.provider === "openfigi"
+          ? "标的名称、交易所和类型是按 OpenFIGI 解析出来的。"
+          : "这支标的的名称和类型暂时还不完整，所以部分字段会先显示成未知。",
+        resolution.provider === "openfigi"
+          ? "Name, exchange, and security type were resolved through OpenFIGI."
+          : "The security identity is still partial, so some fields remain unknown for now."
+      )
+    ],
+    facts: [
+      {
+        label: pick(language, "现在拿到的价格", "Quote right now"),
+        value: quote.price > 0
+          ? `${quote.currency ?? "N/A"} ${quote.price.toFixed(2)}`
+          : pick(language, "还没拿到新报价", "No fresh quote yet"),
+        detail: pick(language, "这是页面现在能拿到的最新参考价。", "This is the freshest reference quote currently available to the page.")
+      },
+      {
+        label: pick(language, "报价时间", "Quote time"),
+        value: new Date(quote.timestamp).toLocaleString(language === "zh" ? "zh-CN" : "en-CA", {
+          month: "short",
+          day: "numeric",
+          hour: "numeric",
+          minute: "2-digit"
+        }),
+        detail: pick(language, "这里显示的是这次报价返回的时间。", "This is the timestamp returned with the current quote.")
+      },
+      {
+        label: pick(language, "报价来源", "Quote source"),
+        value: quote.provider === "twelve-data" ? "Twelve Data" : pick(language, "缓存回退", "Fallback"),
+        detail: pick(language, quote.delayed ? "当前按延迟行情处理。" : "当前按可用现价处理。", quote.delayed ? "Currently treated as delayed market data." : "Currently treated as the latest available quote.")
+      },
+      {
+        label: pick(language, "标的识别来源", "Security identity source"),
+        value: resolution.provider === "openfigi" ? "OpenFIGI" : pick(language, "本地回退", "Fallback"),
+        detail: pick(language, "名称、交易所和类型会优先走这个来源。", "Name, exchange, and security type prefer this source when available.")
+      }
+    ]
+  };
+}
+
 export async function getPortfolioAccountDetailView(userId: string, accountId: string) {
   const repositories = getRepositories();
   const [user, userAccounts, userHoldings, profile] = await Promise.all([
@@ -708,6 +797,69 @@ export async function getPortfolioAccountDetailView(userId: string, accountId: s
     display,
     accountId
   });
+
+  if (!data) {
+    return apiSuccess({ data }, "database");
+  }
+
+  const accountHoldings = userHoldings.filter((holding) => holding.accountId === accountId);
+  const freshestUpdatedAt = accountHoldings
+    .map((holding) => holding.updatedAt)
+    .filter((value): value is string => Boolean(value))
+    .sort()
+    .at(-1);
+  const quotedHoldingCount = accountHoldings.filter((holding) => (holding.lastPriceCad ?? 0) > 0).length;
+  const dominantAssetClass = [...new Map(
+    accountHoldings.map((holding) => [holding.assetClass, 0])
+  ).keys()]
+    .map((assetClass) => ({
+      assetClass,
+      valueCad: accountHoldings
+        .filter((holding) => holding.assetClass === assetClass)
+        .reduce((sum, holding) => sum + holding.marketValueCad, 0)
+    }))
+    .sort((left, right) => right.valueCad - left.valueCad)[0];
+  const topHolding = [...accountHoldings].sort((left, right) => right.marketValueCad - left.marketValueCad)[0];
+
+  data.facts = [
+    {
+      label: pick(user.displayLanguage, "账户里有几笔持仓", "Holdings inside this account"),
+      value: String(accountHoldings.length),
+      detail: pick(user.displayLanguage, "这里数的是这个账户里现在有多少笔单独持仓。", "This counts the number of separate positions currently sitting in the account.")
+    },
+    {
+      label: pick(user.displayLanguage, "这一类资产最重", "Biggest sleeve inside this account"),
+      value: dominantAssetClass
+        ? pick(user.displayLanguage, `${dominantAssetClass.assetClass} 更重`, `${dominantAssetClass.assetClass} is the largest sleeve`)
+        : pick(user.displayLanguage, "还没看出来", "Not enough data yet"),
+      detail: dominantAssetClass
+        ? pick(user.displayLanguage, "这能帮你快速判断这个账户是不是已经压得太偏。", "This gives a quick read on whether the account is leaning too heavily into one sleeve.")
+        : pick(user.displayLanguage, "等导入更多持仓以后，这里会更有参考价值。", "This becomes more useful after more holdings are imported.")
+    },
+    {
+      label: pick(user.displayLanguage, "账户里最重的一笔", "Largest holding here"),
+      value: topHolding ? topHolding.symbol : pick(user.displayLanguage, "还没有", "None yet"),
+      detail: topHolding
+        ? pick(user.displayLanguage, "先看这笔仓位，再决定这个账户是不是过于集中。", "Start with this position when checking whether the account is getting too concentrated.")
+        : pick(user.displayLanguage, "这个账户里还没有可识别的主持仓。", "There is no identifiable lead holding in this account yet.")
+    },
+    {
+      label: pick(user.displayLanguage, "最近一次价格更新时间", "Latest price refresh in this account"),
+      value: freshestUpdatedAt
+        ? new Date(freshestUpdatedAt).toLocaleString(user.displayLanguage === "zh" ? "zh-CN" : "en-CA", {
+          month: "short",
+          day: "numeric",
+          hour: "numeric",
+          minute: "2-digit"
+        })
+        : pick(user.displayLanguage, "还没刷新过", "Not refreshed yet"),
+      detail: pick(
+        user.displayLanguage,
+        `这个账户里有 ${quotedHoldingCount}/${accountHoldings.length} 笔持仓已经拿到可参考价格。`,
+        `${quotedHoldingCount}/${accountHoldings.length} holdings in this account already have usable prices.`
+      )
+    }
+  ];
 
   return apiSuccess({ data }, "database");
 }
@@ -733,6 +885,72 @@ export async function getPortfolioHoldingDetailView(userId: string, holdingId: s
     profile,
     display,
     holdingId
+  });
+
+  if (!data) {
+    return apiSuccess({ data }, "database");
+  }
+
+  const [resolutionResponse, quoteResponse] = await Promise.all([
+    resolveSecurity(data.holding.symbol).catch(() => ({
+      result: {
+        symbol: data.holding.symbol,
+        name: data.holding.name,
+        exchange: null,
+        micCode: null,
+        compositeFigi: null,
+        shareClassFigi: null,
+        securityType: null,
+        marketSector: null,
+        provider: "fallback" as const
+      }
+    })),
+    getSecurityQuote(data.holding.symbol).catch(() => ({
+      result: {
+        symbol: data.holding.symbol,
+        price: 0,
+        currency: data.holding.currency,
+        timestamp: new Date().toISOString(),
+        provider: "fallback" as const,
+        delayed: true
+      }
+    }))
+  ]);
+
+  const resolution = resolutionResponse.result;
+  const quote = quoteResponse.result;
+
+  data.holding.securityType = formatSecurityTypeLabel(resolution.securityType);
+  data.holding.exchange = resolution.exchange ?? pick(user.displayLanguage, "未知交易所", "Unknown exchange");
+  data.holding.marketSector = resolution.marketSector
+    ? formatSecurityTypeLabel(resolution.marketSector)
+    : pick(user.displayLanguage, "未知市场", "Unknown market");
+  data.facts = [
+    {
+      label: pick(user.displayLanguage, "它是什么类型", "Security type"),
+      value: data.holding.securityType,
+      detail: pick(user.displayLanguage, "先认清它是 ETF、股票还是别的，再判断它适不适合继续加。", "Identify whether this is an ETF, stock, or something else before deciding whether it still fits.")
+    },
+    {
+      label: pick(user.displayLanguage, "主要在哪个市场", "Primary exchange"),
+      value: data.holding.exchange,
+      detail: pick(user.displayLanguage, "这能帮助你判断交易市场和后续换汇可能。", "This helps with market context and any future FX implications.")
+    },
+    {
+      label: pick(user.displayLanguage, "账户里的位置", "Position inside this account"),
+      value: data.holding.accountShare,
+      detail: pick(user.displayLanguage, "这里看的分母只是当前账户，不是全部资产。", "This uses the current account as the denominator, not the whole portfolio.")
+    },
+    {
+      label: pick(user.displayLanguage, "整个组合里的位置", "Position inside the full portfolio"),
+      value: data.holding.portfolioShare,
+      detail: pick(user.displayLanguage, "这里看的分母是你全部投资资产。", "This uses your full invested portfolio as the denominator.")
+    }
+  ];
+  data.marketData = getHoldingDetailMarketDataSummary({
+    language: user.displayLanguage,
+    quote,
+    resolution
   });
 
   return apiSuccess({ data }, "database");

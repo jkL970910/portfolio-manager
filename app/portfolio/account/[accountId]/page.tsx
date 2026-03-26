@@ -79,9 +79,19 @@ export default async function PortfolioAccountDetailPage({
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
         <div className="space-y-6">
+          <SectionHeading
+            title={pick(language, "先认清这个账户现在是什么样", "Start by sizing up this account")}
+            description={pick(language, "先把账户里有几笔持仓、哪类资产最重、最近价格更新到什么程度看清楚，再往下看走势和持仓。", "Check how many holdings sit here, which sleeve dominates, and how fresh the prices are before moving into trends and positions.")}
+          />
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            {detail.facts.map((fact, index) => (
+              <StatBlock key={`account-fact-${index}`} icon={<Wallet className="h-4 w-4" />} label={fact.label} value={fact.value} detail={fact.detail} />
+            ))}
+          </div>
+
           <LineChartCard
             title={pick(language, `${detail.account.name} 近 6 个月大概怎么走`, `How ${detail.account.name} has moved over the last 6 months`)}
-            description={pick(language, "先看这个账户自己是稳着往上，还是波动比较大。", "Start by checking whether this account has been moving steadily or swinging more than expected.")}
+            description={pick(language, "先看这个账户自己是稳着往上，还是波动比较大。这里先给参考走势，完整历史回放后面再补。", "Start by checking whether this account has been moving steadily or swinging more than expected. This is a reference trend for now; full historical replay comes later.")}
             data={detail.performance}
             dataKey="value"
             color="#152238"

@@ -33,6 +33,10 @@ type RecommendationDetailCardProps = {
       label: string;
       value: string;
     }[];
+    relatedLinks?: {
+      label: string;
+      href: string;
+    }[];
   };
   expanded?: boolean;
   onToggle?: () => void;
@@ -317,6 +321,15 @@ export function RecommendationDetailCard({
                     <DetailBlock key={`${priority.id}-${item.label}`} label={item.label} value={item.value} />
                   ))}
                 </div>
+                {priority.relatedLinks?.length ? (
+                  <div className="mt-4 space-y-2">
+                    {priority.relatedLinks.map((link) => (
+                      <Button key={`${priority.id}-${link.href}`} href={link.href} variant="secondary" className="w-full">
+                        {link.label}
+                      </Button>
+                    ))}
+                  </div>
+                ) : null}
               </div>
             </div>
           </div>

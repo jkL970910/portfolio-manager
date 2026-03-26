@@ -15,6 +15,7 @@ import { RecommendationSummaryCard } from "@/components/dashboard/recommendation
 import { DonutChartCard } from "@/components/charts/donut-chart";
 import { LineChartCard } from "@/components/charts/line-chart";
 import { RadarPreviewCard } from "@/components/charts/radar-preview";
+import { SecurityMark } from "@/components/portfolio/security-mark";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -192,31 +193,38 @@ export default async function DashboardPage() {
             </CardHeader>
             <CardContent className="space-y-3">
               {data.topHoldings.map((holding) => (
-                <div key={holding.id} className="flex items-center justify-between rounded-[24px] border border-white/55 bg-white/36 p-4 backdrop-blur-md">
-                  <div>
-                    <p className="font-medium">
-                      {holding.symbol} <span className="text-sm text-[color:var(--muted-foreground)]">{holding.name}</span>
-                    </p>
-                    <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-[color:var(--muted-foreground)]">
-                      <span>{holding.account}</span>
-                      <span>-</span>
-                      <span>{holding.lastPrice}</span>
-                      <Badge variant={holding.freshnessVariant}>
-                        {holding.freshnessVariant === "success"
-                          ? pick(language, "新鲜", "Fresh")
-                          : holding.freshnessVariant === "warning"
-                            ? pick(language, "偏旧", "Aging")
-                            : pick(language, "未知", "Unknown")}
-                      </Badge>
+                <Link
+                  key={holding.id}
+                  href={holding.href}
+                  className="flex items-center justify-between gap-4 rounded-[24px] border border-white/55 bg-white/36 p-4 backdrop-blur-md transition hover:bg-white/46 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--ring)]"
+                >
+                  <div className="flex items-start gap-3">
+                    <SecurityMark symbol={holding.symbol} />
+                    <div>
+                      <p className="font-medium">
+                        {holding.symbol} <span className="text-sm text-[color:var(--muted-foreground)]">{holding.name}</span>
+                      </p>
+                      <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-[color:var(--muted-foreground)]">
+                        <span>{holding.account}</span>
+                        <span>-</span>
+                        <span>{holding.lastPrice}</span>
+                        <Badge variant={holding.freshnessVariant}>
+                          {holding.freshnessVariant === "success"
+                            ? pick(language, "新鲜", "Fresh")
+                            : holding.freshnessVariant === "warning"
+                              ? pick(language, "偏旧", "Aging")
+                              : pick(language, "未知", "Unknown")}
+                        </Badge>
+                      </div>
+                      <p className="mt-1 text-[13px] text-[color:var(--muted-foreground)]">{holding.lastUpdated}</p>
                     </div>
-                    <p className="mt-1 text-[13px] text-[color:var(--muted-foreground)]">{holding.lastUpdated}</p>
                   </div>
                   <div className="text-right">
                     <p className="font-semibold">{holding.weight}</p>
                     <p className="text-sm text-[color:var(--muted-foreground)]">{pick(language, "约占整个组合", "Of total portfolio")}</p>
                     <p className="text-sm text-[color:var(--muted-foreground)]">{holding.value}</p>
                   </div>
-                </div>
+                </Link>
               ))}
             </CardContent>
           </Card>

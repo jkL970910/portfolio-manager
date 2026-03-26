@@ -59,9 +59,18 @@ Rules:
 - account detail is the primary drill-down destination from account rows
 - dashboard account rows should also deep-link directly into account detail, not behave like passive summaries
 - holding detail is the primary drill-down destination from symbol links inside holdings tables
+- dashboard top-holding rows should also deep-link into holding detail, not stop at overview-level cards
+- health-score holding drilldowns should open concrete holding detail pages when the diagnosis is about a specific position
+- recommendation cards should deep-link into concrete holding detail when the explanation explicitly references an already-heavy existing position
 - portfolio and holding surfaces must distinguish between:
   - share of total portfolio
   - share inside the current account
+- holding detail should clearly answer:
+  - what this security is
+  - where its current quote came from
+  - whether that quote is delayed or cached
+  - how large it is globally vs inside the account
+- account detail should surface a quick facts layer before the chart, so the user can size up the account before reading the full holdings list
 
 ### Recommendations
 

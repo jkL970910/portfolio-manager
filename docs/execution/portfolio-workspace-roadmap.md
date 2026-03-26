@@ -97,6 +97,15 @@ Current delivery status:
 - holding detail page is now implemented at `/portfolio/holding/[holdingId]`
 - Portfolio account rows now expose a concrete account-detail entry point
 - holding symbols in the holdings table now deep-link into holding detail
+- dashboard top-holding rows now deep-link directly into holding detail instead of stopping at summary cards
+- health-score holding drilldowns now open concrete holding detail pages, so problem diagnosis has a direct object-level destination
+- recommendation detail cards can now deep-link into an existing heavy holding when the explanation is explicitly about not adding more to that position
+- holding detail now includes:
+  - security identity facts
+  - quote-source facts
+  - delayed-vs-cached explanation
+  - stronger visual security mark treatment
+- account detail now includes a compact facts layer so the page immediately answers how many positions live there, which sleeve dominates, and how fresh the account's prices are
 - Phase 2 currently covers read-only inspection only; edit and merge remain Phase 3
 
 ### Phase 3: Edit and repair workflows

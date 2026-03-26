@@ -752,6 +752,7 @@ export function buildDashboardData(args: {
         symbol: holding.symbol,
         name: holding.name,
         account: instanceLabelMap.get(holding.accountId) ?? pick(language, "??", "Account"),
+        href: `/portfolio/holding/${holding.id}`,
         lastPrice: formatHoldingPrice(holding.lastPriceAmount, holding.currency, holding.lastPriceCad, display, language),
         lastUpdated: formatHoldingLastUpdated(holding.updatedAt, language),
         freshnessVariant: getHoldingFreshnessVariant(holding.updatedAt),
@@ -1032,6 +1033,7 @@ export function buildPortfolioAccountDetailData(args: {
       topHoldings: accountCard.topHoldings,
       summaryPoints: accountContext.summaryPoints
     },
+    facts: [],
     performance: accountContext.performance,
     allocation,
     healthScore: accountContext.healthDetail,
@@ -1084,7 +1086,18 @@ export function buildPortfolioHoldingDetailData(args: {
       freshnessVariant: viewHolding.freshnessVariant,
       portfolioShare: viewHolding.portfolioShare,
       accountShare: viewHolding.accountShare,
-      gainLoss: viewHolding.gainLoss
+      gainLoss: viewHolding.gainLoss,
+      securityType: pick(language, "正在识别", "Resolving"),
+      exchange: pick(language, "正在识别", "Resolving"),
+      marketSector: pick(language, "正在识别", "Resolving")
+    },
+    facts: [],
+    marketData: {
+      summary: pick(language, "这页会尽量补一笔最新价格和标的识别结果，帮你先确认这是什么、现在值多少。", "This page tries to pull a fresh quote and security identity so you can confirm what this is and what it roughly looks like right now."),
+      notes: [
+        pick(language, "真实历史回放还没接进来，所以这里的 6 个月曲线先当参考。", "Full historical replay is not wired in yet, so treat the 6-month chart as reference context.")
+      ],
+      facts: []
     },
     performance: getSixMonthSeries(rawHolding.marketValueCad || 1, profile, getMonthLabels(language)).map((point, index, series) => ({
       label: point.label,
@@ -1393,7 +1406,17 @@ export function buildRecommendationsData(args: {
               ? pick(language, "这笔比较小，可以考虑和下一笔一起做。", "This is a small trade; consider batching it with the next contribution.")
               : pick(language, "这笔金额已经够单独执行。", "The current amount is large enough to stand on its own.")
           }
-        ]
+        ],
+        relatedLinks: item.rationale?.existingHoldingId && item.rationale.existingHoldingSymbol
+          ? [{
+              label: pick(
+                language,
+                `打开 ${item.rationale.existingHoldingSymbol} 详情，看看它为什么已经算偏重`,
+                `Open ${item.rationale.existingHoldingSymbol} detail to see why it is already heavy`
+              ),
+              href: `/portfolio/holding/${item.rationale.existingHoldingId}`
+            }]
+          : []
       };
     }),
     scenarios: scenarioRuns.map((scenarioRun, scenarioIndex) => ({

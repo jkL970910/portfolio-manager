@@ -33,6 +33,7 @@ export interface DashboardData {
     symbol: string;
     name: string;
     account: string;
+    href: string;
     lastPrice: string;
     lastUpdated: string;
     freshnessVariant: "success" | "warning" | "neutral";
@@ -234,10 +235,15 @@ export interface PortfolioAccountDetailData {
     currency: string;
     value: string;
     portfolioShare: string;
-    room: string;
-    topHoldings: string[];
-    summaryPoints: string[];
-  };
+      room: string;
+      topHoldings: string[];
+      summaryPoints: string[];
+    };
+  facts: {
+    label: string;
+    value: string;
+    detail?: string;
+  }[];
   performance: { label: string; value: number }[];
   allocation: { name: string; value: number }[];
   healthScore: PortfolioData["healthScore"];
@@ -268,6 +274,23 @@ export interface PortfolioHoldingDetailData {
     portfolioShare: string;
     accountShare: string;
     gainLoss: string;
+    securityType: string;
+    exchange: string;
+    marketSector: string;
+  };
+  facts: {
+    label: string;
+    value: string;
+    detail?: string;
+  }[];
+  marketData: {
+    summary: string;
+    notes: string[];
+    facts: {
+      label: string;
+      value: string;
+      detail?: string;
+    }[];
   };
   performance: { label: string; value: number }[];
   portfolioRole: string[];
@@ -316,6 +339,10 @@ export interface RecommendationsData {
     execution: {
       label: string;
       value: string;
+    }[];
+    relatedLinks?: {
+      label: string;
+      href: string;
     }[];
   }[];
   scenarios: {

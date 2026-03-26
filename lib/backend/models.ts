@@ -162,6 +162,7 @@ export interface RecommendationItem {
     fxPenaltyBps: number;
     minTradeApplied: boolean;
     watchlistMatched: boolean;
+    existingHoldingId?: string;
     existingHoldingSymbol?: string;
     existingHoldingWeightPct?: number;
     existingHoldingRiskContributionPct?: number;

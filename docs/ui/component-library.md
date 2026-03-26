@@ -280,6 +280,18 @@ components/
   - keeps native rail scrollbars visually hidden
   - should be reused anywhere a right-side analytical rail needs to stay visible without forcing the whole page to bottom out first
 
+### `SecurityMark`
+
+- File: [security-mark.tsx](E:\Projects\Portfolio%20Manager\components\portfolio\security-mark.tsx)
+- Purpose: compact visual identity for a holding or security when no issuer logo exists
+- Supports:
+  - asset-class tone
+  - symbol monogram fallback
+  - optional short hint pill such as `ETF`
+- Use when:
+  - rendering a holding detail hero
+  - showing a holding row or account surface without depending on external logos
+
 ## Chart Components
 
 ### `LineChartCard`
@@ -376,6 +388,7 @@ components/
   - defaults to the first three decision steps and can expand into the full trace on demand
   - keeps long Chinese copy out of narrow multi-column stacks
   - adds short plain-language trace tags plus hover/focus glossary chips for core terms such as account fit and FX friction
+  - can expose a direct link into an already-heavy existing holding when the recommendation is explicitly avoiding further concentration there
 - [scenario-compare-card.tsx](E:\Projects\Portfolio%20Manager\components\recommendations\scenario-compare-card.tsx)
   - re-solved scenario compare surface with change-summary text versus the current recommendation run
 - [recommendations/page.tsx](E:\Projects\Portfolio%20Manager\app\recommendations\page.tsx)

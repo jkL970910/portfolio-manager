@@ -79,11 +79,7 @@ Help a self-directed investor:
    - page exists and is DB-backed
    - deeper categorization and budgeting workflows are still missing
 
-2. Portfolio diagnostics depth
-   - allocation, concentration, sector, and price freshness are present
-   - richer portfolio-health analysis is still missing
-
-3. Import review quality
+2. Import review quality
    - symbol audit and correction exist
    - richer persisted correction workflows and staged review state are still missing
 
@@ -91,14 +87,12 @@ Help a self-directed investor:
 
 | Rank | Feature | Priority | Why now |
 |---|---|---|---|
-| 1 | Portfolio workspace phase 1 | P0-next | Users still cannot clearly read account structure, distinguish repeated account types, or navigate Portfolio from an account-first mental model. |
-| 2 | Account detail and holding detail surfaces | P0-next | Health score and recommendations now need concrete account and holding drill-down destinations. |
-| 3 | Account and holding edit workflows | P1 | Users can inspect the portfolio but still cannot repair duplicate accounts, wrong account mapping, or holding placement mistakes. |
-| 4 | Real historical performance | P1 | Portfolio and dashboard trend lines still rely on synthetic history instead of replayed portfolio events. |
-| 5 | Richer import review persistence | P1 | Import review is functional, but corrections are still too session-bound and light. |
-| 6 | Watchlist and target constraints workflow | P1 | Preference storage exists, but the UX and recommendation impact are still too shallow. |
-| 7 | Cloud-ready cache / worker boundaries | P1 | Current market-data cache is process-local and import/recommendation work is still synchronous. |
-| 8 | Citizen/profile admin workflow | P1 | The citizen layer exists, but admin override and profile management are still minimal. |
+| 1 | Account and holding edit workflows | P0-next | Users can now inspect accounts and holdings in detail, but still cannot repair duplicate accounts, wrong account mapping, or holding placement mistakes. |
+| 2 | Real historical performance | P1 | Portfolio and dashboard trend lines still rely on synthetic history instead of replayed portfolio events. |
+| 3 | Richer import review persistence | P1 | Import review is functional, but corrections are still too session-bound and light. |
+| 4 | Watchlist and target constraints workflow | P1 | Preference storage exists, but the UX and recommendation impact are still too shallow. |
+| 5 | Cloud-ready cache / worker boundaries | P1 | Current market-data cache is process-local and import/recommendation work is still synchronous. |
+| 6 | Citizen/profile admin workflow | P1 | The citizen layer exists, but admin override and profile management are still minimal. |
 
 ## Deprioritized / Deferred
 
@@ -126,8 +120,8 @@ Help a self-directed investor:
 | Recommendation engine v2 | Completed | 5 | 4 | 4 | 5 | Keep deepening |
 | Recommendation explanation improvements | Completed | 4 | 2 | 2 | 5 | Keep refining |
 | Portfolio health score and radar analysis | Completed | 4 | 3 | 3 | 4 | Keep refining |
-| Portfolio workspace phase 1 | Planned | 5 | 3 | 2 | 5 | Build next |
-| Account detail and holding detail surfaces | Planned | 5 | 4 | 3 | 5 | Build after phase 1 |
+| Portfolio workspace phase 1 | Completed | 5 | 3 | 2 | 5 | Keep stable |
+| Account detail and holding detail surfaces | Completed | 5 | 4 | 3 | 5 | Keep stable |
 | Account and holding edit workflows | Planned | 5 | 4 | 4 | 5 | Build after detail surfaces |
 | Real historical performance | Planned | 5 | 5 | 4 | 5 | Build after edit foundation |
 | Spending overview and transactions | In Progress | 3 | 3 | 2 | 3 | Keep secondary |
@@ -141,14 +135,12 @@ Help a self-directed investor:
 
 ## Recommended Build Order From Here
 
-1. Portfolio workspace phase 1
-2. Account detail and holding detail surfaces
-3. Account and holding edit workflows
-4. Real historical performance
-5. Richer import review persistence and correction state
-6. Watchlist and target constraints workflow
-7. Citizen/profile admin workflow expansion
-8. Cloud-ready cache and async job boundaries
+1. Account and holding edit workflows
+2. Real historical performance
+3. Richer import review persistence and correction state
+4. Watchlist and target constraints workflow
+5. Citizen/profile admin workflow expansion
+6. Cloud-ready cache and async job boundaries
 
 ## Key Trade-offs
 

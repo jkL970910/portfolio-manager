@@ -96,6 +96,9 @@ Next build focus:
 Current state:
 - account detail page implemented
 - holding detail page implemented
+- dashboard top-holding rows now deep-link into holding detail
+- health-score holding drilldowns now deep-link into holding detail
+- recommendation detail can now open a referenced already-heavy holding directly
 - next gap is no longer inspection, but account/holding edit and repair workflows
 
 3. Add repair workflows
