@@ -104,7 +104,7 @@ export function AccountOverviewCard({
                     onViewHoldings?.();
                   }}
                 >
-                  {pick(language, '往下看这个账户里的持仓', "Jump to this account's holdings")}
+                  {pick(language, '查看账户里的持仓列表', "Jump to this account's holdings")}
                 </Button>
               </div>
             </div>
