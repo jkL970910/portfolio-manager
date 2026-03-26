@@ -275,12 +275,14 @@ components/
   - optional active slice emphasis
   - optional detail text per slice
   - optional header actions such as local view toggles
-  - slice hover tooltip with the full label, detail text, share, and optional current-focus hint
-  - optional helper copy below the chart
+  - slice hover tooltip with the full label, detail text, and share
 - Rules:
   - the surface must allow overflow so slice detail popups are not clipped by the card boundary
   - do not keep a permanent right-side legend list inside sticky rails
   - keep the chart visually centered and let hover/focus reveal the detail
+  - explicitly suppress chart labels and label lines so dense account mixes do not spill text into the card
+  - let hover tooltip carry the account detail so the chart stays visually centered
+  - optional helper copy below the chart
 
 ### `RadarPreview`
 
@@ -346,6 +348,7 @@ components/
   - keeps only one recommendation expanded at a time so the page height stays bounded
 - [recommendation-detail-card.tsx](E:\Projects\Portfolio%20Manager\components\recommendations\recommendation-detail-card.tsx)
   - compact recommendation summary card with a short top summary, a single amount rail, and a cleaner expanded layout
+  - uses wide summary blocks and stacked explanation groups instead of narrow text columns
   - defaults to the first three decision steps and can expand into the full trace on demand
   - keeps long Chinese copy out of narrow multi-column stacks
   - adds short plain-language trace tags plus hover/focus glossary chips for core terms such as account fit and FX friction
@@ -392,4 +395,5 @@ Correct target now:
 - stable in-repo component library
 - documented reuse rules
 - gradual extraction of repeated patterns
+
 

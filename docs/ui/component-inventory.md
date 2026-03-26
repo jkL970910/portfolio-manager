@@ -32,7 +32,7 @@
 | ScrollToTopButton | stable | [scroll-to-top-button.tsx](E:\Projects\Portfolio%20Manager\components\layout\scroll-to-top-button.tsx) | Global floating return-to-top control for long pages |
 | StickyRail | stable | [sticky-rail.tsx](E:\Projects\Portfolio%20Manager\components\layout\sticky-rail.tsx) | Shared sticky side rail wrapper with its own overflow-y scroll when rail content exceeds viewport height, a lowered top offset under the full header stack, and hidden native scrollbars |
 | LineChartCard | stable | [line-chart.tsx](E:\Projects\Portfolio%20Manager\components\charts\line-chart.tsx) | Shared trend chart shell |
-| DonutChartCard | stable | [donut-chart.tsx](E:\Projects\Portfolio%20Manager\components\charts\donut-chart.tsx) | Shared donut chart shell with active-slice emphasis and slice hover tooltips, avoiding permanent right-side legends in sticky rails |
+| DonutChartCard | stable | [donut-chart.tsx](E:\Projects\Portfolio%20Manager\components\charts\donut-chart.tsx) | Shared donut chart shell with active-slice emphasis and slice hover tooltips, no permanent right-side legends, and explicit suppression of chart labels so sticky rails stay clean |
 | RadarPreview | stable | [radar-preview.tsx](E:\Projects\Portfolio%20Manager\components\charts\radar-preview.tsx) | Shared preview chart with optional CTA destination and label |
 | AccountOverviewCard | stable | [account-overview-card.tsx](E:\Projects\Portfolio%20Manager\components\portfolio\account-overview-card.tsx) | Shared portfolio account-instance summary row with unique account naming, click-to-toggle account context, and a separate holdings-jump action |
 | AccountBreakdownPanel | stable | [account-breakdown-panel.tsx](E:\Projects\Portfolio%20Manager\components\portfolio\account-breakdown-panel.tsx) | Sticky right-rail account-instance donut summary that follows the selected account context and exposes account detail through slice hover instead of a permanent legend list |
@@ -54,7 +54,7 @@
 | HealthDrilldownCard | domain | [health-drilldown-card.tsx](E:\Projects\Portfolio%20Manager\components\portfolio\health-drilldown-card.tsx) | Account-type-level and holding-level drill-down card for the portfolio health detail surface, with a shared next-contribution amount switcher |
 | RecommendationRunPanel | domain | [recommendation-run-panel.tsx](E:\Projects\Portfolio%20Manager\components\recommendations\recommendation-run-panel.tsx) | Recommendation generation action |
 | RecommendationPriorityStack | domain | [recommendation-priority-stack.tsx](E:\Projects\Portfolio%20Manager\components\recommendations\recommendation-priority-stack.tsx) | Controller layer that keeps only one ranked recommendation expanded at a time |
-| RecommendationDetailCard | domain | [recommendation-detail-card.tsx](E:\Projects\Portfolio%20Manager\components\recommendations\recommendation-detail-card.tsx) | Compact recommendation card with a short summary top section, a cleaner two-column expanded layout, plain-language decision trace, and practical checks |
+| RecommendationDetailCard | domain | [recommendation-detail-card.tsx](E:\Projects\Portfolio%20Manager\components\recommendations\recommendation-detail-card.tsx) | Recommendation card with a short top summary, wide 2x2 summary blocks, a readable expanded layout for long Chinese copy, plain-language decision trace, and grouped practical checks |
 | ScenarioCompareCard | domain | [scenario-compare-card.tsx](E:\Projects\Portfolio%20Manager\components\recommendations\scenario-compare-card.tsx) | Re-solved scenario compare surface with delta summary versus the current run |
 | Recommendations input summary | domain | [recommendations/page.tsx](E:\Projects\Portfolio%20Manager\app\recommendations\page.tsx) | Top-of-page context block that separates the saved funding order from the usable order for this contribution, and weakens or warns on sheltered accounts whose room is exhausted |
 | PreferencesWorkbench | domain | [preferences-workbench.tsx](E:\Projects\Portfolio%20Manager\components\settings\preferences-workbench.tsx) | Guided + manual settings workflow |
@@ -73,3 +73,4 @@ When a new reusable component is created:
 1. Add it to this file
 2. Mark whether it is `stable`, `candidate`, or `domain`
 3. If it is shared, also document it in `component-library.md`
+

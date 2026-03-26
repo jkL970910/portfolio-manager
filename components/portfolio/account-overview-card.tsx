@@ -1,6 +1,6 @@
 ﻿'use client';
 
-import { Landmark, Wallet } from 'lucide-react';
+import { ArrowUpRight, Landmark, Wallet } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import type { DisplayLanguage } from '@/lib/i18n/ui';
@@ -17,6 +17,7 @@ type AccountOverviewCardProps = {
   room: string;
   topHoldings: string[];
   highlighted?: boolean;
+  detailHref?: `/portfolio/account/${string}`;
   onSelect?: () => void;
   onViewHoldings?: () => void;
 };
@@ -32,6 +33,7 @@ export function AccountOverviewCard({
   room,
   topHoldings,
   highlighted,
+  detailHref,
   onSelect,
   onViewHoldings
 }: AccountOverviewCardProps) {
@@ -81,18 +83,30 @@ export function AccountOverviewCard({
                 <p className="mt-2 text-2xl font-semibold text-[color:var(--foreground)]">{value}</p>
                 <p className="mt-1 text-sm text-[color:var(--muted-foreground)]">{share}</p>
               </div>
-              <Button
-                type="button"
-                variant="secondary"
-                className="w-full"
-                leadingIcon={<Wallet className="h-4 w-4" />}
-                onClick={(event) => {
-                  event.stopPropagation();
-                  onViewHoldings?.();
-                }}
-              >
-                {pick(language, '往下看这个账户里的持仓', "Jump to this account's holdings")}
-              </Button>
+              <div className="grid gap-2">
+                {detailHref ? (
+                  <Button
+                    href={detailHref}
+                    variant="secondary"
+                    className="w-full"
+                    leadingIcon={<ArrowUpRight className="h-4 w-4" />}
+                  >
+                    {pick(language, '打开这个账户详情', 'Open account detail')}
+                  </Button>
+                ) : null}
+                <Button
+                  type="button"
+                  variant="secondary"
+                  className="w-full"
+                  leadingIcon={<Wallet className="h-4 w-4" />}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    onViewHoldings?.();
+                  }}
+                >
+                  {pick(language, '往下看这个账户里的持仓', "Jump to this account's holdings")}
+                </Button>
+              </div>
             </div>
           </div>
         </div>

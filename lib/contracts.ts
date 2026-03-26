@@ -200,9 +200,13 @@ export interface PortfolioData {
   holdings: {
     id: string;
     symbol: string;
+    name: string;
+    assetClass: string;
+    sector: string;
     accountId: string;
     accountType: string;
     account: string;
+    href: string;
     lastPrice: string;
     lastUpdated: string;
     freshnessVariant: "success" | "warning" | "neutral";
@@ -211,6 +215,66 @@ export interface PortfolioData {
     signal: string;
   }[];
   summaryPoints: string[];
+}
+
+export interface PortfolioAccountDetailData {
+  displayContext: {
+    currency: "CAD" | "USD";
+    fxRateLabel: string;
+    fxNote: string;
+  };
+  account: {
+    id: string;
+    name: string;
+    typeId: string;
+    typeLabel: string;
+    institution: string;
+    currency: string;
+    value: string;
+    share: string;
+    room: string;
+    topHoldings: string[];
+    summaryPoints: string[];
+  };
+  performance: { label: string; value: number }[];
+  allocation: { name: string; value: number }[];
+  healthScore: PortfolioData["healthScore"];
+  holdings: PortfolioData["holdings"];
+}
+
+export interface PortfolioHoldingDetailData {
+  displayContext: {
+    currency: "CAD" | "USD";
+    fxRateLabel: string;
+    fxNote: string;
+  };
+  holding: {
+    id: string;
+    symbol: string;
+    name: string;
+    assetClass: string;
+    sector: string;
+    currency: string;
+    accountId: string;
+    accountName: string;
+    accountType: string;
+    accountHref: string;
+    value: string;
+    lastPrice: string;
+    lastUpdated: string;
+    freshnessVariant: "success" | "warning" | "neutral";
+    weight: string;
+    gainLoss: string;
+  };
+  performance: { label: string; value: number }[];
+  portfolioRole: string[];
+  healthSummary: {
+    score: number;
+    status: string;
+    summary: string;
+    drivers: string[];
+    actions: string[];
+  };
 }
 
 export interface RecommendationsData {

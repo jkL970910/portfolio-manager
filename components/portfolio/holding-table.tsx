@@ -1,4 +1,6 @@
-﻿import { Badge } from "@/components/ui/badge";
+﻿import Link from "next/link";
+import { SecurityMark } from "@/components/portfolio/security-mark";
+import { Badge } from "@/components/ui/badge";
 import { EmptyStatePanel } from "@/components/ui/empty-state-panel";
 import type { DisplayLanguage } from "@/lib/i18n/ui";
 import { pick } from "@/lib/i18n/ui";
@@ -6,7 +8,10 @@ import { pick } from "@/lib/i18n/ui";
 type HoldingTableRow = {
   id: string;
   symbol: string;
+  name: string;
+  assetClass: string;
   account: string;
+  href?: string;
   lastPrice: string;
   lastUpdated: string;
   freshnessVariant: "success" | "warning" | "neutral";
@@ -47,13 +52,23 @@ export function HoldingTable({
                 : "border-t border-white/45"}
             >
               <td className="py-4 font-medium text-[color:var(--foreground)]">
-                <div className="flex flex-col gap-2">
-                  <span>{holding.symbol}</span>
-                  {holding.highlightLabel ? (
-                    <span className="inline-flex w-fit rounded-full border border-[rgba(232,121,249,0.22)] bg-[rgba(255,255,255,0.82)] px-2.5 py-1 text-xs font-medium text-[color:var(--foreground)]">
-                      {holding.highlightLabel}
-                    </span>
-                  ) : null}
+                <div className="flex items-start gap-3">
+                  <SecurityMark symbol={holding.symbol} assetClass={holding.assetClass} />
+                  <div className="flex flex-col gap-2">
+                    {holding.href ? (
+                      <Link href={holding.href} className="font-semibold text-[color:var(--foreground)] transition hover:text-[color:var(--secondary)]">
+                        {holding.symbol}
+                      </Link>
+                    ) : (
+                      <span>{holding.symbol}</span>
+                    )}
+                    <span className="text-xs font-medium text-[color:var(--muted-foreground)]">{holding.name}</span>
+                    {holding.highlightLabel ? (
+                      <span className="inline-flex w-fit rounded-full border border-[rgba(232,121,249,0.22)] bg-[rgba(255,255,255,0.82)] px-2.5 py-1 text-xs font-medium text-[color:var(--foreground)]">
+                        {holding.highlightLabel}
+                      </span>
+                    ) : null}
+                  </div>
                 </div>
               </td>
               <td className="py-4 text-[color:var(--muted-foreground)]">{holding.account}</td>

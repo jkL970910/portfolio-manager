@@ -24,6 +24,8 @@ import {
   UserProfile
 } from "@/lib/backend/models";
 import {
+  buildPortfolioAccountDetailData,
+  buildPortfolioHoldingDetailData,
   buildDashboardData,
   buildImportData,
   buildPortfolioData,
@@ -682,6 +684,58 @@ export async function getPortfolioView(userId: string) {
       topHoldingSymbol: [...userHoldings].sort((left, right) => right.marketValueCad - left.marketValueCad)[0]?.symbol ?? null
     }
   }, "database");
+}
+
+export async function getPortfolioAccountDetailView(userId: string, accountId: string) {
+  const repositories = getRepositories();
+  const [user, userAccounts, userHoldings, profile] = await Promise.all([
+    repositories.users.getById(userId),
+    repositories.accounts.listByUserId(userId),
+    repositories.holdings.listByUserId(userId),
+    repositories.preferences.getByUserId(userId)
+  ]);
+
+  const display = {
+    currency: user.baseCurrency,
+    cadToDisplayRate: await getFxRate("CAD", user.baseCurrency)
+  } as const;
+
+  const data = buildPortfolioAccountDetailData({
+    language: user.displayLanguage,
+    accounts: userAccounts,
+    holdings: userHoldings,
+    profile,
+    display,
+    accountId
+  });
+
+  return apiSuccess({ data }, "database");
+}
+
+export async function getPortfolioHoldingDetailView(userId: string, holdingId: string) {
+  const repositories = getRepositories();
+  const [user, userAccounts, userHoldings, profile] = await Promise.all([
+    repositories.users.getById(userId),
+    repositories.accounts.listByUserId(userId),
+    repositories.holdings.listByUserId(userId),
+    repositories.preferences.getByUserId(userId)
+  ]);
+
+  const display = {
+    currency: user.baseCurrency,
+    cadToDisplayRate: await getFxRate("CAD", user.baseCurrency)
+  } as const;
+
+  const data = buildPortfolioHoldingDetailData({
+    language: user.displayLanguage,
+    accounts: userAccounts,
+    holdings: userHoldings,
+    profile,
+    display,
+    holdingId
+  });
+
+  return apiSuccess({ data }, "database");
 }
 
 export async function getRecommendationView(userId: string) {

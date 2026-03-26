@@ -21,8 +21,7 @@ export function DonutChartCard({
   activeId,
   headerActions,
   helperText,
-  noDataText,
-  activeFocusLabel
+  noDataText
 }: {
   title: string;
   description: string;
@@ -31,7 +30,6 @@ export function DonutChartCard({
   headerActions?: ReactNode;
   helperText?: string;
   noDataText?: string;
-  activeFocusLabel?: string;
 }) {
   const hasData = data.length > 0;
 
@@ -51,7 +49,17 @@ export function DonutChartCard({
           {hasData ? (
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
-                <Pie data={data} dataKey="value" nameKey="name" innerRadius={72} outerRadius={104} paddingAngle={5}>
+                <Pie
+                  data={data}
+                  dataKey="value"
+                  nameKey="name"
+                  innerRadius={72}
+                  outerRadius={104}
+                  paddingAngle={5}
+                  label={false}
+                  labelLine={false}
+                  isAnimationActive={false}
+                >
                   {data.map((entry, index) => {
                     const entryId = entry.id ?? entry.name;
                     const isActive = entryId === activeId;
@@ -66,7 +74,7 @@ export function DonutChartCard({
                     );
                   })}
                 </Pie>
-                <Tooltip content={<DonutTooltip data={data} activeId={activeId} activeFocusLabel={activeFocusLabel} />} />
+                <Tooltip cursor={false} content={<DonutTooltip data={data} activeId={activeId} />} />
               </PieChart>
             </ResponsiveContainer>
           ) : (
@@ -87,9 +95,9 @@ export function DonutChartCard({
 }
 
 function DonutTooltip(
-  props: TooltipProps<ValueType, NameType> & { data: DonutDatum[]; activeId?: string; activeFocusLabel?: string }
+  props: TooltipProps<ValueType, NameType> & { data: DonutDatum[]; activeId?: string }
 ) {
-  const { active, data, activeId, activeFocusLabel } = props;
+  const { active, data } = props;
   const payload = (props as TooltipProps<ValueType, NameType> & { payload?: Array<{ payload?: DonutDatum }> }).payload;
 
   if (!active || !payload?.length) {
@@ -104,8 +112,6 @@ function DonutTooltip(
   const entryId = raw.id ?? raw.name;
   const colorIndex = data.findIndex((item) => (item.id ?? item.name) === entryId);
   const color = COLORS[(colorIndex >= 0 ? colorIndex : 0) % COLORS.length];
-  const isActive = entryId === activeId;
-
   return (
     <div className="w-[260px] rounded-[22px] border border-white/65 bg-[linear-gradient(135deg,rgba(255,255,255,0.96),rgba(245,214,235,0.82),rgba(212,226,255,0.76))] p-4 text-sm shadow-[0_20px_40px_rgba(15,23,42,0.12)] backdrop-blur-xl">
       <div className="flex items-center gap-2">
@@ -114,9 +120,6 @@ function DonutTooltip(
       </div>
       {raw.detail ? <p className="mt-3 text-[color:var(--muted-foreground)]">{raw.detail}</p> : null}
       <p className="mt-3 text-[color:var(--foreground)]">{raw.value}%</p>
-      {isActive ? (
-        <p className="mt-2 text-xs font-medium text-[color:var(--primary)]">{activeFocusLabel ?? 'Current account focus'}</p>
-      ) : null}
     </div>
   );
 }

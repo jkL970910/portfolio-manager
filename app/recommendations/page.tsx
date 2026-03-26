@@ -61,7 +61,7 @@ export default async function RecommendationsPage() {
         </CardContent>
       </Card>
 
-      <div className="grid gap-6 xl:grid-cols-[0.9fr_1.1fr]">
+      <div className="grid gap-6 xl:grid-cols-[390px_minmax(0,1fr)] 2xl:grid-cols-[420px_minmax(0,1fr)]">
         <StickyRail>
           <SectionHeading
             title={pick(language, "这次推荐是按什么算的", "What this recommendation is based on")}

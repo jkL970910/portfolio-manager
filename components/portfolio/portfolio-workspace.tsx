@@ -271,6 +271,7 @@ export function PortfolioWorkspace({ data, language, initialFilters }: Portfolio
           </CardHeader>
           <CardContent className="space-y-3">
             <RefreshPricesPanel
+              language={language}
               lastRefreshed={data.quoteStatus.lastRefreshed}
               freshness={data.quoteStatus.freshness}
               coverage={data.quoteStatus.coverage}

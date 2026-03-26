@@ -57,21 +57,21 @@ function getShortDecisionTag(language: DisplayLanguage, text: string, tone: 'pos
     return pick(language, '放对账户', 'Right account');
   }
   if (text.includes('风险') || text.includes('集中') || normalized.includes('risk') || normalized.includes('concentration')) {
-    return pick(language, '别再加重风险', 'Reduce concentration');
+    return pick(language, '先别继续加重', 'Reduce concentration');
   }
   if (text.includes('标的') || text.includes('候选') || normalized.includes('security') || normalized.includes('candidate')) {
     return pick(language, '主标的更顺手', 'Best security');
   }
-  if (text.includes('FX') || text.includes('币种') || normalized.includes('fx') || normalized.includes('currency')) {
+  if (text.includes('FX') || text.includes('换汇') || normalized.includes('currency') || normalized.includes('fx')) {
     return pick(language, '少一点换汇成本', 'Less FX drag');
   }
   if (text.includes('目标') || text.includes('缺口') || normalized.includes('target') || normalized.includes('gap')) {
-    return pick(language, '先补最大缺口', 'Close the gap');
+    return pick(language, '先补最大缺口', 'Close the biggest gap');
   }
 
   return tone === 'positive'
     ? pick(language, '这点在帮它排前面', 'Helps it rank first')
-    : pick(language, '这点让别的路往后排', 'Pushes others back');
+    : pick(language, '这点在压低别的路', 'Pushes other paths back');
 }
 
 function getHelpTerms(language: DisplayLanguage): HelpTerm[] {
@@ -80,15 +80,15 @@ function getHelpTerms(language: DisplayLanguage): HelpTerm[] {
       label: pick(language, '什么叫放对账户', 'What “right account” means'),
       detail: pick(
         language,
-        '系统会一起看账户类型、额度和放置效率，挑一个更适合接这笔钱的位置。',
-        'The system checks account type, room, and placement efficiency to choose the better home for the contribution.'
+        '系统会一起看账户类别、可用额度和放置效率，挑一个更适合接这笔钱的位置。',
+        'The system checks account type, usable room, and placement efficiency before choosing the better home.'
       )
     },
     {
-      label: pick(language, '为什么会提到换汇成本', 'Why FX cost shows up'),
+      label: pick(language, '为什么会提到换汇成本', 'Why FX cost matters'),
       detail: pick(
         language,
-        '如果一条路会额外触发明显换汇，系统通常会把它往后排，除非它真的更值得。',
+        '如果某条路会多触发明显换汇，系统通常会把它往后排，除非它真的更值得。',
         'If a path adds noticeable FX drag, the system usually pushes it back unless the trade-off is clearly worth it.'
       )
     }
@@ -119,7 +119,7 @@ function groupConstraints(
       description: pick(
         language,
         '这些点不一定会拦住你，但最好先知道。',
-        'These do not always block the idea, but you should know them before acting.'
+        'These do not always block the idea, but they are worth checking first.'
       ),
       items: watch
     }
@@ -161,11 +161,12 @@ export function RecommendationDetailCard({
   const constraintGroups = useMemo(() => groupConstraints(priority.constraints, language), [language, priority.constraints]);
   const shouldCollapseTrace = decisionTrace.length > 3;
   const visibleTrace = shouldCollapseTrace && !isTraceExpanded ? decisionTrace.slice(0, 3) : decisionTrace;
+  const alternativesText = priority.alternatives.length > 0 ? priority.alternatives.join(' · ') : priority.tickers;
 
   return (
     <Card className="overflow-hidden">
       <CardContent className="space-y-5 px-5 py-5">
-        <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_240px]">
+        <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_220px] xl:items-start">
           <div className="space-y-4">
             <div className="flex flex-wrap items-center gap-3">
               <Badge variant="primary">#{index + 1}</Badge>
@@ -174,18 +175,12 @@ export function RecommendationDetailCard({
 
             <div className="rounded-[24px] border border-white/55 bg-white/38 px-5 py-4 backdrop-blur-md">
               <p className="text-xs uppercase tracking-[0.16em] text-[color:var(--muted-foreground)]">
-                {pick(language, '准备买什么', 'Lead security')}
+                {pick(language, '这次优先买它', 'Lead security')}
               </p>
               <p className="mt-3 text-lg font-semibold leading-8 text-[color:var(--foreground)]">{priority.security}</p>
             </div>
 
             <p className="text-base leading-8 text-[color:var(--muted-foreground)]">{priority.description}</p>
-
-            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-              <SummaryBlock label={pick(language, '这笔是在补什么', 'What this is fixing')} value={priority.gapSummary} />
-              <SummaryBlock label={pick(language, '先放去哪', 'Best account home')} value={priority.accountFit} />
-              <SummaryBlock label={pick(language, '系统怎么看这条建议', 'How the system sees it')} value={priority.scoreline} />
-            </div>
           </div>
 
           <div className="rounded-[24px] border border-white/55 bg-white/42 p-5 text-right backdrop-blur-md">
@@ -206,19 +201,26 @@ export function RecommendationDetailCard({
           </div>
         </div>
 
+        <div className="grid gap-3 lg:grid-cols-2">
+          <SummaryBlock label={pick(language, '这笔是在补什么', 'What this is fixing')} value={priority.gapSummary} />
+          <SummaryBlock label={pick(language, '先放去哪', 'Best account home')} value={priority.accountFit} />
+          <SummaryBlock label={pick(language, '系统怎么看这条建议', 'How the system sees it')} value={priority.scoreline} />
+          <SummaryBlock label={pick(language, '还有哪些能选', 'Other usable tickers')} value={alternativesText} />
+        </div>
+
         {isExpanded ? (
-          <div className="grid gap-4 xl:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)]">
+          <div className="grid gap-4 xl:grid-cols-[minmax(0,1.1fr)_minmax(320px,0.9fr)]">
             <div className="space-y-4">
-              <div className="grid gap-3 md:grid-cols-2">
+              <div className="grid gap-4 lg:grid-cols-2">
                 <DetailBlock
                   label={pick(language, '如果按这条建议去投', 'If you follow this path')}
                   value={priority.security}
                   detail={priority.gapSummary}
                 />
                 <DetailBlock
-                  label={pick(language, '还有哪些可选标的', 'Other usable tickers')}
-                  value={priority.tickers}
-                  detail={priority.alternatives.join(' · ')}
+                  label={pick(language, '还有哪些可以替代它', 'What could replace it')}
+                  value={alternativesText}
+                  detail={pick(language, '这些也能做同样的事，只是系统暂时没把它们排到最前面。', 'These can do a similar job, but the system did not rank them first this time.')}
                 />
               </div>
 
@@ -269,7 +271,7 @@ export function RecommendationDetailCard({
                         </div>
                         <Badge variant={step.tone === 'positive' ? 'success' : 'warning'}>
                           {step.tone === 'positive'
-                            ? pick(language, '在给它加分', 'Adds support')
+                            ? pick(language, '在加分', 'Adds support')
                             : pick(language, '在压低别的路', 'Pushes others back')}
                         </Badge>
                       </div>
@@ -299,7 +301,7 @@ export function RecommendationDetailCard({
                               ? pick(language, '看起来没问题', 'Looks fine')
                               : constraint.variant === 'warning'
                                 ? pick(language, '这里要留意', 'Watch this')
-                                : pick(language, '顺手补充', 'Extra context')}
+                                : pick(language, '补充背景', 'Extra context')}
                           </Badge>
                         </div>
                       </div>
