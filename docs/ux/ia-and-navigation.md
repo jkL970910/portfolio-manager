@@ -58,6 +58,7 @@ Rules:
 - account-first reading comes before raw holding-table density
 - account detail is the primary drill-down destination from account rows
 - dashboard account rows should also deep-link directly into account detail, not behave like passive summaries
+- dashboard and portfolio account rows should both use a clear whole-row hover affordance so users can tell the full row is clickable before they commit
 - holding detail is the primary drill-down destination from symbol links inside holdings tables
 - dashboard top-holding rows should also deep-link into holding detail, not stop at overview-level cards
 - health-score holding drilldowns should open concrete holding detail pages when the diagnosis is about a specific position

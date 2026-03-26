@@ -267,8 +267,11 @@ components/
 - Purpose: single-row account summary surface inside the Portfolio workspace
 - Supports:
   - click-to-switch account context
+  - hover lift / subtle scale to signal that the whole row is interactive
+  - explicit locked-state pill when the row is the active account context
   - separate holdings-jump action
   - dedicated account-detail entry point
+  - action buttons must stop event bubbling so row-level context toggling does not swallow detail navigation
 
 ### `HoldingTable`
 

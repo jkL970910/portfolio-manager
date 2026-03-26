@@ -138,7 +138,7 @@ export default async function DashboardPage() {
                 <Link
                   key={account.id}
                   href={account.href}
-                  className="flex items-center justify-between rounded-[24px] border border-white/55 bg-white/36 p-4 backdrop-blur-md transition hover:bg-white/48 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--ring)]"
+                  className="group flex items-center justify-between rounded-[24px] border border-white/55 bg-white/36 p-4 backdrop-blur-md transition-[transform,background-color,border-color,box-shadow] duration-200 hover:-translate-y-0.5 hover:scale-[1.01] hover:border-white/72 hover:bg-white/48 hover:shadow-[0_18px_34px_rgba(110,103,130,0.08)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--ring)]"
                 >
                   <div>
                     <div className="flex items-center gap-2">
@@ -151,7 +151,7 @@ export default async function DashboardPage() {
                     <p className="text-lg font-semibold">{account.value}</p>
                     <div className="mt-2 inline-flex items-center gap-2">
                       <Badge variant={account.badgeVariant}>{account.badge}</Badge>
-                      <MoveUpRight className="h-3.5 w-3.5 text-[color:var(--muted-foreground)]" />
+                      <MoveUpRight className="h-3.5 w-3.5 text-[color:var(--muted-foreground)] transition-transform duration-200 group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
                     </div>
                   </div>
                 </Link>
