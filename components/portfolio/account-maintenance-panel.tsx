@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 import { GitMerge, PencilLine, Plus, RefreshCw, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import type { DisplayLanguage } from "@/lib/backend/models";
@@ -62,22 +62,6 @@ export function AccountMaintenancePanel({
     detail.editContext.current.contributionRoomCad == null ? "" : String(detail.editContext.current.contributionRoomCad)
   );
 
-  const [symbol, setSymbol] = useState("");
-  const [holdingName, setHoldingName] = useState("");
-  const [holdingCurrency, setHoldingCurrency] = useState<"CAD" | "USD">(detail.editContext.holdingCreateContext.defaults.currency);
-  const [quantity, setQuantity] = useState("");
-  const [avgCost, setAvgCost] = useState("");
-  const [costBasis, setCostBasis] = useState("");
-  const [lastPrice, setLastPrice] = useState("");
-  const [marketValue, setMarketValue] = useState("");
-  const [costBasisTouched, setCostBasisTouched] = useState(false);
-  const [marketValueTouched, setMarketValueTouched] = useState(false);
-  const [assetClass, setAssetClass] = useState(detail.editContext.holdingCreateContext.assetClassOptions[0]?.value ?? "Canadian Equity");
-  const [sector, setSector] = useState("");
-  const [securityType, setSecurityType] = useState("");
-  const [exchange, setExchange] = useState("");
-  const [marketSector, setMarketSector] = useState("");
-
   const [targetAccountId, setTargetAccountId] = useState("");
   const [preview, setPreview] = useState<MergePreview | null>(null);
 
@@ -87,22 +71,6 @@ export function AccountMaintenancePanel({
     setMode((current) => (current === nextMode ? null : nextMode));
     setStatus("");
   }
-
-  useEffect(() => {
-    const parsedQuantity = toNullableNumber(quantity);
-    const parsedAvgCost = toNullableNumber(avgCost);
-    if (!costBasisTouched && parsedQuantity != null && parsedAvgCost != null) {
-      setCostBasis(String(Number((parsedQuantity * parsedAvgCost).toFixed(2))));
-    }
-  }, [avgCost, costBasisTouched, quantity]);
-
-  useEffect(() => {
-    const parsedQuantity = toNullableNumber(quantity);
-    const parsedLastPrice = toNullableNumber(lastPrice);
-    if (!marketValueTouched && parsedQuantity != null && parsedLastPrice != null) {
-      setMarketValue(String(Number((parsedQuantity * parsedLastPrice).toFixed(2))));
-    }
-  }, [lastPrice, marketValueTouched, quantity]);
 
   function saveAccount() {
     setStatus("");
@@ -124,44 +92,6 @@ export function AccountMaintenancePanel({
         return;
       }
       setStatus(pick(language, "账户资料已经保存，页面正在刷新。", "Account details saved. Refreshing now."));
-      router.refresh();
-    });
-  }
-
-  function createHolding() {
-    setStatus("");
-    startTransition(async () => {
-      const response = await fetch(`/api/portfolio/accounts/${detail.account.id}/holdings`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          symbol: symbol.trim().toUpperCase(),
-          name: holdingName.trim() || undefined,
-          currency: holdingCurrency,
-          quantity: toNullableNumber(quantity),
-          avgCostPerShareAmount: toNullableNumber(avgCost),
-          costBasisAmount: toNullableNumber(costBasis),
-          lastPriceAmount: toNullableNumber(lastPrice),
-          marketValueAmount: toNullableNumber(marketValue),
-          assetClass,
-          sector: sector.trim() || undefined,
-          securityType: securityType || undefined,
-          exchange: exchange || undefined,
-          marketSector: marketSector.trim() || undefined
-        })
-      });
-      const payload = await safeJson(response);
-      if (!response.ok) {
-        setStatus(getApiErrorMessage(payload, pick(language, "新增持仓失败。", "Failed to add the holding.")));
-        return;
-      }
-      const holdingId = (payload as { holdingId?: string }).holdingId;
-      if (holdingId) {
-        router.push(`/portfolio/holding/${holdingId}`);
-        router.refresh();
-        return;
-      }
-      setStatus(pick(language, "这笔持仓已经加到账户里。", "The holding has been added to the account."));
       router.refresh();
     });
   }
@@ -230,8 +160,8 @@ export function AccountMaintenancePanel({
             <p className="text-sm text-[color:var(--muted-foreground)]">
               {pick(
                 language,
-                "这里把改资料、往账户里加持仓、合并重复账户和删除空账户放在一起。先选一种操作，再往下做。",
-                "Use this panel to update account basics, add a holding, merge duplicates, or remove an empty account."
+                "这里把改资料、去导入页补持仓、合并重复账户和删除空账户放在一起。先选一种操作，再往下做。",
+                "Use this panel to update account basics, jump into import with this account pre-selected, merge duplicates, or remove an empty account."
               )}
             </p>
           </div>
@@ -252,8 +182,8 @@ export function AccountMaintenancePanel({
             <div className="rounded-[24px] border border-white/55 bg-white/36 p-4 text-sm leading-7 text-[color:var(--muted-foreground)]">
               {pick(
                 language,
-                "先选上面其中一种操作，再往下改账户资料、加持仓，或者把重复账户合并掉。删除账户也会收在“改账户资料”的最下面。",
-                "Pick one action above to edit the account, add a holding, or merge duplicates. Account deletion stays at the bottom of the edit flow."
+                "先选上面其中一种操作，再往下改账户资料、去导入页补持仓，或者把重复账户合并掉。删除账户也会收在“改账户资料”的最下面。",
+                "Pick one action above to edit the account, jump into import with this account, or merge duplicates. Account deletion stays at the bottom of the edit flow."
               )}
             </div>
           ) : null}
@@ -324,103 +254,16 @@ export function AccountMaintenancePanel({
               <div className="rounded-[22px] border border-white/55 bg-white/38 p-4 text-sm leading-7 text-[color:var(--muted-foreground)]">
                 {pick(
                   language,
-                  "这里适合往这个账户里补一笔新持仓。已有持仓如果要改数量、改分类或删除，直接点进那笔持仓详情页去操作。",
-                  "Use this section to add a new holding. To edit or delete an existing position, open that holding's detail page."
+                  "新增持仓最好还是走导入页，这样账户选择、价格校对和写入流程都和其他入口保持一致。这里会直接带着当前账户跳过去。",
+                  "Adding a new holding works best through the import page so account selection, quote checks, and write logic stay aligned with the rest of the app. This shortcut takes the current account with you."
                 )}
               </div>
-              <div className="space-y-4">
-                <label className="space-y-2">
-                  <span className="text-sm font-medium">{pick(language, "代码", "Symbol")}</span>
-                  <input className={FIELD_CLASS_NAME} value={symbol} onChange={(event) => setSymbol(event.target.value)} placeholder="XEQT" />
-                </label>
-                <label className="space-y-2">
-                  <span className="text-sm font-medium">{pick(language, "名称", "Name")}</span>
-                  <input className={FIELD_CLASS_NAME} value={holdingName} onChange={(event) => setHoldingName(event.target.value)} placeholder={pick(language, "可选，不填就沿用代码", "Optional; leave blank to reuse the symbol")} />
-                </label>
-                <label className="space-y-2">
-                  <span className="text-sm font-medium">{pick(language, "币种", "Currency")}</span>
-                  <select className={FIELD_CLASS_NAME} value={holdingCurrency} onChange={(event) => setHoldingCurrency(event.target.value as "CAD" | "USD")}>
-                    {detail.editContext.holdingCreateContext.currencyOptions.map((option) => (
-                      <option key={option.value} value={option.value}>{option.label}</option>
-                    ))}
-                  </select>
-                </label>
-                <label className="space-y-2">
-                  <span className="text-sm font-medium">{pick(language, "资产类别", "Asset class")}</span>
-                  <select className={FIELD_CLASS_NAME} value={assetClass} onChange={(event) => setAssetClass(event.target.value)}>
-                    {detail.editContext.holdingCreateContext.assetClassOptions.map((option) => (
-                      <option key={option.value} value={option.value}>{option.label}</option>
-                    ))}
-                  </select>
-                </label>
-                <label className="space-y-2">
-                  <span className="text-sm font-medium">{pick(language, "标的类型", "Security type")}</span>
-                  <select className={FIELD_CLASS_NAME} value={securityType} onChange={(event) => setSecurityType(event.target.value)}>
-                    <option value="">{pick(language, "先留空，让系统猜", "Leave blank and let the system infer it")}</option>
-                    {detail.editContext.holdingCreateContext.securityTypeOptions.map((option) => (
-                      <option key={option.value} value={option.value}>{option.label}</option>
-                    ))}
-                  </select>
-                </label>
-                <label className="space-y-2">
-                  <span className="text-sm font-medium">{pick(language, "交易所", "Exchange")}</span>
-                  <select className={FIELD_CLASS_NAME} value={exchange} onChange={(event) => setExchange(event.target.value)}>
-                    <option value="">{pick(language, "先留空，让系统猜", "Leave blank and let the system infer it")}</option>
-                    {detail.editContext.holdingCreateContext.exchangeOptions.map((option) => (
-                      <option key={option.value} value={option.value}>{option.label}</option>
-                    ))}
-                  </select>
-                </label>
-                <label className="space-y-2">
-                  <span className="text-sm font-medium">{pick(language, "行业", "Sector")}</span>
-                  <input className={FIELD_CLASS_NAME} value={sector} onChange={(event) => setSector(event.target.value)} placeholder={pick(language, "可选", "Optional")} />
-                </label>
-                <label className="space-y-2">
-                  <span className="text-sm font-medium">{pick(language, "市场标签", "Market tag")}</span>
-                  <input className={FIELD_CLASS_NAME} value={marketSector} onChange={(event) => setMarketSector(event.target.value)} placeholder={pick(language, "可选", "Optional")} />
-                </label>
-                <label className="space-y-2">
-                  <span className="text-sm font-medium">{pick(language, "数量", "Quantity")}</span>
-                  <input className={FIELD_CLASS_NAME} value={quantity} onChange={(event) => setQuantity(event.target.value)} inputMode="decimal" />
-                </label>
-                <label className="space-y-2">
-                  <span className="text-sm font-medium">{pick(language, "平均成本", "Average cost")}</span>
-                  <input className={FIELD_CLASS_NAME} value={avgCost} onChange={(event) => setAvgCost(event.target.value)} inputMode="decimal" />
-                </label>
-                <label className="space-y-2">
-                  <span className="text-sm font-medium">{pick(language, "总成本", "Cost basis")}</span>
-                  <input
-                    className={FIELD_CLASS_NAME}
-                    value={costBasis}
-                    onChange={(event) => {
-                      setCostBasisTouched(true);
-                      setCostBasis(event.target.value);
-                    }}
-                    inputMode="decimal"
-                  />
-                </label>
-                <label className="space-y-2">
-                  <span className="text-sm font-medium">{pick(language, "当前价格", "Current price")}</span>
-                  <input className={FIELD_CLASS_NAME} value={lastPrice} onChange={(event) => setLastPrice(event.target.value)} inputMode="decimal" />
-                </label>
-                <label className="space-y-2">
-                  <span className="text-sm font-medium">{pick(language, "当前总值", "Current value")}</span>
-                  <input
-                    className={FIELD_CLASS_NAME}
-                    value={marketValue}
-                    onChange={(event) => {
-                      setMarketValueTouched(true);
-                      setMarketValue(event.target.value);
-                    }}
-                    inputMode="decimal"
-                  />
-                  <p className="text-xs text-[color:var(--muted-foreground)]">
-                    {pick(language, "如果你先填了数量和当前价格，这里会自动跟着算；如果你想自己指定总值，也可以直接改这里。", "If quantity and current price are filled in, this value will auto-calculate. You can still override it manually if needed.")}
-                  </p>
-                </label>
-              </div>
-              <Button type="button" onClick={createHolding} disabled={isPending} leadingIcon={isPending ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}>
-                {isPending ? pick(language, "新增中...", "Adding...") : pick(language, "把这笔持仓加进账户", "Add this holding to the account")}
+              <Button
+                href={`/import?workflow=portfolio&mode=guided&accountMode=existing&accountId=${detail.account.id}&method=manual-entry`}
+                type="button"
+                leadingIcon={<Plus className="h-4 w-4" />}
+              >
+                {pick(language, "带着这个账户去导入页补持仓", "Open import with this account pre-selected")}
               </Button>
             </div>
           ) : null}

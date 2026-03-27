@@ -1,4 +1,16 @@
-export type SupportedAssetType = "Common Stock" | "ETF" | "Mutual Fund" | "ADR" | "Index" | "Crypto" | "Forex" | "Unknown";
+export type SupportedAssetType =
+  | "Common Stock"
+  | "ETF"
+  | "Commodity ETF"
+  | "Mutual Fund"
+  | "ADR"
+  | "REIT"
+  | "Trust"
+  | "Preferred Share"
+  | "Index"
+  | "Crypto"
+  | "Forex"
+  | "Unknown";
 
 export interface SecuritySearchResult {
   symbol: string;
@@ -25,6 +37,7 @@ export interface SecurityResolution {
 
 export interface SecurityQuote {
   symbol: string;
+  exchange?: string | null;
   price: number;
   currency?: string | null;
   timestamp: string;

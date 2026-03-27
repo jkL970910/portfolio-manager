@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { revalidatePath } from "next/cache";
 import { getAuthenticatedUserId } from "@/lib/auth/session";
 import { holdingCreateSchema } from "@/lib/backend/payload-schemas";
 import { createHoldingPosition } from "@/lib/backend/services";
@@ -21,6 +22,9 @@ export async function POST(
   try {
     const { accountId } = await params;
     const holdingId = await createHoldingPosition(userId, accountId, parsed.data);
+    revalidatePath("/portfolio", "layout");
+    revalidatePath("/dashboard");
+    revalidatePath("/recommendations");
     return NextResponse.json({ ok: true, holdingId });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Failed to create holding.";

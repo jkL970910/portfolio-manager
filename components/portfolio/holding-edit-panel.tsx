@@ -275,12 +275,34 @@ export function HoldingEditPanel({
                   </label>
                   <label className="space-y-2">
                     <span className="text-sm font-medium">{pick(language, "行业", "Sector")}</span>
-                    <input className={FIELD_CLASS_NAME} value={sectorOverride} onChange={(event) => setSectorOverride(event.target.value)} placeholder={detail.editContext.raw.sector} />
+                    <input
+                      className={FIELD_CLASS_NAME}
+                      value={sectorOverride}
+                      onChange={(event) => setSectorOverride(event.target.value)}
+                      placeholder={detail.editContext.raw.sector}
+                      list="holding-sector-suggestions"
+                    />
                   </label>
                   <label className="space-y-2">
                     <span className="text-sm font-medium">{pick(language, "市场标签", "Market tag")}</span>
-                    <input className={FIELD_CLASS_NAME} value={marketSectorOverride} onChange={(event) => setMarketSectorOverride(event.target.value)} placeholder={detail.editContext.raw.marketSector} />
+                    <input
+                      className={FIELD_CLASS_NAME}
+                      value={marketSectorOverride}
+                      onChange={(event) => setMarketSectorOverride(event.target.value)}
+                      placeholder={detail.editContext.raw.marketSector}
+                      list="holding-market-sector-suggestions"
+                    />
                   </label>
+                  <datalist id="holding-sector-suggestions">
+                    {detail.editContext.sectorSuggestions.map((option) => (
+                      <option key={option} value={option} />
+                    ))}
+                  </datalist>
+                  <datalist id="holding-market-sector-suggestions">
+                    {detail.editContext.marketSectorSuggestions.map((option) => (
+                      <option key={option} value={option} />
+                    ))}
+                  </datalist>
                 </div>
               </div>
 
@@ -292,26 +314,25 @@ export function HoldingEditPanel({
                   ? <Badge variant="warning">{pick(language, "这笔持仓已经有过手动修正。", "Manual overrides already exist")}</Badge>
                   : null}
               </div>
+              <div className="rounded-[26px] border border-[rgba(213,101,120,0.18)] bg-[linear-gradient(135deg,rgba(255,255,255,0.72),rgba(248,224,232,0.3),rgba(255,239,224,0.18))] p-5">
+                <div className="space-y-2">
+                  <p className="text-sm font-semibold text-[color:var(--foreground)]">{pick(language, "最后再决定要不要删除这笔持仓", "Finally, decide whether this holding should be removed")}</p>
+                  <p className="text-sm leading-7 text-[color:var(--muted-foreground)]">
+                    {pick(
+                      language,
+                      "只有在你确认这笔已经不该留在当前账户里时，才删掉它。删掉后会回到账户页，系统也会重新计算组合权重。",
+                      "Delete the holding only if it truly should no longer remain in this account. After removal, you will return to the account page and the portfolio weights will be recalculated."
+                    )}
+                  </p>
+                </div>
+                <div className="mt-4 flex flex-wrap gap-3">
+                  <Button type="button" variant="secondary" className="border-[rgba(213,101,120,0.26)] text-[color:var(--danger)]" onClick={() => setShowDeleteConfirm(true)} leadingIcon={<Trash2 className="h-4 w-4" />}>
+                    {pick(language, "删除这笔持仓", "Delete this holding")}
+                  </Button>
+                </div>
+              </div>
             </div>
           )}
-
-          <div className="rounded-[26px] border border-[rgba(213,101,120,0.18)] bg-[linear-gradient(135deg,rgba(255,255,255,0.72),rgba(248,224,232,0.3),rgba(255,239,224,0.18))] p-5">
-            <div className="space-y-2">
-              <p className="text-sm font-semibold text-[color:var(--foreground)]">{pick(language, "删除这笔持仓", "Delete this holding")}</p>
-              <p className="text-sm leading-7 text-[color:var(--muted-foreground)]">
-                {pick(
-                  language,
-                  "如果你确认这笔已经不该留在当前账户里，就可以删掉它。删掉后会回到账户页，系统也会重新计算组合权重。",
-                  "Delete the holding only if it should no longer exist in this account. After removal, you will return to the account page and the portfolio weights will be recalculated."
-                )}
-              </p>
-            </div>
-            <div className="mt-4 flex flex-wrap gap-3">
-              <Button type="button" variant="secondary" className="border-[rgba(213,101,120,0.26)] text-[color:var(--danger)]" onClick={() => setShowDeleteConfirm(true)} leadingIcon={<Trash2 className="h-4 w-4" />}>
-                {pick(language, "删除这笔持仓", "Delete this holding")}
-              </Button>
-            </div>
-          </div>
 
           {status ? <p className="text-sm text-[color:var(--muted-foreground)]">{status}</p> : null}
         </CardContent>

@@ -134,7 +134,7 @@ User value:
 Current delivery status:
 - account detail now includes one maintenance panel for:
   - account metadata edit
-  - add-holding flow for new positions
+  - add-holding shortcut that routes into import with the current account preselected
   - same-type merge preview + confirmation
   - delete-account confirmation
 - account maintenance now keeps edit, add-holding, and merge inside one shared panel, with account deletion moved to the bottom of edit mode
@@ -154,11 +154,13 @@ Current delivery status:
   - security type override
   - exchange override
   - market sector override
+- holding classification suggestions now explicitly cover gold / commodity / REIT / trust-style securities so common Canadian wrappers do not get forced into `Unknown`
 - holding amount repair now auto-derives cost basis and current value from quantity, average cost, and current price until the user manually overrides those derived fields
 - merge and edit actions now write to a shared `portfolio_edit_logs` table
 - holding classification repair is live and should be treated as part of the Phase 3 baseline
 - holding deletion is available from holding detail and returns the user to the parent account after confirmation
 - holding saves now invalidate related portfolio/account/dashboard/recommendation routes so parent totals and summaries refresh consistently
+- quote refresh now skips ambiguous cross-currency quotes when no explicit exchange override exists, so CAD wrappers and CDR-like positions do not get silently overwritten by mismatched USD prices
 
 ### Phase 4: Real historical performance
 

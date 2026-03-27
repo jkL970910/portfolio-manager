@@ -111,9 +111,11 @@ Current state:
 
 Current state:
 - account detail includes a unified maintenance panel for account edit, add-holding, merge, and delete-account confirmation
+- the add-holding path now deep-links into import with the current account already locked, instead of duplicating a second manual-create flow inside account detail
 - holding detail includes an edit panel with classification repair
 - account and holding write paths now feed a shared edit log
 - old import and quote-refresh write paths now reuse a shared portfolio-state recalculation helper so weight semantics stay aligned after edits, imports, and refreshes
+- quote refresh now protects against ambiguous cross-currency symbol matches when no exchange override is present, so CAD wrappers are not overwritten by mismatched USD prices
 
 4. Replace synthetic trend lines only after the structural model is ready
    - event-backed portfolio history

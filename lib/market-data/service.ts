@@ -5,6 +5,10 @@ import { resolveSecurityWithOpenFigi } from "@/lib/market-data/openfigi";
 import { getQuoteFromTwelveData, searchSecuritiesWithTwelveData } from "@/lib/market-data/twelve-data";
 import type { SecurityQuote, SecurityResolution, SecuritySearchResult } from "@/lib/market-data/types";
 
+type SecurityQuoteOptions = {
+  exchange?: string | null;
+};
+
 export async function searchSecurities(query: string): Promise<{ results: SecuritySearchResult[]; providerHealth: ReturnType<typeof getProviderHealth> }> {
   const trimmed = query.trim();
   if (trimmed.length < 1) {
@@ -52,17 +56,24 @@ export async function resolveSecurity(symbol: string): Promise<{ result: Securit
   };
 }
 
-export async function getSecurityQuote(symbol: string): Promise<{ result: SecurityQuote; providerHealth: ReturnType<typeof getProviderHealth> }> {
+export async function getSecurityQuote(
+  symbol: string,
+  options?: SecurityQuoteOptions
+): Promise<{ result: SecurityQuote; providerHealth: ReturnType<typeof getProviderHealth> }> {
   const trimmed = symbol.trim().toUpperCase();
+  const normalizedExchange = options?.exchange?.trim() || null;
   if (!trimmed) {
     throw new Error("Security symbol is required.");
   }
 
   const { quoteCacheTtlSeconds } = getMarketDataConfig();
-  const quote = await getOrSetCached(`market-data:quote:${trimmed}`, {
+  const cacheKey = normalizedExchange
+    ? `market-data:quote:${trimmed}:${normalizedExchange.toLowerCase()}`
+    : `market-data:quote:${trimmed}`;
+  const quote = await getOrSetCached(cacheKey, {
     ttlMs: quoteCacheTtlSeconds * 1000,
     staleOnErrorMs: quoteCacheTtlSeconds * 1000
-  }, async () => getQuoteFromTwelveData(trimmed));
+  }, async () => getQuoteFromTwelveData(trimmed, normalizedExchange));
 
   if (quote) {
     return { result: quote, providerHealth: getProviderHealth() };
@@ -71,6 +82,7 @@ export async function getSecurityQuote(symbol: string): Promise<{ result: Securi
   return {
     result: {
       symbol: trimmed,
+      exchange: normalizedExchange,
       price: 0,
       currency: null,
       timestamp: new Date().toISOString(),
@@ -81,10 +93,20 @@ export async function getSecurityQuote(symbol: string): Promise<{ result: Securi
   };
 }
 
-export async function getBatchSecurityQuotes(symbols: string[]): Promise<{ results: SecurityQuote[]; providerHealth: ReturnType<typeof getProviderHealth> }> {
-  const uniqueSymbols = [...new Set(symbols.map((symbol) => symbol.trim().toUpperCase()).filter(Boolean))];
-  const results = await Promise.all(uniqueSymbols.map(async (symbol) => {
-    const quote = await getSecurityQuote(symbol);
+export async function getBatchSecurityQuotes(
+  symbols: Array<string | { symbol: string; exchange?: string | null }>
+): Promise<{ results: SecurityQuote[]; providerHealth: ReturnType<typeof getProviderHealth> }> {
+  const uniqueSymbols = [...new Map(
+    symbols
+      .map((entry) => typeof entry === "string"
+        ? { symbol: entry.trim().toUpperCase(), exchange: null as string | null }
+        : { symbol: entry.symbol.trim().toUpperCase(), exchange: entry.exchange?.trim() || null }
+      )
+      .filter((entry) => entry.symbol)
+      .map((entry) => [`${entry.symbol}::${entry.exchange ?? ""}`, entry])
+  ).values()];
+  const results = await Promise.all(uniqueSymbols.map(async (entry) => {
+    const quote = await getSecurityQuote(entry.symbol, { exchange: entry.exchange });
     return quote.result;
   }));
 

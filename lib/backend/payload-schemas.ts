@@ -154,9 +154,13 @@ export const recommendationRunCreateSchema = z.object({
 export const holdingSecurityTypeSchema = z.enum([
   "Common Stock",
   "ETF",
+  "Commodity ETF",
   "Mutual Fund",
   "ADR",
   "Index",
+  "REIT",
+  "Trust",
+  "Preferred Share",
   "Crypto",
   "Forex",
   "Unknown"

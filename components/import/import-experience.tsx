@@ -367,7 +367,8 @@ export function ImportExperience({
   portfolioSteps,
   portfolioSuccessStates,
   spendingSuccessStates,
-  existingAccounts
+  existingAccounts,
+  initialContext
 }: {
   language?: DisplayLanguage;
   latestPortfolioJob: { status: string; fileName: string; createdAt: string } | null;
@@ -376,6 +377,13 @@ export function ImportExperience({
   portfolioSuccessStates: string[];
   spendingSuccessStates: string[];
   existingAccounts: ExistingAccountOption[];
+  initialContext?: {
+    workflowView?: ImportWorkflowView;
+    mode?: ImportMode;
+    accountMode?: "new" | "existing";
+    accountId?: string | null;
+    method?: GuidedMethod;
+  };
 }) {
   const [workflowView, setWorkflowView] = useState<ImportWorkflowView>("portfolio");
   const [mode, setMode] = useState<ImportMode>("guided");
@@ -458,6 +466,25 @@ export function ImportExperience({
     setContributionRoomCad(String(selected.contributionRoomCad ?? 0));
     setInitialMarketValueAmount(String(selected.marketValueAmount ?? selected.marketValueCad ?? 0));
   }, [accountMode, existingAccounts, selectedExistingAccountId]);
+
+  useEffect(() => {
+    if (!initialContext?.accountId) {
+      return;
+    }
+
+    const selected = existingAccounts.find((account) => account.id === initialContext.accountId);
+    if (!selected) {
+      return;
+    }
+
+    setWorkflowView(initialContext.workflowView ?? "portfolio");
+    setMode(initialContext.mode ?? "guided");
+    setAccountMode(initialContext.accountMode ?? "existing");
+    setSelectedExistingAccountId(selected.id);
+    setAccountType(selected.type as GuidedAccountType);
+    setMethod(initialContext.method ?? "manual-entry");
+    setCurrentStep(4);
+  }, [existingAccounts, initialContext]);
 
   function updateManualHolding(id: string, patch: Partial<ManualHoldingDraft>) {
     setManualHoldings((current) => current.map((holding) => holding.id === id ? { ...holding, ...patch } : holding));

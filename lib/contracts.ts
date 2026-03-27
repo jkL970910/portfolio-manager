@@ -271,6 +271,8 @@ export interface PortfolioAccountDetailData {
       assetClassOptions: { value: string; label: string }[];
       securityTypeOptions: { value: string; label: string }[];
       exchangeOptions: { value: string; label: string }[];
+      sectorSuggestions: string[];
+      marketSectorSuggestions: string[];
       defaults: {
         currency: "CAD" | "USD";
       };
@@ -342,6 +344,8 @@ export interface PortfolioHoldingDetailData {
     assetClassOptions: { value: string; label: string }[];
     securityTypeOptions: { value: string; label: string }[];
     exchangeOptions: { value: string; label: string }[];
+    sectorSuggestions: string[];
+    marketSectorSuggestions: string[];
     current: {
       name: string;
       currency: "CAD" | "USD";

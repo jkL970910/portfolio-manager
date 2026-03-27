@@ -375,19 +375,19 @@ function getRecommendationTheme(
 function getSignalForHolding(holding: HoldingPosition, driftMap: Map<string, number>, language: DisplayLanguage) {
   const gap = driftMap.get(holding.assetClass) ?? 0;
   if (holding.symbol === "CASH" && holding.weightPct > 8) {
-    return pick(language, "现金留得还是偏多，拖慢了整体配置。", "Cash drag is still elevated relative to the target mix.");
+    return pick(language, "Loo皇看你这笔现金留得偏多，先别继续囤着了，不然会拖慢整体配置。", "Loo sees too much idle cash here. Leaving it untouched would keep dragging the overall mix.");
   }
   if (gap < -4) {
     return pick(
       language,
-      `这类资产现在还配得不够，离目标大约还差 ${formatCompactPercent(Math.abs(gap), 0)}。`,
+      `Loo皇看这类资产还没补够，离你定的目标大约还差 ${formatCompactPercent(Math.abs(gap), 0)}。`,
       `This sleeve remains underweight by ${formatCompactPercent(Math.abs(gap), 0)} versus target.`
     );
   }
   if (holding.weightPct >= 15) {
-    return pick(language, "这笔仓位已经很重了，对整体波动影响也比较大。", "Core position is carrying a meaningful share of total portfolio risk.");
+    return pick(language, "Loo皇看这笔仓位已经够重，再往上加只会让整体波动更扎眼。", "Loo sees this position as already heavy enough. Adding more would make total portfolio swings stand out even more.");
   }
-  return pick(language, "它现在还算放得顺，没有成为组合的主要问题。", "Supports the current portfolio mix without driving the main gaps.");
+  return pick(language, "Loo皇暂时没有把这笔列成重点，它现在还算放得稳。", "Loo is not flagging this position as urgent right now. It still sits reasonably well in the current mix.");
 }
 
 function formatHoldingLastUpdated(value: string | null | undefined, language: DisplayLanguage) {
@@ -1106,9 +1106,13 @@ export function buildPortfolioAccountDetailData(args: {
         securityTypeOptions: [
           "Common Stock",
           "ETF",
+          "Commodity ETF",
           "Mutual Fund",
           "ADR",
           "Index",
+          "REIT",
+          "Trust",
+          "Preferred Share",
           "Crypto",
           "Forex",
           "Unknown"
@@ -1125,6 +1129,31 @@ export function buildPortfolioAccountDetailData(args: {
           "TSE",
           "Other / Manual"
         ].map((value) => ({ value, label: value })),
+        sectorSuggestions: [
+          "Multi-sector",
+          "Technology",
+          "Financials",
+          "Healthcare",
+          "Industrials",
+          "Consumer",
+          "Energy",
+          "Utilities",
+          "Materials",
+          "Real Estate",
+          "Precious Metals",
+          "Gold",
+          "Commodities"
+        ],
+        marketSectorSuggestions: [
+          "Broad Market",
+          "Precious Metals",
+          "Gold",
+          "Commodities",
+          "Semiconductors",
+          "Consumer Internet",
+          "Energy Infrastructure",
+          "Real Estate"
+        ],
         defaults: {
           currency: ((rawAccount?.currency ?? "CAD") as "CAD" | "USD")
         }
@@ -1253,9 +1282,13 @@ export function buildPortfolioHoldingDetailData(args: {
       securityTypeOptions: [
         "Common Stock",
         "ETF",
+        "Commodity ETF",
         "Mutual Fund",
         "ADR",
         "Index",
+        "REIT",
+        "Trust",
+        "Preferred Share",
         "Crypto",
         "Forex",
         "Unknown"
@@ -1272,6 +1305,31 @@ export function buildPortfolioHoldingDetailData(args: {
         "TSE",
         "Other / Manual"
       ].map((value) => ({ value, label: value })),
+      sectorSuggestions: [
+        "Multi-sector",
+        "Technology",
+        "Financials",
+        "Healthcare",
+        "Industrials",
+        "Consumer",
+        "Energy",
+        "Utilities",
+        "Materials",
+        "Real Estate",
+        "Precious Metals",
+        "Gold",
+        "Commodities"
+      ],
+      marketSectorSuggestions: [
+        "Broad Market",
+        "Precious Metals",
+        "Gold",
+        "Commodities",
+        "Semiconductors",
+        "Consumer Internet",
+        "Energy Infrastructure",
+        "Real Estate"
+      ],
       current: {
         name: rawHolding.name,
         currency: (rawHolding.currency ?? "CAD") as "CAD" | "USD",

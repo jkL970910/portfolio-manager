@@ -20,6 +20,7 @@ interface TwelveDataSearchResponse {
 interface TwelveDataPriceResponse {
   price?: string;
   currency?: string;
+  exchange?: string;
   code?: number;
   message?: string;
 }
@@ -31,10 +32,21 @@ function mapInstrumentType(value?: string): SupportedAssetType {
       return "Common Stock";
     case "etf":
       return "ETF";
+    case "commodity etf":
+    case "commodity":
+      return "Commodity ETF";
     case "mutual fund":
       return "Mutual Fund";
     case "adr":
       return "ADR";
+    case "reit":
+      return "REIT";
+    case "trust":
+    case "unit trust":
+      return "Trust";
+    case "preferred stock":
+    case "preferred share":
+      return "Preferred Share";
     case "index":
       return "Index";
     case "cryptocurrency":
@@ -80,7 +92,7 @@ export async function searchSecuritiesWithTwelveData(query: string): Promise<Sec
     }));
 }
 
-export async function getQuoteFromTwelveData(symbol: string): Promise<SecurityQuote | null> {
+export async function getQuoteFromTwelveData(symbol: string, exchange?: string | null): Promise<SecurityQuote | null> {
   const { twelveDataApiKey } = getMarketDataConfig();
   if (!twelveDataApiKey) {
     return null;
@@ -88,6 +100,9 @@ export async function getQuoteFromTwelveData(symbol: string): Promise<SecurityQu
 
   const url = new URL("https://api.twelvedata.com/price");
   url.searchParams.set("symbol", symbol);
+  if (exchange?.trim()) {
+    url.searchParams.set("exchange", exchange.trim());
+  }
   url.searchParams.set("apikey", twelveDataApiKey);
 
   const response = await fetch(url, { cache: "no-store" });
@@ -104,6 +119,7 @@ export async function getQuoteFromTwelveData(symbol: string): Promise<SecurityQu
 
   return {
     symbol,
+    exchange: payload.exchange ?? exchange ?? null,
     price,
     currency: payload.currency ?? null,
     timestamp: new Date().toISOString(),

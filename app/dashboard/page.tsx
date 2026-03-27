@@ -196,7 +196,7 @@ export default async function DashboardPage() {
                 <Link
                   key={holding.id}
                   href={holding.href}
-                  className="flex items-center justify-between gap-4 rounded-[24px] border border-white/55 bg-white/36 p-4 backdrop-blur-md transition hover:bg-white/46 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--ring)]"
+                  className="group flex items-center justify-between gap-4 rounded-[24px] border border-white/55 bg-white/36 p-4 backdrop-blur-md transition-[background-color,border-color,box-shadow,transform] duration-200 hover:-translate-y-0.5 hover:border-white/72 hover:bg-white/50 hover:shadow-[0_14px_28px_rgba(110,103,130,0.08)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--ring)]"
                 >
                   <div className="flex items-start gap-3">
                     <SecurityMark symbol={holding.symbol} />
@@ -204,6 +204,7 @@ export default async function DashboardPage() {
                       <p className="font-medium">
                         {holding.symbol} <span className="text-sm text-[color:var(--muted-foreground)]">{holding.name}</span>
                       </p>
+                      <p className="mt-1 text-xs font-medium text-[color:var(--primary)]">{pick(language, "点开详情", "Open detail")}</p>
                       <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-[color:var(--muted-foreground)]">
                         <span>{holding.account}</span>
                         <span>-</span>
@@ -223,6 +224,7 @@ export default async function DashboardPage() {
                     <p className="font-semibold">{holding.weight}</p>
                     <p className="text-sm text-[color:var(--muted-foreground)]">{pick(language, "约占整个组合", "Of total portfolio")}</p>
                     <p className="text-sm text-[color:var(--muted-foreground)]">{holding.value}</p>
+                    <MoveUpRight className="ml-auto mt-2 h-3.5 w-3.5 text-[color:var(--muted-foreground)] transition-transform duration-200 group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
                   </div>
                 </Link>
               ))}

@@ -2718,7 +2718,15 @@ export async function refreshPortfolioQuotes(userId: string): Promise<RefreshPor
   const db = getDb();
   const repositories = getRepositories();
   const holdings = await repositories.holdings.listByUserId(userId);
-  const uniqueSymbols = [...new Set(holdings.map((holding) => holding.symbol.trim().toUpperCase()).filter(Boolean))];
+  const uniqueSymbols = [...new Map(
+    holdings
+      .map((holding) => ({
+        symbol: holding.symbol.trim().toUpperCase(),
+        exchange: holding.exchangeOverride?.trim() || null
+      }))
+      .filter((holding) => holding.symbol)
+      .map((holding) => [`${holding.symbol}::${holding.exchange ?? ""}`, holding])
+  ).values()];
 
   if (uniqueSymbols.length === 0) {
     return {
@@ -2734,22 +2742,29 @@ export async function refreshPortfolioQuotes(userId: string): Promise<RefreshPor
   const quoteMap = new Map(
     quoteResults.results
       .filter((quote) => Number.isFinite(quote.price) && quote.price > 0)
-      .map((quote) => [quote.symbol.trim().toUpperCase(), quote])
+      .map((quote) => [`${quote.symbol.trim().toUpperCase()}::${quote.exchange?.trim() || ""}`, quote])
   );
 
   const refreshedAt = new Date();
   let refreshedHoldingCount = 0;
+  const ambiguousQuoteKeys = new Set<string>();
 
   await db.transaction(async (tx) => {
-    const currentHoldings = await tx.select().from(holdingPositions).where(eq(holdingPositions.userId, userId));
+      const currentHoldings = await tx.select().from(holdingPositions).where(eq(holdingPositions.userId, userId));
 
-    for (const holding of currentHoldings) {
-      const quote = quoteMap.get(holding.symbol.trim().toUpperCase());
-      if (!quote) {
-        continue;
-      }
+      for (const holding of currentHoldings) {
+        const quoteKey = `${holding.symbol.trim().toUpperCase()}::${holding.exchangeOverride?.trim() || ""}`;
+        const quote = quoteMap.get(quoteKey) ?? quoteMap.get(`${holding.symbol.trim().toUpperCase()}::`);
+        if (!quote) {
+          continue;
+        }
       const holdingCurrency = normalizeCurrencyCode((holding.currency as string) || "CAD");
       const quoteCurrency = normalizeCurrencyCode(quote.currency || holdingCurrency);
+      const hasExplicitExchangeOverride = Boolean(holding.exchangeOverride?.trim());
+      if (!hasExplicitExchangeOverride && holdingCurrency !== quoteCurrency) {
+        ambiguousQuoteKeys.add(quoteKey);
+        continue;
+      }
       const nativePrice = quote.price;
       const priceInCad = quoteCurrency === "CAD"
         ? nativePrice
@@ -2790,7 +2805,7 @@ export async function refreshPortfolioQuotes(userId: string): Promise<RefreshPor
 
   return {
     refreshedHoldingCount,
-    missingQuoteCount: uniqueSymbols.length - quoteMap.size,
+    missingQuoteCount: uniqueSymbols.length - quoteMap.size + ambiguousQuoteKeys.size,
     sampledSymbolCount: uniqueSymbols.length,
     refreshedAt: refreshedAt.toISOString()
   };

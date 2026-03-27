@@ -125,7 +125,7 @@ export default async function PortfolioSecurityDetailPage({
             title={pick(language, "它和你的组合现在是什么关系", "How it currently relates to your portfolio")}
             description={pick(
               language,
-              "如果你已经持有它，这里会告诉你它分散在哪些账户；如果还没持有，这里就把它当候选标的看。",
+              "如果你已经持有它，这里会告诉你它分散在哪些账户里；如果还没持有，这里就把它当候选标的来理解。",
               "If you already hold it, this section shows where it sits across accounts. If not, it treats the symbol as a candidate security."
             )}
           />
@@ -158,7 +158,7 @@ export default async function PortfolioSecurityDetailPage({
                         </p>
                       </div>
                       <div className="grid gap-3 sm:grid-cols-3">
-                        <StatBlock icon={<Landmark className="h-4 w-4" />} label={pick(language, "这笔现在值多少", "Current value")} value={holding.value} />
+                        <StatBlock icon={<Landmark className="h-4 w-4" />} label={pick(language, "当前估值", "Current value")} value={holding.value} />
                         <StatBlock icon={<Landmark className="h-4 w-4" />} label={pick(language, "占整个组合多少", "Share of total portfolio")} value={holding.portfolioShare} />
                         <StatBlock icon={<Landmark className="h-4 w-4" />} label={pick(language, "占这个账户多少", "Share inside this account")} value={holding.accountShare} />
                       </div>

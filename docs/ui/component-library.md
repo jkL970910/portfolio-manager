@@ -285,6 +285,7 @@ components/
   - separate share labels for:
     - share of total portfolio
     - share inside the current account
+  - Chinese holding guidance rendered in a `Loo皇审核` tone instead of neutral analysis phrasing
   - clean UTF-8 Chinese copy; do not allow mojibake regressions in shared holding labels
   - keeps native rail scrollbars visually hidden
   - should be reused anywhere a right-side analytical rail needs to stay visible without forcing the whole page to bottom out first
@@ -329,6 +330,7 @@ components/
   - classification repair
   - override reset
   - delete-holding confirmation
+  - expanded classification suggestions for gold / commodity / REIT / trust-style instruments
 - Rules:
   - stays collapsed by default
   - must show the original system-read classification separately from user overrides
