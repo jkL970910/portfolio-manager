@@ -47,7 +47,7 @@ export default async function DashboardPage() {
           <div className="relative space-y-4">
             <div className="pointer-events-none absolute -left-16 top-[-72px] h-48 w-48 rounded-full bg-[radial-gradient(circle,rgba(240,143,178,0.22),rgba(240,143,178,0))] blur-2xl" />
             <div className="pointer-events-none absolute left-1/2 top-[-96px] h-44 w-44 -translate-x-1/2 rounded-full bg-[radial-gradient(circle,rgba(255,255,255,0.34),rgba(255,255,255,0))] blur-2xl" />
-            <Badge variant="primary">{pick(language, "Loo 的今日宝库巡检", "Loo's daily vault check")}</Badge>
+            <Badge variant="primary">{pick(language, "Loo 的今日宝库巡检", "Daily portfolio check")}</Badge>
             <div className="space-y-3">
               <h2 className="text-[30px] font-semibold tracking-[-0.04em] text-[color:var(--foreground)]">
                 {pick(language, "先看现在是什么情况，再决定下一笔钱往哪放。", "First see what is going on, then decide where the next dollar should go.")}

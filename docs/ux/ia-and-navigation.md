@@ -150,6 +150,7 @@ Contains:
 - Dashboard summarizes the current state and routes the user to deeper views
 - In Chinese mode, login, registration, and Settings profile are wrapped in a Loo国 citizen identity experience
 - In English mode, authentication and profile remain standard Portfolio Manager flows
+- Shared English surfaces such as Dashboard, Portfolio, Recommendations, Import, and Settings should keep neutral Portfolio Manager wording instead of Loo-specific narrative terms.
 
 ## Design Principles
 

@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import Link from 'next/link';
 import { useMemo, useState } from 'react';
@@ -25,10 +25,7 @@ type RecommendationDetailCardProps = {
     scoreline: string;
     gapSummary: string;
     alternatives: string[];
-    alternativeLinks?: {
-      label: string;
-      href: string;
-    }[];
+    alternativeLinks?: { label: string; href: string }[];
     whyThis: string[];
     whyNot: string[];
     constraints: {
@@ -36,14 +33,8 @@ type RecommendationDetailCardProps = {
       detail: string;
       variant: 'success' | 'warning' | 'neutral';
     }[];
-    execution: {
-      label: string;
-      value: string;
-    }[];
-    relatedLinks?: {
-      label: string;
-      href: string;
-    }[];
+    execution: { label: string; value: string }[];
+    relatedLinks?: { label: string; href: string }[];
   };
   expanded?: boolean;
   onToggle?: () => void;
@@ -65,42 +56,42 @@ function getShortDecisionTag(language: DisplayLanguage, text: string, tone: 'pos
   const normalized = text.toLowerCase();
 
   if (text.includes('账户') || normalized.includes('account')) {
-    return pick(language, '放对账户', 'Right account');
+    return pick(language, '找对账户', 'Right account');
   }
   if (text.includes('风险') || text.includes('集中') || normalized.includes('risk') || normalized.includes('concentration')) {
-    return pick(language, '先别继续加重', 'Reduce concentration');
+    return pick(language, '分散风险', 'Spread risk');
   }
   if (text.includes('标的') || text.includes('候选') || normalized.includes('security') || normalized.includes('candidate')) {
-    return pick(language, '主标的更顺手', 'Best security');
+    return pick(language, '挑对标的', 'Best security');
   }
   if (text.includes('FX') || text.includes('换汇') || normalized.includes('currency') || normalized.includes('fx')) {
-    return pick(language, '少一点换汇成本', 'Less FX drag');
+    return pick(language, '少吃换汇', 'Less FX drag');
   }
   if (text.includes('目标') || text.includes('缺口') || normalized.includes('target') || normalized.includes('gap')) {
-    return pick(language, '先补最大缺口', 'Close the biggest gap');
+    return pick(language, '先补缺口', 'Close the gap');
   }
 
   return tone === 'positive'
-    ? pick(language, '这点在帮它排前面', 'Helps it rank first')
-    : pick(language, '这点在压低别的路', 'Pushes other paths back');
+    ? pick(language, '给这条路加分', 'Supports this path')
+    : pick(language, '把别的路往后压', 'Pushes other paths back');
 }
 
 function getHelpTerms(language: DisplayLanguage): HelpTerm[] {
   return [
     {
-      label: pick(language, '什么叫放对账户', 'What “right account” means'),
+      label: pick(language, '什么叫账户更顺手', 'What “better account fit” means'),
       detail: pick(
         language,
-        '系统会一起看账户类别、可用额度和放置效率，挑一个更适合接这笔钱的位置。',
-        'The system checks account type, usable room, and placement efficiency before choosing the better home.'
+        'Loo皇会一起看账户类型、剩余额度和放进去以后是否更顺手，然后再决定这笔钱先落在哪个账户。',
+        'The system checks account type, usable room, and placement fit before choosing the better account home.'
       )
     },
     {
-      label: pick(language, '为什么会提到换汇成本', 'Why FX cost matters'),
+      label: pick(language, '为什么要看换汇成本', 'Why FX friction matters'),
       detail: pick(
         language,
-        '如果某条路会多触发明显换汇，系统通常会把它往后排，除非它真的更值得。',
-        'If a path adds noticeable FX drag, the system usually pushes it back unless the trade-off is clearly worth it.'
+        '如果一条路要额外换汇，Loo皇会把这部分摩擦一起算进去；除非值得，不然通常不会让它排太前。',
+        'If a path adds extra FX friction, the system factors that in and usually pushes it back unless the trade-off is clearly worth it.'
       )
     }
   ];
@@ -116,21 +107,21 @@ function groupConstraints(
   return [
     {
       id: 'confirmed',
-      title: pick(language, '这条路为什么站得住', 'Why this path still holds up'),
+      title: pick(language, '这条路为什么还站得住', 'Why this path still holds up'),
       description: pick(
         language,
-        '这些点说明它不是碰巧排在前面，而是真的比较顺手。',
-        'These checks explain why it is not randomly first and still looks workable.'
+        '这些点说明它不是碰巧排在前面，而是真的比较顺。',
+        'These checks explain why the path still looks workable instead of randomly ending up first.'
       ),
       items: confirmed
     },
     {
       id: 'watch',
-      title: pick(language, '执行前要留意什么', 'What to watch before acting'),
+      title: pick(language, 'Loo皇还要你留意什么', 'What still needs your judgment'),
       description: pick(
         language,
-        '这些点不一定会拦住你，但最好先知道。',
-        'These do not always block the idea, but they are worth checking first.'
+        '这些不一定会直接拦住这条路，但动手前最好先看一眼。',
+        'These do not always block the idea, but they are worth checking before you act.'
       ),
       items: watch
     }
@@ -154,13 +145,13 @@ export function RecommendationDetailCard({
     () => [
       ...priority.whyThis.map((item) => ({
         tone: 'positive' as const,
-        label: pick(language, '系统为什么先选这条路', 'Why this path comes first'),
+        label: pick(language, 'Loo皇为什么先点这条路', 'Why this path comes first'),
         shortTag: getShortDecisionTag(language, item, 'positive'),
         text: item
       })),
       ...priority.whyNot.map((item) => ({
         tone: 'caution' as const,
-        label: pick(language, '系统为什么没先选别的', 'Why other paths were not first'),
+        label: pick(language, 'Loo皇为什么没先点别的', 'Why other paths were not first'),
         shortTag: getShortDecisionTag(language, item, 'caution'),
         text: item
       }))
@@ -190,18 +181,18 @@ export function RecommendationDetailCard({
                 className="group block rounded-[24px] border border-white/55 bg-white/38 px-5 py-4 backdrop-blur-md transition hover:border-[rgba(240,143,178,0.32)] hover:bg-white/56"
               >
                 <p className="text-xs uppercase tracking-[0.16em] text-[color:var(--muted-foreground)]">
-                  {pick(language, '这次优先买它', 'Lead security')}
+                  {pick(language, 'Loo皇这次先看它', 'Lead security')}
                 </p>
                 <div className="mt-3 flex items-start justify-between gap-3">
                   <p className="text-lg font-semibold leading-8 text-[color:var(--foreground)]">{priority.security}</p>
                   <ArrowUpRight className="mt-1 h-4 w-4 shrink-0 text-[color:var(--primary)] transition group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
                 </div>
-                <p className="mt-2 text-sm text-[color:var(--muted-foreground)]">{pick(language, '点开看这支标的的更多信息', 'Open the full security brief')}</p>
+                <p className="mt-2 text-sm text-[color:var(--muted-foreground)]">{pick(language, '点开看看这支标的的完整说明', 'Open the full security brief')}</p>
               </Link>
             ) : (
               <div className="rounded-[24px] border border-white/55 bg-white/38 px-5 py-4 backdrop-blur-md">
                 <p className="text-xs uppercase tracking-[0.16em] text-[color:var(--muted-foreground)]">
-                  {pick(language, '这次优先买它', 'Lead security')}
+                  {pick(language, 'Loo皇这次先看它', 'Lead security')}
                 </p>
                 <p className="mt-3 text-lg font-semibold leading-8 text-[color:var(--foreground)]">{priority.security}</p>
               </div>
@@ -223,7 +214,7 @@ export function RecommendationDetailCard({
             >
               {isExpanded
                 ? pick(language, '收起这条建议的细节', 'Hide recommendation detail')
-                : pick(language, '看这条建议为什么排第一', 'Why this recommendation ranks first')}
+                : pick(language, '看看 Loo皇为什么先点它', 'Why this recommendation ranks first')}
             </Button>
           </div>
         </div>
@@ -231,7 +222,7 @@ export function RecommendationDetailCard({
         <div className="grid gap-3 lg:grid-cols-2">
           <SummaryBlock label={pick(language, '这笔是在补什么', 'What this is fixing')} value={priority.gapSummary} />
           <SummaryBlock label={pick(language, '先放去哪', 'Best account home')} value={priority.accountFit} />
-          <SummaryBlock label={pick(language, '系统怎么看这条建议', 'How the system sees it')} value={priority.scoreline} />
+          <SummaryBlock label={pick(language, 'Loo皇怎么看这条建议', 'How the system sees it')} value={priority.scoreline} />
           <SummaryBlock
             label={pick(language, '还有哪些能选', 'Other usable tickers')}
             value={alternativesText}
@@ -257,16 +248,16 @@ export function RecommendationDetailCard({
             <div className="space-y-4">
               <div className="grid gap-4 lg:grid-cols-2">
                 <DetailBlock
-                  label={pick(language, '如果按这条建议去投', 'If you follow this path')}
+                  label={pick(language, '如果照这条路去做', 'If you follow this path')}
                   value={priority.security}
                   detail={priority.gapSummary}
                   href={priority.securityHref}
-                  hrefLabel={priority.securityHref ? pick(language, '点开看这支标的', 'Open this security') : undefined}
+                  hrefLabel={priority.securityHref ? pick(language, '打开这支标的', 'Open this security') : undefined}
                 />
                 <DetailBlock
-                  label={pick(language, '还有哪些可以替代它', 'What could replace it')}
+                  label={pick(language, '还有哪些可以替它', 'What could replace it')}
                   value={alternativesText}
-                  detail={pick(language, '这些也能做同样的事，只是系统暂时没把它们排到最前面。', 'These can do a similar job, but the system did not rank them first this time.')}
+                  detail={pick(language, '这些也能做差不多的事，只是这次没排到最前。', 'These can do a similar job, but the system did not rank them first this time.')}
                   footer={priority.alternativeLinks?.length ? (
                     <div className="mt-3 flex flex-wrap gap-2">
                       {priority.alternativeLinks.map((item) => (
@@ -288,11 +279,11 @@ export function RecommendationDetailCard({
                 <div className="flex flex-col gap-4">
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                     <div className="space-y-2">
-                      <p className="text-sm font-semibold text-[color:var(--foreground)]">{pick(language, '系统是怎么想到这条路的', 'How the system got here')}</p>
+                      <p className="text-sm font-semibold text-[color:var(--foreground)]">{pick(language, 'Loo皇是怎么想到这条路的', 'How the system got here')}</p>
                       <p className="text-sm leading-7 text-[color:var(--muted-foreground)]">
                         {pick(
                           language,
-                          '顺着看下面这几步，你就能知道系统为什么先选它、为什么别的路排在后面。',
+                          '把这几步顺着看下来，你就会明白 Loo皇为什么先点这条路、为什么把别的方案往后放。',
                           'Read the steps below in order and you will see why this path moved ahead of the others.'
                         )}
                       </p>
@@ -331,8 +322,8 @@ export function RecommendationDetailCard({
                         </div>
                         <Badge variant={step.tone === 'positive' ? 'success' : 'warning'}>
                           {step.tone === 'positive'
-                            ? pick(language, '在加分', 'Adds support')
-                            : pick(language, '在压低别的路', 'Pushes others back')}
+                            ? pick(language, '在给这条路加分', 'Adds support')
+                            : pick(language, '在把别的路往后压', 'Pushes others back')}
                         </Badge>
                       </div>
                     </div>
@@ -371,7 +362,7 @@ export function RecommendationDetailCard({
               ))}
 
               <div className="rounded-[24px] border border-white/55 bg-white/36 p-4 backdrop-blur-md">
-                <p className="text-sm font-semibold text-[color:var(--foreground)]">{pick(language, '如果你真的要执行，先看这些', 'Before you act, check this')}</p>
+                <p className="text-sm font-semibold text-[color:var(--foreground)]">{pick(language, '真要动手前，Loo皇还想提醒你这些', 'Before you act, check this')}</p>
                 <div className="mt-4 grid gap-3 sm:grid-cols-2">
                   {priority.execution.map((item) => (
                     <DetailBlock key={`${priority.id}-${item.label}`} label={item.label} value={item.value} />
@@ -395,15 +386,7 @@ export function RecommendationDetailCard({
   );
 }
 
-function SummaryBlock({
-  label,
-  value,
-  footer
-}: {
-  label: string;
-  value: string;
-  footer?: ReactNode;
-}) {
+function SummaryBlock({ label, value, footer }: { label: string; value: string; footer?: ReactNode }) {
   return (
     <div className="rounded-[20px] border border-white/55 bg-white/36 px-4 py-3 backdrop-blur-md">
       <p className="text-sm text-[color:var(--muted-foreground)]">{label}</p>
@@ -434,10 +417,7 @@ function DetailBlock({
       <p className="mt-2 text-lg font-semibold leading-8 text-[color:var(--foreground)]">{value}</p>
       {detail ? <p className="mt-2 text-sm leading-7 text-[color:var(--muted-foreground)]">{detail}</p> : null}
       {href && hrefLabel ? (
-        <Link
-          href={href}
-          className="mt-3 inline-flex items-center gap-1 text-sm font-medium text-[color:var(--primary)] transition hover:opacity-80"
-        >
+        <Link href={href} className="mt-3 inline-flex items-center gap-1 text-sm font-medium text-[color:var(--primary)] transition hover:opacity-80">
           {hrefLabel}
           <ArrowUpRight className="h-4 w-4" />
         </Link>

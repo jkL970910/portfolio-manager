@@ -24,7 +24,7 @@ export default async function SettingsPage() {
           <div className="relative space-y-4">
             <div className="pointer-events-none absolute -left-14 top-[-60px] h-44 w-44 rounded-full bg-[radial-gradient(circle,rgba(240,143,178,0.2),rgba(240,143,178,0))] blur-3xl" />
             <div className="pointer-events-none absolute left-1/2 top-[-76px] h-40 w-40 -translate-x-1/2 rounded-full bg-[radial-gradient(circle,rgba(255,255,255,0.3),rgba(255,255,255,0))] blur-3xl" />
-            <Badge variant="primary">{pick(language, "Loo 的偏好建模台", "Loo's preference studio")}</Badge>
+            <Badge variant="primary">{pick(language, "Loo 的偏好建模台", "Preference studio")}</Badge>
             <div className="space-y-3">
               <h2 className="text-[30px] font-semibold tracking-[-0.04em] text-[color:var(--foreground)]">
                 {pick(language, "先讲清你的规则，系统才有资格给出推荐。", "Make the rules explicit before the product earns the right to recommend anything.")}

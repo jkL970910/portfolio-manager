@@ -38,25 +38,25 @@ export default async function RecommendationsPage() {
   return (
     <AppShell
       viewer={viewer}
-      title={pick(language, "藏宝路线", "Recommendations")}
-      description={pick(language, "推荐页负责给出更完整的资金配置路径。输入、理由、账户放置和风险说明都保持可见。", "This page carries the full funding path. Inputs, rationale, account placement, and risk notes stay visible.")}
+      title={pick(language, "Loo皇藏宝路线", "Recommendations")}
+      description={pick(language, "这里把 Loo皇审核下一笔钱怎么走的理由摊开给你看。输入、账户顺序和提醒都会一起摆出来。", "This page carries the full funding path. Inputs, rationale, account placement, and risk notes stay visible.")}
     >
       <Card className="overflow-hidden bg-[linear-gradient(135deg,rgba(255,255,255,0.68),rgba(246,218,230,0.52),rgba(221,232,255,0.46))]">
         <CardContent className="grid gap-6 px-6 py-6 md:grid-cols-[1.2fr_0.8fr] md:items-center">
           <div className="space-y-4">
-            <Badge variant="primary">{pick(language, "Loo 的藏宝路线", "Loo's recommendation desk")}</Badge>
+            <Badge variant="primary">{pick(language, "Loo皇审核台", "Recommendation desk")}</Badge>
             <div className="space-y-3">
               <h2 className="text-[30px] font-semibold tracking-[-0.04em] text-[color:var(--foreground)]">
-                {pick(language, "先把假设摆在台面上，再给出下一笔钱怎么走。", "Show the assumptions first, then decide where the next contribution should go.")}
+                {pick(language, "先把条件摆在台面上，再看 Loo皇想让下一笔钱怎么走。", "Show the assumptions first, then decide where the next contribution should go.")}
               </h2>
               <p className="max-w-3xl text-sm leading-7 text-[color:var(--muted-foreground)]">
-                {pick(language, "这里不追求黑箱式结论。目标配置、账户优先级、ticker 备选和说明会一起出现，方便你判断这条路线值不值得采纳。", "This surface avoids black-box output. Target allocation, account order, ticker candidates, and rationale stay visible so you can judge the plan directly.")}
+                {pick(language, "这里不玩黑箱。目标配置、账户顺序、备选标的和 Loo皇的审核理由都会一起摆出来，方便你自己判断值不值得照做。", "This surface avoids black-box output. Target allocation, account order, ticker candidates, and rationale stay visible so you can judge the plan directly.")}
               </p>
             </div>
           </div>
           <div className="grid gap-3 sm:grid-cols-2">
-            <RecommendationSignal title={pick(language, "系统先看什么", "Inputs")} detail={pick(language, "你的目标、账户、投入金额和偏好。", "Targets, accounts, amount, and preferences")} />
-            <RecommendationSignal title={pick(language, "最后会给你什么", "Outputs")} detail={pick(language, "先买哪类资产、放哪个账户、为什么这么做。", "Asset priorities, account fit, and rationale")} />
+            <RecommendationSignal title={pick(language, "Loo皇先看什么", "Inputs")} detail={pick(language, "你的目标、账户、投入金额和偏好。", "Targets, accounts, amount, and preferences")} />
+            <RecommendationSignal title={pick(language, "Loo皇最后会告诉你什么", "Outputs")} detail={pick(language, "先买哪类资产、放哪个账户、为什么这么做。", "Asset priorities, account fit, and rationale")} />
           </div>
         </CardContent>
       </Card>
@@ -64,8 +64,8 @@ export default async function RecommendationsPage() {
       <div className="grid gap-6 xl:grid-cols-[390px_minmax(0,1fr)] 2xl:grid-cols-[420px_minmax(0,1fr)]">
         <StickyRail>
           <SectionHeading
-            title={pick(language, "这次推荐是按什么算的", "What this recommendation is based on")}
-            description={pick(language, "先把你现在的偏好、账户顺序和投入金额摆出来，这样你更容易看懂系统为什么这么分配。", "Show the current preferences, account order, and amount first so the recommendation is easier to understand.")}
+            title={pick(language, "这次 Loo皇是按什么看的", "What this recommendation is based on")}
+            description={pick(language, "先把你现在的偏好、账户顺序和投入金额摆出来，这样你更容易看懂 Loo皇为什么这么分配。", "Show the current preferences, account order, and amount first so the recommendation is easier to understand.")}
           />
           <Card>
             <CardContent className="space-y-3 px-6 py-5">
@@ -75,8 +75,8 @@ export default async function RecommendationsPage() {
               <div className="grid gap-3 sm:grid-cols-3">
                 {[
                   pick(language, "先看这次准备投多少钱。", "Start with the amount you plan to invest."),
-                  pick(language, "再看系统优先补哪一类资产。", "Then check which sleeve the system wants to top up first."),
-                  pick(language, "最后看为什么选这条路、哪些地方还要你自己判断。", "Finish by reading why this path won and what still needs your judgment.")
+                  pick(language, "再看 Loo皇先让你补哪一类资产。", "Then check which sleeve the system wants to top up first."),
+                  pick(language, "最后看 Loo皇为什么点这条路、哪些地方还要你自己判断。", "Finish by reading why this path won and what still needs your judgment.")
                 ].map((tip) => (
                   <div key={tip} className="rounded-[20px] border border-white/55 bg-white/34 p-4 text-sm leading-7 text-[color:var(--muted-foreground)] backdrop-blur-md">
                     {tip}
@@ -115,7 +115,7 @@ export default async function RecommendationsPage() {
           </Card>
           <Card>
             <CardHeader>
-              <CardTitle>{pick(language, "系统大致怎么想", "How the system is thinking")}</CardTitle>
+              <CardTitle>{pick(language, "Loo皇大致怎么想", "How the system is thinking")}</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
               <div className="grid gap-3 sm:grid-cols-3">
@@ -124,11 +124,11 @@ export default async function RecommendationsPage() {
                   <p className="mt-2 font-semibold">{data.engine.version}</p>
                 </div>
                 <div className="rounded-[24px] border border-white/55 bg-white/34 p-4 backdrop-blur-md">
-                  <p className="text-xs uppercase tracking-[0.16em] text-[color:var(--muted-foreground)]">{pick(language, "这次系统先想补什么", "What the system is fixing first")}</p>
+                  <p className="text-xs uppercase tracking-[0.16em] text-[color:var(--muted-foreground)]">{pick(language, "这次 Loo皇先想补什么", "What the system is fixing first")}</p>
                   <p className="mt-2 font-semibold">{data.engine.objective}</p>
                 </div>
                 <div className="rounded-[24px] border border-white/55 bg-white/34 p-4 backdrop-blur-md">
-                  <p className="text-xs uppercase tracking-[0.16em] text-[color:var(--muted-foreground)]">{pick(language, "这条路现在有多说得通", "How reasonable this path looks right now")}</p>
+                  <p className="text-xs uppercase tracking-[0.16em] text-[color:var(--muted-foreground)]">{pick(language, "这条路现在有多站得住", "How reasonable this path looks right now")}</p>
                   <p className="mt-2 font-semibold">{data.engine.confidence}</p>
                 </div>
               </div>
@@ -165,21 +165,21 @@ export default async function RecommendationsPage() {
           <div className="grid gap-4 lg:grid-cols-2">
             <Card>
               <CardHeader>
-                <CardTitle>{pick(language, "这条建议有多稳", "How reliable this looks")}</CardTitle>
+                <CardTitle>{pick(language, "这条路有多站得住", "How reliable this looks")}</CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
                 <div className="rounded-[24px] border border-white/55 bg-white/36 p-4 backdrop-blur-md">
                   <div className="flex items-center gap-2 font-medium">
                     <ShieldCheck className="h-4 w-4 text-[color:var(--success)]" />
-                    {pick(language, `系统把握度：${data.engine.confidence}`, `Confidence: ${data.engine.confidence}`)}
+                    {pick(language, `Loo皇当前把握度：${data.engine.confidence}`, `Confidence: ${data.engine.confidence}`)}
                   </div>
                   <p className="mt-2 text-sm text-[color:var(--muted-foreground)]">
-                    {pick(language, "这个数字只是在说：按你现在给的信息，这条建议大体说得通。它不是收益保证，也不是必须照做的命令。", "This only means the recommendation broadly makes sense given the information available today. It is not a return guarantee or an execution command.")}
+                    {pick(language, "这个数字只是在说：按你现在给的信息，Loo皇觉得这条路大体说得通。它不是收益保证，也不是必须照做的命令。", "This only means the recommendation broadly makes sense given the information available today. It is not a return guarantee or an execution command.")}
                   </p>
                 </div>
                 <div className="rounded-[24px] border border-white/55 bg-white/34 p-4 backdrop-blur-md">
                   <p className="text-sm font-semibold text-[color:var(--foreground)]">
-                    {pick(language, "为什么系统觉得这条路还算站得住", "Why the system thinks this path is reasonably solid")}
+                    {pick(language, "为什么 Loo皇觉得这条路还算站得住", "Why the system thinks this path is reasonably solid")}
                   </p>
                   <div className="mt-3 space-y-3">
                     {confidenceReasons.map((reason) => (
@@ -191,7 +191,7 @@ export default async function RecommendationsPage() {
                 </div>
                 <div className="rounded-[24px] border border-[rgba(240,143,178,0.22)] bg-[linear-gradient(135deg,rgba(255,255,255,0.78),rgba(245,214,235,0.26),rgba(255,239,224,0.2))] p-4 backdrop-blur-md">
                   <p className="text-sm font-semibold text-[color:var(--foreground)]">
-                    {pick(language, "哪些地方还要你自己再判断", "What still needs your own judgment")}
+                    {pick(language, "哪些地方 Loo皇还要你自己再判断", "What still needs your own judgment")}
                   </p>
                   <div className="mt-3 space-y-3">
                     {confidenceWatchouts.map((note) => (
@@ -219,7 +219,7 @@ export default async function RecommendationsPage() {
               <div className="flex items-start gap-3">
                 <Info className="mt-0.5 h-5 w-5 text-[color:var(--primary)]" />
                 <p className="text-sm text-[color:var(--muted-foreground)]">
-                  {pick(language, "这页是在帮你把下一笔钱怎么投想清楚，不是在替你自动下单。你可以先看懂，再决定要不要照着做。", "This page helps you think through the next contribution. It does not trade automatically for you.")}
+                  {pick(language, "这页是在帮你看懂 Loo皇为什么这样审核下一笔钱，不是在替你自动下单。你可以先看明白，再决定要不要照着做。", "This page helps you think through the next contribution. It does not trade automatically for you.")}
                 </p>
               </div>
               <Button href="/portfolio" variant="secondary">

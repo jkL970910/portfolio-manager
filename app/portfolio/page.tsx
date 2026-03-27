@@ -24,7 +24,7 @@ export default async function PortfolioPage({
       <Card className="overflow-hidden bg-[linear-gradient(135deg,rgba(255,255,255,0.68),rgba(246,218,230,0.5),rgba(221,232,255,0.44))]">
         <CardContent className="grid gap-6 px-6 py-6 md:grid-cols-[1.2fr_0.8fr] md:items-center">
           <div className="space-y-4">
-            <div className="inline-flex rounded-full border border-white/60 bg-white/44 px-4 py-2 text-sm font-medium text-[color:var(--foreground)] backdrop-blur-md">{pick(language, "Loo 帮你先按账户拆开看", "Loo starts with the account structure")}</div>
+            <div className="inline-flex rounded-full border border-white/60 bg-white/44 px-4 py-2 text-sm font-medium text-[color:var(--foreground)] backdrop-blur-md">{pick(language, "Loo 帮你先按账户拆开看", "Start with the account structure")}</div>
             <div className="space-y-3">
               <h2 className="text-[30px] font-semibold tracking-[-0.04em] text-[color:var(--foreground)]">
                 {pick(language, "先看你到底有哪些账户、钱主要压在哪几个里，再往下看具体仓位。", "Start by checking which accounts exist and where most of the money actually sits before drilling into holdings.")}

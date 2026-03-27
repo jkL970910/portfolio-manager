@@ -1102,7 +1102,7 @@ export function ImportExperience({
           <div className="relative space-y-4">
             <div className="pointer-events-none absolute -left-14 top-[-60px] h-44 w-44 rounded-full bg-[radial-gradient(circle,rgba(240,143,178,0.2),rgba(240,143,178,0))] blur-3xl" />
             <div className="pointer-events-none absolute left-1/2 top-[-80px] h-40 w-40 -translate-x-1/2 rounded-full bg-[radial-gradient(circle,rgba(255,255,255,0.3),rgba(255,255,255,0))] blur-3xl" />
-            <Badge variant="primary">Loo 的入库向导</Badge>
+            <Badge variant="primary">{pick(language, "Loo 的入库向导", "Import workspace")}</Badge>
             <div className="space-y-3">
               <h2 className="text-[30px] font-semibold tracking-[-0.04em] text-[color:var(--foreground)]">
                 先决定导入路径，再把宝库整理干净。

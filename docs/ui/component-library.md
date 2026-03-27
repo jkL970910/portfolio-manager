@@ -12,6 +12,7 @@ Use it as the source of truth before introducing any new UI component.
 - Keep primitives generic and domain components explicit
 - Separate layout, navigation, display, forms, and finance-specific concerns
 - Promote repeated page patterns into reusable components quickly
+- Keep the Chinese `Loo国` worldbuilding scoped to Chinese-mode surfaces that intentionally use it; shared English pages should keep standard `Portfolio Manager` wording.
 
 ## Current Structure
 
@@ -443,6 +444,7 @@ components/
   - defaults to the first three decision steps and can expand into the full trace on demand
   - keeps long Chinese copy out of narrow multi-column stacks
   - adds short plain-language trace tags plus hover/focus glossary chips for core terms such as account fit and FX friction
+  - Chinese mode should phrase recommendation reasoning as `Loo皇审核`, while English stays in plain Portfolio Manager language
   - the lead symbol and any alternative symbols should deep-link into the shared security detail page
   - can expose a direct link into an already-heavy existing holding when the recommendation is explicitly avoiding further concentration there
 - [scenario-compare-card.tsx](E:\Projects\Portfolio%20Manager\components\recommendations\scenario-compare-card.tsx)
@@ -454,6 +456,7 @@ components/
   - if a sheltered account has `available room <= 0`, do not present it as the first usable path for that run
   - exhausted sheltered accounts should be called out in plain language instead of forcing the user to infer the problem from deeper recommendation details
   - exhausted account-order rows should render as a weaker or warning-style summary instead of looking equivalent to fully usable account paths
+  - Chinese recommendation copy should sound like `Loo皇审核`; English should remain neutral and non-roleplay
 
 ### Settings
 

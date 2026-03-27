@@ -375,7 +375,7 @@ function getRecommendationTheme(
 function getSignalForHolding(holding: HoldingPosition, driftMap: Map<string, number>, language: DisplayLanguage) {
   const gap = driftMap.get(holding.assetClass) ?? 0;
   if (holding.symbol === "CASH" && holding.weightPct > 8) {
-    return pick(language, "Loo皇看你这笔现金留得偏多，先别继续囤着了，不然会拖慢整体配置。", "Loo sees too much idle cash here. Leaving it untouched would keep dragging the overall mix.");
+    return pick(language, "Loo皇看你这笔现金留得偏多，先别继续囤着了，不然会拖慢整体配置。", "There is too much idle cash here right now. Leaving it untouched would keep dragging the overall mix.");
   }
   if (gap < -4) {
     return pick(
@@ -385,9 +385,9 @@ function getSignalForHolding(holding: HoldingPosition, driftMap: Map<string, num
     );
   }
   if (holding.weightPct >= 15) {
-    return pick(language, "Loo皇看这笔仓位已经够重，再往上加只会让整体波动更扎眼。", "Loo sees this position as already heavy enough. Adding more would make total portfolio swings stand out even more.");
+    return pick(language, "Loo皇看这笔仓位已经够重，再往上加只会让整体波动更扎眼。", "This position is already heavy enough. Adding more would make total portfolio swings stand out even more.");
   }
-  return pick(language, "Loo皇暂时没有把这笔列成重点，它现在还算放得稳。", "Loo is not flagging this position as urgent right now. It still sits reasonably well in the current mix.");
+  return pick(language, "Loo皇暂时没有把这笔列成重点，它现在还算放得稳。", "This position is not being flagged as urgent right now. It still sits reasonably well in the current mix.");
 }
 
 function formatHoldingLastUpdated(value: string | null | undefined, language: DisplayLanguage) {
@@ -584,19 +584,19 @@ function getRecommendationAssumptions(profile: PreferenceProfile, accounts: Inve
   return [
     pick(
       language,
-      "系统会先拿你现在的持仓，去对照你自己设的目标配置。",
+      "Loo皇会先拿你现在的持仓，去对照你自己设的目标配置。",
       "The system first compares your current mix with the target mix you set."
     ),
     pick(
       language,
-      `系统也会参考你想先用哪些账户。这次真正还能先用的是 ${formatAccountPriorityOrder(effectiveOrder, language)}。`,
+      `Loo皇也会参考你想先用哪些账户。这次真正还能先用的是 ${formatAccountPriorityOrder(effectiveOrder, language)}。`,
       `It also considers which accounts you prefer to use first. The usable order for this contribution is ${formatAccountPriorityOrder(effectiveOrder, language)}.`
     ),
     ...(exhaustedTypes.length > 0
       ? [
           pick(
             language,
-            `${formatAccountPriorityOrder(exhaustedTypes, language)} 这次会先往后排，因为额度已经用完了。`,
+            `${formatAccountPriorityOrder(exhaustedTypes, language)} 这次会先往后排，因为 Loo皇看到账户额度已经用完了。`,
             `${formatAccountPriorityOrder(exhaustedTypes, language)} drops back for this contribution because the available room is already used up.`
           )
         ]
@@ -604,12 +604,12 @@ function getRecommendationAssumptions(profile: PreferenceProfile, accounts: Inve
     profile.taxAwarePlacement
       ? pick(
         language,
-        "你打开了账户放置引导，所以系统会更在意钱放在哪个账户里更顺手。",
+        "你打开了账户放置引导，所以 Loo皇会更在意钱放在哪个账户里更顺手。",
         "You have account placement guidance turned on, so the system pays more attention to which account is a better long-term home."
       )
       : pick(
         language,
-        "你没有打开账户放置引导，所以系统会更直接地先补最大的配置缺口。",
+        "你没有打开账户放置引导，所以 Loo皇会更直接地先补最大的配置缺口。",
         "Account placement guidance is off, so the run leans more on allocation gaps and room availability."
       )
   ];
@@ -624,7 +624,7 @@ function getRecommendationItemExplanation(
   const accountType = getAccountTypeLabel(item.targetAccountType, language);
   return pick(
     language,
-    `${assetClass} 现在配得还不够，所以这次会先把 ${formatDisplayCurrency(item.amountCad, display)} 放进 ${accountType}。`,
+    `Loo皇看 ${assetClass} 现在还没补够，所以这次会先把 ${formatDisplayCurrency(item.amountCad, display)} 放进 ${accountType}。`,
     `${assetClass} is currently underweight relative to the configured target, so this run allocates ${formatDisplayCurrency(item.amountCad, display)} to ${accountType}.`
   );
 }
@@ -673,8 +673,8 @@ function getManualGroups(profile: PreferenceProfile, language: DisplayLanguage):
     {
       title: pick(language, "账户放置引导", "Tax-aware placement"),
       description: profile.taxAwarePlacement
-        ? pick(language, "已经打开。系统会更认真地判断钱放在哪类账户里更顺手。", "Tax-aware placement is enabled. Advanced province and marginal bracket fields can stay collapsed by default.")
-        : pick(language, "现在关闭。系统会更直接地先补配置缺口。", "Tax-aware placement is disabled. The engine will favor simpler account-fit rules."),
+        ? pick(language, "已经打开。Loo皇会更认真地判断钱放在哪类账户里更顺手。", "Tax-aware placement is enabled. Advanced province and marginal bracket fields can stay collapsed by default.")
+        : pick(language, "现在关闭。Loo皇会更直接地先补配置缺口。", "Tax-aware placement is disabled. The engine will favor simpler account-fit rules."),
       badge: pick(language, "高级", "Advanced")
     }
   ];
@@ -1615,10 +1615,10 @@ export function buildRecommendationsData(args: {
       objective: latestRun?.objective
         ? pick(
           language,
-          latestRun.objective === "target-tracking" ? "先补离目标最远的缺口" : latestRun.objective,
+          latestRun.objective === "target-tracking" ? "Loo皇先补离目标最远的缺口" : latestRun.objective,
           latestRun.objective === "target-tracking" ? "Close the biggest target gap first" : latestRun.objective
         )
-        : pick(language, "先补离目标最远的缺口", "Close the biggest target gap first"),
+        : pick(language, "Loo皇先补离目标最远的缺口", "Close the biggest target gap first"),
       confidence: latestRun?.confidenceScore != null
         ? `${latestRun.confidenceScore.toFixed(0)}/100`
         : pick(language, "待生成", "Pending")
@@ -1644,9 +1644,9 @@ export function buildRecommendationsData(args: {
     explainer: latestRun?.assumptions?.length
       ? getRecommendationAssumptions(profile, accounts, language)
       : [
-          pick(language, "系统会先看你现在持有什么，再和目标配置做对照。", "The system first looks at what you already hold and compares it with your target mix."),
-          pick(language, "离目标差得最远的那一类，通常会先排到前面。", "The asset sleeve furthest from target usually moves to the front of the queue."),
-          pick(language, "系统会先决定钱放进哪个账户更顺手，再挑具体标的。", "The system first chooses the best account home, then picks a security inside that sleeve.")
+          pick(language, "Loo皇会先看你现在持有什么，再和目标配置做对照。", "The system first looks at what you already hold and compares it with your target mix."),
+          pick(language, "离目标差得最远的那一类，Loo皇通常会先把它排到前面。", "The asset sleeve furthest from target usually moves to the front of the queue."),
+          pick(language, "Loo皇会先决定钱放进哪个账户更顺手，再挑具体标的。", "The system first chooses the best account home, then picks a security inside that sleeve.")
         ],
     priorities: (latestRun?.items ?? []).map((item, index) => {
       const leadSecurity = item.securitySymbol && item.securityName
@@ -1663,15 +1663,15 @@ export function buildRecommendationsData(args: {
         securityHref: item.securitySymbol ? `/portfolio/security/${encodeURIComponent(item.securitySymbol)}` : undefined,
         tickers: item.tickerOptions.join(", "),
         accountFit: item.accountFitScore != null
-          ? pick(
-            language,
-            `${getAccountTypeFit(item.targetAccountType, language)} 大致顺手度 ${item.accountFitScore.toFixed(0)}/100`,
-            `${getAccountTypeFit(item.targetAccountType, language)} Rough fit ${item.accountFitScore.toFixed(0)}/100`
-          )
+        ? pick(
+          language,
+          `${getAccountTypeFit(item.targetAccountType, language)}，Loo皇给它的大致顺手度是 ${item.accountFitScore.toFixed(0)}/100`,
+          `${getAccountTypeFit(item.targetAccountType, language)} Rough fit ${item.accountFitScore.toFixed(0)}/100`
+        )
           : getAccountTypeFit(item.targetAccountType, language),
         scoreline: pick(
           language,
-          `标的合适度 ${item.securityScore?.toFixed(0) ?? "--"} / 账户顺手度 ${item.accountFitScore?.toFixed(0) ?? "--"} / 税务友好度 ${item.taxFitScore?.toFixed(0) ?? "--"}`,
+          `Loo皇给这条路的印象是：标的合适度 ${item.securityScore?.toFixed(0) ?? "--"} / 账户顺手度 ${item.accountFitScore?.toFixed(0) ?? "--"} / 税务友好度 ${item.taxFitScore?.toFixed(0) ?? "--"}`,
           `Security fit ${item.securityScore?.toFixed(0) ?? "--"} / Account fit ${item.accountFitScore?.toFixed(0) ?? "--"} / Tax fit ${item.taxFitScore?.toFixed(0) ?? "--"}`
         ),
         gapSummary: item.allocationGapBeforePct != null && item.allocationGapAfterPct != null
@@ -1695,7 +1695,7 @@ export function buildRecommendationsData(args: {
               `${getAssetClassLabel(item.assetClass, language)} 现在离目标还差 ${item.rationale.gapBeforePct.toFixed(1)} 个百分点。`,
               `${getAssetClassLabel(item.assetClass, language)} is currently ${item.rationale.gapBeforePct.toFixed(1)}% below target.`
             )
-            : pick(language, "系统会先补现在最明显的配置缺口。", "The engine prioritizes the largest current allocation gap."),
+            : pick(language, "Loo皇会先补现在最明显的配置缺口。", "The engine prioritizes the largest current allocation gap."),
           pick(
             language,
             `${getAccountTypeLabel(item.targetAccountType, language)} 在当前条件下是更顺手的账户。`,
@@ -1704,29 +1704,29 @@ export function buildRecommendationsData(args: {
           item.rationale?.existingHoldingSymbol && item.rationale.existingHoldingRiskContributionPct != null
             ? pick(
               language,
-              `${item.rationale.existingHoldingSymbol} 已经贡献了大约 ${item.rationale.existingHoldingRiskContributionPct.toFixed(0)}% 的组合风险，所以系统不想再把新钱继续压到同一处。`,
+              `${item.rationale.existingHoldingSymbol} 已经贡献了大约 ${item.rationale.existingHoldingRiskContributionPct.toFixed(0)}% 的组合风险，所以 Loo皇不想再把新钱继续压到同一处。`,
               `${item.rationale.existingHoldingSymbol} already contributes about ${item.rationale.existingHoldingRiskContributionPct.toFixed(0)}% of total portfolio risk, so this path redirects new money toward an account and security combination that spreads risk out instead of reinforcing it.`
             )
             : pick(
               language,
-              "这条路不只是在补缺口，也是在避免把新钱继续堆到现在最重的风险来源上。",
+              "这条路不只是在补缺口，也是在避免把新钱继续堆到现在最重的风险来源上，这是 Loo皇刻意绕开的地方。",
               "This path not only closes the allocation gap, it also avoids stacking fresh money onto the current heaviest risk source."
             ),
           item.rationale?.watchlistMatched
             ? pick(language, "这支主标的也刚好符合你的关注名单。", "The lead security also matched your watchlist.")
-            : pick(language, "在当前候选池里，它是最顺手的主标的。", "The lead security is the highest-scoring expression in the current candidate set.")
+            : pick(language, "在当前候选池里，Loo皇觉得它是最顺手的主标的。", "The lead security is the highest-scoring expression in the current candidate set.")
         ],
         whyNot: [
           alternatives.length > 0
-            ? pick(language, `${alternatives.join(" / ")} 这些备选都没有当前主标的顺手。`, `Alternatives ${alternatives.join(" / ")} scored below the current lead security.`)
-            : pick(language, "现在没有明显更强的备选。", "No clearly stronger alternative is available in this sleeve."),
+            ? pick(language, `${alternatives.join(" / ")} 这些备选都没有当前主标的顺手，所以 Loo皇没先点它们。`, `Alternatives ${alternatives.join(" / ")} scored below the current lead security.`)
+            : pick(language, "Loo皇现在没看到明显更强的备选。", "No clearly stronger alternative is available in this sleeve."),
           item.rationale?.existingHoldingSymbol && item.rationale.existingHoldingRiskContributionPct != null
             ? pick(
               language,
-              `${item.rationale.existingHoldingSymbol} 已经贡献了大约 ${item.rationale.existingHoldingRiskContributionPct.toFixed(0)}% 的组合风险，所以系统不会继续优先加它。`,
+              `${item.rationale.existingHoldingSymbol} 已经贡献了大约 ${item.rationale.existingHoldingRiskContributionPct.toFixed(0)}% 的组合风险，所以 Loo皇不会继续优先加它。`,
               `${item.rationale.existingHoldingSymbol} already contributes about ${item.rationale.existingHoldingRiskContributionPct.toFixed(0)}% of total portfolio risk, so the engine avoids doubling down on the same risk source.`
             )
-            : pick(language, "系统会尽量回避已经太集中的风险来源。", "The engine avoids leaning even harder into risk sources that are already concentrated inside the sleeve."),
+            : pick(language, "Loo皇会尽量回避已经太集中的风险来源。", "The engine avoids leaning even harder into risk sources that are already concentrated inside the sleeve."),
           (item.fxFrictionPenaltyBps ?? 0) > 0
             ? pick(language, `这条路大约要多承担 ${item.fxFrictionPenaltyBps} bps 的换汇成本，所以部分 USD 想法被往后压了。`, `Cross-currency friction of about ${item.fxFrictionPenaltyBps} bps pushed some USD ideas lower.`)
             : pick(language, "这条路没有明显的换汇成本压力。", "This path does not carry a material FX friction cost.")
@@ -1737,17 +1737,17 @@ export function buildRecommendationsData(args: {
             detail: item.allocationGapBeforePct != null && item.allocationGapAfterPct != null
               ? pick(
                 language,
-                `按这条建议执行后，缺口会从 ${item.allocationGapBeforePct.toFixed(1)}% 缩到 ${item.allocationGapAfterPct.toFixed(1)}%。`,
+                `如果照 Loo皇这条路去做，缺口会从 ${item.allocationGapBeforePct.toFixed(1)}% 缩到 ${item.allocationGapAfterPct.toFixed(1)}%。`,
                 `Narrows from ${item.allocationGapBeforePct.toFixed(1)}% to ${item.allocationGapAfterPct.toFixed(1)}%.`
               )
-              : pick(language, "下次重新生成后，这里会更新。", "Will update on the next run."),
+              : pick(language, "Loo皇下次重审后，这里会更新。", "Will update on the next run."),
             variant: "success" as const
           },
           {
             label: pick(language, "账户放哪里更顺", "Tax / account placement"),
             detail: pick(
               language,
-              `${getAccountTypeLabel(item.targetAccountType, language)} 看起来更顺手，账户顺手度 ${item.accountFitScore?.toFixed(0) ?? "--"}，税务友好度 ${item.taxFitScore?.toFixed(0) ?? "--"}。`,
+              `${getAccountTypeLabel(item.targetAccountType, language)} 在 Loo皇眼里更顺手，账户顺手度 ${item.accountFitScore?.toFixed(0) ?? "--"}，税务友好度 ${item.taxFitScore?.toFixed(0) ?? "--"}。`,
               `${getAccountTypeLabel(item.targetAccountType, language)} looks like a smoother home here, with account fit ${item.accountFitScore?.toFixed(0) ?? "--"} and tax fit ${item.taxFitScore?.toFixed(0) ?? "--"}.`
             ),
             variant: profile.taxAwarePlacement ? "success" : "neutral"
@@ -1755,8 +1755,8 @@ export function buildRecommendationsData(args: {
           {
             label: pick(language, "FX 成本", "FX friction"),
             detail: (item.fxFrictionPenaltyBps ?? 0) > 0
-              ? pick(language, `这条路大约会吃掉 ${item.fxFrictionPenaltyBps} bps 的换汇成本。`, `This path absorbs about ${item.fxFrictionPenaltyBps} bps of FX cost.`)
-              : pick(language, "这条路基本避开了明显的换汇成本。", "This path avoids material FX friction."),
+              ? pick(language, `Loo皇看这条路大约会吃掉 ${item.fxFrictionPenaltyBps} bps 的换汇成本。`, `This path absorbs about ${item.fxFrictionPenaltyBps} bps of FX cost.`)
+              : pick(language, "Loo皇看这条路基本避开了明显的换汇成本。", "This path avoids material FX friction."),
             variant: (item.fxFrictionPenaltyBps ?? 0) > 0 ? "warning" : "success"
           }
         ],
@@ -1773,8 +1773,8 @@ export function buildRecommendationsData(args: {
           {
             label: pick(language, "执行提醒", "Execution note"),
             value: item.rationale?.minTradeApplied
-              ? pick(language, "这笔比较小，可以考虑和下一笔一起做。", "This is a small trade; consider batching it with the next contribution.")
-              : pick(language, "这笔金额已经够单独执行。", "The current amount is large enough to stand on its own.")
+              ? pick(language, "Loo皇提醒你：这笔比较小，可以考虑和下一笔一起做。", "This is a small trade; consider batching it with the next contribution.")
+              : pick(language, "Loo皇提醒你：这笔金额已经够单独执行。", "The current amount is large enough to stand on its own.")
           }
         ],
         relatedLinks: item.rationale?.existingHoldingId && item.rationale.existingHoldingSymbol
@@ -1811,11 +1811,11 @@ export function buildRecommendationsData(args: {
     })),
     notes: [
       profile.taxAwarePlacement
-        ? pick(language, "系统也会看钱放在哪类账户更顺手，但这不是正式税务建议。", "The system also considers which account type is a better home for the money, but this is not formal tax advice.")
-        : pick(language, "你没打开账户放置引导，所以系统会更直接地先补最大缺口。", "Account placement guidance is off, so the system leans more heavily on closing the biggest allocation gap first."),
+        ? pick(language, "Loo皇也会看钱放在哪类账户更顺手，但这不是正式税务建议。", "The system also considers which account type is a better home for the money, but this is not formal tax advice.")
+        : pick(language, "你没打开账户放置引导，所以 Loo皇会更直接地先补最大缺口。", "Account placement guidance is off, so the system leans more heavily on closing the biggest allocation gap first."),
       pick(
         language,
-        `你现在用的是“${getRecommendationStrategyLabel(profile.recommendationStrategy, language)}”。当偏离大到 ${profile.rebalancingTolerancePct}% 左右时，系统会更愿意主动调整。`,
+        `你现在用的是“${getRecommendationStrategyLabel(profile.recommendationStrategy, language)}”。当偏离大到 ${profile.rebalancingTolerancePct}% 左右时，Loo皇会更愿意主动出手调整。`,
         `Your current strategy is "${getRecommendationStrategyLabel(profile.recommendationStrategy, language)}". Once drift moves beyond about ${profile.rebalancingTolerancePct}%, the system becomes more willing to nudge changes.`
       ),
       ...sanitizeRecommendationNotes(latestRun?.notes)

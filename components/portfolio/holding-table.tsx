@@ -44,7 +44,7 @@ export function HoldingTable({
         <span>{pick(language, "最近价格", "Last price")}</span>
         <span>{pick(language, "占比", "Share")}</span>
         <span>{pick(language, "盈亏", "Gain / loss")}</span>
-        <span>{pick(language, "Loo皇审核", "Loo review")}</span>
+        <span>{pick(language, "Loo皇审核", "Review note")}</span>
       </div>
 
       {holdings.map((holding) => (
@@ -108,7 +108,7 @@ export function HoldingTable({
             <div className="rounded-[22px] border border-white/55 bg-white/40 p-4 text-sm leading-7 text-[color:var(--muted-foreground)]">
               <div className="mb-2 flex items-center gap-2 text-xs font-medium uppercase tracking-[0.14em] text-[color:var(--primary)]">
                 <Crown className="h-3.5 w-3.5" />
-                {pick(language, "Loo皇审核", "Loo review")}
+                {pick(language, "Loo皇审核", "Review note")}
               </div>
               {holding.signal}
             </div>
