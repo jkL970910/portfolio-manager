@@ -65,8 +65,15 @@ export interface HoldingPosition {
   symbol: string;
   name: string;
   assetClass: string;
+  rawAssetClass?: string;
+  assetClassOverride?: string | null;
   sector: string;
+  rawSector?: string;
+  sectorOverride?: string | null;
   currency?: CurrencyCode;
+  securityTypeOverride?: string | null;
+  exchangeOverride?: string | null;
+  marketSectorOverride?: string | null;
   quantity?: number | null;
   avgCostPerShareAmount?: number | null;
   costBasisAmount?: number | null;

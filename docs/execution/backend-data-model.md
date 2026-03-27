@@ -41,12 +41,18 @@
 - market_value_cad
 - weight_pct
 - gain_loss_pct
+- asset_class_override nullable
+- sector_override nullable
+- security_type_override nullable
+- exchange_override nullable
+- market_sector_override nullable
 - created_at
 - updated_at
 
 Notes:
-- `account_id` is currently the only strong bridge between account and holding detail.
-- the product still lacks dedicated account-merge metadata and holding edit history.
+- `account_id` is the bridge between account detail and holding detail.
+- override fields preserve user repairs without erasing provider-derived source values.
+- recommendation and portfolio-health logic should prefer override values when present.
 
 ### cashflow_transactions
 - id
@@ -171,45 +177,32 @@ Purpose:
 
 ### Phase 3: edit and repair workflows
 
-Likely additions:
+Implemented now:
 
-#### account_merge_logs
+#### portfolio_edit_logs
 - id
 - user_id
-- source_account_id
-- target_account_id
-- merged_at
-- summary_json
-
-Purpose:
-- preserve auditability for account merge flows
-
-#### holding_edit_logs
-- id
-- user_id
-- holding_id
-- changed_fields_json
+- entity_type
+- entity_id
+- action
+- summary
+- payload
 - created_at
 
 Purpose:
-- preserve auditability for holding edits and account reassignment
+- preserve auditability for:
+  - holding edits
+  - account edits
+  - account merge operations
 
-#### holding_classification_overrides
-- id
-- user_id
-- holding_id
-- security_type nullable
-- exchange nullable
-- market_sector nullable
-- asset_class nullable
-- source default `user_override`
-- created_at
-- updated_at
-
-Purpose:
-- let users repair incomplete or wrong holding metadata without re-importing the entire account
-- improve recommendation and health-score accuracy when provider resolution returns `Unknown`
-- preserve the distinction between provider-derived classification and user-confirmed classification
+Current implementation choice:
+- holding classification repair is stored directly on `holding_positions` as nullable override fields:
+  - `asset_class_override`
+  - `sector_override`
+  - `security_type_override`
+  - `exchange_override`
+  - `market_sector_override`
+- this keeps the write path simple while still preserving raw provider-derived values in backend view models
 
 Planned controlled vocab lists:
 - security type:
@@ -242,6 +235,7 @@ Planned controlled vocab lists:
 Model note:
 - `Unknown securityType` or `Unknown exchange` mainly weakens display quality, market context, and future FX/exchange logic.
 - `Unknown assetClass` is materially more dangerous because recommendation v2 and portfolio health both rely on `assetClass` as a primary input.
+- for that reason, Phase 3 lets users repair `assetClass`, `securityType`, `exchange`, and `marketSector` from the holding detail page.
 
 ### Phase 4: real historical performance
 

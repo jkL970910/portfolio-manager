@@ -57,9 +57,17 @@ Rules:
 - account category and account instance are different concepts and should both be supported
 - account-first reading comes before raw holding-table density
 - account detail is the primary drill-down destination from account rows
+- account detail now also owns the primary Phase 3 repair entry points for:
+  - account metadata edit
+  - add-holding flow for new positions
+  - account merge preview / confirmation
+  - delete-account confirmation
 - dashboard account rows should also deep-link directly into account detail, not behave like passive summaries
 - dashboard and portfolio account rows should both use a clear whole-row hover affordance so users can tell the full row is clickable before they commit
 - holding detail is the primary drill-down destination from symbol links inside holdings tables
+- holding detail now also owns the primary Phase 3 repair entry point for:
+  - holding edit
+  - holding classification repair
 - security detail is the primary drill-down destination from recommendation lead/alternative symbols, even when the user does not already hold the symbol
 - dashboard top-holding rows should also deep-link into holding detail, not stop at overview-level cards
 - health-score holding drilldowns should open concrete holding detail pages when the diagnosis is about a specific position

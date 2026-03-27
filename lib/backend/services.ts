@@ -45,6 +45,7 @@ import {
   importJobs,
   importMappingPresets,
   investmentAccounts,
+  portfolioEditLogs,
   preferenceProfiles,
   recommendationItems,
   recommendationRuns,
@@ -55,6 +56,8 @@ import { convertCurrencyAmount, getFxRate } from "@/lib/market-data/fx";
 import { getSecurityQuote, resolveSecurity } from "@/lib/market-data/service";
 import type { SecurityQuote, SecurityResolution } from "@/lib/market-data/types";
 import { pick } from "@/lib/i18n/ui";
+
+type DbTransaction = Parameters<Parameters<ReturnType<typeof getDb>["transaction"]>[0]>[0];
 
 export interface PreferenceProfileInput {
   riskProfile: RiskProfile;
@@ -99,6 +102,66 @@ export interface UpdateCitizenOverrideInput {
   rank?: CitizenRank | null;
   addressTier?: CitizenAddressTier | null;
   idCode?: string | null;
+}
+
+export interface UpdateHoldingPositionInput {
+  name?: string;
+  accountId?: string;
+  currency?: CurrencyCode;
+  quantity?: number | null;
+  avgCostPerShareAmount?: number | null;
+  costBasisAmount?: number | null;
+  lastPriceAmount?: number | null;
+  marketValueAmount?: number | null;
+  assetClassOverride?: string | null;
+  sectorOverride?: string | null;
+  securityTypeOverride?: string | null;
+  exchangeOverride?: string | null;
+  marketSectorOverride?: string | null;
+}
+
+export interface CreateHoldingPositionInput {
+  symbol: string;
+  name?: string;
+  currency?: CurrencyCode;
+  quantity?: number | null;
+  avgCostPerShareAmount?: number | null;
+  costBasisAmount?: number | null;
+  lastPriceAmount?: number | null;
+  marketValueAmount?: number | null;
+  assetClass: string;
+  sector?: string | null;
+  securityType?: string | null;
+  exchange?: string | null;
+  marketSector?: string | null;
+}
+
+export interface UpdateInvestmentAccountInput {
+  nickname?: string;
+  institution?: string;
+  type?: AccountType;
+  currency?: CurrencyCode;
+  contributionRoomCad?: number | null;
+}
+
+export interface MergeAccountsPreviewResult {
+  source: {
+    id: string;
+    name: string;
+    type: AccountType;
+    valueCad: number;
+    holdingCount: number;
+  };
+  target: {
+    id: string;
+    name: string;
+    type: AccountType;
+    valueCad: number;
+    holdingCount: number;
+  };
+  mergedValueCad: number;
+  movedHoldingCount: number;
+  warnings: string[];
 }
 
 export interface CreateImportJobInput {
@@ -520,6 +583,70 @@ async function normalizeManualHolding(input: NonNullable<CreateGuidedImportInput
   };
 }
 
+async function recalculatePortfolioState(tx: DbTransaction, userId: string) {
+  const refreshedHoldings = await tx.select().from(holdingPositions).where(eq(holdingPositions.userId, userId));
+  const totalPortfolioCad = refreshedHoldings.reduce((sum: number, holding: typeof holdingPositions.$inferSelect) => sum + Number(holding.marketValueCad), 0);
+  const holdingsByAccount = new Map<string, typeof refreshedHoldings>();
+
+  for (const holding of refreshedHoldings) {
+    const group = holdingsByAccount.get(holding.accountId) ?? [];
+    group.push(holding);
+    holdingsByAccount.set(holding.accountId, group);
+  }
+
+  const refreshedAt = new Date();
+
+  for (const holding of refreshedHoldings) {
+    const weightPct = totalPortfolioCad > 0 ? round((Number(holding.marketValueCad) / totalPortfolioCad) * 100, 2) : 0;
+    await tx
+      .update(holdingPositions)
+      .set({
+        weightPct: weightPct.toFixed(2),
+        updatedAt: refreshedAt
+      })
+      .where(eq(holdingPositions.id, holding.id));
+  }
+
+  const allAccounts = await tx.select().from(investmentAccounts).where(eq(investmentAccounts.userId, userId));
+
+  for (const account of allAccounts) {
+    const accountHoldings = holdingsByAccount.get(account.id) ?? [];
+    const accountTotalCad = accountHoldings.reduce((sum: number, holding: typeof holdingPositions.$inferSelect) => sum + Number(holding.marketValueCad), 0);
+    const accountCurrency = normalizeCurrencyCode((account.currency as string) || "CAD");
+    const accountTotalAmount = accountTotalCad > 0
+      ? (await convertCurrencyAmount(accountTotalCad, "CAD", accountCurrency)) || accountTotalCad
+      : 0;
+
+    await tx
+      .update(investmentAccounts)
+      .set({
+        marketValueAmount: accountTotalAmount.toFixed(2),
+        marketValueCad: accountTotalCad.toFixed(2),
+        updatedAt: refreshedAt
+      })
+      .where(eq(investmentAccounts.id, account.id));
+  }
+}
+
+async function createPortfolioEditLog(
+  tx: DbTransaction,
+  userId: string,
+  entityType: "holding" | "account" | "account-merge",
+  entityId: string,
+  action: string,
+  summary: string,
+  payload: Record<string, unknown>
+) {
+  await tx.insert(portfolioEditLogs).values({
+    userId,
+    entityType,
+    entityId,
+    action,
+    summary,
+    payload
+  });
+}
+
 function applySymbolCorrectionsToParsedImport(
   parsed: ParsedCsvImport,
   corrections: Record<string, { symbol: string; name?: string }> | undefined
@@ -921,11 +1048,17 @@ export async function getPortfolioHoldingDetailView(userId: string, holdingId: s
   const resolution = resolutionResponse.result;
   const quote = quoteResponse.result;
 
-  data.holding.securityType = formatSecurityTypeLabel(resolution.securityType);
-  data.holding.exchange = resolution.exchange ?? pick(user.displayLanguage, "未知交易所", "Unknown exchange");
-  data.holding.marketSector = resolution.marketSector
+  const resolvedSecurityType = formatSecurityTypeLabel(resolution.securityType);
+  const resolvedExchange = resolution.exchange ?? pick(user.displayLanguage, "未知交易所", "Unknown exchange");
+  const resolvedMarketSector = resolution.marketSector
     ? formatSecurityTypeLabel(resolution.marketSector)
     : pick(user.displayLanguage, "未知市场", "Unknown market");
+  data.editContext.raw.securityType = resolvedSecurityType;
+  data.editContext.raw.exchange = resolvedExchange;
+  data.editContext.raw.marketSector = resolvedMarketSector;
+  data.holding.securityType = data.editContext.current.securityTypeOverride ?? resolvedSecurityType;
+  data.holding.exchange = data.editContext.current.exchangeOverride ?? resolvedExchange;
+  data.holding.marketSector = data.editContext.current.marketSectorOverride ?? resolvedMarketSector;
   data.facts = [
     {
       label: pick(user.displayLanguage, "它是什么类型", "Security type"),
@@ -1036,6 +1169,438 @@ export async function getPortfolioSecurityDetailView(userId: string, symbol: str
   });
 
   return apiSuccess({ data }, "database");
+}
+
+export async function updateHoldingPosition(userId: string, holdingId: string, input: UpdateHoldingPositionInput) {
+  const db = getDb();
+
+  return db.transaction(async (tx) => {
+    const holding = await tx.query.holdingPositions.findFirst({
+      where: and(eq(holdingPositions.userId, userId), eq(holdingPositions.id, holdingId))
+    });
+    if (!holding) {
+      throw new Error("Holding was not found.");
+    }
+
+    const targetAccountId = input.accountId ?? holding.accountId;
+    const targetAccount = await tx.query.investmentAccounts.findFirst({
+      where: and(eq(investmentAccounts.userId, userId), eq(investmentAccounts.id, targetAccountId))
+    });
+    if (!targetAccount) {
+      throw new Error("Target account was not found.");
+    }
+
+    const currency = normalizeCurrencyCode(input.currency ?? (holding.currency as string) ?? "CAD");
+    const quantity = input.quantity !== undefined ? input.quantity : (holding.quantity == null ? null : Number(holding.quantity));
+    const avgCostPerShareAmount = input.avgCostPerShareAmount !== undefined ? input.avgCostPerShareAmount : (holding.avgCostPerShareAmount == null ? null : Number(holding.avgCostPerShareAmount));
+    const lastPriceAmount = input.lastPriceAmount !== undefined ? input.lastPriceAmount : (holding.lastPriceAmount == null ? null : Number(holding.lastPriceAmount));
+    const costBasisAmount = input.costBasisAmount !== undefined
+      ? input.costBasisAmount
+      : quantity != null && avgCostPerShareAmount != null
+        ? round(quantity * avgCostPerShareAmount)
+        : (holding.costBasisAmount == null ? null : Number(holding.costBasisAmount));
+    const marketValueAmount = input.marketValueAmount !== undefined
+      ? input.marketValueAmount
+      : quantity != null && lastPriceAmount != null
+        ? round(quantity * lastPriceAmount)
+        : Number(holding.marketValueAmount ?? holding.marketValueCad);
+    if (marketValueAmount == null || marketValueAmount < 0) {
+      throw new Error("Holding market value must be present.");
+    }
+
+    const avgCostPerShareCad = await toCadAmount(avgCostPerShareAmount, currency);
+    const costBasisCad = await toCadAmount(costBasisAmount, currency);
+    const lastPriceCad = await toCadAmount(lastPriceAmount, currency);
+    const marketValueCad = (await toCadAmount(marketValueAmount, currency)) ?? 0;
+    const gainLossPct = costBasisCad != null && costBasisCad > 0
+      ? round(((marketValueCad - costBasisCad) / costBasisCad) * 100, 2)
+      : Number(holding.gainLossPct);
+
+    await tx
+      .update(holdingPositions)
+      .set({
+        accountId: targetAccount.id,
+        name: input.name ?? holding.name,
+        currency,
+        quantity: quantity == null ? null : quantity.toFixed(6),
+        avgCostPerShareAmount: avgCostPerShareAmount == null ? null : avgCostPerShareAmount.toFixed(4),
+        costBasisAmount: costBasisAmount == null ? null : costBasisAmount.toFixed(2),
+        lastPriceAmount: lastPriceAmount == null ? null : lastPriceAmount.toFixed(4),
+        marketValueAmount: marketValueAmount.toFixed(2),
+        avgCostPerShareCad: avgCostPerShareCad == null ? null : avgCostPerShareCad.toFixed(4),
+        costBasisCad: costBasisCad == null ? null : costBasisCad.toFixed(2),
+        lastPriceCad: lastPriceCad == null ? null : lastPriceCad.toFixed(4),
+        marketValueCad: marketValueCad.toFixed(2),
+        gainLossPct: gainLossPct.toFixed(2),
+        assetClassOverride: input.assetClassOverride !== undefined ? input.assetClassOverride : holding.assetClassOverride,
+        sectorOverride: input.sectorOverride !== undefined ? input.sectorOverride : holding.sectorOverride,
+        securityTypeOverride: input.securityTypeOverride !== undefined ? input.securityTypeOverride : holding.securityTypeOverride,
+        exchangeOverride: input.exchangeOverride !== undefined ? input.exchangeOverride : holding.exchangeOverride,
+        marketSectorOverride: input.marketSectorOverride !== undefined ? input.marketSectorOverride : holding.marketSectorOverride,
+        updatedAt: new Date()
+      })
+      .where(eq(holdingPositions.id, holding.id));
+
+    await recalculatePortfolioState(tx, userId);
+    await createPortfolioEditLog(
+      tx,
+      userId,
+      "holding",
+      holding.id,
+      "update",
+      `Updated holding ${holding.symbol}`,
+      {
+        before: {
+          accountId: holding.accountId,
+          name: holding.name,
+          currency: holding.currency,
+          quantity: holding.quantity,
+          avgCostPerShareAmount: holding.avgCostPerShareAmount,
+          costBasisAmount: holding.costBasisAmount,
+          lastPriceAmount: holding.lastPriceAmount,
+          marketValueAmount: holding.marketValueAmount,
+          assetClassOverride: holding.assetClassOverride,
+          sectorOverride: holding.sectorOverride,
+          securityTypeOverride: holding.securityTypeOverride,
+          exchangeOverride: holding.exchangeOverride,
+          marketSectorOverride: holding.marketSectorOverride
+        },
+        after: input
+      }
+    );
+
+    return true;
+  });
+}
+
+export async function createHoldingPosition(userId: string, accountId: string, input: CreateHoldingPositionInput) {
+  const db = getDb();
+
+  return db.transaction(async (tx) => {
+    const account = await tx.query.investmentAccounts.findFirst({
+      where: and(eq(investmentAccounts.userId, userId), eq(investmentAccounts.id, accountId))
+    });
+    if (!account) {
+      throw new Error("Target account was not found.");
+    }
+
+    const currency = normalizeCurrencyCode(input.currency ?? (account.currency as string) ?? "CAD");
+    const quantity = input.quantity ?? null;
+    const avgCostPerShareAmount = input.avgCostPerShareAmount ?? null;
+    const explicitCostBasisAmount = input.costBasisAmount ?? null;
+    const lastPriceAmount = input.lastPriceAmount ?? null;
+    const explicitMarketValueAmount = input.marketValueAmount ?? null;
+
+    const costBasisAmount = explicitCostBasisAmount ?? (
+      quantity != null && avgCostPerShareAmount != null ? round(quantity * avgCostPerShareAmount) : null
+    );
+    const marketValueAmount = explicitMarketValueAmount ?? (
+      quantity != null && lastPriceAmount != null ? round(quantity * lastPriceAmount) : null
+    );
+
+    if (marketValueAmount == null || marketValueAmount < 0) {
+      throw new Error("Holding market value must be present.");
+    }
+
+    const avgCostPerShareCad = await toCadAmount(avgCostPerShareAmount, currency);
+    const costBasisCad = await toCadAmount(costBasisAmount, currency);
+    const lastPriceCad = await toCadAmount(lastPriceAmount, currency);
+    const marketValueCad = (await toCadAmount(marketValueAmount, currency)) ?? 0;
+    const gainLossPct = costBasisCad != null && costBasisCad > 0
+      ? round(((marketValueCad - costBasisCad) / costBasisCad) * 100, 2)
+      : 0;
+
+    const [created] = await tx
+      .insert(holdingPositions)
+      .values({
+        userId,
+        accountId,
+        symbol: input.symbol.trim().toUpperCase(),
+        name: input.name?.trim() || input.symbol.trim().toUpperCase(),
+        assetClass: input.assetClass,
+        sector: input.sector?.trim() || "Multi-sector",
+        currency,
+        quantity: quantity == null ? null : quantity.toFixed(6),
+        avgCostPerShareAmount: avgCostPerShareAmount == null ? null : avgCostPerShareAmount.toFixed(4),
+        costBasisAmount: costBasisAmount == null ? null : costBasisAmount.toFixed(2),
+        lastPriceAmount: lastPriceAmount == null ? null : lastPriceAmount.toFixed(4),
+        marketValueAmount: marketValueAmount.toFixed(2),
+        avgCostPerShareCad: avgCostPerShareCad == null ? null : avgCostPerShareCad.toFixed(4),
+        costBasisCad: costBasisCad == null ? null : costBasisCad.toFixed(2),
+        lastPriceCad: lastPriceCad == null ? null : lastPriceCad.toFixed(4),
+        marketValueCad: marketValueCad.toFixed(2),
+        gainLossPct: gainLossPct.toFixed(2),
+        weightPct: "0.00",
+        assetClassOverride: null,
+        sectorOverride: null,
+        securityTypeOverride: input.securityType ?? null,
+        exchangeOverride: input.exchange ?? null,
+        marketSectorOverride: input.marketSector?.trim() || null
+      })
+      .returning();
+
+    await recalculatePortfolioState(tx, userId);
+    await createPortfolioEditLog(
+      tx,
+      userId,
+      "holding",
+      created.id,
+      "create",
+      `Created holding ${created.symbol}`,
+      {
+        accountId,
+        input
+      }
+    );
+
+    return created.id;
+  });
+}
+
+export async function deleteHoldingPosition(userId: string, holdingId: string) {
+  const db = getDb();
+
+  return db.transaction(async (tx) => {
+    const holding = await tx.query.holdingPositions.findFirst({
+      where: and(eq(holdingPositions.userId, userId), eq(holdingPositions.id, holdingId))
+    });
+    if (!holding) {
+      throw new Error("Holding was not found.");
+    }
+
+    await tx.delete(holdingPositions).where(eq(holdingPositions.id, holding.id));
+    await recalculatePortfolioState(tx, userId);
+    await createPortfolioEditLog(
+      tx,
+      userId,
+      "holding",
+      holding.id,
+      "delete",
+      `Deleted holding ${holding.symbol}`,
+      {
+        deleted: {
+          symbol: holding.symbol,
+          accountId: holding.accountId,
+          marketValueCad: holding.marketValueCad
+        }
+      }
+    );
+
+    return true;
+  });
+}
+
+export async function updateInvestmentAccount(userId: string, accountId: string, input: UpdateInvestmentAccountInput) {
+  const db = getDb();
+  return db.transaction(async (tx) => {
+    const account = await tx.query.investmentAccounts.findFirst({
+      where: and(eq(investmentAccounts.userId, userId), eq(investmentAccounts.id, accountId))
+    });
+    if (!account) {
+      throw new Error("Account was not found.");
+    }
+
+    const currency = input.currency ?? normalizeCurrencyCode((account.currency as string) || "CAD");
+    const marketValueCad = Number(account.marketValueCad);
+    const marketValueAmount = (await convertCurrencyAmount(marketValueCad, "CAD", currency)) || marketValueCad;
+
+    await tx
+      .update(investmentAccounts)
+      .set({
+        nickname: input.nickname ?? account.nickname,
+        institution: input.institution ?? account.institution,
+        type: input.type ?? (account.type as AccountType),
+        currency,
+        contributionRoomCad: input.contributionRoomCad === undefined
+          ? account.contributionRoomCad
+          : input.contributionRoomCad == null
+            ? null
+            : input.contributionRoomCad.toFixed(2),
+        marketValueAmount: marketValueAmount.toFixed(2),
+        updatedAt: new Date()
+      })
+      .where(eq(investmentAccounts.id, account.id));
+
+    await createPortfolioEditLog(
+      tx,
+      userId,
+      "account",
+      account.id,
+      "update",
+      `Updated account ${account.nickname}`,
+      {
+        before: {
+          nickname: account.nickname,
+          institution: account.institution,
+          type: account.type,
+          currency: account.currency,
+          contributionRoomCad: account.contributionRoomCad
+        },
+        after: input
+      }
+    );
+
+    return true;
+  });
+}
+
+export async function deleteInvestmentAccount(userId: string, accountId: string) {
+  const db = getDb();
+  return db.transaction(async (tx) => {
+    const account = await tx.query.investmentAccounts.findFirst({
+      where: and(eq(investmentAccounts.userId, userId), eq(investmentAccounts.id, accountId))
+    });
+    if (!account) {
+      throw new Error("Account was not found.");
+    }
+
+    const remainingHoldings = await tx.select({ id: holdingPositions.id }).from(holdingPositions).where(
+      and(eq(holdingPositions.userId, userId), eq(holdingPositions.accountId, accountId))
+    );
+    if (remainingHoldings.length > 0) {
+      throw new Error("Please move, delete, or merge the holdings in this account before deleting the account.");
+    }
+
+    await tx.delete(investmentAccounts).where(eq(investmentAccounts.id, account.id));
+    await createPortfolioEditLog(
+      tx,
+      userId,
+      "account",
+      account.id,
+      "delete",
+      `Deleted account ${account.nickname}`,
+      {
+        deleted: {
+          nickname: account.nickname,
+          institution: account.institution,
+          type: account.type
+        }
+      }
+    );
+
+    return true;
+  });
+}
+
+export async function previewAccountMerge(userId: string, sourceAccountId: string, targetAccountId: string): Promise<MergeAccountsPreviewResult> {
+  const repositories = getRepositories();
+  const [accounts, holdings] = await Promise.all([
+    repositories.accounts.listByUserId(userId),
+    repositories.holdings.listByUserId(userId)
+  ]);
+  const source = accounts.find((account) => account.id === sourceAccountId);
+  const target = accounts.find((account) => account.id === targetAccountId);
+  if (!source || !target) {
+    throw new Error("Source or target account was not found.");
+  }
+
+  const sourceHoldingCount = holdings.filter((holding) => holding.accountId === source.id).length;
+  const targetHoldingCount = holdings.filter((holding) => holding.accountId === target.id).length;
+  const warnings: string[] = [];
+  if (source.type !== target.type) {
+    warnings.push("These two accounts do not have the same account type, so merge is blocked for now.");
+  }
+  if ((source.contributionRoomCad ?? null) != null || (target.contributionRoomCad ?? null) != null) {
+    warnings.push("Contribution room is not additive during merge. The target account room value will be kept.");
+  }
+
+  return {
+    source: {
+      id: source.id,
+      name: `${source.institution} ${source.nickname}`,
+      type: source.type,
+      valueCad: source.marketValueCad,
+      holdingCount: sourceHoldingCount
+    },
+    target: {
+      id: target.id,
+      name: `${target.institution} ${target.nickname}`,
+      type: target.type,
+      valueCad: target.marketValueCad,
+      holdingCount: targetHoldingCount
+    },
+    mergedValueCad: round(source.marketValueCad + target.marketValueCad, 2),
+    movedHoldingCount: sourceHoldingCount,
+    warnings
+  };
+}
+
+export async function mergeAccounts(userId: string, sourceAccountId: string, targetAccountId: string) {
+  const preview = await previewAccountMerge(userId, sourceAccountId, targetAccountId);
+  if (preview.source.type !== preview.target.type) {
+    throw new Error("Only accounts with the same type can be merged right now.");
+  }
+
+  const db = getDb();
+  return db.transaction(async (tx) => {
+    const sourceHoldings = await tx.select().from(holdingPositions).where(and(eq(holdingPositions.userId, userId), eq(holdingPositions.accountId, sourceAccountId)));
+    const targetHoldings = await tx.select().from(holdingPositions).where(and(eq(holdingPositions.userId, userId), eq(holdingPositions.accountId, targetAccountId)));
+    const targetBySymbol = new Map(targetHoldings.map((holding) => [holding.symbol.trim().toUpperCase(), holding]));
+
+    for (const sourceHolding of sourceHoldings) {
+      const matched = targetBySymbol.get(sourceHolding.symbol.trim().toUpperCase());
+      if (!matched) {
+        await tx
+          .update(holdingPositions)
+          .set({ accountId: targetAccountId, updatedAt: new Date() })
+          .where(eq(holdingPositions.id, sourceHolding.id));
+        continue;
+      }
+
+      const quantity = (sourceHolding.quantity == null ? 0 : Number(sourceHolding.quantity)) + (matched.quantity == null ? 0 : Number(matched.quantity));
+      const costBasisAmount = (sourceHolding.costBasisAmount == null ? 0 : Number(sourceHolding.costBasisAmount)) + (matched.costBasisAmount == null ? 0 : Number(matched.costBasisAmount));
+      const costBasisCad = (sourceHolding.costBasisCad == null ? 0 : Number(sourceHolding.costBasisCad)) + (matched.costBasisCad == null ? 0 : Number(matched.costBasisCad));
+      const marketValueAmount = Number(sourceHolding.marketValueAmount ?? sourceHolding.marketValueCad) + Number(matched.marketValueAmount ?? matched.marketValueCad);
+      const marketValueCad = Number(sourceHolding.marketValueCad) + Number(matched.marketValueCad);
+      const avgCostPerShareAmount = quantity > 0 && costBasisAmount > 0 ? round(costBasisAmount / quantity, 4) : null;
+      const avgCostPerShareCad = quantity > 0 && costBasisCad > 0 ? round(costBasisCad / quantity, 4) : null;
+      const lastPriceAmount = matched.lastPriceAmount == null ? sourceHolding.lastPriceAmount : matched.lastPriceAmount;
+      const lastPriceCad = matched.lastPriceCad == null ? sourceHolding.lastPriceCad : matched.lastPriceCad;
+      const gainLossPct = costBasisCad > 0 ? round(((marketValueCad - costBasisCad) / costBasisCad) * 100, 2) : Number(matched.gainLossPct);
+
+      await tx
+        .update(holdingPositions)
+        .set({
+          quantity: quantity > 0 ? quantity.toFixed(6) : null,
+          costBasisAmount: costBasisAmount > 0 ? costBasisAmount.toFixed(2) : null,
+          costBasisCad: costBasisCad > 0 ? costBasisCad.toFixed(2) : null,
+          marketValueAmount: marketValueAmount.toFixed(2),
+          marketValueCad: marketValueCad.toFixed(2),
+          avgCostPerShareAmount: avgCostPerShareAmount == null ? null : avgCostPerShareAmount.toFixed(4),
+          avgCostPerShareCad: avgCostPerShareCad == null ? null : avgCostPerShareCad.toFixed(4),
+          lastPriceAmount: lastPriceAmount,
+          lastPriceCad: lastPriceCad,
+          gainLossPct: gainLossPct.toFixed(2),
+          assetClassOverride: matched.assetClassOverride ?? sourceHolding.assetClassOverride,
+          sectorOverride: matched.sectorOverride ?? sourceHolding.sectorOverride,
+          securityTypeOverride: matched.securityTypeOverride ?? sourceHolding.securityTypeOverride,
+          exchangeOverride: matched.exchangeOverride ?? sourceHolding.exchangeOverride,
+          marketSectorOverride: matched.marketSectorOverride ?? sourceHolding.marketSectorOverride,
+          updatedAt: new Date()
+        })
+        .where(eq(holdingPositions.id, matched.id));
+
+      await tx.delete(holdingPositions).where(eq(holdingPositions.id, sourceHolding.id));
+    }
+
+    await tx.delete(investmentAccounts).where(and(eq(investmentAccounts.userId, userId), eq(investmentAccounts.id, sourceAccountId)));
+    await recalculatePortfolioState(tx, userId);
+    await createPortfolioEditLog(
+      tx,
+      userId,
+      "account-merge",
+      sourceAccountId,
+      "merge",
+      `Merged account ${sourceAccountId} into ${targetAccountId}`,
+      {
+        sourceAccountId,
+        targetAccountId,
+        preview
+      }
+    );
+
+    return true;
+  });
 }
 
 export async function getRecommendationView(userId: string) {
@@ -2069,29 +2634,12 @@ export async function createGuidedImportAccount(userId: string, input: CreateGui
         }
       }
 
-      const refreshedHoldings = await tx.select().from(holdingPositions).where(
-        and(
-          eq(holdingPositions.userId, userId),
-          eq(holdingPositions.accountId, accountRow.id)
-        )
-      );
-      const totalMarketValue = refreshedHoldings.reduce((sum, holding) => sum + Number(holding.marketValueCad), 0);
-      for (const holding of refreshedHoldings) {
-        const weightPct = totalMarketValue > 0 ? round((Number(holding.marketValueCad) / totalMarketValue) * 100, 2) : 0;
-        await tx
-          .update(holdingPositions)
-          .set({ weightPct: weightPct.toFixed(2), updatedAt: new Date() })
-          .where(eq(holdingPositions.id, holding.id));
-      }
+      await recalculatePortfolioState(tx, userId);
       const [updatedAccount] = await tx
-        .update(investmentAccounts)
-        .set({
-          marketValueAmount: ((await convertCurrencyAmount(totalMarketValue, "CAD", accountRow.currency as CurrencyCode)) || totalMarketValue).toFixed(2),
-          marketValueCad: totalMarketValue.toFixed(2),
-          updatedAt: new Date()
-        })
+        .select()
+        .from(investmentAccounts)
         .where(eq(investmentAccounts.id, accountRow.id))
-        .returning();
+        .limit(1);
       accountRow = updatedAccount;
       createdHoldingSymbol = normalizedHoldings.map((holding) => holding.symbol).join(", ");
     }
@@ -2237,40 +2785,7 @@ export async function refreshPortfolioQuotes(userId: string): Promise<RefreshPor
       refreshedHoldingCount += 1;
     }
 
-    const refreshedHoldings = await tx.select().from(holdingPositions).where(eq(holdingPositions.userId, userId));
-    const holdingsByAccount = new Map<string, typeof refreshedHoldings>();
-    for (const holding of refreshedHoldings) {
-      const group = holdingsByAccount.get(holding.accountId) ?? [];
-      group.push(holding);
-      holdingsByAccount.set(holding.accountId, group);
-    }
-
-    for (const [accountId, accountHoldings] of holdingsByAccount.entries()) {
-      const accountTotal = accountHoldings.reduce((sum, holding) => sum + Number(holding.marketValueCad), 0);
-      const accountRow = await tx.query.investmentAccounts.findFirst({
-        where: eq(investmentAccounts.id, accountId)
-      });
-
-      for (const holding of accountHoldings) {
-        const weightPct = accountTotal > 0 ? round((Number(holding.marketValueCad) / accountTotal) * 100, 2) : 0;
-        await tx
-          .update(holdingPositions)
-          .set({
-            weightPct: weightPct.toFixed(2),
-            updatedAt: refreshedAt
-          })
-          .where(eq(holdingPositions.id, holding.id));
-      }
-
-      await tx
-        .update(investmentAccounts)
-        .set({
-          marketValueAmount: ((await convertCurrencyAmount(accountTotal, "CAD", normalizeCurrencyCode((accountRow?.currency as string) || "CAD"))) || accountTotal).toFixed(2),
-          marketValueCad: accountTotal.toFixed(2),
-          updatedAt: refreshedAt
-        })
-        .where(eq(investmentAccounts.id, accountId));
-    }
+    await recalculatePortfolioState(tx, userId);
   });
 
   return {

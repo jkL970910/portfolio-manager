@@ -1,6 +1,6 @@
 # Portfolio Workspace Roadmap
 
-Last updated: 2026-03-25
+Last updated: 2026-03-26
 
 ## Why this roadmap exists
 
@@ -131,6 +131,35 @@ User value:
 - users can clean up real-life broker/account structure without deleting and re-importing everything
 - users can fix `Unknown` or incorrect holding metadata so downstream health and recommendation logic stays trustworthy
 
+Current delivery status:
+- account detail now includes one maintenance panel for:
+  - account metadata edit
+  - add-holding flow for new positions
+  - same-type merge preview + confirmation
+  - delete-account confirmation
+- account maintenance now keeps edit, add-holding, and merge inside one shared panel, with account deletion moved to the bottom of edit mode
+- account maintenance now stays collapsed until the user picks one maintenance action, so edit / add-holding / merge do not compete on first load
+- account edit now uses a single-column form so rail layouts stay readable on narrower widths
+- holding detail now includes an edit panel for:
+  - name
+  - account reassignment
+  - currency
+  - quantity
+  - average cost
+  - cost basis
+  - current price
+  - current value
+  - asset class override
+  - sector override
+  - security type override
+  - exchange override
+  - market sector override
+- holding amount repair now auto-derives cost basis and current value from quantity, average cost, and current price until the user manually overrides those derived fields
+- merge and edit actions now write to a shared `portfolio_edit_logs` table
+- holding classification repair is live and should be treated as part of the Phase 3 baseline
+- holding deletion is available from holding detail and returns the user to the parent account after confirmation
+- holding saves now invalidate related portfolio/account/dashboard/recommendation routes so parent totals and summaries refresh consistently
+
 ### Phase 4: Real historical performance
 
 Goal:
@@ -162,10 +191,11 @@ Phase 2 needs:
 - richer account and holding detail view models
 - security display metadata such as icon/logo support
 
-Phase 3 needs:
+Phase 3 now has:
 - account edit flows
-- merge logs or account relationship tracking
+- account merge preview + confirmation
 - holding mutation audit trail
+- classification repair stored directly on holding rows through explicit override fields
 
 Phase 4 needs:
 - `portfolio_events`

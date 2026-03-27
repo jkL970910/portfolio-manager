@@ -556,6 +556,28 @@ function formatHoldingPrice(amount: number | null | undefined, currency: Currenc
   return pick(language, "暂时没有价格", "Not priced");
 }
 
+function formatHoldingQuantity(quantity: number | null | undefined, language: DisplayLanguage) {
+  if (quantity == null || !Number.isFinite(quantity)) {
+    return pick(language, "还没填", "Not set");
+  }
+  return quantity.toLocaleString(language === "zh" ? "zh-CN" : "en-CA", {
+    maximumFractionDigits: 4
+  });
+}
+
+function formatHoldingAmount(
+  amount: number | null | undefined,
+  currency: CurrencyCode | null | undefined,
+  amountCad: number | null | undefined,
+  display: DisplayContext,
+  language: DisplayLanguage
+) {
+  if (amountCad == null || !Number.isFinite(amountCad) || amountCad <= 0) {
+    return pick(language, "还没填", "Not set");
+  }
+  return formatMoneyForDisplay(amount ?? amountCad, currency ?? "CAD", amountCad, display);
+}
+
 function getRecommendationAssumptions(profile: PreferenceProfile, accounts: InvestmentAccount[], language: DisplayLanguage) {
   const effectiveOrder = getEffectiveAccountPriorityOrder(accounts, profile.accountFundingPriority);
   const exhaustedTypes = getExhaustedPriorityTypes(accounts, profile.accountFundingPriority);
@@ -965,7 +987,16 @@ export function buildPortfolioData(args: {
           accountType: accounts.find((account) => account.id === holding.accountId)?.type ?? "Taxable",
           account: instanceLabelMap.get(holding.accountId) ?? pick(language, "账户", "Account"),
           href: `/portfolio/holding/${holding.id}`,
-          lastPrice: formatHoldingPrice(holding.lastPriceAmount, holding.currency, holding.lastPriceCad, display, language),
+          quantity: formatHoldingQuantity(holding.quantity, language),
+          avgCost: formatHoldingAmount(
+            holding.avgCostPerShareAmount,
+            (holding.currency as CurrencyCode | undefined) ?? "CAD",
+            holding.avgCostPerShareCad,
+            display,
+            language
+          ),
+          value: formatMoneyForDisplay(holding.marketValueAmount, (holding.currency as CurrencyCode | undefined) ?? "CAD", holding.marketValueCad, display),
+          lastPrice: formatHoldingPrice(holding.lastPriceAmount, (holding.currency as CurrencyCode | undefined) ?? "CAD", holding.lastPriceCad, display, language),
           lastUpdated: formatHoldingLastUpdated(holding.updatedAt, language),
           freshnessVariant: getHoldingFreshnessVariant(holding.updatedAt),
           portfolioShare: formatCompactPercent(holding.weightPct, 1),
@@ -1005,6 +1036,7 @@ export function buildPortfolioAccountDetailData(args: {
   const portfolio = buildPortfolioData({ language, accounts, holdings, profile, display });
   const accountCard = portfolio.accountCards.find((account) => account.id === accountId);
   const accountContext = portfolio.accountContexts.find((account) => account.id === accountId);
+  const rawAccount = accounts.find((account) => account.id === accountId);
 
   if (!accountCard || !accountContext) {
     return null;
@@ -1038,7 +1070,66 @@ export function buildPortfolioAccountDetailData(args: {
     performance: accountContext.performance,
     allocation,
     healthScore: accountContext.healthDetail,
-    holdings: portfolio.holdings.filter((holding) => holding.accountId === accountId)
+    holdings: portfolio.holdings.filter((holding) => holding.accountId === accountId),
+    editContext: {
+      typeOptions: ["TFSA", "RRSP", "FHSA", "Taxable"].map((value) => ({
+        value,
+        label: getAccountTypeLabel(value as InvestmentAccount["type"], language)
+      })),
+      currencyOptions: [
+        { value: "CAD" as const, label: "CAD" },
+        { value: "USD" as const, label: "USD" }
+      ],
+      current: {
+        nickname: rawAccount?.nickname ?? "",
+        institution: rawAccount?.institution ?? "",
+        type: rawAccount?.type ?? accountCard.typeId,
+        currency: ((rawAccount?.currency ?? "CAD") as "CAD" | "USD"),
+        contributionRoomCad: rawAccount?.contributionRoomCad ?? null
+      },
+      mergeTargets: accounts
+        .filter((item) => item.id !== accountId && item.type === (rawAccount?.type ?? accountCard.typeId))
+        .map((item) => ({
+          value: item.id,
+          label: portfolio.accountCards.find((card) => card.id === item.id)?.name ?? item.nickname,
+          detail: `${getAccountTypeLabel(item.type, language)} · ${item.institution} · ${item.currency ?? "CAD"}`
+        })),
+      holdingCreateContext: {
+        currencyOptions: [
+          { value: "CAD" as const, label: "CAD" },
+          { value: "USD" as const, label: "USD" }
+        ],
+        assetClassOptions: ["Canadian Equity", "US Equity", "International Equity", "Fixed Income", "Cash"].map((value) => ({
+          value,
+          label: getAssetClassLabel(value, language)
+        })),
+        securityTypeOptions: [
+          "Common Stock",
+          "ETF",
+          "Mutual Fund",
+          "ADR",
+          "Index",
+          "Crypto",
+          "Forex",
+          "Unknown"
+        ].map((value) => ({ value, label: value })),
+        exchangeOptions: [
+          "TSX",
+          "TSXV",
+          "Cboe Canada",
+          "NYSE",
+          "NASDAQ",
+          "NYSE Arca",
+          "OTC",
+          "LSE",
+          "TSE",
+          "Other / Manual"
+        ].map((value) => ({ value, label: value })),
+        defaults: {
+          currency: ((rawAccount?.currency ?? "CAD") as "CAD" | "USD")
+        }
+      }
+    }
   };
 }
 
@@ -1055,6 +1146,7 @@ export function buildPortfolioHoldingDetailData(args: {
   const health = buildPortfolioHealthSummary({ accounts, holdings, profile, language });
   const rawHolding = holdings.find((holding) => holding.id === holdingId);
   const viewHolding = portfolio.holdings.find((holding) => holding.id === holdingId);
+  const accountCardsById = new Map(portfolio.accountCards.map((entry) => [entry.id, entry]));
 
   if (!rawHolding || !viewHolding) {
     return null;
@@ -1082,6 +1174,21 @@ export function buildPortfolioHoldingDetailData(args: {
       accountType: account ? getAccountTypeLabel(account.type, language) : pick(language, "账户", "Account"),
       accountHref: `/portfolio/account/${rawHolding.accountId}`,
       value: formatMoneyForDisplay(rawHolding.marketValueAmount, rawHolding.currency ?? "CAD", rawHolding.marketValueCad, display),
+      quantity: formatHoldingQuantity(rawHolding.quantity, language),
+      avgCost: formatHoldingAmount(
+        rawHolding.avgCostPerShareAmount,
+        rawHolding.currency,
+        rawHolding.avgCostPerShareCad,
+        display,
+        language
+      ),
+      costBasis: formatHoldingAmount(
+        rawHolding.costBasisAmount,
+        rawHolding.currency,
+        rawHolding.costBasisCad,
+        display,
+        language
+      ),
       lastPrice: viewHolding.lastPrice,
       lastUpdated: viewHolding.lastUpdated,
       freshnessVariant: viewHolding.freshnessVariant,
@@ -1128,6 +1235,64 @@ export function buildPortfolioHoldingDetailData(args: {
       actions: holdingHealth?.actions ?? [
         pick(language, "如果暂时没有明显问题，就先别急着动，等下一笔资金安排时再一起看。", "If nothing stands out yet, leave it alone for now and review it again with the next contribution.")
       ]
+    },
+    editContext: {
+      accountOptions: accounts.map((account) => ({
+        value: account.id,
+        label: accountCardsById.get(account.id)?.name ?? account.nickname,
+        detail: `${getAccountTypeLabel(account.type, language)} · ${account.institution} · ${account.currency ?? "CAD"}`
+      })),
+      currencyOptions: [
+        { value: "CAD" as const, label: "CAD" },
+        { value: "USD" as const, label: "USD" }
+      ],
+      assetClassOptions: ["Canadian Equity", "US Equity", "International Equity", "Fixed Income", "Cash"].map((value) => ({
+        value,
+        label: getAssetClassLabel(value, language)
+      })),
+      securityTypeOptions: [
+        "Common Stock",
+        "ETF",
+        "Mutual Fund",
+        "ADR",
+        "Index",
+        "Crypto",
+        "Forex",
+        "Unknown"
+      ].map((value) => ({ value, label: value })),
+      exchangeOptions: [
+        "TSX",
+        "TSXV",
+        "Cboe Canada",
+        "NYSE",
+        "NASDAQ",
+        "NYSE Arca",
+        "OTC",
+        "LSE",
+        "TSE",
+        "Other / Manual"
+      ].map((value) => ({ value, label: value })),
+      current: {
+        name: rawHolding.name,
+        currency: (rawHolding.currency ?? "CAD") as "CAD" | "USD",
+        quantity: rawHolding.quantity ?? null,
+        avgCostPerShareAmount: rawHolding.avgCostPerShareAmount ?? null,
+        costBasisAmount: rawHolding.costBasisAmount ?? null,
+        lastPriceAmount: rawHolding.lastPriceAmount ?? null,
+        marketValueAmount: rawHolding.marketValueAmount ?? null,
+        assetClassOverride: rawHolding.assetClassOverride ?? null,
+        sectorOverride: rawHolding.sectorOverride ?? null,
+        securityTypeOverride: rawHolding.securityTypeOverride ?? null,
+        exchangeOverride: rawHolding.exchangeOverride ?? null,
+        marketSectorOverride: rawHolding.marketSectorOverride ?? null
+      },
+      raw: {
+        assetClass: rawHolding.rawAssetClass ?? rawHolding.assetClass,
+        sector: rawHolding.rawSector ?? rawHolding.sector,
+        securityType: pick(language, "正在识别", "Resolving"),
+        exchange: pick(language, "正在识别", "Resolving"),
+        marketSector: pick(language, "正在识别", "Resolving")
+      }
     }
   };
 }

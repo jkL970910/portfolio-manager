@@ -281,6 +281,11 @@ components/
   - deep-link entry into holding detail from the full symbol block (icon + symbol + name)
   - hover lift / inline affordance so users can tell a holding row leads to detail
   - filtered / highlighted states
+  - explicit display of total shares, average cost, and current value
+  - separate share labels for:
+    - share of total portfolio
+    - share inside the current account
+  - clean UTF-8 Chinese copy; do not allow mojibake regressions in shared holding labels
   - keeps native rail scrollbars visually hidden
   - should be reused anywhere a right-side analytical rail needs to stay visible without forcing the whole page to bottom out first
 
@@ -293,16 +298,52 @@ components/
   - symbol monogram fallback
   - optional short hint pill such as `ETF`
 - Use when:
-  - rendering a holding detail hero
-  - showing a holding row or account surface without depending on external logos
+- rendering a holding detail hero
+- showing a holding row or account surface without depending on external logos
+
+### `AccountMaintenancePanel`
+
+- File: [account-maintenance-panel.tsx](E:\Projects\Portfolio%20Manager\components\portfolio\account-maintenance-panel.tsx)
+- Purpose: unified account maintenance surface mounted inside account detail
+- Supports:
+  - account metadata edit
+  - add-holding flow for new positions
+  - merge preview and confirmation
+  - delete-account confirmation
+- Rules:
+  - keep edit and merge inside one shared maintenance card so "modify" actions are not split across multiple surfaces
+  - segmented mode switching should be the main navigation inside the card
+  - default state should be collapsed until the user chooses one maintenance action
+  - account edit should use a single-column form instead of side-by-side field grids
+  - destructive delete should live at the bottom of edit mode, not as a parallel top-level action card
+  - deletion must always require a confirm dialog
+  - delete should fail safely when holdings still exist and explain the next step in plain language
+
+### `HoldingEditPanel`
+
+- File: [holding-edit-panel.tsx](E:\Projects\Portfolio%20Manager\components\portfolio\holding-edit-panel.tsx)
+- Purpose: holding repair surface mounted inside holding detail
+- Supports:
+  - holding field edits
+  - account reassignment
+  - classification repair
+  - override reset
+  - delete-holding confirmation
+- Rules:
+  - stays collapsed by default
+  - must show the original system-read classification separately from user overrides
+  - edits should improve recommendation and health-score trust, not just cosmetics
+  - amount inputs should stack vertically so labels and values do not clip inside narrow rails
+  - cost basis and current value should auto-derive from quantity, average cost, and current price until the user manually overrides them
+  - save behavior must refresh both the holding itself and parent account totals so returning to account/portfolio surfaces reflects the latest state
 
 ### `PortfolioSecurityDetailPage`
 
 - File: [page.tsx](E:\Projects\Portfolio%20Manager\app\portfolio\security\[symbol]\page.tsx)
 - Purpose: read-only security detail surface for recommended or already-held symbols
 - Rules:
-  - should work even when the user does not already own the symbol
-  - should show a reference trend, identity facts, quote-source facts, and any related holdings already inside the portfolio
+- should work even when the user does not already own the symbol
+- should show a reference trend, identity facts, quote-source facts, and any related holdings already inside the portfolio
 
 ## Chart Components
 

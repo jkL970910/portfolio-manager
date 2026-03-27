@@ -67,8 +67,13 @@ export const holdingPositions = pgTable("holding_positions", {
   symbol: varchar("symbol", { length: 32 }).notNull(),
   name: varchar("name", { length: 160 }).notNull(),
   assetClass: varchar("asset_class", { length: 64 }).notNull(),
+  assetClassOverride: varchar("asset_class_override", { length: 64 }),
   sector: varchar("sector", { length: 64 }).notNull(),
+  sectorOverride: varchar("sector_override", { length: 64 }),
   currency: varchar("currency", { length: 3 }).notNull().default("CAD"),
+  securityTypeOverride: varchar("security_type_override", { length: 32 }),
+  exchangeOverride: varchar("exchange_override", { length: 64 }),
+  marketSectorOverride: varchar("market_sector_override", { length: 64 }),
   quantity: numeric("quantity", { precision: 18, scale: 6 }),
   avgCostPerShareAmount: numeric("avg_cost_per_share_amount", { precision: 14, scale: 4 }),
   costBasisAmount: numeric("cost_basis_amount", { precision: 14, scale: 2 }),
@@ -82,6 +87,17 @@ export const holdingPositions = pgTable("holding_positions", {
   gainLossPct: numeric("gain_loss_pct", { precision: 7, scale: 2 }).notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow()
+});
+
+export const portfolioEditLogs = pgTable("portfolio_edit_logs", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  userId: uuid("user_id").notNull().references(() => users.id),
+  entityType: varchar("entity_type", { length: 32 }).notNull(),
+  entityId: varchar("entity_id", { length: 64 }).notNull(),
+  action: varchar("action", { length: 32 }).notNull(),
+  summary: text("summary").notNull(),
+  payload: jsonb("payload").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow()
 });
 
 export const cashflowTransactions = pgTable("cashflow_transactions", {

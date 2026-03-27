@@ -87,8 +87,8 @@ Help a self-directed investor:
 
 | Rank | Feature | Priority | Why now |
 |---|---|---|---|
-| 1 | Account and holding edit workflows | P0-next | Users can now inspect accounts and holdings in detail, but still cannot repair duplicate accounts, wrong account mapping, holding placement mistakes, or unknown security classification. |
-| 2 | Real historical performance | P1 | Portfolio and dashboard trend lines still rely on synthetic history instead of replayed portfolio events. |
+| 1 | Real historical performance | P1 | Portfolio and dashboard trend lines still rely on synthetic history instead of replayed portfolio events. |
+| 2 | Richer import review persistence | P1 | Import review is functional, but corrections are still too session-bound and light. |
 | 3 | Richer import review persistence | P1 | Import review is functional, but corrections are still too session-bound and light. |
 | 4 | Watchlist and target constraints workflow | P1 | Preference storage exists, but the UX and recommendation impact are still too shallow. |
 | 5 | Cloud-ready cache / worker boundaries | P1 | Current market-data cache is process-local and import/recommendation work is still synchronous. |
@@ -122,7 +122,7 @@ Help a self-directed investor:
 | Portfolio health score and radar analysis | Completed | 4 | 3 | 3 | 4 | Keep refining |
 | Portfolio workspace phase 1 | Completed | 5 | 3 | 2 | 5 | Keep stable |
 | Account detail and holding detail surfaces | Completed | 5 | 4 | 3 | 5 | Keep stable |
-| Account and holding edit workflows | Planned | 5 | 4 | 4 | 5 | Build after detail surfaces, including classification repair for unknown holdings |
+| Account and holding edit workflows | Completed | 5 | 4 | 4 | 5 | Phase 3 baseline is now live, including unified account maintenance, add-holding, holding delete, merge preview/confirm, and classification repair |
 | Real historical performance | Planned | 5 | 5 | 4 | 5 | Build after edit foundation |
 | Spending overview and transactions | In Progress | 3 | 3 | 2 | 3 | Keep secondary |
 | Richer import review persistence | Planned | 4 | 3 | 3 | 4 | Build soon |
@@ -135,12 +135,11 @@ Help a self-directed investor:
 
 ## Recommended Build Order From Here
 
-1. Account and holding edit workflows
-2. Real historical performance
-3. Richer import review persistence and correction state
-4. Watchlist and target constraints workflow
-5. Citizen/profile admin workflow expansion
-6. Cloud-ready cache and async job boundaries
+1. Real historical performance
+2. Richer import review persistence and correction state
+3. Watchlist and target constraints workflow
+4. Citizen/profile admin workflow expansion
+5. Cloud-ready cache and async job boundaries
 
 ## Key Trade-offs
 
@@ -156,9 +155,9 @@ Help a self-directed investor:
 
 Turn the next milestone into engineering tickets for:
 
-1. portfolio workspace phase 1
-2. account detail and holding detail surfaces
-3. account and holding edit workflows
+1. real historical performance
+2. richer import review persistence
+3. watchlist and target constraints workflow
 
 
 

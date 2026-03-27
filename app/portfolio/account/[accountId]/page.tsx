@@ -8,6 +8,7 @@ import { RadarPreviewCard } from "@/components/charts/radar-preview";
 import { AppShell } from "@/components/layout/app-shell";
 import { StickyRail } from "@/components/layout/sticky-rail";
 import { HoldingTable } from "@/components/portfolio/holding-table";
+import { AccountMaintenancePanel } from "@/components/portfolio/account-maintenance-panel";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { SectionHeading } from "@/components/ui/section-heading";
@@ -133,6 +134,8 @@ export default async function PortfolioAccountDetailPage({
         </div>
 
         <StickyRail>
+          <AccountMaintenancePanel detail={detail} language={language} />
+
           <RadarPreviewCard
             title={pick(language, `${detail.account.name} 现在大概是什么状态`, `How ${detail.account.name} looks right now`)}
             status={`${detail.healthScore.score}/100 · ${detail.healthScore.status}`}
@@ -148,6 +151,13 @@ export default async function PortfolioAccountDetailPage({
 
           <Card>
             <CardContent className="space-y-3 px-6 py-6">
+              <div className="rounded-[24px] border border-white/55 bg-white/36 p-4 text-sm leading-7 text-[color:var(--muted-foreground)] backdrop-blur-md">
+                {pick(
+                  language,
+                  "这里可以改账户资料、往账户里加一笔新持仓，或把重复账户合并掉。已有持仓如果要删除或改分类，直接点进那笔持仓详情页去操作。",
+                  "Use this rail to edit account details, add a new holding, or merge duplicate accounts. To delete or reclassify an existing position, open that holding detail page."
+                )}
+              </div>
               {detail.healthScore.highlights.map((highlight, index) => (
                 <div key={`account-health-highlight-${index}`} className="rounded-[24px] border border-white/55 bg-white/36 p-4 text-sm leading-7 text-[color:var(--muted-foreground)] backdrop-blur-md">
                   {highlight}

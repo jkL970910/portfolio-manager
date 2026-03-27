@@ -151,6 +151,99 @@ export const recommendationRunCreateSchema = z.object({
   contributionAmountCad: z.number().positive().max(1000000)
 });
 
+export const holdingSecurityTypeSchema = z.enum([
+  "Common Stock",
+  "ETF",
+  "Mutual Fund",
+  "ADR",
+  "Index",
+  "Crypto",
+  "Forex",
+  "Unknown"
+]);
+
+export const holdingExchangeSchema = z.enum([
+  "TSX",
+  "TSXV",
+  "Cboe Canada",
+  "NYSE",
+  "NASDAQ",
+  "NYSE Arca",
+  "OTC",
+  "LSE",
+  "TSE",
+  "Other / Manual"
+]);
+
+export const holdingAssetClassSchema = z.enum([
+  "Canadian Equity",
+  "US Equity",
+  "International Equity",
+  "Fixed Income",
+  "Cash"
+]);
+
+export const holdingEditSchema = z.object({
+  name: z.string().trim().min(1).max(160).optional(),
+  accountId: z.string().uuid().optional(),
+  currency: z.enum(["CAD", "USD"]).optional(),
+  quantity: z.number().min(0).max(1_000_000_000).nullable().optional(),
+  avgCostPerShareAmount: z.number().min(0).max(1_000_000).nullable().optional(),
+  costBasisAmount: z.number().min(0).max(1_000_000_000).nullable().optional(),
+  lastPriceAmount: z.number().min(0).max(1_000_000).nullable().optional(),
+  marketValueAmount: z.number().min(0).max(1_000_000_000).nullable().optional(),
+  assetClassOverride: holdingAssetClassSchema.nullable().optional(),
+  sectorOverride: z.string().trim().min(1).max(64).nullable().optional(),
+  securityTypeOverride: holdingSecurityTypeSchema.nullable().optional(),
+  exchangeOverride: holdingExchangeSchema.nullable().optional(),
+  marketSectorOverride: z.string().trim().min(1).max(64).nullable().optional()
+}).refine(
+  (value) => Object.values(value).some((entry) => entry !== undefined),
+  "At least one holding field must be updated."
+);
+
+export const holdingCreateSchema = z.object({
+  symbol: z.string().trim().min(1).max(32),
+  name: z.string().trim().min(1).max(160).optional(),
+  currency: z.enum(["CAD", "USD"]).default("CAD"),
+  quantity: z.number().min(0).max(1_000_000_000).nullable().optional(),
+  avgCostPerShareAmount: z.number().min(0).max(1_000_000).nullable().optional(),
+  costBasisAmount: z.number().min(0).max(1_000_000_000).nullable().optional(),
+  lastPriceAmount: z.number().min(0).max(1_000_000).nullable().optional(),
+  marketValueAmount: z.number().min(0).max(1_000_000_000).nullable().optional(),
+  assetClass: holdingAssetClassSchema,
+  sector: z.string().trim().min(1).max(64).optional(),
+  securityType: holdingSecurityTypeSchema.optional(),
+  exchange: holdingExchangeSchema.optional(),
+  marketSector: z.string().trim().min(1).max(64).optional()
+}).refine(
+  (value) => value.marketValueAmount != null || (value.quantity != null && value.lastPriceAmount != null),
+  "Provide current value directly, or provide quantity and current price."
+);
+
+export const accountEditSchema = z.object({
+  nickname: z.string().trim().min(1).max(120).optional(),
+  institution: z.string().trim().min(2).max(120).optional(),
+  type: z.enum(["TFSA", "RRSP", "FHSA", "Taxable"]).optional(),
+  currency: z.enum(["CAD", "USD"]).optional(),
+  contributionRoomCad: z.number().min(0).max(1_000_000).nullable().optional()
+}).refine(
+  (value) => Object.values(value).some((entry) => entry !== undefined),
+  "At least one account field must be updated."
+);
+
+export const accountMergePreviewSchema = z.object({
+  sourceAccountId: z.string().uuid(),
+  targetAccountId: z.string().uuid()
+}).refine((value) => value.sourceAccountId !== value.targetAccountId, {
+  message: "Source and target accounts must be different.",
+  path: ["targetAccountId"]
+});
+
+export const accountMergeConfirmSchema = accountMergePreviewSchema.extend({
+  confirm: z.literal(true)
+});
+
 export const guidedAllocationDraftSchema = z.object({
   answers: z.object({
     goal: z.enum(["retirement", "home", "wealth", "capital-preservation"]),
@@ -195,3 +288,11 @@ export type GuidedImportCreatePayload = z.infer<typeof guidedImportCreateSchema>
 export type RecommendationRunCreatePayload = z.infer<typeof recommendationRunCreateSchema>;
 export type GuidedAllocationDraftPayload = z.infer<typeof guidedAllocationDraftSchema>;
 export type CitizenOverrideInputPayload = z.infer<typeof citizenOverrideInputSchema>;
+export type HoldingSecurityTypePayload = z.infer<typeof holdingSecurityTypeSchema>;
+export type HoldingExchangePayload = z.infer<typeof holdingExchangeSchema>;
+export type HoldingAssetClassPayload = z.infer<typeof holdingAssetClassSchema>;
+export type HoldingEditPayload = z.infer<typeof holdingEditSchema>;
+export type HoldingCreatePayload = z.infer<typeof holdingCreateSchema>;
+export type AccountEditPayload = z.infer<typeof accountEditSchema>;
+export type AccountMergePreviewPayload = z.infer<typeof accountMergePreviewSchema>;
+export type AccountMergeConfirmPayload = z.infer<typeof accountMergeConfirmSchema>;

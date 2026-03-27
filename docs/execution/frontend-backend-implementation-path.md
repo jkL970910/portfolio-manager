@@ -101,13 +101,19 @@ Current state:
 - health-score holding drilldowns now deep-link into holding detail
 - recommendation detail can now open a referenced already-heavy holding directly
 - recommendation detail can now also open a security detail page for the recommended lead or alternative symbol
-- next gap is no longer inspection, but account/holding edit and repair workflows
+- inspection is no longer the next gap; Phase 3 now covers account/holding edit and repair workflows
 
 3. Add repair workflows
    - account metadata edit
    - holding edit
    - holding classification repair for unknown or wrong security metadata
    - merge duplicate accounts with explicit preview and confirmation
+
+Current state:
+- account detail includes a unified maintenance panel for account edit, add-holding, merge, and delete-account confirmation
+- holding detail includes an edit panel with classification repair
+- account and holding write paths now feed a shared edit log
+- old import and quote-refresh write paths now reuse a shared portfolio-state recalculation helper so weight semantics stay aligned after edits, imports, and refreshes
 
 4. Replace synthetic trend lines only after the structural model is ready
    - event-backed portfolio history

@@ -209,6 +209,9 @@ export interface PortfolioData {
     accountType: string;
     account: string;
     href: string;
+    quantity: string;
+    avgCost: string;
+    value: string;
     lastPrice: string;
     lastUpdated: string;
     freshnessVariant: "success" | "warning" | "neutral";
@@ -248,6 +251,31 @@ export interface PortfolioAccountDetailData {
   allocation: { name: string; value: number }[];
   healthScore: PortfolioData["healthScore"];
   holdings: PortfolioData["holdings"];
+  editContext: {
+    typeOptions: { value: string; label: string }[];
+    currencyOptions: { value: "CAD" | "USD"; label: string }[];
+    current: {
+      nickname: string;
+      institution: string;
+      type: string;
+      currency: "CAD" | "USD";
+      contributionRoomCad: number | null;
+    };
+    mergeTargets: {
+      value: string;
+      label: string;
+      detail: string;
+    }[];
+    holdingCreateContext: {
+      currencyOptions: { value: "CAD" | "USD"; label: string }[];
+      assetClassOptions: { value: string; label: string }[];
+      securityTypeOptions: { value: string; label: string }[];
+      exchangeOptions: { value: string; label: string }[];
+      defaults: {
+        currency: "CAD" | "USD";
+      };
+    };
+  };
 }
 
 export interface PortfolioHoldingDetailData {
@@ -268,6 +296,9 @@ export interface PortfolioHoldingDetailData {
     accountType: string;
     accountHref: string;
     value: string;
+    quantity: string;
+    avgCost: string;
+    costBasis: string;
     lastPrice: string;
     lastUpdated: string;
     freshnessVariant: "success" | "warning" | "neutral";
@@ -300,6 +331,38 @@ export interface PortfolioHoldingDetailData {
     summary: string;
     drivers: string[];
     actions: string[];
+  };
+  editContext: {
+    accountOptions: {
+      value: string;
+      label: string;
+      detail: string;
+    }[];
+    currencyOptions: { value: "CAD" | "USD"; label: string }[];
+    assetClassOptions: { value: string; label: string }[];
+    securityTypeOptions: { value: string; label: string }[];
+    exchangeOptions: { value: string; label: string }[];
+    current: {
+      name: string;
+      currency: "CAD" | "USD";
+      quantity: number | null;
+      avgCostPerShareAmount: number | null;
+      costBasisAmount: number | null;
+      lastPriceAmount: number | null;
+      marketValueAmount: number | null;
+      assetClassOverride: string | null;
+      sectorOverride: string | null;
+      securityTypeOverride: string | null;
+      exchangeOverride: string | null;
+      marketSectorOverride: string | null;
+    };
+    raw: {
+      assetClass: string;
+      sector: string;
+      securityType: string;
+      exchange: string;
+      marketSector: string;
+    };
   };
 }
 

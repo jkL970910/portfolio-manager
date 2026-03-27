@@ -7,6 +7,7 @@ import { AppShell } from "@/components/layout/app-shell";
 import { StickyRail } from "@/components/layout/sticky-rail";
 import { LineChartCard } from "@/components/charts/line-chart";
 import { SecurityMark } from "@/components/portfolio/security-mark";
+import { HoldingEditPanel } from "@/components/portfolio/holding-edit-panel";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -68,8 +69,11 @@ export default async function PortfolioHoldingDetailPage({
               </div>
             </div>
           </div>
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
             <StatBlock icon={<Landmark className="h-4 w-4" />} label={pick(language, "这笔现在值多少", "Current value")} value={detail.holding.value} />
+            <StatBlock icon={<Landmark className="h-4 w-4" />} label={pick(language, "一共有多少股", "Total shares")} value={detail.holding.quantity} />
+            <StatBlock icon={<Landmark className="h-4 w-4" />} label={pick(language, "平均成本", "Average cost")} value={detail.holding.avgCost} />
+            <StatBlock icon={<Landmark className="h-4 w-4" />} label={pick(language, "总成本", "Cost basis")} value={detail.holding.costBasis} />
             <StatBlock
               icon={<Landmark className="h-4 w-4" />}
               label={pick(language, "占整个组合多少", "Share of total portfolio")}
@@ -146,6 +150,8 @@ export default async function PortfolioHoldingDetailPage({
         </div>
 
         <StickyRail>
+          <HoldingEditPanel detail={detail} language={language} />
+
           <Card>
             <CardContent className="space-y-4 px-6 py-6">
               <div className="flex items-center justify-between gap-3">
