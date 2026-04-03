@@ -133,7 +133,7 @@ export function PortfolioWorkspace({ data, language, initialFilters }: Portfolio
   }
 
   return (
-    <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
+    <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_248px] 2xl:grid-cols-[minmax(0,1fr)_264px]">
       <div className="space-y-6">
         <LineChartCard
           title={
@@ -153,7 +153,7 @@ export function PortfolioWorkspace({ data, language, initialFilters }: Portfolio
 
         <SectionHeading
           title={pick(language, '再看账户结构', 'Then look at the account structure')}
-          description={pick(language, '点账户卡本身会切换整页上下文；卡片按钮只负责把你带到下面的持仓表。', 'Clicking an account card switches the whole page context; the card button only jumps you down to the holdings table.')}
+          description={pick(language, '点卡片切换上下文，点按钮再往下看持仓表。', 'Click a card to switch context; use the button if you want to jump down to holdings.')}
         />
         <div className="space-y-4">
           {data.accountCards.map((account) => (
@@ -178,7 +178,7 @@ export function PortfolioWorkspace({ data, language, initialFilters }: Portfolio
 
         <SectionHeading
           title={pick(language, '最后再看持仓明细', 'Finally drill into the holdings')}
-          description={pick(language, '这里会跟着你当前选中的整体或账户一起变化。', 'This table follows the overall or account context you have selected above.')}
+          description={pick(language, '这里会跟着你当前选中的整体或账户一起变化。', 'This table follows the overall or account context you selected above.')}
         />
         <div ref={holdingsRef}>
           <Card>

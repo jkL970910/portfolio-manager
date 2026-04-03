@@ -19,12 +19,14 @@ export async function AppShell({
   title,
   description,
   viewer,
-  children
+  children,
+  compactHeader = false
 }: {
   title: string;
   description: string;
   viewer: Viewer;
   children: React.ReactNode;
+  compactHeader?: boolean;
 }) {
   const language = viewer.displayLanguage;
   const fxRate = viewer.baseCurrency === "CAD" ? 1 : await getFxRate("CAD", viewer.baseCurrency);
@@ -90,11 +92,11 @@ export async function AppShell({
         </div>
       </FloatingHeaderFrame>
 
-      <main className="mx-auto mt-6 max-w-[1440px] space-y-6">
+      <main className={compactHeader ? "mx-auto mt-4 max-w-[1440px] space-y-4" : "mx-auto mt-6 max-w-[1440px] space-y-6"}>
         <section className="px-1">
-          <div className="space-y-1">
-            <h2 className="text-[32px] font-semibold tracking-tight">{title}</h2>
-            <p className="text-[15px] text-[color:var(--muted-foreground)]">{description}</p>
+          <div className={compactHeader ? "space-y-0.5" : "space-y-1"}>
+            <h2 className={compactHeader ? "text-[20px] font-semibold tracking-tight sm:text-[22px]" : "text-[28px] font-semibold tracking-tight sm:text-[30px]"}>{title}</h2>
+            <p className={compactHeader ? "max-w-[760px] text-[13px] leading-5 text-[color:var(--muted-foreground)]" : "max-w-[920px] text-sm leading-7 text-[color:var(--muted-foreground)]"}>{description}</p>
           </div>
         </section>
         {children}

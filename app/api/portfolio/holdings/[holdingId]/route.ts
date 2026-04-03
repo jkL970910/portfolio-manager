@@ -23,6 +23,9 @@ export async function PATCH(
     const { holdingId } = await params;
     await updateHoldingPosition(userId, holdingId, parsed.data);
     revalidatePath("/portfolio", "layout");
+    revalidatePath("/portfolio/account/[accountId]", "page");
+    revalidatePath("/portfolio/holding/[holdingId]", "page");
+    revalidatePath("/portfolio/health");
     revalidatePath("/dashboard");
     revalidatePath("/recommendations");
     return NextResponse.json({ ok: true });
@@ -46,6 +49,9 @@ export async function DELETE(
     const { holdingId } = await params;
     await deleteHoldingPosition(userId, holdingId);
     revalidatePath("/portfolio", "layout");
+    revalidatePath("/portfolio/account/[accountId]", "page");
+    revalidatePath("/portfolio/holding/[holdingId]", "page");
+    revalidatePath("/portfolio/health");
     revalidatePath("/dashboard");
     revalidatePath("/recommendations");
     return NextResponse.json({ ok: true });

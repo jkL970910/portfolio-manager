@@ -8,7 +8,6 @@ import { StickyRail } from "@/components/layout/sticky-rail";
 import { RecommendationPriorityStack } from "@/components/recommendations/recommendation-priority-stack";
 import { ScenarioCompareCard } from "@/components/recommendations/scenario-compare-card";
 import { EmptyStatePanel } from "@/components/ui/empty-state-panel";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { SectionHeading } from "@/components/ui/section-heading";
@@ -39,52 +38,16 @@ export default async function RecommendationsPage() {
     <AppShell
       viewer={viewer}
       title={pick(language, "Loo皇藏宝路线", "Recommendations")}
-      description={pick(language, "这里把 Loo皇审核下一笔钱怎么走的理由摊开给你看。输入、账户顺序和提醒都会一起摆出来。", "This page carries the full funding path. Inputs, rationale, account placement, and risk notes stay visible.")}
+      description={pick(language, "这里把 Loo皇审核下一笔钱怎么走的理由摊开给你看：先看投入条件，再看先补什么，最后看为什么这样排。", "This page lays out the next contribution path: inputs first, then the priority sleeve, then the reasoning behind the ranking.")}
+      compactHeader
     >
-      <Card className="overflow-hidden bg-[linear-gradient(135deg,rgba(255,255,255,0.68),rgba(246,218,230,0.52),rgba(221,232,255,0.46))]">
-        <CardContent className="grid gap-6 px-6 py-6 md:grid-cols-[1.2fr_0.8fr] md:items-center">
-          <div className="space-y-4">
-            <Badge variant="primary">{pick(language, "Loo皇审核台", "Recommendation desk")}</Badge>
-            <div className="space-y-3">
-              <h2 className="text-[30px] font-semibold tracking-[-0.04em] text-[color:var(--foreground)]">
-                {pick(language, "先把条件摆在台面上，再看 Loo皇想让下一笔钱怎么走。", "Show the assumptions first, then decide where the next contribution should go.")}
-              </h2>
-              <p className="max-w-3xl text-sm leading-7 text-[color:var(--muted-foreground)]">
-                {pick(language, "这里不玩黑箱。目标配置、账户顺序、备选标的和 Loo皇的审核理由都会一起摆出来，方便你自己判断值不值得照做。", "This surface avoids black-box output. Target allocation, account order, ticker candidates, and rationale stay visible so you can judge the plan directly.")}
-              </p>
-            </div>
-          </div>
-          <div className="grid gap-3 sm:grid-cols-2">
-            <RecommendationSignal title={pick(language, "Loo皇先看什么", "Inputs")} detail={pick(language, "你的目标、账户、投入金额和偏好。", "Targets, accounts, amount, and preferences")} />
-            <RecommendationSignal title={pick(language, "Loo皇最后会告诉你什么", "Outputs")} detail={pick(language, "先买哪类资产、放哪个账户、为什么这么做。", "Asset priorities, account fit, and rationale")} />
-          </div>
-        </CardContent>
-      </Card>
+      <div className="grid gap-6 xl:grid-cols-[288px_minmax(0,1fr)] 2xl:grid-cols-[312px_minmax(0,1fr)]">
 
-      <div className="grid gap-6 xl:grid-cols-[390px_minmax(0,1fr)] 2xl:grid-cols-[420px_minmax(0,1fr)]">
         <StickyRail>
           <SectionHeading
             title={pick(language, "这次 Loo皇是按什么看的", "What this recommendation is based on")}
-            description={pick(language, "先把你现在的偏好、账户顺序和投入金额摆出来，这样你更容易看懂 Loo皇为什么这么分配。", "Show the current preferences, account order, and amount first so the recommendation is easier to understand.")}
+            description={pick(language, "先看投入金额、账户顺序和偏好。", "Start with the amount, account order, and preferences.")}
           />
-          <Card>
-            <CardContent className="space-y-3 px-6 py-5">
-              <p className="text-sm font-semibold text-[color:var(--foreground)]">
-                {pick(language, "第一次看这页，先看这三块", "If this is your first pass, start with these three")}
-              </p>
-              <div className="grid gap-3 sm:grid-cols-3">
-                {[
-                  pick(language, "先看这次准备投多少钱。", "Start with the amount you plan to invest."),
-                  pick(language, "再看 Loo皇先让你补哪一类资产。", "Then check which sleeve the system wants to top up first."),
-                  pick(language, "最后看 Loo皇为什么点这条路、哪些地方还要你自己判断。", "Finish by reading why this path won and what still needs your judgment.")
-                ].map((tip) => (
-                  <div key={tip} className="rounded-[20px] border border-white/55 bg-white/34 p-4 text-sm leading-7 text-[color:var(--muted-foreground)] backdrop-blur-md">
-                    {tip}
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
           <Card>
             <CardHeader>
               <CardTitle>{pick(language, "这次准备投入多少", "Planned contribution")}</CardTitle>
@@ -111,6 +74,27 @@ export default async function RecommendationsPage() {
                   </div>
                 ))}
               </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="px-6 py-5">
+              <details className="group">
+                <summary className="flex cursor-pointer list-none items-center justify-between gap-4 text-sm font-semibold text-[color:var(--foreground)]">
+                  <span>{pick(language, "第一次看这页？点开看快速顺序", "First time here? Open the quick reading order")}</span>
+                  <ArrowRight className="h-4 w-4 shrink-0 transition-transform duration-200 group-open:rotate-90" />
+                </summary>
+                <div className="mt-4 grid gap-3">
+                  {[
+                    pick(language, "先看这次准备投多少钱。", "Start with the amount you plan to invest."),
+                    pick(language, "再看 Loo皇先让你补哪一类资产。", "Then check which sleeve the system wants to top up first."),
+                    pick(language, "最后看 Loo皇为什么点这条路、哪些地方还要你自己判断。", "Finish by reading why this path won and what still needs your judgment.")
+                  ].map((tip) => (
+                    <div key={tip} className="rounded-[20px] border border-white/55 bg-white/34 p-4 text-sm leading-7 text-[color:var(--muted-foreground)] backdrop-blur-md">
+                      {tip}
+                    </div>
+                  ))}
+                </div>
+              </details>
             </CardContent>
           </Card>
           <Card>
@@ -239,14 +223,5 @@ function ActionRow({ label, href }: { label: string; href: Route }) {
       {label}
       <ArrowRight className="h-4 w-4" />
     </Button>
-  );
-}
-
-function RecommendationSignal({ title, detail }: { title: string; detail: string }) {
-  return (
-    <div className="rounded-[24px] border border-white/55 bg-white/44 p-4 backdrop-blur-md">
-      <p className="text-sm font-medium text-[color:var(--muted-foreground)]">{title}</p>
-      <p className="mt-3 text-base font-semibold text-[color:var(--foreground)]">{detail}</p>
-    </div>
   );
 }

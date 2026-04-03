@@ -48,8 +48,8 @@ export function RecommendationRunPanel({
   }
 
   return (
-    <div className="space-y-4 rounded-[24px] border border-[color:var(--border)] bg-[color:var(--card-muted)] p-5">
-      <div className="grid gap-4 md:grid-cols-[1fr_132px] md:items-start">
+    <div className="space-y-4 rounded-[22px] border border-[color:var(--border)] bg-[color:var(--card-muted)] p-4">
+      <div className="grid gap-3 md:grid-cols-[1fr_92px] md:items-start">
         <div>
           <p className="font-semibold">{pick(language, "生成新的推荐结果", "Generate new recommendation run")}</p>
           <p className="mt-1 text-sm text-[color:var(--muted-foreground)]">
@@ -58,7 +58,7 @@ export function RecommendationRunPanel({
         </div>
         <div className="space-y-3 justify-self-start md:justify-self-end">
           <Badge variant="primary">{pick(language, "实时生成", "Live recalculation")}</Badge>
-          <MascotAsset name="reviewPointing" className="h-[132px] w-[132px]" sizes="132px" />
+          <MascotAsset name="reviewPointing" className="h-[88px] w-[88px]" sizes="88px" />
         </div>
       </div>
       <label className="block space-y-2">

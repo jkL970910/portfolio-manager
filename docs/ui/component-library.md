@@ -232,8 +232,13 @@ components/
 - Responsibilities:
   - signed-in header
   - branding
+  - compact non-home header mode so detail and analysis pages do not keep oversized hero-style title blocks
   - sticky compression behavior
   - top navigation
+- Rules:
+  - keep the home/dashboard overview expressive
+  - non-home analytical pages should prefer lighter page headers over large hero cards when the page structure already explains itself
+  - non-home page titles should stay compact enough that the first analytical block is visible without a large hero-style gap
 
 ### `FloatingHeaderFrame`
 
@@ -259,6 +264,7 @@ components/
   - scrolls independently when its own content becomes taller than the viewport
   - when the rail itself reaches the top or bottom, wheel scrolling should continue the main page instead of trapping the pointer
 - should sit low enough to clear the full floating header + nav stack on first paint
+- should stay narrow enough that the main analytical column keeps priority; treat the rail as context, not the primary reading surface
 
 ## Portfolio Components
 
@@ -281,13 +287,16 @@ components/
 - Supports:
   - deep-link entry into holding detail from the full symbol block (icon + symbol + name)
   - hover lift / inline affordance so users can tell a holding row leads to detail
+  - compact account-detail mode that hides the redundant account column and tightens widths so the sticky rail does not clip the final columns
   - filtered / highlighted states
   - explicit display of total shares, average cost, and current value
+  - short readable Chinese headers instead of long analytical phrases
   - separate share labels for:
     - share of total portfolio
     - share inside the current account
   - Chinese holding guidance rendered in a `Loo皇审核` tone instead of neutral analysis phrasing
   - clean UTF-8 Chinese copy; do not allow mojibake regressions in shared holding labels
+  - tighter current-value column that keeps estimate, current price, freshness, and last-updated information compact enough that the value column does not tower over adjacent columns
   - keeps native rail scrollbars visually hidden
   - should be reused anywhere a right-side analytical rail needs to stay visible without forcing the whole page to bottom out first
 
@@ -346,7 +355,33 @@ components/
 - Purpose: read-only security detail surface for recommended or already-held symbols
 - Rules:
 - should work even when the user does not already own the symbol
+- should follow the same first-fold pattern as holding and account detail:
+  - left identity block
+  - primary metrics band on the right
+  - secondary facts below inside the same overview card
 - should show a reference trend, identity facts, quote-source facts, and any related holdings already inside the portfolio
+
+### Detail Overview Pattern
+
+- Files:
+  - [app/portfolio/account/[accountId]/page.tsx](E:\Projects\Portfolio%20Manager\app\portfolio\account\[accountId]\page.tsx)
+  - [app/portfolio/holding/[holdingId]/page.tsx](E:\Projects\Portfolio%20Manager\app\portfolio\holding\[holdingId]\page.tsx)
+  - [app/portfolio/security/[symbol]/page.tsx](E:\Projects\Portfolio%20Manager\app\portfolio\security\[symbol]\page.tsx)
+- Purpose: unify first-fold layout across account, holding, and security detail pages
+- Rules:
+  - use one compact overview card rather than a wide empty left block plus detached stat cards
+  - keep identity information on the left
+  - spread primary metrics across the remaining width instead of pinning them to the far right
+  - place secondary facts in a lower grid inside the same card
+  - reduce icon size and remove redundant explanatory copy when the facts already explain the object
+
+### `ImportExperience`
+
+- File: [import-experience.tsx](E:\Projects\Portfolio%20Manager\components\import\import-experience.tsx)
+- Purpose: guided and direct import workspace
+- Rules:
+  - keep the top intro lightweight on non-home surfaces
+  - use a short context strip instead of a large hero card once the workflow options themselves already explain the next step
 
 ## Chart Components
 
@@ -421,6 +456,7 @@ components/
   - do not collapse those two meanings into one generic "weight" label
 - [refresh-prices-panel.tsx](E:\Projects\Portfolio%20Manager\components\portfolio\refresh-prices-panel.tsx)
   - batch quote refresh workflow
+  - explains that a missing quote means no new quote returned on this refresh, not necessarily that the row has no usable cached price
 - [health-dimension-card.tsx](E:\Projects\Portfolio%20Manager\components\portfolio\health-dimension-card.tsx)
   - detailed health-score breakdown card for a single dimension
 - [health-action-queue.tsx](E:\Projects\Portfolio%20Manager\components\portfolio\health-action-queue.tsx)
@@ -457,6 +493,7 @@ components/
   - exhausted sheltered accounts should be called out in plain language instead of forcing the user to infer the problem from deeper recommendation details
   - exhausted account-order rows should render as a weaker or warning-style summary instead of looking equivalent to fully usable account paths
   - Chinese recommendation copy should sound like `Loo皇审核`; English should remain neutral and non-roleplay
+  - first-time reading help should stay lightweight or collapsible once the page structure already explains itself
 
 ### Settings
 

@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import Link from "next/link";
 import { ArrowUpRight, Crown } from "lucide-react";
@@ -19,102 +19,123 @@ function freshnessLabel(language: DisplayLanguage, variant: HoldingRow["freshnes
   return pick(language, "未知", "Unknown");
 }
 
+function displaySecurityName(holding: HoldingRow) {
+  return holding.name.trim().toUpperCase() === holding.symbol.trim().toUpperCase() ? null : holding.name;
+}
+
 export function HoldingTable({
   holdings,
-  language
+  language,
+  hideAccountColumn = false
 }: {
   holdings: HoldingRow[];
   language: DisplayLanguage;
+  hideAccountColumn?: boolean;
 }) {
   if (holdings.length === 0) {
     return (
       <div className="rounded-[24px] border border-white/55 bg-white/36 p-5 text-sm leading-7 text-[color:var(--muted-foreground)] backdrop-blur-md">
-        {pick(language, "这里暂时还没有持仓。先导入，或者去账户页补一笔新持仓。", "There are no holdings here yet. Import data first or add a new holding from the account page.")}
+        {pick(language, "这里还没有持仓。先导入，或者去账户页补一笔新持仓。", "There are no holdings here yet. Import data first or add a new holding from the account page.")}
       </div>
     );
   }
 
   return (
     <div className="space-y-3">
-      <div className="hidden items-center gap-4 rounded-[22px] border border-white/55 bg-white/26 px-5 py-4 text-sm font-medium text-[color:var(--muted-foreground)] lg:grid lg:grid-cols-[minmax(230px,1.55fr)_minmax(150px,0.9fr)_minmax(180px,1fr)_minmax(135px,0.8fr)_minmax(150px,0.9fr)_minmax(190px,1fr)_minmax(90px,0.65fr)_minmax(250px,1.4fr)]">
+      <div
+        className={[
+          "hidden items-center gap-4 rounded-[22px] border border-white/55 bg-white/26 px-5 py-4 text-sm font-medium text-[color:var(--muted-foreground)] xl:grid",
+          hideAccountColumn
+            ? "xl:grid-cols-[minmax(196px,1.12fr)_minmax(148px,0.8fr)_minmax(156px,0.8fr)_minmax(82px,0.36fr)_minmax(176px,0.92fr)]"
+            : "xl:grid-cols-[minmax(190px,1.02fr)_minmax(112px,0.6fr)_minmax(144px,0.72fr)_minmax(148px,0.76fr)_minmax(72px,0.32fr)_minmax(176px,0.9fr)]"
+        ].join(" ")}
+      >
         <span>{pick(language, "持仓", "Holding")}</span>
-        <span>{pick(language, "账户", "Account")}</span>
+        {hideAccountColumn ? null : <span>{pick(language, "账户", "Account")}</span>}
         <span>{pick(language, "成本", "Cost")}</span>
         <span>{pick(language, "当前估值", "Current value")}</span>
-        <span>{pick(language, "最近价格", "Last price")}</span>
-        <span>{pick(language, "占比", "Share")}</span>
         <span>{pick(language, "盈亏", "Gain / loss")}</span>
         <span>{pick(language, "Loo皇审核", "Review note")}</span>
       </div>
 
-      {holdings.map((holding) => (
-        <div
-          key={holding.id}
-          className={`rounded-[26px] border p-5 backdrop-blur-md transition-colors ${
-            holding.highlighted
-              ? "border-[rgba(240,143,178,0.4)] bg-[linear-gradient(135deg,rgba(255,255,255,0.78),rgba(246,218,230,0.22),rgba(221,232,255,0.18))]"
-              : "border-white/55 bg-white/36"
-          }`}
-        >
-          <div className="grid gap-4 lg:grid-cols-[minmax(230px,1.55fr)_minmax(150px,0.9fr)_minmax(180px,1fr)_minmax(135px,0.8fr)_minmax(150px,0.9fr)_minmax(190px,1fr)_minmax(90px,0.65fr)_minmax(250px,1.4fr)] lg:items-start">
-            <div className="space-y-3">
-              <Link
-                href={holding.href}
-                className="group flex items-start gap-3 rounded-[22px] border border-white/60 bg-white/48 px-4 py-3 transition-[background-color,border-color,box-shadow] duration-200 hover:border-white/78 hover:bg-white/64 hover:shadow-[0_12px_28px_rgba(110,103,130,0.08)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--ring)]"
-              >
-                <SecurityMark symbol={holding.symbol} assetClass={holding.assetClass} className="h-14 w-14 rounded-[18px] text-sm" />
-                <div className="min-w-0 space-y-1">
-                  <div className="flex items-start gap-2">
-                    <div className="min-w-0">
-                      <p className="truncate text-[28px] leading-none font-semibold tracking-[-0.03em] text-[color:var(--foreground)] sm:text-[30px]">
-                        {holding.symbol}
-                      </p>
-                      <p className="mt-1 truncate text-sm text-[color:var(--muted-foreground)]">{holding.name}</p>
+      {holdings.map((holding) => {
+        const securityName = displaySecurityName(holding);
+        return (
+          <div
+            key={holding.id}
+            className={`rounded-[26px] border p-5 backdrop-blur-md transition-colors ${
+              holding.highlighted
+                ? "border-[rgba(240,143,178,0.4)] bg-[linear-gradient(135deg,rgba(255,255,255,0.78),rgba(246,218,230,0.22),rgba(221,232,255,0.18))]"
+                : "border-white/55 bg-white/36"
+            }`}
+          >
+            <div
+              className={[
+                "grid gap-5 xl:items-start",
+                hideAccountColumn
+                  ? "xl:grid-cols-[minmax(196px,1.12fr)_minmax(148px,0.8fr)_minmax(156px,0.8fr)_minmax(82px,0.36fr)_minmax(176px,0.92fr)]"
+                  : "xl:grid-cols-[minmax(190px,1.02fr)_minmax(112px,0.6fr)_minmax(144px,0.72fr)_minmax(148px,0.76fr)_minmax(72px,0.32fr)_minmax(176px,0.9fr)]"
+              ].join(" ")}
+            >
+              <div className="space-y-3">
+                <Link
+                  href={holding.href}
+                  className="group flex items-start gap-3 rounded-[22px] border border-white/60 bg-white/48 px-4 py-3 transition-[background-color,border-color,box-shadow] duration-200 hover:border-white/78 hover:bg-white/64 hover:shadow-[0_12px_28px_rgba(110,103,130,0.08)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--ring)]"
+                >
+                  <SecurityMark symbol={holding.symbol} assetClass={holding.assetClass} className="h-11 w-11 rounded-[14px] text-[13px]" />
+                  <div className="min-w-0 space-y-1">
+                    <div className="flex items-start gap-2">
+                      <div className="min-w-0">
+                        <p className="truncate text-[20px] leading-none font-semibold tracking-[-0.03em] text-[color:var(--foreground)] sm:text-[22px]">
+                          {holding.symbol}
+                        </p>
+                        {securityName ? <p className="mt-1 truncate text-sm text-[color:var(--muted-foreground)]">{securityName}</p> : null}
+                      </div>
+                      <ArrowUpRight className="mt-1 h-4 w-4 shrink-0 text-[color:var(--muted-foreground)] transition-transform duration-200 group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
                     </div>
-                    <ArrowUpRight className="mt-1 h-4 w-4 shrink-0 text-[color:var(--muted-foreground)] transition-transform duration-200 group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
+                    <p className="text-xs font-medium text-[color:var(--primary)]">{pick(language, "点开详情", "Open detail")}</p>
                   </div>
-                  <p className="text-xs font-medium text-[color:var(--primary)]">{pick(language, "点开详情", "Open detail")}</p>
+                </Link>
+                {holding.highlighted && holding.highlightLabel ? <Badge variant="primary">{holding.highlightLabel}</Badge> : null}
+              </div>
+
+              {hideAccountColumn ? null : <InfoBlock label={pick(language, "账户", "Account")} value={holding.account} muted={holding.accountType} />}
+
+              <InfoBlock
+                label={pick(language, "成本", "Cost")}
+                value={pick(language, `总股数 ${holding.quantity}`, `Shares ${holding.quantity}`)}
+                muted={pick(language, `平均成本 ${holding.avgCost}`, `Avg cost ${holding.avgCost}`)}
+              />
+
+              <div className="space-y-2">
+                <InfoBlock
+                  label={pick(language, "当前估值", "Current value")}
+                  value={holding.value}
+                  muted={pick(language, `现价 ${holding.lastPrice}`, `Last price ${holding.lastPrice}`)}
+                />
+                <div className="rounded-[18px] border border-white/55 bg-white/40 px-4 py-3 text-sm text-[color:var(--muted-foreground)]">
+                  <p>{pick(language, `占整个组合 ${holding.portfolioShare}`, `Of total portfolio ${holding.portfolioShare}`)}</p>
+                  <p className="mt-1">{pick(language, `占这个账户 ${holding.accountShare}`, `Inside this account ${holding.accountShare}`)}</p>
                 </div>
-              </Link>
-              {holding.highlighted && holding.highlightLabel ? <Badge variant="primary">{holding.highlightLabel}</Badge> : null}
-            </div>
-
-            <InfoBlock label={pick(language, "账户", "Account")} value={holding.account} muted={holding.accountType} />
-
-            <InfoBlock
-              label={pick(language, "成本", "Cost")}
-              value={pick(language, `总股数 ${holding.quantity}`, `Shares ${holding.quantity}`)}
-              muted={pick(language, `平均成本 ${holding.avgCost}`, `Avg cost ${holding.avgCost}`)}
-            />
-
-            <InfoBlock label={pick(language, "当前估值", "Current value")} value={holding.value} />
-
-            <div className="space-y-2">
-              <InfoBlock label={pick(language, "最近价格", "Last price")} value={holding.lastPrice} />
-              <div className="inline-flex items-center gap-2">
-                <Badge variant={holding.freshnessVariant}>{freshnessLabel(language, holding.freshnessVariant)}</Badge>
-                <span className="text-xs text-[color:var(--muted-foreground)]">{holding.lastUpdated}</span>
+                <div className="flex flex-wrap items-center gap-2 text-xs text-[color:var(--muted-foreground)]">
+                  <Badge variant={holding.freshnessVariant}>{freshnessLabel(language, holding.freshnessVariant)}</Badge>
+                  <span>{holding.lastUpdated}</span>
+                </div>
               </div>
-            </div>
 
-            <InfoBlock
-              label={pick(language, "占比", "Share")}
-              value={pick(language, `占整个组合 ${holding.portfolioShare}`, `Of total portfolio ${holding.portfolioShare}`)}
-              muted={pick(language, `占这个账户 ${holding.accountShare}`, `Inside this account ${holding.accountShare}`)}
-            />
+              <InfoBlock label={pick(language, "盈亏", "Gain / loss")} value={holding.gainLoss} />
 
-            <InfoBlock label={pick(language, "盈亏", "Gain / loss")} value={holding.gainLoss} />
-
-            <div className="rounded-[22px] border border-white/55 bg-white/40 p-4 text-sm leading-7 text-[color:var(--muted-foreground)]">
-              <div className="mb-2 flex items-center gap-2 text-xs font-medium uppercase tracking-[0.14em] text-[color:var(--primary)]">
-                <Crown className="h-3.5 w-3.5" />
-                {pick(language, "Loo皇审核", "Review note")}
+              <div className="rounded-[22px] border border-white/55 bg-white/40 p-4 text-sm leading-7 text-[color:var(--muted-foreground)]">
+                <div className="mb-2 flex items-center gap-2 text-xs font-medium uppercase tracking-[0.14em] text-[color:var(--primary)]">
+                  <Crown className="h-3.5 w-3.5" />
+                  {pick(language, "Loo皇审核", "Review note")}
+                </div>
+                {holding.signal}
               </div>
-              {holding.signal}
             </div>
           </div>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }
@@ -131,7 +152,7 @@ function InfoBlock({
   return (
     <div className="space-y-2">
       <p className="text-sm font-medium text-[color:var(--muted-foreground)]">{label}</p>
-      <p className="text-lg font-semibold leading-8 text-[color:var(--foreground)]">{value}</p>
+      <p className="text-base font-semibold leading-8 text-[color:var(--foreground)]">{value}</p>
       {muted ? <p className="text-sm leading-7 text-[color:var(--muted-foreground)]">{muted}</p> : null}
     </div>
   );

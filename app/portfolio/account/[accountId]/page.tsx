@@ -36,60 +36,82 @@ export default async function PortfolioAccountDetailPage({
       title={detail.account.name}
       description={pick(
         language,
-        "先看这个账户自己的走势、放了哪些资产、还有哪些地方需要先修。",
-        "Use this page to inspect the account trend, the assets inside it, and the first areas that still need work."
+        "先看这个账户的关键数字，再往下看走势、提醒和持仓。",
+        "Start with the key account facts, then move into the trend, notes, and holdings."
       )}
+      compactHeader
     >
-      <Card className="overflow-hidden bg-[linear-gradient(135deg,rgba(255,255,255,0.68),rgba(246,218,230,0.52),rgba(221,232,255,0.46))]">
-        <CardContent className="grid gap-6 px-6 py-6 md:grid-cols-[1.1fr_0.9fr] md:items-center">
-          <div className="space-y-4">
-            <div className="flex flex-wrap items-center gap-3">
-              <Button href="/portfolio" variant="secondary" leadingIcon={<ArrowLeft className="h-4 w-4" />}>
-                {pick(language, "返回组合页", "Back to portfolio")}
-              </Button>
-              <div className="inline-flex rounded-full border border-white/60 bg-white/44 px-4 py-2 text-sm font-medium text-[color:var(--foreground)] backdrop-blur-md">
-                {detail.account.typeLabel}
+      <div className="space-y-5">
+        <div className="flex flex-wrap items-center gap-3">
+          <Button href="/portfolio" variant="secondary" leadingIcon={<ArrowLeft className="h-4 w-4" />}>
+            {pick(language, "返回组合页", "Back to portfolio")}
+          </Button>
+          <div className="inline-flex rounded-full border border-white/60 bg-white/44 px-4 py-2 text-sm font-medium text-[color:var(--foreground)] backdrop-blur-md">
+            {detail.account.typeLabel}
+          </div>
+        </div>
+
+        <Card className="bg-white/34">
+          <CardContent className="space-y-5 px-5 py-5">
+            <div className="grid gap-5 xl:grid-cols-[minmax(260px,360px)_minmax(0,1fr)] xl:items-start">
+              <div className="min-w-0 rounded-[18px] border border-white/55 bg-white/30 px-4 py-4 backdrop-blur-md">
+                <div className="flex flex-wrap items-center gap-2 text-xs text-[color:var(--muted-foreground)]">
+                  <span className="inline-flex rounded-full border border-white/60 bg-white/48 px-3 py-1 font-medium text-[color:var(--foreground)]">
+                    {detail.account.typeLabel}
+                  </span>
+                  <span className="inline-flex rounded-full border border-white/60 bg-white/44 px-3 py-1">
+                    {detail.account.currency}
+                  </span>
+                  <span className="inline-flex rounded-full border border-white/60 bg-white/44 px-3 py-1">
+                    {detail.account.institution}
+                  </span>
+                </div>
+                <h2 className="mt-3 text-[24px] font-semibold tracking-tight text-[color:var(--foreground)] sm:text-[28px]">
+                  {detail.account.name}
+                </h2>
+                <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                  <div className="rounded-[18px] border border-white/55 bg-white/42 p-4">
+                    <p className="text-xs uppercase tracking-[0.14em] text-[color:var(--muted-foreground)]">
+                      {pick(language, "主要持仓", "Top holdings")}
+                    </p>
+                    <p className="mt-2 text-sm font-semibold leading-6 text-[color:var(--foreground)]">
+                      {detail.account.topHoldings.join(" · ") || pick(language, "暂时还没有明显主仓", "No clear top holding yet")}
+                    </p>
+                  </div>
+                  <div className="rounded-[18px] border border-white/55 bg-white/42 p-4">
+                    <p className="text-xs uppercase tracking-[0.14em] text-[color:var(--muted-foreground)]">
+                      {pick(language, "先看什么", "What to check first")}
+                    </p>
+                    <p className="mt-2 text-sm leading-6 text-[color:var(--foreground)]">
+                      {detail.account.summaryPoints[0] ?? pick(language, "先看这个账户里哪类资产最重，再决定要不要继续拆到单笔持仓。", "Start with the dominant sleeve, then decide whether you need to drill into single holdings.")}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                <StatBlock icon={<Wallet className="h-4 w-4" />} label={pick(language, "当前账户总值", "Current account value")} value={detail.account.value} />
+                <StatBlock
+                  icon={<CircleGauge className="h-4 w-4" />}
+                  label={pick(language, "占整个组合", "Share of total portfolio")}
+                  value={detail.account.portfolioShare}
+                  detail={pick(language, "分母是你全部投资资产。", "Compared with your full invested portfolio.")}
+                />
+                <StatBlock icon={<Wallet className="h-4 w-4" />} label={pick(language, "账户币种", "Account currency")} value={detail.account.currency} />
+                <StatBlock icon={<Wallet className="h-4 w-4" />} label={pick(language, "额度和状态", "Room and status")} value={detail.account.room} />
               </div>
             </div>
-            <div className="space-y-3">
-              <h2 className="text-[30px] font-semibold tracking-[-0.04em] text-[color:var(--foreground)]">
-                {pick(language, `${detail.account.name} 现在大概是什么样`, `How ${detail.account.name} looks right now`)}
-              </h2>
-              <p className="max-w-3xl text-sm leading-7 text-[color:var(--muted-foreground)]">
-                {pick(
-                  language,
-                  "这里不再把别的账户混进来。你看到的走势、分布、健康提示和持仓表，都只属于这个账户。",
-                  "Nothing else is mixed into this page. The trend, allocation, health signals, and holdings table all belong to this account only."
-                )}
-              </p>
+            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+              {detail.facts.map((fact, index) => (
+                <StatBlock key={`account-fact-${index}`} icon={<Wallet className="h-4 w-4" />} label={fact.label} value={fact.value} detail={fact.detail} />
+              ))}
             </div>
-          </div>
-          <div className="grid gap-3 sm:grid-cols-2">
-            <StatBlock icon={<Wallet className="h-4 w-4" />} label={pick(language, "这个账户现在有多少", "Current account value")} value={detail.account.value} />
-            <StatBlock
-              icon={<CircleGauge className="h-4 w-4" />}
-              label={pick(language, "这个账户占整个组合多少", "Share of total portfolio")}
-              value={detail.account.portfolioShare}
-              detail={pick(language, "这里看的分母是你全部投资资产，不只是这个账户。", "This compares the account with your full invested portfolio, not just this account.")}
-            />
-            <StatBlock icon={<Wallet className="h-4 w-4" />} label={pick(language, "账户币种", "Account currency")} value={detail.account.currency} />
-            <StatBlock icon={<Wallet className="h-4 w-4" />} label={pick(language, "额度和状态", "Room and status")} value={detail.account.room} />
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      </div>
 
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_248px] 2xl:grid-cols-[minmax(0,1fr)_264px]">
         <div className="space-y-6">
-          <SectionHeading
-            title={pick(language, "先认清这个账户现在是什么样", "Start by sizing up this account")}
-            description={pick(language, "先把账户里有几笔持仓、哪类资产最重、最近价格更新到什么程度看清楚，再往下看走势和持仓。", "Check how many holdings sit here, which sleeve dominates, and how fresh the prices are before moving into trends and positions.")}
-          />
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-            {detail.facts.map((fact, index) => (
-              <StatBlock key={`account-fact-${index}`} icon={<Wallet className="h-4 w-4" />} label={fact.label} value={fact.value} detail={fact.detail} />
-            ))}
-          </div>
-
           <LineChartCard
             title={pick(language, `${detail.account.name} 近 6 个月大概怎么走`, `How ${detail.account.name} has moved over the last 6 months`)}
             description={pick(language, "先看这个账户自己是稳着往上，还是波动比较大。这里先给参考走势，完整历史回放后面再补。", "Start by checking whether this account has been moving steadily or swinging more than expected. This is a reference trend for now; full historical replay comes later.")}
@@ -128,7 +150,7 @@ export default async function PortfolioAccountDetailPage({
           />
           <Card>
             <CardContent className="px-6 py-6">
-              <HoldingTable holdings={detail.holdings} language={language} />
+              <HoldingTable holdings={detail.holdings} language={language} hideAccountColumn />
             </CardContent>
           </Card>
         </div>

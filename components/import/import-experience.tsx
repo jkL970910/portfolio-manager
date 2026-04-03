@@ -19,7 +19,6 @@ import {
 import { ImportJobPanel } from "@/components/import/import-job-panel";
 import { SpendingImportPanel } from "@/components/import/spending-import-panel";
 import { WorkflowOptionCard } from "@/components/import/workflow-option-card";
-import { MascotAsset } from "@/components/brand/mascot-asset";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -483,7 +482,9 @@ export function ImportExperience({
     setSelectedExistingAccountId(selected.id);
     setAccountType(selected.type as GuidedAccountType);
     setMethod(initialContext.method ?? "manual-entry");
-    setCurrentStep(4);
+    // Account-bound "add holding" should land on the source-entry step
+    // with the account already locked in, not jump past the details form.
+    setCurrentStep(3);
   }, [existingAccounts, initialContext]);
 
   function updateManualHolding(id: string, patch: Partial<ManualHoldingDraft>) {
@@ -663,9 +664,26 @@ export function ImportExperience({
         ? quote.provider
         : "market-data provider";
       const delayedSuffix = quote.delayed === true ? " (delayed)" : "";
+      const quoteCurrency = normalizeSupportedCurrency(quote.currency);
+      if (holding.currency && holding.currency !== quoteCurrency) {
+        setManualHoldingStatus((current) => ({
+          ...current,
+          [id]: {
+            ...current[id],
+            quoteLoading: false,
+            error: "",
+            message: pick(
+              language,
+              `拿到的是 ${formatAmount(nextPrice, quoteCurrency)}，但你这笔现在按 ${holding.currency} 处理。为了避免把 CAD 包装版误套成 USD 正股，这里先不自动回填价格，请你确认交易所或币种后再填。`,
+              `The quote came back as ${formatAmount(nextPrice, quoteCurrency)}, while this holding is currently set to ${holding.currency}. To avoid treating a CAD wrapper like the USD primary listing, the price was not auto-filled. Confirm the market or currency first, then enter the price.`
+            )
+          }
+        }));
+        return;
+      }
+
       updateManualHolding(id, {
-        currentPriceAmount: nextPrice.toFixed(2),
-        currency: normalizeSupportedCurrency(quote.currency)
+        currentPriceAmount: nextPrice.toFixed(2)
       });
       setManualHoldingStatus((current) => ({
         ...current,
@@ -673,7 +691,7 @@ export function ImportExperience({
           ...current[id],
           quoteLoading: false,
           error: "",
-          message: `Fetched ${providerLabel} quote at ${formatAmount(nextPrice, normalizeSupportedCurrency(quote.currency))}${delayedSuffix}.`
+          message: `Fetched ${providerLabel} quote at ${formatAmount(nextPrice, quoteCurrency)}${delayedSuffix}.`
         }
       }));
     } catch (error) {
@@ -1096,43 +1114,21 @@ export function ImportExperience({
       : pick(language, "继续", "Continue");
 
   return (
-    <div className="space-y-6">
-      <Card className="overflow-hidden bg-[linear-gradient(135deg,rgba(255,255,255,0.72),rgba(248,223,233,0.54),rgba(224,235,255,0.48))] before:bg-[linear-gradient(180deg,rgba(255,255,255,0.48),rgba(255,255,255,0.12)_38%,rgba(255,255,255,0.02)_100%)]">
-        <CardContent className="grid gap-6 px-6 py-6 md:grid-cols-[1.1fr_0.9fr] md:items-center">
-          <div className="relative space-y-4">
-            <div className="pointer-events-none absolute -left-14 top-[-60px] h-44 w-44 rounded-full bg-[radial-gradient(circle,rgba(240,143,178,0.2),rgba(240,143,178,0))] blur-3xl" />
-            <div className="pointer-events-none absolute left-1/2 top-[-80px] h-40 w-40 -translate-x-1/2 rounded-full bg-[radial-gradient(circle,rgba(255,255,255,0.3),rgba(255,255,255,0))] blur-3xl" />
-            <Badge variant="primary">{pick(language, "Loo 的入库向导", "Import workspace")}</Badge>
-            <div className="space-y-3">
-              <h2 className="text-[30px] font-semibold tracking-[-0.04em] text-[color:var(--foreground)]">
-                先决定导入路径，再把宝库整理干净。
-              </h2>
-              <p className="max-w-3xl text-sm leading-7 text-[color:var(--muted-foreground)]">
-                投资标的和消费流水现在是两条独立工作流。这样后续接 broker API、银行流水或聚合器时，不会互相污染。
-              </p>
-            </div>
-            <div className="flex flex-wrap gap-3 text-sm text-[color:var(--muted-foreground)]">
-              <span className="rounded-full border border-white/60 bg-white/42 px-4 py-2 backdrop-blur-md">{pick(language, "逐账户引导式入库", "Guided onboarding for one-account-at-a-time setup")}</span>
-              <span className="rounded-full border border-white/60 bg-white/42 px-4 py-2 backdrop-blur-md">{pick(language, "面向已有导出的批量 CSV 导入", "Bulk CSV import for existing exports")}</span>
-            </div>
+      <div className="space-y-6">
+        <div className="flex flex-wrap items-center gap-2 rounded-[20px] border border-white/55 bg-white/30 px-4 py-3 backdrop-blur-md">
+          <Badge variant="primary">{pick(language, "Loo 的入库向导", "Import workspace")}</Badge>
+          <span className="text-sm text-[color:var(--muted-foreground)]">
+            {pick(language, "先分清投资和消费，再决定走哪条导入路。", "Separate portfolio and spending first, then choose the path you want.")}
+          </span>
+          <div className="ml-auto flex flex-wrap gap-2">
+            <span className="rounded-full border border-white/60 bg-white/46 px-2.5 py-1 text-[11px] text-[color:var(--muted-foreground)]">
+              {pick(language, "投资：账户、持仓、估值", "Portfolio: accounts, holdings, valuation")}
+            </span>
+            <span className="rounded-full border border-white/60 bg-white/46 px-2.5 py-1 text-[11px] text-[color:var(--muted-foreground)]">
+              {pick(language, "消费：流水、分类、现金流", "Spending: transactions, categories, cash flow")}
+            </span>
           </div>
-          <div className="relative grid gap-4 md:grid-cols-[220px_1fr] md:items-center">
-            <div className="pointer-events-none absolute bottom-[-30px] right-[-18px] h-36 w-36 rounded-full bg-[radial-gradient(circle,rgba(139,168,255,0.16),rgba(139,168,255,0))] blur-3xl" />
-            <div className="flex justify-center md:justify-start">
-              <div className="space-y-3 pt-8">
-                <MascotAsset name="miniSticker" className="h-[180px] w-[180px]" sizes="180px" />
-                <div className="max-w-[210px] rounded-[22px] border border-white/62 bg-[linear-gradient(180deg,rgba(255,255,255,0.78),rgba(255,248,251,0.64))] px-4 py-3 text-sm font-medium leading-6 text-[color:var(--foreground)] shadow-[0_14px_30px_rgba(110,103,130,0.07)] backdrop-blur-xl">
-                  {pick(language, "你先选路径，我来保证账户和流水不会串在一起。", "Pick the path first. I will keep accounts and transaction feeds from getting mixed together.")}
-                </div>
-              </div>
-            </div>
-            <div className="grid gap-3">
-              <LooSignal title={pick(language, "投资路径", "Portfolio path")} detail={pick(language, "账户、持仓、估值与推荐刷新", "Accounts, holdings, valuation, and recommendation refresh")} />
-              <LooSignal title={pick(language, "消费路径", "Spending path")} detail={pick(language, "交易流水、分类与现金流", "Transactions, categories, and cash flow")} />
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+        </div>
 
       <Card>
         <CardHeader>
@@ -2190,17 +2186,5 @@ function StepCompleteSetup({
     </div>
   );
 }
-
-function LooSignal({ title, detail }: { title: string; detail: string }) {
-  return (
-    <div className="rounded-[24px] border border-white/62 bg-[linear-gradient(180deg,rgba(255,255,255,0.62),rgba(255,250,252,0.32))] p-4 shadow-[0_14px_30px_rgba(110,103,130,0.06)] backdrop-blur-md">
-      <p className="text-sm font-medium text-[color:var(--muted-foreground)]">{title}</p>
-      <p className="mt-3 text-base font-semibold text-[color:var(--foreground)]">{detail}</p>
-    </div>
-  );
-}
-
-
-
 
 

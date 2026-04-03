@@ -161,6 +161,15 @@ Current delivery status:
 - holding deletion is available from holding detail and returns the user to the parent account after confirmation
 - holding saves now invalidate related portfolio/account/dashboard/recommendation routes so parent totals and summaries refresh consistently
 - quote refresh now skips ambiguous cross-currency quotes when no explicit exchange override exists, so CAD wrappers and CDR-like positions do not get silently overwritten by mismatched USD prices
+- Phase 3 cleanup has also tightened:
+    - holding-table wording and density with shorter labels
+    - quote refresh explanations around missing-vs-cached quotes
+    - recommendations first-time guidance through a lighter collapsible hint instead of a permanently expanded coaching block
+    - non-home analytical pages now prefer lighter page headers over large hero cards, so density stays high once the page structure is already self-explanatory
+    - account detail and holding detail top sections now use compact identity rows instead of large intro cards
+    - security detail uses the same compact identity-row pattern and no longer assumes old market-data status badge fields
+    - sticky analytical rails were narrowed again so holdings tables keep more horizontal room
+    - import now opens with a compact context strip instead of a large explanatory hero
 
 ### Phase 4: Real historical performance
 
@@ -239,3 +248,6 @@ Phase 1 is done when:
 - A global floating scroll-to-top control is available across pages through AppShell.
 - Sticky right rails should scroll independently when their own content exceeds viewport height, instead of forcing the whole page to the bottom before lower rail modules become reachable.
 - Sticky rails should clear the full floating header and top-nav stack on first paint, and their native scrollbars should stay visually hidden.
+
+
+- Account detail pages use a true identity block on the left of the first fold instead of a thin context strip, so the top section communicates the account quickly without leaving large empty space.

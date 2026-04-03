@@ -31,10 +31,11 @@ export default async function PortfolioHealthPage({
       description={activeAccount
         ? pick(language, "这一页只看当前账户，不再看整个组合。先看这个账户自己哪里失衡，再决定要不要继续加钱。", "This page is focused on the current account only. See what is out of shape here before deciding whether to keep funding it.")
         : pick(language, "这一页把组合问题拆开讲清楚，帮你判断下一步先修哪里。", "This page breaks the portfolio into clear problem areas so you can decide what to fix first.")}
+      compactHeader
     >
-      <Card className="overflow-hidden bg-[linear-gradient(135deg,rgba(255,255,255,0.68),rgba(246,218,230,0.52),rgba(221,232,255,0.46))]">
-        <CardContent className="grid gap-6 px-6 py-6 md:grid-cols-[1.1fr_0.9fr] md:items-center">
-          <div className="space-y-4">
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(320px,420px)] xl:items-start">
+        <Card>
+          <CardContent className="space-y-4 px-6 py-6">
             <div className="flex flex-wrap items-center gap-3">
               <Button href={backHref} variant="secondary" leadingIcon={<ArrowLeft className="h-4 w-4" />}>
                 {pick(language, "返回组合页", "Back to portfolio")}
@@ -55,21 +56,21 @@ export default async function PortfolioHealthPage({
                   : pick(language, "这里不是只给一个分数，而是直接告诉你：问题在哪、如果先不管会怎样、下一步先修什么。", "This page does not stop at a score. It tells you what is off, what happens if you ignore it, and what to fix first.")}
               </p>
             </div>
-          </div>
-          <RadarPreviewCard
-            title={activeAccount ? pick(language, `${activeAccount.name} 现在大概是什么状态`, `How ${activeAccount.name} looks right now`) : pick(language, "现在整体大概是什么状态", "Current overall shape")}
-            status={`${health.score}/100 · ${health.status}`}
-            description={pick(
-              language,
-              `你现在最稳的一块是 ${health.strongestDimension}，最该先修的是 ${health.weakestDimension}。`,
-              `Your strongest area is ${health.strongestDimension}, and the first one to fix is ${health.weakestDimension}.`
-            )}
-            data={health.radar}
-            href={backHref}
-            ctaLabel={pick(language, "返回组合页", "Back to portfolio")}
-          />
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+        <RadarPreviewCard
+          title={activeAccount ? pick(language, `${activeAccount.name} 现在大概是什么状态`, `How ${activeAccount.name} looks right now`) : pick(language, "现在整体大概是什么状态", "Current overall shape")}
+          status={`${health.score}/100 · ${health.status}`}
+          description={pick(
+            language,
+            `你现在最稳的一块是 ${health.strongestDimension}，最该先修的是 ${health.weakestDimension}。`,
+            `Your strongest area is ${health.strongestDimension}, and the first one to fix is ${health.weakestDimension}.`
+          )}
+          data={health.radar}
+          href={backHref}
+          ctaLabel={pick(language, "返回组合页", "Back to portfolio")}
+        />
+      </div>
 
       <div className="grid gap-6 xl:grid-cols-[0.95fr_1.05fr]">
         <div className="space-y-6">

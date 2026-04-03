@@ -202,7 +202,10 @@ export default async function DashboardPage() {
                     <SecurityMark symbol={holding.symbol} />
                     <div>
                       <p className="font-medium">
-                        {holding.symbol} <span className="text-sm text-[color:var(--muted-foreground)]">{holding.name}</span>
+                        {holding.symbol}
+                        {holding.name.trim().toUpperCase() === holding.symbol.trim().toUpperCase() ? null : (
+                          <span className="text-sm text-[color:var(--muted-foreground)]"> {holding.name}</span>
+                        )}
                       </p>
                       <p className="mt-1 text-xs font-medium text-[color:var(--primary)]">{pick(language, "点开详情", "Open detail")}</p>
                       <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-[color:var(--muted-foreground)]">

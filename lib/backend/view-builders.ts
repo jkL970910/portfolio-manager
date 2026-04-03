@@ -109,6 +109,40 @@ const TARGET_PRESETS: Record<RiskProfile, AllocationTarget[]> = {
   ]
 };
 
+function getSecurityTypeOptionLabel(value: string, language: DisplayLanguage) {
+  const labels: Record<string, { zh: string; en: string }> = {
+    "Common Stock": { zh: "普通股票", en: "Common Stock" },
+    ETF: { zh: "ETF", en: "ETF" },
+    "Commodity ETF": { zh: "商品 ETF", en: "Commodity ETF" },
+    "Mutual Fund": { zh: "共同基金", en: "Mutual Fund" },
+    ADR: { zh: "ADR", en: "ADR" },
+    Index: { zh: "指数", en: "Index" },
+    REIT: { zh: "REIT", en: "REIT" },
+    Trust: { zh: "信托", en: "Trust" },
+    "Preferred Share": { zh: "优先股", en: "Preferred Share" },
+    Crypto: { zh: "加密资产", en: "Crypto" },
+    Forex: { zh: "外汇", en: "Forex" },
+    Unknown: { zh: "未知", en: "Unknown" }
+  };
+  return pick(language, labels[value]?.zh ?? value, labels[value]?.en ?? value);
+}
+
+function getExchangeOptionLabel(value: string, language: DisplayLanguage) {
+  const labels: Record<string, { zh: string; en: string }> = {
+    TSX: { zh: "TSX 多交所", en: "TSX" },
+    TSXV: { zh: "TSXV 创业板", en: "TSXV" },
+    "Cboe Canada": { zh: "Cboe Canada", en: "Cboe Canada" },
+    NYSE: { zh: "NYSE 纽交所", en: "NYSE" },
+    NASDAQ: { zh: "NASDAQ 纳指", en: "NASDAQ" },
+    "NYSE Arca": { zh: "NYSE Arca", en: "NYSE Arca" },
+    OTC: { zh: "OTC 场外市场", en: "OTC" },
+    LSE: { zh: "LSE 伦交所", en: "LSE" },
+    TSE: { zh: "TSE 东交所", en: "TSE" },
+    "Other / Manual": { zh: "其他 / 手动指定", en: "Other / Manual" }
+  };
+  return pick(language, labels[value]?.zh ?? value, labels[value]?.en ?? value);
+}
+
 type DisplayContext = {
   currency: CurrencyCode;
   cadToDisplayRate: number;
@@ -1116,7 +1150,7 @@ export function buildPortfolioAccountDetailData(args: {
           "Crypto",
           "Forex",
           "Unknown"
-        ].map((value) => ({ value, label: value })),
+        ].map((value) => ({ value, label: getSecurityTypeOptionLabel(value, language) })),
         exchangeOptions: [
           "TSX",
           "TSXV",
@@ -1128,7 +1162,7 @@ export function buildPortfolioAccountDetailData(args: {
           "LSE",
           "TSE",
           "Other / Manual"
-        ].map((value) => ({ value, label: value })),
+        ].map((value) => ({ value, label: getExchangeOptionLabel(value, language) })),
         sectorSuggestions: [
           "Multi-sector",
           "Technology",
@@ -1142,7 +1176,8 @@ export function buildPortfolioAccountDetailData(args: {
           "Real Estate",
           "Precious Metals",
           "Gold",
-          "Commodities"
+          "Commodities",
+          "Mining"
         ],
         marketSectorSuggestions: [
           "Broad Market",
@@ -1292,7 +1327,7 @@ export function buildPortfolioHoldingDetailData(args: {
         "Crypto",
         "Forex",
         "Unknown"
-      ].map((value) => ({ value, label: value })),
+      ].map((value) => ({ value, label: getSecurityTypeOptionLabel(value, language) })),
       exchangeOptions: [
         "TSX",
         "TSXV",
@@ -1304,7 +1339,7 @@ export function buildPortfolioHoldingDetailData(args: {
         "LSE",
         "TSE",
         "Other / Manual"
-      ].map((value) => ({ value, label: value })),
+      ].map((value) => ({ value, label: getExchangeOptionLabel(value, language) })),
       sectorSuggestions: [
         "Multi-sector",
         "Technology",
@@ -1318,7 +1353,8 @@ export function buildPortfolioHoldingDetailData(args: {
         "Real Estate",
         "Precious Metals",
         "Gold",
-        "Commodities"
+        "Commodities",
+        "Mining"
       ],
       marketSectorSuggestions: [
         "Broad Market",

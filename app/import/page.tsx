@@ -1,4 +1,4 @@
-import { requireViewer } from "@/lib/auth/session";
+﻿import { requireViewer } from "@/lib/auth/session";
 import { getImportView } from "@/lib/backend/services";
 import { AppShell } from "@/components/layout/app-shell";
 import { ImportExperience } from "@/components/import/import-experience";
@@ -25,9 +25,10 @@ export default async function ImportPage({
       title={pick(language, "入库中心", "Import")}
       description={pick(
         language,
-        "投资标的和消费流水分开导入。账户、持仓、交易各走自己的流程，同时也为以后接 broker 或 bank API 留好了边界。",
+        "把投资账户和消费流水分开导入。账户、持仓和交易各走自己的流程，后面接 broker 或 bank API 时也不会混在一起。",
         "Portfolio assets and spending records are imported through separate workflows. Accounts, holdings, and transactions keep their own boundaries so broker or bank APIs can plug in later."
       )}
+      compactHeader
     >
       <ImportExperience
         language={language}

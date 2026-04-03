@@ -20,6 +20,9 @@ export async function POST(request: NextRequest) {
     try {
       await mergeAccounts(userId, parsed.data.sourceAccountId, parsed.data.targetAccountId);
       revalidatePath("/portfolio", "layout");
+      revalidatePath("/portfolio/account/[accountId]", "page");
+      revalidatePath("/portfolio/holding/[holdingId]", "page");
+      revalidatePath("/portfolio/health");
       revalidatePath("/dashboard");
       revalidatePath("/recommendations");
       return NextResponse.json({ ok: true });

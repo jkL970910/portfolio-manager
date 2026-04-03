@@ -166,16 +166,52 @@ export function AccountMaintenancePanel({
             </p>
           </div>
 
-          <div className="grid gap-3 sm:grid-cols-3">
-            <Button type="button" variant={mode === "edit" ? "primary" : "secondary"} onClick={() => toggleMode("edit")} leadingIcon={<PencilLine className="h-4 w-4" />}>
-              {pick(language, "改账户资料", "Edit account")}
-            </Button>
-            <Button type="button" variant={mode === "add-holding" ? "primary" : "secondary"} onClick={() => toggleMode("add-holding")} leadingIcon={<Plus className="h-4 w-4" />}>
-              {pick(language, "往里加一笔持仓", "Add a holding")}
-            </Button>
-            <Button type="button" variant={mode === "merge" ? "primary" : "secondary"} onClick={() => toggleMode("merge")} leadingIcon={<GitMerge className="h-4 w-4" />}>
-              {pick(language, "合并重复账户", "Merge accounts")}
-            </Button>
+          <div className="space-y-3">
+            {[
+              {
+                value: "edit" as const,
+                icon: <PencilLine className="h-4 w-4" />,
+                title: pick(language, "改账户资料", "Edit account"),
+                detail: pick(language, "改账户名、机构、币种和可用额度。", "Update the name, institution, currency, and room value.")
+              },
+              {
+                value: "add-holding" as const,
+                icon: <Plus className="h-4 w-4" />,
+                title: pick(language, "往里加一笔持仓", "Add a holding"),
+                detail: pick(language, "带着这个账户跳去导入页，直接补一笔新持仓。", "Jump into import with this account already locked in.")
+              },
+              {
+                value: "merge" as const,
+                icon: <GitMerge className="h-4 w-4" />,
+                title: pick(language, "合并重复账户", "Merge accounts"),
+                detail: pick(language, "先看预览，再把重复账户并到一起。", "Preview first, then combine duplicate accounts.")
+              }
+            ].map((action) => {
+              const active = mode === action.value;
+              return (
+                <button
+                  key={action.value}
+                  type="button"
+                  onClick={() => toggleMode(action.value)}
+                  className={`flex w-full items-start justify-between gap-4 rounded-[24px] border px-4 py-4 text-left transition ${
+                    active
+                      ? "border-[rgba(240,143,178,0.34)] bg-[linear-gradient(135deg,rgba(255,255,255,0.82),rgba(246,218,230,0.24),rgba(221,232,255,0.14))] shadow-[0_14px_28px_rgba(110,103,130,0.08)]"
+                      : "border-white/55 bg-white/36 hover:border-white/72 hover:bg-white/48"
+                  }`}
+                >
+                  <div className="flex items-start gap-3">
+                    <span className="mt-0.5 inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/60 bg-white/62 text-[color:var(--foreground)]">
+                      {action.icon}
+                    </span>
+                    <div className="space-y-1">
+                      <p className="text-sm font-semibold text-[color:var(--foreground)]">{action.title}</p>
+                      <p className="text-sm leading-6 text-[color:var(--muted-foreground)]">{action.detail}</p>
+                    </div>
+                  </div>
+                  {active ? <Badge variant="primary">{pick(language, "当前正在改这个", "Active")}</Badge> : null}
+                </button>
+              );
+            })}
           </div>
 
           {mode === null ? (
