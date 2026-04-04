@@ -51,75 +51,90 @@ export default async function PortfolioAccountDetailPage({
           </div>
         </div>
 
-        <Card className="bg-white/34">
-          <CardContent className="space-y-5 px-5 py-5">
-            <div className="grid gap-5 xl:grid-cols-[minmax(260px,360px)_minmax(0,1fr)] xl:items-start">
-              <div className="min-w-0 rounded-[18px] border border-white/55 bg-white/30 px-4 py-4 backdrop-blur-md">
-                <div className="flex flex-wrap items-center gap-2 text-xs text-[color:var(--muted-foreground)]">
-                  <span className="inline-flex rounded-full border border-white/60 bg-white/48 px-3 py-1 font-medium text-[color:var(--foreground)]">
-                    {detail.account.typeLabel}
-                  </span>
-                  <span className="inline-flex rounded-full border border-white/60 bg-white/44 px-3 py-1">
-                    {detail.account.currency}
-                  </span>
-                  <span className="inline-flex rounded-full border border-white/60 bg-white/44 px-3 py-1">
-                    {detail.account.institution}
-                  </span>
-                </div>
-                <h2 className="mt-3 text-[24px] font-semibold tracking-tight text-[color:var(--foreground)] sm:text-[28px]">
-                  {detail.account.name}
-                </h2>
-                <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                  <div className="rounded-[18px] border border-white/55 bg-white/42 p-4">
-                    <p className="text-xs uppercase tracking-[0.14em] text-[color:var(--muted-foreground)]">
-                      {pick(language, "主要持仓", "Top holdings")}
-                    </p>
-                    <p className="mt-2 text-sm font-semibold leading-6 text-[color:var(--foreground)]">
-                      {detail.account.topHoldings.join(" · ") || pick(language, "暂时还没有明显主仓", "No clear top holding yet")}
-                    </p>
+        <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px] xl:items-start">
+          <Card className="bg-white/34">
+            <CardContent className="min-w-0 space-y-5 px-5 py-5">
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <div className="flex flex-wrap items-center gap-3">
+                    <h2 className="text-[24px] font-semibold tracking-tight text-[color:var(--foreground)] sm:text-[28px]">
+                      {detail.account.name}
+                    </h2>
+                    <div className="flex flex-wrap items-center gap-2 text-xs text-[color:var(--muted-foreground)]">
+                      <span className="inline-flex rounded-full border border-white/60 bg-white/48 px-3 py-1 font-medium text-[color:var(--foreground)]">
+                        {detail.account.typeLabel}
+                      </span>
+                      <span className="inline-flex rounded-full border border-white/60 bg-white/44 px-3 py-1">
+                        {detail.account.currency}
+                      </span>
+                      <span className="inline-flex rounded-full border border-white/60 bg-white/44 px-3 py-1">
+                        {detail.account.institution}
+                      </span>
+                    </div>
                   </div>
-                  <div className="rounded-[18px] border border-white/55 bg-white/42 p-4">
-                    <p className="text-xs uppercase tracking-[0.14em] text-[color:var(--muted-foreground)]">
-                      {pick(language, "先看什么", "What to check first")}
-                    </p>
-                    <p className="mt-2 text-sm leading-6 text-[color:var(--foreground)]">
-                      {detail.account.summaryPoints[0] ?? pick(language, "先看这个账户里哪类资产最重，再决定要不要继续拆到单笔持仓。", "Start with the dominant sleeve, then decide whether you need to drill into single holdings.")}
-                    </p>
-                  </div>
+                  <p className="text-sm leading-6 text-[color:var(--muted-foreground)]">
+                    {pick(
+                      language,
+                      detail.account.topHoldings.length > 0
+                        ? `先看这个账户近 6 个月怎么走，再确认主仓是不是已经压得太重。现在最显眼的是 ${detail.account.topHoldings.join(" · ")}。`
+                        : "先看这个账户近 6 个月怎么走，再确认现在的钱主要压在哪一类资产里。",
+                      detail.account.topHoldings.length > 0
+                        ? `Start with the 6-month trend, then check whether the main positions are already too concentrated. Most visible: ${detail.account.topHoldings.join(" · ")}.`
+                        : "Start with the 6-month trend, then check which sleeves currently dominate this account."
+                    )}
+                  </p>
                 </div>
               </div>
-
-              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                <StatBlock icon={<Wallet className="h-4 w-4" />} label={pick(language, "当前账户总值", "Current account value")} value={detail.account.value} />
-                <StatBlock
-                  icon={<CircleGauge className="h-4 w-4" />}
-                  label={pick(language, "占整个组合", "Share of total portfolio")}
-                  value={detail.account.portfolioShare}
-                  detail={pick(language, "分母是你全部投资资产。", "Compared with your full invested portfolio.")}
-                />
-                <StatBlock icon={<Wallet className="h-4 w-4" />} label={pick(language, "账户币种", "Account currency")} value={detail.account.currency} />
-                <StatBlock icon={<Wallet className="h-4 w-4" />} label={pick(language, "额度和状态", "Room and status")} value={detail.account.room} />
-              </div>
-            </div>
-            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-              {detail.facts.map((fact, index) => (
-                <StatBlock key={`account-fact-${index}`} icon={<Wallet className="h-4 w-4" />} label={fact.label} value={fact.value} detail={fact.detail} />
-              ))}
-            </div>
-          </CardContent>
-        </Card>
+              <LineChartCard
+                title={pick(language, `${detail.account.name} 近 6 个月大概怎么走`, `How ${detail.account.name} has moved over the last 6 months`)}
+                description={pick(language, "这里只看这个账户自己的走势。", "This trend looks only at the account itself.")}
+                data={detail.performance}
+                dataKey="value"
+                color="#152238"
+              />
+            </CardContent>
+          </Card>
+          <div className="space-y-4">
+            <Card className="bg-white/34">
+              <CardContent className="space-y-3 p-4">
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <CompactMetric icon={<Wallet className="h-4 w-4" />} label={pick(language, "当前账户总值", "Current account value")} value={detail.account.value} />
+                  <CompactMetric
+                    icon={<CircleGauge className="h-4 w-4" />}
+                    label={pick(language, "占整个组合", "Of portfolio")}
+                    value={compactPortfolioShare(detail.account.portfolioShare)}
+                  />
+                  <CompactMetric icon={<Wallet className="h-4 w-4" />} label={pick(language, "账户币种", "Account currency")} value={detail.account.currency} />
+                  <CompactMetric
+                    icon={<Wallet className="h-4 w-4" />}
+                    label={pick(language, "可用额度", "Available room")}
+                    value={compactRoom(detail.account.room, detail.account.currency)}
+                  />
+                </div>
+              </CardContent>
+            </Card>
+            <DonutChartCard
+              title={pick(language, "账户内资产分布", "Allocation inside this account")}
+              data={detail.allocation}
+              noDataText={pick(language, "这个账户里还没有足够的持仓数据。", "There is not enough holding data inside this account yet.")}
+              legendMode="side"
+              legendMaxItems={5}
+              chartHeight={148}
+              chartMaxWidth={156}
+              innerRadius={36}
+              outerRadius={56}
+            />
+          </div>
+        </div>
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          {detail.facts.map((fact, index) => (
+            <StatBlock key={`account-fact-${index}`} icon={<Wallet className="h-4 w-4" />} label={fact.label} value={fact.value} detail={fact.detail} />
+          ))}
+        </div>
       </div>
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_248px] 2xl:grid-cols-[minmax(0,1fr)_264px]">
         <div className="space-y-6">
-          <LineChartCard
-            title={pick(language, `${detail.account.name} 近 6 个月大概怎么走`, `How ${detail.account.name} has moved over the last 6 months`)}
-            description={pick(language, "先看这个账户自己是稳着往上，还是波动比较大。这里先给参考走势，完整历史回放后面再补。", "Start by checking whether this account has been moving steadily or swinging more than expected. This is a reference trend for now; full historical replay comes later.")}
-            data={detail.performance}
-            dataKey="value"
-            color="#152238"
-          />
-
           <SectionHeading
             title={pick(language, "先看这个账户目前的重点", "What stands out in this account")}
             description={pick(language, "这些都是只针对这个账户的提醒，不会把别的账户混进来。", "These notes are specific to this account only.")}
@@ -131,18 +146,6 @@ export default async function PortfolioAccountDetailPage({
               </Card>
             ))}
           </div>
-
-          <SectionHeading
-            title={pick(language, "这个账户里的钱主要放在哪些资产里", "How the money is split inside this account")}
-            description={pick(language, "先看这个账户内部大概偏向哪几类资产。", "Use this to see which sleeves dominate inside the account.")}
-          />
-          <DonutChartCard
-            title={pick(language, "账户内资产分布", "Allocation inside this account")}
-            description={pick(language, "这里只看这个账户本身，不看整个组合。", "This chart looks only at this account, not the full portfolio.")}
-            data={detail.allocation}
-            helperText={pick(language, "把鼠标放到切片上，可以看到这一类资产在这个账户里大概占多少。", "Hover a slice to see how much of this account sits in that sleeve.")}
-            noDataText={pick(language, "这个账户里还没有足够的持仓数据。", "There is not enough holding data inside this account yet.")}
-          />
 
           <SectionHeading
             title={pick(language, "再往下看这个账户里的具体持仓", "Then inspect the holdings inside this account")}
@@ -197,4 +200,42 @@ export default async function PortfolioAccountDetailPage({
       </div>
     </AppShell>
   );
+}
+
+function CompactMetric({
+  icon,
+  label,
+  value
+}: {
+  icon: React.ReactNode;
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="rounded-[20px] border border-white/55 bg-white/40 p-4 backdrop-blur-md">
+      <div className="flex items-center gap-2 text-sm text-[color:var(--muted-foreground)]">
+        {icon}
+        {label}
+      </div>
+      <p className="mt-3 text-[18px] leading-8 font-semibold text-[color:var(--foreground)]">{value}</p>
+    </div>
+  );
+}
+
+function compactPortfolioShare(value: string) {
+  const match = value.match(/-?\d+(?:\.\d+)?%/);
+  return match?.[0] ?? value;
+}
+
+function compactRoom(value: string, currency: string) {
+  if (value.includes("不记录") || value.toLowerCase().includes("does not track")) {
+    return value;
+  }
+
+  const moneyMatch = value.match(/([$¥€£]\s?[\d,]+(?:\.\d+)?|\d[\d,]*(?:\.\d+)?)/);
+  if (!moneyMatch) {
+    return value;
+  }
+
+  return `${currency} ${moneyMatch[0].replace(/\s+/g, "")}`;
 }

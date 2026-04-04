@@ -3,7 +3,6 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { RefreshCcw } from "lucide-react";
-import { MascotAsset } from "@/components/brand/mascot-asset";
 import { Button } from "@/components/ui/button";
 import { assertApiData, getApiErrorMessage, safeJson } from "@/lib/client/api";
 import type { DisplayLanguage } from "@/lib/i18n/ui";
@@ -87,30 +86,30 @@ export function RefreshPricesPanel({
 
   return (
     <div className="space-y-3 rounded-2xl border border-[color:var(--border)] p-4">
-      <div className="grid gap-4 md:grid-cols-[1fr_112px] md:items-start">
-        <div>
-          <p className="font-medium">{pick(language, "更新持仓价格", "Refresh market prices")}</p>
-          <p className="mt-2 text-sm text-[color:var(--muted-foreground)]">
-            {pick(
-              language,
-              "系统会尽量把导入过的持仓价格更新到最新，然后重新计算总值、盈亏和账户占比。",
-              "Pull the latest cached quotes for imported holdings, then recompute market value, gain/loss, and account weights."
-            )}
-          </p>
-        </div>
-        <div className="justify-self-start md:justify-self-end">
-          <MascotAsset name="sideEyeReview" className="h-[112px] w-[112px]" sizes="112px" />
-        </div>
+      <div>
+        <p className="font-medium">{pick(language, "更新持仓价格", "Refresh market prices")}</p>
+        <p className="mt-2 text-sm text-[color:var(--muted-foreground)]">
+          {pick(language, "刷新后会重算总值、盈亏和账户占比。", "Refresh quotes, then recalculate value, gain/loss, and weights.")}
+        </p>
       </div>
-      <div className="rounded-2xl border border-[color:var(--border)] bg-[color:var(--card-muted)] px-4 py-3 text-sm text-[color:var(--muted-foreground)]">
-        <p><span className="font-medium text-[color:var(--foreground)]">{pick(language, "上次刷新", "Last refreshed")}:</span> {lastRefreshed}</p>
-        <p className="mt-1"><span className="font-medium text-[color:var(--foreground)]">{pick(language, "现在这些价格看起来有多新", "How recent the prices look")}:</span> {freshness}</p>
-        <p className="mt-1"><span className="font-medium text-[color:var(--foreground)]">{pick(language, "这次覆盖到多少持仓", "How many holdings have usable prices")}:</span> {coverage}</p>
-        <p className="mt-2 text-xs leading-6">
+      <div className="grid gap-2">
+        <div className="rounded-2xl border border-[color:var(--border)] bg-[color:var(--card-muted)] px-4 py-3 text-sm text-[color:var(--muted-foreground)]">
+          <span className="font-medium text-[color:var(--foreground)]">{pick(language, "上次刷新", "Last refreshed")}: </span>
+          {lastRefreshed}
+        </div>
+        <div className="rounded-2xl border border-[color:var(--border)] bg-[color:var(--card-muted)] px-4 py-3 text-sm text-[color:var(--muted-foreground)]">
+          <span className="font-medium text-[color:var(--foreground)]">{pick(language, "价格新鲜度", "Freshness")}: </span>
+          {freshness}
+        </div>
+        <div className="rounded-2xl border border-[color:var(--border)] bg-[color:var(--card-muted)] px-4 py-3 text-sm text-[color:var(--muted-foreground)]">
+          <span className="font-medium text-[color:var(--foreground)]">{pick(language, "覆盖到多少持仓", "Coverage")}: </span>
+          {coverage}
+        </div>
+        <p className="px-1 text-xs leading-6 text-[color:var(--muted-foreground)]">
           {pick(
             language,
-            "即使这次有些代码没拿到新报价，表格里它们仍可能显示之前缓存下来的价格和时间，所以“较新”并不一定代表这次刷新刚刚成功拿到新报价。",
-            "Even when some symbols do not return a new quote this time, their rows may still show older cached prices and timestamps. So a row marked as fresh does not always mean this refresh just returned a brand-new quote."
+            "如果这次没拿到新报价，表格会继续显示之前缓存下来的价格。",
+            "If a symbol misses a new quote this time, the table may still show an older cached price."
           )}
         </p>
       </div>
@@ -120,11 +119,8 @@ export function RefreshPricesPanel({
           : pick(language, "更新持仓价格", "Refresh prices")}
       </Button>
       {status.type !== "idle" ? (
-        <div className={`grid gap-3 rounded-2xl border px-4 py-3 text-sm md:grid-cols-[1fr_96px] md:items-center ${status.type === "success" ? "border-[#b6d7c7] bg-[#eef8f1] text-[#21613f]" : "border-[#e7b0b8] bg-[#fff3f5] text-[#8e2433]"}`}>
-          <div>{status.message}</div>
-          <div className="justify-self-start md:justify-self-end">
-            <MascotAsset name={status.type === "success" ? "successSmirk" : "alertRun"} className="h-24 w-24" sizes="96px" />
-          </div>
+        <div className={`rounded-2xl border px-4 py-3 text-sm leading-7 ${status.type === "success" ? "border-[#b6d7c7] bg-[#eef8f1] text-[#21613f]" : "border-[#e7b0b8] bg-[#fff3f5] text-[#8e2433]"}`}>
+          {status.message}
         </div>
       ) : null}
     </div>

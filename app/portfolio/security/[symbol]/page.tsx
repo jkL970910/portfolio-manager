@@ -49,66 +49,56 @@ export default async function PortfolioSecurityDetailPage({
           </Link>
         </div>
 
-        <Card className="bg-white/34">
-          <CardContent className="space-y-5 px-5 py-5">
-            <div className="grid gap-5 xl:grid-cols-[minmax(260px,360px)_minmax(0,1fr)] xl:items-start">
-              <div className="rounded-[18px] border border-white/55 bg-white/30 px-4 py-4 backdrop-blur-md">
-                <div className="flex items-start gap-2.5">
-              <SecurityMark
-                symbol={detail.security.symbol}
-                assetClass={detail.security.assetClass}
-                hint={detail.security.securityType === "Unknown" ? undefined : detail.security.securityType.slice(0, 3).toUpperCase()}
-                className="h-6 w-6 rounded-[9px] text-[9px]"
+        <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_340px] xl:items-start">
+          <Card className="bg-white/34">
+            <CardContent className="space-y-5 px-5 py-5">
+              <div className="flex items-start gap-2.5">
+                <SecurityMark
+                  symbol={detail.security.symbol}
+                  assetClass={detail.security.assetClass}
+                  hint={detail.security.securityType === "Unknown" ? undefined : detail.security.securityType.slice(0, 3).toUpperCase()}
+                  className="h-6 w-6 rounded-[9px] text-[9px]"
+                />
+                <div className="min-w-0 space-y-1.5">
+                  <div className="flex flex-wrap items-center gap-3">
+                    <h2 className="truncate text-[20px] font-semibold tracking-[-0.04em] text-[color:var(--foreground)] sm:text-[22px]">{detail.security.symbol}</h2>
+                    <div className="flex flex-wrap items-center gap-2 text-xs text-[color:var(--muted-foreground)]">
+                      <span className="inline-flex rounded-full border border-white/60 bg-white/44 px-3 py-1">{detail.security.assetClass}</span>
+                      <span className="inline-flex rounded-full border border-white/60 bg-white/44 px-3 py-1">{detail.security.sector}</span>
+                      <span className="inline-flex rounded-full border border-white/60 bg-white/44 px-3 py-1">{detail.security.securityType}</span>
+                      <span className="inline-flex rounded-full border border-white/60 bg-white/44 px-3 py-1">{detail.security.exchange}</span>
+                    </div>
+                  </div>
+                  <div>
+                    {detail.security.name.trim().toUpperCase() === detail.security.symbol.trim().toUpperCase() ? null : (
+                      <p className="mt-1 text-sm text-[color:var(--muted-foreground)]">{detail.security.name}</p>
+                    )}
+                  </div>
+                </div>
+              </div>
+              <LineChartCard
+                title={pick(language, `${detail.security.symbol} 近 6 个月参考走势`, `Reference 6-month view for ${detail.security.symbol}`)}
+                description={pick(language, "先看这支标的最近大概是稳着走，还是波动更明显。", "Use this to gauge whether the security has looked steadier or more volatile lately.")}
+                data={detail.performance}
+                dataKey="value"
+                color="#152238"
               />
-              <div className="min-w-0 space-y-1.5">
-                <div>
-                  <h2 className="truncate text-[20px] font-semibold tracking-[-0.04em] text-[color:var(--foreground)] sm:text-[22px]">{detail.security.symbol}</h2>
-                  {detail.security.name.trim().toUpperCase() === detail.security.symbol.trim().toUpperCase() ? null : (
-                    <p className="mt-1 text-sm text-[color:var(--muted-foreground)]">{detail.security.name}</p>
-                  )}
-                </div>
-                <div className="flex flex-wrap items-center gap-2 text-xs text-[color:var(--muted-foreground)]">
-                  <span className="inline-flex rounded-full border border-white/60 bg-white/44 px-3 py-1">{detail.security.assetClass}</span>
-                  <span className="inline-flex rounded-full border border-white/60 bg-white/44 px-3 py-1">{detail.security.sector}</span>
-                  <span className="inline-flex rounded-full border border-white/60 bg-white/44 px-3 py-1">{detail.security.securityType}</span>
-                  <span className="inline-flex rounded-full border border-white/60 bg-white/44 px-3 py-1">{detail.security.exchange}</span>
-                </div>
-              </div>
-            </div>
-              </div>
-
-              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            </CardContent>
+          </Card>
+          <Card className="h-full bg-white/34">
+            <CardContent className="p-4">
+              <div className="grid gap-3 sm:grid-cols-2">
                 {detail.facts.map((fact, index) => (
-                  <StatBlock key={`security-fact-${index}`} icon={<Landmark className="h-4 w-4" />} label={fact.label} value={fact.value} detail={fact.detail} />
+                  <CompactMetric key={`security-fact-${index}`} label={fact.label} value={compactMetricValue(fact.value)} />
                 ))}
               </div>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        </div>
       </div>
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_248px] 2xl:grid-cols-[minmax(0,1fr)_264px]">
         <div className="space-y-6">
-          <LineChartCard
-            title={pick(language, `${detail.security.symbol} 近 6 个月参考走势`, `Reference 6-month view for ${detail.security.symbol}`)}
-            description={pick(
-              language,
-              "这里先给你一个参考走势，帮你判断这支标的最近大概是稳着走，还是波动更明显。完整历史回放后面再补。",
-              "This gives you a reference trend so you can judge whether the security has looked steadier or more volatile lately. Full historical replay comes later."
-            )}
-            data={detail.performance}
-            dataKey="value"
-            color="#152238"
-          />
-
-          <SectionHeading
-            title={pick(language, "先把这支标的认清楚", "Start by identifying this security")}
-            description={pick(
-              language,
-              "先看它是什么、在哪个市场、价格大概在哪，再决定要不要真的把它放进组合里。",
-              "Start with what it is, where it trades, and where the quote roughly sits before deciding whether it belongs in the portfolio."
-            )}
-          />
           <Card>
             <CardContent className="space-y-4 px-6 py-6">
               <div className="rounded-[24px] border border-white/55 bg-white/36 p-4 text-sm leading-7 text-[color:var(--muted-foreground)] backdrop-blur-md">
@@ -193,5 +183,34 @@ export default async function PortfolioSecurityDetailPage({
         </StickyRail>
       </div>
     </AppShell>
+  );
+}
+
+function compactMetricValue(value: string) {
+  const percentMatch = value.match(/-?\d+(?:\.\d+)?%/);
+  if (percentMatch) {
+    return percentMatch[0];
+  }
+
+  const moneyMatch = value.match(/(?:CAD|USD|JPY|EUR|GBP)\s*\$?[\d,]+(?:\.\d+)?|[$¥€£]\s?[\d,]+(?:\.\d+)?/);
+  if (moneyMatch) {
+    return moneyMatch[0].replace(/\s+/g, " ");
+  }
+
+  return value;
+}
+
+function CompactMetric({
+  label,
+  value
+}: {
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="rounded-[18px] border border-white/55 bg-white/42 p-4">
+      <p className="text-xs uppercase tracking-[0.14em] text-[color:var(--muted-foreground)]">{label}</p>
+      <p className="mt-2 text-sm leading-6 font-semibold text-[color:var(--foreground)]">{value}</p>
+    </div>
   );
 }

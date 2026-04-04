@@ -46,8 +46,8 @@ export function HoldingTable({
         className={[
           "hidden items-center gap-4 rounded-[22px] border border-white/55 bg-white/26 px-5 py-4 text-sm font-medium text-[color:var(--muted-foreground)] xl:grid",
           hideAccountColumn
-            ? "xl:grid-cols-[minmax(196px,1.12fr)_minmax(148px,0.8fr)_minmax(156px,0.8fr)_minmax(82px,0.36fr)_minmax(176px,0.92fr)]"
-            : "xl:grid-cols-[minmax(190px,1.02fr)_minmax(112px,0.6fr)_minmax(144px,0.72fr)_minmax(148px,0.76fr)_minmax(72px,0.32fr)_minmax(176px,0.9fr)]"
+            ? "xl:grid-cols-[minmax(196px,1.12fr)_minmax(148px,0.8fr)_minmax(140px,0.74fr)_minmax(120px,0.58fr)_minmax(176px,0.92fr)]"
+            : "xl:grid-cols-[minmax(190px,1.02fr)_minmax(112px,0.6fr)_minmax(144px,0.72fr)_minmax(140px,0.72fr)_minmax(120px,0.54fr)_minmax(176px,0.9fr)]"
         ].join(" ")}
       >
         <span>{pick(language, "持仓", "Holding")}</span>
@@ -73,8 +73,8 @@ export function HoldingTable({
               className={[
                 "grid gap-5 xl:items-start",
                 hideAccountColumn
-                  ? "xl:grid-cols-[minmax(196px,1.12fr)_minmax(148px,0.8fr)_minmax(156px,0.8fr)_minmax(82px,0.36fr)_minmax(176px,0.92fr)]"
-                  : "xl:grid-cols-[minmax(190px,1.02fr)_minmax(112px,0.6fr)_minmax(144px,0.72fr)_minmax(148px,0.76fr)_minmax(72px,0.32fr)_minmax(176px,0.9fr)]"
+                  ? "xl:grid-cols-[minmax(196px,1.12fr)_minmax(148px,0.8fr)_minmax(140px,0.74fr)_minmax(120px,0.58fr)_minmax(176px,0.92fr)]"
+                  : "xl:grid-cols-[minmax(190px,1.02fr)_minmax(112px,0.6fr)_minmax(144px,0.72fr)_minmax(140px,0.72fr)_minmax(120px,0.54fr)_minmax(176px,0.9fr)]"
               ].join(" ")}
             >
               <div className="space-y-3">
@@ -113,17 +113,19 @@ export function HoldingTable({
                   value={holding.value}
                   muted={pick(language, `现价 ${holding.lastPrice}`, `Last price ${holding.lastPrice}`)}
                 />
-                <div className="rounded-[18px] border border-white/55 bg-white/40 px-4 py-3 text-sm text-[color:var(--muted-foreground)]">
+              </div>
+
+              <div className="space-y-2">
+                <InfoBlock label={pick(language, "盈亏", "Gain / loss")} value={holding.gainLoss} />
+                <div className="space-y-1 text-sm text-[color:var(--muted-foreground)]">
                   <p>{pick(language, `占整个组合 ${holding.portfolioShare}`, `Of total portfolio ${holding.portfolioShare}`)}</p>
-                  <p className="mt-1">{pick(language, `占这个账户 ${holding.accountShare}`, `Inside this account ${holding.accountShare}`)}</p>
+                  <p>{pick(language, `占这个账户 ${holding.accountShare}`, `Inside this account ${holding.accountShare}`)}</p>
                 </div>
-                <div className="flex flex-wrap items-center gap-2 text-xs text-[color:var(--muted-foreground)]">
+                <div className="flex flex-wrap items-center gap-2 pt-1 text-xs text-[color:var(--muted-foreground)]">
                   <Badge variant={holding.freshnessVariant}>{freshnessLabel(language, holding.freshnessVariant)}</Badge>
                   <span>{holding.lastUpdated}</span>
                 </div>
               </div>
-
-              <InfoBlock label={pick(language, "盈亏", "Gain / loss")} value={holding.gainLoss} />
 
               <div className="rounded-[22px] border border-white/55 bg-white/40 p-4 text-sm leading-7 text-[color:var(--muted-foreground)]">
                 <div className="mb-2 flex items-center gap-2 text-xs font-medium uppercase tracking-[0.14em] text-[color:var(--primary)]">

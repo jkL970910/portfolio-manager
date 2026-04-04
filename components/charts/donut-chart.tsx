@@ -21,72 +21,117 @@ export function DonutChartCard({
   activeId,
   headerActions,
   helperText,
-  noDataText
+  noDataText,
+  legendMode = 'none',
+  legendMaxItems = 6,
+  chartHeight = 280,
+  chartMaxWidth = 320,
+  innerRadius = 72,
+  outerRadius = 104
 }: {
   title: string;
-  description: string;
+  description?: string;
   data: DonutDatum[];
   activeId?: string;
   headerActions?: ReactNode;
   helperText?: string;
   noDataText?: string;
+  legendMode?: 'none' | 'side';
+  legendMaxItems?: number;
+  chartHeight?: number;
+  chartMaxWidth?: number;
+  innerRadius?: number;
+  outerRadius?: number;
 }) {
   const hasData = data.length > 0;
+  const legendItems = data.slice(0, legendMaxItems);
 
   return (
     <Card className="overflow-visible">
-      <CardHeader>
+      <CardHeader className="pb-2">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
           <div>
             <CardTitle>{title}</CardTitle>
-            <p className="mt-2 text-sm text-[color:var(--muted-foreground)]">{description}</p>
+            {description ? (
+              <p className="mt-1 text-sm text-[color:var(--muted-foreground)]">{description}</p>
+            ) : null}
           </div>
           {headerActions ? <div className="shrink-0">{headerActions}</div> : null}
         </div>
       </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="mx-auto h-[280px] max-w-[320px]">
-          {hasData ? (
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie
-                  data={data}
-                  dataKey="value"
-                  nameKey="name"
-                  innerRadius={72}
-                  outerRadius={104}
-                  paddingAngle={5}
-                  label={false}
-                  labelLine={false}
-                  isAnimationActive={false}
-                >
-                  {data.map((entry, index) => {
-                    const entryId = entry.id ?? entry.name;
-                    const isActive = entryId === activeId;
-                    return (
-                      <Cell
-                        key={entryId}
-                        fill={COLORS[index % COLORS.length]}
-                        stroke={isActive ? 'rgba(232,121,249,0.88)' : 'rgba(255,255,255,0.8)'}
-                        strokeWidth={isActive ? 5 : 2}
-                        opacity={activeId && !isActive ? 0.42 : 1}
-                      />
-                    );
-                  })}
-                </Pie>
-                <Tooltip cursor={false} content={<DonutTooltip data={data} activeId={activeId} />} />
-              </PieChart>
-            </ResponsiveContainer>
-          ) : (
-            <div className="flex h-full items-center justify-center rounded-[24px] bg-[color:var(--card-muted)] px-6 text-center text-sm text-[color:var(--muted-foreground)]">
-              {noDataText ?? 'No allocation data yet. Import accounts to populate this chart.'}
+      <CardContent className="space-y-3 pt-0">
+        <div className={legendMode === 'side' && hasData ? 'grid gap-3 md:grid-cols-[156px_minmax(0,1fr)] md:items-center' : ''}>
+          <div className="mx-auto w-full" style={{ height: `${chartHeight}px`, width: `${chartMaxWidth}px`, maxWidth: '100%' }}>
+            {hasData ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={data}
+                    dataKey="value"
+                    nameKey="name"
+                    innerRadius={innerRadius}
+                    outerRadius={outerRadius}
+                    paddingAngle={5}
+                    label={false}
+                    labelLine={false}
+                    isAnimationActive={false}
+                  >
+                    {data.map((entry, index) => {
+                      const entryId = entry.id ?? entry.name;
+                      const isActive = entryId === activeId;
+                      return (
+                        <Cell
+                          key={entryId}
+                          fill={COLORS[index % COLORS.length]}
+                          stroke={isActive ? 'rgba(232,121,249,0.88)' : 'rgba(255,255,255,0.8)'}
+                          strokeWidth={isActive ? 5 : 2}
+                          opacity={activeId && !isActive ? 0.42 : 1}
+                        />
+                      );
+                    })}
+                  </Pie>
+                  <Tooltip cursor={false} content={<DonutTooltip data={data} activeId={activeId} />} />
+                </PieChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="flex h-full items-center justify-center rounded-[24px] bg-[color:var(--card-muted)] px-6 text-center text-sm text-[color:var(--muted-foreground)]">
+                {noDataText ?? 'No allocation data yet. Import accounts to populate this chart.'}
+              </div>
+            )}
+          </div>
+
+          {legendMode === 'side' && hasData ? (
+            <div className="grid gap-2">
+              {legendItems.map((entry, index) => {
+                const entryId = entry.id ?? entry.name;
+                const isActive = entryId === activeId;
+                return (
+                  <div
+                    key={`legend-${entryId}`}
+                    className={`flex items-center justify-between rounded-[16px] border px-3 py-2 text-sm backdrop-blur-md transition ${
+                      isActive
+                        ? 'border-[rgba(232,121,249,0.45)] bg-[rgba(255,255,255,0.52)]'
+                        : 'border-white/55 bg-white/34'
+                    }`}
+                  >
+                    <div className="min-w-0 pr-3">
+                      <div className="flex items-center gap-2">
+                        <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: COLORS[index % COLORS.length] }} />
+                        <p className="truncate font-medium text-[color:var(--foreground)]">{entry.name}</p>
+                      </div>
+                      {entry.detail ? <p className="mt-1 truncate text-xs text-[color:var(--muted-foreground)]">{entry.detail}</p> : null}
+                    </div>
+                    <p className="shrink-0 text-sm font-semibold text-[color:var(--foreground)]">{entry.value}%</p>
+                  </div>
+                );
+              })}
             </div>
-          )}
+          ) : null}
         </div>
 
-        {hasData ? (
-          <div className="rounded-[20px] border border-white/55 bg-white/30 px-4 py-3 text-xs leading-6 text-[color:var(--muted-foreground)] backdrop-blur-md">
-            {helperText ?? 'Hover a slice to see which account it represents and roughly how much of the portfolio sits there.'}
+        {hasData && helperText ? (
+          <div className="rounded-[20px] border border-white/55 bg-white/30 px-4 py-2 text-xs leading-6 text-[color:var(--muted-foreground)] backdrop-blur-md">
+            {helperText}
           </div>
         ) : null}
       </CardContent>

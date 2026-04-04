@@ -349,6 +349,24 @@ components/
   - cost basis and current value should auto-derive from quantity, average cost, and current price until the user manually overrides them
   - save behavior must refresh both the holding itself and parent account totals so returning to account/portfolio surfaces reflects the latest state
 
+### `Holding Detail Role Cards`
+
+- File: [page.tsx](E:\Projects\Portfolio%20Manager\app\portfolio\holding\[holdingId]\page.tsx)
+- Purpose: compact first-read interpretation of what this holding means inside the portfolio
+- Rules:
+  - render as ultra-compact parallel cards with a small icon and one short judgment
+  - do not let these cards grow into tall prose blocks or multi-paragraph explanations
+  - keep this section scannable in one pass before the user moves into deeper quote or review detail
+
+### `Holding Quote Source And Review`
+
+- File: [page.tsx](E:\Projects\Portfolio%20Manager\app\portfolio\holding\[holdingId]\page.tsx)
+- Purpose: compact source-of-truth block for quote freshness and review notes
+- Rules:
+  - first fold should show only a short summary plus the most useful quote facts
+  - longer quote notes should live behind a collapsible panel
+  - avoid turning this section into another tall explanatory stack that competes with the holding overview
+
 ### `PortfolioSecurityDetailPage`
 
 - File: [page.tsx](E:\Projects\Portfolio%20Manager\app\portfolio\security\[symbol]\page.tsx)
@@ -356,9 +374,9 @@ components/
 - Rules:
 - should work even when the user does not already own the symbol
 - should follow the same first-fold pattern as holding and account detail:
-  - left identity block
-  - primary metrics band on the right
-  - secondary facts below inside the same overview card
+  - left overview card that combines identity and the 6-month reference trend
+  - right compact metrics grid
+  - no repeated ratio/fact cards immediately below that restate the same numbers
 - should show a reference trend, identity facts, quote-source facts, and any related holdings already inside the portfolio
 
 ### Detail Overview Pattern
@@ -369,10 +387,26 @@ components/
   - [app/portfolio/security/[symbol]/page.tsx](E:\Projects\Portfolio%20Manager\app\portfolio\security\[symbol]\page.tsx)
 - Purpose: unify first-fold layout across account, holding, and security detail pages
 - Rules:
-  - use one compact overview card rather than a wide empty left block plus detached stat cards
+  - left side carries the overview story: identity first, then the 6-month trend in the same visual block
+  - right side carries compact metrics and summary-only support
+  - on account detail, the account-internal donut belongs in the right-side summary stack rather than as a large full-width block below
+  - the account-detail donut in the right-side stack should use the compact donut size and avoid redundant helper text beneath it
+  - do not repeat ratio, gain/loss, or “what to look at first” facts immediately below if they already appear in the first fold
+  - keep the title row consistent: title on the left, key pills directly on the right, subtitle only when it adds new information
+  - right side carries only compact metrics
+  - do not repeat the same share/gain/loss facts in both the right metrics rail and a second facts grid below
+  - account, holding, and security detail should all feel like the same family of page, not three separate layouts
+  - title-row layout should stay consistent across account, holding, and security detail:
+    - title on the left
+    - key pills immediately to the right of the title
+    - supporting subtitle below only when it adds new information
+- Rules:
+  - use two independent first-fold cards instead of one oversized shell: an overview card on the left and a compact primary-metrics card on the right
   - keep identity information on the left
-  - spread primary metrics across the remaining width instead of pinning them to the far right
-  - place secondary facts in a lower grid inside the same card
+  - keep primary metrics in a narrow 2x2 card rather than pinning detached stat cards to the far right
+  - compact primary metrics should show the shortest useful value, for example `48%` instead of `大约占整个组合 48%`, and `CAD $50,000` instead of a full sentence about remaining room
+  - place secondary facts in a lower grid after the first-fold cards
+  - do not repeat the same conclusion on both sides of the first fold; the left overview should stay identity-first while the right metrics explain scale and proportion
   - reduce icon size and remove redundant explanatory copy when the facts already explain the object
 
 ### `ImportExperience`
@@ -393,12 +427,25 @@ components/
 ### `DonutChartCard`
 
 - File: [donut-chart.tsx](E:\Projects\Portfolio%20Manager\components\charts\donut-chart.tsx)
+- Purpose: shared donut chart shell for allocation summaries
+- Supports:
+  - hover tooltip detail
+  - active-slice emphasis
+  - compact size tuning for right-rail use
+  - optional compact side legend for dense summary stacks
+- Rules:
+  - right-rail donuts should prefer the compact side legend over long helper paragraphs
+  - when a compact side legend is enabled, keep the donut container at a fixed summary width so the ring never disappears in narrow rails
+  - keep the ring small enough that it reads as a summary, not a second main panel
+
+- File: [donut-chart.tsx](E:\Projects\Portfolio%20Manager\components\charts\donut-chart.tsx)
 - Purpose: allocation and distribution breakdowns
 - Supports:
   - optional active slice emphasis
   - optional detail text per slice
   - optional header actions such as local view toggles
   - slice hover tooltip with the full label, detail text, and share
+  - optional compact sizing controls for narrow summary stacks
 - Rules:
   - the surface must allow overflow so slice detail popups are not clipped by the card boundary
   - do not keep a permanent right-side legend list inside sticky rails
@@ -406,6 +453,8 @@ components/
   - explicitly suppress chart labels and label lines so dense account mixes do not spill text into the card
   - let hover tooltip carry the account detail so the chart stays visually centered
   - optional helper copy below the chart
+  - compact right-rail donuts should usually omit extra helper copy when the surrounding card title already explains the context
+  - compact right-rail donuts should also reduce header and content spacing so the chart reads like a summary widget rather than a second large content block
 
 ### `RadarPreview`
 
@@ -494,6 +543,7 @@ components/
   - exhausted account-order rows should render as a weaker or warning-style summary instead of looking equivalent to fully usable account paths
   - Chinese recommendation copy should sound like `Loo皇审核`; English should remain neutral and non-roleplay
   - first-time reading help should stay lightweight or collapsible once the page structure already explains itself
+  - the “how the system is thinking” summaries should stack vertically, and the longer explainer belongs behind a collapsible detail panel instead of staying permanently open in the first fold
 
 ### Settings
 

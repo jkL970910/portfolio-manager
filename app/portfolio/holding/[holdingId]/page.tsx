@@ -1,4 +1,4 @@
-﻿import { ArrowLeft, ArrowRight, Landmark } from "lucide-react";
+﻿import { ArrowLeft, ArrowRight, Landmark, ShieldCheck, Target, TrendingUp } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireViewer } from "@/lib/auth/session";
@@ -82,98 +82,100 @@ export default async function PortfolioHoldingDetailPage({
           </Link>
         </div>
 
-        <Card className="bg-white/34">
-          <CardContent className="px-5 py-5">
-            <div className="grid gap-5 xl:grid-cols-[minmax(260px,360px)_minmax(0,1fr)] xl:items-start">
-              <div className="min-w-0 rounded-[18px] border border-white/55 bg-white/30 px-4 py-4 backdrop-blur-md">
-                <div className="flex items-start gap-3">
-                  <SecurityMark
-                    symbol={detail.holding.symbol}
-                    assetClass={detail.holding.assetClass}
-                    hint={detail.holding.securityType === "Unknown" ? undefined : detail.holding.securityType.slice(0, 3).toUpperCase()}
-                    className="h-6 w-6 rounded-[9px] text-[9px]"
-                  />
-                  <div className="min-w-0 space-y-2">
-                    <div>
-                      <h2 className="truncate text-[20px] font-semibold tracking-[-0.04em] text-[color:var(--foreground)] sm:text-[22px]">{detail.holding.symbol}</h2>
-                      {detail.holding.name.trim().toUpperCase() === detail.holding.symbol.trim().toUpperCase() ? null : (
-                        <p className="mt-1 text-sm text-[color:var(--muted-foreground)]">{detail.holding.name}</p>
-                      )}
-                    </div>
+        <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px] xl:items-stretch">
+          <Card className="bg-white/34">
+            <CardContent className="min-w-0 space-y-5 px-5 py-5">
+              <div className="flex items-start gap-2.5">
+                <SecurityMark
+                  symbol={detail.holding.symbol}
+                  assetClass={detail.holding.assetClass}
+                  hint={detail.holding.securityType === "Unknown" ? undefined : detail.holding.securityType.slice(0, 3).toUpperCase()}
+                  className="h-6 w-6 rounded-[9px] text-[9px]"
+                />
+                <div className="min-w-0 flex-1 space-y-2">
+                  <div className="flex flex-wrap items-center gap-3">
+                    <h2 className="truncate text-[20px] font-semibold tracking-[-0.04em] text-[color:var(--foreground)] sm:text-[22px]">{detail.holding.symbol}</h2>
                     <div className="flex flex-wrap items-center gap-2 text-xs text-[color:var(--muted-foreground)]">
+                      <span className="inline-flex rounded-full border border-white/60 bg-white/44 px-3 py-1">{detail.holding.accountName}</span>
                       <span className="inline-flex rounded-full border border-white/60 bg-white/44 px-3 py-1">{detail.holding.assetClass}</span>
                       <span className="inline-flex rounded-full border border-white/60 bg-white/44 px-3 py-1">{detail.holding.sector}</span>
-                      <span className="inline-flex rounded-full border border-white/60 bg-white/44 px-3 py-1">{localizeSecurityType(detail.holding.securityType, language)}</span>
-                      <span className="inline-flex rounded-full border border-white/60 bg-white/44 px-3 py-1">{localizeExchange(detail.holding.exchange, language)}</span>
-                      <span className="inline-flex rounded-full border border-white/60 bg-white/44 px-3 py-1">{detail.holding.accountName}</span>
                     </div>
+                  </div>
+                  <div>
+                    {detail.holding.name.trim().toUpperCase() === detail.holding.symbol.trim().toUpperCase() ? null : (
+                      <p className="mt-1 text-sm text-[color:var(--muted-foreground)]">{detail.holding.name}</p>
+                    )}
                   </div>
                 </div>
               </div>
-
-              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                <StatBlock icon={<Landmark className="h-4 w-4" />} label={pick(language, "当前估值", "Current value")} value={detail.holding.value} />
-                <StatBlock icon={<Landmark className="h-4 w-4" />} label={pick(language, "总股数", "Total shares")} value={detail.holding.quantity} />
-                <StatBlock icon={<Landmark className="h-4 w-4" />} label={pick(language, "平均成本", "Average cost")} value={detail.holding.avgCost} />
-                <StatBlock icon={<Landmark className="h-4 w-4" />} label={pick(language, "现价", "Last price")} value={detail.holding.lastPrice} />
+              <LineChartCard
+                title={pick(language, `${detail.holding.symbol} 近 6 个月参考走势`, `Reference 6-month view for ${detail.holding.symbol}`)}
+                description={pick(language, "这里只看这笔持仓自己的参考走势。", "This trend focuses on this holding only.")}
+                data={detail.performance}
+                dataKey="value"
+                color="#152238"
+              />
+            </CardContent>
+          </Card>
+          <Card className="h-full bg-white/34">
+            <CardContent className="space-y-3 p-4">
+              <div className="grid gap-3 sm:grid-cols-2">
+                <CompactMetric label={pick(language, "当前估值", "Current value")} value={detail.holding.value} />
+                <CompactMetric label={pick(language, "总股数", "Total shares")} value={detail.holding.quantity} />
+                <CompactMetric label={pick(language, "平均成本", "Average cost")} value={detail.holding.avgCost} />
+                <CompactMetric label={pick(language, "现价", "Last price")} value={detail.holding.lastPrice} />
+                <CompactMetric label={pick(language, "总成本", "Cost basis")} value={detail.holding.costBasis} />
+                <CompactMetric label={pick(language, "盈亏", "Gain / loss")} value={detail.holding.gainLoss} />
+                <CompactMetric label={pick(language, "占组合", "Of portfolio")} value={detail.holding.portfolioShare} />
+                <CompactMetric label={pick(language, "占账户", "Of account")} value={detail.holding.accountShare} />
+                <CompactMetric label={pick(language, "标的类型", "Security type")} value={localizeSecurityType(detail.holding.securityType, language)} />
+                <CompactMetric label={pick(language, "主要市场", "Primary market")} value={localizeExchange(detail.holding.exchange, language)} />
               </div>
-            </div>
-            <div className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-              <StatBlock icon={<Landmark className="h-4 w-4" />} label={pick(language, "总成本", "Cost basis")} value={detail.holding.costBasis} />
-              <StatBlock icon={<Landmark className="h-4 w-4" />} label={pick(language, "占组合", "Of portfolio")} value={detail.holding.portfolioShare} detail={pick(language, "这里看的是它在全部投资资产里的分量。", "This measures its share of the full invested portfolio.")} />
-              <StatBlock icon={<Landmark className="h-4 w-4" />} label={pick(language, "占账户", "Of account")} value={detail.holding.accountShare} detail={pick(language, "这里只看它在当前账户里的大小。", "This only measures its share inside the current account.")} />
-              <StatBlock icon={<Landmark className="h-4 w-4" />} label={pick(language, "盈亏", "Gain / loss")} value={detail.holding.gainLoss} />
-              {detail.facts.map((fact, index) => (
-                <StatBlock key={`holding-fact-${index}`} icon={<Landmark className="h-4 w-4" />} label={fact.label} value={fact.value} detail={fact.detail} />
-              ))}
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        </div>
       </div>
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_248px] 2xl:grid-cols-[minmax(0,1fr)_264px]">
         <div className="space-y-6">
-          <SectionHeading
-            title={pick(language, "先认清这笔现在是什么状态", "Understand the current state first")}
-            description={pick(language, "先看这笔是不是已经够重、价格是不是够新、还有哪些地方需要你自己多留个心眼。", "Check whether the position is already heavy, whether the quote looks fresh enough, and where you still need your own judgment.")}
-          />
-          <div className="grid gap-4">
+          <div className="grid gap-3 md:grid-cols-3">
             {detail.portfolioRole.map((item, index) => (
-              <Card key={`holding-role-${index}`}>
-                <CardContent className="px-5 py-5 text-sm leading-7 text-[color:var(--muted-foreground)]">{item}</CardContent>
-              </Card>
+              <CompactInsightCard
+                key={`holding-role-${index}`}
+                icon={index == 0 ? <Target className="h-4 w-4" /> : index == 1 ? <TrendingUp className="h-4 w-4" /> : <ShieldCheck className="h-4 w-4" />}
+                text={item}
+              />
             ))}
           </div>
 
-          <LineChartCard
-            title={pick(language, `${detail.holding.symbol} 近 6 个月参考走势`, `Reference 6-month view for ${detail.holding.symbol}`)}
-            description={pick(language, "这里先给你一个参考走势，帮你判断这笔持仓最近大概是稳着走，还是波动比较大。完整历史回放后面再补。", "This gives you a reference view so you can quickly judge whether the position has been steadier or more volatile recently. Full historical replay comes later.")}
-            data={detail.performance}
-            dataKey="value"
-            color="#152238"
-          />
-
           <SectionHeading
-            title={pick(language, "现在拿到的价格靠不靠谱", "How trustworthy the current quote looks")}
-            description={pick(language, "这里会说明这页当前拿到的价格来自哪里、是不是延迟行情，以及哪些地方还需要你自己判断。", "This explains where the current quote came from, whether it is delayed, and where your own judgment still matters.")}
+            title={pick(language, "报价和审核", "Quote source and review")}
+            description={pick(language, "先看当前价格从哪里来，细节需要时再展开。", "Start with the current quote source and expand only if you need more detail.")}
           />
           <Card>
-            <CardContent className="space-y-4 px-6 py-6">
-              <div className="rounded-[24px] border border-white/55 bg-white/36 p-4 text-sm leading-7 text-[color:var(--muted-foreground)] backdrop-blur-md">
+            <CardContent className="space-y-3 px-5 py-4">
+              <div className="rounded-[18px] border border-white/55 bg-white/36 px-4 py-3 text-sm leading-6 text-[color:var(--muted-foreground)] backdrop-blur-md">
                 {detail.marketData.summary}
               </div>
-              <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
                 {detail.marketData.facts.map((fact, index) => (
                   <StatBlock key={`holding-market-fact-${index}`} icon={<Landmark className="h-4 w-4" />} label={fact.label} value={fact.value} detail={fact.detail} />
                 ))}
               </div>
-              <div className="grid gap-3">
-                {detail.marketData.notes.map((note, index) => (
-                  <div key={`holding-market-note-${index}`} className="rounded-[24px] border border-white/55 bg-white/36 p-4 text-sm leading-7 text-[color:var(--muted-foreground)] backdrop-blur-md">
-                    {note}
+              {detail.marketData.notes.length > 0 ? (
+                <details className="rounded-[18px] border border-white/55 bg-white/30 px-4 py-3">
+                  <summary className="cursor-pointer list-none text-sm font-medium text-[color:var(--foreground)] marker:hidden">
+                    {pick(language, "展开更多报价说明", "Show more quote notes")}
+                  </summary>
+                  <div className="mt-3 grid gap-3">
+                    {detail.marketData.notes.map((note, index) => (
+                      <div key={`holding-market-note-${index}`} className="rounded-[16px] border border-white/55 bg-white/36 p-3 text-sm leading-6 text-[color:var(--muted-foreground)] backdrop-blur-md">
+                        {note}
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
+                </details>
+              ) : null}
             </CardContent>
           </Card>
         </div>
@@ -211,5 +213,40 @@ export default async function PortfolioHoldingDetailPage({
         </StickyRail>
       </div>
     </AppShell>
+  );
+}
+
+
+function CompactInsightCard({
+  icon,
+  text
+}: {
+  icon: React.ReactNode;
+  text: string;
+}) {
+  return (
+    <Card>
+      <CardContent className="flex items-start gap-3 px-3.5 py-3.5 text-sm leading-5 text-[color:var(--muted-foreground)]">
+        <div className="mt-0.5 shrink-0 rounded-full border border-white/60 bg-white/42 p-1.5 text-[color:var(--foreground)]">
+          {icon}
+        </div>
+        <p>{text}</p>
+      </CardContent>
+    </Card>
+  );
+}
+
+function CompactMetric({
+  label,
+  value
+}: {
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="rounded-[18px] border border-white/55 bg-white/42 p-4">
+      <p className="text-xs uppercase tracking-[0.14em] text-[color:var(--muted-foreground)]">{label}</p>
+      <p className="mt-2 text-sm leading-6 font-semibold text-[color:var(--foreground)]">{value}</p>
+    </div>
   );
 }

@@ -102,25 +102,33 @@ export default async function RecommendationsPage() {
               <CardTitle>{pick(language, "Loo皇大致怎么想", "How the system is thinking")}</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
-              <div className="grid gap-3 sm:grid-cols-3">
+              <div className="space-y-3">
                 <div className="rounded-[24px] border border-white/55 bg-white/34 p-4 backdrop-blur-md">
                   <p className="text-xs uppercase tracking-[0.16em] text-[color:var(--muted-foreground)]">{pick(language, "现在用的是哪套规则", "Which rule set is being used")}</p>
                   <p className="mt-2 font-semibold">{data.engine.version}</p>
                 </div>
                 <div className="rounded-[24px] border border-white/55 bg-white/34 p-4 backdrop-blur-md">
                   <p className="text-xs uppercase tracking-[0.16em] text-[color:var(--muted-foreground)]">{pick(language, "这次 Loo皇先想补什么", "What the system is fixing first")}</p>
-                  <p className="mt-2 font-semibold">{data.engine.objective}</p>
+                  <p className="mt-2 font-semibold leading-7">{data.engine.objective}</p>
                 </div>
                 <div className="rounded-[24px] border border-white/55 bg-white/34 p-4 backdrop-blur-md">
                   <p className="text-xs uppercase tracking-[0.16em] text-[color:var(--muted-foreground)]">{pick(language, "这条路现在有多站得住", "How reasonable this path looks right now")}</p>
                   <p className="mt-2 font-semibold">{data.engine.confidence}</p>
                 </div>
               </div>
-              {data.explainer.map((point) => (
-                <div key={point} className="rounded-[24px] border border-white/55 bg-white/34 p-4 text-sm leading-7 text-[color:var(--muted-foreground)] backdrop-blur-md">
-                  {point}
+              <details className="group rounded-[24px] border border-white/55 bg-white/34 p-4 backdrop-blur-md">
+                <summary className="flex cursor-pointer list-none items-center justify-between gap-4 text-sm font-semibold text-[color:var(--foreground)]">
+                  <span>{pick(language, "展开完整解释", "Open the full explanation")}</span>
+                  <ArrowRight className="h-4 w-4 shrink-0 transition-transform duration-200 group-open:rotate-90" />
+                </summary>
+                <div className="mt-4 grid gap-3">
+                  {data.explainer.map((point) => (
+                    <div key={point} className="rounded-[20px] border border-white/55 bg-white/42 p-4 text-sm leading-7 text-[color:var(--muted-foreground)]">
+                      {point}
+                    </div>
+                  ))}
                 </div>
-              ))}
+              </details>
             </CardContent>
           </Card>
           <RecommendationRunPanel initialContributionAmount={data.run.contributionAmountCad || 5000} language={language} />
