@@ -420,6 +420,42 @@ export interface PortfolioSecurityDetailData {
     accountShare: string;
     gainLoss: string;
   }[];
+  heldPosition: null | {
+    aggregate: {
+      quantity: string;
+      avgCost: string;
+      costBasis: string;
+      value: string;
+      lastPrice: string;
+      gainLoss: string;
+      portfolioShare: string;
+      accountCount: string;
+      summaryPoints: string[];
+    };
+    accountOptions: {
+      accountId: string;
+      label: string;
+      detail: string;
+      holdingId: string;
+      summary: string;
+    }[];
+    accountSummaries: {
+      accountId: string;
+      accountLabel: string;
+      accountType: string;
+      quantity: string;
+      avgCost: string;
+      costBasis: string;
+      value: string;
+      lastPrice: string;
+      gainLoss: string;
+      portfolioShare: string;
+      accountShare: string;
+      holdingCount: string;
+      summaryPoints: string[];
+    }[];
+    accountViews: PortfolioHoldingDetailData[];
+  };
 }
 
 export interface RecommendationsData {

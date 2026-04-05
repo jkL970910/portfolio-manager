@@ -6,6 +6,7 @@ import {
   holdingPositions,
   importJobs,
   investmentAccounts,
+  portfolioSnapshots,
   preferenceProfiles,
   recommendationItems,
   recommendationRuns,
@@ -15,6 +16,7 @@ import {
   HoldingPosition,
   ImportJob,
   InvestmentAccount,
+  PortfolioSnapshot,
   PreferenceProfile,
   RecommendationRun,
   UserProfile
@@ -66,6 +68,26 @@ function mapImportJob(row: typeof importJobs.$inferSelect): ImportJob {
     status: row.status as ImportJob["status"],
     sourceType: row.sourceType as "csv",
     fileName: row.fileName,
+    createdAt: row.createdAt.toISOString()
+  };
+}
+
+function mapSnapshot(row: typeof portfolioSnapshots.$inferSelect): PortfolioSnapshot {
+  const accountBreakdown = row.accountBreakdownJson as Record<string, number | string | null>;
+  const holdingBreakdown = row.holdingBreakdownJson as Record<string, number | string | null>;
+
+  return {
+    id: row.id,
+    userId: row.userId,
+    snapshotDate: row.snapshotDate,
+    totalValueCad: toNumber(row.totalValueCad),
+    accountBreakdown: Object.fromEntries(
+      Object.entries(accountBreakdown ?? {}).map(([key, value]) => [key, toNumber(value)])
+    ),
+    holdingBreakdown: Object.fromEntries(
+      Object.entries(holdingBreakdown ?? {}).map(([key, value]) => [key, toNumber(value)])
+    ),
+    sourceVersion: row.sourceVersion,
     createdAt: row.createdAt.toISOString()
   };
 }
@@ -168,6 +190,7 @@ export const postgresRepositories: BackendRepositories = {
         marketValueCad,
         weightPct: toNumber(row.weightPct),
         gainLossPct: toNumber(row.gainLossPct),
+        createdAt: row.createdAt.toISOString(),
         updatedAt: row.updatedAt.toISOString()
           };
         })()
@@ -191,6 +214,16 @@ export const postgresRepositories: BackendRepositories = {
         amountCad: toNumber(row.amountCad),
         direction: row.direction as "inflow" | "outflow"
       }));
+    }
+  },
+  snapshots: {
+    async listByUserId(userId) {
+      const db = getDb();
+      const rows = await db.query.portfolioSnapshots.findMany({
+        where: eq(portfolioSnapshots.userId, userId),
+        orderBy: desc(portfolioSnapshots.snapshotDate)
+      });
+      return rows.map(mapSnapshot);
     }
   },
   preferences: {

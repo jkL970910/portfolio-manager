@@ -281,3 +281,9 @@ Purpose:
 
 Purpose:
 - persist replayed daily portfolio values for dashboard and portfolio charts
+
+Current implementation status:
+- `portfolio_snapshots` now exists in the runtime schema
+- dashboard net worth trend now prefers persisted snapshot values
+- portfolio and account detail trend cards now prefer persisted snapshot values
+- holding and security detail pages still use reference curves until `security_price_history` is wired into replay builders

@@ -85,7 +85,19 @@ export interface HoldingPosition {
   marketValueCad: number;
   weightPct: number;
   gainLossPct: number;
+  createdAt?: string | null;
   updatedAt?: string | null;
+}
+
+export interface PortfolioSnapshot {
+  id: EntityId;
+  userId: EntityId;
+  snapshotDate: string;
+  totalValueCad: number;
+  accountBreakdown: Record<string, number>;
+  holdingBreakdown: Record<string, number>;
+  sourceVersion: string;
+  createdAt: string;
 }
 
 export interface CashflowTransaction {
@@ -170,6 +182,7 @@ export interface RecommendationItem {
     minTradeApplied: boolean;
     watchlistMatched: boolean;
     existingHoldingId?: string;
+    existingHoldingAccountId?: string;
     existingHoldingSymbol?: string;
     existingHoldingWeightPct?: number;
     existingHoldingRiskContributionPct?: number;

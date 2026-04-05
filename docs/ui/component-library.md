@@ -287,8 +287,8 @@ components/
 - File: [holding-table.tsx](E:\Projects\Portfolio%20Manager\components\portfolio\holding-table.tsx)
 - Purpose: detailed holdings table used in portfolio and account detail surfaces
 - Supports:
-  - split entry points so the symbol area clearly offers both `持仓详情 / Holding detail` and `标的资料 / Security page`
-  - inline affordances that make the two detail paths discoverable without turning the full row into a dense set of competing buttons
+  - one primary security entry point in the symbol area instead of parallel `持仓详情 / Holding detail` and `标的资料 / Security page` buttons
+  - the single entry should open the shared security route, where already-held symbols can still expose position-specific drill-downs without duplicating the first navigation step
   - compact account-detail mode that hides the redundant account column and tightens widths so the sticky rail does not clip the final columns
   - filtered / highlighted states
   - explicit display of total shares, average cost, and current value
@@ -335,7 +335,7 @@ components/
 ### `HoldingEditPanel`
 
 - File: [holding-edit-panel.tsx](E:\Projects\Portfolio%20Manager\components\portfolio\holding-edit-panel.tsx)
-- Purpose: holding repair surface mounted inside holding detail
+- Purpose: holding repair surface mounted inside the selected account view of the unified symbol page
 - Supports:
   - holding field edits
   - account reassignment
@@ -353,8 +353,8 @@ components/
 
 ### `Holding Detail Role Cards`
 
-- File: [page.tsx](E:\Projects\Portfolio%20Manager\app\portfolio\holding\[holdingId]\page.tsx)
-- Purpose: compact first-read interpretation of what this holding means inside the portfolio
+- File: [unified-security-detail.tsx](E:\Projects\Portfolio%20Manager\components\portfolio\unified-security-detail.tsx)
+- Purpose: compact first-read interpretation of what the selected account-level holding means inside the portfolio
 - Rules:
   - render as ultra-compact parallel cards with a small icon and one short judgment
   - do not let these cards grow into tall prose blocks or multi-paragraph explanations
@@ -362,14 +362,14 @@ components/
 
 ### `Holding Quote Source And Review`
 
-- File: [page.tsx](E:\Projects\Portfolio%20Manager\app\portfolio\holding\[holdingId]\page.tsx)
-- Purpose: compact source-of-truth block for quote freshness and review notes
+- File: [unified-security-detail.tsx](E:\Projects\Portfolio%20Manager\components\portfolio\unified-security-detail.tsx)
+- Purpose: compact source-of-truth block for quote freshness and review notes inside the selected account view of the unified symbol page
 - Rules:
   - first fold should show only a short summary plus the most useful quote facts
   - longer quote notes should live behind a collapsible panel
   - avoid turning this section into another tall explanatory stack that competes with the holding overview
   - single-security refresh must be visible in the first fold of holding detail
-  - in holding detail it should sit as the first card in the right summary rail, directly above the holding edit panel
+  - in the selected account view it should sit as the first card in the right summary rail, directly above the holding edit panel
 
 ### `RefreshSecurityPricePanel`
 
@@ -380,18 +380,43 @@ components/
   - compact mode should still show symbol, cached quote time, freshness, action button, and success/error feedback
   - avoid using the full-width layout inside detail pages once a stable right rail exists
 
+### `UnifiedSecurityDetail`
+
+- File: [unified-security-detail.tsx](E:\Projects\Portfolio%20Manager\components\portfolio\unified-security-detail.tsx)
+- Purpose: single symbol workspace for both candidate securities and already-held positions
+- Supports:
+  - one unified symbol route at `/portfolio/security/[symbol]`
+  - default aggregate held-position view across all accounts
+  - compact account-level selection inside the first-fold detail area instead of a separate large context card
+  - aggregate and account-level quantity / average-cost summaries
+  - record selection inside one account when the same symbol exists in multiple holding rows there
+  - reuse of the existing holding repair and single-symbol refresh panels inside the selected account view
+- Rules:
+  - if the symbol is not held, keep the page in candidate-security mode
+  - if the symbol is held, default to the aggregate view before drilling into one account
+  - aggregate view should show combined quantity and blended average cost before the user selects an account
+  - account selection should live as a compact dropdown in the first fold and reveal the same repair / refresh / review depth that used to live only on the holding detail route
+  - if one account contains multiple holding rows for the same symbol, keep the header metrics aggregated at the account level and add a second selector for the exact row being reviewed or edited
+  - old holding routes may remain as compatibility redirects, but the primary browsing route is the unified symbol page
+
 ### `PortfolioSecurityDetailPage`
 
 - File: [page.tsx](E:\Projects\Portfolio%20Manager\app\portfolio\security\[symbol]\page.tsx)
-- Purpose: read-only security detail surface for recommended or already-held symbols
+- Purpose: unified symbol detail surface for recommended or already-held symbols
 - Rules:
 - should work even when the user does not already own the symbol
+- should also work as the primary route for symbols the user already owns
+- should keep candidate-security and held-position views inside the same route instead of splitting them into two first-level pages
 - should follow the same first-fold pattern as holding and account detail:
   - left overview card that combines identity and the 6-month reference trend
   - right compact metrics grid
   - no repeated ratio/fact cards immediately below that restate the same numbers
 - should show a reference trend, identity facts, quote-source facts, and any related holdings already inside the portfolio
-- the single-security refresh action should be visible in the first fold as the first card in the right summary rail, above the candidate-evaluation block
+- when the symbol is already held:
+  - default to an aggregate held-position view across all accounts
+  - offer an account selector
+  - reveal the full held-position review / repair rail once an account is selected
+- the single-security refresh action should be visible in the first fold as the first card in the right summary rail
 
 ### Detail Overview Pattern
 

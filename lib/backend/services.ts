@@ -1,6 +1,7 @@
 ﻿import { hash } from "bcryptjs";
 import { and, desc, eq } from "drizzle-orm";
 import { apiSuccess } from "@/lib/backend/contracts";
+import type { PortfolioHoldingDetailData } from "@/lib/contracts";
 import { ImportFieldMapping, ImportValidationError, ParsedCsvImport, parseImportCsv } from "@/lib/backend/csv-import";
 import { getRepositories } from "@/lib/backend/repositories/factory";
 import {
@@ -756,10 +757,11 @@ function filterCsvContentByWorkflow(
 export async function getDashboardView(userId: string) {
   const repositories = getRepositories();
   const user = await repositories.users.getById(userId);
-  const [userAccounts, userHoldings, userTransactions, profile] = await Promise.all([
+  const [userAccounts, userHoldings, userTransactions, userSnapshots, profile] = await Promise.all([
     repositories.accounts.listByUserId(user.id),
     repositories.holdings.listByUserId(user.id),
     repositories.transactions.listByUserId(user.id),
+    repositories.snapshots.listByUserId(user.id),
     repositories.preferences.getByUserId(user.id)
   ]);
 
@@ -781,6 +783,7 @@ export async function getDashboardView(userId: string) {
       accounts: userAccounts,
       holdings: userHoldings,
       transactions: userTransactions,
+      snapshots: userSnapshots,
       profile,
       latestRun,
       display
@@ -796,10 +799,11 @@ export async function getDashboardView(userId: string) {
 
 export async function getPortfolioView(userId: string) {
   const repositories = getRepositories();
-  const [user, userAccounts, userHoldings, profile] = await Promise.all([
+  const [user, userAccounts, userHoldings, userSnapshots, profile] = await Promise.all([
     repositories.users.getById(userId),
     repositories.accounts.listByUserId(userId),
     repositories.holdings.listByUserId(userId),
+    repositories.snapshots.listByUserId(userId),
     repositories.preferences.getByUserId(userId)
   ]);
 
@@ -809,7 +813,7 @@ export async function getPortfolioView(userId: string) {
   } as const;
 
   return apiSuccess({
-    ...buildPortfolioData({ language: user.displayLanguage, accounts: userAccounts, holdings: userHoldings, profile, display }),
+    ...buildPortfolioData({ language: user.displayLanguage, accounts: userAccounts, holdings: userHoldings, snapshots: userSnapshots, profile, display }),
     context: {
       totalMarketValueCad: userAccounts.reduce((sum, account) => sum + account.marketValueCad, 0),
       topHoldingSymbol: [...userHoldings].sort((left, right) => right.marketValueCad - left.marketValueCad)[0]?.symbol ?? null
@@ -903,12 +907,63 @@ function getHoldingDetailMarketDataSummary(params: {
   };
 }
 
+function applyResolvedSecurityContextToHoldingDetail(args: {
+  data: PortfolioHoldingDetailData;
+  language: DisplayLanguage;
+  resolution: SecurityResolution;
+  quote: SecurityQuote;
+}) {
+  const { data, language, resolution, quote } = args;
+  const resolvedSecurityType = formatSecurityTypeLabel(resolution.securityType);
+  const resolvedExchange = resolution.exchange ?? pick(language, "未知交易所", "Unknown exchange");
+  const resolvedMarketSector = resolution.marketSector
+    ? formatSecurityTypeLabel(resolution.marketSector)
+    : pick(language, "未知市场", "Unknown market");
+
+  data.editContext.raw.securityType = resolvedSecurityType;
+  data.editContext.raw.exchange = resolvedExchange;
+  data.editContext.raw.marketSector = resolvedMarketSector;
+  data.holding.securityType = data.editContext.current.securityTypeOverride ?? resolvedSecurityType;
+  data.holding.exchange = data.editContext.current.exchangeOverride ?? resolvedExchange;
+  data.holding.marketSector = data.editContext.current.marketSectorOverride ?? resolvedMarketSector;
+  data.facts = [
+    {
+      label: pick(language, "它是什么类型", "Security type"),
+      value: data.holding.securityType,
+      detail: pick(language, "先认清它是 ETF、股票还是别的，再判断它适不适合继续加。", "Identify whether this is an ETF, stock, or something else before deciding whether it still fits.")
+    },
+    {
+      label: pick(language, "主要在哪个市场", "Primary exchange"),
+      value: data.holding.exchange,
+      detail: pick(language, "这能帮助你判断交易市场和后续换汇可能。", "This helps with market context and any future FX implications.")
+    },
+    {
+      label: pick(language, "账户里的位置", "Position inside this account"),
+      value: data.holding.accountShare,
+      detail: pick(language, "这里看的分母只是当前账户，不是全部资产。", "This uses the current account as the denominator, not the whole portfolio.")
+    },
+    {
+      label: pick(language, "整个组合里的位置", "Position inside the full portfolio"),
+      value: data.holding.portfolioShare,
+      detail: pick(language, "这里看的分母是你全部投资资产。", "This uses your full invested portfolio as the denominator.")
+    }
+  ];
+  data.marketData = getHoldingDetailMarketDataSummary({
+    language,
+    quote,
+    resolution
+  });
+
+  return data;
+}
+
 export async function getPortfolioAccountDetailView(userId: string, accountId: string) {
   const repositories = getRepositories();
-  const [user, userAccounts, userHoldings, profile] = await Promise.all([
+  const [user, userAccounts, userHoldings, userSnapshots, profile] = await Promise.all([
     repositories.users.getById(userId),
     repositories.accounts.listByUserId(userId),
     repositories.holdings.listByUserId(userId),
+    repositories.snapshots.listByUserId(userId),
     repositories.preferences.getByUserId(userId)
   ]);
 
@@ -921,6 +976,7 @@ export async function getPortfolioAccountDetailView(userId: string, accountId: s
     language: user.displayLanguage,
     accounts: userAccounts,
     holdings: userHoldings,
+    snapshots: userSnapshots,
     profile,
     display,
     accountId
@@ -994,10 +1050,11 @@ export async function getPortfolioAccountDetailView(userId: string, accountId: s
 
 export async function getPortfolioHoldingDetailView(userId: string, holdingId: string) {
   const repositories = getRepositories();
-  const [user, userAccounts, userHoldings, profile] = await Promise.all([
+  const [user, userAccounts, userHoldings, userSnapshots, profile] = await Promise.all([
     repositories.users.getById(userId),
     repositories.accounts.listByUserId(userId),
     repositories.holdings.listByUserId(userId),
+    repositories.snapshots.listByUserId(userId),
     repositories.preferences.getByUserId(userId)
   ]);
 
@@ -1010,6 +1067,7 @@ export async function getPortfolioHoldingDetailView(userId: string, holdingId: s
     language: user.displayLanguage,
     accounts: userAccounts,
     holdings: userHoldings,
+    snapshots: userSnapshots,
     profile,
     display,
     holdingId
@@ -1048,54 +1106,23 @@ export async function getPortfolioHoldingDetailView(userId: string, holdingId: s
   const resolution = resolutionResponse.result;
   const quote = quoteResponse.result;
 
-  const resolvedSecurityType = formatSecurityTypeLabel(resolution.securityType);
-  const resolvedExchange = resolution.exchange ?? pick(user.displayLanguage, "未知交易所", "Unknown exchange");
-  const resolvedMarketSector = resolution.marketSector
-    ? formatSecurityTypeLabel(resolution.marketSector)
-    : pick(user.displayLanguage, "未知市场", "Unknown market");
-  data.editContext.raw.securityType = resolvedSecurityType;
-  data.editContext.raw.exchange = resolvedExchange;
-  data.editContext.raw.marketSector = resolvedMarketSector;
-  data.holding.securityType = data.editContext.current.securityTypeOverride ?? resolvedSecurityType;
-  data.holding.exchange = data.editContext.current.exchangeOverride ?? resolvedExchange;
-  data.holding.marketSector = data.editContext.current.marketSectorOverride ?? resolvedMarketSector;
-  data.facts = [
-    {
-      label: pick(user.displayLanguage, "它是什么类型", "Security type"),
-      value: data.holding.securityType,
-      detail: pick(user.displayLanguage, "先认清它是 ETF、股票还是别的，再判断它适不适合继续加。", "Identify whether this is an ETF, stock, or something else before deciding whether it still fits.")
-    },
-    {
-      label: pick(user.displayLanguage, "主要在哪个市场", "Primary exchange"),
-      value: data.holding.exchange,
-      detail: pick(user.displayLanguage, "这能帮助你判断交易市场和后续换汇可能。", "This helps with market context and any future FX implications.")
-    },
-    {
-      label: pick(user.displayLanguage, "账户里的位置", "Position inside this account"),
-      value: data.holding.accountShare,
-      detail: pick(user.displayLanguage, "这里看的分母只是当前账户，不是全部资产。", "This uses the current account as the denominator, not the whole portfolio.")
-    },
-    {
-      label: pick(user.displayLanguage, "整个组合里的位置", "Position inside the full portfolio"),
-      value: data.holding.portfolioShare,
-      detail: pick(user.displayLanguage, "这里看的分母是你全部投资资产。", "This uses your full invested portfolio as the denominator.")
-    }
-  ];
-  data.marketData = getHoldingDetailMarketDataSummary({
-    language: user.displayLanguage,
-    quote,
-    resolution
-  });
-
-  return apiSuccess({ data }, "database");
+  return apiSuccess({
+    data: applyResolvedSecurityContextToHoldingDetail({
+      data,
+      language: user.displayLanguage,
+      resolution,
+      quote
+    })
+  }, "database");
 }
 
 export async function getPortfolioSecurityDetailView(userId: string, symbol: string) {
   const repositories = getRepositories();
-  const [user, userAccounts, userHoldings, profile] = await Promise.all([
+  const [user, userAccounts, userHoldings, userSnapshots, profile] = await Promise.all([
     repositories.users.getById(userId),
     repositories.accounts.listByUserId(userId),
     repositories.holdings.listByUserId(userId),
+    repositories.snapshots.listByUserId(userId),
     repositories.preferences.getByUserId(userId)
   ]);
 
@@ -1108,6 +1135,7 @@ export async function getPortfolioSecurityDetailView(userId: string, symbol: str
     language: user.displayLanguage,
     accounts: userAccounts,
     holdings: userHoldings,
+    snapshots: userSnapshots,
     profile,
     display,
     symbol
@@ -1167,6 +1195,16 @@ export async function getPortfolioSecurityDetailView(userId: string, symbol: str
     quote,
     resolution
   });
+  if (data.heldPosition) {
+    data.heldPosition.accountViews = data.heldPosition.accountViews.map((detail) =>
+      applyResolvedSecurityContextToHoldingDetail({
+        data: detail,
+        language: user.displayLanguage,
+        resolution,
+        quote
+      })
+    );
+  }
 
   return apiSuccess({ data }, "database");
 }

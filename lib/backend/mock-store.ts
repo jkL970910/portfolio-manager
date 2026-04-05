@@ -5,6 +5,7 @@ import {
   HoldingPosition,
   ImportJob,
   InvestmentAccount,
+  PortfolioSnapshot,
   PreferenceProfile,
   RecommendationRun,
   UserProfile
@@ -245,6 +246,237 @@ export const transactions: CashflowTransaction[] = [
     category: "Income",
     amountCad: 7100,
     direction: "inflow"
+  }
+];
+
+export const portfolioSnapshots: PortfolioSnapshot[] = [
+  {
+    id: "snap_demo_2025_10",
+    userId: "user_demo",
+    snapshotDate: "2025-10-01",
+    totalValueCad: 364900,
+    accountBreakdown: {
+      acct_tfsa_demo: 111200,
+      acct_rrsp_demo: 177500,
+      acct_taxable_demo: 76200
+    },
+    holdingBreakdown: {
+      hold_veqt_demo: 66200,
+      hold_xaw_demo: 42800,
+      hold_cash_demo: 35400,
+      hold_xbb_demo: 19400
+    },
+    sourceVersion: "snapshot-v1",
+    createdAt: "2025-10-01T00:00:00.000Z"
+  },
+  {
+    id: "snap_demo_2025_11",
+    userId: "user_demo",
+    snapshotDate: "2025-11-01",
+    totalValueCad: 372800,
+    accountBreakdown: {
+      acct_tfsa_demo: 114600,
+      acct_rrsp_demo: 180700,
+      acct_taxable_demo: 77500
+    },
+    holdingBreakdown: {
+      hold_veqt_demo: 68400,
+      hold_xaw_demo: 44100,
+      hold_cash_demo: 35800,
+      hold_xbb_demo: 20100
+    },
+    sourceVersion: "snapshot-v1",
+    createdAt: "2025-11-01T00:00:00.000Z"
+  },
+  {
+    id: "snap_demo_2025_12",
+    userId: "user_demo",
+    snapshotDate: "2025-12-01",
+    totalValueCad: 381600,
+    accountBreakdown: {
+      acct_tfsa_demo: 117400,
+      acct_rrsp_demo: 185300,
+      acct_taxable_demo: 78900
+    },
+    holdingBreakdown: {
+      hold_veqt_demo: 70100,
+      hold_xaw_demo: 45200,
+      hold_cash_demo: 37000,
+      hold_xbb_demo: 21400
+    },
+    sourceVersion: "snapshot-v1",
+    createdAt: "2025-12-01T00:00:00.000Z"
+  },
+  {
+    id: "snap_demo_2026_01",
+    userId: "user_demo",
+    snapshotDate: "2026-01-01",
+    totalValueCad: 394700,
+    accountBreakdown: {
+      acct_tfsa_demo: 121500,
+      acct_rrsp_demo: 191200,
+      acct_taxable_demo: 82000
+    },
+    holdingBreakdown: {
+      hold_veqt_demo: 72400,
+      hold_xaw_demo: 46800,
+      hold_cash_demo: 38500,
+      hold_xbb_demo: 22100
+    },
+    sourceVersion: "snapshot-v1",
+    createdAt: "2026-01-01T00:00:00.000Z"
+  },
+  {
+    id: "snap_demo_2026_02",
+    userId: "user_demo",
+    snapshotDate: "2026-02-01",
+    totalValueCad: 404900,
+    accountBreakdown: {
+      acct_tfsa_demo: 124800,
+      acct_rrsp_demo: 197100,
+      acct_taxable_demo: 83000
+    },
+    holdingBreakdown: {
+      hold_veqt_demo: 74100,
+      hold_xaw_demo: 47900,
+      hold_cash_demo: 39800,
+      hold_xbb_demo: 22400
+    },
+    sourceVersion: "snapshot-v1",
+    createdAt: "2026-02-01T00:00:00.000Z"
+  },
+  {
+    id: "snap_demo_2026_03",
+    userId: "user_demo",
+    snapshotDate: "2026-03-01",
+    totalValueCad: 412300,
+    accountBreakdown: {
+      acct_tfsa_demo: 128400,
+      acct_rrsp_demo: 201200,
+      acct_taxable_demo: 82700
+    },
+    holdingBreakdown: {
+      hold_veqt_demo: 75200,
+      hold_xaw_demo: 48600,
+      hold_cash_demo: 40800,
+      hold_xbb_demo: 22300
+    },
+    sourceVersion: "snapshot-v1",
+    createdAt: "2026-03-01T00:00:00.000Z"
+  },
+  {
+    id: "snap_casey_2025_10",
+    userId: "user_casey",
+    snapshotDate: "2025-10-01",
+    totalValueCad: 199400,
+    accountBreakdown: {
+      acct_tfsa_casey: 65100,
+      acct_rrsp_casey: 104300,
+      acct_fhsa_casey: 30000
+    },
+    holdingBreakdown: {
+      hold_xeqt_casey: 36600,
+      hold_vfv_casey: 31400,
+      hold_xef_casey: 17800,
+      hold_cash_casey: 8600
+    },
+    sourceVersion: "snapshot-v1",
+    createdAt: "2025-10-01T00:00:00.000Z"
+  },
+  {
+    id: "snap_casey_2025_11",
+    userId: "user_casey",
+    snapshotDate: "2025-11-01",
+    totalValueCad: 205600,
+    accountBreakdown: {
+      acct_tfsa_casey: 66800,
+      acct_rrsp_casey: 107100,
+      acct_fhsa_casey: 31700
+    },
+    holdingBreakdown: {
+      hold_xeqt_casey: 37800,
+      hold_vfv_casey: 32300,
+      hold_xef_casey: 18400,
+      hold_cash_casey: 9100
+    },
+    sourceVersion: "snapshot-v1",
+    createdAt: "2025-11-01T00:00:00.000Z"
+  },
+  {
+    id: "snap_casey_2025_12",
+    userId: "user_casey",
+    snapshotDate: "2025-12-01",
+    totalValueCad: 211900,
+    accountBreakdown: {
+      acct_tfsa_casey: 68400,
+      acct_rrsp_casey: 111000,
+      acct_fhsa_casey: 32500
+    },
+    holdingBreakdown: {
+      hold_xeqt_casey: 39000,
+      hold_vfv_casey: 33200,
+      hold_xef_casey: 19100,
+      hold_cash_casey: 9600
+    },
+    sourceVersion: "snapshot-v1",
+    createdAt: "2025-12-01T00:00:00.000Z"
+  },
+  {
+    id: "snap_casey_2026_01",
+    userId: "user_casey",
+    snapshotDate: "2026-01-01",
+    totalValueCad: 218700,
+    accountBreakdown: {
+      acct_tfsa_casey: 70100,
+      acct_rrsp_casey: 114900,
+      acct_fhsa_casey: 33700
+    },
+    holdingBreakdown: {
+      hold_xeqt_casey: 40100,
+      hold_vfv_casey: 34100,
+      hold_xef_casey: 19500,
+      hold_cash_casey: 10000
+    },
+    sourceVersion: "snapshot-v1",
+    createdAt: "2026-01-01T00:00:00.000Z"
+  },
+  {
+    id: "snap_casey_2026_02",
+    userId: "user_casey",
+    snapshotDate: "2026-02-01",
+    totalValueCad: 223800,
+    accountBreakdown: {
+      acct_tfsa_casey: 72100,
+      acct_rrsp_casey: 117600,
+      acct_fhsa_casey: 34100
+    },
+    holdingBreakdown: {
+      hold_xeqt_casey: 41400,
+      hold_vfv_casey: 34900,
+      hold_xef_casey: 19800,
+      hold_cash_casey: 9300
+    },
+    sourceVersion: "snapshot-v1",
+    createdAt: "2026-02-01T00:00:00.000Z"
+  },
+  {
+    id: "snap_casey_2026_03",
+    userId: "user_casey",
+    snapshotDate: "2026-03-01",
+    totalValueCad: 226400,
+    accountBreakdown: {
+      acct_tfsa_casey: 74200,
+      acct_rrsp_casey: 119400,
+      acct_fhsa_casey: 32800
+    },
+    holdingBreakdown: {
+      hold_xeqt_casey: 42100,
+      hold_vfv_casey: 35600,
+      hold_xef_casey: 19800,
+      hold_cash_casey: 9400
+    },
+    sourceVersion: "snapshot-v1",
+    createdAt: "2026-03-01T00:00:00.000Z"
   }
 ];
 

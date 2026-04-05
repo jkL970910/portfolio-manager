@@ -83,11 +83,11 @@ Help a self-directed investor:
    - symbol audit and correction exist
    - richer persisted correction workflows and staged review state are still missing
 
-## Planned: Highest Priority Next
+## Planned / In Progress: Highest Priority Next
 
 | Rank | Feature | Priority | Why now |
 |---|---|---|---|
-| 1 | Real historical performance | P1 | Portfolio and dashboard trend lines still rely on synthetic history instead of replayed portfolio events. |
+| 1 | Real historical performance | P1 | Snapshot-backed portfolio and account trends are now wired in, but holding/security history still needs event replay plus price history. |
 | 2 | Richer import review persistence | P1 | Import review is functional, but corrections are still too session-bound and light. |
 | 3 | Richer import review persistence | P1 | Import review is functional, but corrections are still too session-bound and light. |
 | 4 | Watchlist and target constraints workflow | P1 | Preference storage exists, but the UX and recommendation impact are still too shallow. |
@@ -123,7 +123,7 @@ Help a self-directed investor:
 | Portfolio workspace phase 1 | Completed | 5 | 3 | 2 | 5 | Keep stable |
 | Account detail and holding detail surfaces | Completed | 5 | 4 | 3 | 5 | Keep stable |
 | Account and holding edit workflows | Completed | 5 | 4 | 4 | 5 | Phase 3 baseline is now live, including unified account maintenance, add-holding, holding delete, merge preview/confirm, and classification repair |
-| Real historical performance | Planned | 5 | 5 | 4 | 5 | Build after edit foundation |
+| Real historical performance | In Progress | 5 | 5 | 4 | 5 | Snapshot-backed portfolio/account trends are live; continue with events and security price history |
 | Spending overview and transactions | In Progress | 3 | 3 | 2 | 3 | Keep secondary |
 | Richer import review persistence | Planned | 4 | 3 | 3 | 4 | Build soon |
 | Watchlist and target constraints workflow | Planned | 3 | 2 | 2 | 4 | Build after guided setup |
@@ -135,7 +135,9 @@ Help a self-directed investor:
 
 ## Recommended Build Order From Here
 
-1. Real historical performance
+1. Real historical performance completion:
+   snapshot-backed dashboard / portfolio / account trends are done
+   next: portfolio events, security price history, holding/security replay
 2. Richer import review persistence and correction state
 3. Watchlist and target constraints workflow
 4. Citizen/profile admin workflow expansion

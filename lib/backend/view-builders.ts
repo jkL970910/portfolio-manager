@@ -16,6 +16,7 @@ import {
   HoldingPosition,
   ImportJob,
   InvestmentAccount,
+  PortfolioSnapshot,
   PreferenceProfile,
   RecommendationRun,
   RiskProfile,
@@ -342,6 +343,47 @@ function getSixMonthSeries(latestValue: number, profile: PreferenceProfile, labe
   return labels.map((label, index) => ({
     label,
     value: Math.max(0, Math.round(latestValue * growthCurve[index]))
+  }));
+}
+
+function formatSnapshotLabel(snapshotDate: string, language: DisplayLanguage) {
+  return new Date(`${snapshotDate}T00:00:00`).toLocaleString(language === "zh" ? "zh-CN" : "en-CA", {
+    month: "short"
+  });
+}
+
+function buildHistoricalSeriesFromSnapshots(args: {
+  snapshots?: PortfolioSnapshot[];
+  language: DisplayLanguage;
+  getValue: (snapshot: PortfolioSnapshot) => number;
+}) {
+  const { snapshots = [], language, getValue } = args;
+  const recent = [...snapshots]
+    .sort((left, right) => left.snapshotDate.localeCompare(right.snapshotDate))
+    .slice(-6)
+    .map((snapshot) => ({
+      label: formatSnapshotLabel(snapshot.snapshotDate, language),
+      value: round(getValue(snapshot), 2)
+    }))
+    .filter((point) => Number.isFinite(point.value));
+
+  return recent.length >= 2 ? recent : null;
+}
+
+function buildIndexedHistoricalSeries(args: {
+  snapshots?: PortfolioSnapshot[];
+  language: DisplayLanguage;
+  getValue: (snapshot: PortfolioSnapshot) => number;
+}) {
+  const absoluteSeries = buildHistoricalSeriesFromSnapshots(args);
+  if (!absoluteSeries || absoluteSeries.length < 2) {
+    return null;
+  }
+
+  const baseline = absoluteSeries[0]?.value || 1;
+  return absoluteSeries.map((point) => ({
+    label: point.label,
+    value: round((point.value / baseline) * 100, 1)
   }));
 }
 
@@ -748,11 +790,12 @@ export function buildDashboardData(args: {
   accounts: InvestmentAccount[];
   holdings: HoldingPosition[];
   transactions: CashflowTransaction[];
+  snapshots?: PortfolioSnapshot[];
   profile: PreferenceProfile;
   latestRun: RecommendationRun | null;
   display: DisplayContext;
 }): DashboardData {
-  const { viewer, accounts, holdings, transactions, profile, latestRun, display } = args;
+  const { viewer, accounts, holdings, transactions, snapshots = [], profile, latestRun, display } = args;
   const language = viewer.displayLanguage;
   const { typeLabelMap, instanceLabelMap } = buildAccountLabelMaps(accounts, language);
   const totalPortfolio = sum(accounts.map((account) => account.marketValueCad));
@@ -772,6 +815,11 @@ export function buildDashboardData(args: {
   const spending = buildSpendingSummary(transactions, profile.cashBufferTargetCad);
   const accountPriorityOrder = profile.accountFundingPriority;
   const recommendation = getRecommendationTheme(latestRun, display, language, profile, accounts);
+  const netWorthTrend = buildHistoricalSeriesFromSnapshots({
+    snapshots,
+    language,
+    getValue: (snapshot) => snapshot.totalValueCad
+  }) ?? getSixMonthSeries(totalPortfolio, profile, getMonthLabels(language));
 
   return {
     displayContext: buildDisplayContext(display, language),
@@ -846,7 +894,7 @@ export function buildDashboardData(args: {
         weight: formatCompactPercent(holding.weightPct, 1),
         value: formatMoneyForDisplay(holding.marketValueAmount, holding.currency ?? "CAD", holding.marketValueCad, display)
       })),
-    netWorthTrend: getSixMonthSeries(totalPortfolio, profile, getMonthLabels(language)),
+    netWorthTrend,
     spendingMonthLabel: getLatestMonthLabel(language),
     savingsPattern: formatCompactPercent(spending.savingsRate, 1),
     investableCash: formatDisplayCurrency(spending.investableCash, display),
@@ -870,17 +918,24 @@ export function buildPortfolioData(args: {
   language: DisplayLanguage;
   accounts: InvestmentAccount[];
   holdings: HoldingPosition[];
+  snapshots?: PortfolioSnapshot[];
   profile: PreferenceProfile;
   display: DisplayContext;
 }): PortfolioData {
-  const { language, accounts, holdings, profile, display } = args;
+  const { language, accounts, holdings, snapshots = [], profile, display } = args;
   const { typeLabelMap, instanceLabelMap, instanceDetailMap } = buildAccountLabelMaps(accounts, language);
   const currentAllocation = getCurrentAllocation(holdings);
   const targetAllocation = getTargetAllocation(profile);
   const health = buildPortfolioHealthSummary({ accounts, holdings, profile, language });
   const totalPortfolio = sum(accounts.map((account) => account.marketValueCad));
-  const performanceBase = getSixMonthSeries(totalPortfolio || 1, profile).map((point) => point.value);
-  const baseline = performanceBase[0] || 1;
+  const portfolioPerformance = buildIndexedHistoricalSeries({
+    snapshots,
+    language,
+    getValue: (snapshot) => snapshot.totalValueCad
+  }) ?? getSixMonthSeries(totalPortfolio || 1, profile, getMonthLabels(language)).map((point, index, series) => ({
+    label: point.label,
+    value: round((point.value / (series[0]?.value || 1)) * 100, 1)
+  }));
   const driftMap = new Map<string, number>();
   for (const [assetClass, targetPct] of targetAllocation.entries()) {
     driftMap.set(assetClass, round((currentAllocation.get(assetClass) ?? 0) - targetPct, 1));
@@ -968,9 +1023,13 @@ export function buildPortfolioData(args: {
         name: instanceLabelMap.get(account.id) ?? account.nickname,
         typeId: account.type,
         typeLabel: typeLabelMap.get(account.id) ?? account.type,
-        performance: getSixMonthSeries(accountTotal, profile, getMonthLabels(language)).map((point) => ({
+        performance: buildIndexedHistoricalSeries({
+          snapshots,
+          language,
+          getValue: (snapshot) => snapshot.accountBreakdown[account.id] ?? 0
+        }) ?? getSixMonthSeries(accountTotal, profile, getMonthLabels(language)).map((point, index, series) => ({
           label: point.label,
-          value: round((point.value / (getSixMonthSeries(accountTotal, profile)[0]?.value || 1)) * 100, 1)
+          value: round((point.value / (series[0]?.value || 1)) * 100, 1)
         })),
         healthScore: {
           score: accountHealth.score,
@@ -1014,10 +1073,7 @@ export function buildPortfolioData(args: {
 
   return {
     displayContext: buildDisplayContext(display, language),
-    performance: getSixMonthSeries(totalPortfolio || 1, profile, getMonthLabels(language)).map((point, index) => ({
-      label: point.label,
-      value: round((performanceBase[index] / baseline) * 100, 1)
-    })),
+    performance: portfolioPerformance,
     accountTypeAllocation,
     accountInstanceAllocation,
     accountCards,
@@ -1094,12 +1150,13 @@ export function buildPortfolioAccountDetailData(args: {
   language: DisplayLanguage;
   accounts: InvestmentAccount[];
   holdings: HoldingPosition[];
+  snapshots?: PortfolioSnapshot[];
   profile: PreferenceProfile;
   display: DisplayContext;
   accountId: string;
 }): PortfolioAccountDetailData | null {
-  const { language, accounts, holdings, profile, display, accountId } = args;
-  const portfolio = buildPortfolioData({ language, accounts, holdings, profile, display });
+  const { language, accounts, holdings, snapshots = [], profile, display, accountId } = args;
+  const portfolio = buildPortfolioData({ language, accounts, holdings, snapshots, profile, display });
   const accountCard = portfolio.accountCards.find((account) => account.id === accountId);
   const accountContext = portfolio.accountContexts.find((account) => account.id === accountId);
   const rawAccount = accounts.find((account) => account.id === accountId);
@@ -1234,12 +1291,13 @@ export function buildPortfolioHoldingDetailData(args: {
   language: DisplayLanguage;
   accounts: InvestmentAccount[];
   holdings: HoldingPosition[];
+  snapshots?: PortfolioSnapshot[];
   profile: PreferenceProfile;
   display: DisplayContext;
   holdingId: string;
 }): PortfolioHoldingDetailData | null {
-  const { language, accounts, holdings, profile, display, holdingId } = args;
-  const portfolio = buildPortfolioData({ language, accounts, holdings, profile, display });
+  const { language, accounts, holdings, snapshots = [], profile, display, holdingId } = args;
+  const portfolio = buildPortfolioData({ language, accounts, holdings, snapshots, profile, display });
   const health = buildPortfolioHealthSummary({ accounts, holdings, profile, language });
   const rawHolding = holdings.find((holding) => holding.id === holdingId);
   const viewHolding = portfolio.holdings.find((holding) => holding.id === holdingId);
@@ -1428,13 +1486,14 @@ export function buildPortfolioSecurityDetailData(args: {
   language: DisplayLanguage;
   accounts: InvestmentAccount[];
   holdings: HoldingPosition[];
+  snapshots?: PortfolioSnapshot[];
   profile: PreferenceProfile;
   display: DisplayContext;
   symbol: string;
 }): PortfolioSecurityDetailData | null {
-  const { language, accounts, holdings, profile, display, symbol } = args;
+  const { language, accounts, holdings, snapshots = [], profile, display, symbol } = args;
   const normalizedSymbol = symbol.trim().toUpperCase();
-  const portfolio = buildPortfolioData({ language, accounts, holdings, profile, display });
+  const portfolio = buildPortfolioData({ language, accounts, holdings, snapshots, profile, display });
   const matchingHoldings = holdings.filter((holding) => holding.symbol.trim().toUpperCase() === normalizedSymbol);
   const matchingViewHoldings = portfolio.holdings.filter((holding) => holding.symbol.trim().toUpperCase() === normalizedSymbol);
   const referenceHolding = matchingHoldings[0];
@@ -1454,6 +1513,177 @@ export function buildPortfolioSecurityDetailData(args: {
   const assetClassCurrentPct = referenceHolding
     ? getCurrentAllocation(holdings).get(referenceHolding.assetClass) ?? 0
     : 0;
+  const totalQuantity = sum(
+    matchingHoldings
+      .map((holding) => holding.quantity ?? 0)
+      .filter((value) => Number.isFinite(value))
+  );
+  const totalCostBasisCad = sum(matchingHoldings.map((holding) => holding.costBasisCad ?? 0));
+  const totalCostBasisAmount = sum(matchingHoldings.map((holding) => holding.costBasisAmount ?? 0));
+  const weightedAvgCostAmount = totalQuantity > 0
+    ? sum(
+        matchingHoldings.map((holding) => (holding.quantity ?? 0) * (holding.avgCostPerShareAmount ?? 0))
+      ) / totalQuantity
+    : null;
+  const weightedAvgCostCad = totalQuantity > 0
+    ? sum(
+        matchingHoldings.map((holding) => (holding.quantity ?? 0) * (holding.avgCostPerShareCad ?? 0))
+      ) / totalQuantity
+    : null;
+  const aggregateGainLossPct = totalCostBasisCad > 0
+    ? ((totalValueCad - totalCostBasisCad) / totalCostBasisCad) * 100
+    : null;
+  const accountViews = matchingHoldings
+    .map((holding) =>
+      buildPortfolioHoldingDetailData({
+        language,
+        accounts,
+        holdings,
+        snapshots,
+        profile,
+        display,
+        holdingId: holding.id
+      })
+    )
+    .filter((detail): detail is PortfolioHoldingDetailData => detail !== null)
+    .sort((left, right) => {
+      const leftRaw = matchingHoldings.find((holding) => holding.id === left.holding.id);
+      const rightRaw = matchingHoldings.find((holding) => holding.id === right.holding.id);
+      return (rightRaw?.marketValueCad ?? 0) - (leftRaw?.marketValueCad ?? 0);
+    });
+  const accountSummaries = [...new Set(accountViews.map((detail) => detail.holding.accountId))]
+    .map((accountId) => {
+      const accountHoldings = matchingHoldings.filter((holding) => holding.accountId === accountId);
+      const representativeView = accountViews.find((detail) => detail.holding.accountId === accountId);
+      const accountTotalCad = sum(holdings.filter((holding) => holding.accountId === accountId).map((holding) => holding.marketValueCad));
+      const accountValueCad = sum(accountHoldings.map((holding) => holding.marketValueCad));
+      const accountQuantity = sum(accountHoldings.map((holding) => holding.quantity ?? 0));
+      const accountCostBasisCad = sum(accountHoldings.map((holding) => holding.costBasisCad ?? 0));
+      const accountCostBasisAmount = sum(accountHoldings.map((holding) => holding.costBasisAmount ?? 0));
+      const accountWeightedAvgCostAmount = accountQuantity > 0
+        ? sum(accountHoldings.map((holding) => (holding.quantity ?? 0) * (holding.avgCostPerShareAmount ?? 0))) / accountQuantity
+        : null;
+      const accountWeightedAvgCostCad = accountQuantity > 0
+        ? sum(accountHoldings.map((holding) => (holding.quantity ?? 0) * (holding.avgCostPerShareCad ?? 0))) / accountQuantity
+        : null;
+      const accountGainLossPct = accountCostBasisCad > 0
+        ? ((accountValueCad - accountCostBasisCad) / accountCostBasisCad) * 100
+        : null;
+
+      return {
+        accountId,
+        accountLabel: representativeView?.holding.accountName ?? pick(language, "账户", "Account"),
+        accountType: representativeView?.holding.accountType ?? pick(language, "账户", "Account"),
+        quantity: formatHoldingQuantity(accountQuantity, language),
+        avgCost: formatHoldingAmount(
+          accountWeightedAvgCostAmount,
+          accountHoldings[0]?.currency ?? "CAD",
+          accountWeightedAvgCostCad,
+          display,
+          language
+        ),
+        costBasis: formatHoldingAmount(
+          accountCostBasisAmount,
+          accountHoldings[0]?.currency ?? "CAD",
+          accountCostBasisCad,
+          display,
+          language
+        ),
+        value: formatMoneyForDisplay(
+          sum(accountHoldings.map((holding) => holding.marketValueAmount ?? 0)),
+          accountHoldings[0]?.currency ?? "CAD",
+          accountValueCad,
+          display
+        ),
+        lastPrice: formatHoldingPrice(
+          accountHoldings[0]?.lastPriceAmount ?? null,
+          accountHoldings[0]?.currency ?? "CAD",
+          accountHoldings[0]?.lastPriceCad ?? null,
+          display,
+          language
+        ),
+        gainLoss: accountGainLossPct == null ? pick(language, "成本待补", "Cost basis pending") : formatSignedPercent(accountGainLossPct, 1),
+        portfolioShare: totalPortfolioCad > 0 ? formatCompactPercent((accountValueCad / totalPortfolioCad) * 100, 1) : "0%",
+        accountShare: accountTotalCad > 0 ? formatCompactPercent((accountValueCad / accountTotalCad) * 100, 1) : "0%",
+        holdingCount: String(accountHoldings.length),
+        summaryPoints: [
+          pick(
+            language,
+            `${representativeView?.holding.accountName ?? pick(language, "这个账户", "this account")} 里一共持有 ${formatHoldingQuantity(accountQuantity, language)} 的 ${normalizedSymbol}。`,
+            `${representativeView?.holding.accountName ?? "This account"} currently holds ${formatHoldingQuantity(accountQuantity, language)} of ${normalizedSymbol}.`
+          ),
+          pick(
+            language,
+            `这部分在当前账户里大约占 ${accountTotalCad > 0 ? formatCompactPercent((accountValueCad / accountTotalCad) * 100, 1) : "0%"}，在整个组合里大约占 ${totalPortfolioCad > 0 ? formatCompactPercent((accountValueCad / totalPortfolioCad) * 100, 1) : "0%"}。`,
+            `This slice is about ${accountTotalCad > 0 ? formatCompactPercent((accountValueCad / accountTotalCad) * 100, 1) : "0%"} of the account and about ${totalPortfolioCad > 0 ? formatCompactPercent((accountValueCad / totalPortfolioCad) * 100, 1) : "0%"} of the full portfolio.`
+          )
+        ]
+      };
+    });
+  const heldPosition = matchingHoldings.length > 0
+    ? {
+        aggregate: {
+          quantity: formatHoldingQuantity(totalQuantity, language),
+          avgCost: formatHoldingAmount(
+            weightedAvgCostAmount,
+            referenceHolding?.currency ?? "CAD",
+            weightedAvgCostCad,
+            display,
+            language
+          ),
+          costBasis: formatHoldingAmount(
+            totalCostBasisAmount,
+            referenceHolding?.currency ?? "CAD",
+            totalCostBasisCad,
+            display,
+            language
+          ),
+          value: totalValueCad > 0
+            ? formatMoneyForDisplay(
+                sum(matchingHoldings.map((holding) => holding.marketValueAmount ?? 0)),
+                referenceHolding?.currency ?? "CAD",
+                totalValueCad,
+                display
+              )
+            : pick(language, "还没持有", "Not held yet"),
+          lastPrice: formatHoldingPrice(
+            referenceHolding?.lastPriceAmount ?? null,
+            referenceHolding?.currency ?? "CAD",
+            referenceHolding?.lastPriceCad ?? null,
+            display,
+            language
+          ),
+          gainLoss: aggregateGainLossPct == null ? pick(language, "成本待补", "Cost basis pending") : formatSignedPercent(aggregateGainLossPct, 1),
+          portfolioShare: totalPortfolioCad > 0 ? formatCompactPercent((totalValueCad / totalPortfolioCad) * 100, 1) : "0%",
+          accountCount: String(accountCount),
+          summaryPoints: [
+            pick(
+              language,
+              `默认先把 ${normalizedSymbol} 在你所有账户里的持仓合在一起看，这样能先判断它整体是不是已经够重。`,
+              `The default view combines ${normalizedSymbol} across your accounts so you can judge the overall exposure first.`
+            ),
+            pick(
+              language,
+              `如果想看某个账户里的这笔仓位，再切到账户视角，就会补上那个账户里的比例、审核、刷新和编辑信息。`,
+              `Switch to an account view when you want the exact account-level ratio, review notes, refresh controls, and edit tools for that position.`
+            )
+          ]
+        },
+        accountOptions: accountSummaries.map((summary) => ({
+          accountId: summary.accountId,
+          label: summary.accountLabel,
+          detail: summary.accountType,
+          holdingId: accountViews.find((view) => view.holding.accountId === summary.accountId)?.holding.id ?? summary.accountId,
+          summary: pick(
+            language,
+            `${summary.value} · 占这个账户 ${summary.accountShare}`,
+            `${summary.value} · ${summary.accountShare} of this account`
+          )
+        })),
+        accountSummaries,
+        accountViews
+      }
+    : null;
 
   return {
     displayContext: portfolio.displayContext,
@@ -1561,7 +1791,8 @@ export function buildPortfolioSecurityDetailData(args: {
         accountShare: holding.accountShare,
         gainLoss: holding.gainLoss
       };
-    })
+    }),
+    heldPosition
   };
 }
 export function buildRecommendationsData(args: {
@@ -1853,7 +2084,9 @@ export function buildRecommendationsData(args: {
                 `打开 ${item.rationale.existingHoldingSymbol} 详情，看看它为什么已经算偏重`,
                 `Open ${item.rationale.existingHoldingSymbol} detail to see why it is already heavy`
               ),
-              href: `/portfolio/holding/${item.rationale.existingHoldingId}`
+              href: item.rationale.existingHoldingAccountId
+                ? `/portfolio/security/${encodeURIComponent(item.rationale.existingHoldingSymbol)}?account=${encodeURIComponent(item.rationale.existingHoldingAccountId)}&holding=${encodeURIComponent(item.rationale.existingHoldingId)}`
+                : `/portfolio/security/${encodeURIComponent(item.rationale.existingHoldingSymbol)}?holding=${encodeURIComponent(item.rationale.existingHoldingId)}`
             }]
           : []
       };

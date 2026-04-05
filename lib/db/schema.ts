@@ -184,6 +184,47 @@ export const recommendationItems = pgTable("recommendation_items", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow()
 });
 
+export const portfolioEvents = pgTable("portfolio_events", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  userId: uuid("user_id").notNull().references(() => users.id),
+  accountId: uuid("account_id").notNull().references(() => investmentAccounts.id),
+  symbol: varchar("symbol", { length: 32 }),
+  eventType: varchar("event_type", { length: 32 }).notNull(),
+  quantity: numeric("quantity", { precision: 18, scale: 6 }),
+  priceAmount: numeric("price_amount", { precision: 14, scale: 4 }),
+  currency: varchar("currency", { length: 3 }),
+  bookedAt: date("booked_at").notNull(),
+  effectiveAt: timestamp("effective_at", { withTimezone: true }).notNull(),
+  source: varchar("source", { length: 32 }).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow()
+});
+
+export const securityPriceHistory = pgTable("security_price_history", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  symbol: varchar("symbol", { length: 32 }).notNull(),
+  priceDate: date("price_date").notNull(),
+  close: numeric("close", { precision: 14, scale: 4 }).notNull(),
+  adjustedClose: numeric("adjusted_close", { precision: 14, scale: 4 }),
+  currency: varchar("currency", { length: 3 }).notNull().default("CAD"),
+  source: varchar("source", { length: 32 }).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow()
+}, (table) => ({
+  symbolDateIdx: uniqueIndex("security_price_history_symbol_date_idx").on(table.symbol, table.priceDate)
+}));
+
+export const portfolioSnapshots = pgTable("portfolio_snapshots", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  userId: uuid("user_id").notNull().references(() => users.id),
+  snapshotDate: date("snapshot_date").notNull(),
+  totalValueCad: numeric("total_value_cad", { precision: 14, scale: 2 }).notNull(),
+  accountBreakdownJson: jsonb("account_breakdown_json").notNull(),
+  holdingBreakdownJson: jsonb("holding_breakdown_json").notNull(),
+  sourceVersion: varchar("source_version", { length: 32 }).notNull().default("v1"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow()
+}, (table) => ({
+  userSnapshotDateIdx: uniqueIndex("portfolio_snapshots_user_date_idx").on(table.userId, table.snapshotDate)
+}));
+
 export const importJobs = pgTable("import_jobs", {
   id: uuid("id").defaultRandom().primaryKey(),
   userId: uuid("user_id").notNull().references(() => users.id),

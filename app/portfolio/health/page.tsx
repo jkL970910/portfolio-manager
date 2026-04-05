@@ -183,7 +183,7 @@ export default async function PortfolioHealthPage({
           title={pick(language, "按持仓拆开看", "Holding drill-down")}
           description={pick(language, "这里不是看涨跌，而是看哪笔仓位最容易让整个组合变得更偏。", "This section focuses on which holding can skew the portfolio most, not which one moved the most.")}
           items={health.holdingDrilldown}
-          openLabel={pick(language, "打开这笔持仓详情", "Open holding detail")}
+          openLabel={pick(language, "打开这支标的详情", "Open symbol detail")}
           driversLabel={pick(language, "先看这些事实", "What the system sees")}
           actionsLabel={pick(language, "现在先做这些", "What to do first")}
           scenarioLabel={pick(language, "如果下一笔投这么多（规划基准 CAD）", "If the next contribution is this size (planning-base CAD)")}

@@ -94,15 +94,19 @@ User value:
 
 Current delivery status:
 - account detail page is now implemented at `/portfolio/account/[accountId]`
-- holding detail page is now implemented at `/portfolio/holding/[holdingId]`
-- security detail page is now implemented at `/portfolio/security/[symbol]`
+- holding detail compatibility route remains at `/portfolio/holding/[holdingId]`, but now forwards into the unified symbol page with the matching account context
+- security detail page at `/portfolio/security/[symbol]` is now the unified symbol route
 - Portfolio account rows now expose a concrete account-detail entry point
-- holding symbols in the holdings table now deep-link into holding detail
-- dashboard top-holding rows now deep-link directly into holding detail instead of stopping at summary cards
-- health-score holding drilldowns now open concrete holding detail pages, so problem diagnosis has a direct object-level destination
+- holding symbols in the holdings table now deep-link into the unified symbol page
+- dashboard top-holding rows now deep-link directly into the unified symbol page instead of stopping at summary cards
+- health-score holding drilldowns still preserve object-level targeting, but now land on the unified symbol page with the matching account preselected
 - recommendation detail cards can now deep-link into an existing heavy holding when the explanation is explicitly about not adding more to that position
 - recommendation detail cards can now also deep-link into a security detail page for the lead or alternative symbol, even before the user holds it
-- holding detail now includes:
+- the unified symbol page now includes:
+  - candidate-security mode when the symbol is not yet held
+  - aggregate held-position mode when the symbol is already held
+  - compact first-fold account selection that reveals the full held-position review / edit / refresh stack for one account
+  - an additional holding-row selector when one account contains multiple rows for the same symbol
   - security identity facts
   - quote-source facts
   - delayed-vs-cached explanation

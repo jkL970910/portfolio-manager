@@ -4,6 +4,7 @@ import {
   HoldingPosition,
   ImportJob,
   InvestmentAccount,
+  PortfolioSnapshot,
   PreferenceProfile,
   RecommendationRun,
   UserProfile
@@ -33,6 +34,10 @@ export interface TransactionRepository {
   listByUserId(userId: EntityId): Promise<CashflowTransaction[]>;
 }
 
+export interface PortfolioSnapshotRepository {
+  listByUserId(userId: EntityId): Promise<PortfolioSnapshot[]>;
+}
+
 export interface PreferenceRepository {
   getByUserId(userId: EntityId): Promise<PreferenceProfile>;
 }
@@ -50,6 +55,7 @@ export interface BackendRepositories {
   accounts: AccountRepository;
   holdings: HoldingRepository;
   transactions: TransactionRepository;
+  snapshots: PortfolioSnapshotRepository;
   preferences: PreferenceRepository;
   recommendations: RecommendationRepository;
   importJobs: ImportJobRepository;

@@ -4,6 +4,7 @@ import {
   findUserById,
   holdings,
   importJobs,
+  portfolioSnapshots,
   preferenceProfiles,
   recommendationRuns,
   transactions
@@ -56,6 +57,11 @@ export const mockRepositories: BackendRepositories = {
   transactions: {
     async listByUserId(userId) {
       return transactions.filter((transaction) => transaction.userId === userId);
+    }
+  },
+  snapshots: {
+    async listByUserId(userId) {
+      return portfolioSnapshots.filter((snapshot) => snapshot.userId === userId);
     }
   },
   preferences: {

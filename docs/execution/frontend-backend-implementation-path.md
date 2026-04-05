@@ -82,6 +82,14 @@ Next build focus:
 - account and holding edit workflows
 - replay-based historical performance
 
+Updated now:
+
+- snapshot-backed trend lines are live for:
+  - dashboard net worth
+  - portfolio workspace
+  - account detail
+- holding and security detail still use reference curves pending `security_price_history`
+
 ## Portfolio workspace build path
 
 1. Fix account readability first
@@ -95,12 +103,15 @@ Next build focus:
 
 Current state:
 - account detail page implemented
-- holding detail page implemented
-- security detail page implemented for recommended and already-held symbols
-- dashboard top-holding rows now deep-link into holding detail
-- health-score holding drilldowns now deep-link into holding detail
+- holding detail compatibility route retained, but now redirects into the unified symbol page
+- security detail page is now the unified symbol route for both recommended and already-held symbols
+- dashboard top-holding rows now deep-link into the unified symbol page
+- health-score holding drilldowns still target holding ids, but the route now forwards into the unified symbol page with the matching account preselected
 - recommendation detail can now open a referenced already-heavy holding directly
 - recommendation detail can now also open a security detail page for the recommended lead or alternative symbol
+- already-held symbols now default to an aggregate cross-account view on the unified symbol page, with compact first-fold selectors that reveal the full position-detail stack for the selected account
+- if the same symbol appears multiple times inside one account, the unified symbol page now keeps the account metrics aggregated and adds a second selector for the exact holding row to review and edit
+- health-score and recommendation links that used to target the old holding route now deep-link straight into the unified symbol page with account and holding context preserved
 - inspection is no longer the next gap; Phase 3 now covers account/holding edit and repair workflows
 
 3. Add repair workflows

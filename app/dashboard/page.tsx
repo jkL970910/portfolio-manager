@@ -208,17 +208,11 @@ export default async function DashboardPage() {
                       </p>
                       <div className="mt-1 flex flex-wrap items-center gap-2">
                         <Link
-                          href={holding.href}
+                          href={holding.securityHref}
                           className="group inline-flex items-center gap-1 rounded-full border border-white/72 bg-white/74 px-3 py-1.5 text-xs font-medium text-[color:var(--primary)] transition-[background-color,border-color,box-shadow] duration-200 hover:border-white hover:bg-white hover:shadow-[0_10px_20px_rgba(110,103,130,0.08)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--ring)]"
                         >
-                          {pick(language, "持仓详情", "Holding detail")}
+                          {pick(language, "查看标的", "Open security")}
                           <MoveUpRight className="h-3.5 w-3.5 transition-transform duration-200 group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
-                        </Link>
-                        <Link
-                          href={holding.securityHref}
-                          className="inline-flex items-center rounded-full border border-[rgba(240,143,178,0.35)] bg-[rgba(255,255,255,0.72)] px-3 py-1.5 text-xs font-medium text-[color:var(--foreground)] transition-[background-color,border-color] duration-200 hover:border-[rgba(240,143,178,0.55)] hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--ring)]"
-                        >
-                          {pick(language, "标的资料", "Security page")}
                         </Link>
                       </div>
                       <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-[color:var(--muted-foreground)]">

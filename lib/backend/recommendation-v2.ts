@@ -367,6 +367,7 @@ export function buildRecommendationV2(args: {
         minTradeApplied: rawAmount < 500,
         watchlistMatched: profile.watchlistSymbols.includes(best.security.candidate.symbol),
         existingHoldingId: existingHolding?.id,
+        existingHoldingAccountId: existingHolding?.accountId,
         existingHoldingSymbol: existingHolding?.symbol,
         existingHoldingWeightPct: existingHolding?.weightPct,
         existingHoldingRiskContributionPct: existingHolding ? holdingRiskContribution.get(existingHolding.symbol.toUpperCase()) ?? undefined : undefined
