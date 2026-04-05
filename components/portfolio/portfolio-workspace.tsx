@@ -165,6 +165,7 @@ export function PortfolioWorkspace({ data, language, initialFilters }: Portfolio
               institution={account.institution}
               currency={account.currency}
               value={account.value}
+              gainLoss={account.gainLoss}
               share={account.share}
               room={account.room}
               topHoldings={account.topHoldings}

@@ -22,6 +22,7 @@ export function DonutChartCard({
   headerActions,
   helperText,
   noDataText,
+  className,
   legendMode = 'none',
   legendMaxItems = 6,
   chartHeight = 280,
@@ -36,6 +37,7 @@ export function DonutChartCard({
   headerActions?: ReactNode;
   helperText?: string;
   noDataText?: string;
+  className?: string;
   legendMode?: 'none' | 'side';
   legendMaxItems?: number;
   chartHeight?: number;
@@ -47,7 +49,7 @@ export function DonutChartCard({
   const legendItems = data.slice(0, legendMaxItems);
 
   return (
-    <Card className="overflow-visible">
+    <Card className={`overflow-visible ${className ?? ''}`.trim()}>
       <CardHeader className="pb-2">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
           <div>

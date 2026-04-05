@@ -186,6 +186,11 @@ function formatSignedPercent(value: number, digits = 0) {
   return `${value > 0 ? "+" : ""}${value.toFixed(digits)}%`;
 }
 
+function formatSignedDisplayCurrency(valueCad: number, context: DisplayContext) {
+  const absolute = formatDisplayCurrency(Math.abs(valueCad), context);
+  return `${valueCad >= 0 ? "+" : "-"}${absolute}`;
+}
+
 function round(value: number, digits = 0) {
   const factor = 10 ** digits;
   return Math.round(value * factor) / factor;
@@ -202,6 +207,30 @@ function getLatestMonthLabel(language: DisplayLanguage) {
 
 function sum(values: number[]) {
   return values.reduce((total, value) => total + value, 0);
+}
+
+function getAccountGainLossSummary(
+  holdings: HoldingPosition[],
+  display: DisplayContext,
+  language: DisplayLanguage
+) {
+  const holdingsWithCost = holdings.filter(
+    (holding) => holding.costBasisCad != null && Number.isFinite(holding.costBasisCad)
+  );
+  if (holdingsWithCost.length === 0) {
+    return pick(language, "成本待补", "Cost basis pending");
+  }
+
+  const knownMarketValueCad = sum(holdingsWithCost.map((holding) => holding.marketValueCad));
+  const knownCostBasisCad = sum(holdingsWithCost.map((holding) => holding.costBasisCad ?? 0));
+  const gainLossCad = knownMarketValueCad - knownCostBasisCad;
+  const amount = formatSignedDisplayCurrency(gainLossCad, display);
+
+  if (holdingsWithCost.length === holdings.length && knownCostBasisCad > 0) {
+    return `${amount} · ${formatSignedPercent((gainLossCad / knownCostBasisCad) * 100, 1)}`;
+  }
+
+  return amount;
 }
 
 function groupBy<T>(items: T[], getKey: (item: T) => string, getValue: (item: T) => number) {
@@ -810,6 +839,7 @@ export function buildDashboardData(args: {
         name: holding.name,
         account: instanceLabelMap.get(holding.accountId) ?? pick(language, "账户", "Account"),
         href: `/portfolio/holding/${holding.id}`,
+        securityHref: `/portfolio/security/${encodeURIComponent(holding.symbol)}`,
         lastPrice: formatHoldingPrice(holding.lastPriceAmount, holding.currency, holding.lastPriceCad, display, language),
         lastUpdated: formatHoldingLastUpdated(holding.updatedAt, language),
         freshnessVariant: getHoldingFreshnessVariant(holding.updatedAt),
@@ -907,6 +937,7 @@ export function buildPortfolioData(args: {
         institution: account.institution,
         currency: account.currency ?? "CAD",
         value: formatDisplayCurrency(account.marketValueCad, display),
+        gainLoss: getAccountGainLossSummary(accountHoldings, display, language),
         share: totalPortfolio > 0
           ? pick(language, `大约占整个组合 ${formatCompactPercent((account.marketValueCad / totalPortfolio) * 100, 0)}`, `About ${formatCompactPercent((account.marketValueCad / totalPortfolio) * 100, 0)} of the full portfolio`)
           : pick(language, "还没有资产", "No assets yet"),
@@ -1021,6 +1052,7 @@ export function buildPortfolioData(args: {
           accountType: accounts.find((account) => account.id === holding.accountId)?.type ?? "Taxable",
           account: instanceLabelMap.get(holding.accountId) ?? pick(language, "账户", "Account"),
           href: `/portfolio/holding/${holding.id}`,
+          securityHref: `/portfolio/security/${encodeURIComponent(holding.symbol)}`,
           quantity: formatHoldingQuantity(holding.quantity, language),
           avgCost: formatHoldingAmount(
             holding.avgCostPerShareAmount,
@@ -1095,6 +1127,7 @@ export function buildPortfolioAccountDetailData(args: {
       institution: accountCard.institution,
       currency: accountCard.currency,
       value: accountCard.value,
+      gainLoss: getAccountGainLossSummary(rawHoldings, display, language),
       portfolioShare: accountCard.share,
       room: accountCard.room,
       topHoldings: accountCard.topHoldings,

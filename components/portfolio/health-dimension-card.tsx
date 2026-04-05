@@ -46,16 +46,15 @@ export function HealthDimensionCard({
           </span>
         </div>
       </CardHeader>
-      <CardContent className="grid gap-4 xl:grid-cols-3">
-        <div className="space-y-3">
+      <CardContent className="grid gap-4 xl:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)]">
+        <div className="space-y-4">
           <p className="text-sm font-semibold text-[color:var(--foreground)]">{driversLabel}</p>
           {dimension.drivers.map((driver, index) => (
             <div key={`${dimension.id}-driver-${index}`} className="rounded-[24px] border border-white/55 bg-white/36 px-4 py-3 text-sm leading-7 text-[color:var(--muted-foreground)] backdrop-blur-md">
               {driver}
             </div>
           ))}
-        </div>
-        <div className="space-y-3">
+
           <p className="text-sm font-semibold text-[color:var(--foreground)]">{consequencesLabel}</p>
           {dimension.consequences.map((consequence, index) => (
             <div key={`${dimension.id}-consequence-${index}`} className="rounded-[24px] border border-[rgba(240,143,178,0.22)] bg-[linear-gradient(135deg,rgba(255,255,255,0.76),rgba(245,214,235,0.28),rgba(255,239,224,0.22))] px-4 py-3 text-sm leading-7 text-[color:var(--muted-foreground)] backdrop-blur-md">

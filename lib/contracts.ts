@@ -34,6 +34,7 @@ export interface DashboardData {
     name: string;
     account: string;
     href: string;
+    securityHref: string;
     lastPrice: string;
     lastUpdated: string;
     freshnessVariant: "success" | "warning" | "neutral";
@@ -78,6 +79,7 @@ export interface PortfolioData {
     institution: string;
     currency: string;
     value: string;
+    gainLoss: string;
     share: string;
     room: string;
     topHoldings: string[];
@@ -209,6 +211,7 @@ export interface PortfolioData {
     accountType: string;
     account: string;
     href: string;
+    securityHref: string;
     quantity: string;
     avgCost: string;
     value: string;
@@ -237,6 +240,7 @@ export interface PortfolioAccountDetailData {
     institution: string;
     currency: string;
     value: string;
+    gainLoss: string;
     portfolioShare: string;
       room: string;
       topHoldings: string[];

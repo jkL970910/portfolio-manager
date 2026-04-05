@@ -2811,6 +2811,136 @@ export async function refreshPortfolioQuotes(userId: string): Promise<RefreshPor
   };
 }
 
+export async function refreshPortfolioSecurityQuote(userId: string, symbol: string) {
+  const normalizedSymbol = symbol.trim().toUpperCase();
+  const db = getDb();
+  const repositories = getRepositories();
+  const holdings = (await repositories.holdings.listByUserId(userId)).filter(
+    (holding) => holding.symbol.trim().toUpperCase() === normalizedSymbol
+  );
+
+  const uniqueSymbols = [...new Map(
+    holdings
+      .map((holding) => ({
+        symbol: holding.symbol.trim().toUpperCase(),
+        exchange: holding.exchangeOverride?.trim() || null
+      }))
+      .filter((holding) => holding.symbol)
+      .map((holding) => [`${holding.symbol}::${holding.exchange ?? ""}`, holding])
+  ).values()];
+
+  if (uniqueSymbols.length === 0) {
+    const quote = await getSecurityQuote(normalizedSymbol).catch(() => null);
+
+    return {
+      symbol: normalizedSymbol,
+      matchedHoldingCount: 0,
+      refreshedHoldingCount: 0,
+      missingQuoteCount: quote?.result?.price && quote.result.price > 0 ? 0 : 1,
+      sampledSymbolCount: 1,
+      ambiguousHoldingCount: 0,
+      quoteFound: Boolean(quote?.result?.price && quote.result.price > 0),
+      quotePrice: quote?.result?.price && quote.result.price > 0 ? quote.result.price : null,
+      quoteCurrency: quote?.result?.currency ?? null,
+      refreshedAt: new Date().toISOString()
+    };
+  }
+
+  const { getBatchSecurityQuotes } = await import("@/lib/market-data/service");
+  const quoteResults = await getBatchSecurityQuotes(uniqueSymbols);
+  const quoteMap = new Map(
+    quoteResults.results
+      .filter((quote) => Number.isFinite(quote.price) && quote.price > 0)
+      .map((quote) => [`${quote.symbol.trim().toUpperCase()}::${quote.exchange?.trim() || ""}`, quote])
+  );
+
+  const refreshedAt = new Date();
+  let refreshedHoldingCount = 0;
+  const ambiguousQuoteKeys = new Set<string>();
+
+  await db.transaction(async (tx) => {
+    const currentHoldings = await tx
+      .select()
+      .from(holdingPositions)
+      .where(eq(holdingPositions.userId, userId));
+
+    for (const holding of currentHoldings) {
+      if (holding.symbol.trim().toUpperCase() !== normalizedSymbol) {
+        continue;
+      }
+
+      const quoteKey = `${holding.symbol.trim().toUpperCase()}::${holding.exchangeOverride?.trim() || ""}`;
+      const quote = quoteMap.get(quoteKey) ?? quoteMap.get(`${holding.symbol.trim().toUpperCase()}::`);
+      if (!quote) {
+        continue;
+      }
+
+      const holdingCurrency = normalizeCurrencyCode((holding.currency as string) || "CAD");
+      const quoteCurrency = normalizeCurrencyCode(quote.currency || holdingCurrency);
+      const hasExplicitExchangeOverride = Boolean(holding.exchangeOverride?.trim());
+      if (!hasExplicitExchangeOverride && holdingCurrency !== quoteCurrency) {
+        ambiguousQuoteKeys.add(quoteKey);
+        continue;
+      }
+
+      const nativePrice = quote.price;
+      const priceInCad = quoteCurrency === "CAD"
+        ? nativePrice
+        : await convertCurrencyAmount(nativePrice, quoteCurrency, "CAD");
+
+      const quantity = holding.quantity == null ? null : Number(holding.quantity);
+      const currentMarketValue = quantity != null && quantity > 0
+        ? round(
+            holdingCurrency === quoteCurrency
+              ? quantity * nativePrice
+              : quantity * (holding.lastPriceAmount == null ? nativePrice : Number(holding.lastPriceAmount))
+          )
+        : Number(holding.marketValueAmount ?? holding.marketValueCad);
+      const currentMarketValueCad = quantity != null && quantity > 0
+        ? round(quantity * priceInCad)
+        : Number(holding.marketValueCad);
+      const costBasis = holding.costBasisCad == null ? null : Number(holding.costBasisCad);
+      const gainLossPct = costBasis != null && costBasis > 0
+        ? round(((currentMarketValueCad - costBasis) / costBasis) * 100, 2)
+        : Number(holding.gainLossPct);
+
+      await tx
+        .update(holdingPositions)
+        .set({
+          currency: holdingCurrency,
+          lastPriceAmount: nativePrice.toFixed(4),
+          lastPriceCad: priceInCad.toFixed(4),
+          marketValueAmount: currentMarketValue.toFixed(2),
+          marketValueCad: currentMarketValueCad.toFixed(2),
+          gainLossPct: gainLossPct.toFixed(2),
+          updatedAt: refreshedAt
+        })
+        .where(eq(holdingPositions.id, holding.id));
+
+      refreshedHoldingCount += 1;
+    }
+
+    if (refreshedHoldingCount > 0) {
+      await recalculatePortfolioState(tx, userId);
+    }
+  });
+
+  const firstQuote = quoteResults.results.find((quote) => Number.isFinite(quote.price) && quote.price > 0) ?? null;
+
+  return {
+    symbol: normalizedSymbol,
+    matchedHoldingCount: holdings.length,
+    refreshedHoldingCount,
+    missingQuoteCount: uniqueSymbols.length - quoteMap.size + ambiguousQuoteKeys.size,
+    sampledSymbolCount: uniqueSymbols.length,
+    ambiguousHoldingCount: ambiguousQuoteKeys.size,
+    quoteFound: quoteMap.size > 0,
+    quotePrice: firstQuote?.price ?? null,
+    quoteCurrency: firstQuote?.currency ?? null,
+    refreshedAt: refreshedAt.toISOString()
+  };
+}
+
 export async function createRecommendationRun(userId: string, input: CreateRecommendationRunInput): Promise<RecommendationRun> {
   const repositories = getRepositories();
   const [user, accounts, holdings, profile] = await Promise.all([

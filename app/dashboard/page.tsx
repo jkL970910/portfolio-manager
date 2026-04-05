@@ -193,10 +193,9 @@ export default async function DashboardPage() {
             </CardHeader>
             <CardContent className="space-y-3">
               {data.topHoldings.map((holding) => (
-                <Link
+                <div
                   key={holding.id}
-                  href={holding.href}
-                  className="group flex items-center justify-between gap-4 rounded-[24px] border border-white/55 bg-white/36 p-4 backdrop-blur-md transition-[background-color,border-color,box-shadow,transform] duration-200 hover:-translate-y-0.5 hover:border-white/72 hover:bg-white/50 hover:shadow-[0_14px_28px_rgba(110,103,130,0.08)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--ring)]"
+                  className="flex items-center justify-between gap-4 rounded-[24px] border border-white/55 bg-white/36 p-4 backdrop-blur-md"
                 >
                   <div className="flex items-start gap-3">
                     <SecurityMark symbol={holding.symbol} />
@@ -207,7 +206,21 @@ export default async function DashboardPage() {
                           <span className="text-sm text-[color:var(--muted-foreground)]"> {holding.name}</span>
                         )}
                       </p>
-                      <p className="mt-1 text-xs font-medium text-[color:var(--primary)]">{pick(language, "点开详情", "Open detail")}</p>
+                      <div className="mt-1 flex flex-wrap items-center gap-2">
+                        <Link
+                          href={holding.href}
+                          className="group inline-flex items-center gap-1 rounded-full border border-white/72 bg-white/74 px-3 py-1.5 text-xs font-medium text-[color:var(--primary)] transition-[background-color,border-color,box-shadow] duration-200 hover:border-white hover:bg-white hover:shadow-[0_10px_20px_rgba(110,103,130,0.08)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--ring)]"
+                        >
+                          {pick(language, "持仓详情", "Holding detail")}
+                          <MoveUpRight className="h-3.5 w-3.5 transition-transform duration-200 group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
+                        </Link>
+                        <Link
+                          href={holding.securityHref}
+                          className="inline-flex items-center rounded-full border border-[rgba(240,143,178,0.35)] bg-[rgba(255,255,255,0.72)] px-3 py-1.5 text-xs font-medium text-[color:var(--foreground)] transition-[background-color,border-color] duration-200 hover:border-[rgba(240,143,178,0.55)] hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--ring)]"
+                        >
+                          {pick(language, "标的资料", "Security page")}
+                        </Link>
+                      </div>
                       <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-[color:var(--muted-foreground)]">
                         <span>{holding.account}</span>
                         <span>-</span>
@@ -227,9 +240,8 @@ export default async function DashboardPage() {
                     <p className="font-semibold">{holding.weight}</p>
                     <p className="text-sm text-[color:var(--muted-foreground)]">{pick(language, "约占整个组合", "Of total portfolio")}</p>
                     <p className="text-sm text-[color:var(--muted-foreground)]">{holding.value}</p>
-                    <MoveUpRight className="ml-auto mt-2 h-3.5 w-3.5 text-[color:var(--muted-foreground)] transition-transform duration-200 group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
                   </div>
-                </Link>
+                </div>
               ))}
             </CardContent>
           </Card>

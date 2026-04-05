@@ -6,6 +6,7 @@ import { getPortfolioHoldingDetailView } from "@/lib/backend/services";
 import { AppShell } from "@/components/layout/app-shell";
 import { StickyRail } from "@/components/layout/sticky-rail";
 import { LineChartCard } from "@/components/charts/line-chart";
+import { RefreshSecurityPricePanel } from "@/components/portfolio/refresh-security-price-panel";
 import { SecurityMark } from "@/components/portfolio/security-mark";
 import { HoldingEditPanel } from "@/components/portfolio/holding-edit-panel";
 import { Badge } from "@/components/ui/badge";
@@ -14,6 +15,18 @@ import { Card, CardContent } from "@/components/ui/card";
 import { SectionHeading } from "@/components/ui/section-heading";
 import { StatBlock } from "@/components/ui/stat-block";
 import { pick } from "@/lib/i18n/ui";
+
+function formatFreshnessLabel(language: "zh" | "en", variant: "success" | "warning" | "neutral") {
+  if (variant === "success") {
+    return pick(language, "较新", "Fresh");
+  }
+
+  if (variant === "warning") {
+    return pick(language, "偏旧", "Slightly stale");
+  }
+
+  return pick(language, "未知", "Unknown");
+}
 
 function localizeSecurityType(value: string, language: "zh" | "en") {
   const labels: Record<string, { zh: string; en: string }> = {
@@ -181,6 +194,14 @@ export default async function PortfolioHoldingDetailPage({
         </div>
 
         <StickyRail>
+          <RefreshSecurityPricePanel
+            compact
+            language={language}
+            symbol={detail.holding.symbol}
+            lastRefreshed={detail.holding.lastUpdated}
+            freshness={formatFreshnessLabel(language, detail.holding.freshnessVariant)}
+          />
+
           <HoldingEditPanel detail={detail} language={language} />
 
           <Card>

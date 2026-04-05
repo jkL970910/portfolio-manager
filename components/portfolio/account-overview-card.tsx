@@ -14,6 +14,7 @@ type AccountOverviewCardProps = {
   institution: string;
   currency: string;
   value: string;
+  gainLoss: string;
   share: string;
   room: string;
   topHoldings: string[];
@@ -30,6 +31,7 @@ export function AccountOverviewCard({
   institution,
   currency,
   value,
+  gainLoss,
   share,
   room,
   topHoldings,
@@ -104,6 +106,7 @@ export function AccountOverviewCard({
               <div className="rounded-[20px] border border-white/55 bg-white/40 p-4 text-right">
                 <p className="text-xs uppercase tracking-[0.18em] text-[color:var(--muted-foreground)]">{pick(language, '当前总值', 'Current value')}</p>
                 <p className="mt-2 text-2xl font-semibold text-[color:var(--foreground)]">{value}</p>
+                <p className="mt-1 text-sm font-medium text-[color:var(--muted-foreground)]">{gainLoss}</p>
                 <p className="mt-1 text-sm text-[color:var(--muted-foreground)]">{share}</p>
               </div>
               <div

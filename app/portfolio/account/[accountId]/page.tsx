@@ -51,58 +51,58 @@ export default async function PortfolioAccountDetailPage({
           </div>
         </div>
 
-        <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px] xl:items-start">
-          <Card className="bg-white/34">
-            <CardContent className="min-w-0 space-y-5 px-5 py-5">
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <div className="flex flex-wrap items-center gap-3">
-                    <h2 className="text-[24px] font-semibold tracking-tight text-[color:var(--foreground)] sm:text-[28px]">
-                      {detail.account.name}
-                    </h2>
-                    <div className="flex flex-wrap items-center gap-2 text-xs text-[color:var(--muted-foreground)]">
-                      <span className="inline-flex rounded-full border border-white/60 bg-white/48 px-3 py-1 font-medium text-[color:var(--foreground)]">
-                        {detail.account.typeLabel}
-                      </span>
-                      <span className="inline-flex rounded-full border border-white/60 bg-white/44 px-3 py-1">
-                        {detail.account.currency}
-                      </span>
-                      <span className="inline-flex rounded-full border border-white/60 bg-white/44 px-3 py-1">
-                        {detail.account.institution}
-                      </span>
-                    </div>
+        <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_320px] xl:items-stretch">
+          <Card className="h-full bg-white/34">
+            <CardContent className="flex h-full min-w-0 flex-col gap-5 px-5 py-5">
+              <div className="space-y-3">
+                <div className="flex flex-wrap items-center gap-3">
+                  <h2 className="text-[24px] font-semibold tracking-tight text-[color:var(--foreground)] sm:text-[28px]">
+                    {detail.account.name}
+                  </h2>
+                  <div className="flex flex-wrap items-center gap-2 text-xs text-[color:var(--muted-foreground)]">
+                    <span className="inline-flex rounded-full border border-white/60 bg-white/48 px-3 py-1 font-medium text-[color:var(--foreground)]">
+                      {detail.account.typeLabel}
+                    </span>
+                    <span className="inline-flex rounded-full border border-white/60 bg-white/44 px-3 py-1">
+                      {detail.account.currency}
+                    </span>
+                    <span className="inline-flex rounded-full border border-white/60 bg-white/44 px-3 py-1">
+                      {detail.account.institution}
+                    </span>
                   </div>
-                  <p className="text-sm leading-6 text-[color:var(--muted-foreground)]">
-                    {pick(
-                      language,
-                      detail.account.topHoldings.length > 0
-                        ? `先看这个账户近 6 个月怎么走，再确认主仓是不是已经压得太重。现在最显眼的是 ${detail.account.topHoldings.join(" · ")}。`
-                        : "先看这个账户近 6 个月怎么走，再确认现在的钱主要压在哪一类资产里。",
-                      detail.account.topHoldings.length > 0
-                        ? `Start with the 6-month trend, then check whether the main positions are already too concentrated. Most visible: ${detail.account.topHoldings.join(" · ")}.`
-                        : "Start with the 6-month trend, then check which sleeves currently dominate this account."
-                    )}
-                  </p>
                 </div>
+                {detail.account.topHoldings.length > 0 ? (
+                  <div className="rounded-[18px] border border-white/55 bg-white/34 px-4 py-3 text-sm text-[color:var(--muted-foreground)] backdrop-blur-md">
+                    <span className="font-medium text-[color:var(--foreground)]">{pick(language, "主要持仓", "Main holdings")}</span>
+                    <span className="ml-2">{detail.account.topHoldings.join(" · ")}</span>
+                  </div>
+                ) : null}
               </div>
-              <LineChartCard
+              <div className="min-h-0 flex-1">
+                <LineChartCard
                 title={pick(language, `${detail.account.name} 近 6 个月大概怎么走`, `How ${detail.account.name} has moved over the last 6 months`)}
                 description={pick(language, "这里只看这个账户自己的走势。", "This trend looks only at the account itself.")}
                 data={detail.performance}
                 dataKey="value"
                 color="#152238"
-              />
+                />
+              </div>
             </CardContent>
           </Card>
-          <div className="space-y-4">
+          <div className="grid h-full grid-rows-[auto_minmax(0,1fr)] gap-4">
             <Card className="bg-white/34">
               <CardContent className="space-y-3 p-4">
                 <div className="grid gap-3 sm:grid-cols-2">
-                  <CompactMetric icon={<Wallet className="h-4 w-4" />} label={pick(language, "当前账户总值", "Current account value")} value={detail.account.value} />
+                  <CompactMetric
+                    icon={<Wallet className="h-4 w-4" />}
+                    label={pick(language, "当前账户总值", "Current account value")}
+                    value={detail.account.value}
+                    detail={compactPortfolioShare(detail.account.portfolioShare)}
+                  />
                   <CompactMetric
                     icon={<CircleGauge className="h-4 w-4" />}
-                    label={pick(language, "占整个组合", "Of portfolio")}
-                    value={compactPortfolioShare(detail.account.portfolioShare)}
+                    label={pick(language, "账户总盈亏", "Account gain/loss")}
+                    value={detail.account.gainLoss}
                   />
                   <CompactMetric icon={<Wallet className="h-4 w-4" />} label={pick(language, "账户币种", "Account currency")} value={detail.account.currency} />
                   <CompactMetric
@@ -114,15 +114,16 @@ export default async function PortfolioAccountDetailPage({
               </CardContent>
             </Card>
             <DonutChartCard
+              className="h-full bg-white/34"
               title={pick(language, "账户内资产分布", "Allocation inside this account")}
               data={detail.allocation}
               noDataText={pick(language, "这个账户里还没有足够的持仓数据。", "There is not enough holding data inside this account yet.")}
               legendMode="side"
               legendMaxItems={5}
-              chartHeight={148}
-              chartMaxWidth={156}
-              innerRadius={36}
-              outerRadius={56}
+              chartHeight={118}
+              chartMaxWidth={124}
+              innerRadius={28}
+              outerRadius={44}
             />
           </div>
         </div>
@@ -205,11 +206,13 @@ export default async function PortfolioAccountDetailPage({
 function CompactMetric({
   icon,
   label,
-  value
+  value,
+  detail
 }: {
   icon: React.ReactNode;
   label: string;
   value: string;
+  detail?: string;
 }) {
   return (
     <div className="rounded-[20px] border border-white/55 bg-white/40 p-4 backdrop-blur-md">
@@ -218,6 +221,7 @@ function CompactMetric({
         {label}
       </div>
       <p className="mt-3 text-[18px] leading-8 font-semibold text-[color:var(--foreground)]">{value}</p>
+      {detail ? <p className="mt-1 text-sm text-[color:var(--muted-foreground)]">{detail}</p> : null}
     </div>
   );
 }

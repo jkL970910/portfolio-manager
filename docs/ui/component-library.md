@@ -278,6 +278,8 @@ components/
   - explicit locked-state pill when the row is the active account context
   - separate holdings-jump action
   - dedicated account-detail entry point
+  - compact gain/loss line directly beneath the current account value
+  - share-of-portfolio shown as lighter helper text instead of competing with the main value
   - action buttons must stop event bubbling so row-level context toggling does not swallow detail navigation
 
 ### `HoldingTable`
@@ -285,8 +287,8 @@ components/
 - File: [holding-table.tsx](E:\Projects\Portfolio%20Manager\components\portfolio\holding-table.tsx)
 - Purpose: detailed holdings table used in portfolio and account detail surfaces
 - Supports:
-  - deep-link entry into holding detail from the full symbol block (icon + symbol + name)
-  - hover lift / inline affordance so users can tell a holding row leads to detail
+  - split entry points so the symbol area clearly offers both `持仓详情 / Holding detail` and `标的资料 / Security page`
+  - inline affordances that make the two detail paths discoverable without turning the full row into a dense set of competing buttons
   - compact account-detail mode that hides the redundant account column and tightens widths so the sticky rail does not clip the final columns
   - filtered / highlighted states
   - explicit display of total shares, average cost, and current value
@@ -366,6 +368,17 @@ components/
   - first fold should show only a short summary plus the most useful quote facts
   - longer quote notes should live behind a collapsible panel
   - avoid turning this section into another tall explanatory stack that competes with the holding overview
+  - single-security refresh must be visible in the first fold of holding detail
+  - in holding detail it should sit as the first card in the right summary rail, directly above the holding edit panel
+
+### `RefreshSecurityPricePanel`
+
+- File: [refresh-security-price-panel.tsx](E:\Projects\Portfolio%20Manager\components\portfolio\refresh-security-price-panel.tsx)
+- Purpose: refresh one symbol without re-running the full portfolio refresh
+- Rules:
+  - support a compact rail variant for narrow right-side summary stacks
+  - compact mode should still show symbol, cached quote time, freshness, action button, and success/error feedback
+  - avoid using the full-width layout inside detail pages once a stable right rail exists
 
 ### `PortfolioSecurityDetailPage`
 
@@ -378,6 +391,7 @@ components/
   - right compact metrics grid
   - no repeated ratio/fact cards immediately below that restate the same numbers
 - should show a reference trend, identity facts, quote-source facts, and any related holdings already inside the portfolio
+- the single-security refresh action should be visible in the first fold as the first card in the right summary rail, above the candidate-evaluation block
 
 ### Detail Overview Pattern
 
@@ -391,6 +405,13 @@ components/
   - right side carries compact metrics and summary-only support
   - on account detail, the account-internal donut belongs in the right-side summary stack rather than as a large full-width block below
   - the account-detail donut in the right-side stack should use the compact donut size and avoid redundant helper text beneath it
+  - account detail should keep both first-fold columns visually balanced: make the left overview card full-height and keep the right summary rail narrow enough that compact metrics read as short values such as `48%` or `CAD $50,000`
+  - on account detail, the first-fold metric order should be:
+    - current account value
+    - account gain/loss
+    - account currency
+    - available room
+  - share of total portfolio belongs under the current account value as helper copy, not as a separate equal-weight metric card
   - do not repeat ratio, gain/loss, or “what to look at first” facts immediately below if they already appear in the first fold
   - keep the title row consistent: title on the left, key pills directly on the right, subtitle only when it adds new information
   - right side carries only compact metrics
@@ -425,6 +446,13 @@ components/
 - Purpose: trend charts inside analytical cards
 
 ### `DonutChartCard`
+- File: [donut-chart.tsx](E:\Projects\Portfolio%20Manager\components\charts\donut-chart.tsx)
+- Purpose: shared donut chart shell for both main-column and right-rail summary use
+- Supports:
+  - optional compact side legend
+  - fixed-width donut container in narrow rails
+  - optional helper text
+  - optional `className` so page-level layouts can stretch summary donuts to fill a right-rail slot
 
 - File: [donut-chart.tsx](E:\Projects\Portfolio%20Manager\components\charts\donut-chart.tsx)
 - Purpose: shared donut chart shell for allocation summaries
@@ -515,6 +543,10 @@ components/
   - account drill-down is grouped by account type, not by individual account nickname
   - each drill-down card can deep-link back into `/portfolio`, where the matching rows should remain visually highlighted
   - supports a card-level contribution amount switcher so the user can compare which dimension would improve first under different next-contribution sizes
+- [app/portfolio/health/page.tsx](E:\Projects\Portfolio%20Manager\app\portfolio\health\page.tsx)
+- health detail pages should use a compact overview card beside the radar card, followed by a short action/highlights row, then full-width dimension cards and single-column drill-down sections
+  - avoid separate top hero columns that leave empty space beneath a shorter left summary
+  - keep the second row linear rather than split into mismatched columns: first a full-width action queue, then a full-width reminders / recommendation handoff card, followed by a full-width dimension stack
 
 ### Recommendations
 

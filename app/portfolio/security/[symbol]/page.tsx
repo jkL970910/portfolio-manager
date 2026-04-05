@@ -6,6 +6,7 @@ import { getPortfolioSecurityDetailView } from "@/lib/backend/services";
 import { AppShell } from "@/components/layout/app-shell";
 import { StickyRail } from "@/components/layout/sticky-rail";
 import { LineChartCard } from "@/components/charts/line-chart";
+import { RefreshSecurityPricePanel } from "@/components/portfolio/refresh-security-price-panel";
 import { SecurityMark } from "@/components/portfolio/security-mark";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -161,8 +162,17 @@ export default async function PortfolioSecurityDetailPage({
         </div>
 
         <StickyRail>
-          <Card>
-            <CardContent className="space-y-4 px-6 py-6">
+          <RefreshSecurityPricePanel
+            compact
+            language={language}
+            symbol={detail.security.symbol}
+            lastRefreshed={detail.security.quoteTimestamp}
+            freshness={formatFreshnessLabel(language, detail.security.freshnessVariant)}
+          />
+
+          <div className="space-y-4">
+            <Card>
+              <CardContent className="space-y-4 px-6 py-6">
               <p className="text-sm font-semibold text-[color:var(--foreground)]">{pick(language, "如果你把它当候选标的来看", "If you are evaluating it as a candidate")}</p>
               <div className="rounded-[24px] border border-white/55 bg-white/36 p-4 text-sm leading-7 text-[color:var(--muted-foreground)] backdrop-blur-md">
                 {detail.marketData.summary}
@@ -178,12 +188,25 @@ export default async function PortfolioSecurityDetailPage({
               <Button href="/portfolio" className="w-full" trailingIcon={<ArrowRight className="h-4 w-4" />}>
                 {pick(language, "回组合页继续看整体", "Back to portfolio")}
               </Button>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+          </div>
         </StickyRail>
       </div>
     </AppShell>
   );
+}
+
+function formatFreshnessLabel(language: "zh" | "en", variant: "success" | "warning" | "neutral") {
+  if (variant === "success") {
+    return pick(language, "较新", "Fresh");
+  }
+
+  if (variant === "warning") {
+    return pick(language, "偏旧", "Slightly stale");
+  }
+
+  return pick(language, "未知", "Unknown");
 }
 
 function compactMetricValue(value: string) {

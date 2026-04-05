@@ -78,24 +78,34 @@ export function HoldingTable({
               ].join(" ")}
             >
               <div className="space-y-3">
-                <Link
-                  href={holding.href}
-                  className="group flex items-start gap-3 rounded-[22px] border border-white/60 bg-white/48 px-4 py-3 transition-[background-color,border-color,box-shadow] duration-200 hover:border-white/78 hover:bg-white/64 hover:shadow-[0_12px_28px_rgba(110,103,130,0.08)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--ring)]"
-                >
-                  <SecurityMark symbol={holding.symbol} assetClass={holding.assetClass} className="h-11 w-11 rounded-[14px] text-[13px]" />
-                  <div className="min-w-0 space-y-1">
-                    <div className="flex items-start gap-2">
+                <div className="rounded-[22px] border border-white/60 bg-white/48 px-4 py-3">
+                  <div className="flex items-start gap-3">
+                    <SecurityMark symbol={holding.symbol} assetClass={holding.assetClass} className="h-11 w-11 rounded-[14px] text-[13px]" />
+                    <div className="min-w-0 space-y-2">
                       <div className="min-w-0">
                         <p className="truncate text-[20px] leading-none font-semibold tracking-[-0.03em] text-[color:var(--foreground)] sm:text-[22px]">
                           {holding.symbol}
                         </p>
                         {securityName ? <p className="mt-1 truncate text-sm text-[color:var(--muted-foreground)]">{securityName}</p> : null}
                       </div>
-                      <ArrowUpRight className="mt-1 h-4 w-4 shrink-0 text-[color:var(--muted-foreground)] transition-transform duration-200 group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Link
+                          href={holding.href}
+                          className="group inline-flex items-center gap-1 rounded-full border border-white/72 bg-white/74 px-3 py-1.5 text-xs font-medium text-[color:var(--primary)] transition-[background-color,border-color,box-shadow] duration-200 hover:border-white hover:bg-white hover:shadow-[0_10px_20px_rgba(110,103,130,0.08)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--ring)]"
+                        >
+                          {pick(language, "持仓详情", "Holding detail")}
+                          <ArrowUpRight className="h-3.5 w-3.5 transition-transform duration-200 group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
+                        </Link>
+                        <Link
+                          href={holding.securityHref}
+                          className="inline-flex items-center rounded-full border border-[rgba(240,143,178,0.35)] bg-[rgba(255,255,255,0.72)] px-3 py-1.5 text-xs font-medium text-[color:var(--foreground)] transition-[background-color,border-color] duration-200 hover:border-[rgba(240,143,178,0.55)] hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--ring)]"
+                        >
+                          {pick(language, "标的资料", "Security page")}
+                        </Link>
+                      </div>
                     </div>
-                    <p className="text-xs font-medium text-[color:var(--primary)]">{pick(language, "点开详情", "Open detail")}</p>
                   </div>
-                </Link>
+                </div>
                 {holding.highlighted && holding.highlightLabel ? <Badge variant="primary">{holding.highlightLabel}</Badge> : null}
               </div>
 
