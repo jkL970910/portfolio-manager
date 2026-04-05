@@ -35,7 +35,7 @@ import {
   buildSettingsData,
   buildSpendingData
 } from "@/lib/backend/view-builders";
-import { buildRecommendationV2 } from "@/lib/backend/recommendation-v2";
+import { buildRecommendationV2, scoreCandidateSecurity } from "@/lib/backend/recommendation-v2";
 import { getDb } from "@/lib/db/client";
 import {
   allocationTargets,
@@ -205,6 +205,14 @@ export interface RefreshPortfolioQuotesResult {
 
 export interface CreateRecommendationRunInput {
   contributionAmountCad: number;
+}
+
+export interface ScoreCandidateSecurityInput {
+  symbol: string;
+  name?: string;
+  currency?: CurrencyCode;
+  assetClass?: string;
+  securityType?: string | null;
 }
 
 export interface SaveImportMappingPresetInput {
@@ -2100,6 +2108,58 @@ export async function updatePreferenceProfile(userId: string, input: PreferenceP
   });
 }
 
+export async function addWatchlistSymbol(userId: string, symbol: string): Promise<PreferenceProfile> {
+  const normalizedSymbol = symbol.trim().toUpperCase();
+  if (!normalizedSymbol) {
+    throw new Error("Watchlist symbol is required.");
+  }
+
+  const repositories = getRepositories();
+  const profile = await repositories.preferences.getByUserId(userId);
+  if (profile.watchlistSymbols.includes(normalizedSymbol)) {
+    return profile;
+  }
+
+  return updatePreferenceProfile(userId, {
+    riskProfile: profile.riskProfile,
+    targetAllocation: profile.targetAllocation,
+    accountFundingPriority: profile.accountFundingPriority,
+    taxAwarePlacement: profile.taxAwarePlacement,
+    cashBufferTargetCad: profile.cashBufferTargetCad,
+    transitionPreference: profile.transitionPreference,
+    recommendationStrategy: profile.recommendationStrategy,
+    source: profile.source ?? "manual",
+    rebalancingTolerancePct: profile.rebalancingTolerancePct,
+    watchlistSymbols: [...profile.watchlistSymbols, normalizedSymbol].slice(0, 20)
+  });
+}
+
+export async function removeWatchlistSymbol(userId: string, symbol: string): Promise<PreferenceProfile> {
+  const normalizedSymbol = symbol.trim().toUpperCase();
+  if (!normalizedSymbol) {
+    throw new Error("Watchlist symbol is required.");
+  }
+
+  const repositories = getRepositories();
+  const profile = await repositories.preferences.getByUserId(userId);
+  if (!profile.watchlistSymbols.includes(normalizedSymbol)) {
+    return profile;
+  }
+
+  return updatePreferenceProfile(userId, {
+    riskProfile: profile.riskProfile,
+    targetAllocation: profile.targetAllocation,
+    accountFundingPriority: profile.accountFundingPriority,
+    taxAwarePlacement: profile.taxAwarePlacement,
+    cashBufferTargetCad: profile.cashBufferTargetCad,
+    transitionPreference: profile.transitionPreference,
+    recommendationStrategy: profile.recommendationStrategy,
+    source: profile.source ?? "manual",
+    rebalancingTolerancePct: profile.rebalancingTolerancePct,
+    watchlistSymbols: profile.watchlistSymbols.filter((entry) => entry !== normalizedSymbol)
+  });
+}
+
 export async function registerUserWithCitizenProfile(input: RegisterUserInput): Promise<{
   user: UserProfile;
   citizenProfile: CitizenProfile;
@@ -2180,6 +2240,26 @@ export async function registerUserWithCitizenProfile(input: RegisterUserInput): 
     user,
     citizenProfile
   };
+}
+
+export async function scoreCandidateSecurityForUser(userId: string, input: ScoreCandidateSecurityInput) {
+  const repositories = getRepositories();
+  const [user, accounts, holdings, profile] = await Promise.all([
+    repositories.users.getById(userId),
+    repositories.accounts.listByUserId(userId),
+    repositories.holdings.listByUserId(userId),
+    repositories.preferences.getByUserId(userId)
+  ]);
+
+  return apiSuccess({
+    scorecard: scoreCandidateSecurity({
+      accounts,
+      holdings,
+      profile,
+      language: user.displayLanguage,
+      candidate: input
+    })
+  }, "database");
 }
 
 export async function registerUserAccount(input: RegisterUserInput): Promise<UserProfile> {

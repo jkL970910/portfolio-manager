@@ -51,6 +51,34 @@ type FxPolicy = {
   preferredTradingCurrency: "CAD" | "USD" | "mixed";
 };
 
+export type CandidateSecurityScoreInput = {
+  symbol: string;
+  name?: string;
+  currency?: CurrencyCode;
+  assetClass?: string;
+  securityType?: string | null;
+};
+
+export type CandidateSecurityScoreResult = {
+  symbol: string;
+  name: string;
+  assetClass: string;
+  assetClassSource: "explicit" | "existing-holding" | "known-universe" | "heuristic";
+  currency: CurrencyCode;
+  score: number;
+  verdict: "strong" | "watch" | "weak";
+  watchlistMatched: boolean;
+  selectedAccountType: AccountType;
+  selectedAccountName: string;
+  accountFitScore: number;
+  taxFitScore: number;
+  securityScore: number;
+  fxPenaltyBps: number;
+  summary: string;
+  drivers: string[];
+  warnings: string[];
+};
+
 type AccountScore = {
   account: InvestmentAccount;
   accountFitScore: number;
@@ -236,6 +264,29 @@ function buildSecurityUniverse(assetClass: string) {
   ];
 }
 
+function buildKnownUniverseLookup() {
+  return Object.values(SECURITY_UNIVERSE)
+    .flat()
+    .reduce<Map<string, SecurityCandidate>>((map, candidate) => {
+      map.set(candidate.symbol.toUpperCase(), candidate);
+      return map;
+    }, new Map());
+}
+
+function inferAssetClassFromSecurityType(securityType: string | null | undefined, currency: CurrencyCode | undefined) {
+  const normalizedType = (securityType ?? "").toLowerCase();
+  if (normalizedType.includes("bond")) {
+    return "Fixed Income";
+  }
+  if (normalizedType.includes("commodity")) {
+    return "Cash";
+  }
+  if (normalizedType.includes("crypto")) {
+    return currency === "USD" ? "US Equity" : "Canadian Equity";
+  }
+  return currency === "USD" ? "US Equity" : "Canadian Equity";
+}
+
 function buildRunNotes(profile: PreferenceProfile, fxPolicy: FxPolicy, language: DisplayLanguage) {
   return [
     pick(
@@ -398,5 +449,100 @@ export function buildRecommendationV2(args: {
 
 export function getAccountPlacementMatrix() {
   return ACCOUNT_FIT_MATRIX;
+}
+
+export function scoreCandidateSecurity(args: {
+  accounts: InvestmentAccount[];
+  holdings: HoldingPosition[];
+  profile: PreferenceProfile;
+  language: DisplayLanguage;
+  candidate: CandidateSecurityScoreInput;
+}): CandidateSecurityScoreResult {
+  const { accounts, holdings, profile, language, candidate } = args;
+  const normalizedSymbol = candidate.symbol.trim().toUpperCase();
+  const knownUniverse = buildKnownUniverseLookup();
+  const existingHolding = holdings.find((holding) => holding.symbol.trim().toUpperCase() === normalizedSymbol);
+  const knownCandidate = knownUniverse.get(normalizedSymbol);
+  const assetClass = candidate.assetClass
+    ?? existingHolding?.assetClass
+    ?? knownCandidate?.assetClass
+    ?? inferAssetClassFromSecurityType(candidate.securityType, candidate.currency ?? knownCandidate?.currency ?? existingHolding?.currency ?? "CAD");
+  const assetClassSource: CandidateSecurityScoreResult["assetClassSource"] = candidate.assetClass
+    ? "explicit"
+    : existingHolding
+      ? "existing-holding"
+      : knownCandidate
+        ? "known-universe"
+        : "heuristic";
+  const securityCandidate: SecurityCandidate = {
+    symbol: normalizedSymbol,
+    name: candidate.name?.trim() || knownCandidate?.name || existingHolding?.name || normalizedSymbol,
+    assetClass,
+    currency: candidate.currency ?? knownCandidate?.currency ?? existingHolding?.currency ?? "CAD",
+    expenseBps: knownCandidate?.expenseBps ?? 18,
+    liquidityScore: knownCandidate?.liquidityScore ?? 72,
+    tags: knownCandidate?.tags ?? ["manual-candidate"]
+  };
+  const fxPolicy = inferFxPolicy(accounts, holdings);
+  const placement = scoreAccountPlacement(accounts, profile, assetClass, securityCandidate.currency, fxPolicy);
+  const security = scoreSecurityCandidate(securityCandidate, assetClass, placement.account, holdings, profile, fxPolicy);
+  const score = round(((placement.accountFitScore * 100) + (placement.taxFitScore * 100) + security.score) / 3, 1);
+  const verdict: CandidateSecurityScoreResult["verdict"] = score >= 80 ? "strong" : score >= 62 ? "watch" : "weak";
+
+  return {
+    symbol: normalizedSymbol,
+    name: securityCandidate.name,
+    assetClass,
+    assetClassSource,
+    currency: securityCandidate.currency,
+    score,
+    verdict,
+    watchlistMatched: profile.watchlistSymbols.includes(normalizedSymbol),
+    selectedAccountType: placement.account.type,
+    selectedAccountName: placement.account.nickname || placement.account.institution || placement.account.type,
+    accountFitScore: round(placement.accountFitScore * 100, 1),
+    taxFitScore: round(placement.taxFitScore * 100, 1),
+    securityScore: security.score,
+    fxPenaltyBps: security.fxPenaltyBps,
+    summary: pick(
+      language,
+      score >= 80
+        ? `${normalizedSymbol} 目前看起来是比较顺手的候选，账户放置、税务位置和标的匹配都比较稳。`
+        : score >= 62
+          ? `${normalizedSymbol} 可以继续观察，但还需要结合账户位置、换汇成本或资产类别判断。`
+          : `${normalizedSymbol} 现在还不是特别顺手，更像需要额外确认的候选。`,
+      score >= 80
+        ? `${normalizedSymbol} currently looks like a strong candidate, with supportive account placement, tax fit, and security fit.`
+        : score >= 62
+          ? `${normalizedSymbol} is worth keeping on the list, but it still needs account, FX, or sleeve-fit review.`
+          : `${normalizedSymbol} does not look especially natural yet and needs extra review before it earns conviction.`
+    ),
+    drivers: [
+      pick(
+        language,
+        `当前最顺手的账户落点是 ${getAccountTypeLabel(placement.account.type, language)}，账户匹配大约 ${round(placement.accountFitScore * 100, 0)}/100。`,
+        `The smoothest account home right now is ${getAccountTypeLabel(placement.account.type, language)}, with account fit around ${round(placement.accountFitScore * 100, 0)}/100.`
+      ),
+      pick(
+        language,
+        `这支标的本身的候选分大约 ${security.score.toFixed(0)}/100。`,
+        `The security itself scores about ${security.score.toFixed(0)}/100 as a candidate.`
+      ),
+      profile.watchlistSymbols.includes(normalizedSymbol)
+        ? pick(language, "它已经在你的观察列表里，所以引擎会给它一点额外加分。", "It is already on your watchlist, so the engine gives it a small watchlist bonus.")
+        : pick(language, "它现在还不在你的观察列表里，所以没有拿到观察列表加分。", "It is not currently on your watchlist, so it gets no watchlist bonus.")
+    ],
+    warnings: [
+      ...(assetClassSource === "heuristic"
+        ? [pick(language, "这支标的的资产类别是系统按币种和类型推出来的，最好再人工确认一次。", "The asset sleeve for this symbol was inferred heuristically, so it should be confirmed manually.")]
+        : []),
+      ...(security.fxPenaltyBps > 0
+        ? [pick(language, `如果按当前最优账户去放，大约会承受 ${security.fxPenaltyBps} bps 的换汇摩擦。`, `The current best account path still carries about ${security.fxPenaltyBps} bps of FX friction.`)]
+        : []),
+      ...(existingHolding && existingHolding.weightPct >= 12
+        ? [pick(language, `${normalizedSymbol} 已经在组合里占比较重，继续加之前要额外看集中度。`, `${normalizedSymbol} is already a relatively heavy position, so concentration needs another check before adding more.`)]
+        : [])
+    ]
+  };
 }
 

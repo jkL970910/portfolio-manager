@@ -23,6 +23,7 @@ export function TopNav({
   const navItems = [
     { href: "/dashboard", label: language === "zh" ? "总览" : "Dashboard" },
     { href: "/portfolio", label: language === "zh" ? "组合" : "Portfolio" },
+    { href: "/discover", label: language === "zh" ? "发现" : "Discover" },
     { href: "/recommendations", label: language === "zh" ? "推荐" : "Recommendations" },
     { href: "/spending", label: language === "zh" ? "消费" : "Spending" },
     { href: "/import", label: language === "zh" ? "导入" : "Import" },

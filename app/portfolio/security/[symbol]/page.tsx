@@ -2,7 +2,7 @@ import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireViewer } from "@/lib/auth/session";
-import { getPortfolioSecurityDetailView } from "@/lib/backend/services";
+import { getPortfolioSecurityDetailView, getPreferenceView } from "@/lib/backend/services";
 import { AppShell } from "@/components/layout/app-shell";
 import { UnifiedSecurityDetail } from "@/components/portfolio/unified-security-detail";
 import { Button } from "@/components/ui/button";
@@ -19,7 +19,10 @@ export default async function PortfolioSecurityDetailPage({
   const language = viewer.displayLanguage;
   const { symbol } = await params;
   const filters = (await searchParams) ?? {};
-  const response = await getPortfolioSecurityDetailView(viewer.id, decodeURIComponent(symbol));
+  const [response, preferences] = await Promise.all([
+    getPortfolioSecurityDetailView(viewer.id, decodeURIComponent(symbol)),
+    getPreferenceView(viewer.id)
+  ]);
   const detail = response.data.data;
 
   if (!detail) {
@@ -53,6 +56,7 @@ export default async function PortfolioSecurityDetailPage({
         language={language}
         initialAccountId={filters.account ?? null}
         initialHoldingId={filters.holding ?? null}
+        initialTracked={preferences.data.profile.watchlistSymbols.includes(detail.security.symbol.trim().toUpperCase())}
       />
     </AppShell>
   );

@@ -105,7 +105,7 @@ Current delivery status:
 - the unified symbol page now includes:
   - candidate-security mode when the symbol is not yet held
   - aggregate held-position mode when the symbol is already held
-  - compact first-fold account selection that reveals the full held-position review / edit / refresh stack for one account
+  - compact metric-rail account selection that reveals the full held-position review / edit / refresh stack for one account
   - an additional holding-row selector when one account contains multiple rows for the same symbol
   - security identity facts
   - quote-source facts
@@ -185,9 +185,15 @@ Scope:
 - security price history
 - portfolio snapshots
 - real portfolio/account/holding historical value series
+- security discovery page for arbitrary symbol lookup
+- watchlist add/remove flow from search results and unified symbol pages
+- candidate-security scoring flow for watchlist items or user-selected securities
+- recommendation-engine extension that can score arbitrary candidate symbols, not only the engine's default lead ideas
 
 User value:
 - Dashboard and Portfolio performance charts finally follow the real portfolio
+- user can search any symbol, save it to a watchlist, and evaluate whether it is investable before buying
+- recommendation logic becomes usable as a decision-support lens for user-selected ideas, not only system-generated ones
 
 ## Recommended execution order
 

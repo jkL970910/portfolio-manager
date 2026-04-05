@@ -88,7 +88,7 @@ Help a self-directed investor:
 | Rank | Feature | Priority | Why now |
 |---|---|---|---|
 | 1 | Real historical performance | P1 | Snapshot-backed portfolio and account trends are now wired in, but holding/security history still needs event replay plus price history. |
-| 2 | Richer import review persistence | P1 | Import review is functional, but corrections are still too session-bound and light. |
+| 2 | Security discovery and candidate scoring | P1 | The recommendation engine already computes security-fit signals, but users still cannot search arbitrary symbols, save them, or ask the engine to score a self-directed candidate. |
 | 3 | Richer import review persistence | P1 | Import review is functional, but corrections are still too session-bound and light. |
 | 4 | Watchlist and target constraints workflow | P1 | Preference storage exists, but the UX and recommendation impact are still too shallow. |
 | 5 | Cloud-ready cache / worker boundaries | P1 | Current market-data cache is process-local and import/recommendation work is still synchronous. |
@@ -124,6 +124,7 @@ Help a self-directed investor:
 | Account detail and holding detail surfaces | Completed | 5 | 4 | 3 | 5 | Keep stable |
 | Account and holding edit workflows | Completed | 5 | 4 | 4 | 5 | Phase 3 baseline is now live, including unified account maintenance, add-holding, holding delete, merge preview/confirm, and classification repair |
 | Real historical performance | In Progress | 5 | 5 | 4 | 5 | Snapshot-backed portfolio/account trends are live; continue with events and security price history |
+| Security discovery and candidate scoring | In Progress | 4 | 4 | 3 | 5 | Discovery page, watchlist toggles, and first-pass candidate scoring are live; continue with deeper comparison and rating workflows |
 | Spending overview and transactions | In Progress | 3 | 3 | 2 | 3 | Keep secondary |
 | Richer import review persistence | Planned | 4 | 3 | 3 | 4 | Build soon |
 | Watchlist and target constraints workflow | Planned | 3 | 2 | 2 | 4 | Build after guided setup |
@@ -138,10 +139,14 @@ Help a self-directed investor:
 1. Real historical performance completion:
    snapshot-backed dashboard / portfolio / account trends are done
    next: portfolio events, security price history, holding/security replay
-2. Richer import review persistence and correction state
-3. Watchlist and target constraints workflow
-4. Citizen/profile admin workflow expansion
-5. Cloud-ready cache and async job boundaries
+2. Security discovery and candidate scoring:
+   search arbitrary symbols
+   add/remove watchlist items from search or symbol pages
+   run recommendation-style scoring for watchlist or manually selected candidates
+3. Richer import review persistence and correction state
+4. Watchlist and target constraints workflow
+5. Citizen/profile admin workflow expansion
+6. Cloud-ready cache and async job boundaries
 
 ## Key Trade-offs
 
@@ -158,8 +163,9 @@ Help a self-directed investor:
 Turn the next milestone into engineering tickets for:
 
 1. real historical performance
-2. richer import review persistence
-3. watchlist and target constraints workflow
+2. security discovery and candidate scoring
+3. richer import review persistence
+4. watchlist and target constraints workflow
 
 
 

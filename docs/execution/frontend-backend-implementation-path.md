@@ -89,6 +89,16 @@ Updated now:
   - portfolio workspace
   - account detail
 - holding and security detail still use reference curves pending `security_price_history`
+- next Phase 4 expansion now also includes:
+  - a security discovery page for arbitrary symbol search
+  - watchlist add/remove flows from search and unified symbol pages
+  - recommendation-style candidate scoring for watchlist items and manually selected symbols
+
+Implemented now:
+
+- dedicated discovery page at `/discover`
+- quick single-symbol watchlist add/remove API and UI
+- recommendation-style candidate scoring API and UI for search results and unified symbol pages
 
 ## Portfolio workspace build path
 
@@ -109,7 +119,7 @@ Current state:
 - health-score holding drilldowns still target holding ids, but the route now forwards into the unified symbol page with the matching account preselected
 - recommendation detail can now open a referenced already-heavy holding directly
 - recommendation detail can now also open a security detail page for the recommended lead or alternative symbol
-- already-held symbols now default to an aggregate cross-account view on the unified symbol page, with compact first-fold selectors that reveal the full position-detail stack for the selected account
+- already-held symbols now default to an aggregate cross-account view on the unified symbol page, with compact metric-rail dropdown selectors that reveal the full position-detail stack for the selected account
 - if the same symbol appears multiple times inside one account, the unified symbol page now keeps the account metrics aggregated and adds a second selector for the exact holding row to review and edit
 - health-score and recommendation links that used to target the old holding route now deep-link straight into the unified symbol page with account and holding context preserved
 - inspection is no longer the next gap; Phase 3 now covers account/holding edit and repair workflows
@@ -132,6 +142,11 @@ Current state:
    - event-backed portfolio history
    - security price history
    - replay-backed snapshots
+
+5. Extend recommendation surfaces into security discovery
+   - symbol search page
+   - watchlist management from search and symbol detail
+   - candidate-security scoring endpoint and UI
 
 ## Supporting docs
 - `docs/execution/backend-architecture.md`

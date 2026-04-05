@@ -37,6 +37,10 @@ export const displayLanguageInputSchema = z.object({
   language: z.enum(["zh", "en"])
 });
 
+export const watchlistSymbolInputSchema = z.object({
+  symbol: z.string().trim().min(1).max(32)
+});
+
 export const registerUserInputSchema = z.object({
   displayName: z.string().trim().min(2).max(160),
   email: z.string().trim().email(),
@@ -149,6 +153,14 @@ export const guidedImportCreateSchema = z.object({
 
 export const recommendationRunCreateSchema = z.object({
   contributionAmountCad: z.number().positive().max(1000000)
+});
+
+export const candidateScoreCreateSchema = z.object({
+  symbol: z.string().trim().min(1).max(32),
+  name: z.string().trim().min(1).max(160).optional(),
+  currency: z.enum(["CAD", "USD"]).optional(),
+  assetClass: z.string().trim().min(1).max(64).optional(),
+  securityType: z.string().trim().min(1).max(64).optional()
 });
 
 export const holdingSecurityTypeSchema = z.enum([
@@ -285,11 +297,13 @@ export type PreferenceProfileInputPayload = z.infer<typeof preferenceProfileInpu
 export type DisplayCurrencyInputPayload = z.infer<typeof displayCurrencyInputSchema>;
 export type DisplayLanguageInputPayload = z.infer<typeof displayLanguageInputSchema>;
 export type RegisterUserInputPayload = z.infer<typeof registerUserInputSchema>;
+export type WatchlistSymbolInputPayload = z.infer<typeof watchlistSymbolInputSchema>;
 export type ImportJobCreatePayload = z.infer<typeof importJobCreateSchema>;
 export type ImportMappingPresetCreatePayload = z.infer<typeof importMappingPresetCreateSchema>;
 export type ImportMappingPresetUpdatePayload = z.infer<typeof importMappingPresetUpdateSchema>;
 export type GuidedImportCreatePayload = z.infer<typeof guidedImportCreateSchema>;
 export type RecommendationRunCreatePayload = z.infer<typeof recommendationRunCreateSchema>;
+export type CandidateScoreCreatePayload = z.infer<typeof candidateScoreCreateSchema>;
 export type GuidedAllocationDraftPayload = z.infer<typeof guidedAllocationDraftSchema>;
 export type CitizenOverrideInputPayload = z.infer<typeof citizenOverrideInputSchema>;
 export type HoldingSecurityTypePayload = z.infer<typeof holdingSecurityTypeSchema>;

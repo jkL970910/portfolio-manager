@@ -387,7 +387,7 @@ components/
 - Supports:
   - one unified symbol route at `/portfolio/security/[symbol]`
   - default aggregate held-position view across all accounts
-  - compact account-level selection inside the first-fold detail area instead of a separate large context card
+  - compact first-fold dropdown selection inside the metric rail instead of a separate large context card
   - aggregate and account-level quantity / average-cost summaries
   - record selection inside one account when the same symbol exists in multiple holding rows there
   - reuse of the existing holding repair and single-symbol refresh panels inside the selected account view
@@ -398,6 +398,47 @@ components/
   - account selection should live as a compact dropdown in the first fold and reveal the same repair / refresh / review depth that used to live only on the holding detail route
   - if one account contains multiple holding rows for the same symbol, keep the header metrics aggregated at the account level and add a second selector for the exact row being reviewed or edited
   - old holding routes may remain as compatibility redirects, but the primary browsing route is the unified symbol page
+
+### `WatchlistToggleButton`
+
+- File: [watchlist-toggle-button.tsx](E:\Projects\Portfolio%20Manager\components\portfolio\watchlist-toggle-button.tsx)
+- Purpose: fast add/remove control for a single symbol outside the Settings bulk-edit workflow
+- Supports:
+  - compact mode for dense discovery and symbol surfaces
+  - optimistic local watchlist state after API completion
+- Rules:
+  - use this on discovery results and unified symbol pages
+  - Settings remains the bulk-edit surface; this control is for quick single-symbol actions
+
+### `CandidateScorePanel`
+
+- File: [candidate-score-panel.tsx](E:\Projects\Portfolio%20Manager\components\portfolio\candidate-score-panel.tsx)
+- Purpose: request recommendation-style scoring for one user-selected candidate symbol
+- Supports:
+  - one-click score request for the current symbol
+  - scorecard display with:
+    - overall score
+    - account fit
+    - tax fit
+    - security score
+    - warnings
+- Rules:
+  - use for discovery results and unified symbol pages
+  - keep the language consistent with recommendation v2
+  - when the asset class is heuristic, the warnings section must say so explicitly
+
+### `SecurityDiscoveryWorkbench`
+
+- File: [security-discovery-workbench.tsx](E:\Projects\Portfolio%20Manager\components\discover\security-discovery-workbench.tsx)
+- Purpose: dedicated discovery surface for arbitrary symbol lookup before moving into the unified symbol page
+- Supports:
+  - free-text symbol / name search
+  - quick watchlist actions on search results
+  - recommendation-style scoring on search results
+  - deep-link into `/portfolio/security/[symbol]`
+- Rules:
+  - keep search, watchlist, and score actions together on the same result card
+  - discovery is for user-directed idea exploration, not only for replaying system recommendations
 
 ### `PortfolioSecurityDetailPage`
 

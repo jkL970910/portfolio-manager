@@ -7,8 +7,10 @@ import type { PortfolioHoldingDetailData, PortfolioSecurityDetailData } from "@/
 import { LineChartCard } from "@/components/charts/line-chart";
 import { StickyRail } from "@/components/layout/sticky-rail";
 import { HoldingEditPanel } from "@/components/portfolio/holding-edit-panel";
+import { CandidateScorePanel } from "@/components/portfolio/candidate-score-panel";
 import { RefreshSecurityPricePanel } from "@/components/portfolio/refresh-security-price-panel";
 import { SecurityMark } from "@/components/portfolio/security-mark";
+import { WatchlistToggleButton } from "@/components/portfolio/watchlist-toggle-button";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -118,12 +120,14 @@ export function UnifiedSecurityDetail({
   detail,
   language,
   initialAccountId = null,
-  initialHoldingId = null
+  initialHoldingId = null,
+  initialTracked
 }: {
   detail: PortfolioSecurityDetailData;
   language: DisplayLanguage;
   initialAccountId?: string | null;
   initialHoldingId?: string | null;
+  initialTracked: boolean;
 }) {
   const [selectedAccountId, setSelectedAccountId] = useState<string | null>(
     detail.heldPosition?.accountOptions.some((option) => option.accountId === initialAccountId) ? initialAccountId : null
@@ -239,6 +243,7 @@ export function UnifiedSecurityDetail({
                     <p className="text-sm text-[color:var(--muted-foreground)]">{detail.security.name}</p>
                   )}
                   <p className="text-sm leading-7 text-[color:var(--muted-foreground)]">{topSubtitle}</p>
+                  <WatchlistToggleButton symbol={detail.security.symbol} language={language} initialTracked={initialTracked} compact />
                 </div>
               </div>
               <LineChartCard
@@ -397,19 +402,19 @@ export function UnifiedSecurityDetail({
                     : pick(language, "如果你以后持有它，这里也会补上账户分布和持仓视角。", "If you hold it in the future, this page will also add account distribution and held-position views.")
                 }
               />
-              <div className="grid gap-4">
-                {(detail.heldPosition?.aggregate.summaryPoints ?? detail.summaryPoints).map((item, index) => (
-                  <Card key={`security-role-${index}`}>
-                    <CardContent className="px-5 py-5 text-sm leading-7 text-[color:var(--muted-foreground)]">{item}</CardContent>
-                  </Card>
-                ))}
-              </div>
+                <div className="grid gap-4">
+                  {(detail.heldPosition?.aggregate.summaryPoints ?? detail.summaryPoints).map((item, index) => (
+                    <Card key={`security-role-${index}`}>
+                      <CardContent className="px-5 py-5 text-sm leading-7 text-[color:var(--muted-foreground)]">{item}</CardContent>
+                    </Card>
+                  ))}
+                </div>
 
               {detail.relatedHoldings.length > 0 ? (
                 <>
                   <SectionHeading
                     title={pick(language, "你已持有的账户分布", "Account distribution you already hold")}
-                    description={pick(language, "下面按账户列出这支标的当前分散在哪里。点进去后会展开那个账户里的完整持仓视角。", "The cards below show where the symbol currently sits across your accounts. Open one account to reveal the full position view for that account.")}
+                    description={pick(language, "这里保留按账户的快速入口，方便你从总持仓视角直接切到某个账户。", "These cards remain as quick account entry points from the aggregate view.")}
                   />
                   <div className="grid gap-4">
                     {detail.heldPosition?.accountSummaries.map((summary) => (
@@ -439,6 +444,15 @@ export function UnifiedSecurityDetail({
             symbol={detail.security.symbol}
             lastRefreshed={selectedAccountView?.holding.lastUpdated ?? detail.security.quoteTimestamp}
             freshness={formatFreshnessLabel(language, selectedAccountView?.holding.freshnessVariant ?? detail.security.freshnessVariant)}
+          />
+
+          <CandidateScorePanel
+            language={language}
+            symbol={detail.security.symbol}
+            name={detail.security.name}
+            currency={detail.security.currency === "USD" ? "USD" : "CAD"}
+            securityType={detail.security.securityType}
+            compact
           />
 
           {selectedAccountView ? (

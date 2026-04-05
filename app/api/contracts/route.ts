@@ -71,6 +71,11 @@ const contracts = {
       path: "/api/market-data/quotes",
       method: "GET",
       description: "Fetch latest available quotes for multiple symbols through the configured market-data provider layer."
+    },
+    {
+      path: "/api/settings/watchlist",
+      method: "POST / DELETE",
+      description: "Add or remove a single symbol from the signed-in user's watchlist without resubmitting the full preference profile."
     }
   ],
   plannedMutations: [
@@ -133,6 +138,11 @@ const contracts = {
       path: "/api/recommendations/runs",
       methods: ["POST"],
       description: "Generate a new V2 recommendation run from current holdings and preferences, including structured rationale and placement metadata."
+    },
+    {
+      path: "/api/recommendations/candidate-score",
+      methods: ["POST"],
+      description: "Score a manually selected security candidate against the current portfolio, watchlist, account-fit, tax-fit, and FX-friction rules."
     },
     {
       path: "/api/portfolio/refresh-prices",
