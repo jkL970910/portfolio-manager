@@ -163,6 +163,10 @@ export const candidateScoreCreateSchema = z.object({
   securityType: z.string().trim().min(1).max(64).optional()
 });
 
+export const candidateCompareCreateSchema = z.object({
+  symbols: z.array(z.string().trim().min(1).max(32)).min(1).max(10)
+});
+
 export const holdingSecurityTypeSchema = z.enum([
   "Common Stock",
   "ETF",
@@ -304,6 +308,7 @@ export type ImportMappingPresetUpdatePayload = z.infer<typeof importMappingPrese
 export type GuidedImportCreatePayload = z.infer<typeof guidedImportCreateSchema>;
 export type RecommendationRunCreatePayload = z.infer<typeof recommendationRunCreateSchema>;
 export type CandidateScoreCreatePayload = z.infer<typeof candidateScoreCreateSchema>;
+export type CandidateCompareCreatePayload = z.infer<typeof candidateCompareCreateSchema>;
 export type GuidedAllocationDraftPayload = z.infer<typeof guidedAllocationDraftSchema>;
 export type CitizenOverrideInputPayload = z.infer<typeof citizenOverrideInputSchema>;
 export type HoldingSecurityTypePayload = z.infer<typeof holdingSecurityTypeSchema>;

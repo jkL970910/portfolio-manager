@@ -1,13 +1,31 @@
 import { getProviderHealth } from "@/lib/market-data/config";
 import { getOrSetCached } from "@/lib/market-data/cache";
 import { getMarketDataConfig } from "@/lib/market-data/config";
+import { getHistoricalSeriesFromAlphaVantage } from "@/lib/market-data/alpha-vantage";
 import { resolveSecurityWithOpenFigi } from "@/lib/market-data/openfigi";
-import { getQuoteFromTwelveData, searchSecuritiesWithTwelveData } from "@/lib/market-data/twelve-data";
-import type { SecurityQuote, SecurityResolution, SecuritySearchResult } from "@/lib/market-data/types";
+import { getHistoricalSeriesFromTwelveData, getQuoteFromTwelveData, searchSecuritiesWithTwelveData } from "@/lib/market-data/twelve-data";
+import type { SecurityHistoricalPoint, SecurityQuote, SecurityResolution, SecuritySearchResult } from "@/lib/market-data/types";
 
 type SecurityQuoteOptions = {
   exchange?: string | null;
+  currency?: string | null;
 };
+
+function hasDenseHistory(points: SecurityHistoricalPoint[]) {
+  if (points.length < 30) {
+    return false;
+  }
+
+  const sorted = [...points].sort((left, right) => left.date.localeCompare(right.date));
+  const latest = sorted[sorted.length - 1];
+  const previous = sorted[sorted.length - 2];
+  if (!latest || !previous) {
+    return false;
+  }
+
+  const dayGap = (new Date(latest.date).getTime() - new Date(previous.date).getTime()) / (1000 * 60 * 60 * 24);
+  return dayGap <= 7;
+}
 
 export async function searchSecurities(query: string): Promise<{ results: SecuritySearchResult[]; providerHealth: ReturnType<typeof getProviderHealth> }> {
   const trimmed = query.trim();
@@ -112,6 +130,47 @@ export async function getBatchSecurityQuotes(
 
   return {
     results,
+    providerHealth: getProviderHealth()
+  };
+}
+
+export async function getSecurityHistoricalSeries(
+  symbol: string,
+  options?: SecurityQuoteOptions
+): Promise<{ results: SecurityHistoricalPoint[]; providerHealth: ReturnType<typeof getProviderHealth> }> {
+  const trimmed = symbol.trim().toUpperCase();
+  const normalizedExchange = options?.exchange?.trim() || null;
+  const normalizedCurrency = options?.currency?.trim().toUpperCase() || null;
+  if (!trimmed) {
+    throw new Error("Security symbol is required.");
+  }
+
+  const { quoteCacheTtlSeconds } = getMarketDataConfig();
+  const cacheKey = [
+    "market-data:history:v3",
+    trimmed,
+    normalizedExchange?.toLowerCase() ?? "no-exchange",
+    normalizedCurrency?.toLowerCase() ?? "no-currency"
+  ].join(":");
+  const results = await getOrSetCached(cacheKey, {
+    ttlMs: quoteCacheTtlSeconds * 1000,
+    staleOnErrorMs: 60 * 1000
+  }, async () => {
+    const twelveResults = await getHistoricalSeriesFromTwelveData(trimmed, normalizedExchange).catch(() => []);
+    if (hasDenseHistory(twelveResults)) {
+      return twelveResults;
+    }
+
+    const alphaResults = await getHistoricalSeriesFromAlphaVantage(trimmed, normalizedExchange, normalizedCurrency);
+    if (alphaResults.length >= 2) {
+      return alphaResults;
+    }
+
+    return twelveResults;
+  });
+
+  return {
+    results: results ?? [],
     providerHealth: getProviderHealth()
   };
 }

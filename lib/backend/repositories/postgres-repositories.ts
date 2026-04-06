@@ -6,17 +6,21 @@ import {
   holdingPositions,
   importJobs,
   investmentAccounts,
+  portfolioEvents,
   portfolioSnapshots,
   preferenceProfiles,
   recommendationItems,
   recommendationRuns,
+  securityPriceHistory,
   users
 } from "@/lib/db/schema";
 import {
   HoldingPosition,
   ImportJob,
   InvestmentAccount,
+  PortfolioEvent,
   PortfolioSnapshot,
+  SecurityPriceHistoryPoint,
   PreferenceProfile,
   RecommendationRun,
   UserProfile
@@ -88,6 +92,36 @@ function mapSnapshot(row: typeof portfolioSnapshots.$inferSelect): PortfolioSnap
       Object.entries(holdingBreakdown ?? {}).map(([key, value]) => [key, toNumber(value)])
     ),
     sourceVersion: row.sourceVersion,
+    createdAt: row.createdAt.toISOString()
+  };
+}
+
+function mapSecurityPriceHistory(row: typeof securityPriceHistory.$inferSelect): SecurityPriceHistoryPoint {
+  return {
+    id: row.id,
+    symbol: row.symbol,
+    priceDate: row.priceDate,
+    close: toNumber(row.close),
+    adjustedClose: row.adjustedClose == null ? null : toNumber(row.adjustedClose),
+    currency: row.currency as SecurityPriceHistoryPoint["currency"],
+    source: row.source,
+    createdAt: row.createdAt.toISOString()
+  };
+}
+
+function mapPortfolioEvent(row: typeof portfolioEvents.$inferSelect): PortfolioEvent {
+  return {
+    id: row.id,
+    userId: row.userId,
+    accountId: row.accountId,
+    symbol: row.symbol ?? null,
+    eventType: row.eventType,
+    quantity: row.quantity == null ? null : toNumber(row.quantity),
+    priceAmount: row.priceAmount == null ? null : toNumber(row.priceAmount),
+    currency: row.currency as PortfolioEvent["currency"],
+    bookedAt: row.bookedAt,
+    effectiveAt: row.effectiveAt.toISOString(),
+    source: row.source,
     createdAt: row.createdAt.toISOString()
   };
 }
@@ -216,6 +250,16 @@ export const postgresRepositories: BackendRepositories = {
       }));
     }
   },
+  portfolioEvents: {
+    async listByUserId(userId) {
+      const db = getDb();
+      const rows = await db.query.portfolioEvents.findMany({
+        where: eq(portfolioEvents.userId, userId),
+        orderBy: desc(portfolioEvents.effectiveAt)
+      });
+      return rows.map(mapPortfolioEvent);
+    }
+  },
   snapshots: {
     async listByUserId(userId) {
       const db = getDb();
@@ -224,6 +268,16 @@ export const postgresRepositories: BackendRepositories = {
         orderBy: desc(portfolioSnapshots.snapshotDate)
       });
       return rows.map(mapSnapshot);
+    }
+  },
+  securityPriceHistory: {
+    async listBySymbol(symbol) {
+      const db = getDb();
+      const rows = await db.query.securityPriceHistory.findMany({
+        where: eq(securityPriceHistory.symbol, symbol.trim().toUpperCase()),
+        orderBy: desc(securityPriceHistory.priceDate)
+      });
+      return rows.map(mapSecurityPriceHistory);
     }
   },
   preferences: {

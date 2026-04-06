@@ -88,7 +88,10 @@ Updated now:
   - dashboard net worth
   - portfolio workspace
   - account detail
-- holding and security detail still use reference curves pending `security_price_history`
+- current-day portfolio snapshots now refresh automatically after portfolio recalculation on write paths
+- unified security detail aggregate view now replays combined held-position history from `portfolio_events + security_price_history`
+- selected account views inside the unified symbol page now replay held-position history from `portfolio_events + security_price_history` when both are available
+- when local symbol history is missing or too shallow, unified security detail now fetches provider history and persists it into `security_price_history`
 - next Phase 4 expansion now also includes:
   - a security discovery page for arbitrary symbol search
   - watchlist add/remove flows from search and unified symbol pages
@@ -99,6 +102,8 @@ Implemented now:
 - dedicated discovery page at `/discover`
 - quick single-symbol watchlist add/remove API and UI
 - recommendation-style candidate scoring API and UI for search results and unified symbol pages
+- unified symbol history now supports `1D / 1M / 3M / 6M / 1Y / All` range filters on real price data
+- if local symbol history is too sparse, unified symbol history now refetches denser daily price history automatically
 
 ## Portfolio workspace build path
 
@@ -142,6 +147,12 @@ Current state:
    - event-backed portfolio history
    - security price history
    - replay-backed snapshots
+
+Updated now:
+
+- selected held-symbol views now replay from `portfolio_events + security_price_history`
+- holding create / quantity update / move / delete flows now emit new `portfolio_events` records so future replay history can extend beyond seed data
+- portfolio CSV imports now emit replay events too, and replace-mode imports reset stale replay state before rebuilding holdings
 
 5. Extend recommendation surfaces into security discovery
    - symbol search page

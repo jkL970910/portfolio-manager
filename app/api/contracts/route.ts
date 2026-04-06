@@ -145,6 +145,11 @@ const contracts = {
       description: "Score a manually selected security candidate against the current portfolio, watchlist, account-fit, tax-fit, and FX-friction rules."
     },
     {
+      path: "/api/recommendations/candidate-compare",
+      methods: ["POST"],
+      description: "Compare multiple candidate securities side by side using the same recommendation-style score model."
+    },
+    {
       path: "/api/portfolio/refresh-prices",
       methods: ["POST"],
       description: "Refresh user-scoped holding prices in bulk, persist updated market value and gain/loss, and recompute account weights."

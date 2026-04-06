@@ -5,7 +5,9 @@ import {
   HoldingPosition,
   ImportJob,
   InvestmentAccount,
+  PortfolioEvent,
   PortfolioSnapshot,
+  SecurityPriceHistoryPoint,
   PreferenceProfile,
   RecommendationRun,
   UserProfile
@@ -249,6 +251,51 @@ export const transactions: CashflowTransaction[] = [
   }
 ];
 
+export const portfolioEvents: PortfolioEvent[] = [
+  {
+    id: "evt_demo_veqt_buy",
+    userId: "user_demo",
+    accountId: "acct_tfsa_demo",
+    symbol: "VEQT",
+    eventType: "buy",
+    quantity: 1800,
+    priceAmount: 34.2,
+    currency: "CAD",
+    bookedAt: "2025-10-01",
+    effectiveAt: "2025-10-01T00:00:00.000Z",
+    source: "seed",
+    createdAt: "2025-10-01T00:00:00.000Z"
+  },
+  {
+    id: "evt_casey_xeqt_buy",
+    userId: "user_casey",
+    accountId: "acct_tfsa_casey",
+    symbol: "XEQT",
+    eventType: "buy",
+    quantity: 1200,
+    priceAmount: 31.8,
+    currency: "CAD",
+    bookedAt: "2025-10-01",
+    effectiveAt: "2025-10-01T00:00:00.000Z",
+    source: "seed",
+    createdAt: "2025-10-01T00:00:00.000Z"
+  },
+  {
+    id: "evt_casey_vfv_buy",
+    userId: "user_casey",
+    accountId: "acct_rrsp_casey",
+    symbol: "VFV",
+    eventType: "buy",
+    quantity: 280,
+    priceAmount: 118.2,
+    currency: "CAD",
+    bookedAt: "2025-10-01",
+    effectiveAt: "2025-10-01T00:00:00.000Z",
+    source: "seed",
+    createdAt: "2025-10-01T00:00:00.000Z"
+  }
+];
+
 export const portfolioSnapshots: PortfolioSnapshot[] = [
   {
     id: "snap_demo_2025_10",
@@ -478,6 +525,27 @@ export const portfolioSnapshots: PortfolioSnapshot[] = [
     sourceVersion: "snapshot-v1",
     createdAt: "2026-03-01T00:00:00.000Z"
   }
+];
+
+export const securityPriceHistory: SecurityPriceHistoryPoint[] = [
+  { id: "price_veqt_1", symbol: "VEQT", priceDate: "2025-10-01", close: 34.2, adjustedClose: null, currency: "CAD", source: "seed", createdAt: "2025-10-01T00:00:00.000Z" },
+  { id: "price_veqt_2", symbol: "VEQT", priceDate: "2025-11-01", close: 34.9, adjustedClose: null, currency: "CAD", source: "seed", createdAt: "2025-11-01T00:00:00.000Z" },
+  { id: "price_veqt_3", symbol: "VEQT", priceDate: "2025-12-01", close: 35.6, adjustedClose: null, currency: "CAD", source: "seed", createdAt: "2025-12-01T00:00:00.000Z" },
+  { id: "price_veqt_4", symbol: "VEQT", priceDate: "2026-01-01", close: 36.4, adjustedClose: null, currency: "CAD", source: "seed", createdAt: "2026-01-01T00:00:00.000Z" },
+  { id: "price_veqt_5", symbol: "VEQT", priceDate: "2026-02-01", close: 37.1, adjustedClose: null, currency: "CAD", source: "seed", createdAt: "2026-02-01T00:00:00.000Z" },
+  { id: "price_veqt_6", symbol: "VEQT", priceDate: "2026-03-01", close: 37.9, adjustedClose: null, currency: "CAD", source: "seed", createdAt: "2026-03-01T00:00:00.000Z" },
+  { id: "price_xeqt_1", symbol: "XEQT", priceDate: "2025-10-01", close: 31.8, adjustedClose: null, currency: "CAD", source: "seed", createdAt: "2025-10-01T00:00:00.000Z" },
+  { id: "price_xeqt_2", symbol: "XEQT", priceDate: "2025-11-01", close: 32.6, adjustedClose: null, currency: "CAD", source: "seed", createdAt: "2025-11-01T00:00:00.000Z" },
+  { id: "price_xeqt_3", symbol: "XEQT", priceDate: "2025-12-01", close: 33.1, adjustedClose: null, currency: "CAD", source: "seed", createdAt: "2025-12-01T00:00:00.000Z" },
+  { id: "price_xeqt_4", symbol: "XEQT", priceDate: "2026-01-01", close: 33.8, adjustedClose: null, currency: "CAD", source: "seed", createdAt: "2026-01-01T00:00:00.000Z" },
+  { id: "price_xeqt_5", symbol: "XEQT", priceDate: "2026-02-01", close: 34.4, adjustedClose: null, currency: "CAD", source: "seed", createdAt: "2026-02-01T00:00:00.000Z" },
+  { id: "price_xeqt_6", symbol: "XEQT", priceDate: "2026-03-01", close: 35.2, adjustedClose: null, currency: "CAD", source: "seed", createdAt: "2026-03-01T00:00:00.000Z" },
+  { id: "price_vfv_1", symbol: "VFV", priceDate: "2025-10-01", close: 118.2, adjustedClose: null, currency: "CAD", source: "seed", createdAt: "2025-10-01T00:00:00.000Z" },
+  { id: "price_vfv_2", symbol: "VFV", priceDate: "2025-11-01", close: 121.4, adjustedClose: null, currency: "CAD", source: "seed", createdAt: "2025-11-01T00:00:00.000Z" },
+  { id: "price_vfv_3", symbol: "VFV", priceDate: "2025-12-01", close: 123.9, adjustedClose: null, currency: "CAD", source: "seed", createdAt: "2025-12-01T00:00:00.000Z" },
+  { id: "price_vfv_4", symbol: "VFV", priceDate: "2026-01-01", close: 126.5, adjustedClose: null, currency: "CAD", source: "seed", createdAt: "2026-01-01T00:00:00.000Z" },
+  { id: "price_vfv_5", symbol: "VFV", priceDate: "2026-02-01", close: 129.1, adjustedClose: null, currency: "CAD", source: "seed", createdAt: "2026-02-01T00:00:00.000Z" },
+  { id: "price_vfv_6", symbol: "VFV", priceDate: "2026-03-01", close: 132.8, adjustedClose: null, currency: "CAD", source: "seed", createdAt: "2026-03-01T00:00:00.000Z" }
 ];
 
 export const preferenceProfiles: PreferenceProfile[] = [

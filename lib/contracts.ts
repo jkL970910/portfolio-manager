@@ -68,7 +68,7 @@ export interface PortfolioData {
     fxRateLabel: string;
     fxNote: string;
   };
-  performance: { label: string; value: number }[];
+  performance: { label: string; value: number; rawDate?: string }[];
   accountTypeAllocation: { id: string; name: string; value: number; detail?: string }[];
   accountInstanceAllocation: { id: string; name: string; value: number; detail?: string }[];
   accountCards: {
@@ -90,7 +90,7 @@ export interface PortfolioData {
     name: string;
     typeId: string;
     typeLabel: string;
-    performance: { label: string; value: number }[];
+    performance: { label: string; value: number; rawDate?: string }[];
     healthScore: {
       score: number;
       status: string;
@@ -251,7 +251,7 @@ export interface PortfolioAccountDetailData {
     value: string;
     detail?: string;
   }[];
-  performance: { label: string; value: number }[];
+  performance: { label: string; value: number; rawDate?: string }[];
   allocation: { name: string; value: number }[];
   healthScore: PortfolioData["healthScore"];
   holdings: PortfolioData["holdings"];
@@ -329,7 +329,7 @@ export interface PortfolioHoldingDetailData {
       detail?: string;
     }[];
   };
-  performance: { label: string; value: number }[];
+  performance: { label: string; value: number; rawDate?: string }[];
   portfolioRole: string[];
   healthSummary: {
     score: number;
@@ -407,7 +407,7 @@ export interface PortfolioSecurityDetailData {
       detail?: string;
     }[];
   };
-  performance: { label: string; value: number }[];
+  performance: { label: string; value: number; rawDate?: string }[];
   summaryPoints: string[];
   relatedHoldings: {
     id: string;

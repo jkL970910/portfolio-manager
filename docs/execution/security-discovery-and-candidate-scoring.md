@@ -99,6 +99,15 @@ The engine should support a "candidate scoring" mode that:
    - score selected watchlist symbols
    - compare a small set of candidate ideas
 
+Implemented now:
+
+- dedicated discovery page at `/discover`
+- single-symbol watchlist add/remove from discovery and unified symbol pages
+- single-symbol candidate scoring from discovery and unified symbol pages
+- batch watchlist comparison inside discovery
+- manual comparison for currently selected search results inside discovery
+- unified symbol page now supports `1D / 1M / 3M / 6M / 1Y / All` history-range switching on real price data
+
 ## Acceptance criteria
 
 1. User can search arbitrary securities from a dedicated discovery route

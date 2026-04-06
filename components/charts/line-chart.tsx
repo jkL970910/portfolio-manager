@@ -9,13 +9,19 @@ export function LineChartCard({
   description,
   data,
   dataKey,
-  color
+  color,
+  actions,
+  tooltipLabel = "value",
+  tooltipValueFormatter
 }: {
   title: string;
   description: string;
   data: Array<Record<string, number | string>>;
   dataKey: string;
   color: string;
+  actions?: React.ReactNode;
+  tooltipLabel?: string;
+  tooltipValueFormatter?: (value: number) => string;
 }) {
   const [isMounted, setIsMounted] = useState(false);
   const hasData = data.length > 0;
@@ -27,7 +33,10 @@ export function LineChartCard({
   return (
     <Card>
       <CardHeader>
-        <CardTitle>{title}</CardTitle>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <CardTitle>{title}</CardTitle>
+          {actions}
+        </div>
         <p className="mt-2 text-sm text-[color:var(--muted-foreground)]">{description}</p>
       </CardHeader>
       <CardContent className="h-[320px]">
@@ -37,7 +46,14 @@ export function LineChartCard({
               <CartesianGrid stroke="rgba(91,100,114,0.14)" vertical={false} />
               <XAxis dataKey="label" tickLine={false} axisLine={false} stroke="#5b6472" fontSize={12} />
               <YAxis tickLine={false} axisLine={false} stroke="#5b6472" fontSize={12} />
-              <Tooltip />
+              <Tooltip
+                formatter={(value) => {
+                  if (typeof value !== "number") {
+                    return [value, tooltipLabel];
+                  }
+                  return [tooltipValueFormatter ? tooltipValueFormatter(value) : value, tooltipLabel];
+                }}
+              />
               <Line type="monotone" dataKey={dataKey} stroke={color} strokeWidth={3} dot={false} />
             </LineChart>
           </ResponsiveContainer>

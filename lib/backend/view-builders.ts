@@ -16,7 +16,9 @@ import {
   HoldingPosition,
   ImportJob,
   InvestmentAccount,
+  PortfolioEvent,
   PortfolioSnapshot,
+  SecurityPriceHistoryPoint,
   PreferenceProfile,
   RecommendationRun,
   RiskProfile,
@@ -383,6 +385,81 @@ function buildIndexedHistoricalSeries(args: {
   const baseline = absoluteSeries[0]?.value || 1;
   return absoluteSeries.map((point) => ({
     label: point.label,
+    value: round((point.value / baseline) * 100, 1)
+  }));
+}
+
+function buildAbsolutePriceHistorySeries(args: {
+  priceHistory?: SecurityPriceHistoryPoint[];
+  language: DisplayLanguage;
+}) {
+  const { priceHistory = [], language } = args;
+  const recent = [...priceHistory]
+    .sort((left, right) => left.priceDate.localeCompare(right.priceDate))
+    .map((point) => ({
+      label: formatSnapshotLabel(point.priceDate, language),
+      rawDate: point.priceDate,
+      value: point.adjustedClose ?? point.close
+    }))
+    .filter((point) => Number.isFinite(point.value));
+
+  if (recent.length < 2) {
+    return null;
+  }
+
+  return recent.map((point) => ({
+    label: point.label,
+    rawDate: point.rawDate,
+    value: round(point.value, 2)
+  }));
+}
+
+function buildIndexedHeldPositionSeries(args: {
+  priceHistory?: SecurityPriceHistoryPoint[];
+  events?: PortfolioEvent[];
+  accountId?: string;
+  symbol: string;
+  language: DisplayLanguage;
+}) {
+  const { priceHistory = [], events = [], accountId, symbol, language } = args;
+  const normalizedSymbol = symbol.trim().toUpperCase();
+  const relevantEvents = events
+    .filter((event) => (!accountId || event.accountId === accountId) && event.symbol?.trim().toUpperCase() === normalizedSymbol)
+    .sort((left, right) => left.bookedAt.localeCompare(right.bookedAt));
+  const relevantHistory = [...priceHistory]
+    .sort((left, right) => left.priceDate.localeCompare(right.priceDate))
+    .slice(-6);
+
+  if (relevantEvents.length === 0 || relevantHistory.length < 2) {
+    return null;
+  }
+
+  let runningQuantity = 0;
+  let eventIndex = 0;
+  const rawSeries = relevantHistory.map((point) => {
+    while (eventIndex < relevantEvents.length && relevantEvents[eventIndex].bookedAt <= point.priceDate) {
+      const event = relevantEvents[eventIndex];
+      const delta = event.quantity ?? 0;
+      runningQuantity += event.eventType === "sell" ? -delta : delta;
+      eventIndex += 1;
+    }
+
+    return {
+      label: formatSnapshotLabel(point.priceDate, language),
+      rawDate: point.priceDate,
+      value: round((point.adjustedClose ?? point.close) * Math.max(runningQuantity, 0), 2)
+    };
+  });
+
+  const meaningful = rawSeries.filter((point) => point.value > 0);
+  if (meaningful.length < 2) {
+    return null;
+  }
+
+  const baseline = meaningful[0]?.value || 1;
+  return meaningful.map((point) => ({
+    label: point.label,
+    rawDate: point.rawDate,
     value: round((point.value / baseline) * 100, 1)
   }));
 }
@@ -1486,12 +1563,14 @@ export function buildPortfolioSecurityDetailData(args: {
   language: DisplayLanguage;
   accounts: InvestmentAccount[];
   holdings: HoldingPosition[];
+  portfolioEvents?: PortfolioEvent[];
+  priceHistory?: SecurityPriceHistoryPoint[];
   snapshots?: PortfolioSnapshot[];
   profile: PreferenceProfile;
   display: DisplayContext;
   symbol: string;
 }): PortfolioSecurityDetailData | null {
-  const { language, accounts, holdings, snapshots = [], profile, display, symbol } = args;
+  const { language, accounts, holdings, portfolioEvents = [], priceHistory = [], snapshots = [], profile, display, symbol } = args;
   const normalizedSymbol = symbol.trim().toUpperCase();
   const portfolio = buildPortfolioData({ language, accounts, holdings, snapshots, profile, display });
   const matchingHoldings = holdings.filter((holding) => holding.symbol.trim().toUpperCase() === normalizedSymbol);
@@ -1546,6 +1625,16 @@ export function buildPortfolioSecurityDetailData(args: {
       })
     )
     .filter((detail): detail is PortfolioHoldingDetailData => detail !== null)
+    .map((detail) => ({
+      ...detail,
+      performance: buildIndexedHeldPositionSeries({
+        priceHistory,
+        events: portfolioEvents,
+        accountId: detail.holding.accountId,
+        symbol: detail.holding.symbol,
+        language
+      }) ?? detail.performance
+    }))
     .sort((left, right) => {
       const leftRaw = matchingHoldings.find((holding) => holding.id === left.holding.id);
       const rightRaw = matchingHoldings.find((holding) => holding.id === right.holding.id);
@@ -1620,6 +1709,12 @@ export function buildPortfolioSecurityDetailData(args: {
         ]
       };
     });
+  const aggregatePerformance = buildIndexedHeldPositionSeries({
+    priceHistory,
+    events: portfolioEvents,
+    symbol: normalizedSymbol,
+    language
+  });
   const heldPosition = matchingHoldings.length > 0
     ? {
         aggregate: {
@@ -1751,7 +1846,10 @@ export function buildPortfolioSecurityDetailData(args: {
       ],
       facts: []
     },
-    performance: getSixMonthSeries(totalValueCad || 1, profile, getMonthLabels(language)).map((point, index, series) => ({
+    performance: buildAbsolutePriceHistorySeries({
+      priceHistory,
+      language
+    }) ?? aggregatePerformance ?? getSixMonthSeries(totalValueCad || 1, profile, getMonthLabels(language)).map((point, index, series) => ({
       label: point.label,
       value: round((point.value / (series[0]?.value || 1)) * 100, 1)
     })),

@@ -4,7 +4,9 @@ import {
   findUserById,
   holdings,
   importJobs,
+  portfolioEvents,
   portfolioSnapshots,
+  securityPriceHistory,
   preferenceProfiles,
   recommendationRuns,
   transactions
@@ -59,9 +61,20 @@ export const mockRepositories: BackendRepositories = {
       return transactions.filter((transaction) => transaction.userId === userId);
     }
   },
+  portfolioEvents: {
+    async listByUserId(userId) {
+      return portfolioEvents.filter((event) => event.userId === userId);
+    }
+  },
   snapshots: {
     async listByUserId(userId) {
       return portfolioSnapshots.filter((snapshot) => snapshot.userId === userId);
+    }
+  },
+  securityPriceHistory: {
+    async listBySymbol(symbol) {
+      const normalized = symbol.trim().toUpperCase();
+      return securityPriceHistory.filter((point) => point.symbol.trim().toUpperCase() === normalized);
     }
   },
   preferences: {

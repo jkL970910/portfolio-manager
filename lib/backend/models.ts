@@ -100,6 +100,32 @@ export interface PortfolioSnapshot {
   createdAt: string;
 }
 
+export interface SecurityPriceHistoryPoint {
+  id: EntityId;
+  symbol: string;
+  priceDate: string;
+  close: number;
+  adjustedClose: number | null;
+  currency: CurrencyCode;
+  source: string;
+  createdAt: string;
+}
+
+export interface PortfolioEvent {
+  id: EntityId;
+  userId: EntityId;
+  accountId: EntityId;
+  symbol: string | null;
+  eventType: string;
+  quantity: number | null;
+  priceAmount: number | null;
+  currency: CurrencyCode | null;
+  bookedAt: string;
+  effectiveAt: string;
+  source: string;
+  createdAt: string;
+}
+
 export interface CashflowTransaction {
   id: EntityId;
   userId: EntityId;

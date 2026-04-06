@@ -1,5 +1,5 @@
 import { getMarketDataConfig } from "@/lib/market-data/config";
-import type { SecurityQuote, SecuritySearchResult, SupportedAssetType } from "@/lib/market-data/types";
+import type { SecurityHistoricalPoint, SecurityQuote, SecuritySearchResult, SupportedAssetType } from "@/lib/market-data/types";
 
 interface TwelveDataSymbolResult {
   symbol?: string;
@@ -22,6 +22,22 @@ interface TwelveDataPriceResponse {
   currency?: string;
   exchange?: string;
   code?: number;
+  message?: string;
+}
+
+interface TwelveDataTimeSeriesValue {
+  datetime?: string;
+  close?: string;
+}
+
+interface TwelveDataTimeSeriesResponse {
+  values?: TwelveDataTimeSeriesValue[];
+  meta?: {
+    symbol?: string;
+    currency?: string;
+    exchange?: string;
+  };
+  status?: string;
   message?: string;
 }
 
@@ -126,4 +142,49 @@ export async function getQuoteFromTwelveData(symbol: string, exchange?: string |
     provider: "twelve-data",
     delayed: true
   };
+}
+
+export async function getHistoricalSeriesFromTwelveData(symbol: string, exchange?: string | null): Promise<SecurityHistoricalPoint[]> {
+  const { twelveDataApiKey } = getMarketDataConfig();
+  if (!twelveDataApiKey) {
+    return [];
+  }
+
+  const url = new URL("https://api.twelvedata.com/time_series");
+  url.searchParams.set("symbol", symbol);
+  url.searchParams.set("interval", "1day");
+  url.searchParams.set("outputsize", "365");
+  url.searchParams.set("orderby", "ASC");
+  if (exchange?.trim()) {
+    url.searchParams.set("exchange", exchange.trim());
+  }
+  url.searchParams.set("apikey", twelveDataApiKey);
+
+  const response = await fetch(url, { cache: "no-store" });
+  if (!response.ok) {
+    throw new Error(`Twelve Data time series failed with status ${response.status}.`);
+  }
+
+  const payload = (await response.json()) as TwelveDataTimeSeriesResponse;
+  const values = payload.values ?? [];
+
+  return values
+    .map<SecurityHistoricalPoint | null>((value) => {
+      const close = Number(value.close);
+      const date = value.datetime?.slice(0, 10) ?? "";
+      if (!date || !Number.isFinite(close)) {
+        return null;
+      }
+
+      return {
+        symbol: symbol.trim().toUpperCase(),
+        date,
+        close,
+        adjustedClose: null,
+        currency: payload.meta?.currency ?? null,
+        exchange: payload.meta?.exchange ?? exchange ?? null,
+        provider: "twelve-data" as const
+      };
+    })
+    .filter((value): value is SecurityHistoricalPoint => value !== null);
 }

@@ -35,7 +35,7 @@ export default async function PortfolioSecurityDetailPage({
       title={detail.security.symbol}
       description={pick(
         language,
-        "这里统一看这支标的。未持有时按候选标的理解；已持有时会自动补上总持仓和账户级别的持仓信息。",
+        "这里统一看这支标的。未持有时按候选标的理解；已持有时会自动补上总持仓和账户级别的持仓信息，并优先显示真实历史价格走势。",
         "This is the unified page for the symbol. Candidate securities and already-held positions now converge here."
       )}
       compactHeader

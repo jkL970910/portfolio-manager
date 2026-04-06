@@ -79,6 +79,10 @@ function compactMetricValue(value: string) {
   return value;
 }
 
+function formatPriceTooltip(value: number, currency: string) {
+  return `${currency} $${value.toFixed(2)}`;
+}
+
 function getAggregateMetrics(detail: PortfolioSecurityDetailData, language: DisplayLanguage) {
   if (!detail.heldPosition) {
     return detail.facts.map((fact) => ({
@@ -129,6 +133,7 @@ export function UnifiedSecurityDetail({
   initialHoldingId?: string | null;
   initialTracked: boolean;
 }) {
+  const [selectedRange, setSelectedRange] = useState<"1D" | "1W" | "1M" | "3M" | "6M" | "1Y" | "ALL">("6M");
   const [selectedAccountId, setSelectedAccountId] = useState<string | null>(
     detail.heldPosition?.accountOptions.some((option) => option.accountId === initialAccountId) ? initialAccountId : null
   );
@@ -190,6 +195,52 @@ export function UnifiedSecurityDetail({
   const metrics = selectedAccountView && selectedAccountSummary
     ? getAccountMetrics(selectedAccountSummary, selectedAccountView, language)
     : getAggregateMetrics(detail, language);
+  const chartData = useMemo(() => {
+    const series = detail.performance;
+    const datedSeries = series.filter((point): point is typeof point & { rawDate: string } => typeof point.rawDate === "string");
+    if (datedSeries.length < 2) {
+      return series.slice(-6);
+    }
+
+    const end = new Date(datedSeries[datedSeries.length - 1].rawDate);
+    const daysByRange: Record<Exclude<typeof selectedRange, "ALL">, number> = {
+      "1D": 2,
+      "1W": 8,
+      "1M": 31,
+      "3M": 92,
+      "6M": 183,
+      "1Y": 366
+    };
+
+    let filtered = selectedRange === "ALL"
+      ? datedSeries
+      : datedSeries.filter((point) => {
+          const date = new Date(point.rawDate);
+          const diffDays = (end.getTime() - date.getTime()) / (1000 * 60 * 60 * 24);
+          return diffDays <= daysByRange[selectedRange];
+        });
+
+    if (filtered.length < 2) {
+      filtered = datedSeries.slice(-Math.min(8, datedSeries.length));
+    }
+
+    const formatter = new Intl.DateTimeFormat(language === "zh" ? "zh-CN" : "en-CA", {
+      month: "short",
+      day: selectedRange === "ALL" || selectedRange === "1Y" || selectedRange === "6M" ? undefined : "numeric",
+      year: selectedRange === "ALL" ? "2-digit" : undefined
+    });
+
+    const maxPoints = selectedRange === "ALL" ? 120 : selectedRange === "1Y" ? 90 : 60;
+    if (filtered.length > maxPoints) {
+      const step = Math.ceil(filtered.length / maxPoints);
+      filtered = filtered.filter((_, index) => index % step === 0 || index === filtered.length - 1);
+    }
+
+    return filtered.map((point) => ({
+      ...point,
+      label: formatter.format(new Date(point.rawDate))
+    }));
+  }, [detail.performance, language, selectedRange]);
 
   const topSubtitle = selectedAccountView
     ? pick(
@@ -247,15 +298,34 @@ export function UnifiedSecurityDetail({
                 </div>
               </div>
               <LineChartCard
-                title={pick(language, `${detail.security.symbol} 近 6 个月参考走势`, `Reference 6-month view for ${detail.security.symbol}`)}
-                description={
-                  selectedAccountView
-                    ? pick(language, "走势先看这支标的本身，再结合右侧当前账户里的持仓信息理解。", "Read the trend as the security itself, then combine it with the selected account position on the right.")
-                    : pick(language, "先看这支标的最近大概是稳着走，还是波动更明显。", "Use this to gauge whether the security has looked steadier or more volatile lately.")
+                title={
+                  pick(language, `${detail.security.symbol} 近 6 个月历史价格`, `6-month price history for ${detail.security.symbol}`)
                 }
-                data={detail.performance}
+                description={pick(language, "这里展示的是标的本身的历史价格。右侧现价是最新报价，所以和最后一个月度历史点可能会有轻微差异。", "This chart shows the security's own historical prices. The current price on the right uses the latest quote, so it may differ slightly from the last historical monthly point.")}
+                data={chartData}
                 dataKey="value"
                 color="#152238"
+                actions={
+                  <div className="inline-flex flex-wrap rounded-full border border-white/60 bg-white/56 p-1 backdrop-blur-md">
+                    {(["1D", "1W", "1M", "3M", "6M", "1Y", "ALL"] as const).map((range) => (
+                      <button
+                        key={range}
+                        type="button"
+                        onClick={() => setSelectedRange(range)}
+                        className={[
+                          "rounded-full px-3 py-1.5 text-xs font-medium transition",
+                          selectedRange === range
+                            ? "bg-[linear-gradient(135deg,rgba(240,143,178,0.88),rgba(111,141,246,0.82))] text-white"
+                            : "text-[color:var(--foreground)] hover:bg-white/72"
+                        ].join(" ")}
+                      >
+                        {range === "ALL" ? "All" : range}
+                      </button>
+                    ))}
+                  </div>
+                }
+                tooltipLabel={pick(language, "价格", "Price")}
+                tooltipValueFormatter={(value) => formatPriceTooltip(value, detail.security.currency || "CAD")}
               />
             </CardContent>
           </Card>

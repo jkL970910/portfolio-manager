@@ -45,6 +45,16 @@ export interface SecurityQuote {
   delayed: boolean;
 }
 
+export interface SecurityHistoricalPoint {
+  symbol: string;
+  date: string;
+  close: number;
+  adjustedClose?: number | null;
+  currency?: string | null;
+  exchange?: string | null;
+  provider: "twelve-data" | "fallback";
+}
+
 export interface ProviderHealth {
   openFigiConfigured: boolean;
   twelveDataConfigured: boolean;

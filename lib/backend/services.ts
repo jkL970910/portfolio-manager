@@ -1,5 +1,5 @@
 ﻿import { hash } from "bcryptjs";
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, sql } from "drizzle-orm";
 import { apiSuccess } from "@/lib/backend/contracts";
 import type { PortfolioHoldingDetailData } from "@/lib/contracts";
 import { ImportFieldMapping, ImportValidationError, ParsedCsvImport, parseImportCsv } from "@/lib/backend/csv-import";
@@ -47,14 +47,17 @@ import {
   importMappingPresets,
   investmentAccounts,
   portfolioEditLogs,
+  portfolioEvents,
+  portfolioSnapshots,
   preferenceProfiles,
   recommendationItems,
   recommendationRuns,
+  securityPriceHistory,
   users
 } from "@/lib/db/schema";
-import type { ImportJob, ImportMappingPreset, InvestmentAccount } from "@/lib/backend/models";
+import type { ImportJob, ImportMappingPreset, InvestmentAccount, SecurityPriceHistoryPoint } from "@/lib/backend/models";
 import { convertCurrencyAmount, getFxRate } from "@/lib/market-data/fx";
-import { getSecurityQuote, resolveSecurity } from "@/lib/market-data/service";
+import { getSecurityHistoricalSeries, getSecurityQuote, resolveSecurity } from "@/lib/market-data/service";
 import type { SecurityQuote, SecurityResolution } from "@/lib/market-data/types";
 import { pick } from "@/lib/i18n/ui";
 
@@ -635,6 +638,8 @@ async function recalculatePortfolioState(tx: DbTransaction, userId: string) {
       })
       .where(eq(investmentAccounts.id, account.id));
   }
+
+  await upsertCurrentPortfolioSnapshot(tx, userId);
 }
 
 async function createPortfolioEditLog(
@@ -654,6 +659,115 @@ async function createPortfolioEditLog(
     summary,
     payload
   });
+}
+
+async function createPortfolioEvent(
+  tx: DbTransaction,
+  input: {
+    userId: string;
+    accountId: string;
+    symbol: string;
+    eventType: string;
+    quantity?: number | null;
+    priceAmount?: number | null;
+    currency?: CurrencyCode | null;
+    source?: string;
+    bookedAt?: string;
+  }
+) {
+  const normalizedSymbol = input.symbol.trim().toUpperCase();
+  if (!normalizedSymbol) {
+    return;
+  }
+
+  await tx.insert(portfolioEvents).values({
+    userId: input.userId,
+    accountId: input.accountId,
+    symbol: normalizedSymbol,
+    eventType: input.eventType,
+    quantity: input.quantity == null ? null : input.quantity.toFixed(6),
+    priceAmount: input.priceAmount == null ? null : input.priceAmount.toFixed(4),
+    currency: input.currency ?? null,
+    bookedAt: input.bookedAt ?? new Date().toISOString().slice(0, 10),
+    effectiveAt: new Date(),
+    source: input.source ?? "user-edit"
+  });
+}
+
+async function upsertCurrentPortfolioSnapshot(tx: DbTransaction, userId: string) {
+  const accounts = await tx.query.investmentAccounts.findMany({
+    where: eq(investmentAccounts.userId, userId)
+  });
+  const holdings = await tx.query.holdingPositions.findMany({
+    where: eq(holdingPositions.userId, userId)
+  });
+  const snapshotDate = new Date().toISOString().slice(0, 10);
+  const totalValueCad = holdings.reduce((sum, holding) => sum + Number(holding.marketValueCad), 0);
+  const accountBreakdownJson = Object.fromEntries(
+    accounts.map((account) => [
+      account.id,
+      holdings
+        .filter((holding) => holding.accountId === account.id)
+        .reduce((sum, holding) => sum + Number(holding.marketValueCad), 0)
+    ])
+  );
+  const holdingBreakdownJson = Object.fromEntries(
+    holdings.map((holding) => [holding.id, Number(holding.marketValueCad)])
+  );
+  const existing = await tx.query.portfolioSnapshots.findFirst({
+    where: and(eq(portfolioSnapshots.userId, userId), eq(portfolioSnapshots.snapshotDate, snapshotDate))
+  });
+
+  if (existing) {
+    await tx
+      .update(portfolioSnapshots)
+      .set({
+        totalValueCad: totalValueCad.toFixed(2),
+        accountBreakdownJson,
+        holdingBreakdownJson,
+        sourceVersion: "runtime-v1"
+      })
+      .where(eq(portfolioSnapshots.id, existing.id));
+    return;
+  }
+
+  await tx.insert(portfolioSnapshots).values({
+    userId,
+    snapshotDate,
+    totalValueCad: totalValueCad.toFixed(2),
+    accountBreakdownJson,
+    holdingBreakdownJson,
+    sourceVersion: "runtime-v1"
+  });
+}
+
+async function upsertSecurityPriceHistoryPoints(points: SecurityPriceHistoryPoint[]) {
+  if (points.length === 0) {
+    return;
+  }
+
+  const db = getDb();
+  await db
+    .insert(securityPriceHistory)
+    .values(
+      points.map((point) => ({
+        symbol: point.symbol.trim().toUpperCase(),
+        priceDate: point.priceDate,
+        close: point.close.toFixed(4),
+        adjustedClose: point.adjustedClose == null ? null : point.adjustedClose.toFixed(4),
+        currency: point.currency,
+        source: point.source
+      }))
+    )
+    .onConflictDoUpdate({
+      target: [securityPriceHistory.symbol, securityPriceHistory.priceDate],
+      set: {
+        close: sql`excluded.close`,
+        adjustedClose: sql`excluded.adjusted_close`,
+        currency: sql`excluded.currency`,
+        source: sql`excluded.source`
+      }
+    });
 }
 
 function applySymbolCorrectionsToParsedImport(
@@ -1126,27 +1240,63 @@ export async function getPortfolioHoldingDetailView(userId: string, holdingId: s
 
 export async function getPortfolioSecurityDetailView(userId: string, symbol: string) {
   const repositories = getRepositories();
-  const [user, userAccounts, userHoldings, userSnapshots, profile] = await Promise.all([
+  const normalizedSymbol = symbol.trim().toUpperCase();
+  const [user, userAccounts, userHoldings, userEvents, userSnapshots, userPriceHistory, profile] = await Promise.all([
     repositories.users.getById(userId),
     repositories.accounts.listByUserId(userId),
     repositories.holdings.listByUserId(userId),
+    repositories.portfolioEvents.listByUserId(userId),
     repositories.snapshots.listByUserId(userId),
+    repositories.securityPriceHistory.listBySymbol(normalizedSymbol),
     repositories.preferences.getByUserId(userId)
   ]);
+  let hydratedPriceHistory = userPriceHistory;
 
   const display = {
     currency: user.baseCurrency,
     cadToDisplayRate: await getFxRate("CAD", user.baseCurrency)
   } as const;
 
+  const referenceHolding = userHoldings.find((holding) => holding.symbol.trim().toUpperCase() === normalizedSymbol);
+  if (hydratedPriceHistory.length < 2 || historyNeedsHigherDensity(hydratedPriceHistory)) {
+    try {
+      const historyResponse = await getSecurityHistoricalSeries(normalizedSymbol, {
+        exchange: referenceHolding?.exchangeOverride ?? null,
+        currency: referenceHolding?.currency ?? null
+      });
+      if (historyResponse.results.length > 0) {
+        const mappedPoints: SecurityPriceHistoryPoint[] = historyResponse.results.map((point, index) => ({
+          id: `fetched-${normalizedSymbol}-${point.date}-${index}`,
+          symbol: normalizedSymbol,
+          priceDate: point.date,
+          close: point.close,
+          adjustedClose: point.adjustedClose ?? null,
+          currency: (point.currency ?? "CAD").toUpperCase() === "USD" ? "USD" : "CAD",
+          source: point.provider,
+          createdAt: new Date().toISOString()
+        }));
+        hydratedPriceHistory = mappedPoints;
+        try {
+          await upsertSecurityPriceHistoryPoints(mappedPoints);
+        } catch {
+          hydratedPriceHistory = mappedPoints;
+        }
+      }
+    } catch {
+      hydratedPriceHistory = userPriceHistory;
+    }
+  }
+
   const data = buildPortfolioSecurityDetailData({
     language: user.displayLanguage,
     accounts: userAccounts,
     holdings: userHoldings,
+    portfolioEvents: userEvents,
+    priceHistory: hydratedPriceHistory,
     snapshots: userSnapshots,
     profile,
     display,
-    symbol
+    symbol: normalizedSymbol
   });
 
   if (!data) {
@@ -1261,6 +1411,7 @@ export async function updateHoldingPosition(userId: string, holdingId: string, i
     const gainLossPct = costBasisCad != null && costBasisCad > 0
       ? round(((marketValueCad - costBasisCad) / costBasisCad) * 100, 2)
       : Number(holding.gainLossPct);
+    const previousQuantity = holding.quantity == null ? null : Number(holding.quantity);
 
     await tx
       .update(holdingPositions)
@@ -1286,6 +1437,46 @@ export async function updateHoldingPosition(userId: string, holdingId: string, i
         updatedAt: new Date()
       })
       .where(eq(holdingPositions.id, holding.id));
+
+    if (targetAccount.id !== holding.accountId && previousQuantity != null && previousQuantity > 0) {
+      await createPortfolioEvent(tx, {
+        userId,
+        accountId: holding.accountId,
+        symbol: holding.symbol,
+        eventType: "sell",
+        quantity: previousQuantity,
+        priceAmount: holding.lastPriceAmount == null ? null : Number(holding.lastPriceAmount),
+        currency: normalizeCurrencyCode((holding.currency as string) ?? "CAD"),
+        source: "holding-move"
+      });
+    }
+
+    if (targetAccount.id !== holding.accountId && quantity != null && quantity > 0) {
+      await createPortfolioEvent(tx, {
+        userId,
+        accountId: targetAccount.id,
+        symbol: holding.symbol,
+        eventType: "buy",
+        quantity,
+        priceAmount: lastPriceAmount,
+        currency,
+        source: "holding-move"
+      });
+    } else if (targetAccount.id === holding.accountId) {
+      const quantityDelta = (quantity ?? 0) - (previousQuantity ?? 0);
+      if (Math.abs(quantityDelta) > 0.000001) {
+        await createPortfolioEvent(tx, {
+          userId,
+          accountId: targetAccount.id,
+          symbol: holding.symbol,
+          eventType: "adjustment",
+          quantity: quantityDelta,
+          priceAmount: lastPriceAmount,
+          currency,
+          source: "holding-adjustment"
+        });
+      }
+    }
 
     await recalculatePortfolioState(tx, userId);
     await createPortfolioEditLog(
@@ -1317,6 +1508,22 @@ export async function updateHoldingPosition(userId: string, holdingId: string, i
 
     return true;
   });
+}
+
+function historyNeedsHigherDensity(points: SecurityPriceHistoryPoint[]) {
+  if (points.length < 30) {
+    return true;
+  }
+
+  const sorted = [...points].sort((left, right) => left.priceDate.localeCompare(right.priceDate));
+  const latest = sorted[sorted.length - 1];
+  const previous = sorted[sorted.length - 2];
+  if (!latest || !previous) {
+    return true;
+  }
+
+  const dayGap = (new Date(latest.priceDate).getTime() - new Date(previous.priceDate).getTime()) / (1000 * 60 * 60 * 24);
+  return dayGap > 7;
 }
 
 export async function createHoldingPosition(userId: string, accountId: string, input: CreateHoldingPositionInput) {
@@ -1385,6 +1592,19 @@ export async function createHoldingPosition(userId: string, accountId: string, i
       })
       .returning();
 
+    if (quantity != null && quantity > 0) {
+      await createPortfolioEvent(tx, {
+        userId,
+        accountId,
+        symbol: created.symbol,
+        eventType: "buy",
+        quantity,
+        priceAmount: lastPriceAmount,
+        currency,
+        source: "holding-create"
+      });
+    }
+
     await recalculatePortfolioState(tx, userId);
     await createPortfolioEditLog(
       tx,
@@ -1412,6 +1632,20 @@ export async function deleteHoldingPosition(userId: string, holdingId: string) {
     });
     if (!holding) {
       throw new Error("Holding was not found.");
+    }
+
+    const existingQuantity = holding.quantity == null ? null : Number(holding.quantity);
+    if (existingQuantity != null && existingQuantity > 0) {
+      await createPortfolioEvent(tx, {
+        userId,
+        accountId: holding.accountId,
+        symbol: holding.symbol,
+        eventType: "sell",
+        quantity: existingQuantity,
+        priceAmount: holding.lastPriceAmount == null ? null : Number(holding.lastPriceAmount),
+        currency: normalizeCurrencyCode((holding.currency as string) ?? "CAD"),
+        source: "holding-delete"
+      });
     }
 
     await tx.delete(holdingPositions).where(eq(holdingPositions.id, holding.id));
@@ -2262,6 +2496,30 @@ export async function scoreCandidateSecurityForUser(userId: string, input: Score
   }, "database");
 }
 
+export async function scoreCandidateSecuritiesForUser(userId: string, symbols: string[]) {
+  const repositories = getRepositories();
+  const [user, accounts, holdings, profile] = await Promise.all([
+    repositories.users.getById(userId),
+    repositories.accounts.listByUserId(userId),
+    repositories.holdings.listByUserId(userId),
+    repositories.preferences.getByUserId(userId)
+  ]);
+
+  const uniqueSymbols = [...new Set(symbols.map((symbol) => symbol.trim().toUpperCase()).filter(Boolean))].slice(0, 10);
+
+  return apiSuccess({
+    scorecards: uniqueSymbols.map((symbol) =>
+      scoreCandidateSecurity({
+        accounts,
+        holdings,
+        profile,
+        language: user.displayLanguage,
+        candidate: { symbol }
+      })
+    )
+  }, "database");
+}
+
 export async function registerUserAccount(input: RegisterUserInput): Promise<UserProfile> {
   const result = await registerUserWithCitizenProfile(input);
   return result.user;
@@ -2401,6 +2659,8 @@ export async function createImportJob(userId: string, input: CreateImportJobInpu
       if (input.workflow === "portfolio") {
         await tx.delete(holdingPositions).where(eq(holdingPositions.userId, userId));
         await tx.delete(investmentAccounts).where(eq(investmentAccounts.userId, userId));
+        await tx.delete(portfolioEvents).where(eq(portfolioEvents.userId, userId));
+        await tx.delete(portfolioSnapshots).where(eq(portfolioSnapshots.userId, userId));
       } else {
         await tx.delete(cashflowTransactions).where(eq(cashflowTransactions.userId, userId));
       }
@@ -2523,6 +2783,8 @@ export async function createImportJob(userId: string, input: CreateImportJobInpu
       const matchedHolding = existingHoldingByKey.get(holdingMatchKey(accountId, holding.symbol));
 
       if (matchedHolding) {
+        const previousQuantity = matchedHolding.quantity == null ? 0 : Number(matchedHolding.quantity);
+        const nextQuantity = holding.quantity ?? 0;
         await tx
           .update(holdingPositions)
           .set({
@@ -2544,6 +2806,20 @@ export async function createImportJob(userId: string, input: CreateImportJobInpu
             updatedAt: new Date()
           })
           .where(eq(holdingPositions.id, matchedHolding.id));
+
+        const quantityDelta = nextQuantity - previousQuantity;
+        if (Math.abs(quantityDelta) > 0.000001) {
+          await createPortfolioEvent(tx, {
+            userId,
+            accountId,
+            symbol: holding.symbol,
+            eventType: "adjustment",
+            quantity: quantityDelta,
+            priceAmount: holding.lastPriceAmount ?? null,
+            currency: holding.currency,
+            source: "portfolio-import"
+          });
+        }
       } else {
         holdingsToInsert.push(payload);
       }
@@ -2551,6 +2827,29 @@ export async function createImportJob(userId: string, input: CreateImportJobInpu
 
     if (holdingsToInsert.length > 0) {
       await tx.insert(holdingPositions).values(holdingsToInsert);
+      const insertedHoldingInputs = workflowScopedParsed.holdings.filter((holding) => {
+        const accountId = accountIdByKey.get(holding.accountKey);
+        if (!accountId) {
+          return false;
+        }
+        return !existingHoldingByKey.has(holdingMatchKey(accountId, holding.symbol));
+      });
+      for (const holding of insertedHoldingInputs) {
+        const accountId = accountIdByKey.get(holding.accountKey);
+        if (!accountId || holding.quantity == null || holding.quantity <= 0) {
+          continue;
+        }
+        await createPortfolioEvent(tx, {
+          userId,
+          accountId,
+          symbol: holding.symbol,
+          eventType: "buy",
+          quantity: holding.quantity,
+          priceAmount: holding.lastPriceAmount ?? null,
+          currency: holding.currency,
+          source: "portfolio-import"
+        });
+      }
     }
 
     const existingTransactionByKey = new Map(existingTransactions.map((transaction) => [transactionMatchKey({

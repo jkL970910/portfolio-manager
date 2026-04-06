@@ -388,12 +388,21 @@ components/
   - one unified symbol route at `/portfolio/security/[symbol]`
   - default aggregate held-position view across all accounts
   - compact first-fold dropdown selection inside the metric rail instead of a separate large context card
+  - timeframe filters for symbol history:
+    - `1D`
+    - `1W`
+    - `1M`
+    - `3M`
+    - `6M`
+    - `1Y`
+    - `All`
   - aggregate and account-level quantity / average-cost summaries
   - record selection inside one account when the same symbol exists in multiple holding rows there
   - reuse of the existing holding repair and single-symbol refresh panels inside the selected account view
 - Rules:
   - if the symbol is not held, keep the page in candidate-security mode
   - if the symbol is held, default to the aggregate view before drilling into one account
+  - symbol price history should stay symbol-level even when the user switches account context
   - aggregate view should show combined quantity and blended average cost before the user selects an account
   - account selection should live as a compact dropdown in the first fold and reveal the same repair / refresh / review depth that used to live only on the holding detail route
   - if one account contains multiple holding rows for the same symbol, keep the header metrics aggregated at the account level and add a second selector for the exact row being reviewed or edited
@@ -439,6 +448,18 @@ components/
 - Rules:
   - keep search, watchlist, and score actions together on the same result card
   - discovery is for user-directed idea exploration, not only for replaying system recommendations
+
+### `WatchlistComparePanel`
+
+- File: [watchlist-compare-panel.tsx](E:\Projects\Portfolio%20Manager\components\discover\watchlist-compare-panel.tsx)
+- Purpose: compare a small set of watchlist symbols side by side using recommendation-style scoring
+- Supports:
+  - multi-select from the current watchlist
+  - batch candidate comparison request
+  - ranked result cards
+- Rules:
+  - use this inside discovery rather than inside Settings
+  - comparison should stay lightweight and decision-oriented, not drift into a full backtesting tool
 
 ### `PortfolioSecurityDetailPage`
 

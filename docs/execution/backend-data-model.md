@@ -258,6 +258,12 @@ Required additions:
 Purpose:
 - create a replayable source of truth for historical position changes
 
+Current implementation status:
+- `portfolio_events` now exists in the runtime schema
+- unified security detail uses `portfolio_events + security_price_history` for aggregate and selected-account replay when data exists
+- holding create / update quantity change / cross-account move / delete now write new portfolio events so replay history can continue growing after user edits
+- portfolio CSV imports now also emit `portfolio_events`, and replace-mode imports clear prior events and snapshots before rebuilding the position set
+
 #### security_price_history
 - symbol
 - date
@@ -286,4 +292,7 @@ Current implementation status:
 - `portfolio_snapshots` now exists in the runtime schema
 - dashboard net worth trend now prefers persisted snapshot values
 - portfolio and account detail trend cards now prefer persisted snapshot values
-- holding and security detail pages still use reference curves until `security_price_history` is wired into replay builders
+- current-day portfolio snapshots are now upserted automatically after portfolio write paths recalculate state
+- unified security detail aggregate view now replays combined held-position history from `portfolio_events + security_price_history` when both are available
+- unified security detail will also fetch and persist provider history when local `security_price_history` is missing or too shallow
+- selected account views inside the unified symbol page now replay held-position history from `portfolio_events + security_price_history` when both are available

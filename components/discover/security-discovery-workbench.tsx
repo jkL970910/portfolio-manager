@@ -8,6 +8,7 @@ import type { DisplayLanguage } from "@/lib/i18n/ui";
 import { pick } from "@/lib/i18n/ui";
 import { assertApiData, getApiErrorMessage, safeJson } from "@/lib/client/api";
 import { CandidateScorePanel } from "@/components/portfolio/candidate-score-panel";
+import { WatchlistComparePanel } from "@/components/discover/watchlist-compare-panel";
 import { WatchlistToggleButton } from "@/components/portfolio/watchlist-toggle-button";
 import { SecurityMark } from "@/components/portfolio/security-mark";
 import { Button } from "@/components/ui/button";
@@ -30,6 +31,7 @@ export function SecurityDiscoveryWorkbench({
 }) {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<SecuritySearchResult[]>([]);
+  const [selectedSearchSymbols, setSelectedSearchSymbols] = useState<string[]>([]);
   const [searched, setSearched] = useState(false);
   const [status, setStatus] = useState("");
   const [providerStatus, setProviderStatus] = useState<string | null>(null);
@@ -73,6 +75,7 @@ export function SecurityDiscoveryWorkbench({
         );
         setSearched(true);
         setResults(data.results);
+        setSelectedSearchSymbols([]);
         setProviderStatus(
           data.providerHealth.twelveDataConfigured
             ? pick(language, "当前搜索由 Twelve Data 提供。", "Search is currently backed by Twelve Data.")
@@ -91,8 +94,28 @@ export function SecurityDiscoveryWorkbench({
       }
     });
   }
+
+  function toggleSelectedSearchSymbol(symbol: string) {
+    setSelectedSearchSymbols((current) =>
+      current.includes(symbol)
+        ? current.filter((entry) => entry !== symbol)
+        : [...current, symbol].slice(0, 10)
+    );
+  }
   return (
     <div className="space-y-6">
+      <WatchlistComparePanel language={language} watchlistSymbols={initialWatchlistSymbols} />
+
+      {searched && results.length > 0 ? (
+        <WatchlistComparePanel
+          language={language}
+          watchlistSymbols={selectedSearchSymbols}
+          title={pick(language, "当前搜索结果对比", "Current search comparison")}
+          description={pick(language, "先从这次搜索结果里挑出几支，再把它们放在一起比较。", "Pick a few symbols from the current search results and compare them side by side.")}
+          compareLabel={pick(language, "比较已选搜索结果", "Compare selected search results")}
+        />
+      ) : null}
+
       <Card className="overflow-hidden bg-[linear-gradient(135deg,rgba(255,255,255,0.72),rgba(248,223,233,0.54),rgba(224,235,255,0.46))]">
         <CardContent className="space-y-5 px-6 py-6">
           <div className="space-y-3">
@@ -164,6 +187,19 @@ export function SecurityDiscoveryWorkbench({
                         </div>
                       </div>
                       <p className="text-sm leading-7 text-[color:var(--muted-foreground)]">{result.name}</p>
+                      <button
+                        type="button"
+                        onClick={() => toggleSelectedSearchSymbol(normalized)}
+                        className={`inline-flex rounded-full border px-3 py-1.5 text-xs font-medium transition ${
+                          selectedSearchSymbols.includes(normalized)
+                            ? "border-[rgba(240,143,178,0.4)] bg-[rgba(255,255,255,0.84)] text-[color:var(--primary)]"
+                            : "border-white/60 bg-white/44 text-[color:var(--foreground)] hover:bg-white/58"
+                        }`}
+                      >
+                        {selectedSearchSymbols.includes(normalized)
+                          ? pick(language, "已选入比较", "Selected for compare")
+                          : pick(language, "加入比较", "Add to compare")}
+                      </button>
                     </div>
                   </div>
 
