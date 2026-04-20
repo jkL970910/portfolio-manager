@@ -84,10 +84,12 @@ Next build focus:
 
 Updated now:
 
-- snapshot-backed trend lines are live for:
+- replay-backed trend lines now prefer real holding-price history for:
   - dashboard net worth
   - portfolio workspace
   - account detail
+- dashboard trend is now explicitly framed as invested-asset history, not full net worth, until spending/cash accounts join the same replay model
+- cash account and cash-account-balance-event schema foundations are now in place for the later full net-worth curve
 - current-day portfolio snapshots now refresh automatically after portfolio recalculation on write paths
 - unified security detail aggregate view now replays combined held-position history from `portfolio_events + security_price_history`
 - selected account views inside the unified symbol page now replay held-position history from `portfolio_events + security_price_history` when both are available

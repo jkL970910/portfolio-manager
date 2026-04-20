@@ -1,5 +1,7 @@
 import {
   accounts,
+  cashAccounts,
+  cashAccountBalanceEvents,
   findAuthUserByEmail,
   findUserById,
   holdings,
@@ -59,6 +61,16 @@ export const mockRepositories: BackendRepositories = {
   transactions: {
     async listByUserId(userId) {
       return transactions.filter((transaction) => transaction.userId === userId);
+    }
+  },
+  cashAccounts: {
+    async listByUserId(userId) {
+      return cashAccounts.filter((account) => account.userId === userId);
+    }
+  },
+  cashAccountBalanceEvents: {
+    async listByUserId(userId) {
+      return cashAccountBalanceEvents.filter((event) => event.userId === userId);
     }
   },
   portfolioEvents: {

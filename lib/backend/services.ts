@@ -46,6 +46,8 @@ import {
   importJobs,
   importMappingPresets,
   investmentAccounts,
+  cashAccounts,
+  cashAccountBalanceEvents,
   portfolioEditLogs,
   portfolioEvents,
   portfolioSnapshots,
@@ -55,7 +57,7 @@ import {
   securityPriceHistory,
   users
 } from "@/lib/db/schema";
-import type { ImportJob, ImportMappingPreset, InvestmentAccount, SecurityPriceHistoryPoint } from "@/lib/backend/models";
+import type { HoldingPosition, ImportJob, ImportMappingPreset, InvestmentAccount, SecurityPriceHistoryPoint } from "@/lib/backend/models";
 import { convertCurrencyAmount, getFxRate } from "@/lib/market-data/fx";
 import { getSecurityHistoricalSeries, getSecurityQuote, resolveSecurity } from "@/lib/market-data/service";
 import type { SecurityQuote, SecurityResolution } from "@/lib/market-data/types";
@@ -243,6 +245,7 @@ export interface CreateGuidedImportInput {
   holdings?: Array<{
     symbol: string;
     holdingName?: string;
+    exchange?: string | null;
     assetClass: string;
     sector?: string;
     currency: CurrencyCode;
@@ -542,6 +545,10 @@ function normalizeCurrencyCode(value: string): CurrencyCode {
   return value === "USD" ? "USD" : "CAD";
 }
 
+function holdingIdentityKey(symbol: string, currency: CurrencyCode, exchange?: string | null) {
+  return `${symbol.trim().toUpperCase()}::${currency}::${exchange?.trim().toUpperCase() || ""}`;
+}
+
 async function toCadAmount(amount: number | null | undefined, currency: CurrencyCode) {
   if (amount == null || !Number.isFinite(amount)) {
     return null;
@@ -579,6 +586,7 @@ async function normalizeManualHolding(input: NonNullable<CreateGuidedImportInput
   return {
     symbol: input.symbol.trim().toUpperCase(),
     name: input.holdingName?.trim() || input.symbol.trim().toUpperCase(),
+    exchange: input.exchange?.trim() || null,
     assetClass: input.assetClass,
     sector: input.sector?.trim() || "Multi-sector",
     currency,
@@ -741,6 +749,88 @@ async function upsertCurrentPortfolioSnapshot(tx: DbTransaction, userId: string)
   });
 }
 
+async function rebuildDerivedCashBalanceHistory(tx: DbTransaction, userId: string) {
+  const derivedInstitution = "Imported cash flow";
+  const derivedNickname = "Spending balance";
+  const transactions = await tx.query.cashflowTransactions.findMany({
+    where: eq(cashflowTransactions.userId, userId),
+    orderBy: desc(cashflowTransactions.bookedAt)
+  });
+
+  const sortedTransactions = [...transactions].sort((left, right) => left.bookedAt.localeCompare(right.bookedAt));
+  const existingCashAccount = await tx.query.cashAccounts.findFirst({
+    where: and(eq(cashAccounts.userId, userId), eq(cashAccounts.institution, derivedInstitution), eq(cashAccounts.nickname, derivedNickname))
+  });
+
+  const [cashAccount] = existingCashAccount
+    ? [existingCashAccount]
+    : await tx.insert(cashAccounts).values({
+        userId,
+        institution: derivedInstitution,
+        nickname: derivedNickname,
+        currency: "CAD",
+        currentBalanceAmount: "0.00",
+        currentBalanceCad: "0.00"
+      }).returning();
+
+  await tx.delete(cashAccountBalanceEvents).where(and(eq(cashAccountBalanceEvents.userId, userId), eq(cashAccountBalanceEvents.cashAccountId, cashAccount.id)));
+
+  let runningBalance = 0;
+  const groupedByDate = new Map<string, number>();
+  for (const transaction of sortedTransactions) {
+    const delta = transaction.direction === "inflow" ? Number(transaction.amountCad) : -Number(transaction.amountCad);
+    groupedByDate.set(transaction.bookedAt, (groupedByDate.get(transaction.bookedAt) ?? 0) + delta);
+  }
+
+  const dailyBalances = [...groupedByDate.entries()]
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([bookedAt, delta]) => {
+      runningBalance += delta;
+      return {
+        userId,
+        cashAccountId: cashAccount.id,
+        bookedAt,
+        balanceAmount: runningBalance.toFixed(2),
+        balanceCad: runningBalance.toFixed(2),
+        source: "derived-transaction"
+      };
+    });
+
+  if (dailyBalances.length > 0) {
+    await tx.insert(cashAccountBalanceEvents).values(dailyBalances);
+  }
+
+  await tx
+    .update(cashAccounts)
+    .set({
+      currentBalanceAmount: runningBalance.toFixed(2),
+      currentBalanceCad: runningBalance.toFixed(2),
+      updatedAt: new Date()
+    })
+    .where(eq(cashAccounts.id, cashAccount.id));
+}
+
+async function ensureDerivedCashBalanceHistory(userId: string) {
+  const db = getDb();
+  const [transactions, existingEvents] = await Promise.all([
+    db.query.cashflowTransactions.findMany({
+      where: eq(cashflowTransactions.userId, userId),
+      orderBy: desc(cashflowTransactions.bookedAt)
+    }),
+    db.query.cashAccountBalanceEvents.findFirst({
+      where: eq(cashAccountBalanceEvents.userId, userId)
+    })
+  ]);
+
+  if (transactions.length === 0 || existingEvents) {
+    return;
+  }
+
+  await db.transaction(async (tx) => {
+    await rebuildDerivedCashBalanceHistory(tx, userId);
+  });
+}
+
 async function upsertSecurityPriceHistoryPoints(points: SecurityPriceHistoryPoint[]) {
   if (points.length === 0) {
     return;
@@ -878,14 +968,19 @@ function filterCsvContentByWorkflow(
 
 export async function getDashboardView(userId: string) {
   const repositories = getRepositories();
+  await ensureDerivedCashBalanceHistory(userId);
   const user = await repositories.users.getById(userId);
-  const [userAccounts, userHoldings, userTransactions, userSnapshots, profile] = await Promise.all([
+  const [userAccounts, userHoldings, userTransactions, userCashAccounts, userCashBalanceEvents, userEvents, userSnapshots, profile] = await Promise.all([
     repositories.accounts.listByUserId(user.id),
     repositories.holdings.listByUserId(user.id),
     repositories.transactions.listByUserId(user.id),
+    repositories.cashAccounts.listByUserId(user.id),
+    repositories.cashAccountBalanceEvents.listByUserId(user.id),
+    repositories.portfolioEvents.listByUserId(user.id),
     repositories.snapshots.listByUserId(user.id),
     repositories.preferences.getByUserId(user.id)
   ]);
+  const userPriceHistory = await getHydratedSecurityPriceHistoryForHoldings(userHoldings);
 
   let latestRun: RecommendationRun | null = null;
   try {
@@ -905,6 +1000,10 @@ export async function getDashboardView(userId: string) {
       accounts: userAccounts,
       holdings: userHoldings,
       transactions: userTransactions,
+      cashAccounts: userCashAccounts,
+      cashAccountBalanceEvents: userCashBalanceEvents,
+      portfolioEvents: userEvents,
+      priceHistory: userPriceHistory,
       snapshots: userSnapshots,
       profile,
       latestRun,
@@ -921,13 +1020,15 @@ export async function getDashboardView(userId: string) {
 
 export async function getPortfolioView(userId: string) {
   const repositories = getRepositories();
-  const [user, userAccounts, userHoldings, userSnapshots, profile] = await Promise.all([
+  const [user, userAccounts, userHoldings, userEvents, userSnapshots, profile] = await Promise.all([
     repositories.users.getById(userId),
     repositories.accounts.listByUserId(userId),
     repositories.holdings.listByUserId(userId),
+    repositories.portfolioEvents.listByUserId(userId),
     repositories.snapshots.listByUserId(userId),
     repositories.preferences.getByUserId(userId)
   ]);
+  const userPriceHistory = await getHydratedSecurityPriceHistoryForHoldings(userHoldings);
 
   const display = {
     currency: user.baseCurrency,
@@ -935,7 +1036,16 @@ export async function getPortfolioView(userId: string) {
   } as const;
 
   return apiSuccess({
-    ...buildPortfolioData({ language: user.displayLanguage, accounts: userAccounts, holdings: userHoldings, snapshots: userSnapshots, profile, display }),
+    ...buildPortfolioData({
+      language: user.displayLanguage,
+      accounts: userAccounts,
+      holdings: userHoldings,
+      portfolioEvents: userEvents,
+      priceHistory: userPriceHistory,
+      snapshots: userSnapshots,
+      profile,
+      display
+    }),
     context: {
       totalMarketValueCad: userAccounts.reduce((sum, account) => sum + account.marketValueCad, 0),
       topHoldingSymbol: [...userHoldings].sort((left, right) => right.marketValueCad - left.marketValueCad)[0]?.symbol ?? null
@@ -963,8 +1073,8 @@ function getHoldingDetailMarketDataSummary(params: {
   const { language, quote, resolution } = params;
   const providerLabel = quote.provider === "twelve-data"
     ? "Twelve Data"
-    : resolution.provider === "openfigi"
-      ? "OpenFIGI"
+    : quote.provider === "yahoo-finance"
+      ? "Yahoo Finance"
       : "fallback";
 
   return {
@@ -1017,7 +1127,7 @@ function getHoldingDetailMarketDataSummary(params: {
       },
       {
         label: pick(language, "报价来源", "Quote source"),
-        value: quote.provider === "twelve-data" ? "Twelve Data" : pick(language, "缓存回退", "Fallback"),
+        value: providerLabel,
         detail: pick(language, quote.delayed ? "当前按延迟行情处理。" : "当前按可用现价处理。", quote.delayed ? "Currently treated as delayed market data." : "Currently treated as the latest available quote.")
       },
       {
@@ -1081,13 +1191,15 @@ function applyResolvedSecurityContextToHoldingDetail(args: {
 
 export async function getPortfolioAccountDetailView(userId: string, accountId: string) {
   const repositories = getRepositories();
-  const [user, userAccounts, userHoldings, userSnapshots, profile] = await Promise.all([
+  const [user, userAccounts, userHoldings, userEvents, userSnapshots, profile] = await Promise.all([
     repositories.users.getById(userId),
     repositories.accounts.listByUserId(userId),
     repositories.holdings.listByUserId(userId),
+    repositories.portfolioEvents.listByUserId(userId),
     repositories.snapshots.listByUserId(userId),
     repositories.preferences.getByUserId(userId)
   ]);
+  const userPriceHistory = await getHydratedSecurityPriceHistoryForHoldings(userHoldings);
 
   const display = {
     currency: user.baseCurrency,
@@ -1103,6 +1215,23 @@ export async function getPortfolioAccountDetailView(userId: string, accountId: s
     display,
     accountId
   });
+
+  if (data) {
+    const portfolioData = buildPortfolioData({
+      language: user.displayLanguage,
+      accounts: userAccounts,
+      holdings: userHoldings,
+      portfolioEvents: userEvents,
+      priceHistory: userPriceHistory,
+      snapshots: userSnapshots,
+      profile,
+      display
+    });
+    const accountContext = portfolioData.accountContexts.find((entry) => entry.id === accountId);
+    if (accountContext) {
+      data.performance = accountContext.performance;
+    }
+  }
 
   if (!data) {
     return apiSuccess({ data }, "database");
@@ -1213,7 +1342,10 @@ export async function getPortfolioHoldingDetailView(userId: string, holdingId: s
         provider: "fallback" as const
       }
     })),
-    getSecurityQuote(data.holding.symbol).catch(() => ({
+    getSecurityQuote(data.holding.symbol, {
+      exchange: data.editContext.current.exchangeOverride ?? null,
+      currency: data.holding.currency
+    }).catch(() => ({
       result: {
         symbol: data.holding.symbol,
         price: 0,
@@ -1317,7 +1449,10 @@ export async function getPortfolioSecurityDetailView(userId: string, symbol: str
         provider: "fallback" as const
       }
     })),
-    getSecurityQuote(data.security.symbol).catch(() => ({
+    getSecurityQuote(data.security.symbol, {
+      exchange: referenceHolding?.exchangeOverride ?? null,
+      currency: referenceHolding?.currency ?? data.security.currency
+    }).catch(() => ({
       result: {
         symbol: data.security.symbol,
         price: 0,
@@ -1524,6 +1659,58 @@ function historyNeedsHigherDensity(points: SecurityPriceHistoryPoint[]) {
 
   const dayGap = (new Date(latest.priceDate).getTime() - new Date(previous.priceDate).getTime()) / (1000 * 60 * 60 * 24);
   return dayGap > 7;
+}
+
+async function getHydratedSecurityPriceHistoryForHoldings(holdings: HoldingPosition[]) {
+  const repositories = getRepositories();
+  const bySymbol = new Map<string, HoldingPosition[]>();
+  for (const holding of holdings) {
+    const symbol = holding.symbol.trim().toUpperCase();
+    const group = bySymbol.get(symbol) ?? [];
+    group.push(holding);
+    bySymbol.set(symbol, group);
+  }
+
+  const results = await Promise.all(
+    [...bySymbol.entries()].map(async ([symbol, groupedHoldings]) => {
+      const existing = await repositories.securityPriceHistory.listBySymbol(symbol);
+      if (!historyNeedsHigherDensity(existing)) {
+        return existing;
+      }
+
+      const reference = groupedHoldings[0];
+      try {
+        const fetched = await getSecurityHistoricalSeries(symbol, {
+          exchange: reference?.exchangeOverride ?? null,
+          currency: reference?.currency ?? null
+        });
+        const mappedPoints: SecurityPriceHistoryPoint[] = fetched.results.map((point, index) => ({
+          id: `fetched-${symbol}-${point.date}-${index}`,
+          symbol,
+          priceDate: point.date,
+          close: point.close,
+          adjustedClose: point.adjustedClose ?? null,
+          currency: (point.currency ?? "CAD").toUpperCase() === "USD" ? "USD" : "CAD",
+          source: point.provider,
+          createdAt: new Date().toISOString()
+        }));
+        if (mappedPoints.length > 0) {
+          try {
+            await upsertSecurityPriceHistoryPoints(mappedPoints);
+          } catch {
+            // Keep fetched history in memory for this response even if persistence fails.
+          }
+          return mappedPoints;
+        }
+      } catch {
+        return existing;
+      }
+
+      return existing;
+    })
+  );
+
+  return results.flat();
 }
 
 export async function createHoldingPosition(userId: string, accountId: string, input: CreateHoldingPositionInput) {
@@ -2903,6 +3090,10 @@ export async function createImportJob(userId: string, input: CreateImportJobInpu
       await tx.insert(cashflowTransactions).values(transactionsToInsert);
     }
 
+    if (input.workflow === "spending") {
+      await rebuildDerivedCashBalanceHistory(tx, userId);
+    }
+
       return {
         job: {
           id: jobRow.id,
@@ -3001,16 +3192,22 @@ export async function createGuidedImportAccount(userId: string, input: CreateGui
           eq(holdingPositions.accountId, accountRow.id)
         )
       );
-      const existingHoldingBySymbol = new Map(existingHoldings.map((holding) => [holding.symbol.toUpperCase(), holding]));
+      const existingHoldingByIdentity = new Map(
+        existingHoldings.map((holding) => [
+          holdingIdentityKey(holding.symbol, normalizeCurrencyCode(holding.currency), holding.exchangeOverride),
+          holding
+        ])
+      );
       const normalizedHoldings = await Promise.all(input.holdings.map(normalizeManualHolding));
 
       for (const holding of normalizedHoldings) {
-        const matched = existingHoldingBySymbol.get(holding.symbol);
+        const matched = existingHoldingByIdentity.get(holdingIdentityKey(holding.symbol, holding.currency, holding.exchange));
         if (matched) {
           await tx
             .update(holdingPositions)
             .set({
               name: holding.name,
+              exchangeOverride: holding.exchange,
               assetClass: holding.assetClass,
               sector: holding.sector,
               currency: holding.currency,
@@ -3033,6 +3230,7 @@ export async function createGuidedImportAccount(userId: string, input: CreateGui
             accountId: accountRow.id,
             symbol: holding.symbol,
             name: holding.name,
+            exchangeOverride: holding.exchange,
             assetClass: holding.assetClass,
             sector: holding.sector,
             currency: holding.currency,
@@ -3139,10 +3337,11 @@ export async function refreshPortfolioQuotes(userId: string): Promise<RefreshPor
     holdings
       .map((holding) => ({
         symbol: holding.symbol.trim().toUpperCase(),
-        exchange: holding.exchangeOverride?.trim() || null
+        exchange: holding.exchangeOverride?.trim() || null,
+        currency: normalizeCurrencyCode((holding.currency as string) || "CAD")
       }))
       .filter((holding) => holding.symbol)
-      .map((holding) => [`${holding.symbol}::${holding.exchange ?? ""}`, holding])
+      .map((holding) => [`${holding.symbol}::${holding.exchange ?? ""}::${holding.currency}`, holding])
   ).values()];
 
   if (uniqueSymbols.length === 0) {
@@ -3156,42 +3355,36 @@ export async function refreshPortfolioQuotes(userId: string): Promise<RefreshPor
 
   const { getBatchSecurityQuotes } = await import("@/lib/market-data/service");
   const quoteResults = await getBatchSecurityQuotes(uniqueSymbols);
-  const quoteMap = new Map(
-    quoteResults.results
-      .filter((quote) => Number.isFinite(quote.price) && quote.price > 0)
-      .map((quote) => [`${quote.symbol.trim().toUpperCase()}::${quote.exchange?.trim() || ""}`, quote])
-  );
+  const quoteMap = new Map<string, (typeof quoteResults.results)[number]>();
+  quoteResults.results.forEach((quote, index) => {
+    const request = uniqueSymbols[index];
+    if (request && Number.isFinite(quote.price) && quote.price > 0) {
+      quoteMap.set(`${request.symbol}::${request.exchange ?? ""}::${request.currency}`, quote);
+    }
+  });
 
   const refreshedAt = new Date();
   let refreshedHoldingCount = 0;
-  const ambiguousQuoteKeys = new Set<string>();
+  const missingQuoteKeys = new Set<string>();
 
   await db.transaction(async (tx) => {
       const currentHoldings = await tx.select().from(holdingPositions).where(eq(holdingPositions.userId, userId));
 
       for (const holding of currentHoldings) {
-        const quoteKey = `${holding.symbol.trim().toUpperCase()}::${holding.exchangeOverride?.trim() || ""}`;
-        const quote = quoteMap.get(quoteKey) ?? quoteMap.get(`${holding.symbol.trim().toUpperCase()}::`);
+        const requestedCurrency = normalizeCurrencyCode((holding.currency as string) || "CAD");
+        const quoteKey = `${holding.symbol.trim().toUpperCase()}::${holding.exchangeOverride?.trim() || ""}::${requestedCurrency}`;
+        const quote = quoteMap.get(quoteKey);
         if (!quote) {
+          missingQuoteKeys.add(quoteKey);
           continue;
         }
-      const holdingCurrency = normalizeCurrencyCode((holding.currency as string) || "CAD");
-      const quoteCurrency = normalizeCurrencyCode(quote.currency || holdingCurrency);
-      const hasExplicitExchangeOverride = Boolean(holding.exchangeOverride?.trim());
-      if (!hasExplicitExchangeOverride && holdingCurrency !== quoteCurrency) {
-        ambiguousQuoteKeys.add(quoteKey);
-        continue;
-      }
-      const nativePrice = quote.price;
-      const priceInCad = quoteCurrency === "CAD"
-        ? nativePrice
-        : await convertCurrencyAmount(nativePrice, quoteCurrency, "CAD");
+      const priceInCad = requestedCurrency === "CAD"
+        ? quote.price
+        : await convertCurrencyAmount(quote.price, requestedCurrency, "CAD");
 
       const quantity = holding.quantity == null ? null : Number(holding.quantity);
       const currentMarketValue = quantity != null && quantity > 0
-        ? round((holdingCurrency === quoteCurrency
-          ? quantity * nativePrice
-          : quantity * (holding.lastPriceAmount == null ? nativePrice : Number(holding.lastPriceAmount))))
+        ? round(quantity * quote.price)
         : Number(holding.marketValueAmount ?? holding.marketValueCad);
       const currentMarketValueCad = quantity != null && quantity > 0
         ? round(quantity * priceInCad)
@@ -3204,8 +3397,8 @@ export async function refreshPortfolioQuotes(userId: string): Promise<RefreshPor
       await tx
         .update(holdingPositions)
         .set({
-          currency: holdingCurrency,
-          lastPriceAmount: nativePrice.toFixed(4),
+          currency: requestedCurrency,
+          lastPriceAmount: quote.price.toFixed(4),
           lastPriceCad: priceInCad.toFixed(4),
           marketValueAmount: currentMarketValue.toFixed(2),
           marketValueCad: currentMarketValueCad.toFixed(2),
@@ -3222,7 +3415,7 @@ export async function refreshPortfolioQuotes(userId: string): Promise<RefreshPor
 
   return {
     refreshedHoldingCount,
-    missingQuoteCount: uniqueSymbols.length - quoteMap.size + ambiguousQuoteKeys.size,
+    missingQuoteCount: missingQuoteKeys.size,
     sampledSymbolCount: uniqueSymbols.length,
     refreshedAt: refreshedAt.toISOString()
   };
@@ -3240,10 +3433,11 @@ export async function refreshPortfolioSecurityQuote(userId: string, symbol: stri
     holdings
       .map((holding) => ({
         symbol: holding.symbol.trim().toUpperCase(),
-        exchange: holding.exchangeOverride?.trim() || null
+        exchange: holding.exchangeOverride?.trim() || null,
+        currency: normalizeCurrencyCode((holding.currency as string) || "CAD")
       }))
       .filter((holding) => holding.symbol)
-      .map((holding) => [`${holding.symbol}::${holding.exchange ?? ""}`, holding])
+      .map((holding) => [`${holding.symbol}::${holding.exchange ?? ""}::${holding.currency}`, holding])
   ).values()];
 
   if (uniqueSymbols.length === 0) {
@@ -3265,15 +3459,17 @@ export async function refreshPortfolioSecurityQuote(userId: string, symbol: stri
 
   const { getBatchSecurityQuotes } = await import("@/lib/market-data/service");
   const quoteResults = await getBatchSecurityQuotes(uniqueSymbols);
-  const quoteMap = new Map(
-    quoteResults.results
-      .filter((quote) => Number.isFinite(quote.price) && quote.price > 0)
-      .map((quote) => [`${quote.symbol.trim().toUpperCase()}::${quote.exchange?.trim() || ""}`, quote])
-  );
+  const quoteMap = new Map<string, (typeof quoteResults.results)[number]>();
+  quoteResults.results.forEach((quote, index) => {
+    const request = uniqueSymbols[index];
+    if (request && Number.isFinite(quote.price) && quote.price > 0) {
+      quoteMap.set(`${request.symbol}::${request.exchange ?? ""}::${request.currency}`, quote);
+    }
+  });
 
   const refreshedAt = new Date();
   let refreshedHoldingCount = 0;
-  const ambiguousQuoteKeys = new Set<string>();
+  const missingQuoteKeys = new Set<string>();
 
   await db.transaction(async (tx) => {
     const currentHoldings = await tx
@@ -3286,32 +3482,21 @@ export async function refreshPortfolioSecurityQuote(userId: string, symbol: stri
         continue;
       }
 
-      const quoteKey = `${holding.symbol.trim().toUpperCase()}::${holding.exchangeOverride?.trim() || ""}`;
-      const quote = quoteMap.get(quoteKey) ?? quoteMap.get(`${holding.symbol.trim().toUpperCase()}::`);
+      const requestedCurrency = normalizeCurrencyCode((holding.currency as string) || "CAD");
+      const quoteKey = `${holding.symbol.trim().toUpperCase()}::${holding.exchangeOverride?.trim() || ""}::${requestedCurrency}`;
+      const quote = quoteMap.get(quoteKey);
       if (!quote) {
+        missingQuoteKeys.add(quoteKey);
         continue;
       }
 
-      const holdingCurrency = normalizeCurrencyCode((holding.currency as string) || "CAD");
-      const quoteCurrency = normalizeCurrencyCode(quote.currency || holdingCurrency);
-      const hasExplicitExchangeOverride = Boolean(holding.exchangeOverride?.trim());
-      if (!hasExplicitExchangeOverride && holdingCurrency !== quoteCurrency) {
-        ambiguousQuoteKeys.add(quoteKey);
-        continue;
-      }
-
-      const nativePrice = quote.price;
-      const priceInCad = quoteCurrency === "CAD"
-        ? nativePrice
-        : await convertCurrencyAmount(nativePrice, quoteCurrency, "CAD");
+      const priceInCad = requestedCurrency === "CAD"
+        ? quote.price
+        : await convertCurrencyAmount(quote.price, requestedCurrency, "CAD");
 
       const quantity = holding.quantity == null ? null : Number(holding.quantity);
       const currentMarketValue = quantity != null && quantity > 0
-        ? round(
-            holdingCurrency === quoteCurrency
-              ? quantity * nativePrice
-              : quantity * (holding.lastPriceAmount == null ? nativePrice : Number(holding.lastPriceAmount))
-          )
+        ? round(quantity * quote.price)
         : Number(holding.marketValueAmount ?? holding.marketValueCad);
       const currentMarketValueCad = quantity != null && quantity > 0
         ? round(quantity * priceInCad)
@@ -3324,8 +3509,8 @@ export async function refreshPortfolioSecurityQuote(userId: string, symbol: stri
       await tx
         .update(holdingPositions)
         .set({
-          currency: holdingCurrency,
-          lastPriceAmount: nativePrice.toFixed(4),
+          currency: requestedCurrency,
+          lastPriceAmount: quote.price.toFixed(4),
           lastPriceCad: priceInCad.toFixed(4),
           marketValueAmount: currentMarketValue.toFixed(2),
           marketValueCad: currentMarketValueCad.toFixed(2),
@@ -3348,9 +3533,9 @@ export async function refreshPortfolioSecurityQuote(userId: string, symbol: stri
     symbol: normalizedSymbol,
     matchedHoldingCount: holdings.length,
     refreshedHoldingCount,
-    missingQuoteCount: uniqueSymbols.length - quoteMap.size + ambiguousQuoteKeys.size,
+    missingQuoteCount: missingQuoteKeys.size,
     sampledSymbolCount: uniqueSymbols.length,
-    ambiguousHoldingCount: ambiguousQuoteKeys.size,
+    ambiguousHoldingCount: 0,
     quoteFound: quoteMap.size > 0,
     quotePrice: firstQuote?.price ?? null,
     quoteCurrency: firstQuote?.currency ?? null,
@@ -3432,4 +3617,3 @@ export async function createRecommendationRun(userId: string, input: CreateRecom
     };
   });
 }
-

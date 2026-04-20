@@ -41,7 +41,15 @@ export interface DashboardData {
     weight: string;
     value: string;
   }[];
-  netWorthTrend: { label: string; value: number }[];
+  trendContext: {
+    title: string;
+    description: string;
+    scopeLabel: string;
+    scopeDetail: string;
+    sourceLabel: string;
+    sourceDetail: string;
+  };
+  netWorthTrend: { label: string; value: number; rawDate?: string }[];
   spendingMonthLabel: string;
   savingsPattern: string;
   investableCash: string;
@@ -67,6 +75,14 @@ export interface PortfolioData {
     currency: "CAD" | "USD";
     fxRateLabel: string;
     fxNote: string;
+  };
+  trendContext: {
+    title: string;
+    description: string;
+    scopeLabel: string;
+    scopeDetail: string;
+    sourceLabel: string;
+    sourceDetail: string;
   };
   performance: { label: string; value: number; rawDate?: string }[];
   accountTypeAllocation: { id: string; name: string; value: number; detail?: string }[];
@@ -231,6 +247,14 @@ export interface PortfolioAccountDetailData {
     currency: "CAD" | "USD";
     fxRateLabel: string;
     fxNote: string;
+  };
+  trendContext: {
+    title: string;
+    description: string;
+    scopeLabel: string;
+    scopeDetail: string;
+    sourceLabel: string;
+    sourceDetail: string;
   };
   account: {
     id: string;

@@ -53,6 +53,9 @@ Notes:
 - `account_id` is the bridge between account detail and holding detail.
 - override fields preserve user repairs without erasing provider-derived source values.
 - recommendation and portfolio-health logic should prefer override values when present.
+- quote refresh treats `symbol + exchange_override + currency` as the holding's market-data identity.
+- CAD and USD variants of the same underlying company can coexist as separate rows.
+- `Other / Manual` exchange override marks holdings that should not be refreshed through an equity quote provider, such as physical gold tracked by ounce.
 
 ### cashflow_transactions
 - id
@@ -63,6 +66,27 @@ Notes:
 - category
 - amount_cad
 - direction
+- created_at
+
+### cash_accounts
+- id
+- user_id
+- institution
+- nickname
+- currency
+- current_balance_amount
+- current_balance_cad
+- created_at
+- updated_at
+
+### cash_account_balance_events
+- id
+- user_id
+- cash_account_id
+- booked_at
+- balance_amount
+- balance_cad
+- source
 - created_at
 
 ### preference_profiles
@@ -138,6 +162,10 @@ Notes:
 - recommendation v2 now persists structured placement and scoring metadata so the UI can explain why a sleeve, account, and security were chosen.
 - spending summaries should be derived from `transactions`, not stored separately at first.
 - portfolio dashboard metrics should be computed from accounts, holdings, transactions, and preferences.
+- future full net-worth replay should combine:
+  - invested asset history
+  - cash account balance history
+  - later liability history when that layer exists
 - import mapping presets are now durable user-level resources stored in the database.
 - current dashboard and portfolio trend charts still rely on synthetic series, not replayed historical portfolio values.
 
@@ -236,6 +264,7 @@ Model note:
 - `Unknown securityType` or `Unknown exchange` mainly weakens display quality, market context, and future FX/exchange logic.
 - `Unknown assetClass` is materially more dangerous because recommendation v2 and portfolio health both rely on `assetClass` as a primary input.
 - for that reason, Phase 3 lets users repair `assetClass`, `securityType`, `exchange`, and `marketSector` from the holding detail page.
+- exchange repair also controls quote routing. A CAD CDR should be marked as a Canadian exchange/listing rather than relying on the company name or bare ticker symbol.
 
 ### Phase 4: real historical performance
 
@@ -290,8 +319,9 @@ Purpose:
 
 Current implementation status:
 - `portfolio_snapshots` now exists in the runtime schema
-- dashboard net worth trend now prefers persisted snapshot values
-- portfolio and account detail trend cards now prefer persisted snapshot values
+- dashboard net worth trend now prefers replayed holding value series from real price history, falling back to snapshots only when replay inputs are still shallow
+- portfolio and account detail trend cards now prefer replayed holding value series from real price history, falling back to snapshots only when replay inputs are still shallow
+- dashboard trend is currently scoped to invested assets only; full net-worth replay still needs spending/cash account balances to join the same daily model
 - current-day portfolio snapshots are now upserted automatically after portfolio write paths recalculate state
 - unified security detail aggregate view now replays combined held-position history from `portfolio_events + security_price_history` when both are available
 - unified security detail will also fetch and persist provider history when local `security_price_history` is missing or too shallow

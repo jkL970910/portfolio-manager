@@ -1,6 +1,6 @@
 # Portfolio Workspace Roadmap
 
-Last updated: 2026-03-26
+Last updated: 2026-04-19
 
 ## Why this roadmap exists
 
@@ -165,6 +165,11 @@ Current delivery status:
 - holding deletion is available from holding detail and returns the user to the parent account after confirmation
 - holding saves now invalidate related portfolio/account/dashboard/recommendation routes so parent totals and summaries refresh consistently
 - quote refresh now skips ambiguous cross-currency quotes when no explicit exchange override exists, so CAD wrappers and CDR-like positions do not get silently overwritten by mismatched USD prices
+- quote refresh now routes CAD and USD holdings separately:
+    - CAD CDR / Cboe Canada / NEO holdings use Yahoo Finance `.NE` symbols
+    - CAD TSX holdings use Yahoo Finance `.TO` symbols
+    - USD holdings continue through the USD quote path
+    - manual physical assets can opt out through `Other / Manual`
 - Phase 3 cleanup has also tightened:
     - holding-table wording and density with shorter labels
     - quote refresh explanations around missing-vs-cached quotes

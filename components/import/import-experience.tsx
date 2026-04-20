@@ -115,6 +115,7 @@ type ManualHoldingDraft = {
   id: string;
   searchQuery: string;
   symbol: string;
+  exchange: string;
   holdingName: string;
   assetClass: (typeof ASSET_CLASS_OPTIONS)[number];
   sector: string;
@@ -316,6 +317,7 @@ function createManualHoldingDraft(): ManualHoldingDraft {
     id: Math.random().toString(36).slice(2, 10),
     searchQuery: "",
     symbol: "",
+    exchange: "",
     holdingName: "",
     assetClass: "Canadian Equity",
     sector: "Multi-sector",
@@ -564,40 +566,32 @@ export function ImportExperience({
     }
   }
 
-  async function resolveManualHolding(id: string, symbol: string, nextName?: string) {
+  async function selectManualHoldingSuggestion(id: string, result: MarketDataSearchResult) {
     setManualHoldingStatus((current) => ({
       ...current,
       [id]: { ...current[id], searchLoading: true, error: "", message: "" }
     }));
 
     try {
-      const response = await fetch(`/api/market-data/resolve?symbol=${encodeURIComponent(symbol)}`);
-      const payload = await safeJson(response);
-      if (!response.ok) {
-        throw new Error(getApiErrorMessage(payload, "Security normalization failed."));
-      }
-
-      const data = assertApiData<{ result?: { symbol?: string; name?: string; provider?: string; currency?: string | null } }>(
-        payload,
-        (candidate) => typeof candidate === "object" && candidate !== null,
-        "Security normalization succeeded but returned no usable normalization payload."
-      );
-      const result = data.result;
-      if (!result || typeof result.symbol !== "string" || result.symbol.trim().length === 0) {
-        throw new Error("Security normalization returned no usable symbol.");
+      if (typeof result.symbol !== "string" || result.symbol.trim().length === 0) {
+        throw new Error("Search result returned no usable symbol.");
       }
 
       const normalizedSymbol = result.symbol.toUpperCase();
       const normalizedCurrency = normalizeSupportedCurrency(result.currency);
       const normalizedName = typeof result.name === "string" && result.name.trim().length > 0
         ? result.name
-        : nextName ?? normalizedSymbol;
+        : normalizedSymbol;
+      const normalizedExchange = typeof result.exchange === "string" && result.exchange.trim().length > 0
+        ? result.exchange.trim().toUpperCase()
+        : "";
       const providerLabel = typeof result.provider === "string" && result.provider.trim().length > 0
         ? result.provider
         : "market-data provider";
       updateManualHolding(id, {
         symbol: normalizedSymbol,
         searchQuery: normalizedSymbol,
+        exchange: normalizedExchange,
         holdingName: normalizedName,
         currency: normalizedCurrency
       });
@@ -608,7 +602,7 @@ export function ImportExperience({
           ...current[id],
           searchLoading: false,
           error: "",
-          message: `Normalized to ${normalizedSymbol} via ${providerLabel}.`
+          message: `Selected ${normalizedSymbol}${normalizedExchange ? ` on ${normalizedExchange}` : ""} in ${normalizedCurrency} via ${providerLabel}.`
         }
       }));
     } catch (error) {
@@ -639,7 +633,15 @@ export function ImportExperience({
     }));
 
     try {
-      const response = await fetch(`/api/market-data/quote?symbol=${encodeURIComponent(holding.symbol.trim())}`);
+      const quoteParams = new URLSearchParams({
+        symbol: holding.symbol.trim(),
+        currency: holding.currency
+      });
+      if (holding.exchange.trim()) {
+        quoteParams.set("exchange", holding.exchange.trim());
+      }
+
+      const response = await fetch(`/api/market-data/quote?${quoteParams.toString()}`);
       const payload = await safeJson(response);
       if (!response.ok) {
         throw new Error(getApiErrorMessage(payload, "Quote lookup failed."));
@@ -1039,6 +1041,7 @@ export function ImportExperience({
             ? manualHoldings.map((holding) => ({
                 symbol: holding.symbol.trim(),
                 holdingName: holding.holdingName.trim() || undefined,
+                exchange: holding.exchange.trim() || undefined,
                 assetClass: holding.assetClass,
                 sector: holding.sector.trim() || undefined,
                 currency: holding.currency,
@@ -1264,7 +1267,7 @@ export function ImportExperience({
                     onAddManualHolding={addManualHolding}
                     onRemoveManualHolding={removeManualHolding}
                     onManualHoldingSearch={searchManualHolding}
-                    onManualHoldingSuggestionSelect={resolveManualHolding}
+                    onManualHoldingSuggestionSelect={selectManualHoldingSuggestion}
                     onManualHoldingQuoteFetch={fetchManualHoldingQuote}
                     guidedCsvFileName={guidedCsvFileName}
                     guidedCsvHeaders={guidedCsvHeaders}
@@ -1527,7 +1530,7 @@ function StepProvideSource(props: {
   onAddManualHolding: () => void;
   onRemoveManualHolding: (id: string) => void;
   onManualHoldingSearch: (id: string) => Promise<void>;
-  onManualHoldingSuggestionSelect: (id: string, symbol: string, name?: string) => Promise<void>;
+  onManualHoldingSuggestionSelect: (id: string, result: MarketDataSearchResult) => Promise<void>;
   onManualHoldingQuoteFetch: (id: string) => Promise<void>;
   guidedCsvFileName: string;
   guidedCsvHeaders: string[];
@@ -1853,6 +1856,10 @@ function StepProvideSource(props: {
                     <input value={holding.symbol} onChange={(event) => onManualHoldingChange(holding.id, { symbol: event.target.value.toUpperCase() })} className="w-full rounded-2xl border border-[color:var(--border)] bg-white px-4 py-3 text-sm outline-none" placeholder="VFV" />
                   </label>
                   <label className="space-y-2">
+                    <span className="text-sm font-medium">{pick(language, "交易所 / 市场", "Exchange / market")}</span>
+                    <input value={holding.exchange} onChange={(event) => onManualHoldingChange(holding.id, { exchange: event.target.value.toUpperCase() })} className="w-full rounded-2xl border border-[color:var(--border)] bg-white px-4 py-3 text-sm outline-none" placeholder={pick(language, "例如 NASDAQ / TSX / NEO", "e.g. NASDAQ / TSX / NEO")} />
+                  </label>
+                  <label className="space-y-2">
                     <span className="text-sm font-medium">{pick(language, "持仓名称", "Holding name")}</span>
                     <input value={holding.holdingName} onChange={(event) => onManualHoldingChange(holding.id, { holdingName: event.target.value })} className="w-full rounded-2xl border border-[color:var(--border)] bg-white px-4 py-3 text-sm outline-none" placeholder={pick(language, "标准化成功后会自动填充", "Auto-filled from normalization when available")} />
                   </label>
@@ -1931,7 +1938,7 @@ function StepProvideSource(props: {
                         <button
                           key={`${holding.id}-${result.symbol}-${result.exchange ?? ""}`}
                           type="button"
-                          onClick={() => void onManualHoldingSuggestionSelect(holding.id, result.symbol, result.name)}
+                          onClick={() => void onManualHoldingSuggestionSelect(holding.id, result)}
                           className="flex w-full items-start justify-between gap-3 rounded-2xl border border-[color:var(--border)] bg-white px-4 py-3 text-left transition-colors hover:border-[color:var(--primary)]"
                         >
                           <div>

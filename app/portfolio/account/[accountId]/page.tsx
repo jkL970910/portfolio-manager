@@ -85,6 +85,19 @@ export default async function PortfolioAccountDetailPage({
                 data={detail.performance}
                 dataKey="value"
                 color="#152238"
+                rangeControls
+                valueFormat="currency"
+                currencyCode={detail.displayContext.currency}
+                actions={
+                  <div className="flex flex-wrap gap-2">
+                    <div className="inline-flex rounded-full border border-white/60 bg-white/56 px-3 py-1.5 text-xs font-medium text-[color:var(--foreground)] backdrop-blur-md">
+                      {detail.trendContext.scopeLabel}: {detail.trendContext.scopeDetail}
+                    </div>
+                    <div className="inline-flex rounded-full border border-white/60 bg-white/56 px-3 py-1.5 text-xs font-medium text-[color:var(--foreground)] backdrop-blur-md">
+                      {detail.trendContext.sourceLabel}: {detail.trendContext.sourceDetail}
+                    </div>
+                  </div>
+                }
                 />
               </div>
             </CardContent>

@@ -2,6 +2,8 @@ import { desc, eq } from "drizzle-orm";
 import { getDb } from "@/lib/db/client";
 import {
   allocationTargets,
+  cashAccountBalanceEvents,
+  cashAccounts,
   cashflowTransactions,
   holdingPositions,
   importJobs,
@@ -18,6 +20,8 @@ import {
   HoldingPosition,
   ImportJob,
   InvestmentAccount,
+  CashAccount,
+  CashAccountBalanceEvent,
   PortfolioEvent,
   PortfolioSnapshot,
   SecurityPriceHistoryPoint,
@@ -72,6 +76,33 @@ function mapImportJob(row: typeof importJobs.$inferSelect): ImportJob {
     status: row.status as ImportJob["status"],
     sourceType: row.sourceType as "csv",
     fileName: row.fileName,
+    createdAt: row.createdAt.toISOString()
+  };
+}
+
+function mapCashAccount(row: typeof cashAccounts.$inferSelect): CashAccount {
+  return {
+    id: row.id,
+    userId: row.userId,
+    institution: row.institution,
+    nickname: row.nickname,
+    currency: row.currency as CashAccount["currency"],
+    currentBalanceAmount: toNumber(row.currentBalanceAmount),
+    currentBalanceCad: toNumber(row.currentBalanceCad),
+    createdAt: row.createdAt.toISOString(),
+    updatedAt: row.updatedAt.toISOString()
+  };
+}
+
+function mapCashAccountBalanceEvent(row: typeof cashAccountBalanceEvents.$inferSelect): CashAccountBalanceEvent {
+  return {
+    id: row.id,
+    userId: row.userId,
+    cashAccountId: row.cashAccountId,
+    bookedAt: row.bookedAt,
+    balanceAmount: toNumber(row.balanceAmount),
+    balanceCad: toNumber(row.balanceCad),
+    source: row.source,
     createdAt: row.createdAt.toISOString()
   };
 }
@@ -248,6 +279,25 @@ export const postgresRepositories: BackendRepositories = {
         amountCad: toNumber(row.amountCad),
         direction: row.direction as "inflow" | "outflow"
       }));
+    }
+  },
+  cashAccounts: {
+    async listByUserId(userId) {
+      const db = getDb();
+      const rows = await db.query.cashAccounts.findMany({
+        where: eq(cashAccounts.userId, userId)
+      });
+      return rows.map(mapCashAccount);
+    }
+  },
+  cashAccountBalanceEvents: {
+    async listByUserId(userId) {
+      const db = getDb();
+      const rows = await db.query.cashAccountBalanceEvents.findMany({
+        where: eq(cashAccountBalanceEvents.userId, userId),
+        orderBy: desc(cashAccountBalanceEvents.bookedAt)
+      });
+      return rows.map(mapCashAccountBalanceEvent);
     }
   },
   portfolioEvents: {

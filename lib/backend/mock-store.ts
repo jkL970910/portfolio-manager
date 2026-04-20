@@ -1,6 +1,8 @@
 import { hashSync } from "bcryptjs";
 import {
   AuthIdentity,
+  CashAccount,
+  CashAccountBalanceEvent,
   CashflowTransaction,
   HoldingPosition,
   ImportJob,
@@ -249,6 +251,46 @@ export const transactions: CashflowTransaction[] = [
     amountCad: 7100,
     direction: "inflow"
   }
+];
+
+export const cashAccounts: CashAccount[] = [
+  {
+    id: "cash_demo_main",
+    userId: "user_demo",
+    institution: "Tangerine",
+    nickname: "Daily Cash",
+    currency: "CAD",
+    currentBalanceAmount: 15420,
+    currentBalanceCad: 15420,
+    createdAt: "2025-10-01T00:00:00.000Z",
+    updatedAt: "2026-03-01T00:00:00.000Z"
+  },
+  {
+    id: "cash_casey_main",
+    userId: "user_casey",
+    institution: "Simplii",
+    nickname: "Monthly Buffer",
+    currency: "CAD",
+    currentBalanceAmount: 9820,
+    currentBalanceCad: 9820,
+    createdAt: "2025-10-01T00:00:00.000Z",
+    updatedAt: "2026-03-01T00:00:00.000Z"
+  }
+];
+
+export const cashAccountBalanceEvents: CashAccountBalanceEvent[] = [
+  { id: "cash_evt_demo_1", userId: "user_demo", cashAccountId: "cash_demo_main", bookedAt: "2025-10-01", balanceAmount: 13200, balanceCad: 13200, source: "seed", createdAt: "2025-10-01T00:00:00.000Z" },
+  { id: "cash_evt_demo_2", userId: "user_demo", cashAccountId: "cash_demo_main", bookedAt: "2025-11-01", balanceAmount: 14120, balanceCad: 14120, source: "seed", createdAt: "2025-11-01T00:00:00.000Z" },
+  { id: "cash_evt_demo_3", userId: "user_demo", cashAccountId: "cash_demo_main", bookedAt: "2025-12-01", balanceAmount: 13940, balanceCad: 13940, source: "seed", createdAt: "2025-12-01T00:00:00.000Z" },
+  { id: "cash_evt_demo_4", userId: "user_demo", cashAccountId: "cash_demo_main", bookedAt: "2026-01-01", balanceAmount: 14780, balanceCad: 14780, source: "seed", createdAt: "2026-01-01T00:00:00.000Z" },
+  { id: "cash_evt_demo_5", userId: "user_demo", cashAccountId: "cash_demo_main", bookedAt: "2026-02-01", balanceAmount: 15140, balanceCad: 15140, source: "seed", createdAt: "2026-02-01T00:00:00.000Z" },
+  { id: "cash_evt_demo_6", userId: "user_demo", cashAccountId: "cash_demo_main", bookedAt: "2026-03-01", balanceAmount: 15420, balanceCad: 15420, source: "seed", createdAt: "2026-03-01T00:00:00.000Z" },
+  { id: "cash_evt_casey_1", userId: "user_casey", cashAccountId: "cash_casey_main", bookedAt: "2025-10-01", balanceAmount: 8600, balanceCad: 8600, source: "seed", createdAt: "2025-10-01T00:00:00.000Z" },
+  { id: "cash_evt_casey_2", userId: "user_casey", cashAccountId: "cash_casey_main", bookedAt: "2025-11-01", balanceAmount: 9040, balanceCad: 9040, source: "seed", createdAt: "2025-11-01T00:00:00.000Z" },
+  { id: "cash_evt_casey_3", userId: "user_casey", cashAccountId: "cash_casey_main", bookedAt: "2025-12-01", balanceAmount: 9280, balanceCad: 9280, source: "seed", createdAt: "2025-12-01T00:00:00.000Z" },
+  { id: "cash_evt_casey_4", userId: "user_casey", cashAccountId: "cash_casey_main", bookedAt: "2026-01-01", balanceAmount: 9440, balanceCad: 9440, source: "seed", createdAt: "2026-01-01T00:00:00.000Z" },
+  { id: "cash_evt_casey_5", userId: "user_casey", cashAccountId: "cash_casey_main", bookedAt: "2026-02-01", balanceAmount: 9630, balanceCad: 9630, source: "seed", createdAt: "2026-02-01T00:00:00.000Z" },
+  { id: "cash_evt_casey_6", userId: "user_casey", cashAccountId: "cash_casey_main", bookedAt: "2026-03-01", balanceAmount: 9820, balanceCad: 9820, source: "seed", createdAt: "2026-03-01T00:00:00.000Z" }
 ];
 
 export const portfolioEvents: PortfolioEvent[] = [

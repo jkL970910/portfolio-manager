@@ -4,6 +4,8 @@ import {
   HoldingPosition,
   ImportJob,
   InvestmentAccount,
+  CashAccount,
+  CashAccountBalanceEvent,
   PortfolioEvent,
   PortfolioSnapshot,
   SecurityPriceHistoryPoint,
@@ -36,6 +38,14 @@ export interface TransactionRepository {
   listByUserId(userId: EntityId): Promise<CashflowTransaction[]>;
 }
 
+export interface CashAccountRepository {
+  listByUserId(userId: EntityId): Promise<CashAccount[]>;
+}
+
+export interface CashAccountBalanceEventRepository {
+  listByUserId(userId: EntityId): Promise<CashAccountBalanceEvent[]>;
+}
+
 export interface PortfolioEventRepository {
   listByUserId(userId: EntityId): Promise<PortfolioEvent[]>;
 }
@@ -65,6 +75,8 @@ export interface BackendRepositories {
   accounts: AccountRepository;
   holdings: HoldingRepository;
   transactions: TransactionRepository;
+  cashAccounts: CashAccountRepository;
+  cashAccountBalanceEvents: CashAccountBalanceEventRepository;
   portfolioEvents: PortfolioEventRepository;
   snapshots: PortfolioSnapshotRepository;
   securityPriceHistory: SecurityPriceHistoryRepository;

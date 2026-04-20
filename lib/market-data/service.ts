@@ -4,12 +4,55 @@ import { getMarketDataConfig } from "@/lib/market-data/config";
 import { getHistoricalSeriesFromAlphaVantage } from "@/lib/market-data/alpha-vantage";
 import { resolveSecurityWithOpenFigi } from "@/lib/market-data/openfigi";
 import { getHistoricalSeriesFromTwelveData, getQuoteFromTwelveData, searchSecuritiesWithTwelveData } from "@/lib/market-data/twelve-data";
+import { getQuoteFromYahooFinance } from "@/lib/market-data/yahoo-finance";
 import type { SecurityHistoricalPoint, SecurityQuote, SecurityResolution, SecuritySearchResult } from "@/lib/market-data/types";
 
 type SecurityQuoteOptions = {
   exchange?: string | null;
   currency?: string | null;
 };
+
+function isCanadianQuoteRequest(exchange?: string | null, currency?: string | null) {
+  const normalizedCurrency = currency?.trim().toUpperCase() || null;
+  const normalizedExchange = exchange?.trim().toUpperCase() || null;
+  return normalizedCurrency === "CAD"
+    || normalizedExchange === "TSX"
+    || normalizedExchange === "TSXV"
+    || normalizedExchange === "NEO"
+    || normalizedExchange === "CBOE"
+    || normalizedExchange === "CBOE CANADA"
+    || Boolean(normalizedExchange?.startsWith("NEO-"));
+}
+
+async function getRoutedQuote(symbol: string, exchange?: string | null, currency?: string | null) {
+  if (exchange?.trim().toUpperCase() === "OTHER / MANUAL") {
+    return null;
+  }
+
+  if (isCanadianQuoteRequest(exchange, currency)) {
+    const yahooQuote = await getQuoteFromYahooFinance(symbol, exchange, currency).catch((error) => {
+      const message = error instanceof Error ? error.message.toLowerCase() : "";
+      if (message.includes("rate limit")) {
+        throw error;
+      }
+      return null;
+    });
+    if (yahooQuote) {
+      return yahooQuote;
+    }
+  }
+
+  const twelveQuote = await getQuoteFromTwelveData(symbol, exchange, currency);
+  if (twelveQuote) {
+    return twelveQuote;
+  }
+
+  if (!isCanadianQuoteRequest(exchange, currency)) {
+    return getQuoteFromYahooFinance(symbol, exchange, currency).catch(() => null);
+  }
+
+  return null;
+}
 
 function hasDenseHistory(points: SecurityHistoricalPoint[]) {
   if (points.length < 30) {
@@ -80,18 +123,22 @@ export async function getSecurityQuote(
 ): Promise<{ result: SecurityQuote; providerHealth: ReturnType<typeof getProviderHealth> }> {
   const trimmed = symbol.trim().toUpperCase();
   const normalizedExchange = options?.exchange?.trim() || null;
+  const normalizedCurrency = options?.currency?.trim().toUpperCase() || null;
   if (!trimmed) {
     throw new Error("Security symbol is required.");
   }
 
   const { quoteCacheTtlSeconds } = getMarketDataConfig();
-  const cacheKey = normalizedExchange
-    ? `market-data:quote:${trimmed}:${normalizedExchange.toLowerCase()}`
-    : `market-data:quote:${trimmed}`;
+  const cacheKey = [
+    "market-data:quote:v4",
+    trimmed,
+    normalizedExchange?.toLowerCase() ?? "no-exchange",
+    normalizedCurrency?.toLowerCase() ?? "no-currency"
+  ].join(":");
   const quote = await getOrSetCached(cacheKey, {
     ttlMs: quoteCacheTtlSeconds * 1000,
     staleOnErrorMs: quoteCacheTtlSeconds * 1000
-  }, async () => getQuoteFromTwelveData(trimmed, normalizedExchange));
+  }, async () => getRoutedQuote(trimmed, normalizedExchange, normalizedCurrency));
 
   if (quote) {
     return { result: quote, providerHealth: getProviderHealth() };
@@ -112,21 +159,50 @@ export async function getSecurityQuote(
 }
 
 export async function getBatchSecurityQuotes(
-  symbols: Array<string | { symbol: string; exchange?: string | null }>
+  symbols: Array<string | { symbol: string; exchange?: string | null; currency?: string | null }>
 ): Promise<{ results: SecurityQuote[]; providerHealth: ReturnType<typeof getProviderHealth> }> {
   const uniqueSymbols = [...new Map(
     symbols
       .map((entry) => typeof entry === "string"
-        ? { symbol: entry.trim().toUpperCase(), exchange: null as string | null }
-        : { symbol: entry.symbol.trim().toUpperCase(), exchange: entry.exchange?.trim() || null }
+        ? { symbol: entry.trim().toUpperCase(), exchange: null as string | null, currency: null as string | null }
+        : {
+            symbol: entry.symbol.trim().toUpperCase(),
+            exchange: entry.exchange?.trim() || null,
+            currency: entry.currency?.trim().toUpperCase() || null
+          }
       )
       .filter((entry) => entry.symbol)
-      .map((entry) => [`${entry.symbol}::${entry.exchange ?? ""}`, entry])
+      .map((entry) => [`${entry.symbol}::${entry.exchange ?? ""}::${entry.currency ?? ""}`, entry])
   ).values()];
-  const results = await Promise.all(uniqueSymbols.map(async (entry) => {
-    const quote = await getSecurityQuote(entry.symbol, { exchange: entry.exchange });
-    return quote.result;
-  }));
+  const results: SecurityQuote[] = [];
+  let rateLimited = false;
+  for (const entry of uniqueSymbols) {
+    const fallbackQuote: SecurityQuote = {
+      symbol: entry.symbol,
+      exchange: entry.exchange,
+      price: 0,
+      currency: entry.currency,
+      timestamp: new Date().toISOString(),
+      provider: "fallback" as const,
+      delayed: true
+    };
+
+    if (rateLimited) {
+      results.push(fallbackQuote);
+      continue;
+    }
+
+    try {
+      const quote = await getSecurityQuote(entry.symbol, { exchange: entry.exchange, currency: entry.currency });
+      results.push(quote.result);
+    } catch (error) {
+      const message = error instanceof Error ? error.message.toLowerCase() : "";
+      if (message.includes("twelve data") || message.includes("api credits")) {
+        rateLimited = true;
+      }
+      results.push(fallbackQuote);
+    }
+  }
 
   return {
     results,

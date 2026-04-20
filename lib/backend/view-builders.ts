@@ -16,6 +16,8 @@ import {
   HoldingPosition,
   ImportJob,
   InvestmentAccount,
+  CashAccount,
+  CashAccountBalanceEvent,
   PortfolioEvent,
   PortfolioSnapshot,
   SecurityPriceHistoryPoint,
@@ -354,41 +356,6 @@ function formatSnapshotLabel(snapshotDate: string, language: DisplayLanguage) {
   });
 }
 
-function buildHistoricalSeriesFromSnapshots(args: {
-  snapshots?: PortfolioSnapshot[];
-  language: DisplayLanguage;
-  getValue: (snapshot: PortfolioSnapshot) => number;
-}) {
-  const { snapshots = [], language, getValue } = args;
-  const recent = [...snapshots]
-    .sort((left, right) => left.snapshotDate.localeCompare(right.snapshotDate))
-    .slice(-6)
-    .map((snapshot) => ({
-      label: formatSnapshotLabel(snapshot.snapshotDate, language),
-      value: round(getValue(snapshot), 2)
-    }))
-    .filter((point) => Number.isFinite(point.value));
-
-  return recent.length >= 2 ? recent : null;
-}
-
-function buildIndexedHistoricalSeries(args: {
-  snapshots?: PortfolioSnapshot[];
-  language: DisplayLanguage;
-  getValue: (snapshot: PortfolioSnapshot) => number;
-}) {
-  const absoluteSeries = buildHistoricalSeriesFromSnapshots(args);
-  if (!absoluteSeries || absoluteSeries.length < 2) {
-    return null;
-  }
-
-  const baseline = absoluteSeries[0]?.value || 1;
-  return absoluteSeries.map((point) => ({
-    label: point.label,
-    value: round((point.value / baseline) * 100, 1)
-  }));
-}
-
 function buildAbsolutePriceHistorySeries(args: {
   priceHistory?: SecurityPriceHistoryPoint[];
   language: DisplayLanguage;
@@ -462,6 +429,218 @@ function buildIndexedHeldPositionSeries(args: {
     rawDate: point.rawDate,
     value: round((point.value / baseline) * 100, 1)
   }));
+}
+
+function getHoldingQuantityForReplay(holding: HoldingPosition) {
+  if (holding.quantity != null && Number.isFinite(holding.quantity)) {
+    return holding.quantity;
+  }
+
+  if (
+    holding.marketValueAmount != null &&
+    holding.lastPriceAmount != null &&
+    holding.lastPriceAmount > 0 &&
+    Number.isFinite(holding.marketValueAmount) &&
+    Number.isFinite(holding.lastPriceAmount)
+  ) {
+    return holding.marketValueAmount / holding.lastPriceAmount;
+  }
+
+  return 0;
+}
+
+function getEventQuantityDelta(event: PortfolioEvent) {
+  const quantity = event.quantity ?? 0;
+  if (event.eventType === "sell") {
+    return -quantity;
+  }
+  return quantity;
+}
+
+function buildReplayedAggregateValueSeries(args: {
+  holdings: HoldingPosition[];
+  priceHistory: SecurityPriceHistoryPoint[];
+  events?: PortfolioEvent[];
+  language: DisplayLanguage;
+  display: DisplayContext;
+  accountId?: string;
+}) {
+  const { holdings, priceHistory, events = [], language, display, accountId } = args;
+  const relevantHoldings = accountId
+    ? holdings.filter((holding) => holding.accountId === accountId)
+    : holdings;
+  if (relevantHoldings.length === 0) {
+    return null;
+  }
+
+  const groupedCurrentQuantities = new Map<string, number>();
+  for (const holding of relevantHoldings) {
+    const symbol = holding.symbol.trim().toUpperCase();
+    groupedCurrentQuantities.set(symbol, (groupedCurrentQuantities.get(symbol) ?? 0) + getHoldingQuantityForReplay(holding));
+  }
+
+  const historiesBySymbol = new Map<string, SecurityPriceHistoryPoint[]>();
+  for (const point of priceHistory) {
+    const symbol = point.symbol.trim().toUpperCase();
+    if (!groupedCurrentQuantities.has(symbol)) {
+      continue;
+    }
+    const list = historiesBySymbol.get(symbol) ?? [];
+    list.push(point);
+    historiesBySymbol.set(symbol, list);
+  }
+
+  const allDates = [...new Set(
+    [...historiesBySymbol.values()]
+      .flat()
+      .map((point) => point.priceDate)
+      .sort()
+  )];
+  if (allDates.length < 2) {
+    return null;
+  }
+
+  const endDate = new Date(allDates[allDates.length - 1]);
+  const sixMonthsAgo = new Date(endDate);
+  sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+  const replayDates = allDates.filter((date) => new Date(date) >= sixMonthsAgo);
+  if (replayDates.length < 2) {
+    return null;
+  }
+
+  const groupedEvents = new Map<string, PortfolioEvent[]>();
+  for (const event of events) {
+    const symbol = event.symbol?.trim().toUpperCase();
+    if (!symbol || !groupedCurrentQuantities.has(symbol)) {
+      continue;
+    }
+    if (accountId && event.accountId !== accountId) {
+      continue;
+    }
+    const key = symbol;
+    const list = groupedEvents.get(key) ?? [];
+    list.push(event);
+    groupedEvents.set(key, list);
+  }
+  for (const [key, list] of groupedEvents.entries()) {
+    groupedEvents.set(key, list.sort((left, right) => left.bookedAt.localeCompare(right.bookedAt)));
+  }
+
+  const latestSeenPriceBySymbol = new Map<string, number>();
+  const pointers = new Map<string, number>();
+  for (const [symbol] of historiesBySymbol.entries()) {
+    pointers.set(symbol, 0);
+    historiesBySymbol.set(symbol, historiesBySymbol.get(symbol)!.sort((left, right) => left.priceDate.localeCompare(right.priceDate)));
+  }
+
+  const formatter = new Intl.DateTimeFormat(language === "zh" ? "zh-CN" : "en-CA", {
+    month: "short",
+    day: "numeric"
+  });
+
+  const series = replayDates.map((date) => {
+    for (const [symbol, points] of historiesBySymbol.entries()) {
+      let pointer = pointers.get(symbol) ?? 0;
+      while (pointer < points.length && points[pointer].priceDate <= date) {
+        latestSeenPriceBySymbol.set(symbol, points[pointer].adjustedClose ?? points[pointer].close);
+        pointer += 1;
+      }
+      pointers.set(symbol, pointer);
+    }
+
+    let totalValueCad = 0;
+    for (const [symbol, currentQuantity] of groupedCurrentQuantities.entries()) {
+      const latestPrice = latestSeenPriceBySymbol.get(symbol);
+      if (latestPrice == null) {
+        continue;
+      }
+
+      const futureDelta = (groupedEvents.get(symbol) ?? [])
+        .filter((event) => event.bookedAt > date)
+        .reduce((sum, event) => sum + getEventQuantityDelta(event), 0);
+      const quantityAtDate = currentQuantity - futureDelta;
+      totalValueCad += Math.max(quantityAtDate, 0) * latestPrice;
+    }
+
+    return {
+      label: formatter.format(new Date(date)),
+      rawDate: date,
+      value: round(convertCadToDisplay(totalValueCad, display), 2)
+    };
+  }).filter((point) => point.value > 0);
+
+  return series.length >= 2 ? series : null;
+}
+
+function buildAbsoluteSeriesFromSnapshots(args: {
+  snapshots?: PortfolioSnapshot[];
+  language: DisplayLanguage;
+  display: DisplayContext;
+  getValue: (snapshot: PortfolioSnapshot) => number;
+}) {
+  const { snapshots = [], language, display, getValue } = args;
+  const recent = [...snapshots]
+    .sort((left, right) => left.snapshotDate.localeCompare(right.snapshotDate))
+    .slice(-183)
+    .map((snapshot) => ({
+      label: formatSnapshotLabel(snapshot.snapshotDate, language),
+      rawDate: snapshot.snapshotDate,
+      value: round(convertCadToDisplay(getValue(snapshot), display), 2)
+    }))
+    .filter((point) => Number.isFinite(point.value));
+
+  return recent.length >= 2 ? recent : null;
+}
+
+function buildCashBalanceSeries(args: {
+  cashAccounts?: CashAccount[];
+  cashAccountBalanceEvents?: CashAccountBalanceEvent[];
+  language: DisplayLanguage;
+  display: DisplayContext;
+}) {
+  const { cashAccounts = [], cashAccountBalanceEvents = [], language, display } = args;
+  if (cashAccounts.length === 0) {
+    return null;
+  }
+
+  const eventsByAccount = new Map<string, CashAccountBalanceEvent[]>();
+  for (const event of cashAccountBalanceEvents) {
+    const group = eventsByAccount.get(event.cashAccountId) ?? [];
+    group.push(event);
+    eventsByAccount.set(event.cashAccountId, group);
+  }
+  for (const [key, list] of eventsByAccount.entries()) {
+    eventsByAccount.set(key, list.sort((left, right) => left.bookedAt.localeCompare(right.bookedAt)));
+  }
+
+  const allDates = [...new Set(
+    cashAccountBalanceEvents
+      .map((event) => event.bookedAt)
+      .sort()
+  )];
+  if (allDates.length < 2) {
+    return null;
+  }
+
+  const formatter = new Intl.DateTimeFormat(language === "zh" ? "zh-CN" : "en-CA", {
+    month: "short",
+    day: "numeric"
+  });
+
+  return allDates.map((date) => {
+    let totalBalanceCad = 0;
+    for (const account of cashAccounts) {
+      const events = eventsByAccount.get(account.id) ?? [];
+      const latest = [...events].reverse().find((event) => event.bookedAt <= date);
+      totalBalanceCad += latest?.balanceCad ?? account.currentBalanceCad;
+    }
+
+    return {
+      label: formatter.format(new Date(date)),
+      rawDate: date,
+      value: round(convertCadToDisplay(totalBalanceCad, display), 2)
+    };
+  });
 }
 
 function getMonthlyTransactionSeries(transactions: CashflowTransaction[], language: DisplayLanguage) {
@@ -867,12 +1046,16 @@ export function buildDashboardData(args: {
   accounts: InvestmentAccount[];
   holdings: HoldingPosition[];
   transactions: CashflowTransaction[];
+  cashAccounts?: CashAccount[];
+  cashAccountBalanceEvents?: CashAccountBalanceEvent[];
+  portfolioEvents?: PortfolioEvent[];
+  priceHistory?: SecurityPriceHistoryPoint[];
   snapshots?: PortfolioSnapshot[];
   profile: PreferenceProfile;
   latestRun: RecommendationRun | null;
   display: DisplayContext;
 }): DashboardData {
-  const { viewer, accounts, holdings, transactions, snapshots = [], profile, latestRun, display } = args;
+  const { viewer, accounts, holdings, transactions, cashAccounts = [], cashAccountBalanceEvents = [], portfolioEvents = [], priceHistory = [], snapshots = [], profile, latestRun, display } = args;
   const language = viewer.displayLanguage;
   const { typeLabelMap, instanceLabelMap } = buildAccountLabelMaps(accounts, language);
   const totalPortfolio = sum(accounts.map((account) => account.marketValueCad));
@@ -892,11 +1075,35 @@ export function buildDashboardData(args: {
   const spending = buildSpendingSummary(transactions, profile.cashBufferTargetCad);
   const accountPriorityOrder = profile.accountFundingPriority;
   const recommendation = getRecommendationTheme(latestRun, display, language, profile, accounts);
-  const netWorthTrend = buildHistoricalSeriesFromSnapshots({
+  const investedAssetTrend = buildReplayedAggregateValueSeries({
+    holdings,
+    priceHistory,
+    events: portfolioEvents,
+    language,
+    display
+  }) ?? buildAbsoluteSeriesFromSnapshots({
     snapshots,
     language,
+    display,
     getValue: (snapshot) => snapshot.totalValueCad
   }) ?? getSixMonthSeries(totalPortfolio, profile, getMonthLabels(language));
+  const cashBalanceTrend = buildCashBalanceSeries({
+    cashAccounts,
+    cashAccountBalanceEvents,
+    language,
+    display
+  });
+  const netWorthTrend = cashBalanceTrend && investedAssetTrend.length > 0
+    ? investedAssetTrend.map((point) => {
+        const cashPoint = "rawDate" in point && typeof point.rawDate === "string"
+          ? cashBalanceTrend.find((entry) => entry.rawDate === point.rawDate)
+          : null;
+        return {
+          ...point,
+          value: round(point.value + (cashPoint?.value ?? 0), 2)
+        };
+      })
+    : investedAssetTrend;
 
   return {
     displayContext: buildDisplayContext(display, language),
@@ -971,6 +1178,28 @@ export function buildDashboardData(args: {
         weight: formatCompactPercent(holding.weightPct, 1),
         value: formatMoneyForDisplay(holding.marketValueAmount, holding.currency ?? "CAD", holding.marketValueCad, display)
       })),
+    trendContext: {
+      title: cashBalanceTrend
+        ? pick(language, "总净资产走势", "Net worth trend")
+        : pick(language, "投资资产走势", "Invested asset trend"),
+      description: pick(
+        language,
+        cashBalanceTrend
+          ? "这里已经把投资资产和现金账户余额一起合进净资产曲线。"
+          : "这里目前只回放投资账户里的资产价值，不包含后续会接入的 spending / cash account 余额。",
+        cashBalanceTrend
+          ? "This curve now combines invested assets with the cash-account layer."
+          : "This currently replays invested-asset value only and does not yet include the spending/cash account layer planned for later net worth support."
+      ),
+      scopeLabel: pick(language, "当前范围", "Current scope"),
+      scopeDetail: cashBalanceTrend
+        ? pick(language, "投资资产 + 现金账户", "Invested assets + cash accounts")
+        : pick(language, "仅投资资产", "Invested assets only"),
+      sourceLabel: pick(language, "数据来源", "Data source"),
+      sourceDetail: cashBalanceTrend
+        ? pick(language, "真实持仓价格回放 + 现金余额历史", "Replayed holding prices + cash balance history")
+        : pick(language, "真实持仓价格回放", "Replayed holding prices")
+    },
     netWorthTrend,
     spendingMonthLabel: getLatestMonthLabel(language),
     savingsPattern: formatCompactPercent(spending.savingsRate, 1),
@@ -995,24 +1224,30 @@ export function buildPortfolioData(args: {
   language: DisplayLanguage;
   accounts: InvestmentAccount[];
   holdings: HoldingPosition[];
+  portfolioEvents?: PortfolioEvent[];
+  priceHistory?: SecurityPriceHistoryPoint[];
   snapshots?: PortfolioSnapshot[];
   profile: PreferenceProfile;
   display: DisplayContext;
 }): PortfolioData {
-  const { language, accounts, holdings, snapshots = [], profile, display } = args;
+  const { language, accounts, holdings, portfolioEvents = [], priceHistory = [], snapshots = [], profile, display } = args;
   const { typeLabelMap, instanceLabelMap, instanceDetailMap } = buildAccountLabelMaps(accounts, language);
   const currentAllocation = getCurrentAllocation(holdings);
   const targetAllocation = getTargetAllocation(profile);
   const health = buildPortfolioHealthSummary({ accounts, holdings, profile, language });
   const totalPortfolio = sum(accounts.map((account) => account.marketValueCad));
-  const portfolioPerformance = buildIndexedHistoricalSeries({
+  const portfolioPerformance = buildReplayedAggregateValueSeries({
+    holdings,
+    priceHistory,
+    events: portfolioEvents,
+    language,
+    display
+  }) ?? buildAbsoluteSeriesFromSnapshots({
     snapshots,
     language,
+    display,
     getValue: (snapshot) => snapshot.totalValueCad
-  }) ?? getSixMonthSeries(totalPortfolio || 1, profile, getMonthLabels(language)).map((point, index, series) => ({
-    label: point.label,
-    value: round((point.value / (series[0]?.value || 1)) * 100, 1)
-  }));
+  }) ?? getSixMonthSeries(totalPortfolio || 1, profile, getMonthLabels(language));
   const driftMap = new Map<string, number>();
   for (const [assetClass, targetPct] of targetAllocation.entries()) {
     driftMap.set(assetClass, round((currentAllocation.get(assetClass) ?? 0) - targetPct, 1));
@@ -1100,14 +1335,19 @@ export function buildPortfolioData(args: {
         name: instanceLabelMap.get(account.id) ?? account.nickname,
         typeId: account.type,
         typeLabel: typeLabelMap.get(account.id) ?? account.type,
-        performance: buildIndexedHistoricalSeries({
+        performance: buildReplayedAggregateValueSeries({
+          holdings,
+          priceHistory,
+          events: portfolioEvents,
+          language,
+          display,
+          accountId: account.id
+        }) ?? buildAbsoluteSeriesFromSnapshots({
           snapshots,
           language,
+          display,
           getValue: (snapshot) => snapshot.accountBreakdown[account.id] ?? 0
-        }) ?? getSixMonthSeries(accountTotal, profile, getMonthLabels(language)).map((point, index, series) => ({
-          label: point.label,
-          value: round((point.value / (series[0]?.value || 1)) * 100, 1)
-        })),
+        }) ?? getSixMonthSeries(accountTotal, profile, getMonthLabels(language)),
         healthScore: {
           score: accountHealth.score,
           status: accountHealth.status,
@@ -1150,6 +1390,18 @@ export function buildPortfolioData(args: {
 
   return {
     displayContext: buildDisplayContext(display, language),
+    trendContext: {
+      title: pick(language, "投资资产走势", "Invested asset trend"),
+      description: pick(
+        language,
+        "这里只回放投资账户里的资产价值，不包含现金账户或未来会接入的负债层。",
+        "This only replays invested-asset value and does not include the cash-account or future liability layers."
+      ),
+      scopeLabel: pick(language, "当前范围", "Current scope"),
+      scopeDetail: pick(language, "仅投资资产", "Invested assets only"),
+      sourceLabel: pick(language, "数据来源", "Data source"),
+      sourceDetail: pick(language, "真实持仓价格回放", "Replayed holding prices")
+    },
     performance: portfolioPerformance,
     accountTypeAllocation,
     accountInstanceAllocation,
@@ -1253,6 +1505,18 @@ export function buildPortfolioAccountDetailData(args: {
 
   return {
     displayContext: portfolio.displayContext,
+    trendContext: {
+      title: pick(language, `${accountCard.name} 资产走势`, `${accountCard.name} asset trend`),
+      description: pick(
+        language,
+        "这里只回放这个投资账户内的资产价值，不包含现金账户层。",
+        "This only replays the invested assets inside this account and does not include the cash-account layer."
+      ),
+      scopeLabel: pick(language, "当前范围", "Current scope"),
+      scopeDetail: pick(language, "仅当前投资账户", "Current invested account only"),
+      sourceLabel: pick(language, "数据来源", "Data source"),
+      sourceDetail: pick(language, "真实持仓价格回放", "Replayed holding prices")
+    },
     account: {
       id: accountCard.id,
       name: accountCard.name,

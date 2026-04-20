@@ -111,6 +111,7 @@ export const importMappingPresetUpdateSchema = z.object({
 const guidedHoldingSchema = z.object({
   symbol: z.string().trim().min(1).max(32),
   holdingName: z.string().trim().max(160).optional(),
+  exchange: z.string().trim().min(1).max(64).optional(),
   assetClass: z.string().trim().min(1).max(64),
   sector: z.string().trim().max(64).optional(),
   currency: z.enum(["CAD", "USD"]).default("CAD"),

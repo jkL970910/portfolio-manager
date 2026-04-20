@@ -9,12 +9,14 @@ export async function GET(request: NextRequest) {
   }
 
   const symbol = request.nextUrl.searchParams.get("symbol")?.trim() ?? "";
+  const exchange = request.nextUrl.searchParams.get("exchange")?.trim() || null;
+  const currency = request.nextUrl.searchParams.get("currency")?.trim() || null;
   if (!symbol) {
     return NextResponse.json({ error: "Symbol is required." }, { status: 400 });
   }
 
   try {
-    const data = await getSecurityQuote(symbol);
+    const data = await getSecurityQuote(symbol, { exchange, currency });
     return NextResponse.json({ data });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Quote lookup failed.";

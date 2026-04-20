@@ -138,17 +138,34 @@ export function PortfolioWorkspace({ data, language, initialFilters }: Portfolio
         <LineChartCard
           title={
             activeAccountContext
-              ? pick(language, `${activeAccountContext.name} 近 6 个月大概怎么走`, `How ${activeAccountContext.name} has moved over the last 6 months`)
-              : pick(language, '近 6 个月大概怎么走', 'How it has moved over the last 6 months')
+              ? pick(language, `${activeAccountContext.name} 资产走势`, `${activeAccountContext.name} asset trend`)
+              : data.trendContext.title
           }
           description={
             activeAccountContext
-              ? pick(language, '这里先看这个账户自己大概是稳着往上，还是波动比较大。', 'Start by checking whether this account has been moving steadily or swinging around more than expected.')
-              : pick(language, '先看整体是稳着往上，还是波动比较大。', 'Use this to see whether the portfolio has been moving steadily or swinging around more than you expected.')
+              ? pick(language, '这里只回放当前投资账户里的资产价值。', 'This replays the invested assets inside the current account only.')
+              : data.trendContext.description
           }
           data={currentPerformance}
           dataKey="value"
           color="#152238"
+          rangeControls
+          valueFormat="currency"
+          currencyCode={data.displayContext.currency}
+          actions={
+            <div className="flex flex-wrap gap-2">
+              <div className="inline-flex rounded-full border border-white/60 bg-white/56 px-3 py-1.5 text-xs font-medium text-[color:var(--foreground)] backdrop-blur-md">
+                {activeAccountContext
+                  ? pick(language, '当前范围: 当前投资账户', 'Current scope: current invested account')
+                  : `${data.trendContext.scopeLabel}: ${data.trendContext.scopeDetail}`}
+              </div>
+              <div className="inline-flex rounded-full border border-white/60 bg-white/56 px-3 py-1.5 text-xs font-medium text-[color:var(--foreground)] backdrop-blur-md">
+                {activeAccountContext
+                  ? pick(language, '数据来源: 真实持仓价格回放', 'Data source: replayed holding prices')
+                  : `${data.trendContext.sourceLabel}: ${data.trendContext.sourceDetail}`}
+              </div>
+            </div>
+          }
         />
 
         <SectionHeading

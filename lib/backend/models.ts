@@ -137,6 +137,29 @@ export interface CashflowTransaction {
   direction: "inflow" | "outflow";
 }
 
+export interface CashAccount {
+  id: EntityId;
+  userId: EntityId;
+  institution: string;
+  nickname: string;
+  currency: CurrencyCode;
+  currentBalanceAmount: number;
+  currentBalanceCad: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CashAccountBalanceEvent {
+  id: EntityId;
+  userId: EntityId;
+  cashAccountId: EntityId;
+  bookedAt: string;
+  balanceAmount: number;
+  balanceCad: number;
+  source: string;
+  createdAt: string;
+}
+
 export interface AllocationTarget {
   assetClass: string;
   targetPct: number;

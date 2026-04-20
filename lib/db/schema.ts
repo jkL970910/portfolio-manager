@@ -113,6 +113,29 @@ export const cashflowTransactions = pgTable("cashflow_transactions", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow()
 });
 
+export const cashAccounts = pgTable("cash_accounts", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  userId: uuid("user_id").notNull().references(() => users.id),
+  institution: varchar("institution", { length: 120 }).notNull(),
+  nickname: varchar("nickname", { length: 120 }).notNull(),
+  currency: varchar("currency", { length: 3 }).notNull().default("CAD"),
+  currentBalanceAmount: numeric("current_balance_amount", { precision: 14, scale: 2 }).notNull().default("0"),
+  currentBalanceCad: numeric("current_balance_cad", { precision: 14, scale: 2 }).notNull().default("0"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow()
+});
+
+export const cashAccountBalanceEvents = pgTable("cash_account_balance_events", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  userId: uuid("user_id").notNull().references(() => users.id),
+  cashAccountId: uuid("cash_account_id").notNull().references(() => cashAccounts.id),
+  bookedAt: date("booked_at").notNull(),
+  balanceAmount: numeric("balance_amount", { precision: 14, scale: 2 }).notNull(),
+  balanceCad: numeric("balance_cad", { precision: 14, scale: 2 }).notNull(),
+  source: varchar("source", { length: 32 }).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow()
+});
+
 export const preferenceProfiles = pgTable("preference_profiles", {
   id: uuid("id").defaultRandom().primaryKey(),
   userId: uuid("user_id").notNull().references(() => users.id),

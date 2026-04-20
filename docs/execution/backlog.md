@@ -72,6 +72,8 @@ Help a self-directed investor:
    - batch quote refresh
    - portfolio quote freshness and coverage
    - dashboard top-holdings price freshness
+   - quote identity now uses `symbol + exchange + currency`
+   - CAD-listed quote routing now separates Canadian `.NE` / `.TO` listings from USD primary listings
 
 ## In Progress
 
@@ -129,6 +131,7 @@ Help a self-directed investor:
 | Richer import review persistence | Planned | 4 | 3 | 3 | 4 | Build soon |
 | Watchlist and target constraints workflow | Planned | 3 | 2 | 2 | 4 | Build after guided setup |
 | Cloud-ready cache and async boundaries | Planned | 3 | 4 | 3 | 4 | Build before scale work |
+| Quote provider routing for CAD / USD holdings | Completed | 5 | 3 | 4 | 5 | Keep expanding with official Canadian-data fallbacks after Yahoo-backed personal workflow is validated |
 | Rebalancing optimizer | Deferred | 3 | 5 | 5 | 3 | Push later |
 | Historical scoring and simulation | Deferred | 3 | 4 | 4 | 3 | Push later |
 | Full budgeting workflows | Deferred | 2 | 5 | 3 | 2 | Push later |
@@ -154,6 +157,7 @@ Help a self-directed investor:
 - Prefer transparent, rule-based recommendation logic over opaque optimization.
 - Keep CSV import as the primary ingestion path until broker integrations are clearly justified.
 - Use market-data selectively and cache aggressively to protect provider quotas.
+- Never let a CAD-listed wrapper refresh from a bare USD primary ticker; quote refresh must preserve each holding's native market and currency.
 - Add sophistication only where it materially improves trust, correctness, or repeat usage.
 - Fix account readability before adding more analytics layers.
 - Prefer account-first and holding-first drilldowns over adding more summary cards.
@@ -166,6 +170,7 @@ Turn the next milestone into engineering tickets for:
 2. security discovery and candidate scoring
 3. richer import review persistence
 4. watchlist and target constraints workflow
+5. quote-provider status / stale-price UX for CAD wrappers and manual physical assets
 
 
 

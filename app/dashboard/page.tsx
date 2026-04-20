@@ -241,7 +241,26 @@ export default async function DashboardPage() {
           </Card>
         </div>
         <div className="grid gap-4 xl:grid-cols-2">
-          <LineChartCard title={pick(language, "净资产走势", "Net Worth Trend")} description={pick(language, "过去 6 个月的增长轨迹。", "6-month growth trajectory")} data={data.netWorthTrend} dataKey="value" color="#f08fb2" />
+          <LineChartCard
+            title={data.trendContext.title}
+            description={data.trendContext.description}
+            data={data.netWorthTrend}
+            dataKey="value"
+            color="#f08fb2"
+            rangeControls
+            valueFormat="currency"
+            currencyCode={data.displayContext.currency}
+            actions={
+              <div className="flex flex-wrap gap-2">
+                <div className="inline-flex rounded-full border border-white/60 bg-white/56 px-3 py-1.5 text-xs font-medium text-[color:var(--foreground)] backdrop-blur-md">
+                  {data.trendContext.scopeLabel}: {data.trendContext.scopeDetail}
+                </div>
+                <div className="inline-flex rounded-full border border-white/60 bg-white/56 px-3 py-1.5 text-xs font-medium text-[color:var(--foreground)] backdrop-blur-md">
+                  {data.trendContext.sourceLabel}: {data.trendContext.sourceDetail}
+                </div>
+              </div>
+            }
+          />
           <Card>
             <CardHeader>
               <CardTitle>{pick(language, "月度消费快照", "Monthly Spending Snapshot")}</CardTitle>

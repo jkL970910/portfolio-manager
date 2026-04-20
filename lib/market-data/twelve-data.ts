@@ -108,7 +108,23 @@ export async function searchSecuritiesWithTwelveData(query: string): Promise<Sec
     }));
 }
 
-export async function getQuoteFromTwelveData(symbol: string, exchange?: string | null): Promise<SecurityQuote | null> {
+function getCandidateExchanges(exchange?: string | null, currency?: string | null) {
+  const normalizedExchange = exchange?.trim();
+  if (normalizedExchange) {
+    return [normalizedExchange];
+  }
+
+  switch (currency?.trim().toUpperCase()) {
+    case "CAD":
+      return ["TSX", null];
+    case "USD":
+      return [null];
+    default:
+      return [null];
+  }
+}
+
+async function fetchTwelveDataQuote(symbol: string, exchange?: string | null): Promise<SecurityQuote | null> {
   const { twelveDataApiKey } = getMarketDataConfig();
   if (!twelveDataApiKey) {
     return null;
@@ -127,6 +143,10 @@ export async function getQuoteFromTwelveData(symbol: string, exchange?: string |
   }
 
   const payload = (await response.json()) as TwelveDataPriceResponse;
+  if (payload.code === 429) {
+    throw new Error(payload.message || "Twelve Data quote rate limit reached.");
+  }
+
   const price = Number(payload.price);
 
   if (!Number.isFinite(price)) {
@@ -142,6 +162,30 @@ export async function getQuoteFromTwelveData(symbol: string, exchange?: string |
     provider: "twelve-data",
     delayed: true
   };
+}
+
+export async function getQuoteFromTwelveData(symbol: string, exchange?: string | null, currency?: string | null): Promise<SecurityQuote | null> {
+  const expectedCurrency = currency?.trim().toUpperCase() || null;
+
+  for (const candidateExchange of getCandidateExchanges(exchange, expectedCurrency)) {
+    const quote = await fetchTwelveDataQuote(symbol, candidateExchange);
+    if (!quote) {
+      continue;
+    }
+
+    const quoteCurrency = quote.currency?.trim().toUpperCase() || null;
+    if (expectedCurrency && quoteCurrency && quoteCurrency !== expectedCurrency) {
+      continue;
+    }
+
+    return {
+      ...quote,
+      currency: quoteCurrency ?? expectedCurrency,
+      exchange: exchange?.trim() || quote.exchange || candidateExchange
+    };
+  }
+
+  return null;
 }
 
 export async function getHistoricalSeriesFromTwelveData(symbol: string, exchange?: string | null): Promise<SecurityHistoricalPoint[]> {

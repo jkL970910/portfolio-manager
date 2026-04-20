@@ -28,6 +28,7 @@ export function getProviderHealth(): ProviderHealth {
 
   return {
     openFigiConfigured: Boolean(config.openFigiApiKey),
-    twelveDataConfigured: Boolean(config.twelveDataApiKey)
+    twelveDataConfigured: Boolean(config.twelveDataApiKey),
+    yahooFinanceConfigured: true
   };
 }

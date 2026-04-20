@@ -20,7 +20,7 @@ export interface SecuritySearchResult {
   country?: string | null;
   currency?: string | null;
   type: SupportedAssetType;
-  provider: "twelve-data" | "openfigi" | "fallback";
+  provider: "twelve-data" | "openfigi" | "yahoo-finance" | "fallback";
 }
 
 export interface SecurityResolution {
@@ -41,7 +41,7 @@ export interface SecurityQuote {
   price: number;
   currency?: string | null;
   timestamp: string;
-  provider: "twelve-data" | "fallback";
+  provider: "twelve-data" | "yahoo-finance" | "fallback";
   delayed: boolean;
 }
 
@@ -52,10 +52,11 @@ export interface SecurityHistoricalPoint {
   adjustedClose?: number | null;
   currency?: string | null;
   exchange?: string | null;
-  provider: "twelve-data" | "fallback";
+  provider: "twelve-data" | "yahoo-finance" | "fallback";
 }
 
 export interface ProviderHealth {
   openFigiConfigured: boolean;
   twelveDataConfigured: boolean;
+  yahooFinanceConfigured: boolean;
 }

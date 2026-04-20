@@ -39,10 +39,20 @@ Do not use as the primary quote provider.
 Use for:
 
 - symbol search / autocomplete
-- latest-available quote lookup
+- USD-listed latest-available quote lookup
 - future batch quotes and streaming extensions
 
-This is the preferred runtime provider for the current app because it is a better fit for later quote-driven workflows than Alpha Vantage.
+This remains useful for US-listed securities and broad search, but it is no longer the only quote path. Canadian CAD CDR / CAD-listed wrapper quotes must not fall back to a bare US ticker because that can silently overwrite CAD positions with USD primary-listing prices.
+
+### Yahoo Finance unofficial
+
+Use for:
+
+- CAD-listed quote lookup for the current personal portfolio workflow
+- Cboe Canada / NEO CDR symbols such as `NVDA.NE`, `META.NE`, `MSFT.NE`, `NFLX.NE`, and `AVGO.NE`
+- TSX-listed Canadian ETFs and stocks through `.TO` symbols
+
+This is an unofficial provider and has no SLA. The app must cache aggressively, validate returned currency, and keep the previous usable price when the provider fails or rate-limits.
 
 ### Alpha Vantage
 
@@ -79,9 +89,22 @@ Current provider routing:
 
 - search -> Twelve Data
 - normalization -> OpenFIGI
-- quote -> Twelve Data
+- USD quote -> Twelve Data first, with Yahoo Finance as a lightweight fallback
+- CAD quote with `NEO` / Cboe Canada -> Yahoo Finance using `.NE`
+- CAD quote with `TSX` -> Yahoo Finance using `.TO`
+- CAD quote with `TSXV` -> Yahoo Finance using `.V`
+- `Other / Manual` quote -> no automatic provider lookup
 
 If keys are missing, the layer returns safe fallback payloads instead of crashing the app.
+
+Quote identity is now explicit:
+
+- `symbol + exchange + currency` is the quote identity used by refresh flows.
+- CAD positions must stay CAD-native at the holding row.
+- USD positions must stay USD-native at the holding row.
+- CAD conversion happens at aggregation / display time, not by changing a holding's native quote currency.
+- A provider response whose currency does not match the requested holding currency is rejected.
+- Physical assets such as manually tracked gold should be marked `Other / Manual` so a stock ticker collision cannot overwrite them.
 
 ## Current product usage
 
@@ -111,10 +134,11 @@ Market-data is already wired into:
 
 ## Next steps
 
-1. move quote freshness deeper into recommendation inputs and explanation outputs
-2. add batch quote refresh support to more views where it improves usability without wasting provider credits
+1. add a persisted quote-provider status / stale-age field so rows can explain whether a price is fresh, stale, or manual
+2. validate EODHD and Financial Modeling Prep as optional official fallbacks for Canadian symbols
 3. add durable cloud cache when the app moves beyond single-instance deployment
 4. introduce security-master persistence if import and recommendation logic start depending on richer security metadata
+5. add a commodity / metals provider or manual-price workflow for physical gold and other non-equity holdings
 
 ## Important deployment note
 
