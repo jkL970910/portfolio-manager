@@ -1,176 +1,90 @@
-﻿# Loo国的财富宝库 Execution Backlog
+# Loo国的财富宝库 Execution Backlog
+
+> [!IMPORTANT]
+> As of 2026-04-25, this project is now Flutter-first, mobile-first, Chinese-only, and Loo皇-themed. When this document conflicts with `docs/execution/flutter-mobile-migration-plan.md`, follow the migration plan first.
+
+Last updated: 2026-04-25
 
 ## Objective
 
-Track execution against the current alpha build, reflect what is already implemented, and clarify the next sequence of work toward a stronger MVP.
-
-## Current Product Goal
-
-Help a self-directed investor:
-
-- import and normalize portfolio data
-- configure investment preferences
-- understand portfolio health and allocation drift
-- connect spending visibility to investable cash
-- decide where new capital should go
+Track execution against the new Flutter-first direction while preserving the current feature baseline and development progress.
 
 ## Status Legend
 
-- `Completed`: implemented and usable in the current alpha
-- `In Progress`: implemented enough to use, but still missing important depth or polish
-- `Planned`: not implemented yet, but still part of the near roadmap
+- `Completed`: implemented and usable in the current codebase baseline
+- `In Progress`: started, but still missing important depth
+- `Planned`: agreed direction, not yet migrated or finished
 - `Deferred`: intentionally pushed later
 
-## Execution Snapshot
-
-### Completed
+## Completed Baseline To Preserve
 
 1. Authentication and user-scoped persistence
-   - local registration and login
-   - user-scoped API access
-   - Postgres-backed persistence
-
 2. Account and holdings import foundation
-   - direct CSV import
-   - guided import account creation
-   - guided single-account CSV import
-   - manual multi-holding entry
+3. Import mapping, preview, validation, and confirm foundation
+4. Dashboard / Portfolio / Recommendations / Spending / Import / Settings baseline
+5. Investment preferences persistence
+6. Recommendation engine baseline
+7. Portfolio workspace and repair workflows
+8. Market-data search and quote refresh
+9. Watchlist persistence and candidate-scoring baseline
 
-3. Import review and mapping foundation
-   - preview
-   - field mapping
-   - saved mapping presets
-   - dry-run validation
-   - confirm import
-   - replace / merge modes
-
-4. Core portfolio surfaces
-   - Dashboard
-   - Portfolio
-   - Recommendations
-   - Spending
-   - Import
-   - Settings
-
-5. Investment preferences settings
-   - target allocation persistence
-   - funding priorities
-   - tax-aware placement flag
-   - transition preference
-   - watchlist symbol persistence
-
-6. Recommendation engine v1
-   - drift-based allocation logic
-   - account-aware placement heuristic
-   - persisted recommendation runs
-   - auto baseline recommendation refresh after import
-
-7. Market-data integration v1
-   - security search
-   - symbol normalization
-   - single-quote lookup
-   - batch quote refresh
-   - portfolio quote freshness and coverage
-   - dashboard top-holdings price freshness
-   - quote identity now uses `symbol + exchange + currency`
-   - CAD-listed quote routing now separates Canadian `.NE` / `.TO` listings from USD primary listings
+These are now migration-preserve items, not features to redefine from zero.
 
 ## In Progress
 
-1. Spending overview and transactions
-   - page exists and is DB-backed
-   - deeper categorization and budgeting workflows are still missing
+1. Real historical performance completion
+2. Security discovery and candidate-scoring depth
+3. Spending support depth
+4. Import review persistence
 
-2. Import review quality
-   - symbol audit and correction exist
-   - richer persisted correction workflows and staged review state are still missing
+## New Migration Priorities
 
-## Planned / In Progress: Highest Priority Next
-
-| Rank | Feature | Priority | Why now |
+| Rank | Feature | Status | Why now |
 |---|---|---|---|
-| 1 | Real historical performance | P1 | Snapshot-backed portfolio and account trends are now wired in, but holding/security history still needs event replay plus price history. |
-| 2 | Security discovery and candidate scoring | P1 | The recommendation engine already computes security-fit signals, but users still cannot search arbitrary symbols, save them, or ask the engine to score a self-directed candidate. |
-| 3 | Richer import review persistence | P1 | Import review is functional, but corrections are still too session-bound and light. |
-| 4 | Watchlist and target constraints workflow | P1 | Preference storage exists, but the UX and recommendation impact are still too shallow. |
-| 5 | Cloud-ready cache / worker boundaries | P1 | Current market-data cache is process-local and import/recommendation work is still synchronous. |
-| 6 | Citizen/profile admin workflow | P1 | The citizen layer exists, but admin override and profile management are still minimal. |
+| 1 | Backend contract stabilization for Flutter | Planned | Mobile migration fails if API shape stays web-private. |
+| 2 | Mobile auth strategy | Planned | Current auth assumptions are still web-oriented. |
+| 3 | Flutter app shell and design system | Planned | New UI work must stop landing in the web shell. |
+| 4 | Dashboard / Portfolio / Security detail migration | Planned | These are the highest-frequency user flows. |
+| 5 | Recommendations / Discover migration | Planned | They preserve the product's differentiating value. |
+| 6 | Settings / account edit / holding edit migration | Planned | High-value write flows come after the mobile read shell is stable. |
+| 7 | Import entry and review migration | Planned | Important, but higher-friction and harder to get right on mobile. |
 
-## Deprioritized / Deferred
+## Product Roadmap Priorities That Still Matter
 
-| Feature | Status | Reason |
+| Feature | Status | Priority Call |
 |---|---|---|
-| Full budgeting parity | Deferred | Too broad and weakly differentiated for the product's core decision-support thesis. |
-| Deep transaction categorization rules | Deferred | Useful later, but not required to validate the capital-allocation workflow. |
-| Rebalancing optimizer | Deferred | Higher trust burden and higher implementation complexity than the current stage supports. |
-| Historical scoring and simulation | Deferred | Better after recommendation and scoring logic become more stable. |
-| Advanced market signal integration | Deferred | Not required for core workflow validation. |
-| Broker-native integrations | Deferred | CSV import is sufficient for current validation and faster to iterate. |
+| Real historical performance | In Progress | Keep as top product priority |
+| Richer import review persistence | In Progress | Build soon |
+| Watchlist and target constraints workflow | Planned | Deepen after discovery baseline |
+| Cloud-ready cache / worker boundaries | Planned | Build before heavier AI-agent and quote jobs |
+| Quote-provider status UX | Planned | Important before mobile users trust refresh state |
+| AI-agent assisted analysis | Planned | Add after mobile shell and async boundaries are ready |
 
-## Prioritization Table
+## Deferred
 
-| Feature | Status | Impact | Effort | Risk | Alignment | Priority Call |
-|---|---|---:|---:|---:|---:|---|
-| Authentication and user-scoped persistence | Completed | 5 | 3 | 2 | 5 | Keep stable |
-| Account and holdings import foundation | Completed | 5 | 4 | 3 | 5 | Keep stable |
-| Investment preferences settings | Completed | 5 | 3 | 3 | 5 | Keep stable |
-| Unified portfolio dashboard | Completed | 5 | 3 | 2 | 5 | Keep stable |
-| Portfolio diagnostics foundation | Completed | 5 | 4 | 3 | 5 | Keep stable |
-| Funding recommendation engine v1 | Completed | 5 | 4 | 4 | 5 | Keep as baseline |
-| Guided allocation setup | Completed | 5 | 3 | 3 | 5 | Keep stable |
-| Chinese-mode citizen identity layer | Completed | 4 | 4 | 3 | 5 | Keep stable |
-| Recommendation engine v2 | Completed | 5 | 4 | 4 | 5 | Keep deepening |
-| Recommendation explanation improvements | Completed | 4 | 2 | 2 | 5 | Keep refining |
-| Portfolio health score and radar analysis | Completed | 4 | 3 | 3 | 4 | Keep refining |
-| Portfolio workspace phase 1 | Completed | 5 | 3 | 2 | 5 | Keep stable |
-| Account detail and holding detail surfaces | Completed | 5 | 4 | 3 | 5 | Keep stable |
-| Account and holding edit workflows | Completed | 5 | 4 | 4 | 5 | Phase 3 baseline is now live, including unified account maintenance, add-holding, holding delete, merge preview/confirm, and classification repair |
-| Real historical performance | In Progress | 5 | 5 | 4 | 5 | Snapshot-backed portfolio/account trends are live; continue with events and security price history |
-| Security discovery and candidate scoring | In Progress | 4 | 4 | 3 | 5 | Discovery page, watchlist toggles, and first-pass candidate scoring are live; continue with deeper comparison and rating workflows |
-| Spending overview and transactions | In Progress | 3 | 3 | 2 | 3 | Keep secondary |
-| Richer import review persistence | Planned | 4 | 3 | 3 | 4 | Build soon |
-| Watchlist and target constraints workflow | Planned | 3 | 2 | 2 | 4 | Build after guided setup |
-| Cloud-ready cache and async boundaries | Planned | 3 | 4 | 3 | 4 | Build before scale work |
-| Quote provider routing for CAD / USD holdings | Completed | 5 | 3 | 4 | 5 | Keep expanding with official Canadian-data fallbacks after Yahoo-backed personal workflow is validated |
-| Rebalancing optimizer | Deferred | 3 | 5 | 5 | 3 | Push later |
-| Historical scoring and simulation | Deferred | 3 | 4 | 4 | 3 | Push later |
-| Full budgeting workflows | Deferred | 2 | 5 | 3 | 2 | Push later |
-| Advanced market signal integration | Deferred | 2 | 4 | 5 | 2 | Push later |
+| Feature | Reason |
+|---|---|
+| Full budgeting parity | Still outside the product core |
+| Automated trading | Not part of the current thesis |
+| Broker-native integrations | CSV remains the right first boundary |
+| English-mode support | Explicitly dropped |
+| Desktop-first web polish | Explicitly dropped as the primary direction |
 
 ## Recommended Build Order From Here
 
-1. Real historical performance completion:
-   snapshot-backed dashboard / portfolio / account trends are done
-   next: portfolio events, security price history, holding/security replay
-2. Security discovery and candidate scoring:
-   search arbitrary symbols
-   add/remove watchlist items from search or symbol pages
-   run recommendation-style scoring for watchlist or manually selected candidates
-3. Richer import review persistence and correction state
-4. Watchlist and target constraints workflow
-5. Citizen/profile admin workflow expansion
-6. Cloud-ready cache and async job boundaries
+1. finish docs and planning redirection
+2. audit backend contracts
+3. choose mobile auth approach
+4. create Flutter shell and theme tokens
+5. migrate overview, portfolio, security detail, recommendations, and discover
+6. migrate settings and repair flows
+7. migrate import entry and review
+8. deepen AI-agent, cloud, and queue boundaries
 
 ## Key Trade-offs
 
-- Keep the product centered on portfolio decision support, not full personal-finance breadth.
-- Prefer transparent, rule-based recommendation logic over opaque optimization.
-- Keep CSV import as the primary ingestion path until broker integrations are clearly justified.
-- Use market-data selectively and cache aggressively to protect provider quotas.
-- Never let a CAD-listed wrapper refresh from a bare USD primary ticker; quote refresh must preserve each holding's native market and currency.
-- Add sophistication only where it materially improves trust, correctness, or repeat usage.
-- Fix account readability before adding more analytics layers.
-- Prefer account-first and holding-first drilldowns over adding more summary cards.
-
-## Immediate Next Execution Step
-
-Turn the next milestone into engineering tickets for:
-
-1. real historical performance
-2. security discovery and candidate scoring
-3. richer import review persistence
-4. watchlist and target constraints workflow
-5. quote-provider status / stale-price UX for CAD wrappers and manual physical assets
-
-
-
+- preserve product progress rather than restarting
+- preserve backend domain rules where practical
+- move read-heavy flows before complex write-heavy workflows
+- keep Chinese-only and Loo皇 theme mandatory
+- avoid fake "real-time" promises without sustainable market-data support

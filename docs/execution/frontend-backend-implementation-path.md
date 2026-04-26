@@ -1,168 +1,118 @@
 # Frontend and Backend Implementation Path
 
-## Chosen foundation
-- Frontend shell: Next.js App Router + TypeScript + Tailwind
-- UI source of truth: Figma flows plus `design-system/portfolio-manager/MASTER.md`
-- Current data mode: PostgreSQL-backed repositories through Drizzle
-- Backend handoff mode: route handlers and contracts under `app/api/*`
-- Current auth mode: Auth.js credentials with user-scoped session handling
+> [!IMPORTANT]
+> As of 2026-04-25, this project is now Flutter-first, mobile-first, Chinese-only, and Loo皇-themed. When this document conflicts with `docs/execution/flutter-mobile-migration-plan.md`, follow the migration plan first.
 
-## Frontend path
-1. Lock shared design tokens, navigation, card styles, charts, and page shells.
-2. Keep pages static first: Dashboard, Portfolio, Recommendations, Spending, Import, Settings.
-3. Move page-specific sections into reusable components only after the shape stabilizes.
-4. Use server-side data fetching through route handlers or services instead of page-local fixtures.
-5. Use shared client-side API helpers for browser fetch flows so invalid JSON or partial payloads degrade to local UI errors instead of crashing the route.
+Last updated: 2026-04-25
 
-## Backend path
-1. Keep API contracts stable by endpoint:
-   - `/api/dashboard`
-   - `/api/portfolio`
-   - `/api/recommendations`
-   - `/api/spending`
-   - `/api/import`
-   - `/api/settings/preferences`
-2. Model service boundaries around product domains rather than page files.
-3. Route handlers should only return service outputs, never implement business logic directly.
-4. Keep route handlers thin and push domain rules into `lib/backend/services.ts`.
-5. Preserve repository boundaries so future worker jobs or a separate API service can reuse the same domain logic.
+## Chosen Foundation
 
-## Parallel work split
-### Frontend
-- Build visual components and route-level pages.
-- Keep forms and import flows aligned to real API behavior.
-- Consume stable API envelopes from `app/api/*`.
-- Use `lib/client/api.ts` for `safeJson`, error extraction, and payload assertions in client components.
+- frontend shell: Flutter
+- backend baseline: current Next.js route handlers + `lib/backend/services.ts`
+- persistence: PostgreSQL
+- product language: Chinese only
+- product identity: Loo皇 / Loo国 only
 
-### Backend
-- Evolve schema from `docs/execution/backend-data-model.md`.
-- Implement services behind `lib/backend/services.ts`.
-- Keep imports, preferences, and recommendations user-scoped and persistent.
+## Architecture Rule
 
-## Recommended sequence
-1. Frontend finalizes layout and component boundaries.
-2. Backend stabilizes authenticated user flows and repository-backed reads.
-3. Backend deepens import and recommendation write paths.
-4. Frontend tightens review states, loading states, and onboarding UX around real backend responses.
-5. Backend upgrades recommendation logic and import persistence without breaking the page contracts.
+The backend is preserved before it is replaced.
 
-## Current status snapshot
+That means:
 
-Implemented now:
+- keep domain logic in services
+- keep route handlers thin
+- stop treating backend payloads as web-only page data
+- turn current backend contracts into mobile product APIs
 
-- authenticated login and registration
-- user-scoped database reads and writes
-- database-backed portfolio, recommendations, spending, settings, and import views
-- direct CSV import with preview, field mapping, validation, symbol audit, review, confirm, replace, and merge
-- database-backed CSV mapping presets
-- guided import flow with real account creation, manual holding entry, and single-account CSV import review/confirm
-- manual holdings entry with security search, normalization, and quote lookup
-- manual holdings entry with auto-calculated market value and optional override total value
-- portfolio batch quote refresh with persisted valuation updates
-- recommendation run generation and persistence
-- shared client-side API safety utilities applied across import, settings, recommendations, and portfolio action panels
+## Frontend Path
 
-Still pending:
+1. define Flutter app shell
+2. define Flutter theme tokens and mobile component primitives
+3. encode Chinese-only and Loo皇-theme assumptions in the design system
+4. migrate high-frequency read flows first
+5. migrate complex write and import flows second
 
-- guided allocation setup in Settings
-- richer recommendation engine v2
-- async workers for heavy import or recommendation jobs
-- broker integrations and raw file storage
-- deeper review and correction workflow for invalid imports
+## Backend Path
 
-Updated now:
+1. audit all current `app/api/*` endpoints
+2. normalize payloads for Flutter consumption
+3. separate session/web assumptions from reusable API behavior
+4. choose a mobile-safe auth approach
+5. preserve repository and service boundaries so later worker jobs or separate services can reuse the same logic
 
-- guided allocation setup in Settings
-- recommendation engine v2 foundation
-- portfolio health score and radar detail
+## Migration Sequence
 
-Next build focus:
+### Phase 1: Contract audit
 
-- account detail and holding detail surfaces
-- account and holding edit workflows
-- replay-based historical performance
+Target endpoints:
 
-Updated now:
+- `/api/dashboard`
+- `/api/portfolio`
+- `/api/recommendations`
+- `/api/spending`
+- `/api/import`
+- `/api/settings/preferences`
+- `/api/settings/watchlist`
+- `/api/market-data/*`
 
-- replay-backed trend lines now prefer real holding-price history for:
-  - dashboard net worth
-  - portfolio workspace
-  - account detail
-- dashboard trend is now explicitly framed as invested-asset history, not full net worth, until spending/cash accounts join the same replay model
-- cash account and cash-account-balance-event schema foundations are now in place for the later full net-worth curve
-- current-day portfolio snapshots now refresh automatically after portfolio recalculation on write paths
-- unified security detail aggregate view now replays combined held-position history from `portfolio_events + security_price_history`
-- selected account views inside the unified symbol page now replay held-position history from `portfolio_events + security_price_history` when both are available
-- when local symbol history is missing or too shallow, unified security detail now fetches provider history and persists it into `security_price_history`
-- next Phase 4 expansion now also includes:
-  - a security discovery page for arbitrary symbol search
-  - watchlist add/remove flows from search and unified symbol pages
-  - recommendation-style candidate scoring for watchlist items and manually selected symbols
+Goal:
 
-Implemented now:
+- define which payloads are already mobile-safe
+- identify where web-specific assumptions leak through
 
-- dedicated discovery page at `/discover`
-- quick single-symbol watchlist add/remove API and UI
-- recommendation-style candidate scoring API and UI for search results and unified symbol pages
-- unified symbol history now supports `1D / 1M / 3M / 6M / 1Y / All` range filters on real price data
-- if local symbol history is too sparse, unified symbol history now refetches denser daily price history automatically
+### Phase 2: Flutter shell
 
-## Portfolio workspace build path
+Build:
 
-1. Fix account readability first
-   - repeated TFSA / FHSA / RRSP instances must stop collapsing into ambiguous labels
-   - Portfolio needs account cards before deeper edit flows
+- navigation
+- page scaffolds
+- card and metric primitives
+- list/detail patterns
+- chart containers
+- form controls
 
-2. Add concrete detail destinations
-   - account detail page
-   - holding detail page
-   - recommendation and health-score pages should deep-link into these surfaces
+### Phase 3: Read-flow migration
 
-Current state:
-- account detail page implemented
-- holding detail compatibility route retained, but now redirects into the unified symbol page
-- security detail page is now the unified symbol route for both recommended and already-held symbols
-- dashboard top-holding rows now deep-link into the unified symbol page
-- health-score holding drilldowns still target holding ids, but the route now forwards into the unified symbol page with the matching account preselected
-- recommendation detail can now open a referenced already-heavy holding directly
-- recommendation detail can now also open a security detail page for the recommended lead or alternative symbol
-- already-held symbols now default to an aggregate cross-account view on the unified symbol page, with compact metric-rail dropdown selectors that reveal the full position-detail stack for the selected account
-- if the same symbol appears multiple times inside one account, the unified symbol page now keeps the account metrics aggregated and adds a second selector for the exact holding row to review and edit
-- health-score and recommendation links that used to target the old holding route now deep-link straight into the unified symbol page with account and holding context preserved
-- inspection is no longer the next gap; Phase 3 now covers account/holding edit and repair workflows
+Migrate in order:
 
-3. Add repair workflows
-   - account metadata edit
-   - holding edit
-   - holding classification repair for unknown or wrong security metadata
-   - merge duplicate accounts with explicit preview and confirmation
+1. auth
+2. dashboard
+3. portfolio workspace
+4. security detail
+5. recommendations
+6. discover
 
-Current state:
-- account detail includes a unified maintenance panel for account edit, add-holding, merge, and delete-account confirmation
-- the add-holding path now deep-links into import with the current account already locked, instead of duplicating a second manual-create flow inside account detail
-- holding detail includes an edit panel with classification repair
-- account and holding write paths now feed a shared edit log
-- old import and quote-refresh write paths now reuse a shared portfolio-state recalculation helper so weight semantics stay aligned after edits, imports, and refreshes
-- quote refresh now protects against ambiguous cross-currency symbol matches when no exchange override is present, so CAD wrappers are not overwritten by mismatched USD prices
+### Phase 4: Write-flow migration
 
-4. Replace synthetic trend lines only after the structural model is ready
-   - event-backed portfolio history
-   - security price history
-   - replay-backed snapshots
+Migrate in order:
 
-Updated now:
+1. settings
+2. watchlist actions
+3. account / holding edits
+4. recommendation runs
+5. import entry flows
 
-- selected held-symbol views now replay from `portfolio_events + security_price_history`
-- holding create / quantity update / move / delete flows now emit new `portfolio_events` records so future replay history can extend beyond seed data
-- portfolio CSV imports now emit replay events too, and replace-mode imports reset stale replay state before rebuilding holdings
+### Phase 5: Advanced workflow migration
 
-5. Extend recommendation surfaces into security discovery
-   - symbol search page
-   - watchlist management from search and symbol detail
-   - candidate-security scoring endpoint and UI
+- richer import review persistence
+- AI-agent analysis jobs
+- queue / worker boundaries
+- cloud hardening
 
-## Supporting docs
-- `docs/execution/backend-architecture.md`
-- `docs/execution/backend-data-model.md`
-- `docs/execution/recommendation-engine-v1.md`
-- `docs/execution/market-data-provider-strategy.md`
+## Current Baseline Already Available
+
+- authenticated reads and writes
+- portfolio and recommendation persistence
+- import foundations
+- unified symbol workspace
+- account and holding repair workflows
+- quote refresh and discovery baseline
+- watchlist and candidate scoring baseline
+
+These should be reused, not redefined.
+
+## Explicitly Dropped Direction
+
+- no ongoing desktop-first UI buildout
+- no bilingual UX requirement
+- no assumption that Flutter is a second-class companion app

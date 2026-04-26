@@ -1,184 +1,108 @@
-# Personal Wealth Intelligence Platform
-## Information Architecture (IA)
+# Loo国的财富宝库 Information Architecture
 
-Version: 1.0
+> [!IMPORTANT]
+> As of 2026-04-25, this project is now Flutter-first, mobile-first, Chinese-only, and Loo皇-themed. When this document conflicts with `docs/execution/flutter-mobile-migration-plan.md`, follow the migration plan first.
 
----
+Last updated: 2026-04-25
 
-# 1. Overview
+## 1. Overview
 
-This document defines the full page structure, navigation hierarchy, and information organization of the platform.
+This document defines the mobile-first information architecture for the Flutter migration.
 
-The goal is to ensure:
+Primary rule:
 
-- Clear user navigation
-- Logical grouping of features
-- Alignment with investment-first product philosophy
+- mobile first
+- Chinese only
+- one primary brand voice
+- drill-down flows instead of desktop-style simultaneous density
 
----
+## 2. Primary Navigation
 
-# 2. Navigation Structure
+Bottom navigation:
 
-Primary navigation (left sidebar):
-Home
-Portfolio
-Recommendations
-Transactions
-Settings
+- 总览
+- 组合
+- 推荐
+- 导入
+- 设置
 
----
+Secondary routes:
 
-# 3. Page Hierarchy
+- 发现
+- 账户详情
+- 标的详情
+- 支出
+
+## 3. Page Hierarchy
+
 App
-│
-├── Home
-│ ├── Wealth Summary
-│ ├── Recommendation Card
-│ ├── Portfolio Overview
-│ ├── Portfolio Health
-│ ├── Net Worth Trend
-│ ├── Gain/Loss Snapshot
-│ └── Spending Snapshot
-│
-├── Portfolio
-│ ├── Holdings Table
-│ ├── Tabs
-│ │ ├── By Account
-│ │ ├── Funding Priority
-│ │ ├── Gain/Loss
-│ │ └── Sector Exposure
-│
-├── Recommendations
-│ ├── Summary
-│ ├── Allocation Plan
-│ ├── Ticker Suggestions
-│ ├── Account Placement
-│ ├── Reasoning
-│ └── Risk Notes
-│
-├── Transactions
-│ ├── Transaction Table
-│ ├── Filters
-│ ├── Category Summary
-│ └── Monthly Trends
-│
-└── Settings
-├── Preferences
-├── Allocation Rules
-├── Account Strategy
-├── Data Management
 
----
+- 总览
+  - 财富总览
+  - 组合摘要
+  - 推荐摘要
+  - 价格刷新提醒
+  - 支出摘要
+- 组合
+  - 账户列表
+  - 账户详情
+  - 标的详情
+  - 持仓明细
+  - 健康度 / 漂移 / 集中度
+- 推荐
+  - 当前建议
+  - 账户适配
+  - 标的建议
+  - 原因说明
+  - 情景比较
+- 导入
+  - 导入入口
+  - 账户与持仓导入
+  - 支出导入
+  - 映射与校验
+- 设置
+  - 偏好设置
+  - 指导式配置
+  - 观察列表
+  - 公民档案
+- 发现
+  - 标的搜索
+  - 观察列表操作
+  - 候选标的评分
 
-# 4. Page Definitions
+## 4. Mobile Reading Order
 
----
+### 总览
 
-## 4.1 Home
+1. 当前是否需要行动
+2. 总资产与组合摘要
+3. 价格刷新状态
+4. 推荐摘要
+5. 支出上下文
 
-Purpose:
+### 组合
 
-- Provide global wealth overview
-- Highlight key investment decisions
+1. 账户
+2. 账户内持仓
+3. 具体标的
+4. 风险与漂移解释
 
-Key Sections:
+### 推荐
 
-1. Wealth Summary
-2. Primary Recommendation
-3. Portfolio Structure
-4. Portfolio Health
-5. Net Worth Trend
-6. Performance Snapshot
-7. Spending Summary
+1. 本次建议结论
+2. 原因
+3. 账户放置
+4. 备选标的
+5. 风险提示
 
-Priority:
+## 5. Navigation Rules
 
-- Recommendation first
-- Portfolio second
-- Everything else supporting
+- account-first before holding-table overload
+- one primary CTA per screen
+- long explanations should collapse by default
+- quote provenance and timestamp should stay visible near valuation
+- editing and maintenance flows should sit behind explicit actions, not dominate first paint
 
----
+## 6. Legacy Web Note
 
-## 4.2 Portfolio
-
-Purpose:
-
-- Deep portfolio analysis
-
-Structure:
-
-- Holdings table (primary)
-- Analysis tabs
-
-Tabs:
-
-- By Account
-- Funding Priority
-- Gain/Loss
-- Sector Exposure
-
----
-
-## 4.3 Recommendations
-
-Purpose:
-
-- Provide actionable investment decisions
-
-Structure:
-
-1. Recommendation summary
-2. Allocation breakdown
-3. Suggested tickers
-4. Account placement
-5. Explanation
-6. Risk notes
-
----
-
-## 4.4 Transactions
-
-Purpose:
-
-- Track spending behavior
-
-Structure:
-
-- Transaction table
-- Filters
-- Category summary
-- Monthly trend
-
----
-
-## 4.5 Settings
-
-Purpose:
-
-- Configure system behavior
-
-Structure:
-
-- Risk profile
-- Target allocation
-- Account roles
-- Data import/export
-
----
-
-# 5. Data Flow Overview
-Accounts → Holdings → Portfolio Analysis → Recommendation Engine → UI
-
----
-
-# 6. Key Design Principles
-
-1. Investment-first layout  
-2. Recommendation visibility above analytics  
-3. Minimal friction navigation  
-4. High information clarity  
-5. Scalable architecture  
-
----
-
-# End of Document
+The existing Next.js routes still define much of the current domain behavior, but they are no longer the long-term IA target. Flutter navigation wins when mobile ergonomics conflict with old web layout assumptions.

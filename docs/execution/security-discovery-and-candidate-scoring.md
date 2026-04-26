@@ -1,5 +1,9 @@
 # Security Discovery And Candidate Scoring
 
+> [!IMPORTANT]
+> As of 2026-04-25, this project is now Flutter-first, mobile-first, Chinese-only, and Loo皇-themed. When this document conflicts with `docs/execution/flutter-mobile-migration-plan.md`, follow the migration plan first.
+
+
 ## Objective
 
 Turn symbol search, watchlist management, and recommendation-style scoring into a first-class workflow instead of leaving them split across Settings and import-only entry points.

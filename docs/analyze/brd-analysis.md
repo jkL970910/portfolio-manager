@@ -1,5 +1,9 @@
 ﻿# Portfolio Manager BRD Gap Analysis
 
+> [!IMPORTANT]
+> As of 2026-04-25, this project is now Flutter-first, mobile-first, Chinese-only, and Loo皇-themed. When this document conflicts with `docs/execution/flutter-mobile-migration-plan.md`, follow the migration plan first.
+
+
 ## Overall Assessment
 
 The BRD has a clear product idea: this is not a generic personal finance app, but a portfolio decision platform for a Canadian self-directed investor. That positioning is strong. The current draft is also good at naming core modules and user-visible outputs.

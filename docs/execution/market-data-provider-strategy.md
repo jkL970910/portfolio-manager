@@ -1,5 +1,9 @@
 # Market Data Provider Strategy
 
+> [!IMPORTANT]
+> As of 2026-04-25, this project is now Flutter-first, mobile-first, Chinese-only, and Loo皇-themed. When this document conflicts with `docs/execution/flutter-mobile-migration-plan.md`, follow the migration plan first.
+
+
 ## Goal
 
 Add a stable market-data layer that supports:

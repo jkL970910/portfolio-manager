@@ -1,183 +1,71 @@
-﻿# Cloud Deployment Strategy
+# Cloud Deployment Strategy
+
+> [!IMPORTANT]
+> As of 2026-04-25, this project is now Flutter-first, mobile-first, Chinese-only, and Loo皇-themed. When this document conflicts with `docs/execution/flutter-mobile-migration-plan.md`, follow the migration plan first.
+
+Last updated: 2026-04-25
 
 ## Objective
 
-Define a practical cloud deployment path for Portfolio Manager that supports:
+Define the cloud path for a Flutter-first product whose current backend baseline still lives in this repo.
 
-- a stable public URL
-- cross-device login
-- persistent shared data
-- minimal infrastructure overhead
-- a realistic free-tier evaluation before paid rollout
+## Current Assumptions
 
-## Current Stack
+- user scale is small and personal
+- backend should stay cheap and simple
+- market-data and AI calls are more likely to become the cost driver than general app hosting
+- the first cloud move should preserve velocity, not maximize infrastructure purity
 
-- Next.js App Router
-- PostgreSQL
-- Drizzle ORM
-- Auth.js credentials
-- Route Handlers and service-layer business logic
+## Platform Strategy
 
-This means the lowest-friction deployment path should preserve the monolith rather than split immediately into separate frontend and Python services.
+### Near term
 
-## Deployment Options
+- keep the current backend as the hosted API baseline
+- move database and public hosting to a cheap cloud path
+- let Flutter become the primary client over time
 
-### Option A: Vercel + Neon
+### Mid term
 
-Best fit for the current stack.
+- add durable queue / worker boundaries for heavy AI-agent or quote jobs
+- separate mobile auth needs from web-session assumptions
 
-Why:
+### Long term
 
-- Vercel is the native deployment platform for Next.js
-- Neon offers a usable free Postgres tier and works well with serverless/web workloads
-- this combination gets the project onto a public URL quickly with minimal code changes
+- retire the web app as the primary client surface
+- keep only the backend or an admin/reference shell if still useful
 
-Recommended use:
+## Deployment Recommendation
 
-- alpha and early beta deployment
-- cross-device login
-- low to moderate traffic
-- minimal operational overhead
+### Recommended default
 
-### Option B: Vercel + Supabase
+- app host: low-cost serverless or hobby-grade host for the current backend
+- database: low-cost PostgreSQL host with pause/scale-to-zero behavior where acceptable
+- object/file storage: add only when import persistence or report assets require it
 
-Useful if the project later needs:
+### Why
 
-- storage
-- richer database tooling
-- auth-adjacent services
-- a more integrated backend platform
+- the project is still personal-scale
+- infrastructure cost is not the main problem yet
+- the app should not move to heavyweight cloud complexity before Flutter proves out
 
-Trade-off:
+## Constraints That Matter
 
-- slightly more operational surface than Neon for the current app
-- not necessary unless the product starts depending on Supabase-native capabilities
+1. mobile auth compatibility
+2. quote refresh background behavior
+3. AI-agent job triggering and result caching
+4. database connection behavior under bursty mobile traffic
+5. explicit logging around market-data refresh and analysis runs
 
-### Option C: Railway
+## Rollout Order
 
-Better fit if the product soon needs:
+1. host the current backend/API baseline publicly
+2. move PostgreSQL to the chosen cloud host
+3. validate Flutter against that backend
+4. add queue/worker boundaries only when AI-agent and analysis jobs justify it
+5. only then decide whether the remaining web shell should stay alive
 
-- a worker process
-- cron-like jobs
-- more traditional app + database deployment under one platform
+## Non-Goals Right Now
 
-Trade-off:
-
-- less natural than Vercel for a Next.js-first personal project
-- no longer the most attractive free option for long-running hosted use
-
-## Free-Tier Reality
-
-### Vercel
-
-The Hobby plan is free and intended for personal projects.
-
-### Neon
-
-Neon currently offers a free tier with:
-
-- 100 projects
-- 100 CU-hours monthly per project
-- 0.5 GB storage per project
-- scale-to-zero style behavior for inactive databases
-
-This is good enough for:
-
-- demos
-- low-volume personal usage
-- cross-device testing
-- small beta traffic
-
-It is not ideal for:
-
-- always-on production workloads
-- sustained optimization jobs
-- long-running background workers
-
-### Railway
-
-Railway no longer has a durable free hosted plan for normal ongoing use.
-
-Current model:
-
-- one-time free trial credit
-- Hobby plan is paid monthly
-
-This means Railway is no longer the preferred zero-cost default for this project.
-
-## Recommended Near-Term Choice
-
-For the current product stage, the best deployment path is:
-
-1. Vercel for the app
-2. Neon for PostgreSQL
-
-Why:
-
-- lowest migration cost from the current local stack
-- public URL quickly
-- cross-device auth works once environment variables are set correctly
-- no forced architectural split yet
-
-## Likely Cost Profile
-
-### Can this remain free?
-
-Yes, for a while, if the app remains:
-
-- personal or small-team
-- low traffic
-- low write volume
-- without heavy async compute
-- without constant price refresh jobs
-
-### When does it likely become paid?
-
-The project likely moves into paid territory when one or more of these happen:
-
-1. database no longer scales to zero cleanly because it is effectively always active
-2. recommendation workloads become async and frequent
-3. market-data refreshes become regular background jobs
-4. usage exceeds Vercel Hobby limits or Neon free compute/storage ceilings
-5. collaboration, preview workflows, or uptime expectations exceed hobby-grade limits
-
-## Deployment Constraints That Matter Later
-
-### Auth
-
-Need to set:
-
-- `AUTH_SECRET`
-- application base URL
-- secure cookie behavior for production
-
-### Database
-
-Need to set:
-
-- `DATABASE_URL`
-- preferably a connection style that behaves well with serverless workloads
-
-### Cache
-
-Current in-memory cache is acceptable for local and single-instance alpha use, but it is not a durable shared cache.
-
-### Jobs
-
-If recommendation recompute, imports, or market-data refresh become heavy, move to a durable Postgres-backed queue before introducing separate infrastructure.
-
-## Recommended Rollout Order
-
-1. deploy current monolith to Vercel
-2. attach Neon Postgres
-3. run schema push and seed data
-4. validate login, import, settings, recommendation run, and quote refresh from a second device
-5. only then evaluate queueing, workers, and more advanced infra
-
-## Recommendation
-
-Short answer:
-
-- yes, a free cloud deployment is still realistic for the current stage
-- the best free-first path is `Vercel + Neon`
-- a paid plan becomes likely once the app needs always-on database activity, async workers, or heavier market-data / optimization workloads
+- premature microservice split
+- expensive always-on infrastructure
+- true real-time quote streaming promises without a sustainable provider model

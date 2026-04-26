@@ -1,5 +1,9 @@
 ﻿# Loo Mascot Spec
 
+> [!IMPORTANT]
+> As of 2026-04-25, this project is now Flutter-first, mobile-first, Chinese-only, and Loo皇-themed. When this document conflicts with `docs/execution/flutter-mobile-migration-plan.md`, follow the migration plan first.
+
+
 ## Goal
 
 Create an original mascot for Loo国的财富宝库 that keeps a soft pink, slightly cheeky emotional tone without reproducing an existing IP silhouette.

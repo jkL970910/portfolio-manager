@@ -1,162 +1,93 @@
-﻿# Loo国的财富宝库 Information Architecture
+# Loo国的财富宝库 IA and Navigation
 
-Last updated: 2026-03-17
+> [!IMPORTANT]
+> As of 2026-04-25, this project is now Flutter-first, mobile-first, Chinese-only, and Loo皇-themed. When this document conflicts with `docs/execution/flutter-mobile-migration-plan.md`, follow the migration plan first.
+
+Last updated: 2026-04-25
 
 ## Primary Navigation
 
-- Dashboard
-- Portfolio
-- Recommendations
-- Spending
-- Import
-- Settings
+Bottom tabs:
 
-## Page Roles
+- 总览
+- 组合
+- 推荐
+- 导入
+- 设置
 
-### Dashboard
+Secondary routes:
 
-Purpose:
-- Give a fast overview of wealth, portfolio health, and whether action is needed
+- 发现
+- 账户详情
+- 标的详情
+- 支出
 
-Contains:
-- KPI cards
-- Portfolio Health Score placeholder
-- recommendation alert
-- account overview
-- allocation drift
-- asset mix
-- top holdings
-- net worth trend
-- monthly spending snapshot
-- recommendation summary
+## Navigation Rules
 
-Rules:
-- overview only
-- no full recommendation table
-- no deep tax explanation
+- keep top-level tabs short and stable
+- move deep detail into drill-down routes
+- avoid desktop-style multi-panel overload on first paint
+- prefer one main action per screen
+- keep destructive maintenance behind explicit entry points
 
-### Portfolio
+## Route Priorities
 
-Purpose:
-- Provide a portfolio workspace that starts with account structure and supports deeper account and holding drill-down
+### 总览
 
-Contains:
-- account card list
-- account detail page
-- holding detail page
-- holdings detail
-- account allocation
-- sector exposure
-- concentration risk
-- gain/loss
-- 6-month performance
-- health-score detail
+First-fold priorities:
 
-Rules:
-- repeated account types must remain distinguishable
-- account category and account instance are different concepts and should both be supported
-- account-first reading comes before raw holding-table density
-- account detail is the primary drill-down destination from account rows
-- account detail now also owns the primary Phase 3 repair entry points for:
-  - account metadata edit
-  - add-holding flow for new positions
-  - account merge preview / confirmation
-  - delete-account confirmation
-- dashboard account rows should also deep-link directly into account detail, not behave like passive summaries
-- dashboard and portfolio account rows should both use a clear whole-row hover affordance so users can tell the full row is clickable before they commit
-- holding detail is the primary drill-down destination from symbol links inside holdings tables
-- holding detail now also owns the primary Phase 3 repair entry point for:
-  - holding edit
-  - holding classification repair
-- security detail is the primary drill-down destination from recommendation lead/alternative symbols, even when the user does not already hold the symbol
-- dashboard top-holding rows should also deep-link into holding detail, not stop at overview-level cards
-- health-score holding drilldowns should open concrete holding detail pages when the diagnosis is about a specific position
-- recommendation cards should deep-link into concrete holding detail when the explanation explicitly references an already-heavy existing position
-- recommendation cards should deep-link into a security detail page when the user wants to inspect a recommended symbol before buying it
-- portfolio and holding surfaces must distinguish between:
-  - share of total portfolio
-  - share inside the current account
-- holding detail should clearly answer:
-  - what this security is
-  - where its current quote came from
-  - whether that quote is delayed or cached
-  - how large it is globally vs inside the account
-- account detail should surface a quick facts layer before the chart, so the user can size up the account before reading the full holdings list
+1. 当前是否需要行动
+2. 总资产 / 组合摘要
+3. 推荐摘要
+4. 价格刷新状态
+5. 支出摘要
 
-### Recommendations
+### 组合
 
-Purpose:
-- Provide detailed funding decisions
+First-fold priorities:
 
-Contains:
-- contribution amount
-- target allocation
-- account and tax context
-- ranked priorities
-- ticker suggestions
-- explanation
-- assumptions
+1. 账户列表
+2. 当前选中账户的摘要
+3. 标的入口
+4. 风险和漂移解释
 
-### Spending
+### 推荐
 
-Purpose:
-- Show spending and cash-flow context that supports wealth planning
+First-fold priorities:
 
-Contains:
-- monthly spending total
-- savings rate
-- investable cash
-- spending trend
-- category breakdown
-- recent transactions
+1. 本次建议结论
+2. 账户适配
+3. 核心原因
+4. 备选标的
 
-Rule:
-- secondary to portfolio decision support
+### 导入
 
-### Import
+First-fold priorities:
 
-Purpose:
-- Bring holdings and transactions into the product
+1. 选择导入工作流
+2. 账户 / 持仓导入
+3. 支出导入
+4. 校验与修正
 
-Contains:
-- account setup
-- CSV upload
-- mapping review
-- correction flow
-- target setup entry points
+### 设置
 
-### Settings
+First-fold priorities:
 
-Purpose:
-- Capture the preferences that power recommendations and health scoring
+1. 偏好摘要
+2. 指导式配置入口
+3. 观察列表
+4. 公民档案
 
-Contains:
-- Profile / citizen archive
-- guided allocation setup
-- manual configuration
-- target allocation
-- account priorities
-- tax-aware placement
-- cash buffer
-- recommendation strategy
-- rebalancing tolerance
+## Detail Surface Rules
 
-## Cross-Page Logic
+- account detail is the main drill-down from account lists
+- unified symbol detail is the main drill-down from holdings, recommendations, and discovery
+- explanation panels should collapse by default on smaller screens
+- quote source and timestamp should stay near the valuation block
 
-- Settings defines the target allocation and strategy
-- Recommendations uses those settings to generate funding guidance
-- Portfolio Health Score measures how well the current portfolio matches those settings
-- Portfolio should provide the concrete account and holding destinations that health-score and recommendation explanations point to
-- Dashboard summarizes the current state and routes the user to deeper views
-- In Chinese mode, login, registration, and Settings profile are wrapped in a Loo国 citizen identity experience
-- In English mode, authentication and profile remain standard Portfolio Manager flows
-- Shared English surfaces such as Dashboard, Portfolio, Recommendations, Import, and Settings should keep neutral Portfolio Manager wording instead of Loo-specific narrative terms.
+## Language and Theme Rules
 
-## Design Principles
-
-- Dashboard is overview, not analysis overload
-- Recommendations is detailed, not summary-only
-- Portfolio must feel like a workspace, not only a diagnostics page
-- Spending supports the investing workflow, not the other way around
-- Settings must make the recommendation engine feel transparent, not black-box
-
+- Chinese only
+- no English-mode branching
+- all product-facing copy may use Loo皇 tone where appropriate
+- avoid splitting the IA into “Chinese mode” and “English mode”; there is now only one product experience

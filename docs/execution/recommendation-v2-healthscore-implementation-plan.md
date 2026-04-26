@@ -1,5 +1,9 @@
 # Recommendation V2 + Health Score Implementation Plan
 
+> [!IMPORTANT]
+> As of 2026-04-25, this project is now Flutter-first, mobile-first, Chinese-only, and Loo皇-themed. When this document conflicts with `docs/execution/flutter-mobile-migration-plan.md`, follow the migration plan first.
+
+
 ## Objective
 
 Implement Recommendation Engine V2 and Portfolio Health Score locally before cloud deployment.

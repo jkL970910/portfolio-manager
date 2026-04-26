@@ -1,251 +1,119 @@
-﻿# Loo国的财富宝库
+# Loo国的财富宝库
 
-Loo国的财富宝库 is an AI-assisted investing product prototype for self-directed investors. The product focuses on one operational question:
+> [!IMPORTANT]
+> As of 2026-04-25, this project is now Flutter-first, mobile-first, Chinese-only, and Loo皇-themed. When this document conflicts with `docs/execution/flutter-mobile-migration-plan.md`, follow the migration plan first.
 
-`Where should my next dollar go?`
+Loo国的财富宝库 is now a Flutter-first mobile product for self-directed investors. The project keeps the original portfolio decision-support thesis, but it no longer treats the web app as the long-term primary client.
 
-It combines:
+The core question remains:
+
+`我的下一笔钱应该放到哪里？`
+
+## Current Direction
+
+- primary client: Flutter mobile app
+- backend baseline: existing Next.js + PostgreSQL implementation
+- product language: Chinese only
+- product identity: Loo皇 / Loo国 only
+- web status: reference implementation and temporary backend host, not the future primary UX
+
+## Product Scope
+
+The product still combines:
 
 - portfolio analytics
-- contribution recommendation workflows
+- recommendation workflows
 - spending visibility
 - import and normalization workflows
 - investment preference configuration
+- watchlist and candidate-security analysis
 
-This repository was planned, documented, designed, and implemented with AI-agent-assisted workflows. The point is not "AI built it automatically"; the point is to show a realistic product-building workflow where AI accelerates research, UX iteration, implementation, and documentation while engineering decisions still stay explicit.
+## What We Are Preserving
 
-## Why This Project Exists
+The migration does not reset product progress. The Flutter rewrite must preserve:
 
-Most retail finance apps are good at tracking balances or budgets, but weak at helping users decide how to allocate new capital across real account constraints.
+- authentication
+- dashboard
+- portfolio workspace
+- recommendations
+- spending
+- import
+- settings
+- market-data search and quote refresh
+- watchlist and candidate scoring
 
-Loo国的财富宝库 is designed to help users:
+The roadmap also stays consistent with the current implementation state:
 
-- understand portfolio health
-- identify allocation drift
-- connect spending capacity to investable cash
-- import and normalize real account data
-- configure preferences without advanced portfolio expertise
-- generate recommendation runs tied to current holdings and account priorities
+1. preserve current MVP feature coverage
+2. finish the highest-value unfinished backend/product work
+3. migrate the main UX to Flutter
+4. then deepen AI-agent, cloud, and market-data capabilities
 
-## Core Product Features
+## Current Build Status
 
-### 1. Dashboard
-- portfolio summary
-- global CAD / USD display toggle
-- contribution room visibility
-- portfolio risk snapshot
-- asset mix and top holdings
-- top holdings price freshness
-- net worth trend
-- monthly spending snapshot
-- recommendation summary
+This repository is in `alpha migration planning` stage.
 
-### 2. Portfolio Analysis
-- account allocation analysis
-- holdings detail
-- drift and concentration review
-- price refresh workflow
-- quote freshness and coverage display
-
-### 3. Recommendation Engine v1
-- contribution-based allocation suggestions
-- account-aware placement
-- persisted recommendation runs
-- transparent rationale based on current drift and configured preferences
-
-### 4. Spending
-- spending summary
-- category breakdown
-- transaction view
-- investable cash framing
-
-### 5. Import
-- guided setup flow
-- direct CSV import flow
-- single-account CSV onboarding
-- manual entry with security search and quote lookup
-- multi-currency account and holding entry for CAD / USD
-- field mapping presets
-- dry-run review, symbol audit, correction, and confirm import
-
-### 6. Investment Preferences
-- user-scoped preference persistence
-- target allocation setup
-- guided allocation setup with saved draft persistence
-- funding priority configuration
-- tax-aware placement settings
-- watchlist and transition preferences
-- future link to Portfolio Health Score and guided allocation setup
-
-## AI Agent Contribution
-
-AI agents were used for:
-
-- BRD analysis and revision
-- PRD generation
-- backlog structuring and prioritization
-- Notion project and backlog setup
-- information architecture design
-- Figma Make review and iteration
-- frontend scaffolding
-- backend contract design
-- implementation planning
-- market-data provider evaluation
-
-## Tech Stack
-
-### Frontend
-- Next.js App Router
-- TypeScript
-- Tailwind CSS
-- Recharts
-- Lucide React
-
-### Backend / Data
-- Next.js Route Handlers
-- PostgreSQL
-- Drizzle ORM
-- Auth.js credentials flow
-- user-scoped repository + service architecture
-
-### Market Data
-- OpenFIGI for symbol normalization
-- Twelve Data for security search and USD-first quote lookup
-- Yahoo Finance unofficial routing for CAD-listed `.NE` / `.TO` / `.V` holdings in the current personal workflow
-- in-process TTL cache for provider-rate protection in local and single-instance environments
-
-### Product / Documentation Workflow
-- Markdown docs in-repo
-- Notion MCP for backlog and project management
-- Figma Make for UI exploration
-- Figma MCP for design review workflows
-
-### AI Workflow
-- Codex project skills
-- product strategy / PRD / prioritization skills
-- UI/UX Pro Max skill for design-system and implementation direction
-
-## Current Status
-
-This repository is in `working prototype / alpha` stage.
-
-Implemented now:
+Implemented already in the current codebase:
 
 - authenticated login and local registration
 - PostgreSQL schema and Drizzle-backed repositories
-- user-scoped API routes and services
-- Dashboard, Portfolio, Recommendations, Spending, Import, and Settings pages
+- dashboard, portfolio, recommendations, spending, import, settings, and discover surfaces
 - recommendation runs persisted to the database
-- direct CSV import with:
-  - preview
-  - mapping
-  - presets
-  - dry-run review
-  - symbol audit
-  - confirm import
-  - replace / merge modes
-- guided import with:
-  - new or existing account selection
-  - manual holdings entry
-  - single-account CSV import
-  - preset reuse
-- manual holdings entry with:
-  - security search
-  - symbol normalization
-  - quote lookup
-  - auto-calculated market value
-  - optional override total value
-  - derived cost basis / gain-loss
-- CAD / USD display switching across dashboard, portfolio, recommendations, and spending
-- portfolio price refresh with:
-  - batch quote refresh
-  - freshness / coverage status
-  - symbol + exchange + currency quote identity
-  - separate CAD / USD quote routing so CAD wrappers do not get overwritten by USD primary listings
-- persistent investment preferences and import mapping presets
-- persisted guided allocation questionnaire drafts
-- unified client-side API safety helpers for fetch payload validation
+- direct CSV import with preview, mapping, symbol audit, correction, confirm, replace, and merge
+- guided import with account creation, manual holdings entry, and single-account CSV import
+- account detail, unified symbol detail, and account/holding repair workflows
+- market-data search, quote lookup, batch refresh, and CAD / USD quote routing
+- watchlist persistence and candidate-scoring baseline
 
-Not finished yet:
+Still important to finish:
 
-- recommendation engine v2
-- richer review persistence for invalid imports
-- broker integrations and async workers
-- production auth providers beyond local credentials
-- cloud-scale cache / object storage / background jobs
+- real historical performance completion
+- richer import review persistence
+- watchlist and target-constraint deepening
+- mobile-safe auth strategy
+- cloud-ready cache / worker boundaries
 
-## Quick Start
+## New Execution Order
 
-### Prerequisites
-- Node.js 20+
-- npm
+1. update docs and planning to the Flutter-first direction
+2. stabilize backend contracts for Flutter
+3. define the mobile navigation and Flutter design system
+4. migrate dashboard, portfolio, security detail, recommendations, and discover
+5. migrate settings, edits, and import workflows
+6. deepen AI-agent and cloud infrastructure later
 
-### One-command local startup
-```bash
-npm run local:start
-```
+## Design Direction
 
-This will:
+UI work should follow these rules:
 
-- prepare local env files
-- initialize local PostgreSQL
-- push schema
-- seed demo data if needed
-- start the Next.js dev server
+- mobile-first before desktop density
+- Chinese-only copy
+- strong Loo皇 theme instead of generic fintech minimalism
+- explicit visual personality with disciplined information hierarchy
+- `awesome-design-md` references may inform the Flutter visual system, but they do not replace repo docs as the source of truth
 
-### WSL / Linux startup
-```bash
-npm run local:start:linux
-```
+## Repository Role
 
-For Telegram-driven remote development and mobile preview from WSL, use:
+Today this repository contains:
 
-- [docs/guides/wsl-telegram-remote-dev.md](docs/guides/wsl-telegram-remote-dev.md)
+- the current Next.js implementation baseline
+- backend route handlers and service logic
+- product and execution docs
+- future Flutter migration direction
 
-### Validation
-```bash
-npm run typecheck
-npm run build
-```
+The repo is now the source of truth for:
 
-### Demo login
-- `jiekun@example.com` / `demo1234`
-- `casey@example.com` / `demo1234`
+- product scope
+- backend behavior
+- migration sequencing
 
-### Important local pages
-- `/dashboard`
-- `/portfolio`
-- `/recommendations`
-- `/spending`
-- `/import`
-- `/settings`
+It is not the long-term commitment to a web-first frontend.
 
-## Project Structure
+## Key Docs
 
-```text
-app/                  Next.js pages and API handlers
-components/           shared UI, chart, and feature components
-lib/                  backend services, repositories, auth, db, and market-data code
-docs/                 BRD, PRD, UX specs, execution docs, guides
-design-system/        persisted design-system output from AI-assisted UI workflow
-.codex/skills/        local project skills used by Codex
-```
-
-## Interview / Demo Angle
-
-This project demonstrates:
-
-- product thinking and scope control
-- practical AI-agent collaboration in a real workflow
-- translation from BRD/PRD to backlog to Figma to implementation
-- repository/service architecture before backend complexity grows
-- pragmatic handling of import workflows, market-data tradeoffs, and user-scoped persistence
-
-## Next Steps
-
-1. implement guided allocation setup in Settings
-2. deepen recommendation engine rules and explanation quality
-3. persist richer import review and correction state
-4. add cloud-ready cache and object-storage boundaries
-5. introduce broker-scale background jobs when runtime cost justifies them
-
+- `docs/execution/flutter-mobile-migration-plan.md`
+- `docs/execution/backlog.md`
+- `docs/execution/frontend-backend-implementation-path.md`
+- `docs/source/prd.v1.md`
+- `docs/source/brd.md`
+- `docs/source/information_arch.md`

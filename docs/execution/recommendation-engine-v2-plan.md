@@ -1,5 +1,9 @@
 ﻿# Recommendation Engine V2 Plan
 
+> [!IMPORTANT]
+> As of 2026-04-25, this project is now Flutter-first, mobile-first, Chinese-only, and Loo皇-themed. When this document conflicts with `docs/execution/flutter-mobile-migration-plan.md`, follow the migration plan first.
+
+
 ## Objective
 
 Define the next-generation recommendation engine for Loo国的财富宝库 / Portfolio Manager as a reviewable system design that can be challenged by specialist agents before implementation begins.

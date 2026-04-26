@@ -1,5 +1,9 @@
 # Recommendation Engine V1
 
+> [!IMPORTANT]
+> As of 2026-04-25, this project is now Flutter-first, mobile-first, Chinese-only, and Loo皇-themed. When this document conflicts with `docs/execution/flutter-mobile-migration-plan.md`, follow the migration plan first.
+
+
 ## Objective
 
 Document the current rule-based recommendation engine exactly as it exists in the codebase so future engine work can extend it without guessing at hidden assumptions.
