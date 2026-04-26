@@ -110,7 +110,8 @@ AI agents were used for:
 
 ### Market Data
 - OpenFIGI for symbol normalization
-- Twelve Data for security search and latest-available quotes
+- Twelve Data for security search and USD-first quote lookup
+- Yahoo Finance unofficial routing for CAD-listed `.NE` / `.TO` / `.V` holdings in the current personal workflow
 - in-process TTL cache for provider-rate protection in local and single-instance environments
 
 ### Product / Documentation Workflow
@@ -159,6 +160,8 @@ Implemented now:
 - portfolio price refresh with:
   - batch quote refresh
   - freshness / coverage status
+  - symbol + exchange + currency quote identity
+  - separate CAD / USD quote routing so CAD wrappers do not get overwritten by USD primary listings
 - persistent investment preferences and import mapping presets
 - persisted guided allocation questionnaire drafts
 - unified client-side API safety helpers for fetch payload validation
@@ -189,6 +192,15 @@ This will:
 - push schema
 - seed demo data if needed
 - start the Next.js dev server
+
+### WSL / Linux startup
+```bash
+npm run local:start:linux
+```
+
+For Telegram-driven remote development and mobile preview from WSL, use:
+
+- [docs/guides/wsl-telegram-remote-dev.md](docs/guides/wsl-telegram-remote-dev.md)
 
 ### Validation
 ```bash
