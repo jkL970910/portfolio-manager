@@ -62,6 +62,7 @@ class LooApiClient {
         "email": email,
         "password": password,
       },
+      retryOnUnauthorized: false,
     );
   }
 
@@ -71,6 +72,7 @@ class LooApiClient {
       body: {
         "refreshToken": refreshToken,
       },
+      retryOnUnauthorized: false,
     );
   }
 
@@ -112,9 +114,10 @@ class LooApiClient {
   Future<Map<String, dynamic>> _postJson(
     String path, {
     Map<String, dynamic>? body,
+    bool retryOnUnauthorized = true,
   }) async {
     final uri = _baseUri.replace(path: path);
-    final response = await _httpClient.post(
+    var response = await _httpClient.post(
       uri,
       headers: {
         ..._headers,
@@ -122,6 +125,25 @@ class LooApiClient {
       },
       body: jsonEncode(body ?? const <String, dynamic>{}),
     );
+
+    if (response.statusCode == 401 && retryOnUnauthorized && _refreshAccessToken != null) {
+      final refreshedToken = await _refreshAccessToken();
+      if (refreshedToken != null && refreshedToken.isNotEmpty) {
+        _accessToken = refreshedToken;
+        response = await _httpClient.post(
+          uri,
+          headers: {
+            ..._headers,
+            "Content-Type": "application/json",
+          },
+          body: jsonEncode(body ?? const <String, dynamic>{}),
+        );
+      }
+    }
+
+    if (response.statusCode == 401 && retryOnUnauthorized && _onUnauthorized != null) {
+      await _onUnauthorized();
+    }
 
     if (response.statusCode < 200 || response.statusCode >= 300) {
       throw LooApiException(
