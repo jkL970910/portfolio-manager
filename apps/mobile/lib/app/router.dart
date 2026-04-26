@@ -31,7 +31,7 @@ class _MobileRootShellState extends State<MobileRootShell> {
     final pages = <Widget>[
       OverviewPage(apiClient: widget.apiClient),
       PortfolioPage(apiClient: widget.apiClient),
-      const RecommendationsPage(),
+      RecommendationsPage(apiClient: widget.apiClient),
       const ImportPage(),
       SettingsPage(
         viewerName: widget.viewerName,
@@ -45,11 +45,16 @@ class _MobileRootShellState extends State<MobileRootShell> {
         selectedIndex: _index,
         onDestinationSelected: (value) => setState(() => _index = value),
         destinations: const [
-          NavigationDestination(icon: Icon(Icons.dashboard_outlined), label: "总览"),
-          NavigationDestination(icon: Icon(Icons.account_balance_wallet_outlined), label: "组合"),
-          NavigationDestination(icon: Icon(Icons.auto_awesome_outlined), label: "推荐"),
-          NavigationDestination(icon: Icon(Icons.upload_file_outlined), label: "导入"),
-          NavigationDestination(icon: Icon(Icons.settings_outlined), label: "设置"),
+          NavigationDestination(
+              icon: Icon(Icons.dashboard_outlined), label: "总览"),
+          NavigationDestination(
+              icon: Icon(Icons.account_balance_wallet_outlined), label: "组合"),
+          NavigationDestination(
+              icon: Icon(Icons.auto_awesome_outlined), label: "推荐"),
+          NavigationDestination(
+              icon: Icon(Icons.upload_file_outlined), label: "导入"),
+          NavigationDestination(
+              icon: Icon(Icons.settings_outlined), label: "设置"),
         ],
       ),
     );

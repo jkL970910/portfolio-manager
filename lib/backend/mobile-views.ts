@@ -4,14 +4,16 @@ import type {
   PortfolioAccountDetailData,
   PortfolioData,
   PortfolioHoldingDetailData,
-  PortfolioSecurityDetailData
+  PortfolioSecurityDetailData,
+  RecommendationsData
 } from "@/lib/contracts";
 import {
   getDashboardView,
   getPortfolioAccountDetailView,
   getPortfolioHoldingDetailView,
   getPortfolioSecurityDetailView,
-  getPortfolioView
+  getPortfolioView,
+  getRecommendationView
 } from "@/lib/backend/services";
 import type { Viewer } from "@/lib/auth/session";
 
@@ -115,6 +117,15 @@ type MobilePortfolioSecurityDetailData = Omit<PortfolioSecurityDetailData, "rela
   heldPosition: null | Omit<NonNullable<PortfolioSecurityDetailData["heldPosition"]>, "accountViews"> & {
     accountViews: MobileSecurityAccountHoldingView[];
   };
+};
+
+type MobileRecommendationPriority = Omit<
+  RecommendationsData["priorities"][number],
+  "securityHref" | "alternativeLinks" | "relatedLinks"
+>;
+
+type MobileRecommendationsData = Omit<RecommendationsData, "priorities"> & {
+  priorities: MobileRecommendationPriority[];
 };
 
 function mapMobileHomeData(viewer: Viewer, payload: ApiSuccess<DashboardData & { context?: MobileHomeData["context"] }>): MobileHomeData {
@@ -276,6 +287,21 @@ function mapMobileSecurityDetailData(data: PortfolioSecurityDetailData): MobileP
   };
 }
 
+function mapMobileRecommendationsData(data: RecommendationsData): MobileRecommendationsData {
+  return {
+    ...data,
+    priorities: data.priorities.map((priority) => {
+      const {
+        securityHref: _securityHref,
+        alternativeLinks: _alternativeLinks,
+        relatedLinks: _relatedLinks,
+        ...rest
+      } = priority;
+      return rest;
+    }),
+  };
+}
+
 export async function getMobileHomeView(userId: string, viewer: Viewer) {
   const payload = await getDashboardView(userId);
   return {
@@ -312,6 +338,14 @@ export async function getMobilePortfolioSecurityDetailView(userId: string, symbo
   const payload = await getPortfolioSecurityDetailView(userId, symbol);
   return {
     data: payload.data.data ? mapMobileSecurityDetailData(payload.data.data) : null,
+    meta: payload.meta,
+  };
+}
+
+export async function getMobileRecommendationsView(userId: string) {
+  const payload = await getRecommendationView(userId);
+  return {
+    data: mapMobileRecommendationsData(payload.data),
     meta: payload.meta,
   };
 }
