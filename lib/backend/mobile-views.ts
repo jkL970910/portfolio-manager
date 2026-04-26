@@ -1,6 +1,7 @@
 import type { ApiSuccess } from "@/lib/backend/contracts";
 import type {
   DashboardData,
+  ImportData,
   PortfolioAccountDetailData,
   PortfolioData,
   PortfolioHoldingDetailData,
@@ -9,6 +10,7 @@ import type {
 } from "@/lib/contracts";
 import {
   getDashboardView,
+  getImportView,
   getPortfolioAccountDetailView,
   getPortfolioHoldingDetailView,
   getPortfolioSecurityDetailView,
@@ -126,6 +128,17 @@ type MobileRecommendationPriority = Omit<
 
 type MobileRecommendationsData = Omit<RecommendationsData, "priorities"> & {
   priorities: MobileRecommendationPriority[];
+};
+
+type MobileImportData = {
+  manualSteps: { title: string; description: string }[];
+  actionCards: { label: string; title: string; description: string }[];
+  existingAccounts: Array<ImportData["existingAccounts"][number] & {
+    displayName: string;
+    value: string;
+    detail: string;
+  }>;
+  notes: string[];
 };
 
 function mapMobileHomeData(viewer: Viewer, payload: ApiSuccess<DashboardData & { context?: MobileHomeData["context"] }>): MobileHomeData {
@@ -302,6 +315,61 @@ function mapMobileRecommendationsData(data: RecommendationsData): MobileRecommen
   };
 }
 
+function mapMobileImportData(data: ImportData): MobileImportData {
+  return {
+    manualSteps: [
+      {
+        title: "先创建账户",
+        description: "选择账户类型、币种和机构，把 Loo国资产桶先放对位置。",
+      },
+      {
+        title: "再添加持仓",
+        description: "为账户添加股票、ETF、现金或贵金属持仓，保留原始交易币种。",
+      },
+      {
+        title: "检查成本和市值",
+        description: "确认数量、成本、当前价格和市场归属，避免 CAD/USD 混在一起。",
+      },
+      {
+        title: "保存后回到组合",
+        description: "保存后可直接回组合页、详情页和推荐页继续分析。",
+      },
+    ],
+    actionCards: [
+      {
+        label: "账户",
+        title: "添加账户",
+        description: "新增 TFSA、RRSP、Taxable、FHSA 或其它投资账户。",
+      },
+      {
+        label: "持仓",
+        title: "添加持仓",
+        description: "在已有账户下录入标的、数量、成本、币种和市场。",
+      },
+      {
+        label: "检查",
+        title: "复核现有账户",
+        description: "先看当前账户清单，再决定补哪个账户或持仓。",
+      },
+    ],
+    existingAccounts: data.existingAccounts.map((account) => ({
+      ...account,
+      displayName: account.nickname || account.institution || account.type,
+      value: new Intl.NumberFormat("en-CA", {
+        style: "currency",
+        currency: "CAD",
+        maximumFractionDigits: 0,
+      }).format(account.marketValueCad),
+      detail: [account.type, account.institution, account.currency].filter(Boolean).join(" · "),
+    })),
+    notes: [
+      "移动端 MVP 只保留手动/引导式导入，不迁移 CSV 上传和字段映射。",
+      "CSV 批量导入后续可作为桌面高级功能保留。",
+      ...data.portfolioSuccessStates.slice(0, 2),
+    ],
+  };
+}
+
 export async function getMobileHomeView(userId: string, viewer: Viewer) {
   const payload = await getDashboardView(userId);
   return {
@@ -346,6 +414,14 @@ export async function getMobileRecommendationsView(userId: string) {
   const payload = await getRecommendationView(userId);
   return {
     data: mapMobileRecommendationsData(payload.data),
+    meta: payload.meta,
+  };
+}
+
+export async function getMobileImportView(userId: string) {
+  const payload = await getImportView(userId);
+  return {
+    data: mapMobileImportData(payload.data),
     meta: payload.meta,
   };
 }

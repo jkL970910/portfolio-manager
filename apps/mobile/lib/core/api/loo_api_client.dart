@@ -48,6 +48,10 @@ class LooApiClient {
     return _getJson("/api/mobile/recommendations");
   }
 
+  Future<Map<String, dynamic>> getImportGuide() {
+    return _getJson("/api/mobile/import");
+  }
+
   Future<Map<String, dynamic>> getPortfolioAccountDetail(String accountId) {
     return _getJson(
         "/api/mobile/portfolio/accounts/${Uri.encodeComponent(accountId)}");

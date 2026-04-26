@@ -32,7 +32,7 @@ class _MobileRootShellState extends State<MobileRootShell> {
       OverviewPage(apiClient: widget.apiClient),
       PortfolioPage(apiClient: widget.apiClient),
       RecommendationsPage(apiClient: widget.apiClient),
-      const ImportPage(),
+      ImportPage(apiClient: widget.apiClient),
       SettingsPage(
         viewerName: widget.viewerName,
         onLogout: widget.onLogout,
