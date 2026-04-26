@@ -33,4 +33,4 @@ exec flutter run \
   -d web-server \
   --web-hostname 0.0.0.0 \
   --web-port "$PORT" \
-  --dart-define=PORTFOLIO_API_BASE_URL="$API_BASE_URL"
+  --dart-define=LOO_API_BASE_URL="$API_BASE_URL"
