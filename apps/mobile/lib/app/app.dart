@@ -8,14 +8,19 @@ import "../features/auth/presentation/login_page.dart";
 import "router.dart";
 
 class LooWealthApp extends StatefulWidget {
-  const LooWealthApp({super.key});
+  const LooWealthApp({
+    MobileAuthStore? authStore,
+    super.key,
+  }) : _authStore = authStore;
+
+  final MobileAuthStore? _authStore;
 
   @override
   State<LooWealthApp> createState() => _LooWealthAppState();
 }
 
 class _LooWealthAppState extends State<LooWealthApp> {
-  final _authStore = MobileAuthStore();
+  late final MobileAuthStore _authStore;
 
   MobileAuthSession? _session;
   Future<String?>? _refreshInFlight;
@@ -24,6 +29,7 @@ class _LooWealthAppState extends State<LooWealthApp> {
   @override
   void initState() {
     super.initState();
+    _authStore = widget._authStore ?? MobileAuthStore();
     _restoreSession();
   }
 
