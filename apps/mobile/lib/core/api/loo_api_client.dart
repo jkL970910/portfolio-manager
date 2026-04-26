@@ -35,9 +35,64 @@ class LooApiClient {
     return _getJson("/api/mobile/portfolio/overview");
   }
 
+  Future<Map<String, dynamic>> login({
+    required String email,
+    required String password,
+  }) {
+    return _postJson(
+      "/api/mobile/auth/login",
+      body: {
+        "email": email,
+        "password": password,
+      },
+    );
+  }
+
+  Future<Map<String, dynamic>> refreshSession(String refreshToken) {
+    return _postJson(
+      "/api/mobile/auth/refresh",
+      body: {
+        "refreshToken": refreshToken,
+      },
+    );
+  }
+
+  Future<void> logout() async {
+    await _postJson("/api/mobile/auth/logout");
+  }
+
   Future<Map<String, dynamic>> _getJson(String path) async {
     final uri = _baseUri.replace(path: path);
     final response = await _httpClient.get(uri, headers: _headers);
+
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw LooApiException(
+        _readErrorMessage(response.body),
+        statusCode: response.statusCode,
+      );
+    }
+
+    final decoded = jsonDecode(response.body);
+    if (decoded is! Map<String, dynamic>) {
+      throw const LooApiException("接口返回格式不正确。");
+    }
+
+    return decoded;
+  }
+
+  Future<Map<String, dynamic>> _postJson(
+    String path, {
+    Map<String, dynamic>? body,
+  }) async {
+    final uri = _baseUri.replace(path: path);
+    final response = await _httpClient.post(
+      uri,
+      headers: {
+        ..._headers,
+        "Content-Type": "application/json",
+      },
+      body: jsonEncode(body ?? const <String, dynamic>{}),
+    );
 
     if (response.statusCode < 200 || response.statusCode >= 300) {
       throw LooApiException(

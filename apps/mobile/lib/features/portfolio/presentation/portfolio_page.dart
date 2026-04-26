@@ -4,7 +4,12 @@ import "../../../core/api/loo_api_client.dart";
 import "../../shared/data/mobile_models.dart";
 
 class PortfolioPage extends StatefulWidget {
-  const PortfolioPage({super.key});
+  const PortfolioPage({
+    required this.apiClient,
+    super.key,
+  });
+
+  final LooApiClient apiClient;
 
   @override
   State<PortfolioPage> createState() => _PortfolioPageState();
@@ -17,7 +22,7 @@ class _PortfolioPageState extends State<PortfolioPage> {
   @override
   void initState() {
     super.initState();
-    _apiClient = LooApiClient();
+    _apiClient = widget.apiClient;
     _snapshot = _loadSnapshot();
   }
 

@@ -1,20 +1,18 @@
 import "package:flutter_test/flutter_test.dart";
+import "package:shared_preferences/shared_preferences.dart";
 
 import "package:loo_wealth_mobile/app/app.dart";
 
 void main() {
-  testWidgets("renders the Loo mobile shell", (WidgetTester tester) async {
+  testWidgets("renders the Loo login shell", (WidgetTester tester) async {
+    SharedPreferences.setMockInitialValues({});
+
     await tester.pumpWidget(const LooWealthApp());
+    await tester.pumpAndSettle();
 
-    expect(find.text("总览"), findsWidgets);
-    expect(find.text("组合"), findsOneWidget);
-    expect(find.text("推荐"), findsOneWidget);
-    expect(find.text("导入"), findsOneWidget);
-    expect(find.text("设置"), findsOneWidget);
-
-    await tester.tap(find.text("组合"));
-    await tester.pump();
-
-    expect(find.text("组合御览"), findsOneWidget);
+    expect(find.text("进入 Loo国"), findsOneWidget);
+    expect(find.text("邮箱"), findsOneWidget);
+    expect(find.text("密码"), findsOneWidget);
+    expect(find.text("召唤 Loo皇"), findsOneWidget);
   });
 }

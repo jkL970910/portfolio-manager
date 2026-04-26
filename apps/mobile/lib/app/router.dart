@@ -1,5 +1,6 @@
 import "package:flutter/material.dart";
 
+import "../core/api/loo_api_client.dart";
 import "../features/import_flow/presentation/import_page.dart";
 import "../features/overview/presentation/overview_page.dart";
 import "../features/portfolio/presentation/portfolio_page.dart";
@@ -7,7 +8,16 @@ import "../features/recommendations/presentation/recommendations_page.dart";
 import "../features/settings/presentation/settings_page.dart";
 
 class MobileRootShell extends StatefulWidget {
-  const MobileRootShell({super.key});
+  const MobileRootShell({
+    required this.apiClient,
+    required this.viewerName,
+    required this.onLogout,
+    super.key,
+  });
+
+  final LooApiClient apiClient;
+  final String viewerName;
+  final VoidCallback onLogout;
 
   @override
   State<MobileRootShell> createState() => _MobileRootShellState();
@@ -16,18 +26,21 @@ class MobileRootShell extends StatefulWidget {
 class _MobileRootShellState extends State<MobileRootShell> {
   int _index = 0;
 
-  static const _pages = <Widget>[
-    OverviewPage(),
-    PortfolioPage(),
-    RecommendationsPage(),
-    ImportPage(),
-    SettingsPage(),
-  ];
-
   @override
   Widget build(BuildContext context) {
+    final pages = <Widget>[
+      OverviewPage(apiClient: widget.apiClient),
+      PortfolioPage(apiClient: widget.apiClient),
+      const RecommendationsPage(),
+      const ImportPage(),
+      SettingsPage(
+        viewerName: widget.viewerName,
+        onLogout: widget.onLogout,
+      ),
+    ];
+
     return Scaffold(
-      body: SafeArea(child: _pages[_index]),
+      body: SafeArea(child: pages[_index]),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _index,
         onDestinationSelected: (value) => setState(() => _index = value),
