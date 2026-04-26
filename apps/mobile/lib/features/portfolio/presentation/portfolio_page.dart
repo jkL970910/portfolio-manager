@@ -2,7 +2,7 @@ import "package:flutter/material.dart";
 
 import "../../../core/api/loo_api_client.dart";
 import "account_detail_page.dart";
-import "security_detail_page.dart";
+import "holding_detail_page.dart";
 import "../../shared/data/mobile_models.dart";
 
 class PortfolioPage extends StatefulWidget {
@@ -55,23 +55,30 @@ class _PortfolioPageState extends State<PortfolioPage> {
               SliverToBoxAdapter(
                 child: _PageHeader(
                   title: "组合御览",
-                  subtitle: snapshot.hasData ? snapshot.data!.quoteStatus : "正在整理 Loo国资产账本...",
+                  subtitle: snapshot.hasData
+                      ? snapshot.data!.quoteStatus
+                      : "正在整理 Loo国资产账本...",
                 ),
               ),
               if (snapshot.connectionState == ConnectionState.waiting)
-                const SliverFillRemaining(child: Center(child: CircularProgressIndicator()))
+                const SliverFillRemaining(
+                    child: Center(child: CircularProgressIndicator()))
               else if (snapshot.hasError)
                 SliverFillRemaining(
-                  child: _ErrorState(message: snapshot.error.toString(), onRetry: _refresh),
+                  child: _ErrorState(
+                      message: snapshot.error.toString(), onRetry: _refresh),
                 )
               else if (snapshot.hasData)
                 SliverPadding(
                   padding: const EdgeInsets.fromLTRB(20, 0, 20, 28),
                   sliver: SliverList.list(
                     children: [
-                      _HealthCard(snapshot.data!.healthScore, snapshot.data!.summaryPoints),
+                      _HealthCard(snapshot.data!.healthScore,
+                          snapshot.data!.summaryPoints),
                       const SizedBox(height: 18),
-                      _SectionTitle(title: "账户", actionLabel: "${snapshot.data!.accounts.length} 个"),
+                      _SectionTitle(
+                          title: "账户",
+                          actionLabel: "${snapshot.data!.accounts.length} 个"),
                       const SizedBox(height: 10),
                       ...snapshot.data!.accounts.map(
                         (account) => _AccountTile(
@@ -80,14 +87,16 @@ class _PortfolioPageState extends State<PortfolioPage> {
                         ),
                       ),
                       const SizedBox(height: 18),
-                      _SectionTitle(title: "持仓", actionLabel: "${snapshot.data!.holdings.length} 个"),
+                      _SectionTitle(
+                          title: "持仓",
+                          actionLabel: "${snapshot.data!.holdings.length} 个"),
                       const SizedBox(height: 10),
                       ...snapshot.data!.holdings.take(12).map(
-                        (holding) => _HoldingTile(
-                          holding,
-                          onTap: () => _openSecurityDetail(holding),
-                        ),
-                      ),
+                            (holding) => _HoldingTile(
+                              holding,
+                              onTap: () => _openHoldingDetail(holding),
+                            ),
+                          ),
                     ],
                   ),
                 ),
@@ -110,12 +119,12 @@ class _PortfolioPageState extends State<PortfolioPage> {
     );
   }
 
-  void _openSecurityDetail(MobileHoldingCard holding) {
+  void _openHoldingDetail(MobileHoldingCard holding) {
     Navigator.of(context).push(
       MaterialPageRoute<void>(
-        builder: (_) => SecurityDetailPage(
+        builder: (_) => HoldingDetailPage(
           apiClient: widget.apiClient,
-          symbol: holding.symbol,
+          holdingId: holding.id,
           fallbackTitle: holding.symbol,
         ),
       ),
@@ -143,13 +152,21 @@ class MobilePortfolioSnapshot {
     final healthScore = json["healthScore"];
 
     return MobilePortfolioSnapshot(
-      accounts: readJsonList(json, "accountCards").map(MobileAccountCard.fromJson).toList(),
-      holdings: readJsonList(json, "holdings").map(MobileHoldingCard.fromJson).toList(),
+      accounts: readJsonList(json, "accountCards")
+          .map(MobileAccountCard.fromJson)
+          .toList(),
+      holdings: readJsonList(json, "holdings")
+          .map(MobileHoldingCard.fromJson)
+          .toList(),
       quoteStatus: quoteStatus is Map<String, dynamic>
           ? quoteStatus["lastRefreshed"] as String? ?? "报价状态待刷新"
           : "报价状态待刷新",
-      healthScore: healthScore is Map<String, dynamic> ? "${healthScore["score"] ?? "--"} 分" : "-- 分",
-      summaryPoints: (json["summaryPoints"] as List?)?.whereType<String>().toList() ?? const [],
+      healthScore: healthScore is Map<String, dynamic>
+          ? "${healthScore["score"] ?? "--"} 分"
+          : "-- 分",
+      summaryPoints:
+          (json["summaryPoints"] as List?)?.whereType<String>().toList() ??
+              const [],
     );
   }
 }
@@ -212,7 +229,8 @@ class _SectionTitle extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        Expanded(child: Text(title, style: Theme.of(context).textTheme.titleLarge)),
+        Expanded(
+            child: Text(title, style: Theme.of(context).textTheme.titleLarge)),
         Text(actionLabel, style: Theme.of(context).textTheme.bodyMedium),
       ],
     );

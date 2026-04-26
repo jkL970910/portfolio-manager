@@ -45,11 +45,18 @@ class LooApiClient {
   }
 
   Future<Map<String, dynamic>> getPortfolioAccountDetail(String accountId) {
-    return _getJson("/api/mobile/portfolio/accounts/${Uri.encodeComponent(accountId)}");
+    return _getJson(
+        "/api/mobile/portfolio/accounts/${Uri.encodeComponent(accountId)}");
+  }
+
+  Future<Map<String, dynamic>> getPortfolioHoldingDetail(String holdingId) {
+    return _getJson(
+        "/api/mobile/portfolio/holdings/${Uri.encodeComponent(holdingId)}");
   }
 
   Future<Map<String, dynamic>> getPortfolioSecurityDetail(String symbol) {
-    return _getJson("/api/mobile/portfolio/securities/${Uri.encodeComponent(symbol)}");
+    return _getJson(
+        "/api/mobile/portfolio/securities/${Uri.encodeComponent(symbol)}");
   }
 
   Future<Map<String, dynamic>> login({
@@ -126,7 +133,9 @@ class LooApiClient {
       body: jsonEncode(body ?? const <String, dynamic>{}),
     );
 
-    if (response.statusCode == 401 && retryOnUnauthorized && _refreshAccessToken != null) {
+    if (response.statusCode == 401 &&
+        retryOnUnauthorized &&
+        _refreshAccessToken != null) {
       final refreshedToken = await _refreshAccessToken();
       if (refreshedToken != null && refreshedToken.isNotEmpty) {
         _accessToken = refreshedToken;
@@ -141,7 +150,9 @@ class LooApiClient {
       }
     }
 
-    if (response.statusCode == 401 && retryOnUnauthorized && _onUnauthorized != null) {
+    if (response.statusCode == 401 &&
+        retryOnUnauthorized &&
+        _onUnauthorized != null) {
       await _onUnauthorized();
     }
 

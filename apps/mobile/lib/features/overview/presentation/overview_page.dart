@@ -2,7 +2,7 @@ import "package:flutter/material.dart";
 
 import "../../../core/api/loo_api_client.dart";
 import "../../portfolio/presentation/account_detail_page.dart";
-import "../../portfolio/presentation/security_detail_page.dart";
+import "../../portfolio/presentation/holding_detail_page.dart";
 import "../../shared/data/mobile_models.dart";
 
 class OverviewPage extends StatefulWidget {
@@ -61,10 +61,12 @@ class _OverviewPageState extends State<OverviewPage> {
                 ),
               ),
               if (snapshot.connectionState == ConnectionState.waiting)
-                const SliverFillRemaining(child: Center(child: CircularProgressIndicator()))
+                const SliverFillRemaining(
+                    child: Center(child: CircularProgressIndicator()))
               else if (snapshot.hasError)
                 SliverFillRemaining(
-                  child: _ErrorState(message: snapshot.error.toString(), onRetry: _refresh),
+                  child: _ErrorState(
+                      message: snapshot.error.toString(), onRetry: _refresh),
                 )
               else if (snapshot.hasData)
                 SliverPadding(
@@ -73,7 +75,9 @@ class _OverviewPageState extends State<OverviewPage> {
                     children: [
                       _MetricGrid(metrics: snapshot.data!.metrics),
                       const SizedBox(height: 18),
-                      _SectionTitle(title: "重点账户", actionLabel: "${snapshot.data!.accounts.length} 个账户"),
+                      _SectionTitle(
+                          title: "重点账户",
+                          actionLabel: "${snapshot.data!.accounts.length} 个账户"),
                       const SizedBox(height: 10),
                       ...snapshot.data!.accounts.take(3).map(
                             (account) => _AccountTile(
@@ -82,16 +86,20 @@ class _OverviewPageState extends State<OverviewPage> {
                             ),
                           ),
                       const SizedBox(height: 18),
-                      _SectionTitle(title: "头部持仓", actionLabel: "${snapshot.data!.topHoldings.length} 个标的"),
+                      _SectionTitle(
+                          title: "头部持仓",
+                          actionLabel:
+                              "${snapshot.data!.topHoldings.length} 个标的"),
                       const SizedBox(height: 10),
                       ...snapshot.data!.topHoldings.take(5).map(
                             (holding) => _HoldingTile(
                               holding,
-                              onTap: () => _openSecurityDetail(holding),
+                              onTap: () => _openHoldingDetail(holding),
                             ),
                           ),
                       const SizedBox(height: 18),
-                      _RecommendationCard(snapshot.data!.recommendationTheme, snapshot.data!.recommendationReason),
+                      _RecommendationCard(snapshot.data!.recommendationTheme,
+                          snapshot.data!.recommendationReason),
                     ],
                   ),
                 ),
@@ -114,12 +122,12 @@ class _OverviewPageState extends State<OverviewPage> {
     );
   }
 
-  void _openSecurityDetail(MobileHoldingCard holding) {
+  void _openHoldingDetail(MobileHoldingCard holding) {
     Navigator.of(context).push(
       MaterialPageRoute<void>(
-        builder: (_) => SecurityDetailPage(
+        builder: (_) => HoldingDetailPage(
           apiClient: widget.apiClient,
-          symbol: holding.symbol,
+          holdingId: holding.id,
           fallbackTitle: holding.symbol,
         ),
       ),
@@ -149,10 +157,17 @@ class MobileHomeSnapshot {
     final recommendation = json["recommendation"];
 
     return MobileHomeSnapshot(
-      viewerName: viewer is Map<String, dynamic> ? viewer["displayName"] as String? ?? "Loo国居民" : "Loo国居民",
-      metrics: readJsonList(json, "metrics").map(MobileMetric.fromJson).toList(),
-      accounts: readJsonList(json, "accounts").map(MobileAccountCard.fromJson).toList(),
-      topHoldings: readJsonList(json, "topHoldings").map(MobileHoldingCard.fromJson).toList(),
+      viewerName: viewer is Map<String, dynamic>
+          ? viewer["displayName"] as String? ?? "Loo国居民"
+          : "Loo国居民",
+      metrics:
+          readJsonList(json, "metrics").map(MobileMetric.fromJson).toList(),
+      accounts: readJsonList(json, "accounts")
+          .map(MobileAccountCard.fromJson)
+          .toList(),
+      topHoldings: readJsonList(json, "topHoldings")
+          .map(MobileHoldingCard.fromJson)
+          .toList(),
       recommendationTheme: recommendation is Map<String, dynamic>
           ? recommendation["theme"] as String? ?? "暂无推荐主题"
           : "暂无推荐主题",
@@ -232,7 +247,8 @@ class _SectionTitle extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        Expanded(child: Text(title, style: Theme.of(context).textTheme.titleLarge)),
+        Expanded(
+            child: Text(title, style: Theme.of(context).textTheme.titleLarge)),
         Text(actionLabel, style: Theme.of(context).textTheme.bodyMedium),
       ],
     );
