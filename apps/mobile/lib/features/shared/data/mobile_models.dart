@@ -74,6 +74,26 @@ class MobileHoldingCard {
   }
 }
 
+class MobileFact {
+  const MobileFact({
+    required this.label,
+    required this.value,
+    required this.detail,
+  });
+
+  final String label;
+  final String value;
+  final String detail;
+
+  factory MobileFact.fromJson(Map<String, dynamic> json) {
+    return MobileFact(
+      label: json["label"] as String? ?? "未知事实",
+      value: json["value"] as String? ?? "--",
+      detail: json["detail"] as String? ?? "",
+    );
+  }
+}
+
 List<Map<String, dynamic>> readJsonList(Map<String, dynamic> json, String key) {
   final value = json[key];
   if (value is! List) {

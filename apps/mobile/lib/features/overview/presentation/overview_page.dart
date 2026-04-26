@@ -1,6 +1,8 @@
 import "package:flutter/material.dart";
 
 import "../../../core/api/loo_api_client.dart";
+import "../../portfolio/presentation/account_detail_page.dart";
+import "../../portfolio/presentation/security_detail_page.dart";
 import "../../shared/data/mobile_models.dart";
 
 class OverviewPage extends StatefulWidget {
@@ -75,11 +77,21 @@ class _OverviewPageState extends State<OverviewPage> {
                       const SizedBox(height: 18),
                       _SectionTitle(title: "重点账户", actionLabel: "${snapshot.data!.accounts.length} 个账户"),
                       const SizedBox(height: 10),
-                      ...snapshot.data!.accounts.take(3).map(_AccountTile.new),
+                      ...snapshot.data!.accounts.take(3).map(
+                            (account) => _AccountTile(
+                              account,
+                              onTap: () => _openAccountDetail(account),
+                            ),
+                          ),
                       const SizedBox(height: 18),
                       _SectionTitle(title: "头部持仓", actionLabel: "${snapshot.data!.topHoldings.length} 个标的"),
                       const SizedBox(height: 10),
-                      ...snapshot.data!.topHoldings.take(5).map(_HoldingTile.new),
+                      ...snapshot.data!.topHoldings.take(5).map(
+                            (holding) => _HoldingTile(
+                              holding,
+                              onTap: () => _openSecurityDetail(holding),
+                            ),
+                          ),
                       const SizedBox(height: 18),
                       _RecommendationCard(snapshot.data!.recommendationTheme, snapshot.data!.recommendationReason),
                     ],
@@ -89,6 +101,30 @@ class _OverviewPageState extends State<OverviewPage> {
           ),
         );
       },
+    );
+  }
+
+  void _openAccountDetail(MobileAccountCard account) {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => AccountDetailPage(
+          apiClient: _apiClient,
+          accountId: account.id,
+          fallbackTitle: account.name,
+        ),
+      ),
+    );
+  }
+
+  void _openSecurityDetail(MobileHoldingCard holding) {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => SecurityDetailPage(
+          apiClient: _apiClient,
+          symbol: holding.symbol,
+          fallbackTitle: holding.symbol,
+        ),
+      ),
     );
   }
 }
@@ -206,9 +242,10 @@ class _SectionTitle extends StatelessWidget {
 }
 
 class _AccountTile extends StatelessWidget {
-  const _AccountTile(this.account);
+  const _AccountTile(this.account, {required this.onTap});
 
   final MobileAccountCard account;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -216,18 +253,27 @@ class _AccountTile extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 10),
       child: ListTile(
         contentPadding: EdgeInsets.zero,
+        onTap: onTap,
         title: Text(account.name),
         subtitle: Text(account.detail),
-        trailing: Text(account.value, style: Theme.of(context).textTheme.titleLarge),
+        trailing: Wrap(
+          crossAxisAlignment: WrapCrossAlignment.center,
+          spacing: 8,
+          children: [
+            Text(account.value, style: Theme.of(context).textTheme.titleLarge),
+            const Icon(Icons.chevron_right),
+          ],
+        ),
       ),
     );
   }
 }
 
 class _HoldingTile extends StatelessWidget {
-  const _HoldingTile(this.holding);
+  const _HoldingTile(this.holding, {required this.onTap});
 
   final MobileHoldingCard holding;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -235,9 +281,17 @@ class _HoldingTile extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 10),
       child: ListTile(
         contentPadding: EdgeInsets.zero,
+        onTap: onTap,
         title: Text("${holding.symbol} · ${holding.name}"),
         subtitle: Text(holding.detail),
-        trailing: Text(holding.value, style: Theme.of(context).textTheme.titleLarge),
+        trailing: Wrap(
+          crossAxisAlignment: WrapCrossAlignment.center,
+          spacing: 8,
+          children: [
+            Text(holding.value, style: Theme.of(context).textTheme.titleLarge),
+            const Icon(Icons.chevron_right),
+          ],
+        ),
       ),
     );
   }

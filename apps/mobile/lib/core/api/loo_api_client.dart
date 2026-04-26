@@ -35,6 +35,14 @@ class LooApiClient {
     return _getJson("/api/mobile/portfolio/overview");
   }
 
+  Future<Map<String, dynamic>> getPortfolioAccountDetail(String accountId) {
+    return _getJson("/api/mobile/portfolio/accounts/${Uri.encodeComponent(accountId)}");
+  }
+
+  Future<Map<String, dynamic>> getPortfolioSecurityDetail(String symbol) {
+    return _getJson("/api/mobile/portfolio/securities/${Uri.encodeComponent(symbol)}");
+  }
+
   Future<Map<String, dynamic>> login({
     required String email,
     required String password,
