@@ -7,6 +7,13 @@ out/
 dist/
 build/
 coverage/
+**/.dart_tool/
+**/.flutter-plugins
+**/.flutter-plugins-dependencies
+**/.packages
+**/flutter_build/
+**/ios/Pods/
+**/android/.gradle/
 
 # Logs
 npm-debug.log*

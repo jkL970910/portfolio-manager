@@ -22,6 +22,8 @@
                     "dev:host":  "next dev -H 0.0.0.0",
                     "preview:start":  "npm run dev:host",
                     "preview:tunnel:cloudflare":  "bash ./scripts/start-cloudflare-tunnel.sh",
+                    "mobile:pub:get":  "cd apps/mobile && flutter pub get",
+                    "mobile:dev:web":  "bash ./scripts/start-flutter-mobile.sh",
                     "remote:ductor":  "bash ./scripts/start-ductor.sh",
                     "remote:stack:start":  "bash ./scripts/start-remote-dev-stack.sh",
                     "remote:stack:stop":  "bash ./scripts/stop-remote-dev-stack.sh",
