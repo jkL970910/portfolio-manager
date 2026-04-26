@@ -4,6 +4,9 @@ import "package:http/http.dart" as http;
 
 import "../config/app_config.dart";
 
+typedef AccessTokenRefresh = Future<String?> Function();
+typedef UnauthorizedHandler = Future<void> Function();
+
 class LooApiException implements Exception {
   const LooApiException(this.message, {this.statusCode});
 
@@ -19,13 +22,19 @@ class LooApiClient {
     http.Client? httpClient,
     String baseUrl = AppConfig.apiBaseUrl,
     String accessToken = AppConfig.accessToken,
+    AccessTokenRefresh? refreshAccessToken,
+    UnauthorizedHandler? onUnauthorized,
   })  : _httpClient = httpClient ?? http.Client(),
         _baseUri = Uri.parse(baseUrl),
-        _accessToken = accessToken;
+        _accessToken = accessToken,
+        _refreshAccessToken = refreshAccessToken,
+        _onUnauthorized = onUnauthorized;
 
   final http.Client _httpClient;
   final Uri _baseUri;
-  final String _accessToken;
+  final AccessTokenRefresh? _refreshAccessToken;
+  final UnauthorizedHandler? _onUnauthorized;
+  String _accessToken;
 
   Future<Map<String, dynamic>> getMobileHome() {
     return _getJson("/api/mobile/home");
@@ -71,7 +80,19 @@ class LooApiClient {
 
   Future<Map<String, dynamic>> _getJson(String path) async {
     final uri = _baseUri.replace(path: path);
-    final response = await _httpClient.get(uri, headers: _headers);
+    var response = await _httpClient.get(uri, headers: _headers);
+
+    if (response.statusCode == 401 && _refreshAccessToken != null) {
+      final refreshedToken = await _refreshAccessToken();
+      if (refreshedToken != null && refreshedToken.isNotEmpty) {
+        _accessToken = refreshedToken;
+        response = await _httpClient.get(uri, headers: _headers);
+      }
+    }
+
+    if (response.statusCode == 401 && _onUnauthorized != null) {
+      await _onUnauthorized();
+    }
 
     if (response.statusCode < 200 || response.statusCode >= 300) {
       throw LooApiException(

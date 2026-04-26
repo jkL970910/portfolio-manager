@@ -18,18 +18,16 @@ class OverviewPage extends StatefulWidget {
 }
 
 class _OverviewPageState extends State<OverviewPage> {
-  late final LooApiClient _apiClient;
   late Future<MobileHomeSnapshot> _snapshot;
 
   @override
   void initState() {
     super.initState();
-    _apiClient = widget.apiClient;
     _snapshot = _loadSnapshot();
   }
 
   Future<MobileHomeSnapshot> _loadSnapshot() async {
-    final response = await _apiClient.getMobileHome();
+    final response = await widget.apiClient.getMobileHome();
     final data = response["data"];
     if (data is! Map<String, dynamic>) {
       throw const LooApiException("总览数据格式不正确。");
@@ -108,7 +106,7 @@ class _OverviewPageState extends State<OverviewPage> {
     Navigator.of(context).push(
       MaterialPageRoute<void>(
         builder: (_) => AccountDetailPage(
-          apiClient: _apiClient,
+          apiClient: widget.apiClient,
           accountId: account.id,
           fallbackTitle: account.name,
         ),
@@ -120,7 +118,7 @@ class _OverviewPageState extends State<OverviewPage> {
     Navigator.of(context).push(
       MaterialPageRoute<void>(
         builder: (_) => SecurityDetailPage(
-          apiClient: _apiClient,
+          apiClient: widget.apiClient,
           symbol: holding.symbol,
           fallbackTitle: holding.symbol,
         ),

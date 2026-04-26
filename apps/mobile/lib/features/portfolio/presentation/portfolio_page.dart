@@ -18,18 +18,16 @@ class PortfolioPage extends StatefulWidget {
 }
 
 class _PortfolioPageState extends State<PortfolioPage> {
-  late final LooApiClient _apiClient;
   late Future<MobilePortfolioSnapshot> _snapshot;
 
   @override
   void initState() {
     super.initState();
-    _apiClient = widget.apiClient;
     _snapshot = _loadSnapshot();
   }
 
   Future<MobilePortfolioSnapshot> _loadSnapshot() async {
-    final response = await _apiClient.getPortfolioOverview();
+    final response = await widget.apiClient.getPortfolioOverview();
     final data = response["data"];
     if (data is! Map<String, dynamic>) {
       throw const LooApiException("组合数据格式不正确。");
@@ -104,7 +102,7 @@ class _PortfolioPageState extends State<PortfolioPage> {
     Navigator.of(context).push(
       MaterialPageRoute<void>(
         builder: (_) => AccountDetailPage(
-          apiClient: _apiClient,
+          apiClient: widget.apiClient,
           accountId: account.id,
           fallbackTitle: account.name,
         ),
@@ -116,7 +114,7 @@ class _PortfolioPageState extends State<PortfolioPage> {
     Navigator.of(context).push(
       MaterialPageRoute<void>(
         builder: (_) => SecurityDetailPage(
-          apiClient: _apiClient,
+          apiClient: widget.apiClient,
           symbol: holding.symbol,
           fallbackTitle: holding.symbol,
         ),

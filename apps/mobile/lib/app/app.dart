@@ -18,6 +18,7 @@ class _LooWealthAppState extends State<LooWealthApp> {
   final _authStore = MobileAuthStore();
 
   MobileAuthSession? _session;
+  Future<String?>? _refreshInFlight;
   var _loading = true;
 
   @override
@@ -53,6 +54,42 @@ class _LooWealthAppState extends State<LooWealthApp> {
     }
   }
 
+  Future<String?> _refreshAccessToken() {
+    final refreshInFlight = _refreshInFlight;
+    if (refreshInFlight != null) {
+      return refreshInFlight;
+    }
+
+    final refreshFuture = _refreshSessionForRequest();
+    _refreshInFlight = refreshFuture;
+    return refreshFuture.whenComplete(() {
+      _refreshInFlight = null;
+    });
+  }
+
+  Future<String?> _refreshSessionForRequest() async {
+    final session = _session;
+    if (session == null || session.refreshToken.isEmpty) {
+      await _clearSession();
+      return null;
+    }
+
+    try {
+      final response = await LooApiClient().refreshSession(session.refreshToken);
+      final refreshedSession = MobileAuthSession.fromApiResponse(response);
+      await _authStore.save(refreshedSession);
+      if (mounted) {
+        setState(() {
+          _session = refreshedSession;
+        });
+      }
+      return refreshedSession.accessToken;
+    } catch (_) {
+      await _clearSession();
+      return null;
+    }
+  }
+
   Future<void> _setSession(MobileAuthSession session) async {
     await _authStore.save(session);
     if (!mounted) {
@@ -64,14 +101,7 @@ class _LooWealthAppState extends State<LooWealthApp> {
     });
   }
 
-  Future<void> _logout() async {
-    final session = _session;
-    if (session != null) {
-      try {
-        await LooApiClient(accessToken: session.accessToken).logout();
-      } catch (_) {}
-    }
-
+  Future<void> _clearSession() async {
     await _authStore.clear();
     if (!mounted) {
       return;
@@ -80,6 +110,17 @@ class _LooWealthAppState extends State<LooWealthApp> {
     setState(() {
       _session = null;
     });
+  }
+
+  Future<void> _logout() async {
+    final session = _session;
+    if (session != null) {
+      try {
+        await LooApiClient(accessToken: session.accessToken).logout();
+      } catch (_) {}
+    }
+
+    await _clearSession();
   }
 
   @override
@@ -95,7 +136,11 @@ class _LooWealthAppState extends State<LooWealthApp> {
           : session == null
               ? LoginPage(onAuthenticated: _setSession)
               : MobileRootShell(
-                  apiClient: LooApiClient(accessToken: session.accessToken),
+                  apiClient: LooApiClient(
+                    accessToken: session.accessToken,
+                    refreshAccessToken: _refreshAccessToken,
+                    onUnauthorized: _clearSession,
+                  ),
                   viewerName: session.viewerName,
                   onLogout: _logout,
                 ),
