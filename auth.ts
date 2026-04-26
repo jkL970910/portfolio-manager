@@ -1,8 +1,7 @@
 import Credentials from "next-auth/providers/credentials";
 import NextAuth from "next-auth";
-import { compare } from "bcryptjs";
 import { z } from "zod";
-import { getRepositories } from "@/lib/backend/repositories/factory";
+import { authenticateWithPassword } from "@/lib/auth/credentials";
 
 const signInSchema = z.object({
   email: z.string().email(),
@@ -31,21 +30,16 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           return null;
         }
 
-        const authUser = await getRepositories().users.findByEmail(parsed.data.email.toLowerCase());
-        if (!authUser) {
-          return null;
-        }
-
-        const validPassword = await compare(parsed.data.password, authUser.passwordHash);
-        if (!validPassword) {
+        const profile = await authenticateWithPassword(parsed.data.email, parsed.data.password);
+        if (!profile) {
           return null;
         }
 
         return {
-          id: authUser.profile.id,
-          email: authUser.profile.email,
-          name: authUser.profile.displayName,
-          displayName: authUser.profile.displayName
+          id: profile.id,
+          email: profile.email,
+          name: profile.displayName,
+          displayName: profile.displayName
         };
       }
     })

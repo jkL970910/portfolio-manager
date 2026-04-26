@@ -64,6 +64,15 @@ export const registerUserInputSchema = z.object({
   }
 });
 
+export const mobileAuthLoginSchema = z.object({
+  email: z.string().trim().email(),
+  password: z.string().min(8).max(128)
+});
+
+export const mobileAuthRefreshSchema = z.object({
+  refreshToken: z.string().trim().min(32)
+});
+
 export const citizenOverrideInputSchema = z.object({
   rank: z.enum(["lowly-ox", "base-loo", "citizen", "general", "emperor"]).nullable().optional(),
   addressTier: z.enum(["cowshed", "suburbs", "city", "palace-gate", "bedchamber"]).nullable().optional(),
