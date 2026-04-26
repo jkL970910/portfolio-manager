@@ -1,6 +1,18 @@
 import type { ApiSuccess } from "@/lib/backend/contracts";
-import type { DashboardData, PortfolioData } from "@/lib/contracts";
-import { getDashboardView, getPortfolioView } from "@/lib/backend/services";
+import type {
+  DashboardData,
+  PortfolioAccountDetailData,
+  PortfolioData,
+  PortfolioHoldingDetailData,
+  PortfolioSecurityDetailData
+} from "@/lib/contracts";
+import {
+  getDashboardView,
+  getPortfolioAccountDetailView,
+  getPortfolioHoldingDetailView,
+  getPortfolioSecurityDetailView,
+  getPortfolioView
+} from "@/lib/backend/services";
 import type { Viewer } from "@/lib/auth/session";
 
 type MobileHomeData = {
@@ -86,6 +98,26 @@ type MobilePortfolioOverviewData = {
   };
 };
 
+type MobilePortfolioHoldingListItem = Omit<PortfolioData["holdings"][number], "href" | "securityHref">;
+
+type MobilePortfolioAccountDetailData = Omit<PortfolioAccountDetailData, "holdings"> & {
+  viewer: Viewer;
+  holdings: MobilePortfolioHoldingListItem[];
+};
+
+type MobilePortfolioHoldingDetailData = Omit<PortfolioHoldingDetailData, "holding"> & {
+  viewer: Viewer;
+  holding: Omit<PortfolioHoldingDetailData["holding"], "accountHref">;
+};
+
+type MobilePortfolioSecurityDetailData = Omit<PortfolioSecurityDetailData, "relatedHoldings" | "heldPosition"> & {
+  viewer: Viewer;
+  relatedHoldings: Array<Omit<PortfolioSecurityDetailData["relatedHoldings"][number], "href">>;
+  heldPosition: null | Omit<NonNullable<PortfolioSecurityDetailData["heldPosition"]>, "accountViews"> & {
+    accountViews: MobilePortfolioHoldingDetailData[];
+  };
+};
+
 function mapMobileHomeData(viewer: Viewer, payload: ApiSuccess<DashboardData & { context?: MobileHomeData["context"] }>): MobileHomeData {
   return {
     viewer,
@@ -168,6 +200,84 @@ function mapMobilePortfolioOverviewData(
   };
 }
 
+function mapMobilePortfolioHoldingListItem(holding: PortfolioData["holdings"][number]): MobilePortfolioHoldingListItem {
+  return {
+    id: holding.id,
+    symbol: holding.symbol,
+    name: holding.name,
+    assetClass: holding.assetClass,
+    sector: holding.sector,
+    accountId: holding.accountId,
+    accountType: holding.accountType,
+    account: holding.account,
+    quantity: holding.quantity,
+    avgCost: holding.avgCost,
+    value: holding.value,
+    lastPrice: holding.lastPrice,
+    lastUpdated: holding.lastUpdated,
+    freshnessVariant: holding.freshnessVariant,
+    portfolioShare: holding.portfolioShare,
+    accountShare: holding.accountShare,
+    gainLoss: holding.gainLoss,
+    signal: holding.signal,
+  };
+}
+
+function mapMobileAccountDetailData(viewer: Viewer, data: PortfolioAccountDetailData): MobilePortfolioAccountDetailData {
+  return {
+    viewer,
+    displayContext: data.displayContext,
+    trendContext: data.trendContext,
+    account: data.account,
+    facts: data.facts,
+    performance: data.performance,
+    allocation: data.allocation,
+    healthScore: data.healthScore,
+    holdings: data.holdings.map(mapMobilePortfolioHoldingListItem),
+    editContext: data.editContext,
+  };
+}
+
+function mapMobileHoldingDetailData(viewer: Viewer, data: PortfolioHoldingDetailData): MobilePortfolioHoldingDetailData {
+  const { accountHref: _accountHref, ...holding } = data.holding;
+
+  return {
+    viewer,
+    displayContext: data.displayContext,
+    holding,
+    facts: data.facts,
+    marketData: data.marketData,
+    performance: data.performance,
+    portfolioRole: data.portfolioRole,
+    healthSummary: data.healthSummary,
+    editContext: data.editContext,
+  };
+}
+
+function mapMobileSecurityDetailData(viewer: Viewer, data: PortfolioSecurityDetailData): MobilePortfolioSecurityDetailData {
+  return {
+    viewer,
+    displayContext: data.displayContext,
+    security: data.security,
+    facts: data.facts,
+    marketData: data.marketData,
+    performance: data.performance,
+    summaryPoints: data.summaryPoints,
+    relatedHoldings: data.relatedHoldings.map((holding) => {
+      const { href: _href, ...rest } = holding;
+      return rest;
+    }),
+    heldPosition: data.heldPosition
+      ? {
+          aggregate: data.heldPosition.aggregate,
+          accountOptions: data.heldPosition.accountOptions,
+          accountSummaries: data.heldPosition.accountSummaries,
+          accountViews: data.heldPosition.accountViews.map((holding) => mapMobileHoldingDetailData(viewer, holding)),
+        }
+      : null,
+  };
+}
+
 export async function getMobileHomeView(userId: string, viewer: Viewer) {
   const payload = await getDashboardView(userId);
   return {
@@ -180,6 +290,30 @@ export async function getMobilePortfolioOverviewView(userId: string, viewer: Vie
   const payload = await getPortfolioView(userId);
   return {
     data: mapMobilePortfolioOverviewData(viewer, payload),
+    meta: payload.meta,
+  };
+}
+
+export async function getMobilePortfolioAccountDetailView(userId: string, viewer: Viewer, accountId: string) {
+  const payload = await getPortfolioAccountDetailView(userId, accountId);
+  return {
+    data: payload.data.data ? mapMobileAccountDetailData(viewer, payload.data.data) : null,
+    meta: payload.meta,
+  };
+}
+
+export async function getMobilePortfolioHoldingDetailView(userId: string, viewer: Viewer, holdingId: string) {
+  const payload = await getPortfolioHoldingDetailView(userId, holdingId);
+  return {
+    data: payload.data.data ? mapMobileHoldingDetailData(viewer, payload.data.data) : null,
+    meta: payload.meta,
+  };
+}
+
+export async function getMobilePortfolioSecurityDetailView(userId: string, viewer: Viewer, symbol: string) {
+  const payload = await getPortfolioSecurityDetailView(userId, symbol);
+  return {
+    data: payload.data.data ? mapMobileSecurityDetailData(viewer, payload.data.data) : null,
     meta: payload.meta,
   };
 }

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getMobileViewerFromRequest } from "@/lib/auth/mobile-tokens";
-import { getPortfolioAccountDetailView } from "@/lib/backend/services";
+import { getMobilePortfolioAccountDetailView } from "@/lib/backend/mobile-views";
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ accountId: string }> }) {
   const viewer = await getMobileViewerFromRequest(request);
@@ -9,6 +9,6 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   }
 
   const { accountId } = await params;
-  const result = await getPortfolioAccountDetailView(viewer.id, accountId);
+  const result = await getMobilePortfolioAccountDetailView(viewer.id, viewer, accountId);
   return NextResponse.json(result);
 }
