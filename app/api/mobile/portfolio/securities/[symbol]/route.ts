@@ -9,6 +9,6 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   }
 
   const { symbol } = await params;
-  const result = await getMobilePortfolioSecurityDetailView(viewer.id, viewer, symbol);
+  const result = await getMobilePortfolioSecurityDetailView(viewer.id, symbol);
   return NextResponse.json(result);
 }

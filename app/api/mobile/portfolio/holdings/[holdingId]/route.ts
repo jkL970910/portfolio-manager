@@ -9,6 +9,6 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   }
 
   const { holdingId } = await params;
-  const result = await getMobilePortfolioHoldingDetailView(viewer.id, viewer, holdingId);
+  const result = await getMobilePortfolioHoldingDetailView(viewer.id, holdingId);
   return NextResponse.json(result);
 }

@@ -100,21 +100,20 @@ type MobilePortfolioOverviewData = {
 
 type MobilePortfolioHoldingListItem = Omit<PortfolioData["holdings"][number], "href" | "securityHref">;
 
-type MobilePortfolioAccountDetailData = Omit<PortfolioAccountDetailData, "holdings"> & {
-  viewer: Viewer;
+type MobilePortfolioAccountDetailData = Omit<PortfolioAccountDetailData, "holdings" | "trendContext" | "editContext"> & {
   holdings: MobilePortfolioHoldingListItem[];
 };
 
-type MobilePortfolioHoldingDetailData = Omit<PortfolioHoldingDetailData, "holding"> & {
-  viewer: Viewer;
+type MobilePortfolioHoldingDetailData = Omit<PortfolioHoldingDetailData, "holding" | "editContext"> & {
   holding: Omit<PortfolioHoldingDetailData["holding"], "accountHref">;
 };
 
+type MobileSecurityAccountHoldingView = Omit<MobilePortfolioHoldingDetailData, "displayContext">;
+
 type MobilePortfolioSecurityDetailData = Omit<PortfolioSecurityDetailData, "relatedHoldings" | "heldPosition"> & {
-  viewer: Viewer;
   relatedHoldings: Array<Omit<PortfolioSecurityDetailData["relatedHoldings"][number], "href">>;
   heldPosition: null | Omit<NonNullable<PortfolioSecurityDetailData["heldPosition"]>, "accountViews"> & {
-    accountViews: MobilePortfolioHoldingDetailData[];
+    accountViews: MobileSecurityAccountHoldingView[];
   };
 };
 
@@ -223,26 +222,22 @@ function mapMobilePortfolioHoldingListItem(holding: PortfolioData["holdings"][nu
   };
 }
 
-function mapMobileAccountDetailData(viewer: Viewer, data: PortfolioAccountDetailData): MobilePortfolioAccountDetailData {
+function mapMobileAccountDetailData(data: PortfolioAccountDetailData): MobilePortfolioAccountDetailData {
   return {
-    viewer,
     displayContext: data.displayContext,
-    trendContext: data.trendContext,
     account: data.account,
     facts: data.facts,
     performance: data.performance,
     allocation: data.allocation,
     healthScore: data.healthScore,
     holdings: data.holdings.map(mapMobilePortfolioHoldingListItem),
-    editContext: data.editContext,
   };
 }
 
-function mapMobileHoldingDetailData(viewer: Viewer, data: PortfolioHoldingDetailData): MobilePortfolioHoldingDetailData {
+function mapMobileHoldingDetailData(data: PortfolioHoldingDetailData): MobilePortfolioHoldingDetailData {
   const { accountHref: _accountHref, ...holding } = data.holding;
 
   return {
-    viewer,
     displayContext: data.displayContext,
     holding,
     facts: data.facts,
@@ -250,13 +245,16 @@ function mapMobileHoldingDetailData(viewer: Viewer, data: PortfolioHoldingDetail
     performance: data.performance,
     portfolioRole: data.portfolioRole,
     healthSummary: data.healthSummary,
-    editContext: data.editContext,
   };
 }
 
-function mapMobileSecurityDetailData(viewer: Viewer, data: PortfolioSecurityDetailData): MobilePortfolioSecurityDetailData {
+function mapMobileSecurityAccountHoldingView(data: PortfolioHoldingDetailData): MobileSecurityAccountHoldingView {
+  const { displayContext: _displayContext, ...holdingDetail } = mapMobileHoldingDetailData(data);
+  return holdingDetail;
+}
+
+function mapMobileSecurityDetailData(data: PortfolioSecurityDetailData): MobilePortfolioSecurityDetailData {
   return {
-    viewer,
     displayContext: data.displayContext,
     security: data.security,
     facts: data.facts,
@@ -272,7 +270,7 @@ function mapMobileSecurityDetailData(viewer: Viewer, data: PortfolioSecurityDeta
           aggregate: data.heldPosition.aggregate,
           accountOptions: data.heldPosition.accountOptions,
           accountSummaries: data.heldPosition.accountSummaries,
-          accountViews: data.heldPosition.accountViews.map((holding) => mapMobileHoldingDetailData(viewer, holding)),
+          accountViews: data.heldPosition.accountViews.map(mapMobileSecurityAccountHoldingView),
         }
       : null,
   };
@@ -294,26 +292,26 @@ export async function getMobilePortfolioOverviewView(userId: string, viewer: Vie
   };
 }
 
-export async function getMobilePortfolioAccountDetailView(userId: string, viewer: Viewer, accountId: string) {
+export async function getMobilePortfolioAccountDetailView(userId: string, accountId: string) {
   const payload = await getPortfolioAccountDetailView(userId, accountId);
   return {
-    data: payload.data.data ? mapMobileAccountDetailData(viewer, payload.data.data) : null,
+    data: payload.data.data ? mapMobileAccountDetailData(payload.data.data) : null,
     meta: payload.meta,
   };
 }
 
-export async function getMobilePortfolioHoldingDetailView(userId: string, viewer: Viewer, holdingId: string) {
+export async function getMobilePortfolioHoldingDetailView(userId: string, holdingId: string) {
   const payload = await getPortfolioHoldingDetailView(userId, holdingId);
   return {
-    data: payload.data.data ? mapMobileHoldingDetailData(viewer, payload.data.data) : null,
+    data: payload.data.data ? mapMobileHoldingDetailData(payload.data.data) : null,
     meta: payload.meta,
   };
 }
 
-export async function getMobilePortfolioSecurityDetailView(userId: string, viewer: Viewer, symbol: string) {
+export async function getMobilePortfolioSecurityDetailView(userId: string, symbol: string) {
   const payload = await getPortfolioSecurityDetailView(userId, symbol);
   return {
-    data: payload.data.data ? mapMobileSecurityDetailData(viewer, payload.data.data) : null,
+    data: payload.data.data ? mapMobileSecurityDetailData(payload.data.data) : null,
     meta: payload.meta,
   };
 }
