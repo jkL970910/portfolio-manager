@@ -4,7 +4,7 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 MOBILE_DIR="$ROOT_DIR/apps/mobile"
 PORT="${1:-3001}"
-API_BASE_URL="${PORTFOLIO_API_BASE_URL:-http://127.0.0.1:3000}"
+API_BASE_URL="${LOO_API_BASE_URL:-${PORTFOLIO_API_BASE_URL:-}}"
 
 if ! command -v flutter >/dev/null 2>&1; then
   echo 'flutter is not on PATH.' >&2
@@ -29,8 +29,19 @@ echo '==> Resolving Flutter dependencies'
 flutter pub get
 
 echo "==> Starting Flutter mobile web preview on http://127.0.0.1:${PORT}"
-exec flutter run \
+if [ -n "$API_BASE_URL" ]; then
+  echo "==> Using explicit API base URL: $API_BASE_URL"
+fi
+
+args=(
+  run
   -d web-server \
   --web-hostname 0.0.0.0 \
-  --web-port "$PORT" \
-  --dart-define=LOO_API_BASE_URL="$API_BASE_URL"
+  --web-port "$PORT"
+)
+
+if [ -n "$API_BASE_URL" ]; then
+  args+=(--dart-define=LOO_API_BASE_URL="$API_BASE_URL")
+fi
+
+exec flutter "${args[@]}"

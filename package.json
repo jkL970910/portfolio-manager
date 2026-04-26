@@ -24,6 +24,7 @@
                     "preview:tunnel:cloudflare":  "bash ./scripts/start-cloudflare-tunnel.sh",
                     "mobile:pub:get":  "cd apps/mobile && flutter pub get",
                     "mobile:dev:web":  "bash ./scripts/start-flutter-mobile.sh",
+                    "mobile:preview:proxy":  "node ./scripts/mobile-preview-proxy.mjs",
                     "remote:ductor":  "bash ./scripts/start-ductor.sh",
                     "remote:stack:start":  "bash ./scripts/start-remote-dev-stack.sh",
                     "remote:stack:stop":  "bash ./scripts/stop-remote-dev-stack.sh",

@@ -20,12 +20,12 @@ class LooApiException implements Exception {
 class LooApiClient {
   LooApiClient({
     http.Client? httpClient,
-    String baseUrl = AppConfig.apiBaseUrl,
+    String? baseUrl,
     String accessToken = AppConfig.accessToken,
     AccessTokenRefresh? refreshAccessToken,
     UnauthorizedHandler? onUnauthorized,
   })  : _httpClient = httpClient ?? http.Client(),
-        _baseUri = Uri.parse(baseUrl),
+        _baseUri = Uri.parse(baseUrl ?? AppConfig.apiBaseUrl),
         _accessToken = accessToken,
         _refreshAccessToken = refreshAccessToken,
         _onUnauthorized = onUnauthorized;

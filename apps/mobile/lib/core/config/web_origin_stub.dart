@@ -1,0 +1,3 @@
+String? currentWebOrigin() {
+  return null;
+}
