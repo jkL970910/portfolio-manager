@@ -2,6 +2,7 @@ import "package:flutter/material.dart";
 
 import "../../../core/api/loo_api_client.dart";
 import "../../shared/data/mobile_models.dart";
+import "../../shared/presentation/loo_charts.dart";
 import "detail_state_widgets.dart";
 import "holding_detail_page.dart";
 
@@ -95,6 +96,12 @@ class _SecurityDetailPageState extends State<SecurityDetailPage> {
                 ),
                 const SizedBox(height: 12),
                 _MetricGrid(data),
+                if (data.performance.isNotEmpty) ...[
+                  const SizedBox(height: 16),
+                  const _SectionTitle("价格走势"),
+                  const SizedBox(height: 8),
+                  _PerformanceChartCard(data.performance),
+                ],
                 const SizedBox(height: 16),
                 if (data.summaryPoints.isNotEmpty) ...[
                   const _SectionTitle("Loo皇摘要"),
@@ -301,10 +308,12 @@ class MobileSecurityPerformancePoint {
   const MobileSecurityPerformancePoint({
     required this.label,
     required this.value,
+    required this.chartValue,
   });
 
   final String label;
   final String value;
+  final double chartValue;
 
   factory MobileSecurityPerformancePoint.fromJson(Map<String, dynamic> json) {
     final rawValue = json["value"];
@@ -314,6 +323,7 @@ class MobileSecurityPerformancePoint {
       value: rawValue is num
           ? rawValue.toStringAsFixed(2)
           : rawValue?.toString() ?? "--",
+      chartValue: rawValue is num ? rawValue.toDouble() : 0,
     );
   }
 }
@@ -488,6 +498,43 @@ class _MarketDataCard extends StatelessWidget {
                     ),
                   ),
                 ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _PerformanceChartCard extends StatelessWidget {
+  const _PerformanceChartCard(this.points);
+
+  final List<MobileSecurityPerformancePoint> points;
+
+  @override
+  Widget build(BuildContext context) {
+    final first = points.first;
+    final last = points.last;
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            LooLineChart(
+              points: points
+                  .map(
+                    (point) => LooLineChartPoint(
+                      label: point.label,
+                      value: point.chartValue,
+                    ),
+                  )
+                  .toList(),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              "${first.label} ${first.value} → ${last.label} ${last.value}",
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
           ],
         ),
       ),
