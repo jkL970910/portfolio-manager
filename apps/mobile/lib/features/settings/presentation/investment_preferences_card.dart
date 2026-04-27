@@ -108,6 +108,23 @@ class _InvestmentPreferencesCardState extends State<InvestmentPreferencesCard> {
     }
   }
 
+  Future<void> _openConstraintEditor(MobilePreferenceProfile profile) async {
+    final saved = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) => _ConstraintEditorSheet(
+        apiClient: widget.apiClient,
+        profile: profile,
+      ),
+    );
+    if (saved == true && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("推荐约束已保存，下一次推荐会读取新规则。")),
+      );
+      _refresh();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return FutureBuilder<MobilePreferenceProfile>(
@@ -156,6 +173,10 @@ class _InvestmentPreferencesCardState extends State<InvestmentPreferencesCard> {
                       child: const Text("引导"),
                     ),
                     TextButton(
+                      onPressed: () => _openConstraintEditor(profile),
+                      child: const Text("约束"),
+                    ),
+                    TextButton(
                       onPressed: () => _openEditor(profile),
                       child: const Text("编辑"),
                     ),
@@ -183,12 +204,190 @@ class _InvestmentPreferencesCardState extends State<InvestmentPreferencesCard> {
                 ),
                 const SizedBox(height: 10),
                 Text("账户优先级：${profile.accountFundingPriority.join(" -> ")}"),
+                if (profile.watchlistSymbols.isNotEmpty) ...[
+                  const SizedBox(height: 10),
+                  Text("优先观察：${profile.watchlistSymbols.join("、")}"),
+                ],
               ],
             ),
           ),
         );
       },
     );
+  }
+}
+
+class _ConstraintEditorSheet extends StatefulWidget {
+  const _ConstraintEditorSheet({
+    required this.apiClient,
+    required this.profile,
+  });
+
+  final LooApiClient apiClient;
+  final MobilePreferenceProfile profile;
+
+  @override
+  State<_ConstraintEditorSheet> createState() => _ConstraintEditorSheetState();
+}
+
+class _ConstraintEditorSheetState extends State<_ConstraintEditorSheet> {
+  late var _recommendationStrategy = widget.profile.recommendationStrategy;
+  late var _taxAwarePlacement = widget.profile.taxAwarePlacement;
+  late final _priority =
+      _normalizePriority(widget.profile.accountFundingPriority);
+  late final _watchlistController =
+      TextEditingController(text: widget.profile.watchlistSymbols.join(", "));
+  var _saving = false;
+  String? _error;
+
+  @override
+  void dispose() {
+    _watchlistController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    final watchlist = _watchlistController.text
+        .split(RegExp(r"[,，\s]+"))
+        .map((item) => item.trim().toUpperCase())
+        .where((item) => item.isNotEmpty)
+        .toSet()
+        .take(20)
+        .toList();
+    if (_priority.toSet().length != _priority.length) {
+      setState(() => _error = "账户优先级不能重复。");
+      return;
+    }
+
+    setState(() {
+      _saving = true;
+      _error = null;
+    });
+
+    try {
+      await widget.apiClient.updateInvestmentPreferences({
+        "riskProfile": widget.profile.riskProfile,
+        "targetAllocation": widget.profile.targetAllocation
+            .map((target) => {
+                  "assetClass": target.assetClass,
+                  "targetPct": target.targetPct,
+                })
+            .toList(),
+        "accountFundingPriority": _priority,
+        "taxAwarePlacement": _taxAwarePlacement,
+        "cashBufferTargetCad": widget.profile.cashBufferTargetCad,
+        "transitionPreference": widget.profile.transitionPreference,
+        "recommendationStrategy": _recommendationStrategy,
+        "source": "manual",
+        "rebalancingTolerancePct": widget.profile.rebalancingTolerancePct,
+        "watchlistSymbols": watchlist,
+      });
+      if (mounted) {
+        Navigator.of(context).pop(true);
+      }
+    } catch (error) {
+      if (mounted) {
+        setState(() {
+          _error = error.toString();
+          _saving = false;
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
+    return Padding(
+      padding: EdgeInsets.fromLTRB(20, 20, 20, bottomInset + 20),
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text("推荐约束", style: Theme.of(context).textTheme.headlineMedium),
+            const SizedBox(height: 8),
+            const Text("这些规则会影响候选评分、账户放置和观察标的加分。"),
+            const SizedBox(height: 16),
+            TextField(
+              controller: _watchlistController,
+              enabled: !_saving,
+              textCapitalization: TextCapitalization.characters,
+              decoration: const InputDecoration(
+                labelText: "优先观察标的",
+                helperText: "用逗号或空格分隔，例如 VFV, XEQT, XBB；最多 20 个。",
+              ),
+            ),
+            const SizedBox(height: 12),
+            DropdownButtonFormField<String>(
+              initialValue: _recommendationStrategy,
+              decoration: const InputDecoration(labelText: "推荐策略"),
+              items: const [
+                DropdownMenuItem(value: "tax-aware", child: Text("税务优先")),
+                DropdownMenuItem(value: "target-first", child: Text("目标优先")),
+                DropdownMenuItem(value: "balanced", child: Text("平衡")),
+              ],
+              onChanged: _saving
+                  ? null
+                  : (value) => setState(() => _recommendationStrategy =
+                      value ?? _recommendationStrategy),
+            ),
+            const SizedBox(height: 10),
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              title: const Text("启用税务感知放置"),
+              subtitle: const Text("开启后，推荐会更重视账户类型和税务位置匹配。"),
+              value: _taxAwarePlacement,
+              onChanged: _saving
+                  ? null
+                  : (value) => setState(() => _taxAwarePlacement = value),
+            ),
+            const SizedBox(height: 8),
+            Text("账户优先级", style: Theme.of(context).textTheme.titleLarge),
+            const SizedBox(height: 8),
+            for (var index = 0; index < _priority.length; index++)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: DropdownButtonFormField<String>(
+                  initialValue: _priority[index],
+                  decoration: InputDecoration(labelText: "第 ${index + 1} 顺位"),
+                  items: _accountTypes
+                      .map((type) =>
+                          DropdownMenuItem(value: type, child: Text(type)))
+                      .toList(),
+                  onChanged: _saving
+                      ? null
+                      : (value) => setState(
+                          () => _priority[index] = value ?? _priority[index]),
+                ),
+              ),
+            if (_error != null) ...[
+              const SizedBox(height: 12),
+              Text(_error!,
+                  style: TextStyle(color: Theme.of(context).colorScheme.error)),
+            ],
+            const SizedBox(height: 18),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton(
+                onPressed: _saving ? null : _save,
+                child: Text(_saving ? "保存中..." : "保存约束"),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  List<String> _normalizePriority(List<String> value) {
+    final normalized = value.where(_accountTypes.contains).toList();
+    for (final type in _accountTypes) {
+      if (!normalized.contains(type)) {
+        normalized.add(type);
+      }
+    }
+    return normalized.take(4).toList();
   }
 }
 

@@ -237,6 +237,8 @@ Highest-priority gaps:
    - Watchlist management exists.
    - Mobile recommendation cards now expose scoreline, gap summary, why/why-not
      explanations, constraints, execution steps, and alternatives.
+   - Settings now has a first-pass recommendation constraint editor for
+     watchlist symbols, strategy, tax-aware placement, and account priority.
 
 Implementation priority:
 
