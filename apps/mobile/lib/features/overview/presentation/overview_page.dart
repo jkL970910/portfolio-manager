@@ -2,6 +2,7 @@ import "package:flutter/material.dart";
 
 import "../../../core/api/loo_api_client.dart";
 import "../../portfolio/presentation/account_detail_page.dart";
+import "../../portfolio/presentation/health_score_page.dart";
 import "../../portfolio/presentation/holding_detail_page.dart";
 import "../../shared/data/mobile_models.dart";
 
@@ -75,6 +76,11 @@ class _OverviewPageState extends State<OverviewPage> {
                     children: [
                       _MetricGrid(metrics: snapshot.data!.metrics),
                       const SizedBox(height: 18),
+                      _HealthCard(
+                        snapshot.data!.health,
+                        onTap: _openHealthScore,
+                      ),
+                      const SizedBox(height: 18),
                       _SectionTitle(
                           title: "重点账户",
                           actionLabel: "${snapshot.data!.accounts.length} 个账户"),
@@ -133,12 +139,21 @@ class _OverviewPageState extends State<OverviewPage> {
       ),
     );
   }
+
+  void _openHealthScore() {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => HealthScorePage(apiClient: widget.apiClient),
+      ),
+    );
+  }
 }
 
 class MobileHomeSnapshot {
   const MobileHomeSnapshot({
     required this.viewerName,
     required this.metrics,
+    required this.health,
     required this.accounts,
     required this.topHoldings,
     required this.recommendationTheme,
@@ -147,6 +162,7 @@ class MobileHomeSnapshot {
 
   final String viewerName;
   final List<MobileMetric> metrics;
+  final MobileHomeHealth health;
   final List<MobileAccountCard> accounts;
   final List<MobileHoldingCard> topHoldings;
   final String recommendationTheme;
@@ -162,6 +178,7 @@ class MobileHomeSnapshot {
           : "Loo国居民",
       metrics:
           readJsonList(json, "metrics").map(MobileMetric.fromJson).toList(),
+      health: MobileHomeHealth.fromJson(json["healthScore"]),
       accounts: readJsonList(json, "accounts")
           .map(MobileAccountCard.fromJson)
           .toList(),
@@ -174,6 +191,29 @@ class MobileHomeSnapshot {
       recommendationReason: recommendation is Map<String, dynamic>
           ? recommendation["reason"] as String? ?? "完成数据导入后，Loo国会生成组合建议。"
           : "完成数据导入后，Loo国会生成组合建议。",
+    );
+  }
+}
+
+class MobileHomeHealth {
+  const MobileHomeHealth({
+    required this.score,
+    required this.status,
+    required this.highlights,
+  });
+
+  final String score;
+  final String status;
+  final List<String> highlights;
+
+  factory MobileHomeHealth.fromJson(Object? value) {
+    final json =
+        value is Map<String, dynamic> ? value : const <String, dynamic>{};
+    return MobileHomeHealth(
+      score: "${json["score"] ?? "--"} 分",
+      status: json["status"] as String? ?? "待评估",
+      highlights: (json["highlights"] as List?)?.whereType<String>().toList() ??
+          const [],
     );
   }
 }
@@ -251,6 +291,51 @@ class _SectionTitle extends StatelessWidget {
             child: Text(title, style: Theme.of(context).textTheme.titleLarge)),
         Text(actionLabel, style: Theme.of(context).textTheme.bodyMedium),
       ],
+    );
+  }
+}
+
+class _HealthCard extends StatelessWidget {
+  const _HealthCard(this.health, {required this.onTap});
+
+  final MobileHomeHealth health;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return _LooCard(
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(18),
+        child: Padding(
+          padding: const EdgeInsets.all(2),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Text("Loo国健康巡查",
+                        style: Theme.of(context).textTheme.titleLarge),
+                  ),
+                  const Icon(Icons.chevron_right),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Text(health.score,
+                  style: Theme.of(context).textTheme.headlineMedium),
+              const SizedBox(height: 6),
+              Text(health.status),
+              ...health.highlights.take(2).map(
+                    (item) => Padding(
+                      padding: const EdgeInsets.only(top: 6),
+                      child: Text("• $item"),
+                    ),
+                  ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

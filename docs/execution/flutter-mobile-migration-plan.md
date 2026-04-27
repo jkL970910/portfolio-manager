@@ -209,8 +209,11 @@ Highest-priority gaps:
    - Mobile currently has direct/manual editing only.
    - This should be implemented first because it controls recommendation quality.
 2. Health score drilldown
-   - Mobile shows summary health signals but not the full health score page.
-   - Needs dimension cards, drivers, action queue, and navigation from overview/portfolio.
+   - Mobile now has a first-pass portfolio/account health drilldown page.
+   - It covers score, status, highlights, action queue, radar dimensions,
+     dimension drivers, and account/holding drilldown lists.
+   - Remaining work is visual chart polish and deeper navigation from each
+     drilldown row into the affected account or holding.
 3. Chart foundation
    - Mobile does not yet have reusable chart components for portfolio trend,
      asset allocation, or security price history.
@@ -224,11 +227,11 @@ Highest-priority gaps:
 
 Implementation priority:
 
-1. Guided investment setup
-2. Health score drilldown
-3. Chart foundation
-4. Security and asset analysis depth
-5. Candidate scoring depth
+1. Chart foundation
+2. Security and asset analysis depth
+3. Candidate scoring depth
+4. Health drilldown row navigation
+5. Guided preference tuning based on real usage
 
 ## Explicit non-goals right now
 

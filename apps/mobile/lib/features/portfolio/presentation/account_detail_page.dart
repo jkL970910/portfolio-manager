@@ -3,6 +3,7 @@ import "package:flutter/material.dart";
 import "../../../core/api/loo_api_client.dart";
 import "../../shared/data/mobile_models.dart";
 import "detail_state_widgets.dart";
+import "health_score_page.dart";
 import "holding_detail_page.dart";
 
 class AccountDetailPage extends StatefulWidget {
@@ -108,7 +109,10 @@ class _AccountDetailPageState extends State<AccountDetailPage> {
                 const SizedBox(height: 16),
                 const _SectionTitle("账户健康度"),
                 const SizedBox(height: 8),
-                _HealthCard(data.healthScore),
+                _HealthCard(
+                  data.healthScore,
+                  onTap: () => _openHealthScore(data),
+                ),
                 if (data.allocation.isNotEmpty) ...[
                   const SizedBox(height: 16),
                   const _SectionTitle("账户配置"),
@@ -143,6 +147,18 @@ class _AccountDetailPageState extends State<AccountDetailPage> {
           apiClient: widget.apiClient,
           holdingId: holding.id,
           fallbackTitle: holding.symbol,
+        ),
+      ),
+    );
+  }
+
+  void _openHealthScore(MobileAccountDetailSnapshot data) {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => HealthScorePage(
+          apiClient: widget.apiClient,
+          accountId: widget.accountId,
+          fallbackTitle: "${data.name}健康巡查",
         ),
       ),
     );
@@ -451,33 +467,45 @@ class _TextCard extends StatelessWidget {
 }
 
 class _HealthCard extends StatelessWidget {
-  const _HealthCard(this.health);
+  const _HealthCard(this.health, {required this.onTap});
 
   final MobileAccountHealthScore health;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text("${health.score} · ${health.status}",
-                style: Theme.of(context).textTheme.titleLarge),
-            ...health.highlights.take(3).map(
-                  (item) => Padding(
-                    padding: const EdgeInsets.only(top: 8),
-                    child: Text("• $item"),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(18),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Text("${health.score} · ${health.status}",
+                        style: Theme.of(context).textTheme.titleLarge),
                   ),
-                ),
-            ...health.actions.take(3).map(
-                  (item) => Padding(
-                    padding: const EdgeInsets.only(top: 8),
-                    child: Text("行动：$item"),
+                  const Icon(Icons.chevron_right),
+                ],
+              ),
+              ...health.highlights.take(3).map(
+                    (item) => Padding(
+                      padding: const EdgeInsets.only(top: 8),
+                      child: Text("• $item"),
+                    ),
                   ),
-                ),
-          ],
+              ...health.actions.take(3).map(
+                    (item) => Padding(
+                      padding: const EdgeInsets.only(top: 8),
+                      child: Text("行动：$item"),
+                    ),
+                  ),
+            ],
+          ),
         ),
       ),
     );

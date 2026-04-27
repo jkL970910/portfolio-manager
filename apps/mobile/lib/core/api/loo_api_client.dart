@@ -44,6 +44,13 @@ class LooApiClient {
     return _getJson("/api/mobile/portfolio/overview");
   }
 
+  Future<Map<String, dynamic>> getPortfolioHealth({String? accountId}) {
+    final query = accountId == null || accountId.isEmpty
+        ? ""
+        : "?account=${Uri.encodeQueryComponent(accountId)}";
+    return _getJson("/api/mobile/portfolio/health$query");
+  }
+
   Future<Map<String, dynamic>> getRecommendations() {
     return _getJson("/api/mobile/recommendations");
   }

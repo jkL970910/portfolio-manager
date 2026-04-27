@@ -53,8 +53,8 @@ These are now migration-preserve items, not features to redefine from zero.
 
 | Feature | Status | Priority Call |
 |---|---|---|
-| Mobile guided investment setup | Planned | Build next; it restores web's flow-based preference setup |
-| Mobile health score drilldown | Planned | Build after guided setup |
+| Mobile guided investment setup | Implemented | First-pass guided draft flow exists in Flutter settings |
+| Mobile health score drilldown | In Progress | First-pass score/dimension/action page exists; row-level deep links and charts remain |
 | Mobile chart foundation | Planned | Required for asset allocation and price-history pages |
 | Mobile asset/security analysis depth | Planned | Build after chart foundation |
 | Real historical performance | In Progress | Keep as top product priority |

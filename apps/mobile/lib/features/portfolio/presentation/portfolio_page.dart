@@ -2,6 +2,7 @@ import "package:flutter/material.dart";
 
 import "../../../core/api/loo_api_client.dart";
 import "account_detail_page.dart";
+import "health_score_page.dart";
 import "holding_detail_page.dart";
 import "../../shared/data/mobile_models.dart";
 
@@ -73,8 +74,11 @@ class _PortfolioPageState extends State<PortfolioPage> {
                   padding: const EdgeInsets.fromLTRB(20, 0, 20, 28),
                   sliver: SliverList.list(
                     children: [
-                      _HealthCard(snapshot.data!.healthScore,
-                          snapshot.data!.summaryPoints),
+                      _HealthCard(
+                        snapshot.data!.healthScore,
+                        snapshot.data!.summaryPoints,
+                        onTap: _openHealthScore,
+                      ),
                       const SizedBox(height: 18),
                       _SectionTitle(
                           title: "账户",
@@ -127,6 +131,14 @@ class _PortfolioPageState extends State<PortfolioPage> {
           holdingId: holding.id,
           fallbackTitle: holding.symbol,
         ),
+      ),
+    );
+  }
+
+  void _openHealthScore() {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => HealthScorePage(apiClient: widget.apiClient),
       ),
     );
   }
@@ -194,26 +206,42 @@ class _PageHeader extends StatelessWidget {
 }
 
 class _HealthCard extends StatelessWidget {
-  const _HealthCard(this.score, this.summaryPoints);
+  const _HealthCard(this.score, this.summaryPoints, {required this.onTap});
 
   final String score;
   final List<String> summaryPoints;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     return _LooCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text("国库健康度", style: Theme.of(context).textTheme.titleLarge),
-          const SizedBox(height: 8),
-          Text(score, style: Theme.of(context).textTheme.headlineMedium),
-          const SizedBox(height: 8),
-          ...summaryPoints.take(3).map((point) => Padding(
-                padding: const EdgeInsets.only(top: 4),
-                child: Text("• $point"),
-              )),
-        ],
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(18),
+        child: Padding(
+          padding: const EdgeInsets.all(2),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Text("国库健康度",
+                        style: Theme.of(context).textTheme.titleLarge),
+                  ),
+                  const Icon(Icons.chevron_right),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Text(score, style: Theme.of(context).textTheme.headlineMedium),
+              const SizedBox(height: 8),
+              ...summaryPoints.take(3).map((point) => Padding(
+                    padding: const EdgeInsets.only(top: 4),
+                    child: Text("• $point"),
+                  )),
+            ],
+          ),
+        ),
       ),
     );
   }

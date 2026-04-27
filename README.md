@@ -64,6 +64,7 @@ Implemented already in the current codebase:
 - account detail, unified symbol detail, and account/holding repair workflows
 - market-data search, quote lookup, batch refresh, and symbol + exchange + currency quote identity routing
 - Flutter mobile investment preference editing for risk profile, target allocation, account priority, tax-aware placement, cash buffer, and rebalance tolerance
+- Flutter mobile guided investment preference setup and health score drilldown
 - Flutter mobile recommendation regeneration plus watchlist management
 - watchlist persistence and candidate-scoring baseline
 
@@ -73,6 +74,7 @@ Still important to finish:
 - richer import review persistence
 - watchlist and target-constraint deepening
 - candidate scoring and recommendation explanation depth on mobile
+- reusable mobile chart foundation for asset allocation and price-history views
 - cloud-ready cache / worker boundaries
 
 ## New Execution Order
