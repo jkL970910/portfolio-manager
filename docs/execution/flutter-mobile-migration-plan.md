@@ -177,6 +177,7 @@ These capabilities already exist conceptually and should be preserved during mig
 - market-data search and quote refresh
 - symbol + exchange + currency quote identity routing so USD common shares and CAD-listed / CAD-hedged variants are not merged accidentally
 - mobile investment preference editing for risk profile, target allocation, account priority, tax-aware placement, cash buffer, and rebalance tolerance
+- mobile recommendation regeneration and watchlist management
 - discovery, watchlist, and candidate scoring baseline
 - spending visibility as a supporting workflow
 
@@ -190,7 +191,7 @@ These capabilities already exist conceptually and should be preserved during mig
 6. keep unfinished roadmap items:
    - real historical performance completion
    - richer import review persistence
-   - recommendation regeneration after mobile preference changes
+   - candidate scoring and recommendation explanation depth on mobile
    - watchlist and target constraints deepening
    - cloud-ready cache / worker boundaries
 

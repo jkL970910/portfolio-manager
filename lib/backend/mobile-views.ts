@@ -17,6 +17,7 @@ import {
   getPortfolioView,
   getRecommendationView
 } from "@/lib/backend/services";
+import { getRepositories } from "@/lib/backend/repositories/factory";
 import type { Viewer } from "@/lib/auth/session";
 
 type MobileHomeData = {
@@ -134,6 +135,15 @@ type MobileRecommendationPriority = Omit<
 
 type MobileRecommendationsData = Omit<RecommendationsData, "priorities"> & {
   priorities: MobileRecommendationPriority[];
+  preferenceContext: {
+    riskProfile: string;
+    targetAllocation: { assetClass: string; targetPct: number }[];
+    accountFundingPriority: string[];
+    taxAwarePlacement: boolean;
+    recommendationStrategy: string;
+    rebalancingTolerancePct: number;
+    watchlistSymbols: string[];
+  };
 };
 
 type MobileImportData = {
@@ -313,9 +323,13 @@ function mapMobileSecurityDetailData(data: PortfolioSecurityDetailData): MobileP
   };
 }
 
-function mapMobileRecommendationsData(data: RecommendationsData): MobileRecommendationsData {
+function mapMobileRecommendationsData(
+  data: RecommendationsData,
+  preferenceContext: MobileRecommendationsData["preferenceContext"]
+): MobileRecommendationsData {
   return {
     ...data,
+    preferenceContext,
     priorities: data.priorities.map((priority) => {
       const {
         securityHref: _securityHref,
@@ -428,9 +442,20 @@ export async function getMobilePortfolioSecurityDetailView(
 }
 
 export async function getMobileRecommendationsView(userId: string) {
-  const payload = await getRecommendationView(userId);
+  const [payload, profile] = await Promise.all([
+    getRecommendationView(userId),
+    getRepositories().preferences.getByUserId(userId),
+  ]);
   return {
-    data: mapMobileRecommendationsData(payload.data),
+    data: mapMobileRecommendationsData(payload.data, {
+      riskProfile: profile.riskProfile,
+      targetAllocation: profile.targetAllocation,
+      accountFundingPriority: profile.accountFundingPriority,
+      taxAwarePlacement: profile.taxAwarePlacement,
+      recommendationStrategy: profile.recommendationStrategy,
+      rebalancingTolerancePct: profile.rebalancingTolerancePct,
+      watchlistSymbols: profile.watchlistSymbols,
+    }),
     meta: payload.meta,
   };
 }

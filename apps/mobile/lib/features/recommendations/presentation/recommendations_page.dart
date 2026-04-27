@@ -17,6 +17,7 @@ class RecommendationsPage extends StatefulWidget {
 
 class _RecommendationsPageState extends State<RecommendationsPage> {
   late Future<MobileRecommendationsSnapshot> _snapshot;
+  var _working = false;
 
   @override
   void initState() {
@@ -38,6 +39,106 @@ class _RecommendationsPageState extends State<RecommendationsPage> {
     setState(() {
       _snapshot = _loadSnapshot();
     });
+  }
+
+  Future<void> _createRun() async {
+    final amountController = TextEditingController(text: "2500");
+    final amount = await showDialog<double>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text("重新生成推荐"),
+        content: TextField(
+          controller: amountController,
+          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+          decoration: const InputDecoration(labelText: "本次可投资金额 CAD"),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text("取消"),
+          ),
+          FilledButton(
+            onPressed: () {
+              final parsed = double.tryParse(amountController.text.trim());
+              Navigator.of(context).pop(parsed);
+            },
+            child: const Text("生成"),
+          ),
+        ],
+      ),
+    );
+    amountController.dispose();
+    if (amount == null || amount <= 0 || _working) {
+      return;
+    }
+
+    setState(() => _working = true);
+    try {
+      await widget.apiClient.createRecommendationRun(amount);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("新推荐已生成。")),
+        );
+        setState(() {
+          _working = false;
+          _snapshot = _loadSnapshot();
+        });
+      }
+    } catch (error) {
+      if (mounted) {
+        setState(() => _working = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(error.toString())),
+        );
+      }
+    }
+  }
+
+  Future<void> _addWatchlistSymbol(String symbol) async {
+    final normalized = symbol.trim().toUpperCase();
+    if (normalized.isEmpty || _working) {
+      return;
+    }
+    setState(() => _working = true);
+    try {
+      await widget.apiClient.addWatchlistSymbol(normalized);
+      if (mounted) {
+        setState(() {
+          _working = false;
+          _snapshot = _loadSnapshot();
+        });
+      }
+    } catch (error) {
+      if (mounted) {
+        setState(() => _working = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(error.toString())),
+        );
+      }
+    }
+  }
+
+  Future<void> _removeWatchlistSymbol(String symbol) async {
+    if (_working) {
+      return;
+    }
+    setState(() => _working = true);
+    try {
+      await widget.apiClient.removeWatchlistSymbol(symbol);
+      if (mounted) {
+        setState(() {
+          _working = false;
+          _snapshot = _loadSnapshot();
+        });
+      }
+    } catch (error) {
+      if (mounted) {
+        setState(() => _working = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(error.toString())),
+        );
+      }
+    }
   }
 
   @override
@@ -72,6 +173,21 @@ class _RecommendationsPageState extends State<RecommendationsPage> {
                   sliver: SliverList.list(
                     children: [
                       _SummaryCard(snapshot.data!),
+                      const SizedBox(height: 16),
+                      _GenerateRecommendationCard(
+                        working: _working,
+                        onGenerate: _createRun,
+                      ),
+                      const SizedBox(height: 16),
+                      _PreferenceContextCard(snapshot.data!.preferenceContext),
+                      const SizedBox(height: 16),
+                      _WatchlistCard(
+                        symbols:
+                            snapshot.data!.preferenceContext.watchlistSymbols,
+                        working: _working,
+                        onAdd: _addWatchlistSymbol,
+                        onRemove: _removeWatchlistSymbol,
+                      ),
                       if (snapshot.data!.explainer.isNotEmpty) ...[
                         const SizedBox(height: 16),
                         const _SectionTitle("策略说明"),
@@ -118,6 +234,7 @@ class MobileRecommendationsSnapshot {
     required this.contributionAmount,
     required this.engineLine,
     required this.inputs,
+    required this.preferenceContext,
     required this.explainer,
     required this.priorities,
     required this.scenarios,
@@ -127,6 +244,7 @@ class MobileRecommendationsSnapshot {
   final String contributionAmount;
   final String engineLine;
   final List<MobileRecommendationInput> inputs;
+  final MobilePreferenceContext preferenceContext;
   final List<String> explainer;
   final List<MobileRecommendationPriority> priorities;
   final List<MobileRecommendationScenario> scenarios;
@@ -147,6 +265,8 @@ class MobileRecommendationsSnapshot {
       inputs: readJsonList(json, "inputs")
           .map(MobileRecommendationInput.fromJson)
           .toList(),
+      preferenceContext:
+          MobilePreferenceContext.fromJson(json["preferenceContext"]),
       explainer: (json["explainer"] as List?)?.whereType<String>().toList() ??
           const [],
       priorities: readJsonList(json, "priorities")
@@ -156,6 +276,65 @@ class MobileRecommendationsSnapshot {
           .map(MobileRecommendationScenario.fromJson)
           .toList(),
       notes: (json["notes"] as List?)?.whereType<String>().toList() ?? const [],
+    );
+  }
+}
+
+class MobilePreferenceContext {
+  const MobilePreferenceContext({
+    required this.riskProfile,
+    required this.targetAllocation,
+    required this.accountFundingPriority,
+    required this.taxAwarePlacement,
+    required this.recommendationStrategy,
+    required this.rebalancingTolerancePct,
+    required this.watchlistSymbols,
+  });
+
+  final String riskProfile;
+  final List<MobileRecommendationInput> targetAllocation;
+  final List<String> accountFundingPriority;
+  final bool taxAwarePlacement;
+  final String recommendationStrategy;
+  final int rebalancingTolerancePct;
+  final List<String> watchlistSymbols;
+
+  String get riskLabel => switch (riskProfile) {
+        "Conservative" => "保守",
+        "Growth" => "成长",
+        _ => "平衡",
+      };
+
+  String get allocationLine => targetAllocation
+      .map((target) => "${target.label} ${target.value}%")
+      .join(" · ");
+
+  factory MobilePreferenceContext.fromJson(Object? value) {
+    final json =
+        value is Map<String, dynamic> ? value : const <String, dynamic>{};
+    final allocations = json["targetAllocation"];
+    return MobilePreferenceContext(
+      riskProfile: json["riskProfile"] as String? ?? "Balanced",
+      targetAllocation: allocations is List
+          ? allocations.whereType<Map<String, dynamic>>().map((target) {
+              return MobileRecommendationInput(
+                label: target["assetClass"] as String? ?? "Unknown",
+                value: ((target["targetPct"] as num?)?.toInt() ?? 0).toString(),
+              );
+            }).toList()
+          : const [],
+      accountFundingPriority: (json["accountFundingPriority"] as List?)
+              ?.whereType<String>()
+              .toList() ??
+          const [],
+      taxAwarePlacement: json["taxAwarePlacement"] as bool? ?? false,
+      recommendationStrategy:
+          json["recommendationStrategy"] as String? ?? "balanced",
+      rebalancingTolerancePct:
+          (json["rebalancingTolerancePct"] as num?)?.toInt() ?? 10,
+      watchlistSymbols:
+          (json["watchlistSymbols"] as List?)?.whereType<String>().toList() ??
+              const [],
     );
   }
 }
@@ -335,6 +514,162 @@ class _SummaryCard extends StatelessWidget {
               ],
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _GenerateRecommendationCard extends StatelessWidget {
+  const _GenerateRecommendationCard({
+    required this.working,
+    required this.onGenerate,
+  });
+
+  final bool working;
+  final VoidCallback onGenerate;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: ListTile(
+        leading: const Icon(Icons.auto_awesome),
+        title: const Text("重新生成推荐"),
+        subtitle: const Text("使用当前投资偏好和持仓，输入本次可投资金额后生成新谕令。"),
+        trailing: working
+            ? const SizedBox(
+                width: 22,
+                height: 22,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              )
+            : const Icon(Icons.chevron_right),
+        onTap: working ? null : onGenerate,
+      ),
+    );
+  }
+}
+
+class _PreferenceContextCard extends StatelessWidget {
+  const _PreferenceContextCard(this.context);
+
+  final MobilePreferenceContext context;
+
+  @override
+  Widget build(BuildContext context_) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text("当前推荐规则", style: Theme.of(context_).textTheme.titleLarge),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                _InfoPill("风险：${context.riskLabel}"),
+                _InfoPill("账户：${context.accountFundingPriority.join(" -> ")}"),
+                _InfoPill("策略：${context.recommendationStrategy}"),
+                _InfoPill("再平衡：${context.rebalancingTolerancePct}%"),
+                _InfoPill(context.taxAwarePlacement ? "税务感知：开" : "税务感知：关"),
+              ],
+            ),
+            if (context.allocationLine.isNotEmpty) ...[
+              const SizedBox(height: 10),
+              Text(context.allocationLine),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _WatchlistCard extends StatefulWidget {
+  const _WatchlistCard({
+    required this.symbols,
+    required this.working,
+    required this.onAdd,
+    required this.onRemove,
+  });
+
+  final List<String> symbols;
+  final bool working;
+  final ValueChanged<String> onAdd;
+  final ValueChanged<String> onRemove;
+
+  @override
+  State<_WatchlistCard> createState() => _WatchlistCardState();
+}
+
+class _WatchlistCardState extends State<_WatchlistCard> {
+  final _controller = TextEditingController();
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    final symbol = _controller.text.trim().toUpperCase();
+    if (symbol.isEmpty) {
+      return;
+    }
+    widget.onAdd(symbol);
+    _controller.clear();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text("观察标的", style: Theme.of(context).textTheme.titleLarge),
+            const SizedBox(height: 8),
+            const Text("这里的标的会影响候选评分和后续推荐解释。"),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _controller,
+                    enabled: !widget.working,
+                    textCapitalization: TextCapitalization.characters,
+                    decoration: const InputDecoration(labelText: "代码，例如 VFV"),
+                    onSubmitted: (_) => _submit(),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                FilledButton(
+                  onPressed: widget.working ? null : _submit,
+                  child: const Text("加入"),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            if (widget.symbols.isEmpty)
+              const Text("暂时没有观察标的。")
+            else
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: widget.symbols
+                    .map(
+                      (symbol) => InputChip(
+                        label: Text(symbol),
+                        onDeleted: widget.working
+                            ? null
+                            : () => widget.onRemove(symbol),
+                      ),
+                    )
+                    .toList(),
+              ),
+          ],
         ),
       ),
     );

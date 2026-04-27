@@ -48,6 +48,14 @@ class LooApiClient {
     return _getJson("/api/mobile/recommendations");
   }
 
+  Future<Map<String, dynamic>> createRecommendationRun(
+      double contributionAmountCad) {
+    return _postJson(
+      "/api/mobile/recommendations/runs",
+      body: {"contributionAmountCad": contributionAmountCad},
+    );
+  }
+
   Future<Map<String, dynamic>> getImportGuide() {
     return _getJson("/api/mobile/import");
   }
@@ -213,6 +221,20 @@ class LooApiClient {
   Future<Map<String, dynamic>> updateInvestmentPreferences(
       Map<String, dynamic> payload) {
     return _patchJson("/api/mobile/settings/preferences", body: payload);
+  }
+
+  Future<Map<String, dynamic>> addWatchlistSymbol(String symbol) {
+    return _postJson(
+      "/api/mobile/settings/watchlist",
+      body: {"symbol": symbol},
+    );
+  }
+
+  Future<Map<String, dynamic>> removeWatchlistSymbol(String symbol) {
+    return _deleteJsonWithBody(
+      "/api/mobile/settings/watchlist",
+      body: {"symbol": symbol},
+    );
   }
 
   Future<Map<String, dynamic>> refreshPortfolioQuotes() {
@@ -388,6 +410,54 @@ class LooApiClient {
       if (refreshedToken != null && refreshedToken.isNotEmpty) {
         _accessToken = refreshedToken;
         response = await _httpClient.delete(uri, headers: _headers);
+      }
+    }
+
+    if (response.statusCode == 401 && _onUnauthorized != null) {
+      await _onUnauthorized();
+    }
+
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw LooApiException(
+        _readErrorMessage(response.body),
+        statusCode: response.statusCode,
+      );
+    }
+
+    final decoded = jsonDecode(response.body);
+    if (decoded is! Map<String, dynamic>) {
+      throw const LooApiException("接口返回格式不正确。");
+    }
+
+    return decoded;
+  }
+
+  Future<Map<String, dynamic>> _deleteJsonWithBody(
+    String path, {
+    Map<String, dynamic>? body,
+  }) async {
+    final uri = _baseUri.resolve(path);
+    var request = http.Request("DELETE", uri)
+      ..headers.addAll({
+        ..._headers,
+        "Content-Type": "application/json",
+      })
+      ..body = jsonEncode(body ?? const <String, dynamic>{});
+    var response =
+        await http.Response.fromStream(await _httpClient.send(request));
+
+    if (response.statusCode == 401 && _refreshAccessToken != null) {
+      final refreshedToken = await _refreshAccessToken();
+      if (refreshedToken != null && refreshedToken.isNotEmpty) {
+        _accessToken = refreshedToken;
+        request = http.Request("DELETE", uri)
+          ..headers.addAll({
+            ..._headers,
+            "Content-Type": "application/json",
+          })
+          ..body = jsonEncode(body ?? const <String, dynamic>{});
+        response =
+            await http.Response.fromStream(await _httpClient.send(request));
       }
     }
 
