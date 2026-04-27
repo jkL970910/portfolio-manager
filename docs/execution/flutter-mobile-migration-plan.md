@@ -227,7 +227,9 @@ Highest-priority gaps:
    - Security detail now has a first-pass price trend visualization.
    - Portfolio and account pages now have first-pass allocation distribution
      visuals.
-   - Asset-class drift analysis and target-vs-current views remain shallow.
+   - Security detail now exposes target-vs-current asset-class drift and
+     account distribution for held positions.
+   - Remaining depth is richer asset-class drilldown across the whole portfolio.
 5. Candidate scoring depth
    - Watchlist management exists.
    - Mobile recommendation cards now expose scoreline, gap summary, why/why-not

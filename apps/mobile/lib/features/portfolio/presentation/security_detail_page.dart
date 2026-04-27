@@ -112,11 +112,21 @@ class _SecurityDetailPageState extends State<SecurityDetailPage> {
                 const _SectionTitle("市场状态"),
                 const SizedBox(height: 8),
                 _MarketDataCard(data.marketData),
+                const SizedBox(height: 16),
+                const _SectionTitle("配置偏离"),
+                const SizedBox(height: 8),
+                _AnalysisCard(data.analysis),
                 if (data.heldPosition != null) ...[
                   const SizedBox(height: 16),
                   const _SectionTitle("持有汇总"),
                   const SizedBox(height: 8),
                   _HeldPositionCard(data.heldPosition!),
+                  if (data.heldPosition!.accountSummaries.isNotEmpty) ...[
+                    const SizedBox(height: 16),
+                    const _SectionTitle("账户分布"),
+                    const SizedBox(height: 8),
+                    _AccountDistributionCard(data.heldPosition!),
+                  ],
                 ],
                 const SizedBox(height: 16),
                 const _SectionTitle("标的事实"),
@@ -164,6 +174,7 @@ class MobileSecurityDetailSnapshot {
     required this.freshnessVariant,
     required this.subtitle,
     required this.marketData,
+    required this.analysis,
     required this.performance,
     required this.summaryPoints,
     required this.facts,
@@ -181,6 +192,7 @@ class MobileSecurityDetailSnapshot {
   final String freshnessVariant;
   final String subtitle;
   final MobileSecurityMarketData marketData;
+  final MobileSecurityAnalysis analysis;
   final List<MobileSecurityPerformancePoint> performance;
   final List<String> summaryPoints;
   final List<MobileFact> facts;
@@ -208,6 +220,7 @@ class MobileSecurityDetailSnapshot {
         securityData["exchange"] as String? ?? "",
       ].where((item) => item.isNotEmpty).join(" · "),
       marketData: MobileSecurityMarketData.fromJson(json["marketData"]),
+      analysis: MobileSecurityAnalysis.fromJson(json["analysis"]),
       performance: readJsonList(json, "performance")
           .map(MobileSecurityPerformancePoint.fromJson)
           .toList(),
@@ -304,6 +317,47 @@ class MobileSecurityMarketData {
   }
 }
 
+class MobileSecurityAnalysis {
+  const MobileSecurityAnalysis({
+    required this.assetClassLabel,
+    required this.targetAllocation,
+    required this.currentAllocation,
+    required this.driftLabel,
+    required this.portfolioShare,
+    required this.targetAllocationPct,
+    required this.currentAllocationPct,
+    required this.portfolioSharePct,
+    required this.summary,
+  });
+
+  final String assetClassLabel;
+  final String targetAllocation;
+  final String currentAllocation;
+  final String driftLabel;
+  final String portfolioShare;
+  final double targetAllocationPct;
+  final double currentAllocationPct;
+  final double portfolioSharePct;
+  final String summary;
+
+  factory MobileSecurityAnalysis.fromJson(Object? value) {
+    final json =
+        value is Map<String, dynamic> ? value : const <String, dynamic>{};
+
+    return MobileSecurityAnalysis(
+      assetClassLabel: json["assetClassLabel"] as String? ?? "未知资产类别",
+      targetAllocation: json["targetAllocation"] as String? ?? "--",
+      currentAllocation: json["currentAllocation"] as String? ?? "--",
+      driftLabel: json["driftLabel"] as String? ?? "--",
+      portfolioShare: json["portfolioShare"] as String? ?? "--",
+      targetAllocationPct: _readDouble(json["targetAllocationPct"]),
+      currentAllocationPct: _readDouble(json["currentAllocationPct"]),
+      portfolioSharePct: _readDouble(json["portfolioSharePct"]),
+      summary: json["summary"] as String? ?? "",
+    );
+  }
+}
+
 class MobileSecurityPerformancePoint {
   const MobileSecurityPerformancePoint({
     required this.label,
@@ -338,6 +392,7 @@ class MobileHeldPosition {
     required this.portfolioShare,
     required this.accountCount,
     required this.summaryPoints,
+    required this.accountSummaries,
   });
 
   final String quantity;
@@ -348,6 +403,7 @@ class MobileHeldPosition {
   final String portfolioShare;
   final String accountCount;
   final List<String> summaryPoints;
+  final List<MobileHeldAccountSummary> accountSummaries;
 
   static MobileHeldPosition? fromJson(Object? value) {
     final json = value is Map<String, dynamic> ? value : null;
@@ -369,6 +425,41 @@ class MobileHeldPosition {
               ?.whereType<String>()
               .toList() ??
           const [],
+      accountSummaries: readJsonList(json!, "accountSummaries")
+          .map(MobileHeldAccountSummary.fromJson)
+          .toList(),
+    );
+  }
+}
+
+class MobileHeldAccountSummary {
+  const MobileHeldAccountSummary({
+    required this.accountLabel,
+    required this.accountType,
+    required this.value,
+    required this.positionShare,
+    required this.positionSharePct,
+    required this.accountShare,
+    required this.gainLoss,
+  });
+
+  final String accountLabel;
+  final String accountType;
+  final String value;
+  final String positionShare;
+  final double positionSharePct;
+  final String accountShare;
+  final String gainLoss;
+
+  factory MobileHeldAccountSummary.fromJson(Map<String, dynamic> json) {
+    return MobileHeldAccountSummary(
+      accountLabel: json["accountLabel"] as String? ?? "未知账户",
+      accountType: json["accountType"] as String? ?? "",
+      value: json["value"] as String? ?? "--",
+      positionShare: json["positionShare"] as String? ?? "--",
+      positionSharePct: _readDouble(json["positionSharePct"]),
+      accountShare: json["accountShare"] as String? ?? "",
+      gainLoss: json["gainLoss"] as String? ?? "",
     );
   }
 }
@@ -505,6 +596,83 @@ class _MarketDataCard extends StatelessWidget {
   }
 }
 
+class _AnalysisCard extends StatelessWidget {
+  const _AnalysisCard(this.analysis);
+
+  final MobileSecurityAnalysis analysis;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(analysis.assetClassLabel,
+                style: Theme.of(context).textTheme.titleLarge),
+            if (analysis.summary.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Text(analysis.summary),
+            ],
+            const SizedBox(height: 14),
+            _ProgressMetric(
+              label: "目标配置",
+              value: analysis.targetAllocation,
+              progress: analysis.targetAllocationPct / 100,
+            ),
+            _ProgressMetric(
+              label: "当前配置",
+              value: analysis.currentAllocation,
+              progress: analysis.currentAllocationPct / 100,
+            ),
+            _ProgressMetric(
+              label: "本标的组合占比",
+              value: analysis.portfolioShare,
+              progress: analysis.portfolioSharePct / 100,
+            ),
+            const SizedBox(height: 8),
+            Text("偏离：${analysis.driftLabel}",
+                style: Theme.of(context).textTheme.titleMedium),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ProgressMetric extends StatelessWidget {
+  const _ProgressMetric({
+    required this.label,
+    required this.value,
+    required this.progress,
+  });
+
+  final String label;
+  final String value;
+  final double progress;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(child: Text(label)),
+              Text(value, style: Theme.of(context).textTheme.titleSmall),
+            ],
+          ),
+          const SizedBox(height: 6),
+          LinearProgressIndicator(value: progress.clamp(0, 1)),
+        ],
+      ),
+    );
+  }
+}
+
 class _PerformanceChartCard extends StatelessWidget {
   const _PerformanceChartCard(this.points);
 
@@ -534,6 +702,61 @@ class _PerformanceChartCard extends StatelessWidget {
             Text(
               "${first.label} ${first.value} → ${last.label} ${last.value}",
               style: Theme.of(context).textTheme.bodyMedium,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _AccountDistributionCard extends StatelessWidget {
+  const _AccountDistributionCard(this.position);
+
+  final MobileHeldPosition position;
+
+  @override
+  Widget build(BuildContext context) {
+    final accounts = position.accountSummaries
+        .where((account) => account.positionSharePct > 0)
+        .take(6)
+        .toList();
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            LooDistributionBar(
+              segments: accounts
+                  .map(
+                    (account) => LooDistributionSegment(
+                      label: account.accountLabel,
+                      value: account.positionSharePct,
+                    ),
+                  )
+                  .toList(),
+            ),
+            const SizedBox(height: 12),
+            ...accounts.map(
+              (account) => Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        [
+                          account.accountLabel,
+                          account.accountType,
+                          account.accountShare,
+                        ].where((item) => item.isNotEmpty).join(" · "),
+                      ),
+                    ),
+                    Text(account.positionShare,
+                        style: Theme.of(context).textTheme.titleSmall),
+                  ],
+                ),
+              ),
             ),
           ],
         ),
@@ -660,4 +883,8 @@ String _freshnessLabel(String variant) {
     "warning" => "需要刷新",
     _ => "报价待核",
   };
+}
+
+double _readDouble(Object? value) {
+  return value is num ? value.toDouble() : 0.0;
 }

@@ -56,7 +56,7 @@ These are now migration-preserve items, not features to redefine from zero.
 | Mobile guided investment setup | Implemented | First-pass guided draft flow exists in Flutter settings |
 | Mobile health score drilldown | Implemented | First-pass score, charts, holding links, and account-type filtered views exist |
 | Mobile chart foundation | Implemented | First-pass reusable line, allocation distribution, and health radar widgets exist |
-| Mobile asset/security analysis depth | In Progress | Security price chart and allocation visuals exist; drift/target-vs-current remains |
+| Mobile asset/security analysis depth | In Progress | Security detail has price chart, target-vs-current drift, and account distribution; portfolio-wide asset drilldown remains |
 | Real historical performance | In Progress | Keep as top product priority |
 | Richer import review persistence | In Progress | Build soon |
 | Watchlist and target constraints workflow | In Progress | Mobile now shows richer candidate scoring explanations; target constraint editing remains |

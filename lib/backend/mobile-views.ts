@@ -306,6 +306,7 @@ function mapMobileSecurityDetailData(data: PortfolioSecurityDetailData): MobileP
     security: data.security,
     facts: data.facts,
     marketData: data.marketData,
+    analysis: data.analysis,
     performance: data.performance,
     summaryPoints: data.summaryPoints,
     relatedHoldings: data.relatedHoldings.map((holding) => {

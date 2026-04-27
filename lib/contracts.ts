@@ -431,6 +431,18 @@ export interface PortfolioSecurityDetailData {
       detail?: string;
     }[];
   };
+  analysis: {
+    assetClassLabel: string;
+    targetAllocationPct: number;
+    currentAllocationPct: number;
+    driftPct: number;
+    targetAllocation: string;
+    currentAllocation: string;
+    driftLabel: string;
+    portfolioSharePct: number;
+    portfolioShare: string;
+    summary: string;
+  };
   performance: { label: string; value: number; rawDate?: string }[];
   summaryPoints: string[];
   relatedHoldings: {
@@ -475,6 +487,8 @@ export interface PortfolioSecurityDetailData {
       gainLoss: string;
       portfolioShare: string;
       accountShare: string;
+      positionShare: string;
+      positionSharePct: number;
       holdingCount: string;
       summaryPoints: string[];
     }[];

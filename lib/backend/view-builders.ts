@@ -1967,6 +1967,8 @@ export function buildPortfolioSecurityDetailData(args: {
         gainLoss: accountGainLossPct == null ? pick(language, "成本待补", "Cost basis pending") : formatSignedPercent(accountGainLossPct, 1),
         portfolioShare: totalPortfolioCad > 0 ? formatCompactPercent((accountValueCad / totalPortfolioCad) * 100, 1) : "0%",
         accountShare: accountTotalCad > 0 ? formatCompactPercent((accountValueCad / accountTotalCad) * 100, 1) : "0%",
+        positionShare: totalValueCad > 0 ? formatCompactPercent((accountValueCad / totalValueCad) * 100, 1) : "0%",
+        positionSharePct: totalValueCad > 0 ? round((accountValueCad / totalValueCad) * 100, 1) : 0,
         holdingCount: String(accountHoldings.length),
         summaryPoints: [
           pick(
@@ -2118,6 +2120,26 @@ export function buildPortfolioSecurityDetailData(args: {
         pick(language, "6 个月走势目前还是参考曲线，不是完整历史回放。", "The 6-month trend is still a reference curve, not a full replayed history.")
       ],
       facts: []
+    },
+    analysis: {
+      assetClassLabel: referenceHolding
+        ? getAssetClassLabel(referenceHolding.assetClass, language)
+        : pick(language, "未知资产类别", "Unknown sleeve"),
+      targetAllocationPct: round(assetClassTargetPct, 1),
+      currentAllocationPct: round(assetClassCurrentPct, 1),
+      driftPct: round(assetClassCurrentPct - assetClassTargetPct, 1),
+      targetAllocation: formatCompactPercent(assetClassTargetPct, 1),
+      currentAllocation: formatCompactPercent(assetClassCurrentPct, 1),
+      driftLabel: formatSignedPercent(assetClassCurrentPct - assetClassTargetPct, 1),
+      portfolioSharePct: totalPortfolioCad > 0 ? round((totalValueCad / totalPortfolioCad) * 100, 1) : 0,
+      portfolioShare: totalPortfolioCad > 0 ? formatCompactPercent((totalValueCad / totalPortfolioCad) * 100, 1) : "0%",
+      summary: referenceHolding
+        ? pick(
+            language,
+            `${normalizedSymbol} 属于 ${getAssetClassLabel(referenceHolding.assetClass, language)}，这一类资产目标是 ${formatCompactPercent(assetClassTargetPct, 1)}，当前是 ${formatCompactPercent(assetClassCurrentPct, 1)}。`,
+            `${normalizedSymbol} sits in ${getAssetClassLabel(referenceHolding.assetClass, language)}. The target is ${formatCompactPercent(assetClassTargetPct, 1)} and the current allocation is ${formatCompactPercent(assetClassCurrentPct, 1)}.`
+          )
+        : pick(language, "这个候选标的还没有足够的组合上下文来判断目标偏离。", "This candidate does not yet have enough portfolio context for target drift analysis.")
     },
     performance: buildAbsolutePriceHistorySeries({
       priceHistory,
