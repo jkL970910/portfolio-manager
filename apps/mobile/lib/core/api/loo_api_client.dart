@@ -57,6 +57,11 @@ class LooApiClient {
         "/api/mobile/market-data/resolve?symbol=${Uri.encodeQueryComponent(symbol)}");
   }
 
+  Future<Map<String, dynamic>> searchSecurities(String query) {
+    return _getJson(
+        "/api/mobile/market-data/search?query=${Uri.encodeQueryComponent(query)}");
+  }
+
   Future<Map<String, dynamic>> createManualAccount({
     required String accountType,
     required String institution,

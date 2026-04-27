@@ -622,10 +622,10 @@ class _CreateHoldingSheetState extends State<_CreateHoldingSheet> {
     }
   }
 
-  Future<void> _resolveSymbol() async {
-    final symbol = _symbolController.text.trim();
-    if (symbol.isEmpty) {
-      setState(() => _error = "请先输入代码。");
+  Future<void> _searchSymbol() async {
+    final query = _symbolController.text.trim();
+    if (query.isEmpty) {
+      setState(() => _error = "请先输入代码或名称。");
       return;
     }
 
@@ -634,6 +634,45 @@ class _CreateHoldingSheetState extends State<_CreateHoldingSheet> {
       _error = null;
     });
 
+    try {
+      final response = await widget.apiClient.searchSecurities(query);
+      final data = response["data"];
+      final results = data is Map<String, dynamic> ? data["results"] : null;
+      final candidates = results is List
+          ? results
+              .whereType<Map<String, dynamic>>()
+              .map(MobileSecurityCandidate.fromJson)
+              .toList()
+          : <MobileSecurityCandidate>[];
+
+      if (!mounted) {
+        return;
+      }
+
+      if (candidates.isEmpty) {
+        await _resolveSymbolFallback(query);
+        return;
+      }
+
+      setState(() => _resolving = false);
+      final selected = await showModalBottomSheet<MobileSecurityCandidate>(
+        context: context,
+        builder: (context) => _SecurityCandidateSheet(candidates: candidates),
+      );
+      if (selected != null && mounted) {
+        _applyCandidate(selected);
+      }
+    } catch (error) {
+      if (mounted) {
+        setState(() {
+          _error = error.toString();
+          _resolving = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _resolveSymbolFallback(String symbol) async {
     try {
       final response = await widget.apiClient.resolveSecurity(symbol);
       final data = response["data"];
@@ -660,6 +699,19 @@ class _CreateHoldingSheetState extends State<_CreateHoldingSheet> {
         });
       }
     }
+  }
+
+  void _applyCandidate(MobileSecurityCandidate candidate) {
+    setState(() {
+      _symbolController.text = candidate.symbol;
+      _nameController.text = candidate.name;
+      if (candidate.currency != null && candidate.currency!.isNotEmpty) {
+        _currency = candidate.currency!;
+      }
+      _securityType = _normalizeSecurityType(candidate.type);
+      _exchange = _normalizeExchange(candidate.exchange);
+      _error = null;
+    });
   }
 
   @override
@@ -708,9 +760,9 @@ class _CreateHoldingSheetState extends State<_CreateHoldingSheet> {
               Align(
                 alignment: Alignment.centerRight,
                 child: TextButton.icon(
-                  onPressed: _submitting || _resolving ? null : _resolveSymbol,
+                  onPressed: _submitting || _resolving ? null : _searchSymbol,
                   icon: const Icon(Icons.manage_search),
-                  label: Text(_resolving ? "解析中..." : "解析标的"),
+                  label: Text(_resolving ? "搜索中..." : "搜索/解析标的"),
                 ),
               ),
               const SizedBox(height: 12),
@@ -788,10 +840,16 @@ class _CreateHoldingSheetState extends State<_CreateHoldingSheet> {
                 decoration: const InputDecoration(labelText: "交易所"),
                 items: const [
                   DropdownMenuItem(value: "TSX", child: Text("TSX")),
+                  DropdownMenuItem(value: "TSXV", child: Text("TSXV")),
+                  DropdownMenuItem(
+                      value: "Cboe Canada", child: Text("Cboe Canada")),
                   DropdownMenuItem(value: "NYSE", child: Text("NYSE")),
                   DropdownMenuItem(value: "NASDAQ", child: Text("NASDAQ")),
                   DropdownMenuItem(
                       value: "NYSE Arca", child: Text("NYSE Arca")),
+                  DropdownMenuItem(value: "OTC", child: Text("OTC")),
+                  DropdownMenuItem(value: "LSE", child: Text("LSE")),
+                  DropdownMenuItem(value: "TSE", child: Text("TSE")),
                   DropdownMenuItem(
                       value: "Other / Manual", child: Text("Other / Manual")),
                 ],
@@ -885,14 +943,116 @@ class _CreateHoldingSheetState extends State<_CreateHoldingSheet> {
   }
 
   String _normalizeExchange(String? value) {
+    final normalized = (value ?? "").trim();
+    final upper = normalized.toUpperCase();
+    if (upper == "TSX" || upper.contains("TORONTO STOCK EXCHANGE")) {
+      return "TSX";
+    }
+    if (upper == "TSXV" || upper.contains("TSX VENTURE")) {
+      return "TSXV";
+    }
+    if (upper.contains("CBOE CANADA") ||
+        upper == "NEO" ||
+        upper.contains("NEO EXCHANGE")) {
+      return "Cboe Canada";
+    }
+    if (upper == "NYSE" || upper.contains("NEW YORK STOCK EXCHANGE")) {
+      return "NYSE";
+    }
+    if (upper == "NASDAQ" || upper.contains("NASDAQ")) {
+      return "NASDAQ";
+    }
+    if (upper == "NYSE ARCA" || upper.contains("ARCA")) {
+      return "NYSE Arca";
+    }
+    if (upper == "OTC" || upper.contains("OTC")) {
+      return "OTC";
+    }
+    if (upper == "LSE" || upper.contains("LONDON STOCK EXCHANGE")) {
+      return "LSE";
+    }
+    if (upper == "TSE" || upper.contains("TOKYO STOCK EXCHANGE")) {
+      return "TSE";
+    }
+
     const allowed = {
       "TSX",
+      "TSXV",
+      "Cboe Canada",
       "NYSE",
       "NASDAQ",
       "NYSE Arca",
+      "OTC",
+      "LSE",
+      "TSE",
       "Other / Manual",
     };
-    return allowed.contains(value) ? value! : "Other / Manual";
+    return allowed.contains(normalized) ? normalized : "Other / Manual";
+  }
+}
+
+class MobileSecurityCandidate {
+  const MobileSecurityCandidate({
+    required this.symbol,
+    required this.name,
+    required this.type,
+    this.exchange,
+    this.currency,
+    this.country,
+  });
+
+  final String symbol;
+  final String name;
+  final String type;
+  final String? exchange;
+  final String? currency;
+  final String? country;
+
+  factory MobileSecurityCandidate.fromJson(Map<String, dynamic> json) {
+    return MobileSecurityCandidate(
+      symbol: json["symbol"] as String? ?? "--",
+      name: json["name"] as String? ?? "未知标的",
+      type: json["type"] as String? ?? "Unknown",
+      exchange: json["exchange"] as String?,
+      currency: json["currency"] as String?,
+      country: json["country"] as String?,
+    );
+  }
+}
+
+class _SecurityCandidateSheet extends StatelessWidget {
+  const _SecurityCandidateSheet({required this.candidates});
+
+  final List<MobileSecurityCandidate> candidates;
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      child: ListView(
+        shrinkWrap: true,
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+        children: [
+          Text("选择标的", style: Theme.of(context).textTheme.headlineMedium),
+          const SizedBox(height: 8),
+          const Text("请确认交易所和币种，避免美股正股与 CAD 对冲/加股版本混淆。"),
+          const SizedBox(height: 12),
+          ...candidates.map(
+            (candidate) => Card(
+              child: ListTile(
+                onTap: () => Navigator.of(context).pop(candidate),
+                title: Text("${candidate.symbol} · ${candidate.name}"),
+                subtitle: Text([
+                  candidate.exchange ?? "",
+                  candidate.currency ?? "",
+                  candidate.country ?? "",
+                  candidate.type,
+                ].where((item) => item.isNotEmpty).join(" · ")),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
 

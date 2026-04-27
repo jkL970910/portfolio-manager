@@ -938,10 +938,16 @@ class _EditHoldingSheetState extends State<_EditHoldingSheet> {
                 decoration: const InputDecoration(labelText: "交易所"),
                 items: const [
                   DropdownMenuItem(value: "TSX", child: Text("TSX")),
+                  DropdownMenuItem(value: "TSXV", child: Text("TSXV")),
+                  DropdownMenuItem(
+                      value: "Cboe Canada", child: Text("Cboe Canada")),
                   DropdownMenuItem(value: "NYSE", child: Text("NYSE")),
                   DropdownMenuItem(value: "NASDAQ", child: Text("NASDAQ")),
                   DropdownMenuItem(
                       value: "NYSE Arca", child: Text("NYSE Arca")),
+                  DropdownMenuItem(value: "OTC", child: Text("OTC")),
+                  DropdownMenuItem(value: "LSE", child: Text("LSE")),
+                  DropdownMenuItem(value: "TSE", child: Text("TSE")),
                   DropdownMenuItem(
                       value: "Other / Manual", child: Text("Other / Manual")),
                 ],
@@ -1046,7 +1052,50 @@ class _EditHoldingSheetState extends State<_EditHoldingSheet> {
   }
 
   String _normalizeExchange(String value) {
-    const allowed = {"TSX", "NYSE", "NASDAQ", "NYSE Arca", "Other / Manual"};
-    return allowed.contains(value) ? value : "Other / Manual";
+    final normalized = value.trim();
+    final upper = normalized.toUpperCase();
+    if (upper == "TSX" || upper.contains("TORONTO STOCK EXCHANGE")) {
+      return "TSX";
+    }
+    if (upper == "TSXV" || upper.contains("TSX VENTURE")) {
+      return "TSXV";
+    }
+    if (upper.contains("CBOE CANADA") ||
+        upper == "NEO" ||
+        upper.contains("NEO EXCHANGE")) {
+      return "Cboe Canada";
+    }
+    if (upper == "NYSE" || upper.contains("NEW YORK STOCK EXCHANGE")) {
+      return "NYSE";
+    }
+    if (upper == "NASDAQ" || upper.contains("NASDAQ")) {
+      return "NASDAQ";
+    }
+    if (upper == "NYSE ARCA" || upper.contains("ARCA")) {
+      return "NYSE Arca";
+    }
+    if (upper == "OTC" || upper.contains("OTC")) {
+      return "OTC";
+    }
+    if (upper == "LSE" || upper.contains("LONDON STOCK EXCHANGE")) {
+      return "LSE";
+    }
+    if (upper == "TSE" || upper.contains("TOKYO STOCK EXCHANGE")) {
+      return "TSE";
+    }
+
+    const allowed = {
+      "TSX",
+      "TSXV",
+      "Cboe Canada",
+      "NYSE",
+      "NASDAQ",
+      "NYSE Arca",
+      "OTC",
+      "LSE",
+      "TSE",
+      "Other / Manual",
+    };
+    return allowed.contains(normalized) ? normalized : "Other / Manual";
   }
 }
