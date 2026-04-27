@@ -1290,6 +1290,48 @@ export function buildPortfolioData(args: {
       value: totalPortfolio > 0 ? round((account.marketValueCad / totalPortfolio) * 100, 0) : 0,
       detail: instanceDetailMap.get(account.id)
     }));
+  const assetClassIds = new Set<string>([
+    ...targetAllocation.keys(),
+    ...currentAllocation.keys()
+  ]);
+  const assetClassDrilldown = [...assetClassIds]
+    .map((assetClass) => {
+      const classHoldings = holdings
+        .filter((holding) => holding.assetClass === assetClass)
+        .sort((left, right) => right.marketValueCad - left.marketValueCad);
+      const classValueCad = sum(classHoldings.map((holding) => holding.marketValueCad));
+      const currentPct = round(currentAllocation.get(assetClass) ?? 0, 1);
+      const targetPct = round(targetAllocation.get(assetClass) ?? 0, 1);
+      const driftPct = round(currentPct - targetPct, 1);
+      const label = getAssetClassLabel(assetClass, language);
+
+      return {
+        id: assetClass,
+        name: label,
+        value: formatDisplayCurrency(classValueCad, display),
+        currentPct,
+        targetPct,
+        driftPct,
+        current: formatCompactPercent(currentPct, 1),
+        target: formatCompactPercent(targetPct, 1),
+        driftLabel: formatSignedPercent(driftPct, 1),
+        summary: pick(
+          language,
+          `${label} 当前是 ${formatCompactPercent(currentPct, 1)}，目标是 ${formatCompactPercent(targetPct, 1)}，偏离 ${formatSignedPercent(driftPct, 1)}。`,
+          `${label} is currently ${formatCompactPercent(currentPct, 1)} versus a ${formatCompactPercent(targetPct, 1)} target, a ${formatSignedPercent(driftPct, 1)} drift.`
+        ),
+        holdings: classHoldings.slice(0, 12).map((holding) => ({
+          id: holding.id,
+          symbol: holding.symbol,
+          name: holding.name,
+          account: instanceLabelMap.get(holding.accountId) ?? holding.accountId,
+          accountType: typeLabelMap.get(holding.accountId) ?? "",
+          value: formatDisplayCurrency(holding.marketValueCad, display),
+          portfolioShare: totalPortfolio > 0 ? formatCompactPercent((holding.marketValueCad / totalPortfolio) * 100, 1) : "0%"
+        }))
+      };
+    })
+    .sort((left, right) => Math.abs(right.driftPct) - Math.abs(left.driftPct));
   const accountCards = [...accounts]
     .sort((left, right) => right.marketValueCad - left.marketValueCad)
     .map((account) => {
@@ -1405,6 +1447,7 @@ export function buildPortfolioData(args: {
     performance: portfolioPerformance,
     accountTypeAllocation,
     accountInstanceAllocation,
+    assetClassDrilldown,
     accountCards,
     accountContexts,
     sectorExposure,

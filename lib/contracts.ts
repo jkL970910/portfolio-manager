@@ -87,6 +87,27 @@ export interface PortfolioData {
   performance: { label: string; value: number; rawDate?: string }[];
   accountTypeAllocation: { id: string; name: string; value: number; detail?: string }[];
   accountInstanceAllocation: { id: string; name: string; value: number; detail?: string }[];
+  assetClassDrilldown: {
+    id: string;
+    name: string;
+    value: string;
+    currentPct: number;
+    targetPct: number;
+    driftPct: number;
+    current: string;
+    target: string;
+    driftLabel: string;
+    summary: string;
+    holdings: {
+      id: string;
+      symbol: string;
+      name: string;
+      account: string;
+      accountType: string;
+      value: string;
+      portfolioShare: string;
+    }[];
+  }[];
   accountCards: {
     id: string;
     name: string;

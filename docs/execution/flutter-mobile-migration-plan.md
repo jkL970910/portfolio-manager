@@ -229,7 +229,8 @@ Highest-priority gaps:
      visuals.
    - Security detail now exposes target-vs-current asset-class drift and
      account distribution for held positions.
-   - Remaining depth is richer asset-class drilldown across the whole portfolio.
+   - Portfolio now exposes asset-class drilldown across the whole portfolio,
+     including target/current drift and holdings inside each class.
 5. Candidate scoring depth
    - Watchlist management exists.
    - Mobile recommendation cards now expose scoreline, gap summary, why/why-not

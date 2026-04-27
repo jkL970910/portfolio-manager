@@ -61,6 +61,7 @@ type MobilePortfolioOverviewData = {
   performance: PortfolioData["performance"];
   accountTypeAllocation: PortfolioData["accountTypeAllocation"];
   accountInstanceAllocation: PortfolioData["accountInstanceAllocation"];
+  assetClassDrilldown: PortfolioData["assetClassDrilldown"];
   accountCards: Array<{
     id: string;
     name: string;
@@ -199,6 +200,7 @@ function mapMobilePortfolioOverviewData(
     performance: payload.data.performance,
     accountTypeAllocation: payload.data.accountTypeAllocation,
     accountInstanceAllocation: payload.data.accountInstanceAllocation,
+    assetClassDrilldown: payload.data.assetClassDrilldown,
     accountCards: payload.data.accountCards.map((account) => ({
       id: account.id,
       name: account.name,

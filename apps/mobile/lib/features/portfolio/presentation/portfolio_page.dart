@@ -2,6 +2,7 @@ import "package:flutter/material.dart";
 
 import "../../../core/api/loo_api_client.dart";
 import "account_detail_page.dart";
+import "asset_class_drilldown_page.dart";
 import "health_score_page.dart";
 import "holding_detail_page.dart";
 import "../../shared/data/mobile_models.dart";
@@ -110,6 +111,14 @@ class _PortfolioPageState extends State<PortfolioPage> {
                           points: snapshot.data!.accountInstanceAllocation,
                         ),
                       ],
+                      if (!_isFiltered &&
+                          snapshot.data!.assetClassDrilldown.isNotEmpty) ...[
+                        const SizedBox(height: 18),
+                        _AssetClassCard(
+                          items: snapshot.data!.assetClassDrilldown,
+                          onTap: _openAssetClassDrilldown,
+                        ),
+                      ],
                       const SizedBox(height: 18),
                       _SectionTitle(
                           title: "账户",
@@ -174,6 +183,17 @@ class _PortfolioPageState extends State<PortfolioPage> {
     );
   }
 
+  void _openAssetClassDrilldown(MobileAssetClassDrilldown item) {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => AssetClassDrilldownPage(
+          apiClient: widget.apiClient,
+          item: item,
+        ),
+      ),
+    );
+  }
+
   bool get _isFiltered =>
       widget.accountTypeFilter != null && widget.accountTypeFilter!.isNotEmpty;
 }
@@ -187,6 +207,7 @@ class MobilePortfolioSnapshot {
     required this.summaryPoints,
     required this.accountTypeAllocation,
     required this.accountInstanceAllocation,
+    required this.assetClassDrilldown,
   });
 
   final List<MobileAccountCard> accounts;
@@ -196,6 +217,7 @@ class MobilePortfolioSnapshot {
   final List<String> summaryPoints;
   final List<MobilePortfolioAllocationPoint> accountTypeAllocation;
   final List<MobilePortfolioAllocationPoint> accountInstanceAllocation;
+  final List<MobileAssetClassDrilldown> assetClassDrilldown;
 
   factory MobilePortfolioSnapshot.fromJson(Map<String, dynamic> json) {
     final quoteStatus = json["quoteStatus"];
@@ -223,6 +245,9 @@ class MobilePortfolioSnapshot {
       accountInstanceAllocation: readJsonList(json, "accountInstanceAllocation")
           .map(MobilePortfolioAllocationPoint.fromJson)
           .toList(),
+      assetClassDrilldown: readJsonList(json, "assetClassDrilldown")
+          .map(MobileAssetClassDrilldown.fromJson)
+          .toList(),
     );
   }
 
@@ -238,6 +263,7 @@ class MobilePortfolioSnapshot {
       summaryPoints: summaryPoints,
       accountTypeAllocation: accountTypeAllocation,
       accountInstanceAllocation: accountInstanceAllocation,
+      assetClassDrilldown: assetClassDrilldown,
     );
   }
 }
@@ -263,6 +289,52 @@ class MobilePortfolioAllocationPoint {
       value: value,
       displayValue: "${value.toStringAsFixed(1)}%",
       detail: json["detail"] as String? ?? "",
+    );
+  }
+}
+
+class MobileAssetClassDrilldown {
+  const MobileAssetClassDrilldown({
+    required this.id,
+    required this.name,
+    required this.value,
+    required this.currentPct,
+    required this.targetPct,
+    required this.driftPct,
+    required this.current,
+    required this.target,
+    required this.driftLabel,
+    required this.summary,
+    required this.holdings,
+  });
+
+  final String id;
+  final String name;
+  final String value;
+  final double currentPct;
+  final double targetPct;
+  final double driftPct;
+  final String current;
+  final String target;
+  final String driftLabel;
+  final String summary;
+  final List<MobileHoldingCard> holdings;
+
+  factory MobileAssetClassDrilldown.fromJson(Map<String, dynamic> json) {
+    return MobileAssetClassDrilldown(
+      id: json["id"] as String? ?? "",
+      name: json["name"] as String? ?? "未知资产类别",
+      value: json["value"] as String? ?? "--",
+      currentPct: _readDouble(json["currentPct"]),
+      targetPct: _readDouble(json["targetPct"]),
+      driftPct: _readDouble(json["driftPct"]),
+      current: json["current"] as String? ?? "--",
+      target: json["target"] as String? ?? "--",
+      driftLabel: json["driftLabel"] as String? ?? "--",
+      summary: json["summary"] as String? ?? "",
+      holdings: readJsonList(json, "holdings")
+          .map(MobileHoldingCard.fromJson)
+          .toList(),
     );
   }
 }
@@ -403,6 +475,56 @@ class _AllocationCard extends StatelessWidget {
   }
 }
 
+class _AssetClassCard extends StatelessWidget {
+  const _AssetClassCard({required this.items, required this.onTap});
+
+  final List<MobileAssetClassDrilldown> items;
+  final ValueChanged<MobileAssetClassDrilldown> onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final shownItems =
+        items.where((item) => item.currentPct > 0).take(6).toList();
+    return _LooCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text("资产类别配置", style: Theme.of(context).textTheme.titleLarge),
+          const SizedBox(height: 14),
+          LooDistributionBar(
+            segments: shownItems
+                .map(
+                  (item) => LooDistributionSegment(
+                    label: item.name,
+                    value: item.currentPct,
+                  ),
+                )
+                .toList(),
+          ),
+          const SizedBox(height: 12),
+          ...shownItems.map(
+            (item) => ListTile(
+              contentPadding: EdgeInsets.zero,
+              onTap: () => onTap(item),
+              title: Text(item.name),
+              subtitle: Text("目标 ${item.target} · 当前 ${item.current}"),
+              trailing: Wrap(
+                crossAxisAlignment: WrapCrossAlignment.center,
+                spacing: 8,
+                children: [
+                  Text(item.driftLabel,
+                      style: Theme.of(context).textTheme.titleMedium),
+                  const Icon(Icons.chevron_right),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _SectionTitle extends StatelessWidget {
   const _SectionTitle({required this.title, required this.actionLabel});
 
@@ -517,4 +639,8 @@ class _LooCard extends StatelessWidget {
       ),
     );
   }
+}
+
+double _readDouble(Object? value) {
+  return value is num ? value.toDouble() : 0.0;
 }
