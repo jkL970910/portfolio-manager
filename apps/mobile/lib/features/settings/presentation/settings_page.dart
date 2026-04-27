@@ -1,6 +1,7 @@
 import "package:flutter/material.dart";
 
 import "../../../core/api/loo_api_client.dart";
+import "investment_preferences_card.dart";
 
 class SettingsPage extends StatefulWidget {
   const SettingsPage({
@@ -152,13 +153,7 @@ class _SettingsPageState extends State<SettingsPage> {
             ),
           ),
           const SizedBox(height: 16),
-          const Card(
-            child: ListTile(
-              leading: Icon(Icons.visibility_outlined),
-              title: Text("观察列表与投资偏好"),
-              subtitle: Text("后续接入 watchlist、风险偏好和目标配置。"),
-            ),
-          ),
+          InvestmentPreferencesCard(apiClient: widget.apiClient),
           const SizedBox(height: 24),
           FilledButton.tonalIcon(
             onPressed: widget.onLogout,

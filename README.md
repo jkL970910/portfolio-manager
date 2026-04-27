@@ -63,6 +63,7 @@ Implemented already in the current codebase:
 - guided import with account creation, manual holdings entry, and single-account CSV import
 - account detail, unified symbol detail, and account/holding repair workflows
 - market-data search, quote lookup, batch refresh, and symbol + exchange + currency quote identity routing
+- Flutter mobile investment preference editing for risk profile, target allocation, account priority, tax-aware placement, cash buffer, and rebalance tolerance
 - watchlist persistence and candidate-scoring baseline
 
 Still important to finish:
@@ -70,7 +71,7 @@ Still important to finish:
 - real historical performance completion
 - richer import review persistence
 - watchlist and target-constraint deepening
-- mobile-safe auth strategy
+- richer mobile recommendation regeneration after preference changes
 - cloud-ready cache / worker boundaries
 
 ## New Execution Order

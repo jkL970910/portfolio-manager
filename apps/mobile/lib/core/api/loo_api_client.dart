@@ -206,6 +206,15 @@ class LooApiClient {
     );
   }
 
+  Future<Map<String, dynamic>> getInvestmentPreferences() {
+    return _getJson("/api/mobile/settings/preferences");
+  }
+
+  Future<Map<String, dynamic>> updateInvestmentPreferences(
+      Map<String, dynamic> payload) {
+    return _patchJson("/api/mobile/settings/preferences", body: payload);
+  }
+
   Future<Map<String, dynamic>> refreshPortfolioQuotes() {
     return _postJson("/api/mobile/portfolio/refresh-prices");
   }
