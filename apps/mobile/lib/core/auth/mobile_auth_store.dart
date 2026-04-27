@@ -45,6 +45,7 @@ class MobileAuthStore {
   static const _viewerIdKey = "loo.viewerId";
   static const _viewerNameKey = "loo.viewerName";
   static const _emailKey = "loo.email";
+  static const _baseCurrencyKey = "loo.baseCurrency";
   static const _accessTokenKey = "loo.accessToken";
   static const _refreshTokenKey = "loo.refreshToken";
 
@@ -54,7 +55,10 @@ class MobileAuthStore {
     final accessToken = await _keyValueStore.read(_accessTokenKey);
     final refreshToken = await _keyValueStore.read(_refreshTokenKey);
 
-    if (accessToken == null || accessToken.isEmpty || refreshToken == null || refreshToken.isEmpty) {
+    if (accessToken == null ||
+        accessToken.isEmpty ||
+        refreshToken == null ||
+        refreshToken.isEmpty) {
       return null;
     }
 
@@ -62,6 +66,7 @@ class MobileAuthStore {
       "viewerId": await _keyValueStore.read(_viewerIdKey) ?? "",
       "viewerName": await _keyValueStore.read(_viewerNameKey) ?? "Loo国居民",
       "email": await _keyValueStore.read(_emailKey) ?? "",
+      "baseCurrency": await _keyValueStore.read(_baseCurrencyKey) ?? "CAD",
       "accessToken": accessToken,
       "refreshToken": refreshToken,
     });
@@ -71,8 +76,11 @@ class MobileAuthStore {
     final values = session.toStorage();
 
     await _keyValueStore.write(_viewerIdKey, values["viewerId"] ?? "");
-    await _keyValueStore.write(_viewerNameKey, values["viewerName"] ?? "Loo国居民");
+    await _keyValueStore.write(
+        _viewerNameKey, values["viewerName"] ?? "Loo国居民");
     await _keyValueStore.write(_emailKey, values["email"] ?? "");
+    await _keyValueStore.write(
+        _baseCurrencyKey, values["baseCurrency"] ?? "CAD");
     await _keyValueStore.write(_accessTokenKey, values["accessToken"] ?? "");
     await _keyValueStore.write(_refreshTokenKey, values["refreshToken"] ?? "");
   }
@@ -81,6 +89,7 @@ class MobileAuthStore {
     await _keyValueStore.delete(_viewerIdKey);
     await _keyValueStore.delete(_viewerNameKey);
     await _keyValueStore.delete(_emailKey);
+    await _keyValueStore.delete(_baseCurrencyKey);
     await _keyValueStore.delete(_accessTokenKey);
     await _keyValueStore.delete(_refreshTokenKey);
   }

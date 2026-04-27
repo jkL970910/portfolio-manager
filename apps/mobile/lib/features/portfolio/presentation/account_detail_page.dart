@@ -53,7 +53,16 @@ class _AccountDetailPageState extends State<AccountDetailPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text(widget.fallbackTitle)),
+      appBar: AppBar(
+        title: Text(widget.fallbackTitle),
+        actions: [
+          IconButton(
+            tooltip: "删除账户",
+            onPressed: _confirmDeleteAccount,
+            icon: const Icon(Icons.delete_outline),
+          ),
+        ],
+      ),
       body: FutureBuilder<MobileAccountDetailSnapshot?>(
         future: _snapshot,
         builder: (context, snapshot) {
@@ -133,6 +142,41 @@ class _AccountDetailPageState extends State<AccountDetailPage> {
         ),
       ),
     );
+  }
+
+  Future<void> _confirmDeleteAccount() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text("删除账户？"),
+        content: const Text("删除账户会移除这个账户及其相关持仓。这个操作不能撤销。"),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text("取消")),
+          FilledButton.tonal(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text("删除")),
+        ],
+      ),
+    );
+
+    if (confirmed != true) {
+      return;
+    }
+
+    try {
+      await widget.apiClient.deletePortfolioAccount(widget.accountId);
+      if (mounted) {
+        Navigator.of(context).pop();
+      }
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(error.toString())),
+        );
+      }
+    }
   }
 }
 

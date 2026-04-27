@@ -11,12 +11,16 @@ class MobileRootShell extends StatefulWidget {
   const MobileRootShell({
     required this.apiClient,
     required this.viewerName,
+    required this.baseCurrency,
+    required this.onDisplayCurrencyChanged,
     required this.onLogout,
     super.key,
   });
 
   final LooApiClient apiClient;
   final String viewerName;
+  final String baseCurrency;
+  final Future<void> Function(String currency) onDisplayCurrencyChanged;
   final VoidCallback onLogout;
 
   @override
@@ -35,6 +39,8 @@ class _MobileRootShellState extends State<MobileRootShell> {
       ImportPage(apiClient: widget.apiClient),
       SettingsPage(
         viewerName: widget.viewerName,
+        baseCurrency: widget.baseCurrency,
+        onDisplayCurrencyChanged: widget.onDisplayCurrencyChanged,
         onLogout: widget.onLogout,
       ),
     ];

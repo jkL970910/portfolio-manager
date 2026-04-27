@@ -43,7 +43,8 @@ class _LooWealthAppState extends State<LooWealthApp> {
     }
 
     try {
-      final response = await LooApiClient().refreshSession(storedSession.refreshToken);
+      final response =
+          await LooApiClient().refreshSession(storedSession.refreshToken);
       final refreshedSession = MobileAuthSession.fromApiResponse(response);
       await _authStore.save(refreshedSession);
       if (mounted) {
@@ -81,7 +82,8 @@ class _LooWealthAppState extends State<LooWealthApp> {
     }
 
     try {
-      final response = await LooApiClient().refreshSession(session.refreshToken);
+      final response =
+          await LooApiClient().refreshSession(session.refreshToken);
       final refreshedSession = MobileAuthSession.fromApiResponse(response);
       await _authStore.save(refreshedSession);
       if (mounted) {
@@ -129,6 +131,20 @@ class _LooWealthAppState extends State<LooWealthApp> {
     await _clearSession();
   }
 
+  Future<void> _setDisplayCurrency(String currency) async {
+    final session = _session;
+    if (session == null) {
+      return;
+    }
+
+    await LooApiClient(
+      accessToken: session.accessToken,
+      refreshAccessToken: _refreshAccessToken,
+      onUnauthorized: _clearSession,
+    ).updateDisplayCurrency(currency);
+    await _setSession(session.copyWith(baseCurrency: currency));
+  }
+
   @override
   Widget build(BuildContext context) {
     final session = _session;
@@ -148,6 +164,8 @@ class _LooWealthAppState extends State<LooWealthApp> {
                     onUnauthorized: _clearSession,
                   ),
                   viewerName: session.viewerName,
+                  baseCurrency: session.baseCurrency,
+                  onDisplayCurrencyChanged: _setDisplayCurrency,
                   onLogout: _logout,
                 ),
     );

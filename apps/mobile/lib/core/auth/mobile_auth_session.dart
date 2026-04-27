@@ -3,6 +3,7 @@ class MobileAuthSession {
     required this.viewerId,
     required this.viewerName,
     required this.email,
+    required this.baseCurrency,
     required this.accessToken,
     required this.refreshToken,
   });
@@ -10,6 +11,7 @@ class MobileAuthSession {
   final String viewerId;
   final String viewerName;
   final String email;
+  final String baseCurrency;
   final String accessToken;
   final String refreshToken;
 
@@ -29,8 +31,22 @@ class MobileAuthSession {
       viewerId: viewer["id"] as String? ?? "",
       viewerName: viewer["displayName"] as String? ?? "Loo国居民",
       email: viewer["email"] as String? ?? "",
+      baseCurrency: viewer["baseCurrency"] as String? ?? "CAD",
       accessToken: auth["accessToken"] as String? ?? "",
       refreshToken: auth["refreshToken"] as String? ?? "",
+    );
+  }
+
+  MobileAuthSession copyWith({
+    String? baseCurrency,
+  }) {
+    return MobileAuthSession(
+      viewerId: viewerId,
+      viewerName: viewerName,
+      email: email,
+      baseCurrency: baseCurrency ?? this.baseCurrency,
+      accessToken: accessToken,
+      refreshToken: refreshToken,
     );
   }
 
@@ -39,6 +55,7 @@ class MobileAuthSession {
       "viewerId": viewerId,
       "viewerName": viewerName,
       "email": email,
+      "baseCurrency": baseCurrency,
       "accessToken": accessToken,
       "refreshToken": refreshToken,
     };
@@ -49,6 +66,7 @@ class MobileAuthSession {
       viewerId: storage["viewerId"] ?? "",
       viewerName: storage["viewerName"] ?? "Loo国居民",
       email: storage["email"] ?? "",
+      baseCurrency: storage["baseCurrency"] ?? "CAD",
       accessToken: storage["accessToken"] ?? "",
       refreshToken: storage["refreshToken"] ?? "",
     );

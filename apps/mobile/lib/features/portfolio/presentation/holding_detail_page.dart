@@ -54,7 +54,16 @@ class _HoldingDetailPageState extends State<HoldingDetailPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text(widget.fallbackTitle)),
+      appBar: AppBar(
+        title: Text(widget.fallbackTitle),
+        actions: [
+          IconButton(
+            tooltip: "删除持仓",
+            onPressed: _confirmDeleteHolding,
+            icon: const Icon(Icons.delete_outline),
+          ),
+        ],
+      ),
       body: FutureBuilder<MobileHoldingDetailSnapshot?>(
         future: _snapshot,
         builder: (context, snapshot) {
@@ -161,6 +170,41 @@ class _HoldingDetailPageState extends State<HoldingDetailPage> {
         ),
       ),
     );
+  }
+
+  Future<void> _confirmDeleteHolding() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text("删除持仓？"),
+        content: const Text("删除后会从组合中移除这个持仓，并记录对应组合事件。这个操作不能撤销。"),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text("取消")),
+          FilledButton.tonal(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text("删除")),
+        ],
+      ),
+    );
+
+    if (confirmed != true) {
+      return;
+    }
+
+    try {
+      await widget.apiClient.deletePortfolioHolding(widget.holdingId);
+      if (mounted) {
+        Navigator.of(context).pop();
+      }
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(error.toString())),
+        );
+      }
+    }
   }
 }
 

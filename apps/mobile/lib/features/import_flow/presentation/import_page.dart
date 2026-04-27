@@ -567,6 +567,7 @@ class _CreateHoldingSheetState extends State<_CreateHoldingSheet> {
   var _securityType = "Common Stock";
   var _exchange = "TSX";
   var _submitting = false;
+  var _resolving = false;
   String? _error;
 
   @override
@@ -621,6 +622,46 @@ class _CreateHoldingSheetState extends State<_CreateHoldingSheet> {
     }
   }
 
+  Future<void> _resolveSymbol() async {
+    final symbol = _symbolController.text.trim();
+    if (symbol.isEmpty) {
+      setState(() => _error = "请先输入代码。");
+      return;
+    }
+
+    setState(() {
+      _resolving = true;
+      _error = null;
+    });
+
+    try {
+      final response = await widget.apiClient.resolveSecurity(symbol);
+      final data = response["data"];
+      final result = data is Map<String, dynamic> ? data["result"] : null;
+      final resultData =
+          result is Map<String, dynamic> ? result : const <String, dynamic>{};
+      if (mounted) {
+        setState(() {
+          _symbolController.text =
+              resultData["symbol"] as String? ?? symbol.toUpperCase();
+          _nameController.text =
+              resultData["name"] as String? ?? _nameController.text;
+          _securityType =
+              _normalizeSecurityType(resultData["securityType"] as String?);
+          _exchange = _normalizeExchange(resultData["exchange"] as String?);
+          _resolving = false;
+        });
+      }
+    } catch (error) {
+      if (mounted) {
+        setState(() {
+          _error = error.toString();
+          _resolving = false;
+        });
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
@@ -662,6 +703,15 @@ class _CreateHoldingSheetState extends State<_CreateHoldingSheet> {
                 textCapitalization: TextCapitalization.characters,
                 validator: (value) =>
                     (value == null || value.trim().isEmpty) ? "请输入代码" : null,
+              ),
+              const SizedBox(height: 8),
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton.icon(
+                  onPressed: _submitting || _resolving ? null : _resolveSymbol,
+                  icon: const Icon(Icons.manage_search),
+                  label: Text(_resolving ? "解析中..." : "解析标的"),
+                ),
               ),
               const SizedBox(height: 12),
               TextFormField(
@@ -820,6 +870,29 @@ class _CreateHoldingSheetState extends State<_CreateHoldingSheet> {
       return "请输入大于 0 的数字";
     }
     return null;
+  }
+
+  String _normalizeSecurityType(String? value) {
+    const allowed = {
+      "Common Stock",
+      "ETF",
+      "Commodity ETF",
+      "Mutual Fund",
+      "REIT",
+      "Unknown",
+    };
+    return allowed.contains(value) ? value! : "Common Stock";
+  }
+
+  String _normalizeExchange(String? value) {
+    const allowed = {
+      "TSX",
+      "NYSE",
+      "NASDAQ",
+      "NYSE Arca",
+      "Other / Manual",
+    };
+    return allowed.contains(value) ? value! : "Other / Manual";
   }
 }
 

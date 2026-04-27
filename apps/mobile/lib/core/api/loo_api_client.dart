@@ -52,6 +52,11 @@ class LooApiClient {
     return _getJson("/api/mobile/import");
   }
 
+  Future<Map<String, dynamic>> resolveSecurity(String symbol) {
+    return _getJson(
+        "/api/mobile/market-data/resolve?symbol=${Uri.encodeQueryComponent(symbol)}");
+  }
+
   Future<Map<String, dynamic>> createManualAccount({
     required String accountType,
     required String institution,
@@ -120,6 +125,23 @@ class LooApiClient {
         "/api/mobile/portfolio/securities/${Uri.encodeComponent(symbol)}");
   }
 
+  Future<void> deletePortfolioAccount(String accountId) async {
+    await _deleteJson(
+        "/api/mobile/portfolio/accounts/${Uri.encodeComponent(accountId)}/manage");
+  }
+
+  Future<void> deletePortfolioHolding(String holdingId) async {
+    await _deleteJson(
+        "/api/mobile/portfolio/holdings/${Uri.encodeComponent(holdingId)}/manage");
+  }
+
+  Future<Map<String, dynamic>> updateDisplayCurrency(String currency) {
+    return _patchJson(
+      "/api/mobile/settings/display-currency",
+      body: {"currency": currency},
+    );
+  }
+
   Future<Map<String, dynamic>> login({
     required String email,
     required String password,
@@ -149,7 +171,7 @@ class LooApiClient {
   }
 
   Future<Map<String, dynamic>> _getJson(String path) async {
-    final uri = _baseUri.replace(path: path);
+    final uri = _baseUri.resolve(path);
     var response = await _httpClient.get(uri, headers: _headers);
 
     if (response.statusCode == 401 && _refreshAccessToken != null) {
@@ -184,7 +206,7 @@ class LooApiClient {
     Map<String, dynamic>? body,
     bool retryOnUnauthorized = true,
   }) async {
-    final uri = _baseUri.replace(path: path);
+    final uri = _baseUri.resolve(path);
     var response = await _httpClient.post(
       uri,
       headers: {
@@ -214,6 +236,85 @@ class LooApiClient {
     if (response.statusCode == 401 &&
         retryOnUnauthorized &&
         _onUnauthorized != null) {
+      await _onUnauthorized();
+    }
+
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw LooApiException(
+        _readErrorMessage(response.body),
+        statusCode: response.statusCode,
+      );
+    }
+
+    final decoded = jsonDecode(response.body);
+    if (decoded is! Map<String, dynamic>) {
+      throw const LooApiException("接口返回格式不正确。");
+    }
+
+    return decoded;
+  }
+
+  Future<Map<String, dynamic>> _patchJson(
+    String path, {
+    Map<String, dynamic>? body,
+  }) async {
+    final uri = _baseUri.resolve(path);
+    var response = await _httpClient.patch(
+      uri,
+      headers: {
+        ..._headers,
+        "Content-Type": "application/json",
+      },
+      body: jsonEncode(body ?? const <String, dynamic>{}),
+    );
+
+    if (response.statusCode == 401 && _refreshAccessToken != null) {
+      final refreshedToken = await _refreshAccessToken();
+      if (refreshedToken != null && refreshedToken.isNotEmpty) {
+        _accessToken = refreshedToken;
+        response = await _httpClient.patch(
+          uri,
+          headers: {
+            ..._headers,
+            "Content-Type": "application/json",
+          },
+          body: jsonEncode(body ?? const <String, dynamic>{}),
+        );
+      }
+    }
+
+    if (response.statusCode == 401 && _onUnauthorized != null) {
+      await _onUnauthorized();
+    }
+
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw LooApiException(
+        _readErrorMessage(response.body),
+        statusCode: response.statusCode,
+      );
+    }
+
+    final decoded = jsonDecode(response.body);
+    if (decoded is! Map<String, dynamic>) {
+      throw const LooApiException("接口返回格式不正确。");
+    }
+
+    return decoded;
+  }
+
+  Future<Map<String, dynamic>> _deleteJson(String path) async {
+    final uri = _baseUri.resolve(path);
+    var response = await _httpClient.delete(uri, headers: _headers);
+
+    if (response.statusCode == 401 && _refreshAccessToken != null) {
+      final refreshedToken = await _refreshAccessToken();
+      if (refreshedToken != null && refreshedToken.isNotEmpty) {
+        _accessToken = refreshedToken;
+        response = await _httpClient.delete(uri, headers: _headers);
+      }
+    }
+
+    if (response.statusCode == 401 && _onUnauthorized != null) {
       await _onUnauthorized();
     }
 
