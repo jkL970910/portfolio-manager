@@ -305,6 +305,7 @@ class MobileAssetClassDrilldown {
     required this.target,
     required this.driftLabel,
     required this.summary,
+    required this.actions,
     required this.holdings,
   });
 
@@ -318,6 +319,7 @@ class MobileAssetClassDrilldown {
   final String target;
   final String driftLabel;
   final String summary;
+  final List<String> actions;
   final List<MobileHoldingCard> holdings;
 
   factory MobileAssetClassDrilldown.fromJson(Map<String, dynamic> json) {
@@ -332,6 +334,8 @@ class MobileAssetClassDrilldown {
       target: json["target"] as String? ?? "--",
       driftLabel: json["driftLabel"] as String? ?? "--",
       summary: json["summary"] as String? ?? "",
+      actions:
+          (json["actions"] as List?)?.whereType<String>().toList() ?? const [],
       holdings: readJsonList(json, "holdings")
           .map(MobileHoldingCard.fromJson)
           .toList(),

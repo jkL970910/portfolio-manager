@@ -231,6 +231,8 @@ Highest-priority gaps:
      account distribution for held positions.
    - Portfolio now exposes asset-class drilldown across the whole portfolio,
      including target/current drift and holdings inside each class.
+   - Asset-class drilldown now includes correction actions for underweight,
+     overweight, and near-target cases.
 5. Candidate scoring depth
    - Watchlist management exists.
    - Mobile recommendation cards now expose scoreline, gap summary, why/why-not

@@ -98,6 +98,7 @@ export interface PortfolioData {
     target: string;
     driftLabel: string;
     summary: string;
+    actions: string[];
     holdings: {
       id: string;
       symbol: string;

@@ -28,6 +28,12 @@ class AssetClassDrilldownPage extends StatelessWidget {
           const _SectionTitle("目标偏离"),
           const SizedBox(height: 8),
           _DriftCard(item),
+          if (item.actions.isNotEmpty) ...[
+            const SizedBox(height: 16),
+            const _SectionTitle("修正行动"),
+            const SizedBox(height: 8),
+            _ActionCard(item.actions),
+          ],
           const SizedBox(height: 16),
           _SectionTitle("该类别持仓", actionLabel: "${item.holdings.length} 个"),
           const SizedBox(height: 8),
@@ -156,6 +162,33 @@ class _MetricRow extends StatelessWidget {
           Expanded(child: Text(label)),
           Text(value, style: Theme.of(context).textTheme.titleMedium),
         ],
+      ),
+    );
+  }
+}
+
+class _ActionCard extends StatelessWidget {
+  const _ActionCard(this.actions);
+
+  final List<String> actions;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: actions
+              .take(4)
+              .map(
+                (action) => Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Text("• $action"),
+                ),
+              )
+              .toList(),
+        ),
       ),
     );
   }

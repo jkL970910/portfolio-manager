@@ -1304,6 +1304,50 @@ export function buildPortfolioData(args: {
       const targetPct = round(targetAllocation.get(assetClass) ?? 0, 1);
       const driftPct = round(currentPct - targetPct, 1);
       const label = getAssetClassLabel(assetClass, language);
+      const actions = Math.abs(driftPct) <= 2
+        ? [
+            pick(
+              language,
+              "这一类资产已经接近目标，下一笔钱不需要优先修这里。",
+              "This sleeve is close to target; the next contribution does not need to prioritize it."
+            ),
+            pick(
+              language,
+              "继续监控最大持仓，避免单一标的把这个类别重新拉偏。",
+              "Keep watching the largest holdings so one security does not pull the sleeve off target again."
+            )
+          ]
+        : driftPct < 0
+          ? [
+              pick(
+                language,
+                `这类资产低于目标，下一笔新增资金可以优先考虑补 ${label}。`,
+                `This sleeve is below target, so the next contribution can prioritize ${label}.`
+              ),
+              classHoldings[0]
+                ? pick(
+                    language,
+                    `如果继续买已有标的，先比较 ${classHoldings[0].symbol} 是否仍然符合账户和币种规划。`,
+                    `If adding to an existing holding, first check whether ${classHoldings[0].symbol} still fits the account and currency plan.`
+                  )
+                : pick(
+                    language,
+                    "这个类别当前没有持仓，新增前先通过观察列表或推荐页选标的。",
+                    "There are no holdings in this sleeve yet; use the watchlist or recommendations before adding a security."
+                  )
+            ]
+          : [
+              pick(
+                language,
+                `这类资产高于目标，下一笔钱先不要继续加到 ${label}。`,
+                `This sleeve is above target, so avoid adding the next contribution to ${label}.`
+              ),
+              pick(
+                language,
+                "优先把新增资金放到低于目标的资产类别，除非你主动调整了目标配置。",
+                "Route new money toward underweight sleeves unless you intentionally changed the target allocation."
+              )
+            ];
 
       return {
         id: assetClass,
@@ -1320,6 +1364,7 @@ export function buildPortfolioData(args: {
           `${label} 当前是 ${formatCompactPercent(currentPct, 1)}，目标是 ${formatCompactPercent(targetPct, 1)}，偏离 ${formatSignedPercent(driftPct, 1)}。`,
           `${label} is currently ${formatCompactPercent(currentPct, 1)} versus a ${formatCompactPercent(targetPct, 1)} target, a ${formatSignedPercent(driftPct, 1)} drift.`
         ),
+        actions,
         holdings: classHoldings.slice(0, 12).map((holding) => ({
           id: holding.id,
           symbol: holding.symbol,
