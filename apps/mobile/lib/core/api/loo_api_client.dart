@@ -130,9 +130,59 @@ class LooApiClient {
         "/api/mobile/portfolio/accounts/${Uri.encodeComponent(accountId)}/manage");
   }
 
+  Future<Map<String, dynamic>> updatePortfolioAccount({
+    required String accountId,
+    required String nickname,
+    required String institution,
+    required String type,
+    required String currency,
+    required double contributionRoomCad,
+  }) {
+    return _patchJson(
+      "/api/mobile/portfolio/accounts/${Uri.encodeComponent(accountId)}/manage",
+      body: {
+        "nickname": nickname,
+        "institution": institution,
+        "type": type,
+        "currency": currency,
+        "contributionRoomCad": contributionRoomCad,
+      },
+    );
+  }
+
   Future<void> deletePortfolioHolding(String holdingId) async {
     await _deleteJson(
         "/api/mobile/portfolio/holdings/${Uri.encodeComponent(holdingId)}/manage");
+  }
+
+  Future<Map<String, dynamic>> updatePortfolioHolding({
+    required String holdingId,
+    required String name,
+    required String currency,
+    required double quantity,
+    required double avgCostPerShareAmount,
+    required double lastPriceAmount,
+    required double marketValueAmount,
+    required String assetClass,
+    required String sector,
+    required String securityType,
+    required String exchange,
+  }) {
+    return _patchJson(
+      "/api/mobile/portfolio/holdings/${Uri.encodeComponent(holdingId)}/manage",
+      body: {
+        "name": name,
+        "currency": currency,
+        "quantity": quantity,
+        "avgCostPerShareAmount": avgCostPerShareAmount,
+        "lastPriceAmount": lastPriceAmount,
+        "marketValueAmount": marketValueAmount,
+        "assetClassOverride": assetClass,
+        "sectorOverride": sector,
+        "securityTypeOverride": securityType,
+        "exchangeOverride": exchange,
+      },
+    );
   }
 
   Future<Map<String, dynamic>> updateDisplayCurrency(String currency) {

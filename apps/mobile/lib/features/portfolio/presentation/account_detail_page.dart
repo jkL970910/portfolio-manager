@@ -57,10 +57,14 @@ class _AccountDetailPageState extends State<AccountDetailPage> {
         title: Text(widget.fallbackTitle),
         actions: [
           IconButton(
-            tooltip: "删除账户",
-            onPressed: _confirmDeleteAccount,
-            icon: const Icon(Icons.delete_outline),
+            tooltip: "编辑账户",
+            onPressed: _openEditAccountSheet,
+            icon: const Icon(Icons.edit_outlined),
           ),
+          IconButton(
+              tooltip: "删除账户",
+              onPressed: _confirmDeleteAccount,
+              icon: const Icon(Icons.delete_outline)),
         ],
       ),
       body: FutureBuilder<MobileAccountDetailSnapshot?>(
@@ -144,6 +148,26 @@ class _AccountDetailPageState extends State<AccountDetailPage> {
     );
   }
 
+  Future<void> _openEditAccountSheet() async {
+    final current = await _snapshot;
+    if (!mounted || current == null) {
+      return;
+    }
+
+    final updated = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) => _EditAccountSheet(
+        apiClient: widget.apiClient,
+        accountId: widget.accountId,
+        account: current,
+      ),
+    );
+    if (updated == true && mounted) {
+      _refresh();
+    }
+  }
+
   Future<void> _confirmDeleteAccount() async {
     final confirmed = await showDialog<bool>(
       context: context,
@@ -183,6 +207,9 @@ class _AccountDetailPageState extends State<AccountDetailPage> {
 class MobileAccountDetailSnapshot {
   const MobileAccountDetailSnapshot({
     required this.name,
+    required this.typeId,
+    required this.institution,
+    required this.currency,
     required this.value,
     required this.gainLoss,
     required this.portfolioShare,
@@ -196,6 +223,9 @@ class MobileAccountDetailSnapshot {
   });
 
   final String name;
+  final String typeId;
+  final String institution;
+  final String currency;
   final String value;
   final String gainLoss;
   final String portfolioShare;
@@ -214,6 +244,9 @@ class MobileAccountDetailSnapshot {
 
     return MobileAccountDetailSnapshot(
       name: accountData["name"] as String? ?? "未知账户",
+      typeId: accountData["typeId"] as String? ?? "Taxable",
+      institution: accountData["institution"] as String? ?? "",
+      currency: accountData["currency"] as String? ?? "CAD",
       value: accountData["value"] as String? ?? "--",
       gainLoss: accountData["gainLoss"] as String? ?? "",
       portfolioShare: accountData["portfolioShare"] as String? ?? "",
@@ -465,6 +498,171 @@ class _AllocationTile extends StatelessWidget {
             Text(point.value, style: Theme.of(context).textTheme.titleLarge),
       ),
     );
+  }
+}
+
+class _EditAccountSheet extends StatefulWidget {
+  const _EditAccountSheet({
+    required this.apiClient,
+    required this.accountId,
+    required this.account,
+  });
+
+  final LooApiClient apiClient;
+  final String accountId;
+  final MobileAccountDetailSnapshot account;
+
+  @override
+  State<_EditAccountSheet> createState() => _EditAccountSheetState();
+}
+
+class _EditAccountSheetState extends State<_EditAccountSheet> {
+  final _formKey = GlobalKey<FormState>();
+  late final _nicknameController =
+      TextEditingController(text: widget.account.name);
+  late final _institutionController =
+      TextEditingController(text: widget.account.institution);
+  final _roomController = TextEditingController(text: "0");
+
+  late var _accountType = widget.account.typeId;
+  late var _currency = widget.account.currency;
+  var _submitting = false;
+  String? _error;
+
+  @override
+  void dispose() {
+    _nicknameController.dispose();
+    _institutionController.dispose();
+    _roomController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    if (!_formKey.currentState!.validate()) {
+      return;
+    }
+
+    setState(() {
+      _submitting = true;
+      _error = null;
+    });
+
+    try {
+      await widget.apiClient.updatePortfolioAccount(
+        accountId: widget.accountId,
+        nickname: _nicknameController.text.trim(),
+        institution: _institutionController.text.trim(),
+        type: _accountType,
+        currency: _currency,
+        contributionRoomCad: double.tryParse(_roomController.text.trim()) ?? 0,
+      );
+      if (mounted) {
+        Navigator.of(context).pop(true);
+      }
+    } catch (error) {
+      if (mounted) {
+        setState(() {
+          _error = error.toString();
+          _submitting = false;
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
+
+    return Padding(
+      padding: EdgeInsets.fromLTRB(20, 20, 20, bottomInset + 20),
+      child: Form(
+        key: _formKey,
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text("编辑账户", style: Theme.of(context).textTheme.headlineMedium),
+              const SizedBox(height: 16),
+              DropdownButtonFormField<String>(
+                initialValue: _accountType,
+                decoration: const InputDecoration(labelText: "账户类型"),
+                items: const [
+                  DropdownMenuItem(value: "TFSA", child: Text("TFSA")),
+                  DropdownMenuItem(value: "RRSP", child: Text("RRSP")),
+                  DropdownMenuItem(value: "FHSA", child: Text("FHSA")),
+                  DropdownMenuItem(value: "Taxable", child: Text("Taxable")),
+                ],
+                onChanged: _submitting
+                    ? null
+                    : (value) =>
+                        setState(() => _accountType = value ?? _accountType),
+              ),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: _nicknameController,
+                enabled: !_submitting,
+                decoration: const InputDecoration(labelText: "账户昵称"),
+                validator: (value) =>
+                    (value == null || value.trim().isEmpty) ? "请输入账户昵称" : null,
+              ),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: _institutionController,
+                enabled: !_submitting,
+                decoration: const InputDecoration(labelText: "机构"),
+                validator: (value) => (value == null || value.trim().length < 2)
+                    ? "机构至少 2 个字符"
+                    : null,
+              ),
+              const SizedBox(height: 12),
+              DropdownButtonFormField<String>(
+                initialValue: _currency,
+                decoration: const InputDecoration(labelText: "账户币种"),
+                items: const [
+                  DropdownMenuItem(value: "CAD", child: Text("CAD")),
+                  DropdownMenuItem(value: "USD", child: Text("USD")),
+                ],
+                onChanged: _submitting
+                    ? null
+                    : (value) => setState(() => _currency = value ?? _currency),
+              ),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: _roomController,
+                enabled: !_submitting,
+                keyboardType:
+                    const TextInputType.numberWithOptions(decimal: true),
+                decoration: const InputDecoration(labelText: "贡献额度 CAD"),
+                validator: _validateMoney,
+              ),
+              if (_error != null) ...[
+                const SizedBox(height: 12),
+                Text(_error!,
+                    style:
+                        TextStyle(color: Theme.of(context).colorScheme.error)),
+              ],
+              const SizedBox(height: 18),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton(
+                  onPressed: _submitting ? null : _submit,
+                  child: Text(_submitting ? "保存中..." : "保存账户"),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  String? _validateMoney(String? value) {
+    final parsed = double.tryParse((value ?? "").trim());
+    if (parsed == null || parsed < 0) {
+      return "请输入大于等于 0 的数字";
+    }
+    return null;
   }
 }
 

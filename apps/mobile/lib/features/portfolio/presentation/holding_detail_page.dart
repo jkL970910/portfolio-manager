@@ -58,6 +58,11 @@ class _HoldingDetailPageState extends State<HoldingDetailPage> {
         title: Text(widget.fallbackTitle),
         actions: [
           IconButton(
+            tooltip: "编辑持仓",
+            onPressed: _openEditHoldingSheet,
+            icon: const Icon(Icons.edit_outlined),
+          ),
+          IconButton(
             tooltip: "删除持仓",
             onPressed: _confirmDeleteHolding,
             icon: const Icon(Icons.delete_outline),
@@ -172,6 +177,26 @@ class _HoldingDetailPageState extends State<HoldingDetailPage> {
     );
   }
 
+  Future<void> _openEditHoldingSheet() async {
+    final current = await _snapshot;
+    if (!mounted || current == null) {
+      return;
+    }
+
+    final updated = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) => _EditHoldingSheet(
+        apiClient: widget.apiClient,
+        holdingId: widget.holdingId,
+        holding: current,
+      ),
+    );
+    if (updated == true && mounted) {
+      _refresh();
+    }
+  }
+
   Future<void> _confirmDeleteHolding() async {
     final confirmed = await showDialog<bool>(
       context: context,
@@ -215,10 +240,12 @@ class MobileHoldingDetailSnapshot {
     required this.name,
     required this.accountId,
     required this.accountName,
+    required this.currency,
     required this.accountType,
     required this.assetClass,
     required this.sector,
     required this.exchange,
+    required this.securityType,
     required this.value,
     required this.lastPrice,
     required this.lastUpdated,
@@ -242,10 +269,12 @@ class MobileHoldingDetailSnapshot {
   final String name;
   final String accountId;
   final String accountName;
+  final String currency;
   final String accountType;
   final String assetClass;
   final String sector;
   final String exchange;
+  final String securityType;
   final String value;
   final String lastPrice;
   final String lastUpdated;
@@ -278,10 +307,12 @@ class MobileHoldingDetailSnapshot {
       name: holdingData["name"] as String? ?? "未知标的",
       accountId: holdingData["accountId"] as String? ?? "",
       accountName: holdingData["accountName"] as String? ?? "未知账户",
+      currency: holdingData["currency"] as String? ?? "CAD",
       accountType: holdingData["accountType"] as String? ?? "",
       assetClass: holdingData["assetClass"] as String? ?? "",
       sector: holdingData["sector"] as String? ?? "",
       exchange: holdingData["exchange"] as String? ?? "",
+      securityType: holdingData["securityType"] as String? ?? "Common Stock",
       value: holdingData["value"] as String? ?? "--",
       lastPrice: holdingData["lastPrice"] as String? ?? "--",
       lastUpdated: holdingData["lastUpdated"] as String? ?? "",
@@ -731,5 +762,291 @@ class _PerformanceTile extends StatelessWidget {
             Text(point.value, style: Theme.of(context).textTheme.titleLarge),
       ),
     );
+  }
+}
+
+class _EditHoldingSheet extends StatefulWidget {
+  const _EditHoldingSheet({
+    required this.apiClient,
+    required this.holdingId,
+    required this.holding,
+  });
+
+  final LooApiClient apiClient;
+  final String holdingId;
+  final MobileHoldingDetailSnapshot holding;
+
+  @override
+  State<_EditHoldingSheet> createState() => _EditHoldingSheetState();
+}
+
+class _EditHoldingSheetState extends State<_EditHoldingSheet> {
+  final _formKey = GlobalKey<FormState>();
+  late final _nameController = TextEditingController(text: widget.holding.name);
+  late final _sectorController =
+      TextEditingController(text: widget.holding.sector);
+  final _quantityController = TextEditingController(text: "0");
+  final _avgCostController = TextEditingController(text: "0");
+  final _lastPriceController = TextEditingController(text: "0");
+  final _marketValueController = TextEditingController(text: "0");
+
+  late var _currency = widget.holding.currency;
+  late var _assetClass = _normalizeAssetClass(widget.holding.assetClass);
+  late var _securityType = _normalizeSecurityType(widget.holding.securityType);
+  late var _exchange = _normalizeExchange(widget.holding.exchange);
+  var _submitting = false;
+  String? _error;
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _sectorController.dispose();
+    _quantityController.dispose();
+    _avgCostController.dispose();
+    _lastPriceController.dispose();
+    _marketValueController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    if (!_formKey.currentState!.validate()) {
+      return;
+    }
+
+    setState(() {
+      _submitting = true;
+      _error = null;
+    });
+
+    try {
+      await widget.apiClient.updatePortfolioHolding(
+        holdingId: widget.holdingId,
+        name: _nameController.text.trim(),
+        currency: _currency,
+        quantity: double.tryParse(_quantityController.text.trim()) ?? 0,
+        avgCostPerShareAmount:
+            double.tryParse(_avgCostController.text.trim()) ?? 0,
+        lastPriceAmount: double.tryParse(_lastPriceController.text.trim()) ?? 0,
+        marketValueAmount:
+            double.tryParse(_marketValueController.text.trim()) ?? 0,
+        assetClass: _assetClass,
+        sector: _sectorController.text.trim(),
+        securityType: _securityType,
+        exchange: _exchange,
+      );
+      if (mounted) {
+        Navigator.of(context).pop(true);
+      }
+    } catch (error) {
+      if (mounted) {
+        setState(() {
+          _error = error.toString();
+          _submitting = false;
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
+
+    return Padding(
+      padding: EdgeInsets.fromLTRB(20, 20, 20, bottomInset + 20),
+      child: Form(
+        key: _formKey,
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text("编辑持仓", style: Theme.of(context).textTheme.headlineMedium),
+              const SizedBox(height: 8),
+              Text(widget.holding.symbol),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _nameController,
+                enabled: !_submitting,
+                decoration: const InputDecoration(labelText: "名称"),
+                validator: (value) =>
+                    (value == null || value.trim().isEmpty) ? "请输入名称" : null,
+              ),
+              const SizedBox(height: 12),
+              DropdownButtonFormField<String>(
+                initialValue: _currency,
+                decoration: const InputDecoration(labelText: "交易币种"),
+                items: const [
+                  DropdownMenuItem(value: "CAD", child: Text("CAD")),
+                  DropdownMenuItem(value: "USD", child: Text("USD")),
+                ],
+                onChanged: _submitting
+                    ? null
+                    : (value) => setState(() => _currency = value ?? _currency),
+              ),
+              const SizedBox(height: 12),
+              DropdownButtonFormField<String>(
+                initialValue: _assetClass,
+                decoration: const InputDecoration(labelText: "资产类别"),
+                items: const [
+                  DropdownMenuItem(
+                      value: "Canadian Equity", child: Text("Canadian Equity")),
+                  DropdownMenuItem(
+                      value: "US Equity", child: Text("US Equity")),
+                  DropdownMenuItem(
+                      value: "International Equity",
+                      child: Text("International Equity")),
+                  DropdownMenuItem(
+                      value: "Fixed Income", child: Text("Fixed Income")),
+                  DropdownMenuItem(value: "Cash", child: Text("Cash")),
+                ],
+                onChanged: _submitting
+                    ? null
+                    : (value) =>
+                        setState(() => _assetClass = value ?? _assetClass),
+              ),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: _sectorController,
+                enabled: !_submitting,
+                decoration: const InputDecoration(labelText: "行业"),
+                validator: (value) =>
+                    (value == null || value.trim().isEmpty) ? "请输入行业" : null,
+              ),
+              const SizedBox(height: 12),
+              DropdownButtonFormField<String>(
+                initialValue: _securityType,
+                decoration: const InputDecoration(labelText: "证券类型"),
+                items: const [
+                  DropdownMenuItem(
+                      value: "Common Stock", child: Text("Common Stock")),
+                  DropdownMenuItem(value: "ETF", child: Text("ETF")),
+                  DropdownMenuItem(
+                      value: "Commodity ETF", child: Text("Commodity ETF")),
+                  DropdownMenuItem(
+                      value: "Mutual Fund", child: Text("Mutual Fund")),
+                  DropdownMenuItem(value: "REIT", child: Text("REIT")),
+                  DropdownMenuItem(value: "Unknown", child: Text("Unknown")),
+                ],
+                onChanged: _submitting
+                    ? null
+                    : (value) =>
+                        setState(() => _securityType = value ?? _securityType),
+              ),
+              const SizedBox(height: 12),
+              DropdownButtonFormField<String>(
+                initialValue: _exchange,
+                decoration: const InputDecoration(labelText: "交易所"),
+                items: const [
+                  DropdownMenuItem(value: "TSX", child: Text("TSX")),
+                  DropdownMenuItem(value: "NYSE", child: Text("NYSE")),
+                  DropdownMenuItem(value: "NASDAQ", child: Text("NASDAQ")),
+                  DropdownMenuItem(
+                      value: "NYSE Arca", child: Text("NYSE Arca")),
+                  DropdownMenuItem(
+                      value: "Other / Manual", child: Text("Other / Manual")),
+                ],
+                onChanged: _submitting
+                    ? null
+                    : (value) => setState(() => _exchange = value ?? _exchange),
+              ),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: _quantityController,
+                enabled: !_submitting,
+                keyboardType:
+                    const TextInputType.numberWithOptions(decimal: true),
+                decoration: const InputDecoration(labelText: "数量"),
+                validator: _validateMoney,
+              ),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: _avgCostController,
+                enabled: !_submitting,
+                keyboardType:
+                    const TextInputType.numberWithOptions(decimal: true),
+                decoration: const InputDecoration(labelText: "平均成本"),
+                validator: _validateMoney,
+              ),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: _lastPriceController,
+                enabled: !_submitting,
+                keyboardType:
+                    const TextInputType.numberWithOptions(decimal: true),
+                decoration: const InputDecoration(labelText: "最新价格"),
+                validator: _validateMoney,
+              ),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: _marketValueController,
+                enabled: !_submitting,
+                keyboardType:
+                    const TextInputType.numberWithOptions(decimal: true),
+                decoration: const InputDecoration(labelText: "当前市值"),
+                validator: _validatePositiveMoney,
+              ),
+              if (_error != null) ...[
+                const SizedBox(height: 12),
+                Text(_error!,
+                    style:
+                        TextStyle(color: Theme.of(context).colorScheme.error)),
+              ],
+              const SizedBox(height: 18),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton(
+                  onPressed: _submitting ? null : _submit,
+                  child: Text(_submitting ? "保存中..." : "保存持仓"),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  String? _validateMoney(String? value) {
+    final parsed = double.tryParse((value ?? "").trim());
+    if (parsed == null || parsed < 0) {
+      return "请输入大于等于 0 的数字";
+    }
+    return null;
+  }
+
+  String? _validatePositiveMoney(String? value) {
+    final parsed = double.tryParse((value ?? "").trim());
+    if (parsed == null || parsed <= 0) {
+      return "请输入大于 0 的数字";
+    }
+    return null;
+  }
+
+  String _normalizeAssetClass(String value) {
+    const allowed = {
+      "Canadian Equity",
+      "US Equity",
+      "International Equity",
+      "Fixed Income",
+      "Cash"
+    };
+    return allowed.contains(value) ? value : "Canadian Equity";
+  }
+
+  String _normalizeSecurityType(String value) {
+    const allowed = {
+      "Common Stock",
+      "ETF",
+      "Commodity ETF",
+      "Mutual Fund",
+      "REIT",
+      "Unknown"
+    };
+    return allowed.contains(value) ? value : "Common Stock";
+  }
+
+  String _normalizeExchange(String value) {
+    const allowed = {"TSX", "NYSE", "NASDAQ", "NYSE Arca", "Other / Manual"};
+    return allowed.contains(value) ? value : "Other / Manual";
   }
 }
