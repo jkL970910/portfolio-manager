@@ -4,6 +4,7 @@ import "../../../core/api/loo_api_client.dart";
 import "../../shared/data/mobile_models.dart";
 import "../../shared/presentation/loo_charts.dart";
 import "detail_state_widgets.dart";
+import "holding_detail_page.dart";
 
 class HealthScorePage extends StatefulWidget {
   const HealthScorePage({
@@ -115,12 +116,32 @@ class _HealthScorePageState extends State<HealthScorePage> {
                   const SizedBox(height: 16),
                   const _SectionTitle("持仓巡查"),
                   const SizedBox(height: 8),
-                  ...data.holdingDrilldown.map(_DrilldownCard.new),
+                  ...data.holdingDrilldown.map(
+                    (item) => _DrilldownCard(
+                      item,
+                      onTap: () => _openHoldingDetail(item),
+                    ),
+                  ),
                 ],
               ],
             ),
           );
         },
+      ),
+    );
+  }
+
+  void _openHoldingDetail(MobileHealthDrilldownItem item) {
+    if (item.id.isEmpty) {
+      return;
+    }
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => HoldingDetailPage(
+          apiClient: widget.apiClient,
+          holdingId: item.id,
+          fallbackTitle: item.label,
+        ),
       ),
     );
   }
@@ -261,6 +282,7 @@ class MobileHealthDimension {
 
 class MobileHealthDrilldownItem {
   const MobileHealthDrilldownItem({
+    required this.id,
     required this.label,
     required this.score,
     required this.status,
@@ -269,6 +291,7 @@ class MobileHealthDrilldownItem {
     required this.actions,
   });
 
+  final String id;
   final String label;
   final String score;
   final String status;
@@ -278,6 +301,7 @@ class MobileHealthDrilldownItem {
 
   factory MobileHealthDrilldownItem.fromJson(Map<String, dynamic> json) {
     return MobileHealthDrilldownItem(
+      id: json["id"] as String? ?? "",
       label: json["label"] as String? ?? "未知对象",
       score: "${json["score"] ?? "--"} 分",
       status: json["status"] as String? ?? "待评估",
@@ -474,14 +498,16 @@ class _DimensionCard extends StatelessWidget {
 }
 
 class _DrilldownCard extends StatelessWidget {
-  const _DrilldownCard(this.item);
+  const _DrilldownCard(this.item, {this.onTap});
 
   final MobileHealthDrilldownItem item;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
     return Card(
       child: ListTile(
+        onTap: onTap,
         title: Text(item.label),
         subtitle: Text(
           [
@@ -491,8 +517,14 @@ class _DrilldownCard extends StatelessWidget {
             ...item.actions.take(2).map((action) => "行动：$action"),
           ].join("\n"),
         ),
-        trailing:
+        trailing: Wrap(
+          crossAxisAlignment: WrapCrossAlignment.center,
+          spacing: 8,
+          children: [
             Text(item.score, style: Theme.of(context).textTheme.titleMedium),
+            if (onTap != null) const Icon(Icons.chevron_right),
+          ],
+        ),
       ),
     );
   }

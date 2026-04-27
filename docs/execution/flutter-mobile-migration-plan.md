@@ -212,8 +212,9 @@ Highest-priority gaps:
    - Mobile now has a first-pass portfolio/account health drilldown page.
    - It covers score, status, highlights, action queue, radar dimensions,
      dimension drivers, and account/holding drilldown lists.
-   - Remaining work is visual chart polish and deeper navigation from each
-     drilldown row into the affected account or holding.
+   - Holding drilldown rows can now jump into the affected holding detail.
+   - Remaining work is account-type filtering/navigation, because the current
+     account drilldown contract groups by account type rather than account id.
 3. Chart foundation
    - Build reusable Flutter chart primitives before adding deeper analysis pages.
    - Execution order:
@@ -237,7 +238,7 @@ Implementation priority:
    - reusable allocation distribution bar
    - reusable health radar/score chart
 2. Security and asset analysis depth
-3. Health drilldown row navigation
+3. Account-type filter navigation from Health Score
 4. Candidate scoring depth
 5. Guided preference tuning based on real usage
 
