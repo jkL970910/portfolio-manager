@@ -2,6 +2,7 @@ import "package:flutter/material.dart";
 
 import "../../../core/api/loo_api_client.dart";
 import "../../shared/data/mobile_models.dart";
+import "../../shared/presentation/loo_charts.dart";
 import "detail_state_widgets.dart";
 import "health_score_page.dart";
 import "holding_detail_page.dart";
@@ -116,6 +117,8 @@ class _AccountDetailPageState extends State<AccountDetailPage> {
                 if (data.allocation.isNotEmpty) ...[
                   const SizedBox(height: 16),
                   const _SectionTitle("账户配置"),
+                  const SizedBox(height: 8),
+                  _AllocationChartCard(data.allocation),
                   const SizedBox(height: 8),
                   ...data.allocation.take(6).map(_AllocationTile.new),
                 ],
@@ -335,19 +338,21 @@ class MobileAllocationPoint {
   const MobileAllocationPoint({
     required this.name,
     required this.value,
+    required this.rawValue,
   });
 
   final String name;
   final String value;
+  final double rawValue;
 
   factory MobileAllocationPoint.fromJson(Map<String, dynamic> json) {
     final rawValue = json["value"];
+    final numericValue = rawValue is num ? rawValue.toDouble() : 0.0;
 
     return MobileAllocationPoint(
       name: json["name"] as String? ?? "未知配置",
-      value: rawValue is num
-          ? "${rawValue.toStringAsFixed(1)}%"
-          : rawValue?.toString() ?? "--",
+      value: rawValue is num ? "${rawValue.toStringAsFixed(1)}%" : "--",
+      rawValue: numericValue,
     );
   }
 }
@@ -524,6 +529,33 @@ class _AllocationTile extends StatelessWidget {
         title: Text(point.name),
         trailing:
             Text(point.value, style: Theme.of(context).textTheme.titleLarge),
+      ),
+    );
+  }
+}
+
+class _AllocationChartCard extends StatelessWidget {
+  const _AllocationChartCard(this.points);
+
+  final List<MobileAllocationPoint> points;
+
+  @override
+  Widget build(BuildContext context) {
+    final shownPoints =
+        points.where((point) => point.rawValue > 0).take(6).toList();
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: LooDistributionBar(
+          segments: shownPoints
+              .map(
+                (point) => LooDistributionSegment(
+                  label: point.name,
+                  value: point.rawValue,
+                ),
+              )
+              .toList(),
+        ),
       ),
     );
   }

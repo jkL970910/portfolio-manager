@@ -5,6 +5,7 @@ import "account_detail_page.dart";
 import "health_score_page.dart";
 import "holding_detail_page.dart";
 import "../../shared/data/mobile_models.dart";
+import "../../shared/presentation/loo_charts.dart";
 
 class PortfolioPage extends StatefulWidget {
   const PortfolioPage({
@@ -79,6 +80,21 @@ class _PortfolioPageState extends State<PortfolioPage> {
                         snapshot.data!.summaryPoints,
                         onTap: _openHealthScore,
                       ),
+                      if (snapshot.data!.accountTypeAllocation.isNotEmpty) ...[
+                        const SizedBox(height: 18),
+                        _AllocationCard(
+                          title: "账户类型分布",
+                          points: snapshot.data!.accountTypeAllocation,
+                        ),
+                      ],
+                      if (snapshot
+                          .data!.accountInstanceAllocation.isNotEmpty) ...[
+                        const SizedBox(height: 18),
+                        _AllocationCard(
+                          title: "账户实例分布",
+                          points: snapshot.data!.accountInstanceAllocation,
+                        ),
+                      ],
                       const SizedBox(height: 18),
                       _SectionTitle(
                           title: "账户",
@@ -151,6 +167,8 @@ class MobilePortfolioSnapshot {
     required this.quoteStatus,
     required this.healthScore,
     required this.summaryPoints,
+    required this.accountTypeAllocation,
+    required this.accountInstanceAllocation,
   });
 
   final List<MobileAccountCard> accounts;
@@ -158,6 +176,8 @@ class MobilePortfolioSnapshot {
   final String quoteStatus;
   final String healthScore;
   final List<String> summaryPoints;
+  final List<MobilePortfolioAllocationPoint> accountTypeAllocation;
+  final List<MobilePortfolioAllocationPoint> accountInstanceAllocation;
 
   factory MobilePortfolioSnapshot.fromJson(Map<String, dynamic> json) {
     final quoteStatus = json["quoteStatus"];
@@ -179,6 +199,37 @@ class MobilePortfolioSnapshot {
       summaryPoints:
           (json["summaryPoints"] as List?)?.whereType<String>().toList() ??
               const [],
+      accountTypeAllocation: readJsonList(json, "accountTypeAllocation")
+          .map(MobilePortfolioAllocationPoint.fromJson)
+          .toList(),
+      accountInstanceAllocation: readJsonList(json, "accountInstanceAllocation")
+          .map(MobilePortfolioAllocationPoint.fromJson)
+          .toList(),
+    );
+  }
+}
+
+class MobilePortfolioAllocationPoint {
+  const MobilePortfolioAllocationPoint({
+    required this.name,
+    required this.value,
+    required this.displayValue,
+    required this.detail,
+  });
+
+  final String name;
+  final double value;
+  final String displayValue;
+  final String detail;
+
+  factory MobilePortfolioAllocationPoint.fromJson(Map<String, dynamic> json) {
+    final rawValue = json["value"];
+    final value = rawValue is num ? rawValue.toDouble() : 0.0;
+    return MobilePortfolioAllocationPoint(
+      name: json["name"] as String? ?? "未知配置",
+      value: value,
+      displayValue: "${value.toStringAsFixed(1)}%",
+      detail: json["detail"] as String? ?? "",
     );
   }
 }
@@ -242,6 +293,51 @@ class _HealthCard extends StatelessWidget {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _AllocationCard extends StatelessWidget {
+  const _AllocationCard({required this.title, required this.points});
+
+  final String title;
+  final List<MobilePortfolioAllocationPoint> points;
+
+  @override
+  Widget build(BuildContext context) {
+    final shownPoints =
+        points.where((point) => point.value > 0).take(6).toList();
+    return _LooCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(title, style: Theme.of(context).textTheme.titleLarge),
+          const SizedBox(height: 14),
+          LooDistributionBar(
+            segments: shownPoints
+                .map(
+                  (point) => LooDistributionSegment(
+                    label: point.name,
+                    value: point.value,
+                  ),
+                )
+                .toList(),
+          ),
+          const SizedBox(height: 12),
+          ...shownPoints.map(
+            (point) => Padding(
+              padding: const EdgeInsets.only(top: 6),
+              child: Row(
+                children: [
+                  Expanded(child: Text(point.name)),
+                  Text(point.displayValue,
+                      style: Theme.of(context).textTheme.titleMedium),
+                ],
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

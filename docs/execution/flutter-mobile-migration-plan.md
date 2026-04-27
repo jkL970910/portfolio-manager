@@ -224,8 +224,9 @@ Highest-priority gaps:
      4. upgrade Health Score visual polish and drilldown navigation
 4. Asset and security analysis depth
    - Security detail now has a first-pass price trend visualization.
-   - Asset-class drift analysis, account distribution visuals, and
-     target-vs-current views remain shallow.
+   - Portfolio and account pages now have first-pass allocation distribution
+     visuals.
+   - Asset-class drift analysis and target-vs-current views remain shallow.
 5. Candidate scoring depth
    - Watchlist management exists, but candidate score detail is not yet mobile-native.
 
@@ -235,10 +236,10 @@ Implementation priority:
    - reusable line chart
    - reusable allocation distribution bar
    - reusable health radar/score chart
-2. Portfolio/account asset allocation visualization
-3. Security and asset analysis depth
-4. Health drilldown row navigation
-5. Candidate scoring depth
+2. Security and asset analysis depth
+3. Health drilldown row navigation
+4. Candidate scoring depth
+5. Guided preference tuning based on real usage
 
 ## Explicit non-goals right now
 
