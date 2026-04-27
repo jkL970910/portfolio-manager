@@ -161,6 +161,15 @@ export const guidedImportCreateSchema = z.object({
   }
 });
 
+export const mobileManualAccountCreateSchema = z.object({
+  accountType: z.enum(["TFSA", "RRSP", "FHSA", "Taxable"]),
+  institution: z.string().trim().min(2).max(120),
+  nickname: z.string().trim().min(2).max(120),
+  currency: z.enum(["CAD", "USD"]).default("CAD"),
+  contributionRoomCad: z.number().min(0).max(1000000).optional().default(0),
+  initialMarketValueAmount: z.number().min(0).max(100000000).optional().default(0)
+});
+
 export const recommendationRunCreateSchema = z.object({
   contributionAmountCad: z.number().positive().max(1000000)
 });
@@ -316,6 +325,7 @@ export type ImportJobCreatePayload = z.infer<typeof importJobCreateSchema>;
 export type ImportMappingPresetCreatePayload = z.infer<typeof importMappingPresetCreateSchema>;
 export type ImportMappingPresetUpdatePayload = z.infer<typeof importMappingPresetUpdateSchema>;
 export type GuidedImportCreatePayload = z.infer<typeof guidedImportCreateSchema>;
+export type MobileManualAccountCreatePayload = z.infer<typeof mobileManualAccountCreateSchema>;
 export type RecommendationRunCreatePayload = z.infer<typeof recommendationRunCreateSchema>;
 export type CandidateScoreCreatePayload = z.infer<typeof candidateScoreCreateSchema>;
 export type CandidateCompareCreatePayload = z.infer<typeof candidateCompareCreateSchema>;

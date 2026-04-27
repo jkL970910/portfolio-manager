@@ -52,6 +52,27 @@ class LooApiClient {
     return _getJson("/api/mobile/import");
   }
 
+  Future<Map<String, dynamic>> createManualAccount({
+    required String accountType,
+    required String institution,
+    required String nickname,
+    required String currency,
+    required double contributionRoomCad,
+    required double initialMarketValueAmount,
+  }) {
+    return _postJson(
+      "/api/mobile/import/accounts",
+      body: {
+        "accountType": accountType,
+        "institution": institution,
+        "nickname": nickname,
+        "currency": currency,
+        "contributionRoomCad": contributionRoomCad,
+        "initialMarketValueAmount": initialMarketValueAmount,
+      },
+    );
+  }
+
   Future<Map<String, dynamic>> getPortfolioAccountDetail(String accountId) {
     return _getJson(
         "/api/mobile/portfolio/accounts/${Uri.encodeComponent(accountId)}");

@@ -73,7 +73,14 @@ class _ImportPageState extends State<ImportPage> {
                       const SizedBox(height: 16),
                       const _SectionTitle("导入入口"),
                       const SizedBox(height: 8),
-                      ...snapshot.data!.actionCards.map(_ActionCard.new),
+                      ...snapshot.data!.actionCards.map(
+                        (action) => _ActionCard(
+                          action,
+                          onTap: action.title == "添加账户"
+                              ? _openCreateAccountSheet
+                              : null,
+                        ),
+                      ),
                       const SizedBox(height: 16),
                       _SectionTitle("现有账户",
                           actionLabel: "${snapshot.data!.accounts.length} 个"),
@@ -96,6 +103,20 @@ class _ImportPageState extends State<ImportPage> {
         );
       },
     );
+  }
+
+  Future<void> _openCreateAccountSheet() async {
+    final created = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) => _CreateAccountSheet(apiClient: widget.apiClient),
+    );
+    if (created == true && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("账户已加入 Loo国账本")),
+      );
+      _refresh();
+    }
   }
 }
 
@@ -293,23 +314,199 @@ class _SectionTitle extends StatelessWidget {
 }
 
 class _ActionCard extends StatelessWidget {
-  const _ActionCard(this.action);
+  const _ActionCard(this.action, {this.onTap});
 
   final MobileImportAction action;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
     return Card(
       margin: const EdgeInsets.only(bottom: 10),
       child: ListTile(
+        onTap: onTap,
         leading: CircleAvatar(
             child: Text(
                 action.label.isEmpty ? "入" : action.label.substring(0, 1))),
         title: Text(action.title),
         subtitle: Text(action.description),
-        trailing: const Icon(Icons.chevron_right),
+        trailing: onTap == null
+            ? const Icon(Icons.lock_outline)
+            : const Icon(Icons.chevron_right),
       ),
     );
+  }
+}
+
+class _CreateAccountSheet extends StatefulWidget {
+  const _CreateAccountSheet({required this.apiClient});
+
+  final LooApiClient apiClient;
+
+  @override
+  State<_CreateAccountSheet> createState() => _CreateAccountSheetState();
+}
+
+class _CreateAccountSheetState extends State<_CreateAccountSheet> {
+  final _formKey = GlobalKey<FormState>();
+  final _institutionController = TextEditingController();
+  final _nicknameController = TextEditingController();
+  final _roomController = TextEditingController(text: "0");
+  final _marketValueController = TextEditingController(text: "0");
+
+  var _accountType = "TFSA";
+  var _currency = "CAD";
+  var _submitting = false;
+  String? _error;
+
+  @override
+  void dispose() {
+    _institutionController.dispose();
+    _nicknameController.dispose();
+    _roomController.dispose();
+    _marketValueController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    if (!_formKey.currentState!.validate()) {
+      return;
+    }
+
+    setState(() {
+      _submitting = true;
+      _error = null;
+    });
+
+    try {
+      await widget.apiClient.createManualAccount(
+        accountType: _accountType,
+        institution: _institutionController.text.trim(),
+        nickname: _nicknameController.text.trim(),
+        currency: _currency,
+        contributionRoomCad: double.tryParse(_roomController.text.trim()) ?? 0,
+        initialMarketValueAmount:
+            double.tryParse(_marketValueController.text.trim()) ?? 0,
+      );
+      if (mounted) {
+        Navigator.of(context).pop(true);
+      }
+    } catch (error) {
+      if (mounted) {
+        setState(() {
+          _error = error.toString();
+          _submitting = false;
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
+
+    return Padding(
+      padding: EdgeInsets.fromLTRB(20, 20, 20, bottomInset + 20),
+      child: Form(
+        key: _formKey,
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text("添加账户", style: Theme.of(context).textTheme.headlineMedium),
+              const SizedBox(height: 8),
+              const Text("先建立账户桶；持仓可以下一步再补。"),
+              const SizedBox(height: 16),
+              DropdownButtonFormField<String>(
+                initialValue: _accountType,
+                decoration: const InputDecoration(labelText: "账户类型"),
+                items: const [
+                  DropdownMenuItem(value: "TFSA", child: Text("TFSA")),
+                  DropdownMenuItem(value: "RRSP", child: Text("RRSP")),
+                  DropdownMenuItem(value: "FHSA", child: Text("FHSA")),
+                  DropdownMenuItem(value: "Taxable", child: Text("Taxable")),
+                ],
+                onChanged: _submitting
+                    ? null
+                    : (value) =>
+                        setState(() => _accountType = value ?? _accountType),
+              ),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: _institutionController,
+                enabled: !_submitting,
+                decoration: const InputDecoration(labelText: "机构"),
+                validator: (value) => (value == null || value.trim().length < 2)
+                    ? "机构至少 2 个字符"
+                    : null,
+              ),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: _nicknameController,
+                enabled: !_submitting,
+                decoration: const InputDecoration(labelText: "账户昵称"),
+                validator: (value) => (value == null || value.trim().length < 2)
+                    ? "昵称至少 2 个字符"
+                    : null,
+              ),
+              const SizedBox(height: 12),
+              DropdownButtonFormField<String>(
+                initialValue: _currency,
+                decoration: const InputDecoration(labelText: "账户币种"),
+                items: const [
+                  DropdownMenuItem(value: "CAD", child: Text("CAD")),
+                  DropdownMenuItem(value: "USD", child: Text("USD")),
+                ],
+                onChanged: _submitting
+                    ? null
+                    : (value) => setState(() => _currency = value ?? _currency),
+              ),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: _roomController,
+                enabled: !_submitting,
+                keyboardType:
+                    const TextInputType.numberWithOptions(decimal: true),
+                decoration: const InputDecoration(labelText: "贡献额度 CAD"),
+                validator: _validateMoney,
+              ),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: _marketValueController,
+                enabled: !_submitting,
+                keyboardType:
+                    const TextInputType.numberWithOptions(decimal: true),
+                decoration: const InputDecoration(labelText: "初始市值"),
+                validator: _validateMoney,
+              ),
+              if (_error != null) ...[
+                const SizedBox(height: 12),
+                Text(_error!,
+                    style:
+                        TextStyle(color: Theme.of(context).colorScheme.error)),
+              ],
+              const SizedBox(height: 18),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton(
+                  onPressed: _submitting ? null : _submit,
+                  child: Text(_submitting ? "保存中..." : "保存账户"),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  String? _validateMoney(String? value) {
+    final parsed = double.tryParse((value ?? "").trim());
+    if (parsed == null || parsed < 0) {
+      return "请输入大于等于 0 的数字";
+    }
+    return null;
   }
 }
 

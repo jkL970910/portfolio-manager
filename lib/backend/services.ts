@@ -257,6 +257,15 @@ export interface CreateGuidedImportInput {
   }>;
 }
 
+export interface CreateManualInvestmentAccountInput {
+  accountType: AccountType;
+  institution: string;
+  nickname: string;
+  currency: CurrencyCode;
+  contributionRoomCad: number;
+  initialMarketValueAmount: number;
+}
+
 export interface CreateGuidedImportResult {
   account: InvestmentAccount;
   importJob: ImportJob | null;
@@ -266,6 +275,34 @@ export interface CreateGuidedImportResult {
     contributionAmountCad: number;
     itemCount: number;
   } | null;
+}
+
+export async function createManualInvestmentAccount(userId: string, input: CreateManualInvestmentAccountInput): Promise<InvestmentAccount> {
+  const [accountRow] = await getDb()
+    .insert(investmentAccounts)
+    .values({
+      userId,
+      institution: input.institution,
+      type: input.accountType,
+      nickname: input.nickname,
+      currency: input.currency,
+      marketValueAmount: input.initialMarketValueAmount.toFixed(2),
+      marketValueCad: (await toCadAmount(input.initialMarketValueAmount, input.currency) ?? 0).toFixed(2),
+      contributionRoomCad: input.contributionRoomCad.toFixed(2),
+    })
+    .returning();
+
+  return {
+    id: accountRow.id,
+    userId: accountRow.userId,
+    institution: accountRow.institution,
+    type: accountRow.type as AccountType,
+    nickname: accountRow.nickname,
+    currency: accountRow.currency as CurrencyCode,
+    marketValueAmount: Number(accountRow.marketValueAmount),
+    marketValueCad: Number(accountRow.marketValueCad),
+    contributionRoomCad: accountRow.contributionRoomCad == null ? null : Number(accountRow.contributionRoomCad),
+  };
 }
 
 const DEFAULT_TARGETS_BY_RISK: Record<RiskProfile, AllocationTarget[]> = {
