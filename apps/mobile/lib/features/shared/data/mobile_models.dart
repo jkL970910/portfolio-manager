@@ -24,12 +24,14 @@ class MobileAccountCard {
     required this.name,
     required this.value,
     required this.detail,
+    required this.typeId,
   });
 
   final String id;
   final String name;
   final String value;
   final String detail;
+  final String typeId;
 
   factory MobileAccountCard.fromJson(Map<String, dynamic> json) {
     return MobileAccountCard(
@@ -40,6 +42,7 @@ class MobileAccountCard {
           (json["typeLabel"] as String?) ??
           (json["institution"] as String?) ??
           "",
+      typeId: json["typeId"] as String? ?? "",
     );
   }
 }
@@ -51,6 +54,7 @@ class MobileHoldingCard {
     required this.name,
     required this.value,
     required this.detail,
+    required this.accountType,
   });
 
   final String id;
@@ -58,11 +62,13 @@ class MobileHoldingCard {
   final String name;
   final String value;
   final String detail;
+  final String accountType;
 
   factory MobileHoldingCard.fromJson(Map<String, dynamic> json) {
     final symbol = json["symbol"] as String? ?? "--";
     final account = json["account"] as String? ?? "";
-    final weight = json["weight"] as String? ?? json["portfolioShare"] as String? ?? "";
+    final weight =
+        json["weight"] as String? ?? json["portfolioShare"] as String? ?? "";
 
     return MobileHoldingCard(
       id: json["id"] as String? ?? symbol,
@@ -70,6 +76,7 @@ class MobileHoldingCard {
       name: json["name"] as String? ?? "未知标的",
       value: json["value"] as String? ?? "--",
       detail: [account, weight].where((item) => item.isNotEmpty).join(" · "),
+      accountType: json["accountType"] as String? ?? "",
     );
   }
 }

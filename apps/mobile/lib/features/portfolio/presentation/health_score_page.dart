@@ -3,6 +3,7 @@ import "package:flutter/material.dart";
 import "../../../core/api/loo_api_client.dart";
 import "../../shared/data/mobile_models.dart";
 import "../../shared/presentation/loo_charts.dart";
+import "account_type_portfolio_page.dart";
 import "detail_state_widgets.dart";
 import "holding_detail_page.dart";
 
@@ -110,7 +111,12 @@ class _HealthScorePageState extends State<HealthScorePage> {
                   const SizedBox(height: 16),
                   const _SectionTitle("账户巡查"),
                   const SizedBox(height: 8),
-                  ...data.accountDrilldown.map(_DrilldownCard.new),
+                  ...data.accountDrilldown.map(
+                    (item) => _DrilldownCard(
+                      item,
+                      onTap: () => _openAccountTypePortfolio(item),
+                    ),
+                  ),
                 ],
                 if (data.holdingDrilldown.isNotEmpty) ...[
                   const SizedBox(height: 16),
@@ -141,6 +147,21 @@ class _HealthScorePageState extends State<HealthScorePage> {
           apiClient: widget.apiClient,
           holdingId: item.id,
           fallbackTitle: item.label,
+        ),
+      ),
+    );
+  }
+
+  void _openAccountTypePortfolio(MobileHealthDrilldownItem item) {
+    if (item.id.isEmpty) {
+      return;
+    }
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => AccountTypePortfolioPage(
+          apiClient: widget.apiClient,
+          accountType: item.id,
+          title: "${item.label}巡查",
         ),
       ),
     );

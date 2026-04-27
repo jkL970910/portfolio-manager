@@ -10,10 +10,14 @@ import "../../shared/presentation/loo_charts.dart";
 class PortfolioPage extends StatefulWidget {
   const PortfolioPage({
     required this.apiClient,
+    this.accountTypeFilter,
+    this.title,
     super.key,
   });
 
   final LooApiClient apiClient;
+  final String? accountTypeFilter;
+  final String? title;
 
   @override
   State<PortfolioPage> createState() => _PortfolioPageState();
@@ -35,7 +39,13 @@ class _PortfolioPageState extends State<PortfolioPage> {
       throw const LooApiException("组合数据格式不正确。");
     }
 
-    return MobilePortfolioSnapshot.fromJson(data);
+    final snapshot = MobilePortfolioSnapshot.fromJson(data);
+    final accountTypeFilter = widget.accountTypeFilter;
+    if (accountTypeFilter == null || accountTypeFilter.isEmpty) {
+      return snapshot;
+    }
+
+    return snapshot.filteredByAccountType(accountTypeFilter);
   }
 
   void _refresh() {
@@ -56,7 +66,7 @@ class _PortfolioPageState extends State<PortfolioPage> {
             slivers: [
               SliverToBoxAdapter(
                 child: _PageHeader(
-                  title: "组合御览",
+                  title: widget.title ?? "组合御览",
                   subtitle: snapshot.hasData
                       ? snapshot.data!.quoteStatus
                       : "正在整理 Loo国资产账本...",
@@ -75,20 +85,25 @@ class _PortfolioPageState extends State<PortfolioPage> {
                   padding: const EdgeInsets.fromLTRB(20, 0, 20, 28),
                   sliver: SliverList.list(
                     children: [
-                      _HealthCard(
-                        snapshot.data!.healthScore,
-                        snapshot.data!.summaryPoints,
-                        onTap: _openHealthScore,
-                      ),
-                      if (snapshot.data!.accountTypeAllocation.isNotEmpty) ...[
+                      if (_isFiltered)
+                        _FilterSummaryCard(snapshot.data!)
+                      else
+                        _HealthCard(
+                          snapshot.data!.healthScore,
+                          snapshot.data!.summaryPoints,
+                          onTap: _openHealthScore,
+                        ),
+                      if (!_isFiltered &&
+                          snapshot.data!.accountTypeAllocation.isNotEmpty) ...[
                         const SizedBox(height: 18),
                         _AllocationCard(
                           title: "账户类型分布",
                           points: snapshot.data!.accountTypeAllocation,
                         ),
                       ],
-                      if (snapshot
-                          .data!.accountInstanceAllocation.isNotEmpty) ...[
+                      if (!_isFiltered &&
+                          snapshot
+                              .data!.accountInstanceAllocation.isNotEmpty) ...[
                         const SizedBox(height: 18),
                         _AllocationCard(
                           title: "账户实例分布",
@@ -158,6 +173,9 @@ class _PortfolioPageState extends State<PortfolioPage> {
       ),
     );
   }
+
+  bool get _isFiltered =>
+      widget.accountTypeFilter != null && widget.accountTypeFilter!.isNotEmpty;
 }
 
 class MobilePortfolioSnapshot {
@@ -205,6 +223,21 @@ class MobilePortfolioSnapshot {
       accountInstanceAllocation: readJsonList(json, "accountInstanceAllocation")
           .map(MobilePortfolioAllocationPoint.fromJson)
           .toList(),
+    );
+  }
+
+  MobilePortfolioSnapshot filteredByAccountType(String accountType) {
+    return MobilePortfolioSnapshot(
+      accounts:
+          accounts.where((account) => account.typeId == accountType).toList(),
+      holdings: holdings
+          .where((holding) => holding.accountType == accountType)
+          .toList(),
+      quoteStatus: "已筛选 $accountType 账户类型 · $quoteStatus",
+      healthScore: healthScore,
+      summaryPoints: summaryPoints,
+      accountTypeAllocation: accountTypeAllocation,
+      accountInstanceAllocation: accountInstanceAllocation,
     );
   }
 }
@@ -293,6 +326,33 @@ class _HealthCard extends StatelessWidget {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _FilterSummaryCard extends StatelessWidget {
+  const _FilterSummaryCard(this.data);
+
+  final MobilePortfolioSnapshot data;
+
+  @override
+  Widget build(BuildContext context) {
+    return _LooCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text("账户类型筛选", style: Theme.of(context).textTheme.titleLarge),
+          const SizedBox(height: 8),
+          const Text("这里只显示健康巡查中对应账户类型下的账户和持仓。"),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(child: Text("账户 ${data.accounts.length} 个")),
+              Expanded(child: Text("持仓 ${data.holdings.length} 个")),
+            ],
+          ),
+        ],
       ),
     );
   }

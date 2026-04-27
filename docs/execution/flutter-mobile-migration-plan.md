@@ -213,8 +213,8 @@ Highest-priority gaps:
    - It covers score, status, highlights, action queue, radar dimensions,
      dimension drivers, and account/holding drilldown lists.
    - Holding drilldown rows can now jump into the affected holding detail.
-   - Remaining work is account-type filtering/navigation, because the current
-     account drilldown contract groups by account type rather than account id.
+   - Account drilldown rows now open a filtered portfolio view for that account
+     type, matching the current backend account-type grouping contract.
 3. Chart foundation
    - Build reusable Flutter chart primitives before adding deeper analysis pages.
    - Execution order:
@@ -238,9 +238,9 @@ Implementation priority:
    - reusable allocation distribution bar
    - reusable health radar/score chart
 2. Security and asset analysis depth
-3. Account-type filter navigation from Health Score
-4. Candidate scoring depth
-5. Guided preference tuning based on real usage
+3. Candidate scoring depth
+4. Guided preference tuning based on real usage
+5. Cloud-ready worker/cache boundaries
 
 ## Explicit non-goals right now
 
