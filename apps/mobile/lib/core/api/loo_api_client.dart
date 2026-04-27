@@ -73,6 +73,38 @@ class LooApiClient {
     );
   }
 
+  Future<Map<String, dynamic>> createManualHolding({
+    required String accountId,
+    required String symbol,
+    required String name,
+    required String currency,
+    required String assetClass,
+    required String sector,
+    required String securityType,
+    required String exchange,
+    required double quantity,
+    required double avgCostPerShareAmount,
+    required double lastPriceAmount,
+    required double marketValueAmount,
+  }) {
+    return _postJson(
+      "/api/mobile/import/accounts/${Uri.encodeComponent(accountId)}/holdings",
+      body: {
+        "symbol": symbol,
+        "name": name,
+        "currency": currency,
+        "assetClass": assetClass,
+        "sector": sector,
+        "securityType": securityType,
+        "exchange": exchange,
+        "quantity": quantity,
+        "avgCostPerShareAmount": avgCostPerShareAmount,
+        "lastPriceAmount": lastPriceAmount,
+        "marketValueAmount": marketValueAmount,
+      },
+    );
+  }
+
   Future<Map<String, dynamic>> getPortfolioAccountDetail(String accountId) {
     return _getJson(
         "/api/mobile/portfolio/accounts/${Uri.encodeComponent(accountId)}");
