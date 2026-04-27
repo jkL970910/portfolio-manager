@@ -1833,12 +1833,21 @@ export function buildPortfolioSecurityDetailData(args: {
   profile: PreferenceProfile;
   display: DisplayContext;
   symbol: string;
+  exchange?: string | null;
+  currency?: CurrencyCode | null;
 }): PortfolioSecurityDetailData | null {
-  const { language, accounts, holdings, portfolioEvents = [], priceHistory = [], snapshots = [], profile, display, symbol } = args;
+  const { language, accounts, holdings, portfolioEvents = [], priceHistory = [], snapshots = [], profile, display, symbol, exchange, currency } = args;
   const normalizedSymbol = symbol.trim().toUpperCase();
+  const normalizedExchange = exchange?.trim().toUpperCase() || null;
+  const normalizedCurrency = currency ?? null;
+  const matchesRequestedIdentity = (holding: HoldingPosition) =>
+    holding.symbol.trim().toUpperCase() === normalizedSymbol
+    && (!normalizedCurrency || holding.currency === normalizedCurrency)
+    && (!normalizedExchange || (holding.exchangeOverride?.trim().toUpperCase() || "") === normalizedExchange);
   const portfolio = buildPortfolioData({ language, accounts, holdings, snapshots, profile, display });
-  const matchingHoldings = holdings.filter((holding) => holding.symbol.trim().toUpperCase() === normalizedSymbol);
-  const matchingViewHoldings = portfolio.holdings.filter((holding) => holding.symbol.trim().toUpperCase() === normalizedSymbol);
+  const matchingHoldings = holdings.filter(matchesRequestedIdentity);
+  const matchingHoldingIds = new Set(matchingHoldings.map((holding) => holding.id));
+  const matchingViewHoldings = portfolio.holdings.filter((holding) => matchingHoldingIds.has(holding.id));
   const referenceHolding = matchingHoldings[0];
   const referenceViewHolding = matchingViewHoldings[0];
 
@@ -2057,7 +2066,7 @@ export function buildPortfolioSecurityDetailData(args: {
         : pick(language, "未知行业", "Unknown sector"),
       currency: referenceHolding?.currency ?? "CAD",
       securityType: pick(language, "正在识别", "Resolving"),
-      exchange: pick(language, "正在识别", "Resolving"),
+      exchange: referenceHolding?.exchangeOverride ?? pick(language, "正在识别", "Resolving"),
       marketSector: pick(language, "正在识别", "Resolving"),
       lastPrice: referenceViewHolding?.lastPrice ?? pick(language, "还没拿到价格", "No quote yet"),
       quoteTimestamp: referenceViewHolding?.lastUpdated ?? pick(language, "还没刷新过", "Not refreshed yet"),

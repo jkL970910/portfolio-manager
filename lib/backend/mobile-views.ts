@@ -109,7 +109,13 @@ type MobilePortfolioAccountDetailData = Omit<PortfolioAccountDetailData, "holdin
 };
 
 type MobilePortfolioHoldingDetailData = Omit<PortfolioHoldingDetailData, "holding" | "editContext"> & {
-  holding: Omit<PortfolioHoldingDetailData["holding"], "accountHref">;
+  holding: Omit<PortfolioHoldingDetailData["holding"], "accountHref"> & {
+    identity: {
+      symbol: string;
+      exchange: string | null;
+      currency: "CAD" | "USD";
+    };
+  };
 };
 
 type MobileSecurityAccountHoldingView = Omit<MobilePortfolioHoldingDetailData, "displayContext">;
@@ -263,7 +269,14 @@ function mapMobileHoldingDetailData(data: PortfolioHoldingDetailData): MobilePor
 
   return {
     displayContext: data.displayContext,
-    holding,
+    holding: {
+      ...holding,
+      identity: {
+        symbol: data.holding.symbol,
+        exchange: data.editContext.current.exchangeOverride,
+        currency: data.editContext.current.currency,
+      },
+    },
     facts: data.facts,
     marketData: data.marketData,
     performance: data.performance,
@@ -402,8 +415,12 @@ export async function getMobilePortfolioHoldingDetailView(userId: string, holdin
   };
 }
 
-export async function getMobilePortfolioSecurityDetailView(userId: string, symbol: string) {
-  const payload = await getPortfolioSecurityDetailView(userId, symbol);
+export async function getMobilePortfolioSecurityDetailView(
+  userId: string,
+  symbol: string,
+  identity?: { exchange?: string | null; currency?: "CAD" | "USD" | null }
+) {
+  const payload = await getPortfolioSecurityDetailView(userId, symbol, identity);
   return {
     data: payload.data.data ? mapMobileSecurityDetailData(payload.data.data) : null,
     meta: payload.meta,

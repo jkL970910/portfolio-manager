@@ -38,6 +38,7 @@ class _MobileRootShellState extends State<MobileRootShell> {
       RecommendationsPage(apiClient: widget.apiClient),
       ImportPage(apiClient: widget.apiClient),
       SettingsPage(
+        apiClient: widget.apiClient,
         viewerName: widget.viewerName,
         baseCurrency: widget.baseCurrency,
         onDisplayCurrencyChanged: widget.onDisplayCurrencyChanged,

@@ -10,12 +10,16 @@ class SecurityDetailPage extends StatefulWidget {
     required this.apiClient,
     required this.symbol,
     required this.fallbackTitle,
+    this.exchange,
+    this.currency,
     super.key,
   });
 
   final LooApiClient apiClient;
   final String symbol;
   final String fallbackTitle;
+  final String? exchange;
+  final String? currency;
 
   @override
   State<SecurityDetailPage> createState() => _SecurityDetailPageState();
@@ -31,8 +35,11 @@ class _SecurityDetailPageState extends State<SecurityDetailPage> {
   }
 
   Future<MobileSecurityDetailSnapshot?> _loadSnapshot() async {
-    final response =
-        await widget.apiClient.getPortfolioSecurityDetail(widget.symbol);
+    final response = await widget.apiClient.getPortfolioSecurityDetail(
+      widget.symbol,
+      exchange: widget.exchange,
+      currency: widget.currency,
+    );
     final data = response["data"];
     if (data == null) {
       return null;

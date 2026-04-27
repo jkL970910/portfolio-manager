@@ -171,6 +171,8 @@ class _HoldingDetailPageState extends State<HoldingDetailPage> {
         builder: (_) => SecurityDetailPage(
           apiClient: widget.apiClient,
           symbol: data.symbol,
+          exchange: data.identityExchange,
+          currency: data.currency,
           fallbackTitle: data.symbol,
         ),
       ),
@@ -241,6 +243,7 @@ class MobileHoldingDetailSnapshot {
     required this.accountId,
     required this.accountName,
     required this.currency,
+    required this.identityExchange,
     required this.accountType,
     required this.assetClass,
     required this.sector,
@@ -270,6 +273,7 @@ class MobileHoldingDetailSnapshot {
   final String accountId;
   final String accountName;
   final String currency;
+  final String identityExchange;
   final String accountType;
   final String assetClass;
   final String sector;
@@ -296,6 +300,9 @@ class MobileHoldingDetailSnapshot {
     final holding = json["holding"];
     final holdingData =
         holding is Map<String, dynamic> ? holding : const <String, dynamic>{};
+    final identity = holdingData["identity"];
+    final identityData =
+        identity is Map<String, dynamic> ? identity : const <String, dynamic>{};
     final displayContext = json["displayContext"];
     final displayContextData = displayContext is Map<String, dynamic>
         ? displayContext
@@ -308,6 +315,7 @@ class MobileHoldingDetailSnapshot {
       accountId: holdingData["accountId"] as String? ?? "",
       accountName: holdingData["accountName"] as String? ?? "未知账户",
       currency: holdingData["currency"] as String? ?? "CAD",
+      identityExchange: identityData["exchange"] as String? ?? "",
       accountType: holdingData["accountType"] as String? ?? "",
       assetClass: holdingData["assetClass"] as String? ?? "",
       sector: holdingData["sector"] as String? ?? "",

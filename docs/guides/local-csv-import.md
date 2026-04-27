@@ -194,6 +194,7 @@ Optional:
 Required:
 
 - `symbol`
+- `exchange`
 - `asset_class`
 - `holding_currency`
 - `market_value`
@@ -202,6 +203,7 @@ Required:
 Optional:
 
 - `name`
+- `exchange`
 - `sector`
 - `quantity`
 - `avg_cost_per_share`
@@ -212,6 +214,11 @@ Optional:
 
 `market_value` has higher priority than `quantity x last_price`.
 Use it when you want to explicitly override the computed total value for the holding.
+
+`exchange` is optional but recommended. Import merge matching now treats a holding as
+`account_key + symbol + holding_currency + exchange`. This prevents USD common shares
+and CAD-listed / CAD-hedged versions of the same underlying company from overwriting
+each other during merge imports.
 
 ## Spending CSV
 

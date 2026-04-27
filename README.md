@@ -62,7 +62,7 @@ Implemented already in the current codebase:
 - direct CSV import with preview, mapping, symbol audit, correction, confirm, replace, and merge
 - guided import with account creation, manual holdings entry, and single-account CSV import
 - account detail, unified symbol detail, and account/holding repair workflows
-- market-data search, quote lookup, batch refresh, and CAD / USD quote routing
+- market-data search, quote lookup, batch refresh, and symbol + exchange + currency quote identity routing
 - watchlist persistence and candidate-scoring baseline
 
 Still important to finish:

@@ -175,7 +175,7 @@ These capabilities already exist conceptually and should be preserved during mig
 - portfolio workspace with account and symbol drill-down
 - holding/account edit flows
 - market-data search and quote refresh
-- CAD / USD quote identity routing
+- symbol + exchange + currency quote identity routing so USD common shares and CAD-listed / CAD-hedged variants are not merged accidentally
 - discovery, watchlist, and candidate scoring baseline
 - spending visibility as a supporting workflow
 

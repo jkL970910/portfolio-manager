@@ -548,8 +548,8 @@ function accountMatchKey(account: { institution: string; type: AccountType; nick
   return `${account.institution.toLowerCase()}::${account.type}::${account.nickname.toLowerCase()}`;
 }
 
-function holdingMatchKey(accountId: string, symbol: string) {
-  return `${accountId}::${symbol.toUpperCase()}`;
+function holdingMatchKey(accountId: string, symbol: string, currency: CurrencyCode, exchange?: string | null) {
+  return `${accountId}::${holdingIdentityKey(symbol, currency, exchange)}`;
 }
 
 function transactionMatchKey(transaction: {
@@ -1407,7 +1407,11 @@ export async function getPortfolioHoldingDetailView(userId: string, holdingId: s
   }, "database");
 }
 
-export async function getPortfolioSecurityDetailView(userId: string, symbol: string) {
+export async function getPortfolioSecurityDetailView(
+  userId: string,
+  symbol: string,
+  identity?: { exchange?: string | null; currency?: CurrencyCode | null }
+) {
   const repositories = getRepositories();
   const normalizedSymbol = symbol.trim().toUpperCase();
   const [user, userAccounts, userHoldings, userEvents, userSnapshots, userPriceHistory, profile] = await Promise.all([
@@ -1426,7 +1430,12 @@ export async function getPortfolioSecurityDetailView(userId: string, symbol: str
     cadToDisplayRate: await getFxRate("CAD", user.baseCurrency)
   } as const;
 
-  const referenceHolding = userHoldings.find((holding) => holding.symbol.trim().toUpperCase() === normalizedSymbol);
+  const normalizedIdentityExchange = identity?.exchange?.trim().toUpperCase() || null;
+  const referenceHolding = userHoldings.find((holding) =>
+    holding.symbol.trim().toUpperCase() === normalizedSymbol
+    && (!identity?.currency || holding.currency === identity.currency)
+    && (!normalizedIdentityExchange || (holding.exchangeOverride?.trim().toUpperCase() || "") === normalizedIdentityExchange)
+  ) ?? userHoldings.find((holding) => holding.symbol.trim().toUpperCase() === normalizedSymbol);
   if (hydratedPriceHistory.length < 2 || historyNeedsHigherDensity(hydratedPriceHistory)) {
     try {
       const historyResponse = await getSecurityHistoricalSeries(normalizedSymbol, {
@@ -1465,7 +1474,9 @@ export async function getPortfolioSecurityDetailView(userId: string, symbol: str
     snapshots: userSnapshots,
     profile,
     display,
-    symbol: normalizedSymbol
+    symbol: normalizedSymbol,
+    exchange: identity?.exchange ?? null,
+    currency: identity?.currency ?? null
   });
 
   if (!data) {
@@ -2956,7 +2967,15 @@ export async function createImportJob(userId: string, input: CreateImportJobInpu
       }
     }
 
-    const existingHoldingByKey = new Map(existingHoldings.map((holding) => [holdingMatchKey(holding.accountId, holding.symbol), holding]));
+    const existingHoldingByKey = new Map(existingHoldings.map((holding) => [
+      holdingMatchKey(
+        holding.accountId,
+        holding.symbol,
+        normalizeCurrencyCode((holding.currency as string) || "CAD"),
+        holding.exchangeOverride
+      ),
+      holding
+    ]));
     const holdingsToInsert: Array<{
       userId: string;
       accountId: string;
@@ -2976,6 +2995,7 @@ export async function createImportJob(userId: string, input: CreateImportJobInpu
       marketValueCad: string;
       weightPct: string;
       gainLossPct: string;
+      exchangeOverride: string | null;
     }> = [];
 
     for (const holding of workflowScopedParsed.holdings) {
@@ -2989,6 +3009,7 @@ export async function createImportJob(userId: string, input: CreateImportJobInpu
         accountId,
         symbol: holding.symbol,
         name: holding.name,
+        exchangeOverride: holding.exchange?.trim() || null,
         assetClass: holding.assetClass,
         sector: holding.sector,
         currency: holding.currency,
@@ -3004,7 +3025,9 @@ export async function createImportJob(userId: string, input: CreateImportJobInpu
         weightPct: (holding.weightPct ?? 0).toFixed(2),
         gainLossPct: holding.gainLossPct.toFixed(2)
       };
-      const matchedHolding = existingHoldingByKey.get(holdingMatchKey(accountId, holding.symbol));
+      const matchedHolding = existingHoldingByKey.get(
+        holdingMatchKey(accountId, holding.symbol, holding.currency, holding.exchange)
+      );
 
       if (matchedHolding) {
         const previousQuantity = matchedHolding.quantity == null ? 0 : Number(matchedHolding.quantity);
@@ -3013,6 +3036,7 @@ export async function createImportJob(userId: string, input: CreateImportJobInpu
           .update(holdingPositions)
           .set({
             name: payload.name,
+            exchangeOverride: payload.exchangeOverride,
             assetClass: payload.assetClass,
             sector: payload.sector,
             currency: payload.currency,
@@ -3056,7 +3080,9 @@ export async function createImportJob(userId: string, input: CreateImportJobInpu
         if (!accountId) {
           return false;
         }
-        return !existingHoldingByKey.has(holdingMatchKey(accountId, holding.symbol));
+        return !existingHoldingByKey.has(
+          holdingMatchKey(accountId, holding.symbol, holding.currency, holding.exchange)
+        );
       });
       for (const holding of insertedHoldingInputs) {
         const accountId = accountIdByKey.get(holding.accountKey);

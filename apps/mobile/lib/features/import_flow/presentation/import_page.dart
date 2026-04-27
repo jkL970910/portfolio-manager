@@ -109,16 +109,14 @@ class _ImportPageState extends State<ImportPage> {
   }
 
   Future<void> _openCreateAccountSheet() async {
-    final created = await showModalBottomSheet<bool>(
+    final created = await showModalBottomSheet<_ImportResult>(
       context: context,
       isScrollControlled: true,
       builder: (context) => _CreateAccountSheet(apiClient: widget.apiClient),
     );
-    if (created == true && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("账户已加入 Loo国账本")),
-      );
+    if (created != null && mounted) {
       _refresh();
+      await _showImportResult(created);
     }
   }
 
@@ -131,7 +129,7 @@ class _ImportPageState extends State<ImportPage> {
       return;
     }
 
-    final created = await showModalBottomSheet<bool>(
+    final created = await showModalBottomSheet<_ImportResult>(
       context: context,
       isScrollControlled: true,
       builder: (context) => _CreateHoldingSheet(
@@ -139,13 +137,41 @@ class _ImportPageState extends State<ImportPage> {
         accounts: accounts,
       ),
     );
-    if (created == true && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("持仓已加入 Loo国账本")),
-      );
+    if (created != null && mounted) {
       _refresh();
+      await _showImportResult(created);
     }
   }
+
+  Future<void> _showImportResult(_ImportResult result) {
+    return showDialog<void>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(result.title),
+        content: Text(result.message),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text("继续导入"),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text("知道了"),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ImportResult {
+  const _ImportResult({
+    required this.title,
+    required this.message,
+  });
+
+  final String title;
+  final String message;
 }
 
 class MobileImportSnapshot {
@@ -407,7 +433,7 @@ class _CreateAccountSheetState extends State<_CreateAccountSheet> {
     });
 
     try {
-      await widget.apiClient.createManualAccount(
+      final response = await widget.apiClient.createManualAccount(
         accountType: _accountType,
         institution: _institutionController.text.trim(),
         nickname: _nicknameController.text.trim(),
@@ -417,7 +443,19 @@ class _CreateAccountSheetState extends State<_CreateAccountSheet> {
             double.tryParse(_marketValueController.text.trim()) ?? 0,
       );
       if (mounted) {
-        Navigator.of(context).pop(true);
+        final data = response["data"];
+        final account = data is Map<String, dynamic> ? data["account"] : null;
+        final accountId = account is Map<String, dynamic>
+            ? account["id"] as String? ?? ""
+            : "";
+        Navigator.of(context).pop(_ImportResult(
+          title: "账户已加入 Loo国账本",
+          message: [
+            "${_nicknameController.text.trim()} 已创建。",
+            if (accountId.isNotEmpty) "账户 ID：$accountId",
+            "下一步可以继续添加持仓，或回到组合页检查账户总览。",
+          ].join("\n"),
+        ));
       }
     } catch (error) {
       if (mounted) {
@@ -593,7 +631,7 @@ class _CreateHoldingSheetState extends State<_CreateHoldingSheet> {
     });
 
     try {
-      await widget.apiClient.createManualHolding(
+      final response = await widget.apiClient.createManualHolding(
         accountId: _accountId,
         symbol: _symbolController.text.trim().toUpperCase(),
         name: _nameController.text.trim(),
@@ -610,7 +648,19 @@ class _CreateHoldingSheetState extends State<_CreateHoldingSheet> {
             double.tryParse(_marketValueController.text.trim()) ?? 0,
       );
       if (mounted) {
-        Navigator.of(context).pop(true);
+        final data = response["data"];
+        final holdingId = data is Map<String, dynamic>
+            ? data["holdingId"] as String? ?? ""
+            : "";
+        Navigator.of(context).pop(_ImportResult(
+          title: "持仓已加入 Loo国账本",
+          message: [
+            "${_symbolController.text.trim().toUpperCase()} 已保存。",
+            "身份：$_exchange · $_currency",
+            if (holdingId.isNotEmpty) "持仓 ID：$holdingId",
+            "后续刷新行情时会按代码 + 交易所 + 币种匹配报价。",
+          ].join("\n"),
+        ));
       }
     } catch (error) {
       if (mounted) {

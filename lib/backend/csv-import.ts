@@ -15,6 +15,7 @@ export interface ParsedHoldingSeed {
   accountKey: string;
   symbol: string;
   name: string;
+  exchange: string | null;
   assetClass: string;
   sector: string;
   currency: CurrencyCode;
@@ -73,6 +74,7 @@ export type ImportCanonicalField =
   | "contribution_room_cad"
   | "symbol"
   | "name"
+  | "exchange"
   | "asset_class"
   | "sector"
   | "holding_currency"
@@ -327,6 +329,7 @@ export async function parseImportCsv(csvContent: string, fieldMapping: ImportFie
           accountKey,
           symbol: getMappedValue(record, "symbol", fieldMapping).trim() || "UNKNOWN",
           name: getMappedValue(record, "name", fieldMapping).trim() || getMappedValue(record, "symbol", fieldMapping).trim() || "Imported Holding",
+          exchange: getMappedValue(record, "exchange", fieldMapping).trim() || null,
           assetClass: getMappedValue(record, "asset_class", fieldMapping).trim() || "Unknown",
           sector: getMappedValue(record, "sector", fieldMapping).trim() || "Multi-sector",
           currency,

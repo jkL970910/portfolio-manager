@@ -1,5 +1,5 @@
-﻿record_type,account_key,account_type,institution,account_nickname,account_currency,market_value,contribution_room_cad,symbol,name,asset_class,sector,holding_currency,quantity,avg_cost_per_share,cost_basis,last_price,weight_pct,gain_loss_pct
-account,rrsp_single,RRSP,Wealthsimple,My RRSP,CAD,18250,7000,,,,,,,,,,
-holding,rrsp_single,,,,,,,,VFV,Vanguard S&P 500 Index ETF,US Equity,Index ETF,CAD,42,118.5,4977,129.1,27.3,8.9
-holding,rrsp_single,,,,,,,,XBB,iShares Core Canadian Universe Bond ETF,Fixed Income,Bond ETF,CAD,115,31.2,3588,31.9,20.1,2.2
-holding,rrsp_single,,,,,,,,XEF,iShares Core MSCI EAFE IMI Index ETF,International Equity,Index ETF,CAD,73,28.4,2073.2,30.8,12.3,8.5
+﻿record_type,account_key,account_type,institution,account_nickname,account_currency,market_value,contribution_room_cad,symbol,name,exchange,asset_class,sector,holding_currency,quantity,avg_cost_per_share,cost_basis,last_price,weight_pct,gain_loss_pct
+account,rrsp_single,RRSP,Wealthsimple,My RRSP,CAD,18250,7000,,,,,,,,,,,
+holding,rrsp_single,,,,,,,,VFV,Vanguard S&P 500 Index ETF,TSX,US Equity,Index ETF,CAD,42,118.5,4977,129.1,27.3,8.9
+holding,rrsp_single,,,,,,,,XBB,iShares Core Canadian Universe Bond ETF,TSX,Fixed Income,Bond ETF,CAD,115,31.2,3588,31.9,20.1,2.2
+holding,rrsp_single,,,,,,,,XEF,iShares Core MSCI EAFE IMI Index ETF,TSX,International Equity,Index ETF,CAD,73,28.4,2073.2,30.8,12.3,8.5
