@@ -195,6 +195,41 @@ These capabilities already exist conceptually and should be preserved during mig
    - watchlist and target constraints deepening
    - cloud-ready cache / worker boundaries
 
+## Mobile Gap Register
+
+Current Flutter mobile coverage is now strong enough for account login, overview,
+portfolio detail, manual import, edit/delete, quote refresh, investment preference
+editing, recommendation regeneration, and watchlist maintenance. It is not yet at
+web feature parity for analysis-heavy flows.
+
+Highest-priority gaps:
+
+1. Guided investment setup
+   - Web has a flow-based question path that creates a suggested preference draft.
+   - Mobile currently has direct/manual editing only.
+   - This should be implemented first because it controls recommendation quality.
+2. Health score drilldown
+   - Mobile shows summary health signals but not the full health score page.
+   - Needs dimension cards, drivers, action queue, and navigation from overview/portfolio.
+3. Chart foundation
+   - Mobile does not yet have reusable chart components for portfolio trend,
+     asset allocation, or security price history.
+   - Add a small chart layer before building deeper analysis pages.
+4. Asset and security analysis depth
+   - Security detail exists, but price-history visualization and asset-class
+     drift analysis remain shallow.
+   - Add security price line, account distribution, and target-vs-current views.
+5. Candidate scoring depth
+   - Watchlist management exists, but candidate score detail is not yet mobile-native.
+
+Implementation priority:
+
+1. Guided investment setup
+2. Health score drilldown
+3. Chart foundation
+4. Security and asset analysis depth
+5. Candidate scoring depth
+
 ## Explicit non-goals right now
 
 - ongoing desktop-first polish work

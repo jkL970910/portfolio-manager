@@ -53,6 +53,10 @@ These are now migration-preserve items, not features to redefine from zero.
 
 | Feature | Status | Priority Call |
 |---|---|---|
+| Mobile guided investment setup | Planned | Build next; it restores web's flow-based preference setup |
+| Mobile health score drilldown | Planned | Build after guided setup |
+| Mobile chart foundation | Planned | Required for asset allocation and price-history pages |
+| Mobile asset/security analysis depth | Planned | Build after chart foundation |
 | Real historical performance | In Progress | Keep as top product priority |
 | Richer import review persistence | In Progress | Build soon |
 | Watchlist and target constraints workflow | Planned | Deepen after discovery baseline |
