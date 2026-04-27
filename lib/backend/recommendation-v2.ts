@@ -68,6 +68,7 @@ export type CandidateSecurityScoreResult = {
   score: number;
   verdict: "strong" | "watch" | "weak";
   watchlistMatched: boolean;
+  preferredSymbolMatched: boolean;
   selectedAccountType: AccountType;
   selectedAccountName: string;
   accountFitScore: number;
@@ -208,6 +209,8 @@ function scoreAccountPlacement(
     const roomPenalty = account.type !== "Taxable" && account.contributionRoomCad != null && account.contributionRoomCad <= 0 ? 0.28 : 0;
     const priorityBoost = Math.max(0, 0.08 - Math.max(profile.accountFundingPriority.indexOf(account.type), 0) * 0.02);
     const taxBoost = profile.taxAwarePlacement ? 0.04 : 0;
+    const preferredAccountBoost = profile.recommendationConstraints.preferredAccountTypes.includes(account.type) ? 0.08 : 0;
+    const avoidAccountPenalty = profile.recommendationConstraints.avoidAccountTypes.includes(account.type) ? 0.22 : 0;
     const accountCurrency = account.currency ?? "CAD";
     const rawFxPenalty = accountCurrency === securityCurrency
       ? 0
@@ -215,7 +218,7 @@ function scoreAccountPlacement(
         ? fxPolicy.brokerFxFrictionBps
         : fxPolicy.brokerFxFrictionBps + 150;
     const fxPenalty = round(rawFxPenalty / 10000, 4);
-    const accountFitScore = clamp(baseScore + priorityBoost + taxBoost - roomPenalty - fxPenalty, 0.05, 0.99);
+    const accountFitScore = clamp(baseScore + priorityBoost + taxBoost + preferredAccountBoost - roomPenalty - fxPenalty - avoidAccountPenalty, 0.05, 0.99);
     return {
       account,
       accountFitScore,
@@ -241,6 +244,7 @@ function scoreSecurityCandidate(
   fxPolicy: FxPolicy
 ) {
   const watchlistBoost = profile.watchlistSymbols.includes(candidate.symbol) ? 0.14 : 0;
+  const preferredBoost = getPreferredSymbolBoost(profile, candidate.symbol);
   const expensePenalty = clamp(candidate.expenseBps / 200, 0, 0.18);
   const liquidityBoost = candidate.liquidityScore / 1000;
   const currencyPenalty = (selectedAccount.currency ?? "CAD") === candidate.currency
@@ -250,7 +254,7 @@ function scoreSecurityCandidate(
   const concentrationPenalty = existingHolding && existingHolding.weightPct >= 12 ? 0.1 : 0;
   const exposureMatch = candidate.assetClass === assetClass ? 0.62 : 0.4;
 
-  const score = clamp(exposureMatch + watchlistBoost + liquidityBoost - expensePenalty - (currencyPenalty / 10) - concentrationPenalty, 0.05, 0.99);
+  const score = clamp(exposureMatch + watchlistBoost + preferredBoost + liquidityBoost - expensePenalty - (currencyPenalty / 10) - concentrationPenalty, 0.05, 0.99);
   return {
     candidate,
     score: round(score * 100, 1),
@@ -262,6 +266,32 @@ function buildSecurityUniverse(assetClass: string) {
   return SECURITY_UNIVERSE[assetClass] ?? [
     { symbol: "VCN", name: "Fallback Core ETF", assetClass, currency: "CAD", expenseBps: 12, liquidityScore: 75, tags: ["fallback"] }
   ];
+}
+
+function getAllowedSecurityUniverse(assetClass: string, profile: PreferenceProfile) {
+  const excludedSymbols = new Set(profile.recommendationConstraints.excludedSymbols);
+  const candidates = buildSecurityUniverse(assetClass).filter(
+    (candidate) => !excludedSymbols.has(candidate.symbol.toUpperCase())
+  );
+
+  return candidates.length > 0 ? candidates : buildSecurityUniverse(assetClass);
+}
+
+function getPreferredSymbolBoost(profile: PreferenceProfile, symbol: string) {
+  return profile.recommendationConstraints.preferredSymbols.includes(symbol.toUpperCase()) ? 0.12 : 0;
+}
+
+function getConstrainedTargetPct(profile: PreferenceProfile, assetClass: string, targetPct: number) {
+  const band = profile.recommendationConstraints.assetClassBands.find(
+    (item) => item.assetClass === assetClass
+  );
+  if (!band) {
+    return targetPct;
+  }
+
+  const minPct = band.minPct ?? 0;
+  const maxPct = band.maxPct ?? 100;
+  return clamp(targetPct, minPct, maxPct);
 }
 
 function buildKnownUniverseLookup() {
@@ -331,11 +361,12 @@ export function buildRecommendationV2(args: {
   const targetGaps = targetAllocation
     .map((target) => {
       const currentPct = allocation.get(target.assetClass) ?? 0;
-      const gapPct = Math.max(0, round(target.targetPct - currentPct, 2));
+      const constrainedTargetPct = getConstrainedTargetPct(profile, target.assetClass, target.targetPct);
+      const gapPct = Math.max(0, round(constrainedTargetPct - currentPct, 2));
       return {
         assetClass: target.assetClass,
         currentPct,
-        targetPct: target.targetPct,
+        targetPct: constrainedTargetPct,
         gapPct
       };
     })
@@ -348,8 +379,8 @@ export function buildRecommendationV2(args: {
     .map((target) => ({
       assetClass: target.assetClass,
       currentPct: allocation.get(target.assetClass) ?? 0,
-      targetPct: target.targetPct,
-      gapPct: target.targetPct
+      targetPct: getConstrainedTargetPct(profile, target.assetClass, target.targetPct),
+      gapPct: getConstrainedTargetPct(profile, target.assetClass, target.targetPct)
     })))
     .slice(0, 3);
 
@@ -362,7 +393,7 @@ export function buildRecommendationV2(args: {
       : Math.max(0, Math.round((contributionAmountCad * share) / 100) * 100);
     allocatedSoFar += rawAmount;
 
-    const candidates = buildSecurityUniverse(priority.assetClass);
+    const candidates = getAllowedSecurityUniverse(priority.assetClass, profile);
     const accountPlacements = candidates.map((candidate) => {
       const placement = scoreAccountPlacement(accounts, profile, priority.assetClass, candidate.currency, fxPolicy);
       const security = scoreSecurityCandidate(candidate, priority.assetClass, placement.account, holdings, profile, fxPolicy);
@@ -417,6 +448,7 @@ export function buildRecommendationV2(args: {
         fxPenaltyBps: best.security.fxPenaltyBps,
         minTradeApplied: rawAmount < 500,
         watchlistMatched: profile.watchlistSymbols.includes(best.security.candidate.symbol),
+        preferredSymbolMatched: profile.recommendationConstraints.preferredSymbols.includes(best.security.candidate.symbol),
         existingHoldingId: existingHolding?.id,
         existingHoldingAccountId: existingHolding?.accountId,
         existingHoldingSymbol: existingHolding?.symbol,
@@ -498,6 +530,7 @@ export function scoreCandidateSecurity(args: {
     score,
     verdict,
     watchlistMatched: profile.watchlistSymbols.includes(normalizedSymbol),
+    preferredSymbolMatched: profile.recommendationConstraints.preferredSymbols.includes(normalizedSymbol),
     selectedAccountType: placement.account.type,
     selectedAccountName: placement.account.nickname || placement.account.institution || placement.account.type,
     accountFitScore: round(placement.accountFitScore * 100, 1),

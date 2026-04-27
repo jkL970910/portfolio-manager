@@ -165,6 +165,31 @@ export interface AllocationTarget {
   targetPct: number;
 }
 
+export interface AssetClassConstraintBand {
+  assetClass: string;
+  minPct?: number | null;
+  maxPct?: number | null;
+}
+
+export interface SecurityConstraintIdentity {
+  symbol: string;
+  exchange?: string | null;
+  currency?: CurrencyCode | null;
+  name?: string | null;
+  provider?: string | null;
+}
+
+export interface RecommendationConstraints {
+  excludedSymbols: string[];
+  preferredSymbols: string[];
+  excludedSecurities: SecurityConstraintIdentity[];
+  preferredSecurities: SecurityConstraintIdentity[];
+  assetClassBands: AssetClassConstraintBand[];
+  avoidAccountTypes: AccountType[];
+  preferredAccountTypes: AccountType[];
+  allowedSecurityTypes: string[];
+}
+
 export interface PreferenceProfile {
   id: EntityId;
   userId: EntityId;
@@ -178,6 +203,7 @@ export interface PreferenceProfile {
   source?: PreferenceProfileSource | null;
   rebalancingTolerancePct: number;
   watchlistSymbols: string[];
+  recommendationConstraints: RecommendationConstraints;
   updatedAt?: string | null;
 }
 
@@ -193,7 +219,7 @@ export interface GuidedAllocationDraft {
   id: EntityId;
   userId: EntityId;
   answers: GuidedAllocationAnswers;
-  suggestedProfile: Omit<PreferenceProfile, "id" | "userId" | "watchlistSymbols">;
+  suggestedProfile: Omit<PreferenceProfile, "id" | "userId" | "watchlistSymbols" | "recommendationConstraints">;
   assumptions: string[];
   rationale: string[];
   createdAt: string;
@@ -230,6 +256,7 @@ export interface RecommendationItem {
     fxPenaltyBps: number;
     minTradeApplied: boolean;
     watchlistMatched: boolean;
+    preferredSymbolMatched?: boolean;
     existingHoldingId?: string;
     existingHoldingAccountId?: string;
     existingHoldingSymbol?: string;

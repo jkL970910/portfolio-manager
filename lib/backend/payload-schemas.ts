@@ -5,6 +5,41 @@ const allocationTargetSchema = z.object({
   targetPct: z.number().int().min(0).max(100)
 });
 
+const symbolListSchema = z.array(z.string().trim().min(1).max(32)).max(50);
+
+const securityConstraintIdentitySchema = z.object({
+  symbol: z.string().trim().min(1).max(32),
+  exchange: z.string().trim().min(1).max(64).nullable().optional(),
+  currency: z.enum(["CAD", "USD"]).nullable().optional(),
+  name: z.string().trim().min(1).max(160).nullable().optional(),
+  provider: z.string().trim().min(1).max(64).nullable().optional()
+});
+
+const recommendationConstraintsSchema = z.object({
+  excludedSymbols: symbolListSchema.default([]),
+  preferredSymbols: symbolListSchema.default([]),
+  excludedSecurities: z.array(securityConstraintIdentitySchema).max(50).default([]),
+  preferredSecurities: z.array(securityConstraintIdentitySchema).max(50).default([]),
+  assetClassBands: z.array(z.object({
+    assetClass: z.string().trim().min(1).max(64),
+    minPct: z.number().int().min(0).max(100).nullable().optional(),
+    maxPct: z.number().int().min(0).max(100).nullable().optional()
+  })).max(20).default([]),
+  avoidAccountTypes: z.array(z.enum(["TFSA", "RRSP", "FHSA", "Taxable"])).max(4).default([]),
+  preferredAccountTypes: z.array(z.enum(["TFSA", "RRSP", "FHSA", "Taxable"])).max(4).default([]),
+  allowedSecurityTypes: z.array(z.string().trim().min(1).max(64)).max(20).default([])
+}).superRefine((value, context) => {
+  for (const [index, band] of value.assetClassBands.entries()) {
+    if (band.minPct != null && band.maxPct != null && band.minPct > band.maxPct) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["assetClassBands", index],
+        message: "Asset class minimum cannot be greater than maximum."
+      });
+    }
+  }
+});
+
 export const preferenceProfileInputSchema = z.object({
   riskProfile: z.enum(["Conservative", "Balanced", "Growth"]),
   targetAllocation: z.array(allocationTargetSchema).min(1),
@@ -17,7 +52,8 @@ export const preferenceProfileInputSchema = z.object({
   recommendationStrategy: z.enum(["tax-aware", "target-first", "balanced"]),
   source: z.enum(["manual", "guided"]).optional(),
   rebalancingTolerancePct: z.number().int().min(0).max(50),
-  watchlistSymbols: z.array(z.string().trim().min(1).max(32)).max(20)
+  watchlistSymbols: z.array(z.string().trim().min(1).max(32)).max(20),
+  recommendationConstraints: recommendationConstraintsSchema.optional()
 }).superRefine((value, context) => {
   const total = value.targetAllocation.reduce((sum, target) => sum + target.targetPct, 0);
   if (total !== 100) {

@@ -2495,7 +2495,12 @@ export function buildRecommendationsData(args: {
             ),
           item.rationale?.watchlistMatched
             ? pick(language, "这支主标的也刚好符合你的关注名单。", "The lead security also matched your watchlist.")
-            : pick(language, "在当前候选池里，Loo皇觉得它是最顺手的主标的。", "The lead security is the highest-scoring expression in the current candidate set.")
+            : pick(language, "在当前候选池里，Loo皇觉得它是最顺手的主标的。", "The lead security is the highest-scoring expression in the current candidate set."),
+          item.rationale?.preferredSymbolMatched
+            ? pick(language, `${item.securitySymbol ?? "这支标的"} 命中了你的偏好标的规则，因此评分获得了额外加权。`, `${item.securitySymbol ?? "This security"} matched your preferred-symbol rule, so it received an explicit scoring boost.`)
+            : profile.recommendationConstraints.preferredSymbols.length > 0
+              ? pick(language, "它没有命中偏好标的列表，但在当前资产类别和账户条件下仍然排在前面。", "It did not match the preferred-symbol list, but it still ranked highest under the current sleeve and account constraints.")
+              : pick(language, "你还没有设置偏好标的，所以这次没有额外偏好加权。", "No preferred-symbol rule is set, so no explicit preference boost was applied.")
         ],
         whyNot: [
           alternatives.length > 0
@@ -2510,7 +2515,10 @@ export function buildRecommendationsData(args: {
             : pick(language, "Loo皇会尽量回避已经太集中的风险来源。", "The engine avoids leaning even harder into risk sources that are already concentrated inside the sleeve."),
           (item.fxFrictionPenaltyBps ?? 0) > 0
             ? pick(language, `这条路大约要多承担 ${item.fxFrictionPenaltyBps} bps 的换汇成本，所以部分 USD 想法被往后压了。`, `Cross-currency friction of about ${item.fxFrictionPenaltyBps} bps pushed some USD ideas lower.`)
-            : pick(language, "这条路没有明显的换汇成本压力。", "This path does not carry a material FX friction cost.")
+            : pick(language, "这条路没有明显的换汇成本压力。", "This path does not carry a material FX friction cost."),
+          profile.recommendationConstraints.excludedSymbols.length > 0
+            ? pick(language, `已排除 ${profile.recommendationConstraints.excludedSymbols.join(" / ")}，这些标的不会参与本轮主候选排序。`, `Excluded ${profile.recommendationConstraints.excludedSymbols.join(" / ")} from this run's lead-candidate ranking.`)
+            : pick(language, "没有设置排除标的，所以候选池没有被硬性缩小。", "No excluded-symbol rule is set, so the candidate pool was not hard-filtered.")
         ],
         constraints: [
           {
@@ -2539,6 +2547,32 @@ export function buildRecommendationsData(args: {
               ? pick(language, `Loo皇看这条路大约会吃掉 ${item.fxFrictionPenaltyBps} bps 的换汇成本。`, `This path absorbs about ${item.fxFrictionPenaltyBps} bps of FX cost.`)
               : pick(language, "Loo皇看这条路基本避开了明显的换汇成本。", "This path avoids material FX friction."),
             variant: (item.fxFrictionPenaltyBps ?? 0) > 0 ? "warning" : "success"
+          },
+          {
+            label: pick(language, "标的偏好 / 排除", "Preferred / excluded securities"),
+            detail: pick(
+              language,
+              [
+                profile.recommendationConstraints.preferredSymbols.length > 0
+                  ? `偏好 ${profile.recommendationConstraints.preferredSymbols.join(" / ")}`
+                  : "未设置偏好标的",
+                profile.recommendationConstraints.excludedSymbols.length > 0
+                  ? `排除 ${profile.recommendationConstraints.excludedSymbols.join(" / ")}`
+                  : "未设置排除标的"
+              ].join("；"),
+              [
+                profile.recommendationConstraints.preferredSymbols.length > 0
+                  ? `Preferred ${profile.recommendationConstraints.preferredSymbols.join(" / ")}`
+                  : "No preferred securities",
+                profile.recommendationConstraints.excludedSymbols.length > 0
+                  ? `Excluded ${profile.recommendationConstraints.excludedSymbols.join(" / ")}`
+                  : "No excluded securities"
+              ].join("; ")
+            ),
+            variant: profile.recommendationConstraints.excludedSymbols.length > 0
+              || profile.recommendationConstraints.preferredSymbols.length > 0
+              ? "warning" as const
+              : "neutral" as const
           }
         ],
         execution: [

@@ -30,6 +30,7 @@ import {
   UserProfile
 } from "@/lib/backend/models";
 import { BackendRepositories } from "@/lib/backend/repositories/interfaces";
+import { normalizeRecommendationConstraints } from "@/lib/backend/recommendation-constraints";
 
 function toNumber(value: string | number | null | undefined) {
   if (typeof value === "number") {
@@ -351,6 +352,7 @@ export const postgresRepositories: BackendRepositories = {
         source: (profileRow.source as PreferenceProfile["source"]) ?? "manual",
         rebalancingTolerancePct: profileRow.rebalancingTolerancePct,
         watchlistSymbols: profileRow.watchlistSymbols as string[],
+        recommendationConstraints: normalizeRecommendationConstraints(profileRow.recommendationConstraints),
         updatedAt: profileRow.updatedAt.toISOString()
       };
     }

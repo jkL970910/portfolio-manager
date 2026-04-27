@@ -144,6 +144,7 @@ type MobileRecommendationsData = Omit<RecommendationsData, "priorities"> & {
     recommendationStrategy: string;
     rebalancingTolerancePct: number;
     watchlistSymbols: string[];
+    recommendationConstraints: unknown;
   };
 };
 
@@ -458,6 +459,7 @@ export async function getMobileRecommendationsView(userId: string) {
       recommendationStrategy: profile.recommendationStrategy,
       rebalancingTolerancePct: profile.rebalancingTolerancePct,
       watchlistSymbols: profile.watchlistSymbols,
+      recommendationConstraints: profile.recommendationConstraints,
     }),
     meta: payload.meta,
   };

@@ -609,7 +609,21 @@ export const preferenceProfiles: PreferenceProfile[] = [
     recommendationStrategy: "balanced",
     source: "manual",
     rebalancingTolerancePct: 4,
-    watchlistSymbols: ["XBB", "VCN", "XEF"]
+    watchlistSymbols: ["XBB", "VCN", "XEF"],
+    recommendationConstraints: {
+      excludedSymbols: [],
+      preferredSymbols: ["XBB", "VCN", "XEF"],
+      excludedSecurities: [],
+      preferredSecurities: [
+        { symbol: "XBB", exchange: "TSX", currency: "CAD", name: "iShares Core Canadian Universe Bond Index ETF", provider: "seed" },
+        { symbol: "VCN", exchange: "TSX", currency: "CAD", name: "Vanguard FTSE Canada All Cap Index ETF", provider: "seed" },
+        { symbol: "XEF", exchange: "TSX", currency: "CAD", name: "iShares Core MSCI EAFE IMI Index ETF", provider: "seed" }
+      ],
+      assetClassBands: [],
+      avoidAccountTypes: [],
+      preferredAccountTypes: [],
+      allowedSecurityTypes: []
+    }
   },
   {
     id: "pref_casey",
@@ -628,7 +642,21 @@ export const preferenceProfiles: PreferenceProfile[] = [
     transitionPreference: "direct",
     recommendationStrategy: "target-first",
     rebalancingTolerancePct: 5,
-    watchlistSymbols: ["XEQT", "VFV", "XEF"]
+    watchlistSymbols: ["XEQT", "VFV", "XEF"],
+    recommendationConstraints: {
+      excludedSymbols: [],
+      preferredSymbols: ["XEQT", "VFV", "XEF"],
+      excludedSecurities: [],
+      preferredSecurities: [
+        { symbol: "XEQT", exchange: "TSX", currency: "CAD", name: "iShares Core Equity ETF Portfolio", provider: "seed" },
+        { symbol: "VFV", exchange: "TSX", currency: "CAD", name: "Vanguard S&P 500 Index ETF", provider: "seed" },
+        { symbol: "XEF", exchange: "TSX", currency: "CAD", name: "iShares Core MSCI EAFE IMI Index ETF", provider: "seed" }
+      ],
+      assetClassBands: [],
+      avoidAccountTypes: [],
+      preferredAccountTypes: [],
+      allowedSecurityTypes: []
+    }
   }
 ];
 

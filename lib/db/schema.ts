@@ -148,6 +148,7 @@ export const preferenceProfiles = pgTable("preference_profiles", {
   source: varchar("source", { length: 16 }).notNull().default("manual"),
   rebalancingTolerancePct: integer("rebalancing_tolerance_pct").notNull(),
   watchlistSymbols: jsonb("watchlist_symbols").notNull(),
+  recommendationConstraints: jsonb("recommendation_constraints").notNull().default({}),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow()
 }, (table) => ({

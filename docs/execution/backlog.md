@@ -39,15 +39,19 @@ These are now migration-preserve items, not features to redefine from zero.
 
 ## New Migration Priorities
 
+See `docs/execution/mobile-web-parity-and-backend-refactor.md` for the current
+Flutter/Web feature gap matrix and why backend refactoring is now prioritized
+over simply adding more Flutter screens.
+
 | Rank | Feature | Status | Why now |
 |---|---|---|---|
-| 1 | Backend contract stabilization for Flutter | Planned | Mobile migration fails if API shape stays web-private. |
-| 2 | Mobile auth strategy | Planned | Current auth assumptions are still web-oriented. |
-| 3 | Flutter app shell and design system | Planned | New UI work must stop landing in the web shell. |
-| 4 | Dashboard / Portfolio / Security detail migration | Planned | These are the highest-frequency user flows. |
-| 5 | Recommendations / Discover migration | Planned | They preserve the product's differentiating value. |
-| 6 | Settings / account edit / holding edit migration | Planned | High-value write flows come after the mobile read shell is stable. |
-| 7 | Import entry and review migration | Planned | Important, but higher-friction and harder to get right on mobile. |
+| 1 | Recommendation constraints v2 | In Progress | Backend and mobile now support preferred/excluded identities, account rules, and asset-class bands; next is picker UX and tests. |
+| 2 | Backend contract typing for Flutter | Planned | Mobile should stop depending on web-shaped read models and runtime map parsing. |
+| 3 | Market-data identity and validation hardening | Planned | Prevent USD common shares, CAD-listed versions, CDRs, and hedged listings from being mixed. |
+| 4 | Mobile auth hardening | Planned | Current token refresh/logout behavior is good enough for MVP, not shared production use. |
+| 5 | Cloud-ready cache / worker boundaries | Planned | Quote/history/recommendation/AI jobs should not stay as request-time page work. |
+| 6 | Mobile spending migration | Planned | Useful after investment core and backend boundaries are stable. |
+| 7 | Remaining mobile polish and parity | Planned | Add only after core contracts are safe. |
 
 ## Product Roadmap Priorities That Still Matter
 

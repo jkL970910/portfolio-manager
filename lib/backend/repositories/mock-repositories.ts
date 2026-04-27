@@ -14,6 +14,7 @@ import {
   transactions
 } from "@/lib/backend/mock-store";
 import { BackendRepositories } from "@/lib/backend/repositories/interfaces";
+import { normalizeRecommendationConstraints } from "@/lib/backend/recommendation-constraints";
 
 export const mockRepositories: BackendRepositories = {
   users: {
@@ -95,7 +96,10 @@ export const mockRepositories: BackendRepositories = {
       if (!profile) {
         throw new Error(`Preference profile not found for user ${userId}.`);
       }
-      return profile;
+      return {
+        ...profile,
+        recommendationConstraints: normalizeRecommendationConstraints(profile.recommendationConstraints)
+      };
     }
   },
   recommendations: {

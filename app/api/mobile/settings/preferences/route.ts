@@ -31,9 +31,10 @@ export async function PATCH(request: NextRequest) {
     const profile = await updatePreferenceProfile(viewer.id, parsed.data);
     return NextResponse.json({ data: profile });
   } catch (error) {
+    const message = error instanceof Error ? error.message : "Failed to update preferences.";
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Failed to update preferences." },
-      { status: 500 }
+      { error: message },
+      { status: message.includes("Recommendation constraint symbol") ? 400 : 500 }
     );
   }
 }

@@ -208,6 +208,18 @@ class _InvestmentPreferencesCardState extends State<InvestmentPreferencesCard> {
                   const SizedBox(height: 10),
                   Text("优先观察：${profile.watchlistSymbols.join("、")}"),
                 ],
+                if (profile
+                    .recommendationConstraints.preferredSymbols.isNotEmpty) ...[
+                  const SizedBox(height: 10),
+                  Text(
+                      "推荐偏好：${profile.recommendationConstraints.preferredSymbols.join("、")}"),
+                ],
+                if (profile
+                    .recommendationConstraints.excludedSymbols.isNotEmpty) ...[
+                  const SizedBox(height: 10),
+                  Text(
+                      "排除标的：${profile.recommendationConstraints.excludedSymbols.join("、")}"),
+                ],
               ],
             ),
           ),
@@ -237,23 +249,55 @@ class _ConstraintEditorSheetState extends State<_ConstraintEditorSheet> {
       _normalizePriority(widget.profile.accountFundingPriority);
   late final _watchlistController =
       TextEditingController(text: widget.profile.watchlistSymbols.join(", "));
+  late final _excludedController = TextEditingController(
+      text: _formatSecurityIdentities(
+          widget.profile.recommendationConstraints.excludedSecurities,
+          widget.profile.recommendationConstraints.excludedSymbols));
+  late final _preferredController = TextEditingController(
+      text: _formatSecurityIdentities(
+          widget.profile.recommendationConstraints.preferredSecurities,
+          widget.profile.recommendationConstraints.preferredSymbols));
+  late final _avoidAccountsController = TextEditingController(
+      text: widget.profile.recommendationConstraints.avoidAccountTypes
+          .join(", "));
+  late final _preferredAccountsController = TextEditingController(
+      text: widget.profile.recommendationConstraints.preferredAccountTypes
+          .join(", "));
+  late final _assetBandsController = TextEditingController(
+      text: _formatAssetClassBands(
+          widget.profile.recommendationConstraints.assetClassBands));
   var _saving = false;
   String? _error;
 
   @override
   void dispose() {
     _watchlistController.dispose();
+    _excludedController.dispose();
+    _preferredController.dispose();
+    _avoidAccountsController.dispose();
+    _preferredAccountsController.dispose();
+    _assetBandsController.dispose();
     super.dispose();
   }
 
   Future<void> _save() async {
-    final watchlist = _watchlistController.text
-        .split(RegExp(r"[,，\s]+"))
-        .map((item) => item.trim().toUpperCase())
-        .where((item) => item.isNotEmpty)
-        .toSet()
-        .take(20)
-        .toList();
+    final watchlist = _parseSymbols(_watchlistController.text, max: 20);
+    final excludedSecurities =
+        _parseSecurityIdentities(_excludedController.text);
+    final excludedSymbols =
+        excludedSecurities.map((item) => item["symbol"] as String).toList();
+    final preferredSecurities =
+        _parseSecurityIdentities(_preferredController.text)
+            .where((item) => !excludedSymbols.contains(item["symbol"]))
+            .toList();
+    final preferredSymbols =
+        preferredSecurities.map((item) => item["symbol"] as String).toList();
+    final avoidAccountTypes = _parseAccountTypes(_avoidAccountsController.text);
+    final preferredAccountTypes =
+        _parseAccountTypes(_preferredAccountsController.text)
+            .where((type) => !avoidAccountTypes.contains(type))
+            .toList();
+    final assetClassBands = _parseAssetClassBands(_assetBandsController.text);
     if (_priority.toSet().length != _priority.length) {
       setState(() => _error = "账户优先级不能重复。");
       return;
@@ -281,6 +325,17 @@ class _ConstraintEditorSheetState extends State<_ConstraintEditorSheet> {
         "source": "manual",
         "rebalancingTolerancePct": widget.profile.rebalancingTolerancePct,
         "watchlistSymbols": watchlist,
+        "recommendationConstraints": {
+          "excludedSymbols": excludedSymbols,
+          "preferredSymbols": preferredSymbols,
+          "excludedSecurities": excludedSecurities,
+          "preferredSecurities": preferredSecurities,
+          "assetClassBands": assetClassBands,
+          "avoidAccountTypes": avoidAccountTypes,
+          "preferredAccountTypes": preferredAccountTypes,
+          "allowedSecurityTypes":
+              widget.profile.recommendationConstraints.allowedSecurityTypes,
+        },
       });
       if (mounted) {
         Navigator.of(context).pop(true);
@@ -316,6 +371,57 @@ class _ConstraintEditorSheetState extends State<_ConstraintEditorSheet> {
               decoration: const InputDecoration(
                 labelText: "优先观察标的",
                 helperText: "用逗号或空格分隔，例如 VFV, XEQT, XBB；最多 20 个。",
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _preferredController,
+              enabled: !_saving,
+              textCapitalization: TextCapitalization.characters,
+              decoration: const InputDecoration(
+                labelText: "偏好标的",
+                helperText: "格式：VFV|TSX|CAD；也可只写 VFV。用逗号或空格分隔。",
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _excludedController,
+              enabled: !_saving,
+              textCapitalization: TextCapitalization.characters,
+              decoration: const InputDecoration(
+                labelText: "排除标的",
+                helperText: "格式：AMZN|NASDAQ|USD；排除优先级高于偏好。",
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _preferredAccountsController,
+              enabled: !_saving,
+              textCapitalization: TextCapitalization.characters,
+              decoration: const InputDecoration(
+                labelText: "偏好账户类型",
+                helperText: "例如 TFSA, RRSP；推荐放置会加权。",
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _avoidAccountsController,
+              enabled: !_saving,
+              textCapitalization: TextCapitalization.characters,
+              decoration: const InputDecoration(
+                labelText: "回避账户类型",
+                helperText: "例如 Taxable；回避优先级高于偏好。",
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _assetBandsController,
+              enabled: !_saving,
+              minLines: 2,
+              maxLines: 5,
+              decoration: const InputDecoration(
+                labelText: "资产类别上下限",
+                helperText: "每行一个，例如 US Equity:10-45；用于约束推荐目标。",
               ),
             ),
             const SizedBox(height: 12),
@@ -388,6 +494,104 @@ class _ConstraintEditorSheetState extends State<_ConstraintEditorSheet> {
       }
     }
     return normalized.take(4).toList();
+  }
+
+  List<String> _parseSymbols(String value, {int max = 50}) {
+    return value
+        .split(RegExp(r"[,，\s]+"))
+        .map((item) => item.trim().toUpperCase())
+        .where((item) => item.isNotEmpty)
+        .toSet()
+        .take(max)
+        .toList();
+  }
+
+  List<Map<String, dynamic>> _parseSecurityIdentities(String value) {
+    return value
+        .split(RegExp(r"[,，\s]+"))
+        .map((item) => item.trim())
+        .where((item) => item.isNotEmpty)
+        .map((item) {
+          final parts = item.split("|").map((part) => part.trim()).toList();
+          final symbol = parts.isNotEmpty ? parts[0].toUpperCase() : "";
+          final exchange = parts.length > 1 && parts[1].isNotEmpty
+              ? parts[1].toUpperCase()
+              : null;
+          final currency = parts.length > 2 && parts[2].isNotEmpty
+              ? parts[2].toUpperCase()
+              : null;
+          return {
+            "symbol": symbol,
+            if (exchange != null) "exchange": exchange,
+            if (currency == "CAD" || currency == "USD") "currency": currency,
+          };
+        })
+        .where((item) => (item["symbol"] as String).isNotEmpty)
+        .toList();
+  }
+
+  List<String> _parseAccountTypes(String value) {
+    return value
+        .split(RegExp(r"[,，\s]+"))
+        .map((item) => item.trim().toUpperCase())
+        .map((item) => item == "TAXABLE" ? "Taxable" : item)
+        .where(_accountTypes.contains)
+        .toSet()
+        .toList();
+  }
+
+  List<Map<String, dynamic>> _parseAssetClassBands(String value) {
+    return value
+        .split(RegExp(r"[;\n]+"))
+        .map((line) => line.trim())
+        .where((line) => line.contains(":"))
+        .map((line) {
+          final parts = line.split(":");
+          final assetClass = parts.first.trim();
+          final range = parts.sublist(1).join(":").split("-");
+          final minPct =
+              range.isNotEmpty ? int.tryParse(range[0].trim()) : null;
+          final maxPct =
+              range.length > 1 ? int.tryParse(range[1].trim()) : null;
+          return {
+            "assetClass": assetClass,
+            if (minPct != null) "minPct": minPct,
+            if (maxPct != null) "maxPct": maxPct,
+          };
+        })
+        .where((item) => _assetClasses.contains(item["assetClass"]))
+        .toList();
+  }
+
+  String _formatSecurityIdentities(
+    List<Map<String, dynamic>> identities,
+    List<String> fallbackSymbols,
+  ) {
+    final source = identities.isNotEmpty
+        ? identities
+        : fallbackSymbols.map((symbol) => {"symbol": symbol}).toList();
+    return source.map((item) {
+      final symbol = item["symbol"] as String? ?? "";
+      final exchange = item["exchange"] as String?;
+      final currency = item["currency"] as String?;
+      return [
+        symbol,
+        if (exchange != null && exchange.isNotEmpty) exchange,
+        if (currency != null && currency.isNotEmpty) currency,
+      ].join("|");
+    }).join(", ");
+  }
+
+  String _formatAssetClassBands(List<Map<String, dynamic>> bands) {
+    return bands
+        .map((item) {
+          final assetClass = item["assetClass"] as String? ?? "";
+          final minPct = item["minPct"];
+          final maxPct = item["maxPct"];
+          return "$assetClass:${minPct ?? ""}-${maxPct ?? ""}";
+        })
+        .where((line) => !line.startsWith(":"))
+        .join("\n");
   }
 }
 
@@ -865,6 +1069,7 @@ class MobilePreferenceProfile {
     required this.recommendationStrategy,
     required this.rebalancingTolerancePct,
     required this.watchlistSymbols,
+    required this.recommendationConstraints,
   });
 
   final String riskProfile;
@@ -876,6 +1081,7 @@ class MobilePreferenceProfile {
   final String recommendationStrategy;
   final int rebalancingTolerancePct;
   final List<String> watchlistSymbols;
+  final MobileRecommendationConstraints recommendationConstraints;
 
   String get riskProfileLabel => switch (riskProfile) {
         "Conservative" => "保守",
@@ -927,6 +1133,66 @@ class MobilePreferenceProfile {
       watchlistSymbols:
           (json["watchlistSymbols"] as List?)?.whereType<String>().toList() ??
               const [],
+      recommendationConstraints: MobileRecommendationConstraints.fromJson(
+          json["recommendationConstraints"]),
+    );
+  }
+}
+
+class MobileRecommendationConstraints {
+  const MobileRecommendationConstraints({
+    required this.excludedSymbols,
+    required this.preferredSymbols,
+    required this.excludedSecurities,
+    required this.preferredSecurities,
+    required this.assetClassBands,
+    required this.avoidAccountTypes,
+    required this.preferredAccountTypes,
+    required this.allowedSecurityTypes,
+  });
+
+  final List<String> excludedSymbols;
+  final List<String> preferredSymbols;
+  final List<Map<String, dynamic>> excludedSecurities;
+  final List<Map<String, dynamic>> preferredSecurities;
+  final List<Map<String, dynamic>> assetClassBands;
+  final List<String> avoidAccountTypes;
+  final List<String> preferredAccountTypes;
+  final List<String> allowedSecurityTypes;
+
+  factory MobileRecommendationConstraints.fromJson(Object? value) {
+    final json =
+        value is Map<String, dynamic> ? value : const <String, dynamic>{};
+    return MobileRecommendationConstraints(
+      excludedSymbols:
+          (json["excludedSymbols"] as List?)?.whereType<String>().toList() ??
+              const [],
+      preferredSymbols:
+          (json["preferredSymbols"] as List?)?.whereType<String>().toList() ??
+              const [],
+      excludedSecurities: (json["excludedSecurities"] as List?)
+              ?.whereType<Map<String, dynamic>>()
+              .toList() ??
+          const [],
+      preferredSecurities: (json["preferredSecurities"] as List?)
+              ?.whereType<Map<String, dynamic>>()
+              .toList() ??
+          const [],
+      assetClassBands: (json["assetClassBands"] as List?)
+              ?.whereType<Map<String, dynamic>>()
+              .toList() ??
+          const [],
+      avoidAccountTypes:
+          (json["avoidAccountTypes"] as List?)?.whereType<String>().toList() ??
+              const [],
+      preferredAccountTypes: (json["preferredAccountTypes"] as List?)
+              ?.whereType<String>()
+              .toList() ??
+          const [],
+      allowedSecurityTypes: (json["allowedSecurityTypes"] as List?)
+              ?.whereType<String>()
+              .toList() ??
+          const [],
     );
   }
 }

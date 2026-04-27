@@ -17,6 +17,7 @@ import {
   GuidedAllocationDraft,
   PreferenceProfile,
   PreferenceProfileSource,
+  RecommendationConstraints,
   RecommendationRun,
   RiskProfile,
   TransitionPreference,
@@ -36,6 +37,7 @@ import {
   buildSpendingData
 } from "@/lib/backend/view-builders";
 import { buildRecommendationV2, scoreCandidateSecurity } from "@/lib/backend/recommendation-v2";
+import { DEFAULT_RECOMMENDATION_CONSTRAINTS, normalizeRecommendationConstraints } from "@/lib/backend/recommendation-constraints";
 import { getDb } from "@/lib/db/client";
 import {
   allocationTargets,
@@ -76,6 +78,7 @@ export interface PreferenceProfileInput {
   source?: PreferenceProfileSource;
   rebalancingTolerancePct: number;
   watchlistSymbols: string[];
+  recommendationConstraints?: RecommendationConstraints;
 }
 
 export interface RegisterUserInput {
@@ -91,7 +94,7 @@ export interface RegisterUserInput {
 
 export interface SaveGuidedAllocationDraftInput {
   answers: GuidedAllocationAnswers;
-  suggestedProfile: Omit<PreferenceProfile, "id" | "userId" | "watchlistSymbols">;
+  suggestedProfile: Omit<PreferenceProfile, "id" | "userId" | "watchlistSymbols" | "recommendationConstraints">;
   assumptions: string[];
   rationale: string[];
 }
@@ -340,7 +343,48 @@ function getDefaultPreferenceInput(riskProfile: RiskProfile = "Balanced"): Prefe
     recommendationStrategy: "balanced",
     source: "manual",
     rebalancingTolerancePct: 5,
-    watchlistSymbols: []
+    watchlistSymbols: [],
+    recommendationConstraints: DEFAULT_RECOMMENDATION_CONSTRAINTS
+  };
+}
+
+async function resolveRecommendationConstraintSymbols(input: unknown): Promise<RecommendationConstraints> {
+  const constraints = normalizeRecommendationConstraints(input);
+  async function resolveIdentity(symbol: string) {
+    const resolved = await resolveSecurity(symbol);
+    if (resolved.result.symbol.trim().toUpperCase() !== symbol) {
+      throw new Error(`Recommendation constraint symbol ${symbol} could not be resolved safely.`);
+    }
+    return resolved.result;
+  }
+
+  const excludedSecurities = await Promise.all(constraints.excludedSymbols.map(async (symbol) => {
+    const existing = constraints.excludedSecurities.find((item) => item.symbol === symbol);
+    const resolved = await resolveIdentity(symbol);
+    return {
+      symbol,
+      exchange: existing?.exchange ?? resolved.exchange ?? null,
+      currency: existing?.currency ?? null,
+      name: existing?.name ?? resolved.name ?? symbol,
+      provider: resolved.provider
+    };
+  }));
+  const preferredSecurities = await Promise.all(constraints.preferredSymbols.map(async (symbol) => {
+    const existing = constraints.preferredSecurities.find((item) => item.symbol === symbol);
+    const resolved = await resolveIdentity(symbol);
+    return {
+      symbol,
+      exchange: existing?.exchange ?? resolved.exchange ?? null,
+      currency: existing?.currency ?? null,
+      name: existing?.name ?? resolved.name ?? symbol,
+      provider: resolved.provider
+    };
+  }));
+
+  return {
+    ...constraints,
+    excludedSecurities,
+    preferredSecurities
   };
 }
 
@@ -2272,7 +2316,7 @@ export async function getPreferenceView(userId: string) {
     id: guidedDraftRow.id,
     userId: guidedDraftRow.userId,
     answers: guidedDraftRow.answers as GuidedAllocationAnswers,
-    suggestedProfile: guidedDraftRow.suggestedProfile as Omit<PreferenceProfile, "id" | "userId" | "watchlistSymbols">,
+    suggestedProfile: guidedDraftRow.suggestedProfile as Omit<PreferenceProfile, "id" | "userId" | "watchlistSymbols" | "recommendationConstraints">,
     assumptions: guidedDraftRow.assumptions as string[],
     rationale: guidedDraftRow.rationale as string[],
     createdAt: guidedDraftRow.createdAt.toISOString(),
@@ -2358,7 +2402,7 @@ export async function saveGuidedAllocationDraft(
       id: updated.id,
       userId: updated.userId,
       answers: updated.answers as GuidedAllocationAnswers,
-      suggestedProfile: updated.suggestedProfile as Omit<PreferenceProfile, "id" | "userId" | "watchlistSymbols">,
+      suggestedProfile: updated.suggestedProfile as Omit<PreferenceProfile, "id" | "userId" | "watchlistSymbols" | "recommendationConstraints">,
       assumptions: updated.assumptions as string[],
       rationale: updated.rationale as string[],
       createdAt: updated.createdAt.toISOString(),
@@ -2381,7 +2425,7 @@ export async function saveGuidedAllocationDraft(
     id: created.id,
     userId: created.userId,
     answers: created.answers as GuidedAllocationAnswers,
-    suggestedProfile: created.suggestedProfile as Omit<PreferenceProfile, "id" | "userId" | "watchlistSymbols">,
+    suggestedProfile: created.suggestedProfile as Omit<PreferenceProfile, "id" | "userId" | "watchlistSymbols" | "recommendationConstraints">,
     assumptions: created.assumptions as string[],
     rationale: created.rationale as string[],
     createdAt: created.createdAt.toISOString(),
@@ -2524,13 +2568,15 @@ export async function deleteImportMappingPreset(userId: string, presetId: string
 
 export async function updatePreferenceProfile(userId: string, input: PreferenceProfileInput): Promise<PreferenceProfile> {
   const db = getDb();
+  const profileRow = await db.query.preferenceProfiles.findFirst({ where: eq(preferenceProfiles.userId, userId) });
+  if (!profileRow) {
+    throw new Error(`Preference profile not found for user ${userId}.`);
+  }
+  const recommendationConstraints = input.recommendationConstraints === undefined
+    ? normalizeRecommendationConstraints(profileRow.recommendationConstraints)
+    : await resolveRecommendationConstraintSymbols(input.recommendationConstraints);
 
   return db.transaction(async (tx) => {
-    const profileRow = await tx.query.preferenceProfiles.findFirst({ where: eq(preferenceProfiles.userId, userId) });
-    if (!profileRow) {
-      throw new Error(`Preference profile not found for user ${userId}.`);
-    }
-
     await tx
       .update(preferenceProfiles)
       .set({
@@ -2543,6 +2589,7 @@ export async function updatePreferenceProfile(userId: string, input: PreferenceP
         source: input.source ?? "manual",
         rebalancingTolerancePct: input.rebalancingTolerancePct,
         watchlistSymbols: input.watchlistSymbols,
+        recommendationConstraints,
         updatedAt: new Date()
       })
       .where(eq(preferenceProfiles.id, profileRow.id));
@@ -2572,6 +2619,7 @@ export async function updatePreferenceProfile(userId: string, input: PreferenceP
       source: input.source ?? "manual",
       rebalancingTolerancePct: input.rebalancingTolerancePct,
       watchlistSymbols: input.watchlistSymbols,
+      recommendationConstraints,
       updatedAt: new Date().toISOString()
     };
   });
@@ -2599,7 +2647,8 @@ export async function addWatchlistSymbol(userId: string, symbol: string): Promis
     recommendationStrategy: profile.recommendationStrategy,
     source: profile.source ?? "manual",
     rebalancingTolerancePct: profile.rebalancingTolerancePct,
-    watchlistSymbols: [...profile.watchlistSymbols, normalizedSymbol].slice(0, 20)
+    watchlistSymbols: [...profile.watchlistSymbols, normalizedSymbol].slice(0, 20),
+    recommendationConstraints: profile.recommendationConstraints
   });
 }
 
@@ -2625,7 +2674,8 @@ export async function removeWatchlistSymbol(userId: string, symbol: string): Pro
     recommendationStrategy: profile.recommendationStrategy,
     source: profile.source ?? "manual",
     rebalancingTolerancePct: profile.rebalancingTolerancePct,
-    watchlistSymbols: profile.watchlistSymbols.filter((entry) => entry !== normalizedSymbol)
+    watchlistSymbols: profile.watchlistSymbols.filter((entry) => entry !== normalizedSymbol),
+    recommendationConstraints: profile.recommendationConstraints
   });
 }
 
@@ -2670,7 +2720,8 @@ export async function registerUserWithCitizenProfile(input: RegisterUserInput): 
         recommendationStrategy: defaultPreferences.recommendationStrategy,
         source: defaultPreferences.source ?? "manual",
         rebalancingTolerancePct: defaultPreferences.rebalancingTolerancePct,
-        watchlistSymbols: defaultPreferences.watchlistSymbols
+        watchlistSymbols: defaultPreferences.watchlistSymbols,
+        recommendationConstraints: defaultPreferences.recommendationConstraints
       })
       .returning();
 

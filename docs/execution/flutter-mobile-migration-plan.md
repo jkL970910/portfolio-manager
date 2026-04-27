@@ -202,6 +202,9 @@ portfolio detail, manual import, edit/delete, quote refresh, investment preferen
 editing, recommendation regeneration, and watchlist maintenance. It is not yet at
 web feature parity for analysis-heavy flows.
 
+For the page-by-page Flutter/Web parity matrix and the backend refactor
+rationale, see `docs/execution/mobile-web-parity-and-backend-refactor.md`.
+
 Highest-priority gaps:
 
 1. Guided investment setup
@@ -242,12 +245,17 @@ Highest-priority gaps:
 
 Implementation priority:
 
-1. Chart foundation
-   - reusable line chart
-   - reusable allocation distribution bar
-   - reusable health radar/score chart
-2. Security and asset analysis depth
-3. Guided preference tuning based on real usage
+1. Recommendation constraints v2
+   - explicit hard constraints such as excluded symbols, preferred symbols,
+     asset-class bands, and account/security-type rules
+   - backend validation through market identity resolution
+   - recommendation scoring consumes the same constraint contract mobile edits
+2. Mobile contract typing and DTO cleanup
+   - reduce page-level `Map<String, dynamic>` parsing
+   - separate raw domain values, display text, IDs, and chart data
+3. Market-data identity and validation hardening
+   - preserve symbol + exchange + currency identity in import, watchlist,
+     recommendation, and quote refresh flows
 4. Cloud-ready worker/cache boundaries
 5. Mobile spending migration
 
