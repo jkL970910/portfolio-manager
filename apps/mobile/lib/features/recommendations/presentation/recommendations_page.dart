@@ -367,6 +367,7 @@ class MobileRecommendationPriority {
     required this.gapSummary,
     required this.whyThis,
     required this.whyNot,
+    required this.alternatives,
     required this.constraints,
     required this.execution,
   });
@@ -380,6 +381,7 @@ class MobileRecommendationPriority {
   final String gapSummary;
   final List<String> whyThis;
   final List<String> whyNot;
+  final List<String> alternatives;
   final List<MobileRecommendationConstraint> constraints;
   final List<MobileRecommendationInput> execution;
 
@@ -396,6 +398,9 @@ class MobileRecommendationPriority {
           (json["whyThis"] as List?)?.whereType<String>().toList() ?? const [],
       whyNot:
           (json["whyNot"] as List?)?.whereType<String>().toList() ?? const [],
+      alternatives:
+          (json["alternatives"] as List?)?.whereType<String>().toList() ??
+              const [],
       constraints: readJsonList(json, "constraints")
           .map(MobileRecommendationConstraint.fromJson)
           .toList(),
@@ -725,33 +730,182 @@ class _PriorityCard extends StatelessWidget {
             ),
             if (priority.scoreline.isNotEmpty) ...[
               const SizedBox(height: 10),
-              Text(priority.scoreline,
-                  style: Theme.of(context).textTheme.titleMedium),
+              _ScorelinePanel(priority),
             ],
-            if (priority.gapSummary.isNotEmpty) ...[
-              const SizedBox(height: 8),
-              Text(priority.gapSummary),
+            if (priority.whyThis.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              _ExplanationSection(
+                title: "为什么它排前面",
+                items: priority.whyThis,
+              ),
             ],
-            ...priority.whyThis.take(2).map(
-                  (item) => Padding(
-                    padding: const EdgeInsets.only(top: 8),
-                    child: Text("• $item"),
-                  ),
-                ),
+            if (priority.whyNot.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              _ExplanationSection(
+                title: "需要注意什么",
+                items: priority.whyNot,
+              ),
+            ],
             if (priority.constraints.isNotEmpty) ...[
-              const SizedBox(height: 10),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: priority.constraints
-                    .take(3)
-                    .map(_ConstraintPill.new)
-                    .toList(),
+              const SizedBox(height: 12),
+              _ConstraintSection(priority.constraints),
+            ],
+            if (priority.execution.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              _ExecutionSection(priority.execution),
+            ],
+            if (priority.alternatives.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              _ExplanationSection(
+                title: "可替代选择",
+                items: priority.alternatives,
               ),
             ],
           ],
         ),
       ),
+    );
+  }
+}
+
+class _ScorelinePanel extends StatelessWidget {
+  const _ScorelinePanel(this.priority);
+
+  final MobileRecommendationPriority priority;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: theme.colorScheme.primaryContainer.withValues(alpha: 0.52),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: theme.colorScheme.outlineVariant),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text("评分结论", style: theme.textTheme.titleMedium),
+            const SizedBox(height: 6),
+            Text(priority.scoreline),
+            if (priority.gapSummary.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Text(priority.gapSummary),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ExplanationSection extends StatelessWidget {
+  const _ExplanationSection({required this.title, required this.items});
+
+  final String title;
+  final List<String> items;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(title, style: Theme.of(context).textTheme.titleMedium),
+        const SizedBox(height: 6),
+        ...items.take(4).map(
+              (item) => Padding(
+                padding: const EdgeInsets.only(top: 5),
+                child: Text("• $item"),
+              ),
+            ),
+      ],
+    );
+  }
+}
+
+class _ConstraintSection extends StatelessWidget {
+  const _ConstraintSection(this.constraints);
+
+  final List<MobileRecommendationConstraint> constraints;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text("约束检查", style: Theme.of(context).textTheme.titleMedium),
+        const SizedBox(height: 8),
+        ...constraints.take(4).map(_ConstraintDetailTile.new),
+      ],
+    );
+  }
+}
+
+class _ConstraintDetailTile extends StatelessWidget {
+  const _ConstraintDetailTile(this.constraint);
+
+  final MobileRecommendationConstraint constraint;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = _constraintColor(context, constraint.variant);
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.1),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: color.withValues(alpha: 0.34)),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(constraint.label,
+                  style: Theme.of(context)
+                      .textTheme
+                      .titleSmall
+                      ?.copyWith(color: color)),
+              if (constraint.detail.isNotEmpty) ...[
+                const SizedBox(height: 4),
+                Text(constraint.detail),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ExecutionSection extends StatelessWidget {
+  const _ExecutionSection(this.items);
+
+  final List<MobileRecommendationInput> items;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text("执行拆解", style: Theme.of(context).textTheme.titleMedium),
+        const SizedBox(height: 8),
+        ...items.take(5).map(
+              (item) => Padding(
+                padding: const EdgeInsets.only(bottom: 6),
+                child: Row(
+                  children: [
+                    Expanded(child: Text(item.label)),
+                    Text(item.value,
+                        style: Theme.of(context).textTheme.titleSmall),
+                  ],
+                ),
+              ),
+            ),
+      ],
     );
   }
 }
@@ -829,35 +983,12 @@ class _InfoPill extends StatelessWidget {
   }
 }
 
-class _ConstraintPill extends StatelessWidget {
-  const _ConstraintPill(this.constraint);
-
-  final MobileRecommendationConstraint constraint;
-
-  @override
-  Widget build(BuildContext context) {
-    final color = switch (constraint.variant) {
-      "success" => Colors.green.shade700,
-      "warning" => Colors.orange.shade800,
-      _ => Theme.of(context).colorScheme.onSurfaceVariant,
-    };
-
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: color.withValues(alpha: 0.4)),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-        child: Text(constraint.label,
-            style: Theme.of(context)
-                .textTheme
-                .labelMedium
-                ?.copyWith(color: color)),
-      ),
-    );
-  }
+Color _constraintColor(BuildContext context, String variant) {
+  return switch (variant) {
+    "success" => Colors.green.shade700,
+    "warning" => Colors.orange.shade800,
+    _ => Theme.of(context).colorScheme.onSurfaceVariant,
+  };
 }
 
 class _ErrorState extends StatelessWidget {

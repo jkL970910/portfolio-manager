@@ -59,7 +59,7 @@ These are now migration-preserve items, not features to redefine from zero.
 | Mobile asset/security analysis depth | In Progress | Security price chart and allocation visuals exist; drift/target-vs-current remains |
 | Real historical performance | In Progress | Keep as top product priority |
 | Richer import review persistence | In Progress | Build soon |
-| Watchlist and target constraints workflow | Planned | Deepen after discovery baseline |
+| Watchlist and target constraints workflow | In Progress | Mobile now shows richer candidate scoring explanations; target constraint editing remains |
 | Cloud-ready cache / worker boundaries | Planned | Build before heavier AI-agent and quote jobs |
 | Quote-provider status UX | Planned | Important before mobile users trust refresh state |
 | AI-agent assisted analysis | Planned | Add after mobile shell and async boundaries are ready |

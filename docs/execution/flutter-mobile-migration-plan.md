@@ -229,7 +229,9 @@ Highest-priority gaps:
      visuals.
    - Asset-class drift analysis and target-vs-current views remain shallow.
 5. Candidate scoring depth
-   - Watchlist management exists, but candidate score detail is not yet mobile-native.
+   - Watchlist management exists.
+   - Mobile recommendation cards now expose scoreline, gap summary, why/why-not
+     explanations, constraints, execution steps, and alternatives.
 
 Implementation priority:
 
@@ -238,9 +240,9 @@ Implementation priority:
    - reusable allocation distribution bar
    - reusable health radar/score chart
 2. Security and asset analysis depth
-3. Candidate scoring depth
-4. Guided preference tuning based on real usage
-5. Cloud-ready worker/cache boundaries
+3. Guided preference tuning based on real usage
+4. Cloud-ready worker/cache boundaries
+5. Mobile spending migration
 
 ## Explicit non-goals right now
 
