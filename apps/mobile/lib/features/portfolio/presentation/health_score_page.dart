@@ -2,6 +2,7 @@ import "package:flutter/material.dart";
 
 import "../../../core/api/loo_api_client.dart";
 import "../../shared/data/mobile_models.dart";
+import "../../shared/presentation/loo_charts.dart";
 import "detail_state_widgets.dart";
 
 class HealthScorePage extends StatefulWidget {
@@ -96,7 +97,7 @@ class _HealthScorePageState extends State<HealthScorePage> {
                   const SizedBox(height: 16),
                   const _SectionTitle("雷达维度"),
                   const SizedBox(height: 8),
-                  ...data.radar.map(_RadarTile.new),
+                  _RadarCard(data.radar),
                 ],
                 if (data.dimensions.isNotEmpty) ...[
                   const SizedBox(height: 16),
@@ -382,21 +383,48 @@ class _RadarTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final progress = point.value / 100;
+    return Padding(
+      padding: const EdgeInsets.only(top: 10),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(child: Text(point.dimension)),
+              Text("${point.value.round()} 分",
+                  style: theme.textTheme.titleMedium),
+            ],
+          ),
+          const SizedBox(height: 8),
+          LinearProgressIndicator(value: progress),
+        ],
+      ),
+    );
+  }
+}
+
+class _RadarCard extends StatelessWidget {
+  const _RadarCard(this.points);
+
+  final List<MobileHealthRadarPoint> points;
+
+  @override
+  Widget build(BuildContext context) {
     return Card(
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              children: [
-                Expanded(child: Text(point.dimension)),
-                Text("${point.value.round()} 分",
-                    style: theme.textTheme.titleMedium),
-              ],
+            LooRadarChart(
+              points: points
+                  .map((point) => LooRadarPoint(
+                        label: point.dimension,
+                        value: point.value,
+                      ))
+                  .toList(),
             ),
-            const SizedBox(height: 10),
-            LinearProgressIndicator(value: progress),
+            const SizedBox(height: 8),
+            ...points.map(_RadarTile.new),
           ],
         ),
       ),

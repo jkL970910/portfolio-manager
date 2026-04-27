@@ -215,9 +215,13 @@ Highest-priority gaps:
    - Remaining work is visual chart polish and deeper navigation from each
      drilldown row into the affected account or holding.
 3. Chart foundation
-   - Mobile does not yet have reusable chart components for portfolio trend,
-     asset allocation, or security price history.
-   - Add a small chart layer before building deeper analysis pages.
+   - Build reusable Flutter chart primitives before adding deeper analysis pages.
+   - Execution order:
+     1. add dependency-free chart widgets for line trend, allocation distribution,
+        and health radar/score views
+     2. attach security price history to Security Detail
+     3. attach portfolio/account asset allocation visuals
+     4. upgrade Health Score visual polish and drilldown navigation
 4. Asset and security analysis depth
    - Security detail exists, but price-history visualization and asset-class
      drift analysis remain shallow.
@@ -228,10 +232,13 @@ Highest-priority gaps:
 Implementation priority:
 
 1. Chart foundation
-2. Security and asset analysis depth
-3. Candidate scoring depth
-4. Health drilldown row navigation
-5. Guided preference tuning based on real usage
+   - reusable line chart
+   - reusable allocation distribution bar
+   - reusable health radar/score chart
+2. Security price-history visualization
+3. Portfolio/account asset allocation visualization
+4. Security and asset analysis depth
+5. Candidate scoring depth
 
 ## Explicit non-goals right now
 
