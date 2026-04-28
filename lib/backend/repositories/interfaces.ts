@@ -1,6 +1,8 @@
 import {
   CashflowTransaction,
   EntityId,
+  ExternalResearchJob,
+  ExternalResearchUsageCounter,
   HoldingPosition,
   ImportJob,
   InvestmentAccount,
@@ -12,7 +14,7 @@ import {
   SecurityPriceHistoryPoint,
   PreferenceProfile,
   RecommendationRun,
-  UserProfile
+  UserProfile,
 } from "@/lib/backend/models";
 
 export interface AuthUserRecord {
@@ -23,8 +25,14 @@ export interface AuthUserRecord {
 export interface UserRepository {
   getById(userId: EntityId): Promise<UserProfile>;
   findByEmail(email: string): Promise<AuthUserRecord | null>;
-  updateBaseCurrency(userId: EntityId, currency: UserProfile["baseCurrency"]): Promise<UserProfile>;
-  updateDisplayLanguage(userId: EntityId, language: UserProfile["displayLanguage"]): Promise<UserProfile>;
+  updateBaseCurrency(
+    userId: EntityId,
+    currency: UserProfile["baseCurrency"],
+  ): Promise<UserProfile>;
+  updateDisplayLanguage(
+    userId: EntityId,
+    language: UserProfile["displayLanguage"],
+  ): Promise<UserProfile>;
 }
 
 export interface AccountRepository {
@@ -68,14 +76,57 @@ export interface RecommendationRepository {
 }
 
 export interface PortfolioAnalysisRunRepository {
-  getFreshByKey(userId: EntityId, params: {
-    scope: PortfolioAnalysisRun["scope"];
-    mode: PortfolioAnalysisRun["mode"];
-    targetKey: string;
-    now: Date;
-  }): Promise<PortfolioAnalysisRun | null>;
-  listRecentByUserId(userId: EntityId, limit: number): Promise<PortfolioAnalysisRun[]>;
-  create(input: Omit<PortfolioAnalysisRun, "id" | "createdAt">): Promise<PortfolioAnalysisRun>;
+  getFreshByKey(
+    userId: EntityId,
+    params: {
+      scope: PortfolioAnalysisRun["scope"];
+      mode: PortfolioAnalysisRun["mode"];
+      targetKey: string;
+      now: Date;
+    },
+  ): Promise<PortfolioAnalysisRun | null>;
+  listRecentByUserId(
+    userId: EntityId,
+    limit: number,
+  ): Promise<PortfolioAnalysisRun[]>;
+  create(
+    input: Omit<PortfolioAnalysisRun, "id" | "createdAt">,
+  ): Promise<PortfolioAnalysisRun>;
+}
+
+export interface ExternalResearchJobRepository {
+  create(
+    input: Omit<ExternalResearchJob, "id" | "createdAt" | "updatedAt">,
+  ): Promise<ExternalResearchJob>;
+  listRecentByUserId(
+    userId: EntityId,
+    limit: number,
+  ): Promise<ExternalResearchJob[]>;
+  claimNext(workerId: string, now: Date): Promise<ExternalResearchJob | null>;
+  markSucceeded(
+    jobId: EntityId,
+    resultRunId: EntityId,
+    now: Date,
+  ): Promise<ExternalResearchJob>;
+  markFailed(
+    jobId: EntityId,
+    errorMessage: string,
+    now: Date,
+  ): Promise<ExternalResearchJob>;
+}
+
+export interface ExternalResearchUsageCounterRepository {
+  listByUserIdAndDate(
+    userId: EntityId,
+    counterDate: string,
+  ): Promise<ExternalResearchUsageCounter[]>;
+  increment(input: {
+    userId: EntityId;
+    counterDate: string;
+    scope: ExternalResearchUsageCounter["scope"];
+    runCount: number;
+    symbolCount: number;
+  }): Promise<ExternalResearchUsageCounter>;
 }
 
 export interface ImportJobRepository {
@@ -95,5 +146,7 @@ export interface BackendRepositories {
   preferences: PreferenceRepository;
   recommendations: RecommendationRepository;
   analysisRuns: PortfolioAnalysisRunRepository;
+  externalResearchJobs: ExternalResearchJobRepository;
+  externalResearchUsageCounters: ExternalResearchUsageCounterRepository;
   importJobs: ImportJobRepository;
 }

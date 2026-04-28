@@ -60,6 +60,19 @@ class LooApiClient {
     return _getJson("/api/mobile/analysis/recent?limit=$limit");
   }
 
+  Future<Map<String, dynamic>> getExternalResearchPolicy() {
+    return _getJson("/api/mobile/analysis/external-research-policy");
+  }
+
+  Future<Map<String, dynamic>> getExternalResearchUsage() {
+    return _getJson("/api/mobile/analysis/external-research-usage");
+  }
+
+  Future<Map<String, dynamic>> getExternalResearchJobs({int limit = 5}) {
+    return _getJson(
+        "/api/mobile/analysis/external-research-jobs/recent?limit=$limit");
+  }
+
   Future<Map<String, dynamic>> getRecommendations() {
     return _getJson("/api/mobile/recommendations");
   }

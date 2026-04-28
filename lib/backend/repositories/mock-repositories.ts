@@ -11,13 +11,19 @@ import {
   securityPriceHistory,
   preferenceProfiles,
   recommendationRuns,
-  transactions
+  transactions,
 } from "@/lib/backend/mock-store";
 import { PortfolioAnalysisRun } from "@/lib/backend/models";
+import {
+  ExternalResearchJob,
+  ExternalResearchUsageCounter,
+} from "@/lib/backend/models";
 import { BackendRepositories } from "@/lib/backend/repositories/interfaces";
 import { normalizeRecommendationConstraints } from "@/lib/backend/recommendation-constraints";
 
 const portfolioAnalysisRuns: PortfolioAnalysisRun[] = [];
+const externalResearchJobs: ExternalResearchJob[] = [];
+const externalResearchUsageCounters: ExternalResearchUsageCounter[] = [];
 
 export const mockRepositories: BackendRepositories = {
   users: {
@@ -38,7 +44,7 @@ export const mockRepositories: BackendRepositories = {
       }
       return {
         ...user,
-        baseCurrency: currency
+        baseCurrency: currency,
       };
     },
     async updateDisplayLanguage(userId, language) {
@@ -48,50 +54,58 @@ export const mockRepositories: BackendRepositories = {
       }
       return {
         ...user,
-        displayLanguage: language
+        displayLanguage: language,
       };
-    }
+    },
   },
   accounts: {
     async listByUserId(userId) {
       return accounts.filter((account) => account.userId === userId);
-    }
+    },
   },
   holdings: {
     async listByUserId(userId) {
       return holdings.filter((holding) => holding.userId === userId);
-    }
+    },
   },
   transactions: {
     async listByUserId(userId) {
-      return transactions.filter((transaction) => transaction.userId === userId);
-    }
+      return transactions.filter(
+        (transaction) => transaction.userId === userId,
+      );
+    },
   },
   cashAccounts: {
     async listByUserId(userId) {
       return cashAccounts.filter((account) => account.userId === userId);
-    }
+    },
   },
   cashAccountBalanceEvents: {
     async listByUserId(userId) {
-      return cashAccountBalanceEvents.filter((event) => event.userId === userId);
-    }
+      return cashAccountBalanceEvents.filter(
+        (event) => event.userId === userId,
+      );
+    },
   },
   portfolioEvents: {
     async listByUserId(userId) {
       return portfolioEvents.filter((event) => event.userId === userId);
-    }
+    },
   },
   snapshots: {
     async listByUserId(userId) {
-      return portfolioSnapshots.filter((snapshot) => snapshot.userId === userId);
-    }
+      return portfolioSnapshots.filter(
+        (snapshot) => snapshot.userId === userId,
+      );
+    },
   },
   securityPriceHistory: {
     async listBySymbol(symbol) {
       const normalized = symbol.trim().toUpperCase();
-      return securityPriceHistory.filter((point) => point.symbol.trim().toUpperCase() === normalized);
-    }
+      return securityPriceHistory.filter(
+        (point) => point.symbol.trim().toUpperCase() === normalized,
+      );
+    },
   },
   preferences: {
     async getByUserId(userId) {
@@ -101,9 +115,11 @@ export const mockRepositories: BackendRepositories = {
       }
       return {
         ...profile,
-        recommendationConstraints: normalizeRecommendationConstraints(profile.recommendationConstraints)
+        recommendationConstraints: normalizeRecommendationConstraints(
+          profile.recommendationConstraints,
+        ),
       };
-    }
+    },
   },
   recommendations: {
     async getLatestByUserId(userId) {
@@ -112,7 +128,7 @@ export const mockRepositories: BackendRepositories = {
         throw new Error(`Recommendation run not found for user ${userId}.`);
       }
       return run;
-    }
+    },
   },
   analysisRuns: {
     async getFreshByKey(userId, params) {
@@ -121,25 +137,140 @@ export const mockRepositories: BackendRepositories = {
         .filter((run) => run.scope === params.scope)
         .filter((run) => run.mode === params.mode)
         .filter((run) => run.targetKey === params.targetKey)
-        .filter((run) => new Date(run.expiresAt).getTime() > params.now.getTime())
-        .sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime())[0];
+        .filter(
+          (run) => new Date(run.expiresAt).getTime() > params.now.getTime(),
+        )
+        .sort(
+          (left, right) =>
+            new Date(right.createdAt).getTime() -
+            new Date(left.createdAt).getTime(),
+        )[0];
       return match ?? null;
     },
     async listRecentByUserId(userId, limit) {
       return portfolioAnalysisRuns
         .filter((run) => run.userId === userId)
-        .sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime())
+        .sort(
+          (left, right) =>
+            new Date(right.createdAt).getTime() -
+            new Date(left.createdAt).getTime(),
+        )
         .slice(0, limit);
     },
     async create(input) {
       const run: PortfolioAnalysisRun = {
         ...input,
         id: `analysis_${portfolioAnalysisRuns.length + 1}`,
-        createdAt: new Date().toISOString()
+        createdAt: new Date().toISOString(),
       };
       portfolioAnalysisRuns.unshift(run);
       return run;
-    }
+    },
+  },
+  externalResearchJobs: {
+    async create(input) {
+      const now = new Date().toISOString();
+      const job: ExternalResearchJob = {
+        ...input,
+        id: `external_research_job_${externalResearchJobs.length + 1}`,
+        createdAt: now,
+        updatedAt: now,
+      };
+      externalResearchJobs.unshift(job);
+      return job;
+    },
+    async listRecentByUserId(userId, limit) {
+      return externalResearchJobs
+        .filter((job) => job.userId === userId)
+        .sort(
+          (left, right) =>
+            new Date(right.createdAt).getTime() -
+            new Date(left.createdAt).getTime(),
+        )
+        .slice(0, limit);
+    },
+    async claimNext(workerId, now) {
+      const candidate = externalResearchJobs
+        .filter((job) => job.status === "queued")
+        .filter((job) => new Date(job.runAfter).getTime() <= now.getTime())
+        .sort((left, right) => {
+          if (right.priority !== left.priority) {
+            return right.priority - left.priority;
+          }
+          return (
+            new Date(right.createdAt).getTime() -
+            new Date(left.createdAt).getTime()
+          );
+        })[0];
+      if (!candidate) {
+        return null;
+      }
+      candidate.status = "running";
+      candidate.lockedAt = now.toISOString();
+      candidate.lockedBy = workerId;
+      candidate.startedAt = now.toISOString();
+      candidate.attemptCount += 1;
+      candidate.updatedAt = now.toISOString();
+      return candidate;
+    },
+    async markSucceeded(jobId, resultRunId, now) {
+      const job = externalResearchJobs.find((item) => item.id === jobId);
+      if (!job) {
+        throw new Error(`External research job not found for id ${jobId}.`);
+      }
+      job.status = "succeeded";
+      job.resultRunId = resultRunId;
+      job.finishedAt = now.toISOString();
+      job.errorMessage = null;
+      job.updatedAt = now.toISOString();
+      return job;
+    },
+    async markFailed(jobId, errorMessage, now) {
+      const job = externalResearchJobs.find((item) => item.id === jobId);
+      if (!job) {
+        throw new Error(`External research job not found for id ${jobId}.`);
+      }
+      job.status = "failed";
+      job.finishedAt = now.toISOString();
+      job.errorMessage = errorMessage;
+      job.updatedAt = now.toISOString();
+      return job;
+    },
+  },
+  externalResearchUsageCounters: {
+    async listByUserIdAndDate(userId, counterDate) {
+      return externalResearchUsageCounters.filter(
+        (counter) =>
+          counter.userId === userId && counter.counterDate === counterDate,
+      );
+    },
+    async increment(input) {
+      const existing = externalResearchUsageCounters.find(
+        (counter) =>
+          counter.userId === input.userId &&
+          counter.counterDate === input.counterDate &&
+          counter.scope === input.scope,
+      );
+      const now = new Date().toISOString();
+      if (existing) {
+        existing.runCount += input.runCount;
+        existing.symbolCount += input.symbolCount;
+        existing.updatedAt = now;
+        return existing;
+      }
+      const counter: ExternalResearchUsageCounter = {
+        id: `external_research_usage_${externalResearchUsageCounters.length + 1}`,
+        userId: input.userId,
+        counterDate: input.counterDate,
+        scope: input.scope,
+        runCount: input.runCount,
+        symbolCount: input.symbolCount,
+        createdAt: now,
+        updatedAt: now,
+      };
+      externalResearchUsageCounters.push(counter);
+      return counter;
+    },
   },
   importJobs: {
     async getLatestByUserId(userId) {
@@ -148,6 +279,6 @@ export const mockRepositories: BackendRepositories = {
         throw new Error(`Import job not found for user ${userId}.`);
       }
       return job;
-    }
-  }
+    },
+  },
 };

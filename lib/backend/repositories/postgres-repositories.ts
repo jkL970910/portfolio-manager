@@ -1,10 +1,12 @@
-import { and, desc, eq, gt } from "drizzle-orm";
+import { and, desc, eq, gt, lte, sql } from "drizzle-orm";
 import { getDb } from "@/lib/db/client";
 import {
   allocationTargets,
   cashAccountBalanceEvents,
   cashAccounts,
   cashflowTransactions,
+  externalResearchJobs,
+  externalResearchUsageCounters,
   holdingPositions,
   importJobs,
   investmentAccounts,
@@ -15,7 +17,7 @@ import {
   recommendationItems,
   recommendationRuns,
   securityPriceHistory,
-  users
+  users,
 } from "@/lib/db/schema";
 import {
   HoldingPosition,
@@ -23,13 +25,15 @@ import {
   InvestmentAccount,
   CashAccount,
   CashAccountBalanceEvent,
+  ExternalResearchJob,
+  ExternalResearchUsageCounter,
   PortfolioEvent,
   PortfolioAnalysisRun,
   PortfolioSnapshot,
   SecurityPriceHistoryPoint,
   PreferenceProfile,
   RecommendationRun,
-  UserProfile
+  UserProfile,
 } from "@/lib/backend/models";
 import { BackendRepositories } from "@/lib/backend/repositories/interfaces";
 import { normalizeRecommendationConstraints } from "@/lib/backend/recommendation-constraints";
@@ -50,11 +54,14 @@ function mapUser(row: typeof users.$inferSelect): UserProfile {
     email: row.email,
     displayName: row.displayName,
     baseCurrency: row.baseCurrency as UserProfile["baseCurrency"],
-    displayLanguage: (row.displayLanguage as UserProfile["displayLanguage"]) ?? "zh"
+    displayLanguage:
+      (row.displayLanguage as UserProfile["displayLanguage"]) ?? "zh",
   };
 }
 
-function mapAccount(row: typeof investmentAccounts.$inferSelect): InvestmentAccount {
+function mapAccount(
+  row: typeof investmentAccounts.$inferSelect,
+): InvestmentAccount {
   const currency = (row.currency as InvestmentAccount["currency"]) ?? "CAD";
   const marketValueCad = toNumber(row.marketValueCad);
   const marketValueAmount = toNumber(row.marketValueAmount);
@@ -65,9 +72,13 @@ function mapAccount(row: typeof investmentAccounts.$inferSelect): InvestmentAcco
     type: row.type as InvestmentAccount["type"],
     nickname: row.nickname,
     currency,
-    marketValueAmount: marketValueAmount > 0 ? marketValueAmount : marketValueCad,
+    marketValueAmount:
+      marketValueAmount > 0 ? marketValueAmount : marketValueCad,
     marketValueCad,
-    contributionRoomCad: row.contributionRoomCad == null ? null : toNumber(row.contributionRoomCad)
+    contributionRoomCad:
+      row.contributionRoomCad == null
+        ? null
+        : toNumber(row.contributionRoomCad),
   };
 }
 
@@ -79,7 +90,7 @@ function mapImportJob(row: typeof importJobs.$inferSelect): ImportJob {
     status: row.status as ImportJob["status"],
     sourceType: row.sourceType as "csv",
     fileName: row.fileName,
-    createdAt: row.createdAt.toISOString()
+    createdAt: row.createdAt.toISOString(),
   };
 }
 
@@ -93,11 +104,13 @@ function mapCashAccount(row: typeof cashAccounts.$inferSelect): CashAccount {
     currentBalanceAmount: toNumber(row.currentBalanceAmount),
     currentBalanceCad: toNumber(row.currentBalanceCad),
     createdAt: row.createdAt.toISOString(),
-    updatedAt: row.updatedAt.toISOString()
+    updatedAt: row.updatedAt.toISOString(),
   };
 }
 
-function mapCashAccountBalanceEvent(row: typeof cashAccountBalanceEvents.$inferSelect): CashAccountBalanceEvent {
+function mapCashAccountBalanceEvent(
+  row: typeof cashAccountBalanceEvents.$inferSelect,
+): CashAccountBalanceEvent {
   return {
     id: row.id,
     userId: row.userId,
@@ -106,13 +119,21 @@ function mapCashAccountBalanceEvent(row: typeof cashAccountBalanceEvents.$inferS
     balanceAmount: toNumber(row.balanceAmount),
     balanceCad: toNumber(row.balanceCad),
     source: row.source,
-    createdAt: row.createdAt.toISOString()
+    createdAt: row.createdAt.toISOString(),
   };
 }
 
-function mapSnapshot(row: typeof portfolioSnapshots.$inferSelect): PortfolioSnapshot {
-  const accountBreakdown = row.accountBreakdownJson as Record<string, number | string | null>;
-  const holdingBreakdown = row.holdingBreakdownJson as Record<string, number | string | null>;
+function mapSnapshot(
+  row: typeof portfolioSnapshots.$inferSelect,
+): PortfolioSnapshot {
+  const accountBreakdown = row.accountBreakdownJson as Record<
+    string,
+    number | string | null
+  >;
+  const holdingBreakdown = row.holdingBreakdownJson as Record<
+    string,
+    number | string | null
+  >;
 
   return {
     id: row.id,
@@ -120,30 +141,41 @@ function mapSnapshot(row: typeof portfolioSnapshots.$inferSelect): PortfolioSnap
     snapshotDate: row.snapshotDate,
     totalValueCad: toNumber(row.totalValueCad),
     accountBreakdown: Object.fromEntries(
-      Object.entries(accountBreakdown ?? {}).map(([key, value]) => [key, toNumber(value)])
+      Object.entries(accountBreakdown ?? {}).map(([key, value]) => [
+        key,
+        toNumber(value),
+      ]),
     ),
     holdingBreakdown: Object.fromEntries(
-      Object.entries(holdingBreakdown ?? {}).map(([key, value]) => [key, toNumber(value)])
+      Object.entries(holdingBreakdown ?? {}).map(([key, value]) => [
+        key,
+        toNumber(value),
+      ]),
     ),
     sourceVersion: row.sourceVersion,
-    createdAt: row.createdAt.toISOString()
+    createdAt: row.createdAt.toISOString(),
   };
 }
 
-function mapSecurityPriceHistory(row: typeof securityPriceHistory.$inferSelect): SecurityPriceHistoryPoint {
+function mapSecurityPriceHistory(
+  row: typeof securityPriceHistory.$inferSelect,
+): SecurityPriceHistoryPoint {
   return {
     id: row.id,
     symbol: row.symbol,
     priceDate: row.priceDate,
     close: toNumber(row.close),
-    adjustedClose: row.adjustedClose == null ? null : toNumber(row.adjustedClose),
+    adjustedClose:
+      row.adjustedClose == null ? null : toNumber(row.adjustedClose),
     currency: row.currency as SecurityPriceHistoryPoint["currency"],
     source: row.source,
-    createdAt: row.createdAt.toISOString()
+    createdAt: row.createdAt.toISOString(),
   };
 }
 
-function mapPortfolioEvent(row: typeof portfolioEvents.$inferSelect): PortfolioEvent {
+function mapPortfolioEvent(
+  row: typeof portfolioEvents.$inferSelect,
+): PortfolioEvent {
   return {
     id: row.id,
     userId: row.userId,
@@ -156,11 +188,13 @@ function mapPortfolioEvent(row: typeof portfolioEvents.$inferSelect): PortfolioE
     bookedAt: row.bookedAt,
     effectiveAt: row.effectiveAt.toISOString(),
     source: row.source,
-    createdAt: row.createdAt.toISOString()
+    createdAt: row.createdAt.toISOString(),
   };
 }
 
-function mapPortfolioAnalysisRun(row: typeof portfolioAnalysisRuns.$inferSelect): PortfolioAnalysisRun {
+function mapPortfolioAnalysisRun(
+  row: typeof portfolioAnalysisRuns.$inferSelect,
+): PortfolioAnalysisRun {
   return {
     id: row.id,
     userId: row.userId,
@@ -172,7 +206,49 @@ function mapPortfolioAnalysisRun(row: typeof portfolioAnalysisRuns.$inferSelect)
     sourceMode: row.sourceMode as PortfolioAnalysisRun["sourceMode"],
     generatedAt: row.generatedAt.toISOString(),
     expiresAt: row.expiresAt.toISOString(),
-    createdAt: row.createdAt.toISOString()
+    createdAt: row.createdAt.toISOString(),
+  };
+}
+
+function mapExternalResearchJob(
+  row: typeof externalResearchJobs.$inferSelect,
+): ExternalResearchJob {
+  return {
+    id: row.id,
+    userId: row.userId,
+    scope: row.scope as ExternalResearchJob["scope"],
+    targetKey: row.targetKey,
+    request: row.requestJson as Record<string, unknown>,
+    status: row.status as ExternalResearchJob["status"],
+    sourceMode: row.sourceMode as ExternalResearchJob["sourceMode"],
+    sourceAllowlist: row.sourceAllowlistJson as Record<string, unknown>[],
+    priority: row.priority,
+    attemptCount: row.attemptCount,
+    maxAttempts: row.maxAttempts,
+    runAfter: row.runAfter.toISOString(),
+    lockedAt: row.lockedAt?.toISOString() ?? null,
+    lockedBy: row.lockedBy ?? null,
+    startedAt: row.startedAt?.toISOString() ?? null,
+    finishedAt: row.finishedAt?.toISOString() ?? null,
+    errorMessage: row.errorMessage ?? null,
+    resultRunId: row.resultRunId ?? null,
+    createdAt: row.createdAt.toISOString(),
+    updatedAt: row.updatedAt.toISOString(),
+  };
+}
+
+function mapExternalResearchUsageCounter(
+  row: typeof externalResearchUsageCounters.$inferSelect,
+): ExternalResearchUsageCounter {
+  return {
+    id: row.id,
+    userId: row.userId,
+    counterDate: row.counterDate,
+    scope: row.scope as ExternalResearchUsageCounter["scope"],
+    runCount: row.runCount,
+    symbolCount: row.symbolCount,
+    createdAt: row.createdAt.toISOString(),
+    updatedAt: row.updatedAt.toISOString(),
   };
 }
 
@@ -180,7 +256,9 @@ export const postgresRepositories: BackendRepositories = {
   users: {
     async getById(userId) {
       const db = getDb();
-      const row = await db.query.users.findFirst({ where: eq(users.id, userId) });
+      const row = await db.query.users.findFirst({
+        where: eq(users.id, userId),
+      });
       if (!row) {
         throw new Error(`User not found for id ${userId}.`);
       }
@@ -188,13 +266,15 @@ export const postgresRepositories: BackendRepositories = {
     },
     async findByEmail(email) {
       const db = getDb();
-      const row = await db.query.users.findFirst({ where: eq(users.email, email.toLowerCase()) });
+      const row = await db.query.users.findFirst({
+        where: eq(users.email, email.toLowerCase()),
+      });
       if (!row) {
         return null;
       }
       return {
         profile: mapUser(row),
-        passwordHash: row.passwordHash
+        passwordHash: row.passwordHash,
       };
     },
     async updateBaseCurrency(userId, currency) {
@@ -203,7 +283,7 @@ export const postgresRepositories: BackendRepositories = {
         .update(users)
         .set({
           baseCurrency: currency,
-          updatedAt: new Date()
+          updatedAt: new Date(),
         })
         .where(eq(users.id, userId))
         .returning();
@@ -218,7 +298,7 @@ export const postgresRepositories: BackendRepositories = {
         .update(users)
         .set({
           displayLanguage: language,
-          updatedAt: new Date()
+          updatedAt: new Date(),
         })
         .where(eq(users.id, userId))
         .returning();
@@ -226,67 +306,87 @@ export const postgresRepositories: BackendRepositories = {
         throw new Error(`User not found for id ${userId}.`);
       }
       return mapUser(row);
-    }
+    },
   },
   accounts: {
     async listByUserId(userId) {
       const db = getDb();
-      const rows = await db.query.investmentAccounts.findMany({ where: eq(investmentAccounts.userId, userId) });
+      const rows = await db.query.investmentAccounts.findMany({
+        where: eq(investmentAccounts.userId, userId),
+      });
       return rows.map(mapAccount);
-    }
+    },
   },
   holdings: {
     async listByUserId(userId) {
       const db = getDb();
-      const rows = await db.query.holdingPositions.findMany({ where: eq(holdingPositions.userId, userId) });
+      const rows = await db.query.holdingPositions.findMany({
+        where: eq(holdingPositions.userId, userId),
+      });
       return rows.map((row) => ({
         ...(() => {
-          const currency = (row.currency as HoldingPosition["currency"]) ?? "CAD";
+          const currency =
+            (row.currency as HoldingPosition["currency"]) ?? "CAD";
           const marketValueCad = toNumber(row.marketValueCad);
           const marketValueAmount = toNumber(row.marketValueAmount);
-          const avgCostPerShareCad = row.avgCostPerShareCad == null ? null : toNumber(row.avgCostPerShareCad);
-          const costBasisCad = row.costBasisCad == null ? null : toNumber(row.costBasisCad);
-          const lastPriceCad = row.lastPriceCad == null ? null : toNumber(row.lastPriceCad);
+          const avgCostPerShareCad =
+            row.avgCostPerShareCad == null
+              ? null
+              : toNumber(row.avgCostPerShareCad);
+          const costBasisCad =
+            row.costBasisCad == null ? null : toNumber(row.costBasisCad);
+          const lastPriceCad =
+            row.lastPriceCad == null ? null : toNumber(row.lastPriceCad);
           return {
-        id: row.id,
-        userId: row.userId,
-        accountId: row.accountId,
-        symbol: row.symbol,
-        name: row.name,
-        assetClass: row.assetClassOverride ?? row.assetClass,
-        rawAssetClass: row.assetClass,
-        assetClassOverride: row.assetClassOverride ?? null,
-        sector: row.sectorOverride ?? row.sector,
-        rawSector: row.sector,
-        sectorOverride: row.sectorOverride ?? null,
-        currency,
-        securityTypeOverride: row.securityTypeOverride ?? null,
-        exchangeOverride: row.exchangeOverride ?? null,
-        marketSectorOverride: row.marketSectorOverride ?? null,
-        quantity: row.quantity == null ? null : toNumber(row.quantity),
-        avgCostPerShareAmount: row.avgCostPerShareAmount == null ? avgCostPerShareCad : toNumber(row.avgCostPerShareAmount),
-        costBasisAmount: row.costBasisAmount == null ? costBasisCad : toNumber(row.costBasisAmount),
-        lastPriceAmount: row.lastPriceAmount == null ? lastPriceCad : toNumber(row.lastPriceAmount),
-        marketValueAmount: marketValueAmount > 0 ? marketValueAmount : marketValueCad,
-        avgCostPerShareCad,
-        costBasisCad,
-        lastPriceCad,
-        marketValueCad,
-        weightPct: toNumber(row.weightPct),
-        gainLossPct: toNumber(row.gainLossPct),
-        createdAt: row.createdAt.toISOString(),
-        updatedAt: row.updatedAt.toISOString()
+            id: row.id,
+            userId: row.userId,
+            accountId: row.accountId,
+            symbol: row.symbol,
+            name: row.name,
+            assetClass: row.assetClassOverride ?? row.assetClass,
+            rawAssetClass: row.assetClass,
+            assetClassOverride: row.assetClassOverride ?? null,
+            sector: row.sectorOverride ?? row.sector,
+            rawSector: row.sector,
+            sectorOverride: row.sectorOverride ?? null,
+            currency,
+            securityTypeOverride: row.securityTypeOverride ?? null,
+            exchangeOverride: row.exchangeOverride ?? null,
+            marketSectorOverride: row.marketSectorOverride ?? null,
+            quantity: row.quantity == null ? null : toNumber(row.quantity),
+            avgCostPerShareAmount:
+              row.avgCostPerShareAmount == null
+                ? avgCostPerShareCad
+                : toNumber(row.avgCostPerShareAmount),
+            costBasisAmount:
+              row.costBasisAmount == null
+                ? costBasisCad
+                : toNumber(row.costBasisAmount),
+            lastPriceAmount:
+              row.lastPriceAmount == null
+                ? lastPriceCad
+                : toNumber(row.lastPriceAmount),
+            marketValueAmount:
+              marketValueAmount > 0 ? marketValueAmount : marketValueCad,
+            avgCostPerShareCad,
+            costBasisCad,
+            lastPriceCad,
+            marketValueCad,
+            weightPct: toNumber(row.weightPct),
+            gainLossPct: toNumber(row.gainLossPct),
+            createdAt: row.createdAt.toISOString(),
+            updatedAt: row.updatedAt.toISOString(),
           };
-        })()
+        })(),
       }));
-    }
+    },
   },
   transactions: {
     async listByUserId(userId) {
       const db = getDb();
       const rows = await db.query.cashflowTransactions.findMany({
         where: eq(cashflowTransactions.userId, userId),
-        orderBy: desc(cashflowTransactions.bookedAt)
+        orderBy: desc(cashflowTransactions.bookedAt),
       });
       return rows.map((row) => ({
         id: row.id,
@@ -296,96 +396,110 @@ export const postgresRepositories: BackendRepositories = {
         merchant: row.merchant,
         category: row.category,
         amountCad: toNumber(row.amountCad),
-        direction: row.direction as "inflow" | "outflow"
+        direction: row.direction as "inflow" | "outflow",
       }));
-    }
+    },
   },
   cashAccounts: {
     async listByUserId(userId) {
       const db = getDb();
       const rows = await db.query.cashAccounts.findMany({
-        where: eq(cashAccounts.userId, userId)
+        where: eq(cashAccounts.userId, userId),
       });
       return rows.map(mapCashAccount);
-    }
+    },
   },
   cashAccountBalanceEvents: {
     async listByUserId(userId) {
       const db = getDb();
       const rows = await db.query.cashAccountBalanceEvents.findMany({
         where: eq(cashAccountBalanceEvents.userId, userId),
-        orderBy: desc(cashAccountBalanceEvents.bookedAt)
+        orderBy: desc(cashAccountBalanceEvents.bookedAt),
       });
       return rows.map(mapCashAccountBalanceEvent);
-    }
+    },
   },
   portfolioEvents: {
     async listByUserId(userId) {
       const db = getDb();
       const rows = await db.query.portfolioEvents.findMany({
         where: eq(portfolioEvents.userId, userId),
-        orderBy: desc(portfolioEvents.effectiveAt)
+        orderBy: desc(portfolioEvents.effectiveAt),
       });
       return rows.map(mapPortfolioEvent);
-    }
+    },
   },
   snapshots: {
     async listByUserId(userId) {
       const db = getDb();
       const rows = await db.query.portfolioSnapshots.findMany({
         where: eq(portfolioSnapshots.userId, userId),
-        orderBy: desc(portfolioSnapshots.snapshotDate)
+        orderBy: desc(portfolioSnapshots.snapshotDate),
       });
       return rows.map(mapSnapshot);
-    }
+    },
   },
   securityPriceHistory: {
     async listBySymbol(symbol) {
       const db = getDb();
       const rows = await db.query.securityPriceHistory.findMany({
         where: eq(securityPriceHistory.symbol, symbol.trim().toUpperCase()),
-        orderBy: desc(securityPriceHistory.priceDate)
+        orderBy: desc(securityPriceHistory.priceDate),
       });
       return rows.map(mapSecurityPriceHistory);
-    }
+    },
   },
   preferences: {
     async getByUserId(userId) {
       const db = getDb();
-      const profileRow = await db.query.preferenceProfiles.findFirst({ where: eq(preferenceProfiles.userId, userId) });
+      const profileRow = await db.query.preferenceProfiles.findFirst({
+        where: eq(preferenceProfiles.userId, userId),
+      });
       if (!profileRow) {
         throw new Error(`Preference profile not found for user ${userId}.`);
       }
-      const targets = await db.query.allocationTargets.findMany({ where: eq(allocationTargets.preferenceProfileId, profileRow.id) });
+      const targets = await db.query.allocationTargets.findMany({
+        where: eq(allocationTargets.preferenceProfileId, profileRow.id),
+      });
       return {
         id: profileRow.id,
         userId: profileRow.userId,
         riskProfile: profileRow.riskProfile as PreferenceProfile["riskProfile"],
-        targetAllocation: targets.map((target) => ({ assetClass: target.assetClass, targetPct: target.targetPct })),
-        accountFundingPriority: profileRow.accountFundingPriority as PreferenceProfile["accountFundingPriority"],
+        targetAllocation: targets.map((target) => ({
+          assetClass: target.assetClass,
+          targetPct: target.targetPct,
+        })),
+        accountFundingPriority:
+          profileRow.accountFundingPriority as PreferenceProfile["accountFundingPriority"],
         taxAwarePlacement: profileRow.taxAwarePlacement,
         cashBufferTargetCad: toNumber(profileRow.cashBufferTargetCad),
-        transitionPreference: profileRow.transitionPreference as PreferenceProfile["transitionPreference"],
-        recommendationStrategy: profileRow.recommendationStrategy as PreferenceProfile["recommendationStrategy"],
+        transitionPreference:
+          profileRow.transitionPreference as PreferenceProfile["transitionPreference"],
+        recommendationStrategy:
+          profileRow.recommendationStrategy as PreferenceProfile["recommendationStrategy"],
         source: (profileRow.source as PreferenceProfile["source"]) ?? "manual",
         rebalancingTolerancePct: profileRow.rebalancingTolerancePct,
         watchlistSymbols: profileRow.watchlistSymbols as string[],
-        recommendationConstraints: normalizeRecommendationConstraints(profileRow.recommendationConstraints),
-        updatedAt: profileRow.updatedAt.toISOString()
+        recommendationConstraints: normalizeRecommendationConstraints(
+          profileRow.recommendationConstraints,
+        ),
+        updatedAt: profileRow.updatedAt.toISOString(),
       };
-    }
+    },
   },
   recommendations: {
     async getLatestByUserId(userId) {
       const db = getDb();
       const run = await db.query.recommendationRuns.findFirst({
         where: eq(recommendationRuns.userId, userId),
-        orderBy: desc(recommendationRuns.createdAt)
+        orderBy: desc(recommendationRuns.createdAt),
       });
       if (!run) {
         throw new Error(`Recommendation run not found for user ${userId}.`);
       }
-      const items = await db.query.recommendationItems.findMany({ where: eq(recommendationItems.recommendationRunId, run.id) });
+      const items = await db.query.recommendationItems.findMany({
+        where: eq(recommendationItems.recommendationRunId, run.id),
+      });
       return {
         id: run.id,
         userId: run.userId,
@@ -393,27 +507,45 @@ export const postgresRepositories: BackendRepositories = {
         createdAt: run.createdAt.toISOString(),
         engineVersion: run.engineVersion ?? null,
         objective: run.objective ?? null,
-        confidenceScore: run.confidenceScore == null ? null : toNumber(run.confidenceScore),
+        confidenceScore:
+          run.confidenceScore == null ? null : toNumber(run.confidenceScore),
         assumptions: run.assumptions as string[],
         notes: (run.notes as string[] | null) ?? [],
         items: items.map((item) => ({
           assetClass: item.assetClass,
           amountCad: toNumber(item.amountCad),
-          targetAccountType: item.targetAccountType as RecommendationRun["items"][number]["targetAccountType"],
+          targetAccountType:
+            item.targetAccountType as RecommendationRun["items"][number]["targetAccountType"],
           tickerOptions: item.tickerOptions as string[],
           explanation: item.explanation,
           securitySymbol: item.securitySymbol ?? undefined,
           securityName: item.securityName ?? undefined,
-          securityScore: item.securityScore == null ? undefined : toNumber(item.securityScore),
-          allocationGapBeforePct: item.allocationGapBeforePct == null ? undefined : toNumber(item.allocationGapBeforePct),
-          allocationGapAfterPct: item.allocationGapAfterPct == null ? undefined : toNumber(item.allocationGapAfterPct),
-          accountFitScore: item.accountFitScore == null ? undefined : toNumber(item.accountFitScore),
-          taxFitScore: item.taxFitScore == null ? undefined : toNumber(item.taxFitScore),
+          securityScore:
+            item.securityScore == null
+              ? undefined
+              : toNumber(item.securityScore),
+          allocationGapBeforePct:
+            item.allocationGapBeforePct == null
+              ? undefined
+              : toNumber(item.allocationGapBeforePct),
+          allocationGapAfterPct:
+            item.allocationGapAfterPct == null
+              ? undefined
+              : toNumber(item.allocationGapAfterPct),
+          accountFitScore:
+            item.accountFitScore == null
+              ? undefined
+              : toNumber(item.accountFitScore),
+          taxFitScore:
+            item.taxFitScore == null ? undefined : toNumber(item.taxFitScore),
           fxFrictionPenaltyBps: item.fxFrictionPenaltyBps ?? undefined,
-          rationale: (item.rationale as RecommendationRun["items"][number]["rationale"] | null) ?? undefined
-        }))
+          rationale:
+            (item.rationale as
+              | RecommendationRun["items"][number]["rationale"]
+              | null) ?? undefined,
+        })),
       };
-    }
+    },
   },
   analysisRuns: {
     async getFreshByKey(userId, params) {
@@ -424,9 +556,9 @@ export const postgresRepositories: BackendRepositories = {
           eq(portfolioAnalysisRuns.scope, params.scope),
           eq(portfolioAnalysisRuns.mode, params.mode),
           eq(portfolioAnalysisRuns.targetKey, params.targetKey),
-          gt(portfolioAnalysisRuns.expiresAt, params.now)
+          gt(portfolioAnalysisRuns.expiresAt, params.now),
         ),
-        orderBy: desc(portfolioAnalysisRuns.createdAt)
+        orderBy: desc(portfolioAnalysisRuns.createdAt),
       });
       return row ? mapPortfolioAnalysisRun(row) : null;
     },
@@ -435,7 +567,7 @@ export const postgresRepositories: BackendRepositories = {
       const rows = await db.query.portfolioAnalysisRuns.findMany({
         where: eq(portfolioAnalysisRuns.userId, userId),
         orderBy: desc(portfolioAnalysisRuns.createdAt),
-        limit
+        limit,
       });
       return rows.map(mapPortfolioAnalysisRun);
     },
@@ -452,26 +584,177 @@ export const postgresRepositories: BackendRepositories = {
           resultJson: input.result,
           sourceMode: input.sourceMode,
           generatedAt: new Date(input.generatedAt),
-          expiresAt: new Date(input.expiresAt)
+          expiresAt: new Date(input.expiresAt),
         })
         .returning();
       if (!row) {
         throw new Error("Failed to persist portfolio analysis run.");
       }
       return mapPortfolioAnalysisRun(row);
-    }
+    },
+  },
+  externalResearchJobs: {
+    async create(input) {
+      const db = getDb();
+      const [row] = await db
+        .insert(externalResearchJobs)
+        .values({
+          userId: input.userId,
+          scope: input.scope,
+          targetKey: input.targetKey,
+          requestJson: input.request,
+          status: input.status,
+          sourceMode: input.sourceMode,
+          sourceAllowlistJson: input.sourceAllowlist,
+          priority: input.priority,
+          attemptCount: input.attemptCount,
+          maxAttempts: input.maxAttempts,
+          runAfter: new Date(input.runAfter),
+          lockedAt: input.lockedAt ? new Date(input.lockedAt) : null,
+          lockedBy: input.lockedBy,
+          startedAt: input.startedAt ? new Date(input.startedAt) : null,
+          finishedAt: input.finishedAt ? new Date(input.finishedAt) : null,
+          errorMessage: input.errorMessage,
+          resultRunId: input.resultRunId,
+        })
+        .returning();
+      if (!row) {
+        throw new Error("Failed to create external research job.");
+      }
+      return mapExternalResearchJob(row);
+    },
+    async listRecentByUserId(userId, limit) {
+      const db = getDb();
+      const rows = await db.query.externalResearchJobs.findMany({
+        where: eq(externalResearchJobs.userId, userId),
+        orderBy: desc(externalResearchJobs.createdAt),
+        limit,
+      });
+      return rows.map(mapExternalResearchJob);
+    },
+    async claimNext(workerId, now) {
+      const db = getDb();
+      const candidate = await db.query.externalResearchJobs.findFirst({
+        where: and(
+          eq(externalResearchJobs.status, "queued"),
+          lte(externalResearchJobs.runAfter, now),
+        ),
+        orderBy: [
+          desc(externalResearchJobs.priority),
+          desc(externalResearchJobs.createdAt),
+        ],
+      });
+      if (!candidate) {
+        return null;
+      }
+
+      const [row] = await db
+        .update(externalResearchJobs)
+        .set({
+          status: "running",
+          lockedAt: now,
+          lockedBy: workerId,
+          startedAt: now,
+          attemptCount: sql`${externalResearchJobs.attemptCount} + 1`,
+          updatedAt: now,
+        })
+        .where(
+          and(
+            eq(externalResearchJobs.id, candidate.id),
+            eq(externalResearchJobs.status, "queued"),
+          ),
+        )
+        .returning();
+      return row ? mapExternalResearchJob(row) : null;
+    },
+    async markSucceeded(jobId, resultRunId, now) {
+      const db = getDb();
+      const [row] = await db
+        .update(externalResearchJobs)
+        .set({
+          status: "succeeded",
+          resultRunId,
+          finishedAt: now,
+          errorMessage: null,
+          updatedAt: now,
+        })
+        .where(eq(externalResearchJobs.id, jobId))
+        .returning();
+      if (!row) {
+        throw new Error(`External research job not found for id ${jobId}.`);
+      }
+      return mapExternalResearchJob(row);
+    },
+    async markFailed(jobId, errorMessage, now) {
+      const db = getDb();
+      const [row] = await db
+        .update(externalResearchJobs)
+        .set({
+          status: "failed",
+          finishedAt: now,
+          errorMessage,
+          updatedAt: now,
+        })
+        .where(eq(externalResearchJobs.id, jobId))
+        .returning();
+      if (!row) {
+        throw new Error(`External research job not found for id ${jobId}.`);
+      }
+      return mapExternalResearchJob(row);
+    },
+  },
+  externalResearchUsageCounters: {
+    async listByUserIdAndDate(userId, counterDate) {
+      const db = getDb();
+      const rows = await db.query.externalResearchUsageCounters.findMany({
+        where: and(
+          eq(externalResearchUsageCounters.userId, userId),
+          eq(externalResearchUsageCounters.counterDate, counterDate),
+        ),
+      });
+      return rows.map(mapExternalResearchUsageCounter);
+    },
+    async increment(input) {
+      const db = getDb();
+      const [row] = await db
+        .insert(externalResearchUsageCounters)
+        .values({
+          userId: input.userId,
+          counterDate: input.counterDate,
+          scope: input.scope,
+          runCount: input.runCount,
+          symbolCount: input.symbolCount,
+        })
+        .onConflictDoUpdate({
+          target: [
+            externalResearchUsageCounters.userId,
+            externalResearchUsageCounters.counterDate,
+            externalResearchUsageCounters.scope,
+          ],
+          set: {
+            runCount: sql`${externalResearchUsageCounters.runCount} + ${input.runCount}`,
+            symbolCount: sql`${externalResearchUsageCounters.symbolCount} + ${input.symbolCount}`,
+            updatedAt: new Date(),
+          },
+        })
+        .returning();
+      if (!row) {
+        throw new Error("Failed to increment external research usage.");
+      }
+      return mapExternalResearchUsageCounter(row);
+    },
   },
   importJobs: {
     async getLatestByUserId(userId) {
       const db = getDb();
       const row = await db.query.importJobs.findFirst({
         where: eq(importJobs.userId, userId),
-        orderBy: desc(importJobs.createdAt)
+        orderBy: desc(importJobs.createdAt),
       });
       if (!row) {
         throw new Error(`Import job not found for user ${userId}.`);
       }
       return mapImportJob(row);
-    }
-  }
+    },
+  },
 };

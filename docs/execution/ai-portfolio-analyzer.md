@@ -74,18 +74,18 @@ The tests lock these behaviors:
 
 ## Mapping From Skill To Product Modules
 
-| Skill step | Product interpretation | First implementation |
-|---|---|---|
-| Asset classifier | Use existing `securityType`, `assetClass`, `exchange`, and `currency` fields | Local only |
-| Market data fetch | Use cached quote/market identity already in backend | Local only |
-| Fundamentals / ETF holdings | Future external research module | Deferred |
-| News / macro sentiment | Future cached external research | Deferred |
-| Factor score engine | Deterministic scorecards from existing fields first | P0-B |
-| Event / catalyst analysis | Future cached external research | Deferred |
-| Risk guardrail | Use concentration, currency, account placement, quote freshness, and constraints | P0-B |
-| Portfolio fit | Use current holdings, health summary, recommendations, and account types | P0-B |
-| Forum sentiment | Future worker/cached module | P2 |
-| Report generator | JSON result rendered by Flutter cards | P0-C |
+| Skill step                  | Product interpretation                                                           | First implementation |
+| --------------------------- | -------------------------------------------------------------------------------- | -------------------- |
+| Asset classifier            | Use existing `securityType`, `assetClass`, `exchange`, and `currency` fields     | Local only           |
+| Market data fetch           | Use cached quote/market identity already in backend                              | Local only           |
+| Fundamentals / ETF holdings | Future external research module                                                  | Deferred             |
+| News / macro sentiment      | Future cached external research                                                  | Deferred             |
+| Factor score engine         | Deterministic scorecards from existing fields first                              | P0-B                 |
+| Event / catalyst analysis   | Future cached external research                                                  | Deferred             |
+| Risk guardrail              | Use concentration, currency, account placement, quote freshness, and constraints | P0-B                 |
+| Portfolio fit               | Use current holdings, health summary, recommendations, and account types         | P0-B                 |
+| Forum sentiment             | Future worker/cached module                                                      | P2                   |
+| Report generator            | JSON result rendered by Flutter cards                                            | P0-C                 |
 
 ## P0-A Contract Shape
 
@@ -220,14 +220,53 @@ Next analyzer work:
 - External research guard exists in `lib/backend/portfolio-external-research.ts`.
   It rejects live research by default and requires an explicit long-cache policy
   before any external adapter can run.
+- External research policy is now product-owned and visible to mobile clients:
+  `/api/mobile/analysis/external-research-policy` exposes manual-trigger-only
+  status, cache TTL, daily run cap, per-run symbol cap, worker/provider adapter
+  readiness, and the current source allowlist. The default state remains
+  `未启用`, with all live sources disabled.
 - Account Health and account AI quick scan now separate two lenses:
   `账户内适配` for whether the account is a suitable home for its holdings, and
   `全组合目标参考` for how the account contributes to the total portfolio target.
 - Allocation gap copy must state whether the current percentage is above or
   below target. Do not describe an overweight sleeve as "只有".
 - Manually QA repeated AI quick scans from a real mobile URL.
-- Next analyzer work: design the worker/cost policy and source allowlist before
-  implementing a real external research adapter.
+- Next analyzer work: implement a real background worker queue and persisted
+  usage counters before enabling any external research adapter.
+- Background research for that queue/cost layer is recorded in
+  `docs/execution/external-research-worker-background-research.md`.
+- Migration `0005_external_research_jobs` adds the DB-backed job ledger and
+  usage counters. Mobile Settings now reads today's external research usage
+  through `/api/mobile/analysis/external-research-usage`; enqueue remains
+  guarded off until a worker adapter and provider source are implemented.
+- External research job repositories now expose worker lifecycle methods:
+  `claimNext`, `markSucceeded`, and `markFailed`.
+- Local no-op worker command exists:
+  `npm run worker:external-research:once`. It claims one ready job and marks it
+  failed safely while providers remain disabled, without calling external APIs.
+- Mobile Settings can now read recent external research job status through
+  `/api/mobile/analysis/external-research-jobs/recent`, so queued/running
+  /failed states are visible before provider integration.
+- Cached `market-data` provider adapter exists in
+  `lib/backend/portfolio-external-research-providers.ts`. It only reads local
+  holdings and cached price history, never external APIs. It requires all
+  external-research env flags plus
+  `PORTFOLIO_ANALYZER_EXTERNAL_SOURCE_MARKET_DATA=enabled`.
+- Worker success now normalizes cached provider output into
+  `portfolio_analysis_runs` and marks the job succeeded.
+- Admin-only smoke enqueue command exists:
+  `npm run worker:external-research:enqueue-smoke -- --user-id <uuid>`.
+  It creates a queued cached market-data job for local worker validation, keeps
+  `symbol + exchange + currency` in the request, and does not call external
+  APIs.
+- Local Postgres smoke validation passed for `VFV + TSX + CAD`: worker created
+  a `cached-external` analysis run and did not mix in ticker-only/USD cached
+  data when CAD price history was absent.
+- Mobile recent external-research jobs expose a readable target label such as
+  `VFV · TSX · CAD` in addition to the internal cache key, so QA can verify
+  identity separation from the Settings page.
+- Mobile Settings QA passed for recent external-research job visibility after
+  the local smoke run.
 
 ## Deferred Work
 
@@ -236,6 +275,8 @@ P1:
 - cached news/institutional research
 - explicit user-triggered refresh
 - saved analysis history detail/drilldown
+- background worker queue and persisted usage counters for external research
+- cached-external result detail visibility if mobile needs drilldown
 
 P2:
 
@@ -245,6 +286,5 @@ P2:
 
 P3:
 
-- background worker queue
 - scheduled analysis refresh
 - cloud-cost controls and rate limits

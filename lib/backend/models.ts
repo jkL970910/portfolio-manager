@@ -2,8 +2,18 @@ export type EntityId = string;
 export type CurrencyCode = "CAD" | "USD";
 export type DisplayLanguage = "zh" | "en";
 export type CitizenGender = "male" | "female";
-export type CitizenRank = "lowly-ox" | "base-loo" | "citizen" | "general" | "emperor";
-export type CitizenAddressTier = "cowshed" | "suburbs" | "city" | "palace-gate" | "bedchamber";
+export type CitizenRank =
+  | "lowly-ox"
+  | "base-loo"
+  | "citizen"
+  | "general"
+  | "emperor";
+export type CitizenAddressTier =
+  | "cowshed"
+  | "suburbs"
+  | "city"
+  | "palace-gate"
+  | "bedchamber";
 export type CitizenAvatarType = "default" | "male" | "female" | "emperor";
 
 export type AccountType = "TFSA" | "RRSP" | "FHSA" | "Taxable";
@@ -11,10 +21,17 @@ export type RiskProfile = "Conservative" | "Balanced" | "Growth";
 export type TransitionPreference = "stay-close" | "gradual" | "direct";
 export type RecommendationStrategy = "tax-aware" | "target-first" | "balanced";
 export type PreferenceProfileSource = "manual" | "guided";
-export type GuidedAllocationGoal = "retirement" | "home" | "wealth" | "capital-preservation";
+export type GuidedAllocationGoal =
+  | "retirement"
+  | "home"
+  | "wealth"
+  | "capital-preservation";
 export type GuidedAllocationHorizon = "short" | "medium" | "long";
 export type GuidedAllocationVolatility = "low" | "medium" | "high";
-export type GuidedAllocationPriority = "tax-efficiency" | "balanced" | "stay-close";
+export type GuidedAllocationPriority =
+  | "tax-efficiency"
+  | "balanced"
+  | "stay-close";
 export type GuidedAllocationCashNeed = "low" | "medium" | "high";
 
 export interface UserProfile {
@@ -219,7 +236,10 @@ export interface GuidedAllocationDraft {
   id: EntityId;
   userId: EntityId;
   answers: GuidedAllocationAnswers;
-  suggestedProfile: Omit<PreferenceProfile, "id" | "userId" | "watchlistSymbols" | "recommendationConstraints">;
+  suggestedProfile: Omit<
+    PreferenceProfile,
+    "id" | "userId" | "watchlistSymbols" | "recommendationConstraints"
+  >;
   assumptions: string[];
   rationale: string[];
   createdAt: string;
@@ -290,6 +310,48 @@ export interface PortfolioAnalysisRun {
   generatedAt: string;
   expiresAt: string;
   createdAt: string;
+}
+
+export type ExternalResearchScope = PortfolioAnalysisRun["scope"];
+export type ExternalResearchJobStatus =
+  | "queued"
+  | "running"
+  | "succeeded"
+  | "failed"
+  | "cancelled";
+
+export interface ExternalResearchJob {
+  id: EntityId;
+  userId: EntityId;
+  scope: ExternalResearchScope;
+  targetKey: string;
+  request: Record<string, unknown>;
+  status: ExternalResearchJobStatus;
+  sourceMode: "cached-external";
+  sourceAllowlist: Record<string, unknown>[];
+  priority: number;
+  attemptCount: number;
+  maxAttempts: number;
+  runAfter: string;
+  lockedAt: string | null;
+  lockedBy: string | null;
+  startedAt: string | null;
+  finishedAt: string | null;
+  errorMessage: string | null;
+  resultRunId: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ExternalResearchUsageCounter {
+  id: EntityId;
+  userId: EntityId;
+  counterDate: string;
+  scope: ExternalResearchScope;
+  runCount: number;
+  symbolCount: number;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface ImportJob {

@@ -164,5 +164,5 @@ Note: if `npm run lint` fails because ESLint 9 expects flat config, do not treat
 1. Apply/verify migration `0004_portfolio_analysis_runs` in the target dev DB before relying on persistent analyzer cache.
 2. Manual mobile QA for AI quick scans, including `重新生成`, Health wording/score-level fixes, and `AI 最近分析`, using `docs/guides/mobile-manual-qa-sop.md` as the source of truth.
 3. Commit/push the analyzer refresh UI, Health wording fix, and recent analysis history after validation and user approval.
-4. External research is guarded off by default; next priority is worker/cost policy and source allowlist before any live adapter.
-5. Holding-level deeper AI analysis and chart-heavy UX come after the core analyzer flow is stable.
+4. External research is guarded off by default. The DB-backed job/usage ledger, local worker command, mobile job status visibility, cached market-data provider, and admin-only smoke enqueue tooling are in place. The provider reads only local cached data and requires explicit env flags. Local Postgres smoke validation passed for `VFV + TSX + CAD`, and mobile Settings QA passed for recent job visibility; next priority is deciding whether mobile needs cached-external result detail visibility.
+5. Holding-level deeper AI analysis and chart-heavy UX come after the core analyzer and external-research guardrails are stable.

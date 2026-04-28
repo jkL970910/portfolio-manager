@@ -155,6 +155,8 @@ class _SettingsPageState extends State<SettingsPage> {
           const SizedBox(height: 16),
           _RecentAnalysisCard(apiClient: widget.apiClient),
           const SizedBox(height: 16),
+          _ExternalResearchPolicyCard(apiClient: widget.apiClient),
+          const SizedBox(height: 16),
           InvestmentPreferencesCard(apiClient: widget.apiClient),
           const SizedBox(height: 24),
           FilledButton.tonalIcon(
@@ -256,6 +258,359 @@ class _RecentAnalysisCardState extends State<_RecentAnalysisCard> {
           },
         ),
       ),
+    );
+  }
+}
+
+class _ExternalResearchPolicyCard extends StatefulWidget {
+  const _ExternalResearchPolicyCard({required this.apiClient});
+
+  final LooApiClient apiClient;
+
+  @override
+  State<_ExternalResearchPolicyCard> createState() =>
+      _ExternalResearchPolicyCardState();
+}
+
+class _ExternalResearchPolicyCardState
+    extends State<_ExternalResearchPolicyCard> {
+  late Future<_ExternalResearchPolicy> _policy = _loadPolicy();
+  late Future<List<_ExternalResearchJobItem>> _jobs = _loadJobs();
+
+  Future<_ExternalResearchPolicy> _loadPolicy() async {
+    final response = await widget.apiClient.getExternalResearchUsage();
+    final data = response["data"];
+    final payload =
+        data is Map<String, dynamic> ? data : const <String, dynamic>{};
+    return _ExternalResearchPolicy.fromUsageJson(payload);
+  }
+
+  Future<List<_ExternalResearchJobItem>> _loadJobs() async {
+    final response = await widget.apiClient.getExternalResearchJobs(limit: 5);
+    final data = response["data"];
+    final payload =
+        data is Map<String, dynamic> ? data : const <String, dynamic>{};
+    final rawItems = payload["items"];
+    return rawItems is List
+        ? rawItems
+            .whereType<Map<String, dynamic>>()
+            .map(_ExternalResearchJobItem.fromJson)
+            .toList()
+        : const [];
+  }
+
+  void _refresh() {
+    setState(() {
+      _policy = _loadPolicy();
+      _jobs = _loadJobs();
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: FutureBuilder<_ExternalResearchPolicy>(
+          future: _policy,
+          builder: (context, snapshot) {
+            final policy = snapshot.data;
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    const Icon(Icons.shield_outlined),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        "AI 外部研究",
+                        style: Theme.of(context).textTheme.titleLarge,
+                      ),
+                    ),
+                    IconButton(
+                      onPressed:
+                          snapshot.connectionState == ConnectionState.waiting
+                              ? null
+                              : _refresh,
+                      icon: const Icon(Icons.refresh),
+                      tooltip: "刷新策略",
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                if (snapshot.connectionState == ConnectionState.waiting) ...[
+                  const LinearProgressIndicator(),
+                ] else if (snapshot.hasError) ...[
+                  Text(
+                    "外部研究策略暂时读取失败：${snapshot.error}",
+                    style:
+                        TextStyle(color: Theme.of(context).colorScheme.error),
+                  ),
+                ] else if (policy != null) ...[
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      Chip(
+                        avatar: Icon(
+                          policy.canRunLiveResearch
+                              ? Icons.check_circle_outline
+                              : Icons.block,
+                          size: 18,
+                        ),
+                        label: Text(policy.statusLabel),
+                      ),
+                      if (policy.manualTriggerOnly)
+                        const Chip(label: Text("仅手动触发")),
+                      Chip(label: Text("TTL >= ${policy.ttlHours} 小时")),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  const Text("当前不会自动调用新闻、论坛或付费外部研究。后续必须先接入 worker、缓存和来源白名单。"),
+                  const SizedBox(height: 10),
+                  Text(
+                    "今日用量：${policy.usedRuns}/${policy.dailyRunLimit} 次；剩余 ${policy.remainingRuns} 次。",
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                  Text(
+                    "成本边界：单次最多 ${policy.maxSymbolsPerRun} 个标的。",
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                  const SizedBox(height: 10),
+                  ...policy.sources.map(
+                    (source) => ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      dense: true,
+                      leading: Icon(
+                        source.enabled
+                            ? Icons.check_circle_outline
+                            : Icons.radio_button_unchecked,
+                      ),
+                      title: Text(source.label),
+                      subtitle: Text(source.reason),
+                    ),
+                  ),
+                  const Divider(),
+                  FutureBuilder<List<_ExternalResearchJobItem>>(
+                    future: _jobs,
+                    builder: (context, jobsSnapshot) {
+                      if (jobsSnapshot.connectionState ==
+                          ConnectionState.waiting) {
+                        return const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 8),
+                          child: LinearProgressIndicator(),
+                        );
+                      }
+                      if (jobsSnapshot.hasError) {
+                        return Text(
+                          "最近任务暂时读取失败：${jobsSnapshot.error}",
+                          style: TextStyle(
+                              color: Theme.of(context).colorScheme.error),
+                        );
+                      }
+                      final jobs = jobsSnapshot.data ??
+                          const <_ExternalResearchJobItem>[];
+                      if (jobs.isEmpty) {
+                        return const Text("最近没有外部研究任务。");
+                      }
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            "最近任务",
+                            style: Theme.of(context).textTheme.titleMedium,
+                          ),
+                          const SizedBox(height: 6),
+                          ...jobs.map(_ExternalResearchJobTile.new),
+                        ],
+                      );
+                    },
+                  ),
+                ],
+              ],
+            );
+          },
+        ),
+      ),
+    );
+  }
+}
+
+class _ExternalResearchJobTile extends StatelessWidget {
+  const _ExternalResearchJobTile(this.item);
+
+  final _ExternalResearchJobItem item;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListTile(
+      contentPadding: EdgeInsets.zero,
+      dense: true,
+      leading: Icon(item.statusIcon),
+      title: Text("${item.scopeLabel} · ${item.statusLabel}"),
+      subtitle: Text(item.subtitle),
+    );
+  }
+}
+
+class _ExternalResearchJobItem {
+  const _ExternalResearchJobItem({
+    required this.scopeLabel,
+    required this.status,
+    required this.statusLabel,
+    required this.targetKey,
+    required this.targetLabel,
+    required this.attemptCount,
+    required this.maxAttempts,
+    required this.createdAt,
+    required this.errorMessage,
+  });
+
+  final String scopeLabel;
+  final String status;
+  final String statusLabel;
+  final String targetKey;
+  final String targetLabel;
+  final int attemptCount;
+  final int maxAttempts;
+  final DateTime? createdAt;
+  final String? errorMessage;
+
+  IconData get statusIcon {
+    switch (status) {
+      case "queued":
+        return Icons.schedule;
+      case "running":
+        return Icons.sync;
+      case "succeeded":
+        return Icons.check_circle_outline;
+      case "failed":
+        return Icons.error_outline;
+      default:
+        return Icons.info_outline;
+    }
+  }
+
+  String get createdAtLabel {
+    final value = createdAt;
+    if (value == null) {
+      return "时间未知";
+    }
+    final local = value.toLocal();
+    String two(int number) => number.toString().padLeft(2, "0");
+    return "${local.month}/${local.day} ${two(local.hour)}:${two(local.minute)}";
+  }
+
+  String get subtitle {
+    final details = [
+      targetLabel,
+      "$createdAtLabel · 尝试 $attemptCount/$maxAttempts",
+      if (errorMessage != null && errorMessage!.isNotEmpty) errorMessage!,
+    ];
+    return details.join("\n");
+  }
+
+  factory _ExternalResearchJobItem.fromJson(Map<String, dynamic> json) {
+    final rawCreatedAt = json["createdAt"];
+    return _ExternalResearchJobItem(
+      scopeLabel: json["scopeLabel"] as String? ?? "外部研究",
+      status: json["status"] as String? ?? "unknown",
+      statusLabel: json["statusLabel"] as String? ?? "状态未知",
+      targetKey: json["targetKey"] as String? ?? "目标未知",
+      targetLabel: json["targetLabel"] as String? ??
+          json["targetKey"] as String? ??
+          "目标未知",
+      attemptCount: json["attemptCount"] as int? ?? 0,
+      maxAttempts: json["maxAttempts"] as int? ?? 3,
+      createdAt:
+          rawCreatedAt is String ? DateTime.tryParse(rawCreatedAt) : null,
+      errorMessage: json["errorMessage"] as String?,
+    );
+  }
+}
+
+class _ExternalResearchPolicy {
+  const _ExternalResearchPolicy({
+    required this.statusLabel,
+    required this.canRunLiveResearch,
+    required this.manualTriggerOnly,
+    required this.minTtlSeconds,
+    required this.dailyRunLimit,
+    required this.maxSymbolsPerRun,
+    required this.usedRuns,
+    required this.remainingRuns,
+    required this.sources,
+  });
+
+  final String statusLabel;
+  final bool canRunLiveResearch;
+  final bool manualTriggerOnly;
+  final int minTtlSeconds;
+  final int dailyRunLimit;
+  final int maxSymbolsPerRun;
+  final int usedRuns;
+  final int remainingRuns;
+  final List<_ExternalResearchSource> sources;
+
+  int get ttlHours => (minTtlSeconds / 3600).ceil();
+
+  factory _ExternalResearchPolicy.fromUsageJson(Map<String, dynamic> json) {
+    final policyJson = json["policy"] is Map<String, dynamic>
+        ? json["policy"] as Map<String, dynamic>
+        : const <String, dynamic>{};
+    final usageJson = json["usage"] is Map<String, dynamic>
+        ? json["usage"] as Map<String, dynamic>
+        : const <String, dynamic>{};
+    return _ExternalResearchPolicy.fromJson(policyJson, usageJson: usageJson);
+  }
+
+  factory _ExternalResearchPolicy.fromJson(
+    Map<String, dynamic> json, {
+    Map<String, dynamic> usageJson = const <String, dynamic>{},
+  }) {
+    final rawSources = json["sources"];
+    return _ExternalResearchPolicy(
+      statusLabel: json["statusLabel"] as String? ?? "未启用",
+      canRunLiveResearch: json["canRunLiveResearch"] == true,
+      manualTriggerOnly: json["manualTriggerOnly"] != false,
+      minTtlSeconds: json["minTtlSeconds"] as int? ?? 21600,
+      dailyRunLimit: usageJson["dailyRunLimit"] as int? ??
+          json["dailyRunLimit"] as int? ??
+          20,
+      maxSymbolsPerRun: usageJson["maxSymbolsPerRun"] as int? ??
+          json["maxSymbolsPerRun"] as int? ??
+          12,
+      usedRuns: usageJson["usedRuns"] as int? ?? 0,
+      remainingRuns: usageJson["remainingRuns"] as int? ??
+          json["dailyRunLimit"] as int? ??
+          20,
+      sources: rawSources is List
+          ? rawSources
+              .whereType<Map<String, dynamic>>()
+              .map(_ExternalResearchSource.fromJson)
+              .toList()
+          : const [],
+    );
+  }
+}
+
+class _ExternalResearchSource {
+  const _ExternalResearchSource({
+    required this.label,
+    required this.enabled,
+    required this.reason,
+  });
+
+  final String label;
+  final bool enabled;
+  final String reason;
+
+  factory _ExternalResearchSource.fromJson(Map<String, dynamic> json) {
+    return _ExternalResearchSource(
+      label: json["label"] as String? ?? "外部来源",
+      enabled: json["enabled"] == true,
+      reason: json["reason"] as String? ?? "暂未启用。",
     );
   }
 }
