@@ -19,7 +19,7 @@ export const analyzerSecurityIdentitySchema = z.object({
 });
 
 export const portfolioAnalyzerRequestSchema = z.object({
-  scope: z.enum(["security", "portfolio", "recommendation-run"]),
+  scope: z.enum(["security", "portfolio", "account", "recommendation-run"]),
   mode: z.enum(["quick", "full"]).default("quick"),
   security: analyzerSecurityIdentitySchema.optional(),
   holdingId: z.string().trim().min(1).max(80).optional(),
@@ -32,6 +32,14 @@ export const portfolioAnalyzerRequestSchema = z.object({
       code: z.ZodIssueCode.custom,
       path: ["security"],
       message: "Security analysis requires a resolved security identity or holding id."
+    });
+  }
+
+  if (value.scope === "account" && !value.accountId) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["accountId"],
+      message: "Account analysis requires an account id."
     });
   }
 
@@ -48,7 +56,7 @@ const severitySchema = z.enum(["info", "low", "medium", "high"]);
 
 export const portfolioAnalyzerResultSchema = z.object({
   version: z.literal(PORTFOLIO_ANALYZER_VERSION),
-  scope: z.enum(["security", "portfolio", "recommendation-run"]),
+  scope: z.enum(["security", "portfolio", "account", "recommendation-run"]),
   mode: z.enum(["quick", "full"]),
   generatedAt: z.string().datetime(),
   identity: analyzerSecurityIdentitySchema.optional(),

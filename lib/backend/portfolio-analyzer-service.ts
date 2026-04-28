@@ -2,6 +2,7 @@ import { apiSuccess } from "@/lib/backend/contracts";
 import { getRepositories } from "@/lib/backend/repositories/factory";
 import { PortfolioAnalyzerRequest } from "@/lib/backend/portfolio-analyzer-contracts";
 import {
+  buildAccountAnalyzerQuickScan,
   buildPortfolioAnalyzerQuickScan,
   buildRecommendationRunAnalyzerQuickScan,
   buildSecurityAnalyzerQuickScan
@@ -17,6 +18,20 @@ export async function getPortfolioAnalyzerQuickScan(userId: string, input: Portf
 
   if (input.scope === "portfolio") {
     return apiSuccess(buildPortfolioAnalyzerQuickScan({
+      accounts,
+      holdings,
+      profile
+    }), "database");
+  }
+
+  if (input.scope === "account") {
+    const account = accounts.find((item) => item.id === input.accountId);
+    if (!account) {
+      throw new Error("Requested account is not available for quick analysis.");
+    }
+
+    return apiSuccess(buildAccountAnalyzerQuickScan({
+      account,
       accounts,
       holdings,
       profile

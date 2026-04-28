@@ -192,8 +192,8 @@ Current status:
   available.
 - Portfolio Health now shows a user-triggered "AI 组合快扫" card for full
   portfolio scope.
-- Account-scoped Health pages do not show the portfolio AI card yet, because
-  the backend analyzer contract does not have an account-health scope.
+- Account-scoped Health pages now show a user-triggered "AI 账户快扫" card and
+  send the selected `accountId` to the quick-scan API.
 - Results render summary, confidence/source mode, scorecards, risks, tax notes,
   portfolio-fit notes, action items, sources, and non-advice disclaimer.
 
@@ -201,8 +201,7 @@ Next analyzer work:
 
 - Health Score now consumes asset-class bands before the analyzer depends more
   heavily on health output.
-- Add account-scoped analyzer support only if the product needs account-level
-  AI health explanations.
+- Manually QA the account-scoped analyzer from a real mobile URL.
 - Add cached external research only after worker/cache boundaries exist.
 
 ## Deferred Work

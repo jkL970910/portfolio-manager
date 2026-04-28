@@ -98,6 +98,14 @@ test("portfolio analyzer request requires recommendation run id for run analysis
   assert.equal(parsed.success, false);
 });
 
+test("portfolio analyzer request requires account id for account analysis", () => {
+  const parsed = portfolioAnalyzerRequestSchema.safeParse({
+    scope: "account"
+  });
+
+  assert.equal(parsed.success, false);
+});
+
 test("portfolio analyzer result requires disclaimer and local freshness honesty", () => {
   const parsed = portfolioAnalyzerResultSchema.safeParse(makeResult());
 

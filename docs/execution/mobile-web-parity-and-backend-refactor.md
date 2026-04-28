@@ -252,15 +252,17 @@ Recommended product phases:
      disclaimer requirements, and source freshness honesty.
 
 2. P0-B: Deterministic quick scan backend
-   - Status: first builder slice implemented.
+   - Status: implemented for first deterministic slice.
    - Added `lib/backend/portfolio-analyzer.ts`.
    - Added backend tests in `tests/backend/portfolio-analyzer.test.ts`.
    - Implemented local quick-scan builders for `security`, `portfolio`, and
      `recommendation-run` scopes.
+   - Added account-scoped quick scan for account-level Health explanations.
    - No live Reddit/news scraping in this slice.
    - Added protected route `POST /api/mobile/analysis/quick-scan`.
    - Added Flutter API client method `createAnalyzerQuickScan(...)`.
-   - Remaining: render analysis results in Flutter detail pages.
+   - Remaining: live/cached external research is deferred behind cache/worker
+     boundaries.
 
 3. P0-C: Flutter rendering surface
    - Status: implemented for first pass.
@@ -268,6 +270,8 @@ Recommended product phases:
    - Security Detail exposes user-triggered "AI 标的快扫".
    - Portfolio Health exposes user-triggered "AI 组合快扫" for full-portfolio
      scope.
+   - Account-scoped Health pages expose user-triggered "AI 账户快扫" with the
+     selected `accountId`.
    - Results render summary, confidence/source mode, scorecards, risks, tax
      notes, portfolio-fit notes, action items, sources, and disclaimer.
 
@@ -360,10 +364,11 @@ Remaining work:
 
 Next priority order:
 
-1. Mobile Discover / 标的搜索 MVP manual QA.
-2. Commit/push the Discover slice after user approval.
-3. Account-scoped analyzer support for account-level Health explanations.
-4. Cached external research only after cache/worker boundaries exist.
+1. Manual QA for account-scoped AI quick scan on mobile URL.
+2. Commit/push the account-scoped analyzer slice after user approval.
+3. Cached external research design only after cache/worker boundaries exist.
+4. Holding-level deeper AI analysis and chart-heavy UX after the core analyzer
+   flow is stable.
 
 Migration metadata status:
 

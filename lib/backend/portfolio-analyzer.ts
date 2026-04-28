@@ -245,6 +245,106 @@ export function buildPortfolioAnalyzerQuickScan(args: {
   });
 }
 
+export function buildAccountAnalyzerQuickScan(args: {
+  account: InvestmentAccount;
+  accounts: InvestmentAccount[];
+  holdings: HoldingPosition[];
+  profile: PreferenceProfile;
+  generatedAt?: string;
+}): PortfolioAnalyzerResult {
+  const generatedAt = args.generatedAt ?? new Date().toISOString();
+  const accountHoldings = args.holdings.filter((holding) => holding.accountId === args.account.id);
+  const accountValueCad = sum(accountHoldings.map((holding) => holding.marketValueCad));
+  const totalPortfolioCad = sum(args.accounts.map((account) => account.marketValueCad));
+  const accountWeightPct = totalPortfolioCad > 0 ? (accountValueCad / totalPortfolioCad) * 100 : 0;
+  const health = buildPortfolioHealthSummary({
+    accounts: [args.account],
+    holdings: accountHoldings,
+    profile: args.profile,
+    language: "zh"
+  });
+  const largestHolding = [...accountHoldings].sort((left, right) => right.weightPct - left.weightPct)[0];
+  const taxNotes = getTaxNotes({ holdings: accountHoldings, accounts: [args.account] });
+  const accountLabel = `${args.account.nickname} (${args.account.type})`;
+
+  return assertAnalyzerResult({
+    version: PORTFOLIO_ANALYZER_VERSION,
+    scope: "account",
+    mode: "quick",
+    generatedAt,
+    dataFreshness: {
+      portfolioAsOf: latestIso(accountHoldings.map((holding) => holding.updatedAt), generatedAt),
+      quotesAsOf: accountHoldings.length > 0 ? getQuoteFreshness(accountHoldings, generatedAt) : null,
+      externalResearchAsOf: null,
+      sourceMode: "local"
+    },
+    summary: {
+      title: `${accountLabel} AI 账户快扫`,
+      thesis: `${accountLabel} 当前约占总组合 ${round(accountWeightPct, 1)}%，账户健康分为 ${health.score}。本轮只使用本地账户、持仓、偏好和报价缓存。`,
+      confidence: accountHoldings.length > 0 ? "medium" : "low"
+    },
+    scorecards: [
+      {
+        id: "account-health",
+        label: "账户健康",
+        score: health.score,
+        rationale: health.status
+      },
+      {
+        id: "account-weight",
+        label: "组合占比",
+        score: Math.max(0, Math.min(100, 100 - Math.max(0, accountWeightPct - 45) * 1.2)),
+        rationale: `该账户约占总组合 ${round(accountWeightPct, 1)}%。`
+      },
+      ...health.dimensions.slice(0, 4).map((dimension) => ({
+        id: `dimension-${dimension.id}`,
+        label: dimension.label,
+        score: dimension.score,
+        rationale: dimension.summary
+      }))
+    ].slice(0, 8),
+    risks: [
+      ...health.dimensions
+        .filter((dimension) => dimension.score < 68)
+        .map((dimension) => ({
+          severity: dimension.score < 50 ? "high" as const : "medium" as const,
+          title: `${dimension.label}偏弱`,
+          detail: dimension.drivers[0] ?? dimension.summary
+        })),
+      ...(largestHolding && largestHolding.weightPct >= 15 ? [{
+        severity: "medium" as const,
+        title: "账户内单一持仓偏重",
+        detail: `${largestHolding.symbol} 在全组合中约占 ${round(largestHolding.weightPct, 1)}%，需要结合这个账户的税务位置和资产类别判断。`,
+        relatedIdentity: getHoldingIdentity(largestHolding)
+      }] : []),
+      ...(args.account.contributionRoomCad != null && args.account.contributionRoomCad <= 0 ? [{
+        severity: "info" as const,
+        title: "账户额度已接近用完",
+        detail: `${accountLabel} 当前记录的额度不高，后续新增资金可能需要优先考虑其他账户。`
+      }] : [])
+    ].slice(0, 12),
+    taxNotes: taxNotes.length > 0
+      ? taxNotes
+      : [`${args.account.type} 的账户位置会影响税务效率；本轮只基于本地账户类型和持仓币种提示。`],
+    portfolioFit: [
+      ...health.highlights,
+      `账户类型：${args.account.type}；账户币种：${args.account.currency ?? "CAD"}。`,
+      `当前账户内持仓数：${accountHoldings.length}。`
+    ].slice(0, 12),
+    actionItems: health.actionQueue.slice(0, 5).map((item, index) => ({
+      priority: index === 0 ? "P0" : "P1",
+      title: `账户行动 ${index + 1}`,
+      detail: item
+    })),
+    sources: [
+      { title: "Local account health summary", sourceType: "portfolio-data" },
+      { title: "Local account holdings", sourceType: "portfolio-data" },
+      { title: "Cached holding quote fields", sourceType: "quote-cache" }
+    ],
+    disclaimer: PORTFOLIO_ANALYZER_DISCLAIMER
+  });
+}
+
 export function buildRecommendationRunAnalyzerQuickScan(args: {
   run: RecommendationRun;
   profile: PreferenceProfile;

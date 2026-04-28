@@ -3,6 +3,7 @@ import test from "node:test";
 import type { InvestmentAccount, HoldingPosition, PreferenceProfile, RecommendationRun } from "@/lib/backend/models";
 import { DEFAULT_RECOMMENDATION_CONSTRAINTS } from "@/lib/backend/recommendation-constraints";
 import {
+  buildAccountAnalyzerQuickScan,
   buildPortfolioAnalyzerQuickScan,
   buildRecommendationRunAnalyzerQuickScan,
   buildSecurityAnalyzerQuickScan
@@ -137,6 +138,22 @@ test("portfolio analyzer quick scan returns local structured analysis with discl
   assert.equal(result.dataFreshness.sourceMode, "local");
   assert.ok(result.scorecards.length > 0);
   assert.ok(result.risks.some((risk) => risk.title.includes("集中度")));
+  assert.match(result.disclaimer.zh, /不构成投资建议/);
+});
+
+test("account analyzer quick scan returns account-scoped health explanation", () => {
+  const result = buildAccountAnalyzerQuickScan({
+    account: accounts[0]!,
+    accounts,
+    holdings,
+    profile: makeProfile(),
+    generatedAt
+  });
+
+  assert.equal(result.scope, "account");
+  assert.match(result.summary.title, /TFSA/);
+  assert.ok(result.scorecards.some((card) => card.id === "account-health"));
+  assert.ok(result.portfolioFit.some((item) => item.includes("账户类型")));
   assert.match(result.disclaimer.zh, /不构成投资建议/);
 });
 

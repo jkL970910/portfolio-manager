@@ -94,6 +94,18 @@ class _HealthScorePageState extends State<HealthScorePage> {
                       "mode": "quick",
                     },
                   ),
+                ] else ...[
+                  const SizedBox(height: 12),
+                  AiAnalysisCard(
+                    apiClient: widget.apiClient,
+                    title: "AI 账户快扫",
+                    description: "基于当前账户持仓、账户类型、投资偏好和本地报价缓存生成，不包含实时新闻或论坛情绪。",
+                    payload: {
+                      "scope": "account",
+                      "mode": "quick",
+                      "accountId": widget.accountId,
+                    },
+                  ),
                 ],
                 if (data.highlights.isNotEmpty) ...[
                   const SizedBox(height: 16),
