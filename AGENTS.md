@@ -162,7 +162,7 @@ Note: if `npm run lint` fails because ESLint 9 expects flat config, do not treat
 ## Current Priority Order
 
 1. Apply/verify migration `0004_portfolio_analysis_runs` in the target dev DB before relying on persistent analyzer cache.
-2. Manual mobile QA for AI quick scans and current Flutter mobile features, using `docs/guides/mobile-manual-qa-sop.md` as the source of truth.
-3. Commit/push the analyzer cache boundary after validation and user approval.
+2. Manual mobile QA for AI quick scans, including `重新生成`, and Health wording/score-level fixes, using `docs/guides/mobile-manual-qa-sop.md` as the source of truth.
+3. Commit/push the analyzer refresh UI and Health wording fix after validation and user approval.
 4. Cached external research must wait for explicit cache/worker policy and should not call live external sources by default.
 5. Holding-level deeper AI analysis and chart-heavy UX come after the core analyzer flow is stable.

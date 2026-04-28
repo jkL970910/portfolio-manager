@@ -71,6 +71,9 @@ const ASSET_CLASS_RISK_WEIGHTS: Record<string, number> = {
 const IMPACT_HINT_AMOUNTS = [2500, 5000, 10000] as const;
 
 export type PortfolioHealthSummary = {
+  scopeLevel: "portfolio" | "account";
+  scopeLabel: string;
+  scopeDetail: string;
   score: number;
   status: string;
   radar: Array<{ dimension: string; value: number }>;
@@ -147,8 +150,11 @@ export function buildPortfolioHealthSummary(args: {
   holdings: HoldingPosition[];
   profile: PreferenceProfile;
   language: DisplayLanguage;
+  scopeLevel?: "portfolio" | "account";
 }): PortfolioHealthSummary {
   const { accounts, holdings, profile, language } = args;
+  const scopeLevel = args.scopeLevel ?? "portfolio";
+  const isAccountScope = scopeLevel === "account";
   const { total, allocation } = getCurrentAllocation(holdings);
   const targetAllocation = getConstrainedTargetAllocation(profile);
   const activeAssetClassBands = profile.recommendationConstraints.assetClassBands.filter((band) =>
@@ -206,10 +212,17 @@ export function buildPortfolioHealthSummary(args: {
     95
   );
 
+  const allocationLabel = isAccountScope
+    ? pick(language, "全组合目标参考", "Portfolio Target Reference")
+    : pick(language, "配置贴合", "Allocation");
+  const efficiencyLabel = isAccountScope
+    ? pick(language, "账户内适配", "Account Fit")
+    : pick(language, "账户效率", "Efficiency");
+
   const radar = [
-    { dimension: pick(language, "配置贴合", "Allocation"), value: round(allocationFit, 0) },
+    { dimension: allocationLabel, value: round(allocationFit, 0) },
     { dimension: pick(language, "分散度", "Diversification"), value: round(diversification, 0) },
-    { dimension: pick(language, "账户效率", "Efficiency"), value: round(accountEfficiency, 0) },
+    { dimension: efficiencyLabel, value: round(accountEfficiency, 0) },
     { dimension: pick(language, "集中度", "Concentration"), value: round(concentration, 0) },
     { dimension: pick(language, "风险平衡", "Risk Balance"), value: round(riskBalance, 0) }
   ];
@@ -235,27 +248,53 @@ export function buildPortfolioHealthSummary(args: {
     ? targetAllocation.find((target) => target.assetClass === mainGap.assetClass)?.targetPct ?? 0
     : 0;
   const mainGapCurrentPct = mainGap ? (allocation.get(mainGap.assetClass) ?? 0) : 0;
+  const mainGapAbsPct = mainGap ? Math.abs(mainGap.gap) : 0;
+  const mainGapLabel = mainGap ? getAssetClassLabel(mainGap.assetClass, language) : "";
+  const mainGapDriver = mainGap
+    ? mainGap.gap > 0
+      ? pick(
+        language,
+        `${mainGapLabel} 当前约 ${mainGapCurrentPct.toFixed(1)}%，目标约 ${mainGapTargetPct.toFixed(1)}%，高于目标 ${mainGapAbsPct.toFixed(1)} 个百分点。`,
+        `${mainGapLabel} is currently about ${mainGapCurrentPct.toFixed(1)}% versus a ${mainGapTargetPct.toFixed(1)}% target, overweight by ${mainGapAbsPct.toFixed(1)} percentage points.`
+      )
+      : pick(
+        language,
+        `${mainGapLabel} 当前约 ${mainGapCurrentPct.toFixed(1)}%，目标约 ${mainGapTargetPct.toFixed(1)}%，低于目标 ${mainGapAbsPct.toFixed(1)} 个百分点。`,
+        `${mainGapLabel} is currently about ${mainGapCurrentPct.toFixed(1)}% versus a ${mainGapTargetPct.toFixed(1)}% target, underweight by ${mainGapAbsPct.toFixed(1)} percentage points.`
+      )
+    : "";
 
   const allocationDimension = {
     id: "allocation" as const,
-    label: pick(language, "配置贴合", "Allocation"),
+    label: allocationLabel,
     score: round(allocationFit, 0),
     status: getDimensionStatus(allocationFit, language),
     summary: mainGap
-      ? pick(
-        language,
-        `你现在的 ${getAssetClassLabel(mainGap.assetClass, language)} 配得还不够，和你自己设的目标差得最远。`,
-        `${getAssetClassLabel(mainGap.assetClass, language)} remains the clearest target mismatch.`
-      )
+      ? isAccountScope
+        ? pick(
+          language,
+          `${mainGapLabel} 是这个账户里和全组合目标差异最大的一块；这只是参考，不代表单个账户必须复制全组合目标。`,
+          `${mainGapLabel} is the largest account-level difference versus the portfolio target; this is a reference, not a requirement for one account to mirror the full portfolio.`
+        )
+        : pick(
+          language,
+          `${mainGapLabel} 和你自己设的目标差得最远。`,
+          `${mainGapLabel} remains the clearest target mismatch.`
+        )
       : pick(language, "当前配置已经大致贴近目标。", "Current allocation is broadly aligned with the target."),
     drivers: [
       mainGap
-        ? pick(
-          language,
-          `${getAssetClassLabel(mainGap.assetClass, language)} 的目标大约是 ${mainGapTargetPct.toFixed(0)}%，你现在大约只有 ${mainGapCurrentPct.toFixed(1)}%，所以差了 ${Math.abs(mainGap.gap).toFixed(1)} 个百分点。`,
-          `${getAssetClassLabel(mainGap.assetClass, language)} is off target by ${Math.abs(mainGap.gap).toFixed(1)}%.`
-        )
+        ? mainGapDriver
         : pick(language, "没有明显的配置偏差。", "No major allocation gap was detected."),
+      ...(isAccountScope
+        ? [
+            pick(
+              language,
+              "账户级健康分拆成两个口径：账户内适配看这个账户放得顺不顺；全组合目标参考看它对总组合目标的贡献，不要求单个账户复制全组合目标。",
+              "Account health uses two lenses: account fit checks whether this account is a suitable home, while portfolio target reference checks how it contributes to the full target mix."
+            )
+          ]
+        : []),
       pick(
         language,
         `你的目标配置一共分成了 ${targetAllocation.length} 个资产方向。`,
@@ -282,11 +321,17 @@ export function buildPortfolioHealthSummary(args: {
     ],
     actions: [
       mainGap
-        ? pick(
-          language,
-          `下一笔钱先补到 ${getAssetClassLabel(mainGap.assetClass, language)}，先把最大的缺口补起来。`,
-          `Route the next contribution toward ${getAssetClassLabel(mainGap.assetClass, language)} first.`
-        )
+        ? isAccountScope
+          ? pick(
+            language,
+            `不要只因为这个账户偏离 ${mainGapLabel} 目标就硬调仓；先判断这是不是该账户角色需要承担的侧重点，再看全组合还缺什么。`,
+            `Do not rebalance this account just because it differs from the ${mainGapLabel} target; first decide whether that tilt is intentional for the account, then check the full portfolio gap.`
+          )
+          : pick(
+            language,
+            `下一笔钱先补到 ${mainGapLabel}，先把最大的缺口补起来。`,
+            `Route the next contribution toward ${mainGapLabel} first.`
+          )
         : pick(language, "当前可优先维护而非大幅调整。", "Maintain the mix instead of making large changes.")
     ]
   };
@@ -335,7 +380,7 @@ export function buildPortfolioHealthSummary(args: {
 
   const efficiencyDimension = {
     id: "efficiency" as const,
-    label: pick(language, "账户效率", "Efficiency"),
+    label: efficiencyLabel,
     score: round(accountEfficiency, 0),
     status: getDimensionStatus(accountEfficiency, language),
     summary: leastEfficientHolding?.account
@@ -673,6 +718,21 @@ export function buildPortfolioHealthSummary(args: {
     .slice(0, 5);
 
   return {
+    scopeLevel,
+    scopeLabel: isAccountScope
+      ? pick(language, "账户内适配 + 全组合目标参考", "Account fit + portfolio target reference")
+      : pick(language, "全组合健康", "Full portfolio health"),
+    scopeDetail: isAccountScope
+      ? pick(
+        language,
+        "账户级评分不要求单个账户复制全组合目标；它同时看账户属性是否合适，以及该账户对全组合目标有没有帮助。",
+        "Account-level scoring does not require one account to mirror the full portfolio target; it checks both account fit and contribution to the full target."
+      )
+      : pick(
+        language,
+        "全组合评分以你的总目标配置、账户放置、集中度和风险平衡为口径。",
+        "Portfolio scoring uses the full target mix, account placement, concentration, and risk balance."
+      ),
     score,
     status: score >= 82
       ? pick(language, "状态稳健", "Strong shape")

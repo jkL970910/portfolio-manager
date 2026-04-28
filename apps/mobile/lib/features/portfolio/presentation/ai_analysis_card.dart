@@ -22,20 +22,43 @@ class AiAnalysisCard extends StatefulWidget {
 
 class _AiAnalysisCardState extends State<AiAnalysisCard> {
   Future<MobileAiAnalysisResult>? _analysis;
+  bool _hasResult = false;
+  bool _isLoading = false;
 
-  void _runAnalysis() {
+  void _runAnalysis({bool refresh = false}) {
     setState(() {
-      _analysis = _loadAnalysis();
+      _isLoading = true;
+      _analysis = _loadAnalysis(refresh: refresh);
     });
   }
 
-  Future<MobileAiAnalysisResult> _loadAnalysis() async {
-    final response = await widget.apiClient.createAnalyzerQuickScan(widget.payload);
-    final data = response["data"];
-    if (data is! Map<String, dynamic>) {
-      throw const LooApiException("AI 分析格式不正确。");
+  Future<MobileAiAnalysisResult> _loadAnalysis({required bool refresh}) async {
+    try {
+      final payload = {
+        ...widget.payload,
+        if (refresh) "cacheStrategy": "refresh",
+      };
+      final response = await widget.apiClient.createAnalyzerQuickScan(payload);
+      final data = response["data"];
+      if (data is! Map<String, dynamic>) {
+        throw const LooApiException("AI 分析格式不正确。");
+      }
+      final result = MobileAiAnalysisResult.fromJson(data);
+      if (mounted) {
+        setState(() {
+          _hasResult = true;
+          _isLoading = false;
+        });
+      }
+      return result;
+    } on Object {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+      rethrow;
     }
-    return MobileAiAnalysisResult.fromJson(data);
   }
 
   @override
@@ -63,10 +86,28 @@ class _AiAnalysisCardState extends State<AiAnalysisCard> {
                   ),
                 ),
                 const SizedBox(width: 12),
-                FilledButton.icon(
-                  onPressed: future == null ? _runAnalysis : null,
-                  icon: const Icon(Icons.auto_awesome),
-                  label: Text(future == null ? "生成" : "已生成"),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    FilledButton.icon(
+                      onPressed: _isLoading
+                          ? null
+                          : future == null
+                              ? () => _runAnalysis()
+                              : _hasResult
+                                  ? () => _runAnalysis(refresh: true)
+                                  : null,
+                      icon: const Icon(Icons.auto_awesome),
+                      label: Text(_hasResult ? "重新生成" : "生成"),
+                    ),
+                    if (_hasResult) ...[
+                      const SizedBox(height: 6),
+                      Text(
+                        "跳过缓存",
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                    ],
+                  ],
                 ),
               ],
             ),
@@ -85,7 +126,7 @@ class _AiAnalysisCardState extends State<AiAnalysisCard> {
                   if (snapshot.hasError) {
                     return _AnalysisError(
                       message: snapshot.error.toString(),
-                      onRetry: _runAnalysis,
+                      onRetry: () => _runAnalysis(refresh: true),
                     );
                   }
 
@@ -93,7 +134,7 @@ class _AiAnalysisCardState extends State<AiAnalysisCard> {
                   if (data == null) {
                     return _AnalysisError(
                       message: "没有拿到 AI 分析结果。",
-                      onRetry: _runAnalysis,
+                      onRetry: () => _runAnalysis(refresh: true),
                     );
                   }
 
@@ -237,7 +278,8 @@ class _AnalysisResultView extends StatelessWidget {
         const SizedBox(height: 6),
         Text(data.thesis),
         const SizedBox(height: 8),
-        _MetaPill("置信度 ${_confidenceLabel(data.confidence)} · ${_sourceModeLabel(data.sourceMode)}"),
+        _MetaPill(
+            "置信度 ${_confidenceLabel(data.confidence)} · ${_sourceModeLabel(data.sourceMode)}"),
         if (data.scorecards.isNotEmpty) ...[
           const SizedBox(height: 14),
           ...data.scorecards.take(4).map(_ScorecardRow.new),
@@ -395,7 +437,8 @@ class _AnalysisError extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(message, style: TextStyle(color: Theme.of(context).colorScheme.error)),
+        Text(message,
+            style: TextStyle(color: Theme.of(context).colorScheme.error)),
         const SizedBox(height: 8),
         OutlinedButton(onPressed: onRetry, child: const Text("重试")),
       ],

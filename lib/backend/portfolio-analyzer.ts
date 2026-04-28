@@ -261,8 +261,11 @@ export function buildAccountAnalyzerQuickScan(args: {
     accounts: [args.account],
     holdings: accountHoldings,
     profile: args.profile,
-    language: "zh"
+    language: "zh",
+    scopeLevel: "account"
   });
+  const accountFitDimension = health.dimensions.find((dimension) => dimension.id === "efficiency");
+  const portfolioReferenceDimension = health.dimensions.find((dimension) => dimension.id === "allocation");
   const largestHolding = [...accountHoldings].sort((left, right) => right.weightPct - left.weightPct)[0];
   const taxNotes = getTaxNotes({ holdings: accountHoldings, accounts: [args.account] });
   const accountLabel = `${args.account.nickname} (${args.account.type})`;
@@ -286,9 +289,21 @@ export function buildAccountAnalyzerQuickScan(args: {
     scorecards: [
       {
         id: "account-health",
-        label: "账户健康",
+        label: "账户综合分",
         score: health.score,
-        rationale: health.status
+        rationale: `${health.status}；${health.scopeDetail}`
+      },
+      {
+        id: "account-role-fit",
+        label: "账户内适配",
+        score: accountFitDimension?.score ?? health.score,
+        rationale: accountFitDimension?.summary ?? "检查这个账户里的资产是否适合当前账户属性。"
+      },
+      {
+        id: "portfolio-contribution",
+        label: "全组合目标参考",
+        score: portfolioReferenceDimension?.score ?? health.score,
+        rationale: portfolioReferenceDimension?.summary ?? "检查这个账户对全组合目标配置的贡献。"
       },
       {
         id: "account-weight",
@@ -327,6 +342,7 @@ export function buildAccountAnalyzerQuickScan(args: {
       ? taxNotes
       : [`${args.account.type} 的账户位置会影响税务效率；本轮只基于本地账户类型和持仓币种提示。`],
     portfolioFit: [
+      "本账户分析分两个口径：账户内适配看账户属性是否合适；全组合目标参考看它对总组合配置有没有帮助。",
       ...health.highlights,
       `账户类型：${args.account.type}；账户币种：${args.account.currency ?? "CAD"}。`,
       `当前账户内持仓数：${accountHoldings.length}。`

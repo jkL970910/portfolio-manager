@@ -195,6 +195,8 @@ class _HealthScorePageState extends State<HealthScorePage> {
 class MobileHealthSnapshot {
   const MobileHealthSnapshot({
     required this.scopeName,
+    required this.scopeLabel,
+    required this.scopeDetail,
     required this.score,
     required this.status,
     required this.strongestDimension,
@@ -208,6 +210,8 @@ class MobileHealthSnapshot {
   });
 
   final String scopeName;
+  final String scopeLabel;
+  final String scopeDetail;
   final String score;
   final String status;
   final MobileHealthDimensionPair strongestDimension;
@@ -229,6 +233,12 @@ class MobileHealthSnapshot {
 
     return MobileHealthSnapshot(
       scopeName: scopeData["name"] as String? ?? "组合健康",
+      scopeLabel: healthData["scopeLabel"] as String? ??
+          (scopeData["type"] == "account" ? "账户内适配 + 全组合目标参考" : "全组合健康"),
+      scopeDetail: healthData["scopeDetail"] as String? ??
+          (scopeData["type"] == "account"
+              ? "账户级评分不要求单个账户复制全组合目标。"
+              : "全组合评分按总目标配置、账户效率、集中度和风险平衡判断。"),
       score: "${healthData["score"] ?? "--"} 分",
       status: healthData["status"] as String? ?? "待评估",
       strongestDimension:
@@ -387,6 +397,10 @@ class _SummaryCard extends StatelessWidget {
             children: [
               Text(data.scopeName, style: theme.textTheme.headlineMedium),
               const SizedBox(height: 10),
+              _ScopePill(data.scopeLabel),
+              const SizedBox(height: 8),
+              Text(data.scopeDetail),
+              const SizedBox(height: 14),
               Text(data.score, style: theme.textTheme.displaySmall),
               const SizedBox(height: 8),
               Text(data.status),
@@ -412,6 +426,27 @@ class _SectionTitle extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Text(title, style: Theme.of(context).textTheme.titleLarge);
+  }
+}
+
+class _ScopePill extends StatelessWidget {
+  const _ScopePill(this.label);
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        child: Text(label, style: theme.textTheme.bodySmall),
+      ),
+    );
   }
 }
 

@@ -1414,7 +1414,8 @@ export function buildPortfolioData(args: {
         accounts: [account],
         holdings: accountHoldings,
         profile,
-        language
+        language,
+        scopeLevel: "account"
       });
       const accountTotal = account.marketValueCad || 1;
       return {
@@ -1438,6 +1439,8 @@ export function buildPortfolioData(args: {
         healthScore: {
           score: accountHealth.score,
           status: accountHealth.status,
+          scopeLabel: accountHealth.scopeLabel,
+          scopeDetail: accountHealth.scopeDetail,
           radar: accountHealth.radar,
           highlights: accountHealth.highlights,
           strongestDimension: `${accountHealth.strongestDimension.label} ${accountHealth.strongestDimension.value}`,
@@ -1446,6 +1449,8 @@ export function buildPortfolioData(args: {
         healthDetail: {
           score: accountHealth.score,
           status: accountHealth.status,
+          scopeLabel: accountHealth.scopeLabel,
+          scopeDetail: accountHealth.scopeDetail,
           radar: accountHealth.radar,
           highlights: accountHealth.highlights,
           strongestDimension: `${accountHealth.strongestDimension.label} ${accountHealth.strongestDimension.value}`,
@@ -1500,6 +1505,8 @@ export function buildPortfolioData(args: {
     healthScore: {
       score: health.score,
       status: health.status,
+      scopeLabel: health.scopeLabel,
+      scopeDetail: health.scopeDetail,
       radar: health.radar,
       highlights: health.highlights,
       strongestDimension: `${health.strongestDimension.label} ${health.strongestDimension.value}`,

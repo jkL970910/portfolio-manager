@@ -132,6 +132,8 @@ export interface PortfolioData {
     healthScore: {
       score: number;
       status: string;
+      scopeLabel?: string;
+      scopeDetail?: string;
       radar: { dimension: string; value: number }[];
       highlights: string[];
       strongestDimension: string;
@@ -140,6 +142,8 @@ export interface PortfolioData {
     healthDetail: {
       score: number;
       status: string;
+      scopeLabel?: string;
+      scopeDetail?: string;
       radar: { dimension: string; value: number }[];
       highlights: string[];
       strongestDimension: string;
@@ -195,6 +199,8 @@ export interface PortfolioData {
   healthScore: {
     score: number;
     status: string;
+    scopeLabel?: string;
+    scopeDetail?: string;
     radar: { dimension: string; value: number }[];
     highlights: string[];
     strongestDimension: string;

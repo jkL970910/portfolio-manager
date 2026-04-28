@@ -210,8 +210,13 @@ Next analyzer work:
 
 - Health Score now consumes asset-class bands before the analyzer depends more
   heavily on health output.
-- Apply/verify migration `0004_portfolio_analysis_runs` in the target dev DB
-  before relying on persistent analyzer cache.
+- Flutter AI analysis cards expose `重新生成` after the first result and send
+  `cacheStrategy: "refresh"` to bypass cached results.
+- Account Health and account AI quick scan now separate two lenses:
+  `账户内适配` for whether the account is a suitable home for its holdings, and
+  `全组合目标参考` for how the account contributes to the total portfolio target.
+- Allocation gap copy must state whether the current percentage is above or
+  below target. Do not describe an overweight sleeve as "只有".
 - Manually QA repeated AI quick scans from a real mobile URL.
 - Add cached external research only after cache/worker policy is explicit.
 

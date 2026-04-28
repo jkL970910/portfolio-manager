@@ -368,12 +368,16 @@ Remaining work:
 Next priority order:
 
 1. Apply/verify migration `0004_portfolio_analysis_runs` in the target dev DB.
-2. Manual QA that AI quick scans still generate normally and can be repeated
-   after navigation/reload.
-3. Commit/push the analysis cache boundary after validation.
-4. External research adapter design remains blocked until cache/worker policy
+2. Manual QA that AI quick scans still generate normally, `重新生成` bypasses
+   cache, and repeated navigation/reload does not break the card.
+3. Manual QA account Health wording: account-level pages must show
+   `账户内适配 + 全组合目标参考`, and overweight allocation copy must say
+   `高于目标`, not `只有`.
+4. Commit/push the analyzer refresh UI and Health wording fix after
+   validation.
+5. External research adapter design remains blocked until cache/worker policy
    is explicit.
-5. Holding-level deeper AI analysis and chart-heavy UX after the core analyzer
+6. Holding-level deeper AI analysis and chart-heavy UX after the core analyzer
    flow is stable.
 
 Migration metadata status:

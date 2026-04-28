@@ -137,3 +137,41 @@ test("health score uses asset-class bands as effective target constraints", () =
   assert.ok(constrained.score > unconstrained.score);
   assert.ok(constrainedAllocation.drivers.some((driver) => driver.includes("资产区间约束")));
 });
+
+test("health score describes overweight target gaps without saying only", () => {
+  const health = buildPortfolioHealthSummary({
+    accounts,
+    holdings,
+    profile: makeProfile({
+      targetAllocation: [
+        { assetClass: "Canadian Equity", targetPct: 1 },
+        { assetClass: "US Equity", targetPct: 35 },
+        { assetClass: "International Equity", targetPct: 20 },
+        { assetClass: "Fixed Income", targetPct: 25 },
+        { assetClass: "Cash", targetPct: 10 }
+      ]
+    }),
+    language: "zh"
+  });
+  const allocation = health.dimensions.find((item) => item.id === "allocation");
+
+  assert.ok(allocation);
+  assert.ok(allocation.drivers[0]?.includes("高于目标"));
+  assert.ok(!allocation.drivers[0]?.includes("只有"));
+});
+
+test("account health exposes account-fit and portfolio-target reference lenses", () => {
+  const health = buildPortfolioHealthSummary({
+    accounts,
+    holdings,
+    profile: makeProfile(),
+    language: "zh",
+    scopeLevel: "account"
+  });
+
+  assert.equal(health.scopeLevel, "account");
+  assert.match(health.scopeLabel, /账户内适配/);
+  assert.ok(health.dimensions.some((item) => item.label === "账户内适配"));
+  assert.ok(health.dimensions.some((item) => item.label === "全组合目标参考"));
+  assert.ok(health.dimensions.find((item) => item.id === "allocation")?.drivers.some((driver) => driver.includes("不要求单个账户复制全组合目标")));
+});
