@@ -8,6 +8,27 @@
       "when": 1773881053136,
       "tag": "0000_slippery_avengers",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1775361711226,
+      "tag": "0001_real_historical_performance",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1775506388244,
+      "tag": "0002_cash_accounts_net_worth_foundation",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1777320464970,
+      "tag": "0003_recommendation_constraints",
+      "breakpoints": true
     }
   ]
 }

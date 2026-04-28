@@ -11,7 +11,8 @@ This guide turns the WSL copy of the project into a single-project remote develo
 - Project root: `~/projects/portfolio-manager`
 - Backend/API host: `http://127.0.0.1:3000`
 - Flutter mobile preview: `http://127.0.0.1:3001`
-- Mobile preview tunnel: Cloudflare quick tunnel to the Flutter preview
+- Mobile preview proxy: `http://127.0.0.1:3010` (`/api/*` -> Next.js API, other paths -> Flutter)
+- Mobile preview tunnel: Cloudflare quick tunnel to the mobile preview proxy
 - Telegram control plane: ductor running from the project root
 
 ## One-time installs in WSL
@@ -98,7 +99,25 @@ cd ~/projects/portfolio-manager
 npm run mobile:dev:web
 ```
 
-This serves the Flutter app at `http://127.0.0.1:3001`. The Next.js process on port `3000` remains the current backend/API host while the product migrates to Flutter.
+This builds and serves the Flutter Web release bundle at `http://127.0.0.1:3001`. The release bundle is the default for phone testing because it is more stable behind Cloudflare Tunnel than Flutter's debug web server. The Next.js process on port `3000` remains the current backend/API host while the product migrates to Flutter.
+
+For local hot-reload debugging only:
+
+```bash
+cd ~/projects/portfolio-manager
+FLUTTER_MOBILE_DEV_SERVER=1 npm run mobile:dev:web
+```
+
+## Start the mobile preview proxy
+
+In a third terminal:
+
+```bash
+cd ~/projects/portfolio-manager
+npm run mobile:preview:proxy
+```
+
+This serves the phone-facing preview at `http://127.0.0.1:3010`. It forwards `/api/*` to the Next.js backend on port `3000` and all other paths to Flutter on port `3001`. Use this proxy for phone testing; tunneling directly to `3001` loads the Flutter app but breaks login/API calls.
 
 ## Start the mobile preview tunnel
 
@@ -106,7 +125,7 @@ In another terminal:
 
 ```bash
 cd ~/projects/portfolio-manager
-npm run preview:tunnel:cloudflare -- 3001
+npm run preview:tunnel:cloudflare -- 3010
 ```
 
 Cloudflare quick tunnel will print a temporary `https://...trycloudflare.com` URL. Open that URL on your phone to see the latest local changes.
@@ -138,7 +157,14 @@ Terminal 4:
 
 ```bash
 cd ~/projects/portfolio-manager
-npm run preview:tunnel:cloudflare -- 3001
+npm run mobile:preview:proxy
+```
+
+Terminal 5:
+
+```bash
+cd ~/projects/portfolio-manager
+npm run preview:tunnel:cloudflare -- 3010
 ```
 
 Now you can:
@@ -167,6 +193,7 @@ The startup Telegram message now includes a simple status card with:
 - stack status
 - backend/API URL
 - Flutter preview URL
+- mobile preview proxy URL
 - public preview URL
 - project path
 - tunnel URL file path
@@ -199,6 +226,7 @@ You should see the `portfolio-remote-dev` session with these windows:
 
 - `backend`
 - `flutter`
+- `proxy`
 - `ductor`
 - `tunnel`
 

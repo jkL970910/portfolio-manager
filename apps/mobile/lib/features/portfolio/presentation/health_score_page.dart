@@ -4,6 +4,7 @@ import "../../../core/api/loo_api_client.dart";
 import "../../shared/data/mobile_models.dart";
 import "../../shared/presentation/loo_charts.dart";
 import "account_type_portfolio_page.dart";
+import "ai_analysis_card.dart";
 import "detail_state_widgets.dart";
 import "holding_detail_page.dart";
 
@@ -83,6 +84,17 @@ class _HealthScorePageState extends State<HealthScorePage> {
               padding: const EdgeInsets.fromLTRB(20, 12, 20, 28),
               children: [
                 _SummaryCard(data),
+                if (widget.accountId == null) ...[
+                  const SizedBox(height: 12),
+                  AiAnalysisCard(
+                    apiClient: widget.apiClient,
+                    title: "AI 组合快扫",
+                    payload: const {
+                      "scope": "portfolio",
+                      "mode": "quick",
+                    },
+                  ),
+                ],
                 if (data.highlights.isNotEmpty) ...[
                   const SizedBox(height: 16),
                   const _SectionTitle("Loo皇批注"),

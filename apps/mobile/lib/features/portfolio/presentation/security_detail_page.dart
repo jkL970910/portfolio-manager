@@ -3,6 +3,7 @@ import "package:flutter/material.dart";
 import "../../../core/api/loo_api_client.dart";
 import "../../shared/data/mobile_models.dart";
 import "../../shared/presentation/loo_charts.dart";
+import "ai_analysis_card.dart";
 import "detail_state_widgets.dart";
 import "holding_detail_page.dart";
 
@@ -95,6 +96,21 @@ class _SecurityDetailPageState extends State<SecurityDetailPage> {
                   data,
                 ),
                 const SizedBox(height: 12),
+                AiAnalysisCard(
+                  apiClient: widget.apiClient,
+                  title: "AI 标的快扫",
+                  payload: {
+                    "scope": "security",
+                    "mode": "quick",
+                    "security": {
+                      "symbol": data.symbol,
+                      if (data.exchange.isNotEmpty) "exchange": data.exchange,
+                      if (data.currency.isNotEmpty) "currency": data.currency,
+                      "name": data.name,
+                    },
+                  },
+                ),
+                const SizedBox(height: 12),
                 _MetricGrid(data),
                 if (data.performance.isNotEmpty) ...[
                   const SizedBox(height: 16),
@@ -168,6 +184,7 @@ class MobileSecurityDetailSnapshot {
     required this.name,
     required this.assetClass,
     required this.sector,
+    required this.currency,
     required this.exchange,
     required this.lastPrice,
     required this.quoteTimestamp,
@@ -186,6 +203,7 @@ class MobileSecurityDetailSnapshot {
   final String name;
   final String assetClass;
   final String sector;
+  final String currency;
   final String exchange;
   final String lastPrice;
   final String quoteTimestamp;
@@ -209,6 +227,7 @@ class MobileSecurityDetailSnapshot {
       name: securityData["name"] as String? ?? "未知标的",
       assetClass: securityData["assetClass"] as String? ?? "",
       sector: securityData["sector"] as String? ?? "",
+      currency: securityData["currency"] as String? ?? "",
       exchange: securityData["exchange"] as String? ?? "",
       lastPrice: securityData["lastPrice"] as String? ?? "--",
       quoteTimestamp: securityData["quoteTimestamp"] as String? ?? "",

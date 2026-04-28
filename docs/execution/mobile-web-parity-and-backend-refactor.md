@@ -1,6 +1,6 @@
 # Mobile/Web Parity And Backend Refactor Plan
 
-Last updated: 2026-04-27
+Last updated: 2026-04-28
 
 ## Purpose
 
@@ -124,40 +124,73 @@ boundaries before AI-agent features become central.
 
 ## Recommended Backend Refactor Priority
 
-1. Mobile contract typing and DTO cleanup
+1. AI portfolio analyzer integration
+   - Convert the uploaded `portfolio-analyzer.skill` into product-owned
+     analysis contracts, not a raw Codex-only skill dependency.
+   - Start with structured JSON outputs that Flutter can render in Security
+     Detail, Portfolio Health, and Recommendations.
+   - Keep Canadian investor context, CAD base currency, account-tax awareness,
+     risk guardrails, overlap checks, and source freshness/disclaimer rules.
+   - Do not run full live web/forum research on every page load; gate expensive
+     analysis behind explicit user actions, cache, or future worker jobs.
+
+2. Mobile contract typing and DTO cleanup
    - Replace page-shaped mobile parsing with typed DTOs.
    - Keep raw IDs and raw values where mobile needs charting/filtering.
    - Keep display strings only as display helpers, not as the only source.
 
-2. Recommendation constraints v2
+3. Recommendation constraints v2
    - Add explicit fields for exclusions, preferred symbols, asset-class bands,
      and account/security-type rules.
    - Validate all symbol constraints through market identity resolution.
    - Keep CAD/USD/listing identity in the backend result.
 
-3. Market-data identity and validation API hardening
+4. Market-data identity and validation API hardening
    - Normalize search/resolve/quote response shapes.
    - Always expose symbol, name, exchange, currency, security type, provider,
      confidence, and warning text.
    - Use the same identity contract in import, watchlist, recommendations, and
      quote refresh.
 
-4. Auth hardening
+5. Auth hardening
    - Add revocable refresh-token storage.
    - Make mobile bearer-token auth strict unless an endpoint explicitly allows
      web-session fallback.
    - Preserve Flutter Web compatibility without masking token bugs.
 
-5. Worker/cache boundary design
+6. Worker/cache boundary design
    - Move heavy quote/history/recommendation/AI tasks toward queued or cached
      flows.
    - Keep request handlers as thin API boundaries.
 
 ## Practical Next Development Slice
 
-The next implementation slice should be `Recommendation constraints v2`.
+The next implementation slice is now `AI portfolio analyzer integration`.
+
+This is P0 because the user explicitly wants the uploaded
+`portfolio-analyzer.skill` integrated into the product direction. The right
+implementation path is not to install and execute the skill directly. The skill
+should become a product-owned backend analysis specification with stable output
+contracts.
 
 Minimum useful scope:
+
+- add a project document that maps the skill's analysis modules into product
+  features
+- define backend request/result contracts for:
+  - single security quick scan
+  - portfolio diagnostic quick scan
+  - recommendation-run explanation
+- preserve the existing security identity rule: `symbol + exchange + currency`
+  defines the instrument
+- start with deterministic/local analysis using existing portfolio, health,
+  recommendation, quote, and market-identity data
+- defer live web/news/forum research until cache/worker boundaries exist
+- expose results to Flutter as JSON cards, not React artifacts
+
+`Recommendation constraints v2` remains active but moves underneath the AI
+analyzer work because it supplies important preference and guardrail inputs.
+Its remaining useful scope is:
 
 - extend preference contracts with hard constraints
 - add backend validation for symbol constraints using market search/resolve
@@ -165,9 +198,93 @@ Minimum useful scope:
 - make recommendation scoring consume them
 - keep existing first-pass mobile UI usable while fields are added
 
-This is more important than adding more Flutter pages because the current mobile
-surface already exposes the main product loops. The next quality jump comes from
-better backend rules and safer contracts.
+The next quality jump should now come from structured AI analysis contracts,
+not from adding more standalone Flutter pages.
+
+## Portfolio Analyzer Skill Integration
+
+Status: P0 planning accepted
+
+Uploaded skill source:
+
+- `portfolio-analyzer.skill`
+- Contains `portfolio-analyzer/SKILL.md`
+- Purpose: Canadian investor stock, ETF, and portfolio analysis pipeline
+
+Product interpretation:
+
+- Treat the skill as an analysis blueprint, not as app runtime code.
+- Convert the workflow into backend-owned modules and JSON contracts.
+- Flutter should render structured analysis cards; it should not run or parse a
+  raw agent prompt.
+- Every analysis result must keep data freshness and non-advice disclaimer
+  fields.
+
+Best-fit project areas:
+
+1. Security Detail
+   - single-stock / ETF quick scan
+   - factor scorecard
+   - risk alerts
+   - CAD/USD/listing identity summary
+   - optional future news/forum sentiment
+
+2. Portfolio Health
+   - overlap and concentration diagnostics
+   - account tax-efficiency warnings
+   - MER/cost drag notes
+   - missing exposure / gap analysis
+   - action queue explanations
+
+3. Recommendations
+   - explain why a candidate is suggested or avoided
+   - connect recommendation constraints to user-readable rationale
+   - include account-placement and tax-awareness reasoning
+   - flag conflicts with excluded/preferred/security-type constraints
+
+Recommended product phases:
+
+1. P0-A: Analyzer contract and docs
+   - Status: implemented.
+   - Added `docs/execution/ai-portfolio-analyzer.md`.
+   - Added `lib/backend/portfolio-analyzer-contracts.ts`.
+   - Added backend contract tests for identity preservation, scope validation,
+     disclaimer requirements, and source freshness honesty.
+
+2. P0-B: Deterministic quick scan backend
+   - Status: first builder slice implemented.
+   - Added `lib/backend/portfolio-analyzer.ts`.
+   - Added backend tests in `tests/backend/portfolio-analyzer.test.ts`.
+   - Implemented local quick-scan builders for `security`, `portfolio`, and
+     `recommendation-run` scopes.
+   - No live Reddit/news scraping in this slice.
+   - Added protected route `POST /api/mobile/analysis/quick-scan`.
+   - Added Flutter API client method `createAnalyzerQuickScan(...)`.
+   - Remaining: render analysis results in Flutter detail pages.
+
+3. P0-C: Flutter rendering surface
+   - Status: implemented for first pass.
+   - Added reusable Flutter AI analysis card.
+   - Security Detail exposes user-triggered "AI 标的快扫".
+   - Portfolio Health exposes user-triggered "AI 组合快扫" for full-portfolio
+     scope.
+   - Results render summary, confidence/source mode, scorecards, risks, tax
+     notes, portfolio-fit notes, action items, sources, and disclaimer.
+
+4. P1: Cached external research
+   - Add explicit user-triggered refresh for news/institutional research.
+   - Cache analysis results with freshness timestamps.
+   - Keep source attribution and copyright-safe paraphrasing.
+
+5. P2: Forum sentiment
+   - Add Reddit/community sentiment only after the cache/worker boundary exists.
+   - Treat it as supplemental signal, not recommendation authority.
+
+Open implementation rule:
+
+- The analyzer must never collapse CAD-listed/CDR/CAD-hedged securities into US
+  common shares by symbol alone. All analysis inputs must carry `symbol`,
+  `exchange`, and `currency` when available.
 
 ## Recommendation Constraints V2 Progress
 
@@ -233,16 +350,24 @@ First mobile slice implemented:
 
 Remaining work:
 
-- Replace the remaining lightweight `SYMBOL|EXCHANGE|CURRENCY` fallback with
-  chip-based editing once the picker UX is stable.
-- Add better validation messaging for asset-class bands.
-- Decide whether asset-class bands should also affect Health Score, not only
-  recommendation gap scoring.
+- Constraint securities now use chip-based editing in mobile Settings; search
+  results preserve `symbol`, `exchange`, `currency`, `name`, and `provider`.
+- Mobile Settings now validates asset-class band input before save and reports
+  line-level Chinese errors for bad format, unsupported asset class, invalid
+  number, out-of-range values, or min greater than max.
+- Health Score now consumes asset-class bands as effective target constraints,
+  not only Recommendation gap scoring.
 
 Next priority order:
 
-1. Decide whether Health Score should consume asset-class bands.
-2. Replace text fallback with chip-based constraint editing.
-3. Add better mobile validation messaging for asset-class bands.
-4. Harden DB migration metadata before the next push if drizzle migration tooling
-   expects journal/snapshot entries.
+1. Manual mobile QA for AI quick-scan cards in Security Detail and Portfolio
+   Health.
+2. Commit/push this P0 integration batch after user approval.
+3. Next product slice after QA: account-scoped analyzer support or cached
+   external research, depending on whether the immediate need is deeper local
+   explanations or live market/news context.
+
+Migration metadata status:
+
+- `drizzle/meta/_journal.json` now registers migrations `0001` through `0003`.
+- `npx drizzle-kit check` passes after the journal update.

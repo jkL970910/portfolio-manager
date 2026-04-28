@@ -33,6 +33,21 @@ if [ -n "$API_BASE_URL" ]; then
   echo "==> Using explicit API base URL: $API_BASE_URL"
 fi
 
+if [ "${FLUTTER_MOBILE_DEV_SERVER:-}" != "1" ]; then
+  build_args=(build web --release)
+  if [ -n "$API_BASE_URL" ]; then
+    build_args+=(--dart-define=LOO_API_BASE_URL="$API_BASE_URL")
+  fi
+
+  echo '==> Building Flutter mobile web release bundle'
+  flutter "${build_args[@]}"
+
+  echo "==> Serving Flutter mobile web release bundle on http://127.0.0.1:${PORT}"
+  cd "$ROOT_DIR"
+  exec env FLUTTER_WEB_PORT="$PORT" node ./scripts/serve-flutter-web.mjs
+fi
+
+echo '==> FLUTTER_MOBILE_DEV_SERVER=1 detected; using Flutter debug web server'
 args=(
   run
   -d web-server \

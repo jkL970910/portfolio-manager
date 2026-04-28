@@ -48,6 +48,7 @@ message = (
     'Stack: online\n'
     'Backend/API: http://127.0.0.1:3000\n'
     'Flutter preview: http://127.0.0.1:3001\n'
+    'Mobile preview proxy: http://127.0.0.1:3010\n'
     f'Preview URL: {public_url}\n'
     'Project: ~/projects/portfolio-manager\n'
     'Tunnel file: ~/projects/portfolio-manager/.local/cloudflare-tunnel-url.txt\n'

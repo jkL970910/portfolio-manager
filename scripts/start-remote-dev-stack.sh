@@ -16,8 +16,9 @@ fi
 TMUX_PATH="$PATH"
 BACKEND_CMD="cd '$ROOT_DIR' && export PATH=\"$TMUX_PATH\" && npm run local:start:linux"
 FLUTTER_CMD="cd '$ROOT_DIR' && export PATH=\"$TMUX_PATH\" && npm run mobile:dev:web"
+PROXY_CMD="cd '$ROOT_DIR' && export PATH=\"$TMUX_PATH\" && npm run mobile:preview:proxy"
 DUCTOR_CMD="cd '$ROOT_DIR' && export PATH=\"$TMUX_PATH\" && npm run remote:ductor"
-TUNNEL_CMD="cd '$ROOT_DIR' && export PATH=\"$TMUX_PATH\" && npm run preview:tunnel:cloudflare -- 3001"
+TUNNEL_CMD="cd '$ROOT_DIR' && export PATH=\"$TMUX_PATH\" && npm run preview:tunnel:cloudflare -- 3010"
 
 if ! command -v tmux >/dev/null 2>&1; then
   echo 'tmux is required but not installed.' >&2
@@ -55,6 +56,11 @@ if tmux has-session -t "$SESSION_NAME" 2>/dev/null; then
   if ! window_exists flutter; then
     tmux new-window -t "$SESSION_NAME" -n flutter "$FLUTTER_CMD"
   fi
+  if window_exists proxy; then
+    tmux respawn-pane -k -t "$SESSION_NAME:proxy" "$PROXY_CMD"
+  else
+    tmux new-window -t "$SESSION_NAME" -n proxy "$PROXY_CMD"
+  fi
   if window_exists ductor; then
     tmux respawn-pane -k -t "$SESSION_NAME:ductor" "$DUCTOR_CMD"
   else
@@ -68,6 +74,7 @@ if tmux has-session -t "$SESSION_NAME" 2>/dev/null; then
 else
   tmux new-session -d -s "$SESSION_NAME" -n backend "$BACKEND_CMD"
   tmux new-window -t "$SESSION_NAME" -n flutter "$FLUTTER_CMD"
+  tmux new-window -t "$SESSION_NAME" -n proxy "$PROXY_CMD"
   tmux new-window -t "$SESSION_NAME" -n ductor "$DUCTOR_CMD"
   tmux new-window -t "$SESSION_NAME" -n tunnel "$TUNNEL_CMD"
 fi
@@ -78,8 +85,9 @@ Remote dev stack started in tmux session '$SESSION_NAME'.
 Windows:
 - backend: Next.js API/web host on port 3000
 - flutter: Flutter mobile web preview on port 3001
+- proxy: Mobile preview proxy on port 3010 (/api -> 3000, Flutter -> 3001)
 - ductor: Telegram/Codex control plane
-- tunnel: Cloudflare quick tunnel to the Flutter preview
+- tunnel: Cloudflare quick tunnel to the mobile preview proxy
 
 Useful commands:
 - tmux attach -t $SESSION_NAME

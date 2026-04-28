@@ -51,6 +51,11 @@ class LooApiClient {
     return _getJson("/api/mobile/portfolio/health$query");
   }
 
+  Future<Map<String, dynamic>> createAnalyzerQuickScan(
+      Map<String, dynamic> payload) {
+    return _postJson("/api/mobile/analysis/quick-scan", body: payload);
+  }
+
   Future<Map<String, dynamic>> getRecommendations() {
     return _getJson("/api/mobile/recommendations");
   }

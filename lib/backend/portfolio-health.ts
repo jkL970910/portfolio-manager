@@ -29,6 +29,24 @@ function getTargetAllocation(profile: PreferenceProfile) {
     ];
 }
 
+function getConstrainedTargetAllocation(profile: PreferenceProfile) {
+  return getTargetAllocation(profile).map((target) => {
+    const band = profile.recommendationConstraints.assetClassBands.find(
+      (item) => item.assetClass === target.assetClass
+    );
+    if (!band) {
+      return target;
+    }
+
+    const minPct = band.minPct ?? 0;
+    const maxPct = band.maxPct ?? 100;
+    return {
+      ...target,
+      targetPct: clamp(target.targetPct, minPct, maxPct)
+    };
+  });
+}
+
 function getCurrentAllocation(holdings: HoldingPosition[]) {
   const total = sum(holdings.map((holding) => holding.marketValueCad));
   const byAssetClass = new Map<string, number>();
@@ -132,7 +150,10 @@ export function buildPortfolioHealthSummary(args: {
 }): PortfolioHealthSummary {
   const { accounts, holdings, profile, language } = args;
   const { total, allocation } = getCurrentAllocation(holdings);
-  const targetAllocation = getTargetAllocation(profile);
+  const targetAllocation = getConstrainedTargetAllocation(profile);
+  const activeAssetClassBands = profile.recommendationConstraints.assetClassBands.filter((band) =>
+    targetAllocation.some((target) => target.assetClass === band.assetClass)
+  );
   const gaps = targetAllocation.map((target) => Math.abs((allocation.get(target.assetClass) ?? 0) - target.targetPct));
   const allocationFit = clamp(100 - sum(gaps) * 1.8, 20, 96);
 
@@ -239,7 +260,16 @@ export function buildPortfolioHealthSummary(args: {
         language,
         `你的目标配置一共分成了 ${targetAllocation.length} 个资产方向。`,
         `The active target mix spans ${targetAllocation.length} sleeves.`
-      )
+      ),
+      ...(activeAssetClassBands.length > 0
+        ? [
+            pick(
+              language,
+              `Loo皇已经把 ${activeAssetClassBands.length} 条资产区间约束计入健康分，不再只按原始目标配置判断。`,
+              `${activeAssetClassBands.length} asset-class band constraints are included in the health score, not just the raw target mix.`
+            )
+          ]
+        : [])
     ],
     consequences: [
       mainGap
