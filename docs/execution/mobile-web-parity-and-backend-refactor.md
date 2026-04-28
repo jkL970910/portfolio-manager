@@ -276,6 +276,9 @@ Recommended product phases:
      notes, portfolio-fit notes, action items, sources, and disclaimer.
 
 4. P1: Cached external research
+   - Current foundation: analyzer requests default to bounded cache reuse and
+     can persist results in `portfolio_analysis_runs` once migration `0004` is
+     applied.
    - Add explicit user-triggered refresh for news/institutional research.
    - Cache analysis results with freshness timestamps.
    - Keep source attribution and copyright-safe paraphrasing.
@@ -364,13 +367,16 @@ Remaining work:
 
 Next priority order:
 
-1. Manual QA for account-scoped AI quick scan on mobile URL.
-2. Commit/push the account-scoped analyzer slice after user approval.
-3. Cached external research design only after cache/worker boundaries exist.
-4. Holding-level deeper AI analysis and chart-heavy UX after the core analyzer
+1. Apply/verify migration `0004_portfolio_analysis_runs` in the target dev DB.
+2. Manual QA that AI quick scans still generate normally and can be repeated
+   after navigation/reload.
+3. Commit/push the analysis cache boundary after validation.
+4. External research adapter design remains blocked until cache/worker policy
+   is explicit.
+5. Holding-level deeper AI analysis and chart-heavy UX after the core analyzer
    flow is stable.
 
 Migration metadata status:
 
-- `drizzle/meta/_journal.json` now registers migrations `0001` through `0003`.
+- `drizzle/meta/_journal.json` now registers migrations `0001` through `0004`.
 - `npx drizzle-kit check` passes after the journal update.

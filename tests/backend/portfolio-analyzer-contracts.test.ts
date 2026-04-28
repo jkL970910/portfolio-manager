@@ -82,6 +82,16 @@ test("portfolio analyzer request preserves symbol, exchange, and currency identi
   assert.notDeepEqual(usdCommon.security, cadListed.security);
 });
 
+test("portfolio analyzer request defaults to bounded cache reuse", () => {
+  const parsed = portfolioAnalyzerRequestSchema.parse({
+    scope: "portfolio"
+  });
+
+  assert.equal(parsed.cacheStrategy, "prefer-cache");
+  assert.equal(parsed.maxCacheAgeSeconds, 900);
+  assert.equal(parsed.includeExternalResearch, false);
+});
+
 test("portfolio analyzer request rejects security scope without identity or holding id", () => {
   const parsed = portfolioAnalyzerRequestSchema.safeParse({
     scope: "security"

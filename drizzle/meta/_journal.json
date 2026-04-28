@@ -29,6 +29,13 @@
       "when": 1777320464970,
       "tag": "0003_recommendation_constraints",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1777385600000,
+      "tag": "0004_portfolio_analysis_runs",
+      "breakpoints": true
     }
   ]
 }

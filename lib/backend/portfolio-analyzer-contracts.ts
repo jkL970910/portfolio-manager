@@ -25,6 +25,8 @@ export const portfolioAnalyzerRequestSchema = z.object({
   holdingId: z.string().trim().min(1).max(80).optional(),
   accountId: z.string().trim().min(1).max(80).optional(),
   recommendationRunId: z.string().trim().min(1).max(80).optional(),
+  cacheStrategy: z.enum(["prefer-cache", "refresh"]).default("prefer-cache"),
+  maxCacheAgeSeconds: z.number().int().min(60).max(86400).default(900),
   includeExternalResearch: z.boolean().default(false)
 }).superRefine((value, context) => {
   if (value.scope === "security" && !value.security && !value.holdingId) {

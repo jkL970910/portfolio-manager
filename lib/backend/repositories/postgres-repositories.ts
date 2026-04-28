@@ -1,4 +1,4 @@
-import { desc, eq } from "drizzle-orm";
+import { and, desc, eq, gt } from "drizzle-orm";
 import { getDb } from "@/lib/db/client";
 import {
   allocationTargets,
@@ -9,6 +9,7 @@ import {
   importJobs,
   investmentAccounts,
   portfolioEvents,
+  portfolioAnalysisRuns,
   portfolioSnapshots,
   preferenceProfiles,
   recommendationItems,
@@ -23,6 +24,7 @@ import {
   CashAccount,
   CashAccountBalanceEvent,
   PortfolioEvent,
+  PortfolioAnalysisRun,
   PortfolioSnapshot,
   SecurityPriceHistoryPoint,
   PreferenceProfile,
@@ -154,6 +156,22 @@ function mapPortfolioEvent(row: typeof portfolioEvents.$inferSelect): PortfolioE
     bookedAt: row.bookedAt,
     effectiveAt: row.effectiveAt.toISOString(),
     source: row.source,
+    createdAt: row.createdAt.toISOString()
+  };
+}
+
+function mapPortfolioAnalysisRun(row: typeof portfolioAnalysisRuns.$inferSelect): PortfolioAnalysisRun {
+  return {
+    id: row.id,
+    userId: row.userId,
+    scope: row.scope as PortfolioAnalysisRun["scope"],
+    mode: row.mode as PortfolioAnalysisRun["mode"],
+    targetKey: row.targetKey,
+    request: row.requestJson as Record<string, unknown>,
+    result: row.resultJson as Record<string, unknown>,
+    sourceMode: row.sourceMode as PortfolioAnalysisRun["sourceMode"],
+    generatedAt: row.generatedAt.toISOString(),
+    expiresAt: row.expiresAt.toISOString(),
     createdAt: row.createdAt.toISOString()
   };
 }
@@ -395,6 +413,43 @@ export const postgresRepositories: BackendRepositories = {
           rationale: (item.rationale as RecommendationRun["items"][number]["rationale"] | null) ?? undefined
         }))
       };
+    }
+  },
+  analysisRuns: {
+    async getFreshByKey(userId, params) {
+      const db = getDb();
+      const row = await db.query.portfolioAnalysisRuns.findFirst({
+        where: and(
+          eq(portfolioAnalysisRuns.userId, userId),
+          eq(portfolioAnalysisRuns.scope, params.scope),
+          eq(portfolioAnalysisRuns.mode, params.mode),
+          eq(portfolioAnalysisRuns.targetKey, params.targetKey),
+          gt(portfolioAnalysisRuns.expiresAt, params.now)
+        ),
+        orderBy: desc(portfolioAnalysisRuns.createdAt)
+      });
+      return row ? mapPortfolioAnalysisRun(row) : null;
+    },
+    async create(input) {
+      const db = getDb();
+      const [row] = await db
+        .insert(portfolioAnalysisRuns)
+        .values({
+          userId: input.userId,
+          scope: input.scope,
+          mode: input.mode,
+          targetKey: input.targetKey,
+          requestJson: input.request,
+          resultJson: input.result,
+          sourceMode: input.sourceMode,
+          generatedAt: new Date(input.generatedAt),
+          expiresAt: new Date(input.expiresAt)
+        })
+        .returning();
+      if (!row) {
+        throw new Error("Failed to persist portfolio analysis run.");
+      }
+      return mapPortfolioAnalysisRun(row);
     }
   },
   importJobs: {

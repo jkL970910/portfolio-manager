@@ -1,6 +1,7 @@
 import {
   boolean,
   date,
+  index,
   integer,
   jsonb,
   numeric,
@@ -247,6 +248,22 @@ export const portfolioSnapshots = pgTable("portfolio_snapshots", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow()
 }, (table) => ({
   userSnapshotDateIdx: uniqueIndex("portfolio_snapshots_user_date_idx").on(table.userId, table.snapshotDate)
+}));
+
+export const portfolioAnalysisRuns = pgTable("portfolio_analysis_runs", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  userId: uuid("user_id").notNull().references(() => users.id),
+  scope: varchar("scope", { length: 32 }).notNull(),
+  mode: varchar("mode", { length: 16 }).notNull(),
+  targetKey: varchar("target_key", { length: 240 }).notNull(),
+  requestJson: jsonb("request_json").notNull(),
+  resultJson: jsonb("result_json").notNull(),
+  sourceMode: varchar("source_mode", { length: 32 }).notNull(),
+  generatedAt: timestamp("generated_at", { withTimezone: true }).notNull(),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow()
+}, (table) => ({
+  lookupIdx: index("portfolio_analysis_runs_lookup_idx").on(table.userId, table.scope, table.mode, table.targetKey, table.expiresAt)
 }));
 
 export const importJobs = pgTable("import_jobs", {

@@ -32,6 +32,8 @@ are deferred until cache/worker boundaries exist.
 - Do not merge US common shares with CAD-listed/CDR/CAD-hedged versions by
   symbol alone.
 - Include source freshness on every analysis result.
+- Cache user-triggered analysis results before adding any live external
+  research source.
 - Include non-advice disclaimers on every analysis result:
   - `仅用于研究学习，不构成投资建议。`
   - `For research and educational purposes only. Not investment advice.`
@@ -48,8 +50,9 @@ The contract defines:
 - `AnalyzerSecurityIdentity`
 - `PortfolioAnalyzerRequest`
 - `PortfolioAnalyzerResult`
-- request validation for `security`, `portfolio`, and `recommendation-run`
-  scopes
+- request validation for `security`, `portfolio`, `account`, and
+  `recommendation-run` scopes
+- bounded cache controls for user-triggered quick scans
 - result validation for disclaimers and source freshness honesty
 
 Backend tests:
@@ -60,6 +63,8 @@ The tests lock these behaviors:
 
 - `symbol + exchange + currency` identity is preserved
 - security analysis requires a resolved identity or holding id
+- account analysis requires an account id
+- requests default to bounded cache reuse
 - recommendation-run analysis requires a run id
 - result payloads require non-advice disclaimers
 - local analysis cannot claim external research freshness
@@ -85,6 +90,7 @@ Request scope:
 
 - `security`: analyze a resolved security or holding
 - `portfolio`: analyze current portfolio health and structure
+- `account`: analyze one account's Health context
 - `recommendation-run`: explain a recommendation run
 
 Request mode:
@@ -117,8 +123,10 @@ Current status:
 - The builder now supports local quick-scan results for:
   - `security`
   - `portfolio`
+  - `account`
   - `recommendation-run`
-- This slice is not yet exposed through a mobile API route.
+- The route defaults to bounded cache reuse (`prefer-cache`, 15 minutes) and
+  supports `refresh` for future explicit re-run controls.
 
 Security quick scan should use:
 
@@ -151,6 +159,7 @@ Remaining P0-B backend work:
 - Service/API adapters now call the quick-scan builders with real user data.
 - Protected mobile route exists at `POST /api/mobile/analysis/quick-scan`.
 - Flutter API client exposes `createAnalyzerQuickScan(...)`.
+- Persistence table `portfolio_analysis_runs` exists in migration `0004`.
 - Keep routes bearer-token protected and do not trigger external research.
 - Add route-level tests later if the test harness starts covering Next route
   handlers directly. Current schema and builder tests cover the contract and
@@ -201,8 +210,10 @@ Next analyzer work:
 
 - Health Score now consumes asset-class bands before the analyzer depends more
   heavily on health output.
-- Manually QA the account-scoped analyzer from a real mobile URL.
-- Add cached external research only after worker/cache boundaries exist.
+- Apply/verify migration `0004_portfolio_analysis_runs` in the target dev DB
+  before relying on persistent analyzer cache.
+- Manually QA repeated AI quick scans from a real mobile URL.
+- Add cached external research only after cache/worker policy is explicit.
 
 ## Deferred Work
 
@@ -210,7 +221,7 @@ P1:
 
 - cached news/institutional research
 - explicit user-triggered refresh
-- saved analysis history
+- saved analysis history UI
 
 P2:
 

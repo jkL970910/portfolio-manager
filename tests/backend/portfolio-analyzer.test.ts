@@ -8,6 +8,7 @@ import {
   buildRecommendationRunAnalyzerQuickScan,
   buildSecurityAnalyzerQuickScan
 } from "@/lib/backend/portfolio-analyzer";
+import { buildPortfolioAnalyzerCacheKey } from "@/lib/backend/portfolio-analyzer-service";
 
 const generatedAt = "2026-04-28T04:00:00.000Z";
 
@@ -124,6 +125,27 @@ test("security analyzer quick scan matches by full identity, not ticker alone", 
   assert.equal(result.identity?.currency, "CAD");
   assert.match(result.summary.thesis, /2%/);
   assert.ok(result.portfolioFit.some((item) => item.includes("symbol、exchange、currency")));
+});
+
+test("portfolio analyzer cache key preserves security listing identity", () => {
+  const usdCommon = buildPortfolioAnalyzerCacheKey({
+    scope: "security",
+    mode: "quick",
+    security: { symbol: "AMZN", exchange: "NASDAQ", currency: "USD" },
+    cacheStrategy: "prefer-cache",
+    maxCacheAgeSeconds: 900,
+    includeExternalResearch: false
+  });
+  const cadListed = buildPortfolioAnalyzerCacheKey({
+    scope: "security",
+    mode: "quick",
+    security: { symbol: "AMZN", exchange: "NEO", currency: "CAD" },
+    cacheStrategy: "prefer-cache",
+    maxCacheAgeSeconds: 900,
+    includeExternalResearch: false
+  });
+
+  assert.notEqual(usdCommon, cadListed);
 });
 
 test("portfolio analyzer quick scan returns local structured analysis with disclaimers", () => {

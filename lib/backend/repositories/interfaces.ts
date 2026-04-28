@@ -7,6 +7,7 @@ import {
   CashAccount,
   CashAccountBalanceEvent,
   PortfolioEvent,
+  PortfolioAnalysisRun,
   PortfolioSnapshot,
   SecurityPriceHistoryPoint,
   PreferenceProfile,
@@ -66,6 +67,16 @@ export interface RecommendationRepository {
   getLatestByUserId(userId: EntityId): Promise<RecommendationRun>;
 }
 
+export interface PortfolioAnalysisRunRepository {
+  getFreshByKey(userId: EntityId, params: {
+    scope: PortfolioAnalysisRun["scope"];
+    mode: PortfolioAnalysisRun["mode"];
+    targetKey: string;
+    now: Date;
+  }): Promise<PortfolioAnalysisRun | null>;
+  create(input: Omit<PortfolioAnalysisRun, "id" | "createdAt">): Promise<PortfolioAnalysisRun>;
+}
+
 export interface ImportJobRepository {
   getLatestByUserId(userId: EntityId): Promise<ImportJob>;
 }
@@ -82,5 +93,6 @@ export interface BackendRepositories {
   securityPriceHistory: SecurityPriceHistoryRepository;
   preferences: PreferenceRepository;
   recommendations: RecommendationRepository;
+  analysisRuns: PortfolioAnalysisRunRepository;
   importJobs: ImportJobRepository;
 }

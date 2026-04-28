@@ -278,6 +278,20 @@ export interface RecommendationRun {
   notes?: string[];
 }
 
+export interface PortfolioAnalysisRun {
+  id: EntityId;
+  userId: EntityId;
+  scope: "security" | "portfolio" | "account" | "recommendation-run";
+  mode: "quick" | "full";
+  targetKey: string;
+  request: Record<string, unknown>;
+  result: Record<string, unknown>;
+  sourceMode: "local" | "cached-external" | "live-external";
+  generatedAt: string;
+  expiresAt: string;
+  createdAt: string;
+}
+
 export interface ImportJob {
   id: EntityId;
   userId: EntityId;

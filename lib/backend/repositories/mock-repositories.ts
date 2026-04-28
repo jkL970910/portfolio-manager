@@ -13,8 +13,11 @@ import {
   recommendationRuns,
   transactions
 } from "@/lib/backend/mock-store";
+import { PortfolioAnalysisRun } from "@/lib/backend/models";
 import { BackendRepositories } from "@/lib/backend/repositories/interfaces";
 import { normalizeRecommendationConstraints } from "@/lib/backend/recommendation-constraints";
+
+const portfolioAnalysisRuns: PortfolioAnalysisRun[] = [];
 
 export const mockRepositories: BackendRepositories = {
   users: {
@@ -108,6 +111,27 @@ export const mockRepositories: BackendRepositories = {
       if (!run) {
         throw new Error(`Recommendation run not found for user ${userId}.`);
       }
+      return run;
+    }
+  },
+  analysisRuns: {
+    async getFreshByKey(userId, params) {
+      const match = portfolioAnalysisRuns
+        .filter((run) => run.userId === userId)
+        .filter((run) => run.scope === params.scope)
+        .filter((run) => run.mode === params.mode)
+        .filter((run) => run.targetKey === params.targetKey)
+        .filter((run) => new Date(run.expiresAt).getTime() > params.now.getTime())
+        .sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime())[0];
+      return match ?? null;
+    },
+    async create(input) {
+      const run: PortfolioAnalysisRun = {
+        ...input,
+        id: `analysis_${portfolioAnalysisRuns.length + 1}`,
+        createdAt: new Date().toISOString()
+      };
+      portfolioAnalysisRuns.unshift(run);
       return run;
     }
   },

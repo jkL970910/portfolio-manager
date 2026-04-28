@@ -1,6 +1,10 @@
 import { apiSuccess } from "@/lib/backend/contracts";
 import { getRepositories } from "@/lib/backend/repositories/factory";
-import { PortfolioAnalyzerRequest } from "@/lib/backend/portfolio-analyzer-contracts";
+import {
+  PortfolioAnalyzerRequest,
+  PortfolioAnalyzerResult,
+  portfolioAnalyzerResultSchema
+} from "@/lib/backend/portfolio-analyzer-contracts";
 import {
   buildAccountAnalyzerQuickScan,
   buildPortfolioAnalyzerQuickScan,
@@ -8,37 +12,133 @@ import {
   buildSecurityAnalyzerQuickScan
 } from "@/lib/backend/portfolio-analyzer";
 
+function normalizePart(value: string | null | undefined) {
+  return value?.trim().toUpperCase() || "_";
+}
+
+export function buildPortfolioAnalyzerCacheKey(input: PortfolioAnalyzerRequest) {
+  const prefix = `${input.scope}:${input.mode}`;
+
+  if (input.scope === "portfolio") {
+    return `${prefix}:all`;
+  }
+
+  if (input.scope === "account") {
+    return `${prefix}:account:${input.accountId}`;
+  }
+
+  if (input.scope === "recommendation-run") {
+    return `${prefix}:run:${input.recommendationRunId}`;
+  }
+
+  if (input.holdingId) {
+    return `${prefix}:holding:${input.holdingId}`;
+  }
+
+  const identity = input.security;
+  return [
+    prefix,
+    "security",
+    normalizePart(identity?.symbol),
+    normalizePart(identity?.exchange ?? null),
+    normalizePart(identity?.currency ?? null),
+    normalizePart(identity?.provider ?? null)
+  ].join(":");
+}
+
+function expiresAtFrom(now: Date, maxCacheAgeSeconds: number) {
+  return new Date(now.getTime() + maxCacheAgeSeconds * 1000).toISOString();
+}
+
+function shouldUseCache(input: PortfolioAnalyzerRequest) {
+  return input.cacheStrategy === "prefer-cache" && !input.includeExternalResearch;
+}
+
+async function readCachedAnalyzerResult(
+  userId: string,
+  input: PortfolioAnalyzerRequest,
+  targetKey: string
+) {
+  if (!shouldUseCache(input)) {
+    return null;
+  }
+
+  try {
+    const cached = await getRepositories().analysisRuns.getFreshByKey(userId, {
+      scope: input.scope,
+      mode: input.mode,
+      targetKey,
+      now: new Date()
+    });
+    return cached ? portfolioAnalyzerResultSchema.parse(cached.result) : null;
+  } catch (error) {
+    console.warn("Portfolio analyzer cache read skipped.", error);
+    return null;
+  }
+}
+
+async function persistAnalyzerResult(
+  userId: string,
+  input: PortfolioAnalyzerRequest,
+  targetKey: string,
+  result: PortfolioAnalyzerResult
+) {
+  if (input.includeExternalResearch) {
+    return;
+  }
+
+  try {
+    await getRepositories().analysisRuns.create({
+      userId,
+      scope: result.scope,
+      mode: result.mode,
+      targetKey,
+      request: input as unknown as Record<string, unknown>,
+      result: result as unknown as Record<string, unknown>,
+      sourceMode: result.dataFreshness.sourceMode,
+      generatedAt: result.generatedAt,
+      expiresAt: expiresAtFrom(new Date(), input.maxCacheAgeSeconds)
+    });
+  } catch (error) {
+    console.warn("Portfolio analyzer cache write skipped.", error);
+  }
+}
+
 export async function getPortfolioAnalyzerQuickScan(userId: string, input: PortfolioAnalyzerRequest) {
   const repositories = getRepositories();
+  const targetKey = buildPortfolioAnalyzerCacheKey(input);
+  const cached = await readCachedAnalyzerResult(userId, input, targetKey);
+  if (cached) {
+    return apiSuccess(cached, "database");
+  }
+
   const [accounts, holdings, profile] = await Promise.all([
     repositories.accounts.listByUserId(userId),
     repositories.holdings.listByUserId(userId),
     repositories.preferences.getByUserId(userId)
   ]);
 
+  let result: PortfolioAnalyzerResult;
+
   if (input.scope === "portfolio") {
-    return apiSuccess(buildPortfolioAnalyzerQuickScan({
+    result = buildPortfolioAnalyzerQuickScan({
       accounts,
       holdings,
       profile
-    }), "database");
-  }
-
-  if (input.scope === "account") {
+    });
+  } else if (input.scope === "account") {
     const account = accounts.find((item) => item.id === input.accountId);
     if (!account) {
       throw new Error("Requested account is not available for quick analysis.");
     }
 
-    return apiSuccess(buildAccountAnalyzerQuickScan({
+    result = buildAccountAnalyzerQuickScan({
       account,
       accounts,
       holdings,
       profile
-    }), "database");
-  }
-
-  if (input.scope === "security") {
+    });
+  } else if (input.scope === "security") {
     const holding = input.holdingId
       ? holdings.find((item) => item.id === input.holdingId)
       : undefined;
@@ -56,21 +156,24 @@ export async function getPortfolioAnalyzerQuickScan(userId: string, input: Portf
       throw new Error("Security analysis requires a resolved security identity or holding id.");
     }
 
-    return apiSuccess(buildSecurityAnalyzerQuickScan({
+    result = buildSecurityAnalyzerQuickScan({
       identity,
       accounts,
       holdings,
       profile
-    }), "database");
+    });
+  } else {
+    const latestRun = await repositories.recommendations.getLatestByUserId(userId);
+    if (latestRun.id !== input.recommendationRunId) {
+      throw new Error("Requested recommendation run is not available for quick analysis.");
+    }
+
+    result = buildRecommendationRunAnalyzerQuickScan({
+      run: latestRun,
+      profile
+    });
   }
 
-  const latestRun = await repositories.recommendations.getLatestByUserId(userId);
-  if (latestRun.id !== input.recommendationRunId) {
-    throw new Error("Requested recommendation run is not available for quick analysis.");
-  }
-
-  return apiSuccess(buildRecommendationRunAnalyzerQuickScan({
-    run: latestRun,
-    profile
-  }), "database");
+  await persistAnalyzerResult(userId, input, targetKey, result);
+  return apiSuccess(result, "database");
 }
