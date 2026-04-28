@@ -2573,6 +2573,19 @@ export function buildRecommendationsData(args: {
               || profile.recommendationConstraints.preferredSymbols.length > 0
               ? "warning" as const
               : "neutral" as const
+          },
+          {
+            label: pick(language, "允许标的类型", "Allowed security types"),
+            detail: profile.recommendationConstraints.allowedSecurityTypes.length > 0
+              ? pick(
+                language,
+                `本轮优先限制在 ${profile.recommendationConstraints.allowedSecurityTypes.join(" / ")}。`,
+                `This run prioritizes ${profile.recommendationConstraints.allowedSecurityTypes.join(" / ")}.`
+              )
+              : pick(language, "未限制 ETF、股票或商品 ETF 等类型。", "No ETF, stock, or commodity-type restriction is active."),
+            variant: profile.recommendationConstraints.allowedSecurityTypes.length > 0
+              ? "warning" as const
+              : "neutral" as const
           }
         ],
         execution: [

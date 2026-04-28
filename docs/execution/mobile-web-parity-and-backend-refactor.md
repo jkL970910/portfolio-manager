@@ -200,6 +200,16 @@ First backend slice implemented:
   `avoidAccountTypes`.
 - Asset-class band constraints now adjust effective target percentages used by
   recommendation gap scoring.
+- `allowedSecurityTypes` now affects candidate scoring and candidate-pool
+  selection. If matching candidates exist, the engine prioritizes allowed types;
+  otherwise it degrades instead of returning no recommendation.
+- Backend tests now cover recommendation constraint normalization and invariant
+  behavior for excluded symbols, preferred symbols, allowed security types, and
+  asset-class bands without locking exact recommendation scores.
+- Preference schema tests now cover malformed Recommendation Constraints v2
+  payloads, including invalid security identity currency, impossible asset-class
+  bands, oversized symbol lists, valid resolved identity objects, and legacy
+  payload compatibility when `recommendationConstraints` is omitted.
 
 First mobile slice implemented:
 
@@ -210,30 +220,29 @@ First mobile slice implemented:
   - preferred account types
   - avoided account types
   - asset-class min/max bands
+  - allowed security types
   - recommendation strategy
   - tax-aware placement
   - account funding priority
 - Mobile accepts preferred/excluded identities in the lightweight format
   `SYMBOL|EXCHANGE|CURRENCY`, while still allowing symbol-only entries.
-- Mobile preserves the backend-only constraint field that does not yet have full
-  mobile UI:
-  - `allowedSecurityTypes`
+- Mobile Settings now includes a search picker for preferred/excluded
+  constraint securities. Picker selections preserve resolved `symbol`,
+  `exchange`, `currency`, `name`, and `provider` where the market-data search
+  API supplies them.
 
 Remaining work:
 
-- Replace the lightweight `SYMBOL|EXCHANGE|CURRENCY` identity input with a real
-  search/resolve picker.
-- Add `allowedSecurityTypes` UI and scoring behavior.
+- Replace the remaining lightweight `SYMBOL|EXCHANGE|CURRENCY` fallback with
+  chip-based editing once the picker UX is stable.
 - Add better validation messaging for asset-class bands.
-- Add tests around constraint scoring and preference validation.
 - Decide whether asset-class bands should also affect Health Score, not only
   recommendation gap scoring.
 
 Next priority order:
 
-1. Replace text-based identity entry with a mobile search/resolve picker.
-2. Add `allowedSecurityTypes` scoring and UI.
-3. Add tests around constraint scoring and preference validation.
-4. Decide whether Health Score should consume asset-class bands.
-5. Harden DB migration metadata before the next push if drizzle migration tooling
+1. Decide whether Health Score should consume asset-class bands.
+2. Replace text fallback with chip-based constraint editing.
+3. Add better mobile validation messaging for asset-class bands.
+4. Harden DB migration metadata before the next push if drizzle migration tooling
    expects journal/snapshot entries.

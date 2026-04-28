@@ -11,6 +11,7 @@ const _assetClasses = [
 ];
 
 const _accountTypes = ["TFSA", "RRSP", "FHSA", "Taxable"];
+const _securityTypes = ["ETF", "Common Stock", "Commodity ETF"];
 
 const _riskPresets = {
   "Conservative": {
@@ -266,6 +267,15 @@ class _ConstraintEditorSheetState extends State<_ConstraintEditorSheet> {
   late final _assetBandsController = TextEditingController(
       text: _formatAssetClassBands(
           widget.profile.recommendationConstraints.assetClassBands));
+  late final _allowedSecurityTypesController = TextEditingController(
+      text: widget.profile.recommendationConstraints.allowedSecurityTypes
+          .join(", "));
+  late final List<Map<String, dynamic>> _excludedPicked =
+      List<Map<String, dynamic>>.from(
+          widget.profile.recommendationConstraints.excludedSecurities);
+  late final List<Map<String, dynamic>> _preferredPicked =
+      List<Map<String, dynamic>>.from(
+          widget.profile.recommendationConstraints.preferredSecurities);
   var _saving = false;
   String? _error;
 
@@ -277,19 +287,21 @@ class _ConstraintEditorSheetState extends State<_ConstraintEditorSheet> {
     _avoidAccountsController.dispose();
     _preferredAccountsController.dispose();
     _assetBandsController.dispose();
+    _allowedSecurityTypesController.dispose();
     super.dispose();
   }
 
   Future<void> _save() async {
     final watchlist = _parseSymbols(_watchlistController.text, max: 20);
-    final excludedSecurities =
-        _parseSecurityIdentities(_excludedController.text);
+    final excludedSecurities = _mergeSecurityIdentities(
+        _parseSecurityIdentities(_excludedController.text), _excludedPicked);
     final excludedSymbols =
         excludedSecurities.map((item) => item["symbol"] as String).toList();
-    final preferredSecurities =
-        _parseSecurityIdentities(_preferredController.text)
-            .where((item) => !excludedSymbols.contains(item["symbol"]))
-            .toList();
+    final preferredSecurities = _mergeSecurityIdentities(
+            _parseSecurityIdentities(_preferredController.text),
+            _preferredPicked)
+        .where((item) => !excludedSymbols.contains(item["symbol"]))
+        .toList();
     final preferredSymbols =
         preferredSecurities.map((item) => item["symbol"] as String).toList();
     final avoidAccountTypes = _parseAccountTypes(_avoidAccountsController.text);
@@ -298,6 +310,8 @@ class _ConstraintEditorSheetState extends State<_ConstraintEditorSheet> {
             .where((type) => !avoidAccountTypes.contains(type))
             .toList();
     final assetClassBands = _parseAssetClassBands(_assetBandsController.text);
+    final allowedSecurityTypes =
+        _parseSecurityTypes(_allowedSecurityTypesController.text);
     if (_priority.toSet().length != _priority.length) {
       setState(() => _error = "账户优先级不能重复。");
       return;
@@ -333,8 +347,7 @@ class _ConstraintEditorSheetState extends State<_ConstraintEditorSheet> {
           "assetClassBands": assetClassBands,
           "avoidAccountTypes": avoidAccountTypes,
           "preferredAccountTypes": preferredAccountTypes,
-          "allowedSecurityTypes":
-              widget.profile.recommendationConstraints.allowedSecurityTypes,
+          "allowedSecurityTypes": allowedSecurityTypes,
         },
       });
       if (mounted) {
@@ -348,6 +361,32 @@ class _ConstraintEditorSheetState extends State<_ConstraintEditorSheet> {
         });
       }
     }
+  }
+
+  Future<void> _addSecurityIdentity(
+    TextEditingController controller,
+    List<Map<String, dynamic>> picked,
+  ) async {
+    final selected = await showModalBottomSheet<Map<String, dynamic>>(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) =>
+          _ConstraintSecurityPickerSheet(apiClient: widget.apiClient),
+    );
+    if (selected == null) {
+      return;
+    }
+
+    final entries = _parseSecurityIdentities(controller.text);
+    final existingKeys = entries.map(_securityIdentityKey).toSet();
+    if (!existingKeys.contains(_securityIdentityKey(selected))) {
+      entries.add(selected);
+    }
+    final pickedKeys = picked.map(_securityIdentityKey).toSet();
+    if (!pickedKeys.contains(_securityIdentityKey(selected))) {
+      picked.add(selected);
+    }
+    controller.text = _formatSecurityIdentities(entries, const []);
   }
 
   @override
@@ -383,6 +422,19 @@ class _ConstraintEditorSheetState extends State<_ConstraintEditorSheet> {
                 helperText: "格式：VFV|TSX|CAD；也可只写 VFV。用逗号或空格分隔。",
               ),
             ),
+            Align(
+              alignment: Alignment.centerRight,
+              child: TextButton.icon(
+                onPressed: _saving
+                    ? null
+                    : () => _addSecurityIdentity(
+                          _preferredController,
+                          _preferredPicked,
+                        ),
+                icon: const Icon(Icons.manage_search),
+                label: const Text("搜索添加偏好标的"),
+              ),
+            ),
             const SizedBox(height: 12),
             TextField(
               controller: _excludedController,
@@ -391,6 +443,19 @@ class _ConstraintEditorSheetState extends State<_ConstraintEditorSheet> {
               decoration: const InputDecoration(
                 labelText: "排除标的",
                 helperText: "格式：AMZN|NASDAQ|USD；排除优先级高于偏好。",
+              ),
+            ),
+            Align(
+              alignment: Alignment.centerRight,
+              child: TextButton.icon(
+                onPressed: _saving
+                    ? null
+                    : () => _addSecurityIdentity(
+                          _excludedController,
+                          _excludedPicked,
+                        ),
+                icon: const Icon(Icons.manage_search),
+                label: const Text("搜索添加排除标的"),
               ),
             ),
             const SizedBox(height: 12),
@@ -422,6 +487,16 @@ class _ConstraintEditorSheetState extends State<_ConstraintEditorSheet> {
               decoration: const InputDecoration(
                 labelText: "资产类别上下限",
                 helperText: "每行一个，例如 US Equity:10-45；用于约束推荐目标。",
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _allowedSecurityTypesController,
+              enabled: !_saving,
+              textCapitalization: TextCapitalization.words,
+              decoration: const InputDecoration(
+                labelText: "允许标的类型",
+                helperText: "例如 ETF, Common Stock, Commodity ETF；留空表示不限制。",
               ),
             ),
             const SizedBox(height: 12),
@@ -530,6 +605,21 @@ class _ConstraintEditorSheetState extends State<_ConstraintEditorSheet> {
         .toList();
   }
 
+  List<Map<String, dynamic>> _mergeSecurityIdentities(
+    List<Map<String, dynamic>> parsed,
+    List<Map<String, dynamic>> picked,
+  ) {
+    final pickedByKey = {
+      for (final item in picked) _securityIdentityKey(item): item,
+    };
+    return parsed
+        .map((item) => {
+              ...item,
+              ...?pickedByKey[_securityIdentityKey(item)],
+            })
+        .toList();
+  }
+
   List<String> _parseAccountTypes(String value) {
     return value
         .split(RegExp(r"[,，\s]+"))
@@ -563,6 +653,19 @@ class _ConstraintEditorSheetState extends State<_ConstraintEditorSheet> {
         .toList();
   }
 
+  List<String> _parseSecurityTypes(String value) {
+    final normalized = {
+      for (final type in _securityTypes) type.toLowerCase(): type,
+    };
+    return value
+        .split(RegExp(r"[,，\n]+"))
+        .map((item) => item.trim().toLowerCase())
+        .map((item) => normalized[item])
+        .whereType<String>()
+        .toSet()
+        .toList();
+  }
+
   String _formatSecurityIdentities(
     List<Map<String, dynamic>> identities,
     List<String> fallbackSymbols,
@@ -592,6 +695,183 @@ class _ConstraintEditorSheetState extends State<_ConstraintEditorSheet> {
         })
         .where((line) => !line.startsWith(":"))
         .join("\n");
+  }
+
+  String _securityIdentityKey(Map<String, dynamic> item) {
+    return [
+      item["symbol"] as String? ?? "",
+      item["exchange"] as String? ?? "",
+      item["currency"] as String? ?? "",
+    ].join("|");
+  }
+}
+
+class _ConstraintSecurityPickerSheet extends StatefulWidget {
+  const _ConstraintSecurityPickerSheet({required this.apiClient});
+
+  final LooApiClient apiClient;
+
+  @override
+  State<_ConstraintSecurityPickerSheet> createState() =>
+      _ConstraintSecurityPickerSheetState();
+}
+
+class _ConstraintSecurityPickerSheetState
+    extends State<_ConstraintSecurityPickerSheet> {
+  final _queryController = TextEditingController();
+  var _searching = false;
+  String? _error;
+  List<_ConstraintSecurityCandidate> _results = const [];
+
+  @override
+  void dispose() {
+    _queryController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _search() async {
+    final query = _queryController.text.trim();
+    if (query.isEmpty) {
+      setState(() => _error = "请输入代码或名称。");
+      return;
+    }
+
+    setState(() {
+      _searching = true;
+      _error = null;
+    });
+
+    try {
+      final response = await widget.apiClient.searchSecurities(query);
+      final data = response["data"];
+      final results = data is Map<String, dynamic> ? data["results"] : null;
+      final candidates = results is List
+          ? results
+              .whereType<Map<String, dynamic>>()
+              .map(_ConstraintSecurityCandidate.fromJson)
+              .toList()
+          : <_ConstraintSecurityCandidate>[];
+      if (mounted) {
+        setState(() {
+          _results = candidates;
+          _searching = false;
+          _error = candidates.isEmpty ? "没有找到匹配标的，可继续使用手动输入。" : null;
+        });
+      }
+    } catch (error) {
+      if (mounted) {
+        setState(() {
+          _error = error.toString();
+          _searching = false;
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
+    return SafeArea(
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(20, 20, 20, bottomInset + 20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text("搜索约束标的", style: Theme.of(context).textTheme.headlineMedium),
+            const SizedBox(height: 8),
+            const Text("选择结果会保存代码、交易所和币种，减少 CAD 版本和美股正股混淆。"),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _queryController,
+              textCapitalization: TextCapitalization.characters,
+              decoration: const InputDecoration(labelText: "代码或名称"),
+              onSubmitted: (_) => _search(),
+            ),
+            const SizedBox(height: 8),
+            Align(
+              alignment: Alignment.centerRight,
+              child: FilledButton.icon(
+                onPressed: _searching ? null : _search,
+                icon: const Icon(Icons.search),
+                label: Text(_searching ? "搜索中..." : "搜索"),
+              ),
+            ),
+            if (_error != null) ...[
+              const SizedBox(height: 8),
+              Text(_error!,
+                  style: TextStyle(color: Theme.of(context).colorScheme.error)),
+            ],
+            const SizedBox(height: 12),
+            Flexible(
+              child: ListView(
+                shrinkWrap: true,
+                children: _results
+                    .map(
+                      (candidate) => Card(
+                        child: ListTile(
+                          onTap: () =>
+                              Navigator.of(context).pop(candidate.toIdentity()),
+                          title:
+                              Text("${candidate.symbol} · ${candidate.name}"),
+                          subtitle: Text([
+                            candidate.exchange ?? "",
+                            candidate.currency ?? "",
+                            candidate.country ?? "",
+                            candidate.type,
+                          ].where((item) => item.isNotEmpty).join(" · ")),
+                        ),
+                      ),
+                    )
+                    .toList(),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ConstraintSecurityCandidate {
+  const _ConstraintSecurityCandidate({
+    required this.symbol,
+    required this.name,
+    required this.type,
+    this.exchange,
+    this.currency,
+    this.country,
+    this.provider,
+  });
+
+  final String symbol;
+  final String name;
+  final String type;
+  final String? exchange;
+  final String? currency;
+  final String? country;
+  final String? provider;
+
+  factory _ConstraintSecurityCandidate.fromJson(Map<String, dynamic> json) {
+    return _ConstraintSecurityCandidate(
+      symbol: json["symbol"] as String? ?? "--",
+      name: json["name"] as String? ?? "未知标的",
+      type: json["type"] as String? ?? "Unknown",
+      exchange: json["exchange"] as String?,
+      currency: json["currency"] as String?,
+      country: json["country"] as String?,
+      provider: json["provider"] as String?,
+    );
+  }
+
+  Map<String, dynamic> toIdentity() {
+    return {
+      "symbol": symbol.trim().toUpperCase(),
+      if (exchange != null && exchange!.isNotEmpty) "exchange": exchange,
+      if (currency == "CAD" || currency == "USD") "currency": currency,
+      "name": name,
+      if (provider != null && provider!.isNotEmpty) "provider": provider,
+    };
   }
 }
 

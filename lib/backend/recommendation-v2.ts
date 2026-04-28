@@ -39,6 +39,7 @@ type SecurityCandidate = {
   name: string;
   assetClass: string;
   currency: CurrencyCode;
+  securityType?: string;
   expenseBps: number;
   liquidityScore: number;
   tags: string[];
@@ -245,6 +246,7 @@ function scoreSecurityCandidate(
 ) {
   const watchlistBoost = profile.watchlistSymbols.includes(candidate.symbol) ? 0.14 : 0;
   const preferredBoost = getPreferredSymbolBoost(profile, candidate.symbol);
+  const securityTypePenalty = isSecurityTypeAllowed(profile, candidate.securityType ?? "ETF") ? 0 : 0.24;
   const expensePenalty = clamp(candidate.expenseBps / 200, 0, 0.18);
   const liquidityBoost = candidate.liquidityScore / 1000;
   const currencyPenalty = (selectedAccount.currency ?? "CAD") === candidate.currency
@@ -254,7 +256,7 @@ function scoreSecurityCandidate(
   const concentrationPenalty = existingHolding && existingHolding.weightPct >= 12 ? 0.1 : 0;
   const exposureMatch = candidate.assetClass === assetClass ? 0.62 : 0.4;
 
-  const score = clamp(exposureMatch + watchlistBoost + preferredBoost + liquidityBoost - expensePenalty - (currencyPenalty / 10) - concentrationPenalty, 0.05, 0.99);
+  const score = clamp(exposureMatch + watchlistBoost + preferredBoost + liquidityBoost - expensePenalty - (currencyPenalty / 10) - concentrationPenalty - securityTypePenalty, 0.05, 0.99);
   return {
     candidate,
     score: round(score * 100, 1),
@@ -273,12 +275,28 @@ function getAllowedSecurityUniverse(assetClass: string, profile: PreferenceProfi
   const candidates = buildSecurityUniverse(assetClass).filter(
     (candidate) => !excludedSymbols.has(candidate.symbol.toUpperCase())
   );
+  const typeFiltered = candidates.filter((candidate) =>
+    isSecurityTypeAllowed(profile, candidate.securityType ?? "ETF")
+  );
 
-  return candidates.length > 0 ? candidates : buildSecurityUniverse(assetClass);
+  return typeFiltered.length > 0
+    ? typeFiltered
+    : candidates.length > 0
+      ? candidates
+      : buildSecurityUniverse(assetClass);
 }
 
 function getPreferredSymbolBoost(profile: PreferenceProfile, symbol: string) {
   return profile.recommendationConstraints.preferredSymbols.includes(symbol.toUpperCase()) ? 0.12 : 0;
+}
+
+function isSecurityTypeAllowed(profile: PreferenceProfile, securityType: string) {
+  const allowedTypes = profile.recommendationConstraints.allowedSecurityTypes;
+  if (allowedTypes.length === 0) {
+    return true;
+  }
+  const normalized = securityType.trim().toLowerCase();
+  return allowedTypes.some((item) => item.trim().toLowerCase() === normalized);
 }
 
 function getConstrainedTargetPct(profile: PreferenceProfile, assetClass: string, targetPct: number) {
@@ -511,6 +529,7 @@ export function scoreCandidateSecurity(args: {
     name: candidate.name?.trim() || knownCandidate?.name || existingHolding?.name || normalizedSymbol,
     assetClass,
     currency: candidate.currency ?? knownCandidate?.currency ?? existingHolding?.currency ?? "CAD",
+    securityType: candidate.securityType ?? knownCandidate?.securityType ?? existingHolding?.securityTypeOverride ?? "ETF",
     expenseBps: knownCandidate?.expenseBps ?? 18,
     liquidityScore: knownCandidate?.liquidityScore ?? 72,
     tags: knownCandidate?.tags ?? ["manual-candidate"]

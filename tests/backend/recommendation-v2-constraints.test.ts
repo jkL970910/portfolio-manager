@@ -1,0 +1,140 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+import type { InvestmentAccount, PreferenceProfile } from "@/lib/backend/models";
+import { DEFAULT_RECOMMENDATION_CONSTRAINTS } from "@/lib/backend/recommendation-constraints";
+import { buildRecommendationV2, scoreCandidateSecurity } from "@/lib/backend/recommendation-v2";
+
+const accounts: InvestmentAccount[] = [
+  {
+    id: "acct_tfsa",
+    userId: "user_test",
+    institution: "Test Broker",
+    type: "TFSA",
+    nickname: "TFSA",
+    currency: "CAD",
+    marketValueCad: 50000,
+    contributionRoomCad: 10000
+  },
+  {
+    id: "acct_rrsp",
+    userId: "user_test",
+    institution: "Test Broker",
+    type: "RRSP",
+    nickname: "RRSP",
+    currency: "USD",
+    marketValueCad: 50000,
+    contributionRoomCad: 10000
+  }
+];
+
+function makeProfile(overrides: Partial<PreferenceProfile> = {}): PreferenceProfile {
+  return {
+    id: "pref_test",
+    userId: "user_test",
+    riskProfile: "Growth",
+    targetAllocation: [
+      { assetClass: "Canadian Equity", targetPct: 10 },
+      { assetClass: "US Equity", targetPct: 70 },
+      { assetClass: "International Equity", targetPct: 10 },
+      { assetClass: "Fixed Income", targetPct: 5 },
+      { assetClass: "Cash", targetPct: 5 }
+    ],
+    accountFundingPriority: ["TFSA", "RRSP", "Taxable"],
+    taxAwarePlacement: true,
+    cashBufferTargetCad: 10000,
+    transitionPreference: "gradual",
+    recommendationStrategy: "balanced",
+    source: "manual",
+    rebalancingTolerancePct: 5,
+    watchlistSymbols: [],
+    recommendationConstraints: DEFAULT_RECOMMENDATION_CONSTRAINTS,
+    ...overrides
+  };
+}
+
+test("excluded symbols are removed from lead ticker options when alternatives exist", () => {
+  const run = buildRecommendationV2({
+    accounts,
+    holdings: [],
+    profile: makeProfile({
+      recommendationConstraints: {
+        ...DEFAULT_RECOMMENDATION_CONSTRAINTS,
+        excludedSymbols: ["VTI"]
+      }
+    }),
+    contributionAmountCad: 5000,
+    language: "zh"
+  });
+
+  const usEquityItem = run.items.find((item) => item.assetClass === "US Equity");
+  assert.ok(usEquityItem);
+  assert.ok(!usEquityItem.tickerOptions.includes("VTI"));
+});
+
+test("preferred symbols improve candidate scoring without pinning absolute score", () => {
+  const baseline = scoreCandidateSecurity({
+    accounts,
+    holdings: [],
+    profile: makeProfile(),
+    language: "zh",
+    candidate: { symbol: "VFV", currency: "CAD", assetClass: "US Equity", securityType: "ETF" }
+  });
+  const preferred = scoreCandidateSecurity({
+    accounts,
+    holdings: [],
+    profile: makeProfile({
+      recommendationConstraints: {
+        ...DEFAULT_RECOMMENDATION_CONSTRAINTS,
+        preferredSymbols: ["VFV"]
+      }
+    }),
+    language: "zh",
+    candidate: { symbol: "VFV", currency: "CAD", assetClass: "US Equity", securityType: "ETF" }
+  });
+
+  assert.ok(preferred.securityScore > baseline.securityScore);
+  assert.equal(preferred.preferredSymbolMatched, true);
+});
+
+test("allowed security types penalize disallowed candidates without requiring fixed score snapshots", () => {
+  const baseline = scoreCandidateSecurity({
+    accounts,
+    holdings: [],
+    profile: makeProfile(),
+    language: "zh",
+    candidate: { symbol: "VFV", currency: "CAD", assetClass: "US Equity", securityType: "ETF" }
+  });
+  const restricted = scoreCandidateSecurity({
+    accounts,
+    holdings: [],
+    profile: makeProfile({
+      recommendationConstraints: {
+        ...DEFAULT_RECOMMENDATION_CONSTRAINTS,
+        allowedSecurityTypes: ["Common Stock"]
+      }
+    }),
+    language: "zh",
+    candidate: { symbol: "VFV", currency: "CAD", assetClass: "US Equity", securityType: "ETF" }
+  });
+
+  assert.ok(restricted.securityScore < baseline.securityScore);
+});
+
+test("asset-class bands constrain effective recommendation target percentages", () => {
+  const run = buildRecommendationV2({
+    accounts,
+    holdings: [],
+    profile: makeProfile({
+      recommendationConstraints: {
+        ...DEFAULT_RECOMMENDATION_CONSTRAINTS,
+        assetClassBands: [{ assetClass: "US Equity", minPct: 0, maxPct: 35 }]
+      }
+    }),
+    contributionAmountCad: 5000,
+    language: "zh"
+  });
+
+  const usEquityItem = run.items.find((item) => item.assetClass === "US Equity");
+  assert.ok(usEquityItem?.rationale);
+  assert.equal(usEquityItem.rationale.targetPct, 35);
+});

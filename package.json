@@ -6,6 +6,7 @@
                     "dev":  "next dev",
                     "build":  "next build",
                     "start":  "next start",
+                    "test:backend":  "tsx --test tests/backend/**/*.test.ts",
                     "lint":  "eslint .",
                     "typecheck":  "next typegen \u0026\u0026 tsc --noEmit",
                     "local:start":  "powershell -ExecutionPolicy Bypass -File ./scripts/local-start.ps1",
@@ -56,6 +57,7 @@
                             "dotenv":  "^17.4.2",
                             "eslint":  "^9.34.0",
                             "eslint-config-next":  "^15.5.3",
+                            "tsx":  "^4.21.0",
                             "tailwindcss":  "^4.1.13",
                             "typescript":  "^5.9.2"
                         }
