@@ -198,9 +198,10 @@ These capabilities already exist conceptually and should be preserved during mig
 ## Mobile Gap Register
 
 Current Flutter mobile coverage is now strong enough for account login, overview,
-portfolio detail, manual import, edit/delete, quote refresh, investment preference
-editing, recommendation regeneration, and watchlist maintenance. It is not yet at
-web feature parity for analysis-heavy flows.
+portfolio detail, first-pass discovery/search, manual import, edit/delete, quote
+refresh, investment preference editing, recommendation regeneration, and
+watchlist maintenance. It is not yet at web feature parity for analysis-heavy
+flows.
 
 For the page-by-page Flutter/Web parity matrix and the backend refactor
 rationale, see `docs/execution/mobile-web-parity-and-backend-refactor.md`.
@@ -238,10 +239,16 @@ Highest-priority gaps:
      overweight, and near-target cases.
 5. Candidate scoring depth
    - Watchlist management exists.
+   - Mobile now has a first-pass `搜索标的` flow launched from the
+     Recommendations tab for arbitrary symbol/name search, search-result
+     identity display, watchlist add/remove, and opening Security Detail with
+     symbol + exchange + currency.
    - Mobile recommendation cards now expose scoreline, gap summary, why/why-not
      explanations, constraints, execution steps, and alternatives.
    - Settings now has a first-pass recommendation constraint editor for
      watchlist symbols, strategy, tax-aware placement, and account priority.
+   - Remaining: migrate web discovery's candidate scoring and watchlist
+     comparison panels into mobile.
 
 Implementation priority:
 

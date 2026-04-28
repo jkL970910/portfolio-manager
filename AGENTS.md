@@ -161,7 +161,7 @@ Note: if `npm run lint` fails because ESLint 9 expects flat config, do not treat
 
 ## Current Priority Order
 
-1. Manual mobile QA for current Flutter mobile features, using `docs/guides/mobile-manual-qa-sop.md` as the source of truth.
-2. Commit/push this P0 integration batch after user approval.
-3. Next product feature after QA/push: account-scoped analyzer support for account-level Health explanations.
+1. Manual mobile QA for the new Discover / 标的搜索 MVP and current Flutter mobile features, using `docs/guides/mobile-manual-qa-sop.md` as the source of truth.
+2. Commit/push the Discover slice after user approval.
+3. Next product feature after Discover QA/push: account-scoped analyzer support for account-level Health explanations.
 4. Cached external research comes after account-scoped analyzer support and should wait for cache/worker boundaries.

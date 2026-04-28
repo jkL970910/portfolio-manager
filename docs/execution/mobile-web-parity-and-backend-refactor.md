@@ -28,7 +28,7 @@ The project direction remains:
 | Security detail | Web security page and linked holding context | Mobile security detail with summary, facts, price trend, target drift, account distribution | Mobile lacks some web density and still uses formatted/read-model data instead of raw analytics contracts |
 | Holding detail | Web holding route redirects into security context | Mobile holding detail page exists and opens by holding id | Mobile is now stronger for holding-specific drilldown than the current web redirect |
 | Recommendations | Web recommendation page with run panel, ranking, scenarios, explanations, constraints | Mobile recommendations with regenerate, scoring explanation, watchlist, scenarios, alternatives, execution steps | Mobile has strong first-pass parity; hard constraints still need backend model work |
-| Discover / market search | Web supports symbol search/validation and watchlist discovery | Mobile uses market-data search/resolve in import and recommendation/watchlist flows | Must preserve symbol + exchange + currency identity to avoid USD common share vs CAD-listed/CDR confusion |
+| Discover / market search | Web supports symbol search/validation and watchlist discovery | Mobile now has a first-pass `搜索标的` flow launched from the Recommendations tab for symbol/name search, identity display, watchlist add/remove, and security-detail navigation; import/settings still reuse search/resolve locally | Candidate scoring and watchlist comparison are not yet migrated; all search-result navigation must preserve symbol + exchange + currency identity |
 | Import | Web supports guided/direct flows, manual entry, CSV-oriented paths, preview/review concepts | Mobile intentionally keeps manual guided entry for accounts/holdings; CSV not migrated | This is an explicit product decision. Mobile CSV is deferred/omitted unless a future need appears |
 | Settings / preferences | Web has guided setup, manual workbench, profile/citizen panel, preference source context | Mobile has guided draft, manual edit, recommendation constraint edit, display currency, quote refresh | Citizen/admin profile depth and some web workbench density are not migrated |
 | Spending | Web has spending page and import separation | Mobile has no meaningful spending tab yet | Deferred until investment core and backend boundaries are stable |
@@ -360,12 +360,10 @@ Remaining work:
 
 Next priority order:
 
-1. Manual mobile QA for AI quick-scan cards in Security Detail and Portfolio
-   Health.
-2. Commit/push this P0 integration batch after user approval.
-3. Next product slice after QA: account-scoped analyzer support or cached
-   external research, depending on whether the immediate need is deeper local
-   explanations or live market/news context.
+1. Mobile Discover / 标的搜索 MVP manual QA.
+2. Commit/push the Discover slice after user approval.
+3. Account-scoped analyzer support for account-level Health explanations.
+4. Cached external research only after cache/worker boundaries exist.
 
 Migration metadata status:
 

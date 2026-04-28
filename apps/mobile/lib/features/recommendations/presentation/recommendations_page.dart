@@ -1,6 +1,7 @@
 import "package:flutter/material.dart";
 
 import "../../../core/api/loo_api_client.dart";
+import "../../discover/presentation/discover_page.dart";
 import "../../shared/data/mobile_models.dart";
 
 class RecommendationsPage extends StatefulWidget {
@@ -174,6 +175,8 @@ class _RecommendationsPageState extends State<RecommendationsPage> {
                     children: [
                       _SummaryCard(snapshot.data!),
                       const SizedBox(height: 16),
+                      _DiscoverEntryCard(onOpen: _openDiscover),
+                      const SizedBox(height: 16),
                       _GenerateRecommendationCard(
                         working: _working,
                         onGenerate: _createRun,
@@ -225,6 +228,14 @@ class _RecommendationsPageState extends State<RecommendationsPage> {
           ),
         );
       },
+    );
+  }
+
+  void _openDiscover() {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => DiscoverPage(apiClient: widget.apiClient),
+      ),
     );
   }
 }
@@ -549,6 +560,25 @@ class _GenerateRecommendationCard extends StatelessWidget {
               )
             : const Icon(Icons.chevron_right),
         onTap: working ? null : onGenerate,
+      ),
+    );
+  }
+}
+
+class _DiscoverEntryCard extends StatelessWidget {
+  const _DiscoverEntryCard({required this.onOpen});
+
+  final VoidCallback onOpen;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: ListTile(
+        leading: const Icon(Icons.travel_explore_outlined),
+        title: const Text("搜索标的"),
+        subtitle: const Text("按代码或名称查找股票、ETF、CDR，再加入观察或打开标的详情。"),
+        trailing: const Icon(Icons.chevron_right),
+        onTap: onOpen,
       ),
     );
   }
