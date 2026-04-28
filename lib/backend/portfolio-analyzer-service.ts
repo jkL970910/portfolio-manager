@@ -1,5 +1,6 @@
 import { apiSuccess } from "@/lib/backend/contracts";
 import { getRepositories } from "@/lib/backend/repositories/factory";
+import { assertExternalResearchAllowed } from "@/lib/backend/portfolio-external-research";
 import {
   PortfolioAnalyzerRequest,
   PortfolioAnalyzerResult,
@@ -107,6 +108,7 @@ async function persistAnalyzerResult(
 export async function getPortfolioAnalyzerQuickScan(userId: string, input: PortfolioAnalyzerRequest) {
   const repositories = getRepositories();
   const targetKey = buildPortfolioAnalyzerCacheKey(input);
+  assertExternalResearchAllowed(input);
   const cached = await readCachedAnalyzerResult(userId, input, targetKey);
   if (cached) {
     return apiSuccess(cached, "database");

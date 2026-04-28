@@ -164,5 +164,5 @@ Note: if `npm run lint` fails because ESLint 9 expects flat config, do not treat
 1. Apply/verify migration `0004_portfolio_analysis_runs` in the target dev DB before relying on persistent analyzer cache.
 2. Manual mobile QA for AI quick scans, including `重新生成`, Health wording/score-level fixes, and `AI 最近分析`, using `docs/guides/mobile-manual-qa-sop.md` as the source of truth.
 3. Commit/push the analyzer refresh UI, Health wording fix, and recent analysis history after validation and user approval.
-4. Cached external research must wait for explicit cache/worker policy and should not call live external sources by default.
+4. External research is guarded off by default; next priority is worker/cost policy and source allowlist before any live adapter.
 5. Holding-level deeper AI analysis and chart-heavy UX come after the core analyzer flow is stable.

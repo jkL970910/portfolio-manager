@@ -28,7 +28,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(await getPortfolioAnalyzerQuickScan(viewer.id, parsed.data));
   } catch (error) {
     const message = error instanceof Error ? error.message : "Failed to build analyzer quick scan.";
-    const status = /requires|not available/i.test(message) ? 400 : 500;
+    const status = /requires|not available|not enabled/i.test(message) ? 400 : 500;
     return NextResponse.json({ error: message }, { status });
   }
 }

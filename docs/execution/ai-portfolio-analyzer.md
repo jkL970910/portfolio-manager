@@ -38,6 +38,9 @@ are deferred until cache/worker boundaries exist.
   - `仅用于研究学习，不构成投资建议。`
   - `For research and educational purposes only. Not investment advice.`
 - Do not run live web/forum research on normal page load.
+- External research is disabled by default. Requests with
+  `includeExternalResearch: true` must fail clearly until cache TTL and worker
+  policy are configured.
 
 ## Contract Files
 
@@ -214,14 +217,17 @@ Next analyzer work:
   `cacheStrategy: "refresh"` to bypass cached results.
 - Mobile Settings now exposes `AI 最近分析`, a compact history view backed by
   `portfolio_analysis_runs`.
+- External research guard exists in `lib/backend/portfolio-external-research.ts`.
+  It rejects live research by default and requires an explicit long-cache policy
+  before any external adapter can run.
 - Account Health and account AI quick scan now separate two lenses:
   `账户内适配` for whether the account is a suitable home for its holdings, and
   `全组合目标参考` for how the account contributes to the total portfolio target.
 - Allocation gap copy must state whether the current percentage is above or
   below target. Do not describe an overweight sleeve as "只有".
 - Manually QA repeated AI quick scans from a real mobile URL.
-- Next analyzer work: add explicit cache/worker policy before any external
-  research adapter.
+- Next analyzer work: design the worker/cost policy and source allowlist before
+  implementing a real external research adapter.
 
 ## Deferred Work
 

@@ -377,8 +377,8 @@ Next priority order:
 5. Commit/push the analyzer refresh UI, Health wording fix, and recent analysis
    history after
    validation.
-6. External research adapter design remains blocked until cache/worker policy
-   is explicit.
+6. External research is now guarded off by default; next work is worker/cost
+   policy and source allowlist before any live adapter.
 7. Holding-level deeper AI analysis and chart-heavy UX after the core analyzer
    flow is stable.
 
