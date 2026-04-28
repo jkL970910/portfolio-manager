@@ -267,6 +267,9 @@ Next analyzer work:
   identity separation from the Settings page.
 - Mobile Settings QA passed for recent external-research job visibility after
   the local smoke run.
+- `AI 最近分析` now exposes compact result details on mobile, including
+  scorecards, risks, action items, sources, source mode, and the non-advice
+  disclaimer.
 
 ## Deferred Work
 
@@ -277,6 +280,8 @@ P1:
 - saved analysis history detail/drilldown
 - background worker queue and persisted usage counters for external research
 - cached-external result detail visibility if mobile needs drilldown
+- standardized chart DTO migration, starting with Security Detail. See
+  `docs/execution/mobile-chart-contracts.md`.
 
 P2:
 

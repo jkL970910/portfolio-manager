@@ -17,6 +17,29 @@ export interface MobilePortfolioAnalysisHistoryItem {
   detail: string;
   generatedAt: string;
   sourceMode: PortfolioAnalysisRun["sourceMode"];
+  sourceLabel: string;
+  scorecards: {
+    label: string;
+    score: number;
+    rationale: string;
+  }[];
+  risks: {
+    severity: string;
+    title: string;
+    detail: string;
+  }[];
+  actionItems: {
+    priority: string;
+    title: string;
+    detail: string;
+  }[];
+  sources: {
+    title: string;
+    sourceType: string;
+    date?: string;
+    url?: string;
+  }[];
+  disclaimer: string;
 }
 
 function getSummaryTitle(result: Record<string, unknown>) {
@@ -41,6 +64,104 @@ function getSummaryThesis(result: Record<string, unknown>) {
   return "这条记录来自本地组合、账户、持仓和行情缓存。";
 }
 
+function getSourceLabel(sourceMode: PortfolioAnalysisRun["sourceMode"]) {
+  switch (sourceMode) {
+    case "cached-external":
+      return "缓存外部研究";
+    case "live-external":
+      return "实时外部研究";
+    default:
+      return "本地快扫";
+  }
+}
+
+function mapScorecards(result: Record<string, unknown>) {
+  const raw = result.scorecards;
+  if (!Array.isArray(raw)) {
+    return [];
+  }
+
+  return raw.slice(0, 6).map((item) => {
+    const value = item && typeof item === "object"
+      ? item as Record<string, unknown>
+      : {};
+    return {
+      label: typeof value.label === "string" ? value.label : "评分",
+      score: typeof value.score === "number" ? value.score : 0,
+      rationale: typeof value.rationale === "string" ? value.rationale : ""
+    };
+  });
+}
+
+function mapRisks(result: Record<string, unknown>) {
+  const raw = result.risks;
+  if (!Array.isArray(raw)) {
+    return [];
+  }
+
+  return raw.slice(0, 6).map((item) => {
+    const value = item && typeof item === "object"
+      ? item as Record<string, unknown>
+      : {};
+    return {
+      severity: typeof value.severity === "string" ? value.severity : "info",
+      title: typeof value.title === "string" ? value.title : "风险提示",
+      detail: typeof value.detail === "string" ? value.detail : ""
+    };
+  });
+}
+
+function mapActionItems(result: Record<string, unknown>) {
+  const raw = result.actionItems;
+  if (!Array.isArray(raw)) {
+    return [];
+  }
+
+  return raw.slice(0, 6).map((item) => {
+    const value = item && typeof item === "object"
+      ? item as Record<string, unknown>
+      : {};
+    return {
+      priority: typeof value.priority === "string" ? value.priority : "P2",
+      title: typeof value.title === "string" ? value.title : "后续动作",
+      detail: typeof value.detail === "string" ? value.detail : ""
+    };
+  });
+}
+
+function mapSources(result: Record<string, unknown>) {
+  const raw = result.sources;
+  if (!Array.isArray(raw)) {
+    return [];
+  }
+
+  return raw.slice(0, 8).map((item) => {
+    const value = item && typeof item === "object"
+      ? item as Record<string, unknown>
+      : {};
+    return {
+      title: typeof value.title === "string" ? value.title : "来源",
+      sourceType: typeof value.sourceType === "string"
+        ? value.sourceType
+        : "portfolio-data",
+      date: typeof value.date === "string" ? value.date : undefined,
+      url: typeof value.url === "string" ? value.url : undefined
+    };
+  });
+}
+
+function getDisclaimer(result: Record<string, unknown>) {
+  const disclaimer = result.disclaimer;
+  if (disclaimer && typeof disclaimer === "object" && "zh" in disclaimer) {
+    const zh = (disclaimer as { zh?: unknown }).zh;
+    if (typeof zh === "string" && zh.trim()) {
+      return zh.trim();
+    }
+  }
+
+  return "仅用于研究学习，不构成投资建议。";
+}
+
 export function mapAnalysisRunForMobile(run: PortfolioAnalysisRun): MobilePortfolioAnalysisHistoryItem {
   return {
     id: run.id,
@@ -49,7 +170,13 @@ export function mapAnalysisRunForMobile(run: PortfolioAnalysisRun): MobilePortfo
     title: getSummaryTitle(run.result),
     detail: getSummaryThesis(run.result),
     generatedAt: run.generatedAt,
-    sourceMode: run.sourceMode
+    sourceMode: run.sourceMode,
+    sourceLabel: getSourceLabel(run.sourceMode),
+    scorecards: mapScorecards(run.result),
+    risks: mapRisks(run.result),
+    actionItems: mapActionItems(run.result),
+    sources: mapSources(run.result),
+    disclaimer: getDisclaimer(run.result)
   };
 }
 

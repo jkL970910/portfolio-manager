@@ -4,6 +4,35 @@ export interface MetricCard {
   detail: string;
 }
 
+export interface MobileChartPoint {
+  displayLabel: string;
+  rawDate?: string;
+  value: number;
+  displayValue: string;
+}
+
+export interface MobileChartSeries {
+  id: string;
+  title: string;
+  kind: "line" | "distribution" | "radar";
+  valueType: "money" | "percent" | "index" | "score" | "quantity";
+  currency?: "CAD" | "USD";
+  sourceMode: "local" | "cached-external" | "live-external";
+  freshness: {
+    status: "fresh" | "stale" | "fallback";
+    label: string;
+    latestDate: string | null;
+    detail: string;
+  };
+  identity?: {
+    symbol: string;
+    exchange?: string | null;
+    currency?: "CAD" | "USD" | null;
+  };
+  points: MobileChartPoint[];
+  notes: string[];
+}
+
 export interface DashboardData {
   displayContext: {
     currency: "CAD" | "USD";
@@ -85,8 +114,18 @@ export interface PortfolioData {
     sourceDetail: string;
   };
   performance: { label: string; value: number; rawDate?: string }[];
-  accountTypeAllocation: { id: string; name: string; value: number; detail?: string }[];
-  accountInstanceAllocation: { id: string; name: string; value: number; detail?: string }[];
+  accountTypeAllocation: {
+    id: string;
+    name: string;
+    value: number;
+    detail?: string;
+  }[];
+  accountInstanceAllocation: {
+    id: string;
+    name: string;
+    value: number;
+    detail?: string;
+  }[];
   assetClassDrilldown: {
     id: string;
     name: string;
@@ -294,10 +333,10 @@ export interface PortfolioAccountDetailData {
     value: string;
     gainLoss: string;
     portfolioShare: string;
-      room: string;
-      topHoldings: string[];
-      summaryPoints: string[];
-    };
+    room: string;
+    topHoldings: string[];
+    summaryPoints: string[];
+  };
   facts: {
     label: string;
     value: string;
@@ -472,6 +511,9 @@ export interface PortfolioSecurityDetailData {
     summary: string;
   };
   performance: { label: string; value: number; rawDate?: string }[];
+  chartSeries?: {
+    priceHistory?: MobileChartSeries;
+  };
   summaryPoints: string[];
   relatedHoldings: {
     id: string;
@@ -536,7 +578,11 @@ export interface RecommendationsData {
     objective: string;
     confidence: string;
   };
-  inputs: { label: string; value: string; tone?: "default" | "muted" | "warning" }[];
+  inputs: {
+    label: string;
+    value: string;
+    tone?: "default" | "muted" | "warning";
+  }[];
   explainer: string[];
   priorities: {
     id: string;

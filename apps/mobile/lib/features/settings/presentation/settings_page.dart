@@ -626,9 +626,99 @@ class _RecentAnalysisTile extends StatelessWidget {
       contentPadding: EdgeInsets.zero,
       leading: const Icon(Icons.auto_awesome),
       title: Text(item.title),
-      subtitle:
-          Text("${item.scopeLabel} · ${item.generatedAtLabel}\n${item.detail}"),
+      subtitle: Text(
+          "${item.scopeLabel} · ${item.sourceLabel} · ${item.generatedAtLabel}\n${item.detail}"),
+      trailing: const Icon(Icons.chevron_right),
       isThreeLine: true,
+      onTap: () => _showRecentAnalysisDetail(context, item),
+    );
+  }
+
+  void _showRecentAnalysisDetail(
+    BuildContext context,
+    _RecentAnalysisItem item,
+  ) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) => DraggableScrollableSheet(
+        expand: false,
+        initialChildSize: 0.82,
+        minChildSize: 0.45,
+        maxChildSize: 0.95,
+        builder: (context, scrollController) {
+          return ListView(
+            controller: scrollController,
+            padding: const EdgeInsets.all(20),
+            children: [
+              Text(item.title, style: Theme.of(context).textTheme.titleLarge),
+              const SizedBox(height: 6),
+              Text("${item.scopeLabel} · ${item.sourceLabel}"),
+              const SizedBox(height: 12),
+              Text(item.detail),
+              const SizedBox(height: 18),
+              if (item.scorecards.isNotEmpty) ...[
+                Text("评分卡", style: Theme.of(context).textTheme.titleMedium),
+                const SizedBox(height: 8),
+                ...item.scorecards.map(
+                  (scorecard) => ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: CircleAvatar(
+                      child: Text(scorecard.score.round().toString()),
+                    ),
+                    title: Text(scorecard.label),
+                    subtitle: Text(scorecard.rationale),
+                  ),
+                ),
+                const Divider(),
+              ],
+              if (item.risks.isNotEmpty) ...[
+                Text("风险提示", style: Theme.of(context).textTheme.titleMedium),
+                const SizedBox(height: 8),
+                ...item.risks.map(
+                  (risk) => ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: const Icon(Icons.warning_amber_outlined),
+                    title: Text(risk.title),
+                    subtitle: Text("${risk.severityLabel} · ${risk.detail}"),
+                  ),
+                ),
+                const Divider(),
+              ],
+              if (item.actionItems.isNotEmpty) ...[
+                Text("后续动作", style: Theme.of(context).textTheme.titleMedium),
+                const SizedBox(height: 8),
+                ...item.actionItems.map(
+                  (action) => ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: Chip(label: Text(action.priority)),
+                    title: Text(action.title),
+                    subtitle: Text(action.detail),
+                  ),
+                ),
+                const Divider(),
+              ],
+              if (item.sources.isNotEmpty) ...[
+                Text("来源", style: Theme.of(context).textTheme.titleMedium),
+                const SizedBox(height: 8),
+                ...item.sources.map(
+                  (source) => ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: const Icon(Icons.source_outlined),
+                    title: Text(source.title),
+                    subtitle: Text(source.subtitle),
+                  ),
+                ),
+                const Divider(),
+              ],
+              Text(
+                item.disclaimer,
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+            ],
+          );
+        },
+      ),
     );
   }
 }
@@ -636,15 +726,27 @@ class _RecentAnalysisTile extends StatelessWidget {
 class _RecentAnalysisItem {
   const _RecentAnalysisItem({
     required this.scopeLabel,
+    required this.sourceLabel,
     required this.title,
     required this.detail,
     required this.generatedAt,
+    required this.scorecards,
+    required this.risks,
+    required this.actionItems,
+    required this.sources,
+    required this.disclaimer,
   });
 
   final String scopeLabel;
+  final String sourceLabel;
   final String title;
   final String detail;
   final DateTime? generatedAt;
+  final List<_AnalysisScorecard> scorecards;
+  final List<_AnalysisRisk> risks;
+  final List<_AnalysisActionItem> actionItems;
+  final List<_AnalysisSource> sources;
+  final String disclaimer;
 
   String get generatedAtLabel {
     final value = generatedAt;
@@ -660,10 +762,129 @@ class _RecentAnalysisItem {
     final rawGeneratedAt = json["generatedAt"];
     return _RecentAnalysisItem(
       scopeLabel: json["scopeLabel"] as String? ?? "AI 快扫",
+      sourceLabel: json["sourceLabel"] as String? ?? "本地快扫",
       title: json["title"] as String? ?? "AI 快扫记录",
       detail: json["detail"] as String? ?? "",
       generatedAt:
           rawGeneratedAt is String ? DateTime.tryParse(rawGeneratedAt) : null,
+      scorecards:
+          _readJsonList(json["scorecards"], _AnalysisScorecard.fromJson),
+      risks: _readJsonList(json["risks"], _AnalysisRisk.fromJson),
+      actionItems:
+          _readJsonList(json["actionItems"], _AnalysisActionItem.fromJson),
+      sources: _readJsonList(json["sources"], _AnalysisSource.fromJson),
+      disclaimer: json["disclaimer"] as String? ?? "仅用于研究学习，不构成投资建议。",
+    );
+  }
+}
+
+List<T> _readJsonList<T>(
+  Object? value,
+  T Function(Map<String, dynamic> json) fromJson,
+) {
+  return value is List
+      ? value.whereType<Map<String, dynamic>>().map(fromJson).toList()
+      : const [];
+}
+
+class _AnalysisScorecard {
+  const _AnalysisScorecard({
+    required this.label,
+    required this.score,
+    required this.rationale,
+  });
+
+  final String label;
+  final double score;
+  final String rationale;
+
+  factory _AnalysisScorecard.fromJson(Map<String, dynamic> json) {
+    final score = json["score"];
+    return _AnalysisScorecard(
+      label: json["label"] as String? ?? "评分",
+      score: score is num ? score.toDouble() : 0,
+      rationale: json["rationale"] as String? ?? "",
+    );
+  }
+}
+
+class _AnalysisRisk {
+  const _AnalysisRisk({
+    required this.severity,
+    required this.title,
+    required this.detail,
+  });
+
+  final String severity;
+  final String title;
+  final String detail;
+
+  String get severityLabel {
+    switch (severity) {
+      case "high":
+        return "高";
+      case "medium":
+        return "中";
+      case "low":
+        return "低";
+      default:
+        return "提示";
+    }
+  }
+
+  factory _AnalysisRisk.fromJson(Map<String, dynamic> json) {
+    return _AnalysisRisk(
+      severity: json["severity"] as String? ?? "info",
+      title: json["title"] as String? ?? "风险提示",
+      detail: json["detail"] as String? ?? "",
+    );
+  }
+}
+
+class _AnalysisActionItem {
+  const _AnalysisActionItem({
+    required this.priority,
+    required this.title,
+    required this.detail,
+  });
+
+  final String priority;
+  final String title;
+  final String detail;
+
+  factory _AnalysisActionItem.fromJson(Map<String, dynamic> json) {
+    return _AnalysisActionItem(
+      priority: json["priority"] as String? ?? "P2",
+      title: json["title"] as String? ?? "后续动作",
+      detail: json["detail"] as String? ?? "",
+    );
+  }
+}
+
+class _AnalysisSource {
+  const _AnalysisSource({
+    required this.title,
+    required this.sourceType,
+    required this.date,
+  });
+
+  final String title;
+  final String sourceType;
+  final String? date;
+
+  String get subtitle {
+    final parts = [
+      sourceType,
+      if (date != null && date!.isNotEmpty) date!,
+    ];
+    return parts.join(" · ");
+  }
+
+  factory _AnalysisSource.fromJson(Map<String, dynamic> json) {
+    return _AnalysisSource(
+      title: json["title"] as String? ?? "来源",
+      sourceType: json["sourceType"] as String? ?? "portfolio-data",
+      date: json["date"] as String?,
     );
   }
 }

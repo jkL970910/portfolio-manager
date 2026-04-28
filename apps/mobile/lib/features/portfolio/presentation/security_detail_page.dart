@@ -112,11 +112,15 @@ class _SecurityDetailPageState extends State<SecurityDetailPage> {
                 ),
                 const SizedBox(height: 12),
                 _MetricGrid(data),
-                if (data.performance.isNotEmpty) ...[
+                if (data.priceHistoryChart != null ||
+                    data.performance.isNotEmpty) ...[
                   const SizedBox(height: 16),
                   const _SectionTitle("价格走势"),
                   const SizedBox(height: 8),
-                  _PerformanceChartCard(data.performance),
+                  _PerformanceChartCard(
+                    chart: data.priceHistoryChart,
+                    fallbackPoints: data.performance,
+                  ),
                 ],
                 const SizedBox(height: 16),
                 if (data.summaryPoints.isNotEmpty) ...[
@@ -193,6 +197,7 @@ class MobileSecurityDetailSnapshot {
     required this.marketData,
     required this.analysis,
     required this.performance,
+    required this.priceHistoryChart,
     required this.summaryPoints,
     required this.facts,
     required this.relatedHoldings,
@@ -212,6 +217,7 @@ class MobileSecurityDetailSnapshot {
   final MobileSecurityMarketData marketData;
   final MobileSecurityAnalysis analysis;
   final List<MobileSecurityPerformancePoint> performance;
+  final MobileChartSeries? priceHistoryChart;
   final List<String> summaryPoints;
   final List<MobileFact> facts;
   final List<MobileHoldingCard> relatedHoldings;
@@ -243,6 +249,11 @@ class MobileSecurityDetailSnapshot {
       performance: readJsonList(json, "performance")
           .map(MobileSecurityPerformancePoint.fromJson)
           .toList(),
+      priceHistoryChart: MobileChartSeries.fromJson(
+        (json["chartSeries"] is Map<String, dynamic>
+            ? json["chartSeries"] as Map<String, dynamic>
+            : const <String, dynamic>{})["priceHistory"],
+      ),
       summaryPoints:
           (json["summaryPoints"] as List?)?.whereType<String>().toList() ??
               const [],
@@ -251,6 +262,72 @@ class MobileSecurityDetailSnapshot {
           .map(MobileHoldingCard.fromJson)
           .toList(),
       heldPosition: MobileHeldPosition.fromJson(json["heldPosition"]),
+    );
+  }
+}
+
+class MobileChartSeries {
+  const MobileChartSeries({
+    required this.title,
+    required this.valueType,
+    required this.sourceMode,
+    required this.freshness,
+    required this.points,
+    required this.notes,
+  });
+
+  final String title;
+  final String valueType;
+  final String sourceMode;
+  final MobileChartFreshness freshness;
+  final List<MobileSecurityPerformancePoint> points;
+  final List<String> notes;
+
+  static MobileChartSeries? fromJson(Object? value) {
+    final json =
+        value is Map<String, dynamic> ? value : const <String, dynamic>{};
+    final rawPoints = json["points"];
+    final points = rawPoints is List
+        ? rawPoints
+            .whereType<Map<String, dynamic>>()
+            .map(MobileSecurityPerformancePoint.fromChartPointJson)
+            .toList()
+        : const <MobileSecurityPerformancePoint>[];
+
+    if (points.length < 2) return null;
+
+    return MobileChartSeries(
+      title: json["title"] as String? ?? "价格走势",
+      valueType: json["valueType"] as String? ?? "index",
+      sourceMode: json["sourceMode"] as String? ?? "local",
+      freshness: MobileChartFreshness.fromJson(json["freshness"]),
+      points: points,
+      notes: (json["notes"] as List?)?.whereType<String>().toList() ?? const [],
+    );
+  }
+}
+
+class MobileChartFreshness {
+  const MobileChartFreshness({
+    required this.status,
+    required this.label,
+    required this.latestDate,
+    required this.detail,
+  });
+
+  final String status;
+  final String label;
+  final String? latestDate;
+  final String detail;
+
+  factory MobileChartFreshness.fromJson(Object? value) {
+    final json =
+        value is Map<String, dynamic> ? value : const <String, dynamic>{};
+    return MobileChartFreshness(
+      status: json["status"] as String? ?? "fallback",
+      label: json["label"] as String? ?? "参考曲线",
+      latestDate: json["latestDate"] as String?,
+      detail: json["detail"] as String? ?? "请确认数据来源和更新时间。",
     );
   }
 }
@@ -396,6 +473,18 @@ class MobileSecurityPerformancePoint {
       value: rawValue is num
           ? rawValue.toStringAsFixed(2)
           : rawValue?.toString() ?? "--",
+      chartValue: rawValue is num ? rawValue.toDouble() : 0,
+    );
+  }
+
+  factory MobileSecurityPerformancePoint.fromChartPointJson(
+      Map<String, dynamic> json) {
+    final rawValue = json["value"];
+    return MobileSecurityPerformancePoint(
+      label: json["displayLabel"] as String? ??
+          json["rawDate"] as String? ??
+          "未知日期",
+      value: json["displayValue"] as String? ?? rawValue?.toString() ?? "--",
       chartValue: rawValue is num ? rawValue.toDouble() : 0,
     );
   }
@@ -693,14 +782,20 @@ class _ProgressMetric extends StatelessWidget {
 }
 
 class _PerformanceChartCard extends StatelessWidget {
-  const _PerformanceChartCard(this.points);
+  const _PerformanceChartCard({
+    required this.chart,
+    required this.fallbackPoints,
+  });
 
-  final List<MobileSecurityPerformancePoint> points;
+  final MobileChartSeries? chart;
+  final List<MobileSecurityPerformancePoint> fallbackPoints;
 
   @override
   Widget build(BuildContext context) {
+    final points = chart?.points ?? fallbackPoints;
     final first = points.first;
     final last = points.last;
+    final freshness = chart?.freshness;
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -722,6 +817,24 @@ class _PerformanceChartCard extends StatelessWidget {
               "${first.label} ${first.value} → ${last.label} ${last.value}",
               style: Theme.of(context).textTheme.bodyMedium,
             ),
+            if (freshness != null) ...[
+              const SizedBox(height: 10),
+              Chip(label: Text(freshness.label)),
+              const SizedBox(height: 6),
+              Text(
+                freshness.detail,
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+            ],
+            if (chart != null && chart!.notes.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              ...chart!.notes.take(2).map(
+                    (note) => Text(
+                      "· $note",
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                  ),
+            ],
           ],
         ),
       ),

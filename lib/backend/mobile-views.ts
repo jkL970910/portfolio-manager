@@ -6,7 +6,7 @@ import type {
   PortfolioData,
   PortfolioHoldingDetailData,
   PortfolioSecurityDetailData,
-  RecommendationsData
+  RecommendationsData,
 } from "@/lib/contracts";
 import {
   getDashboardView,
@@ -15,7 +15,7 @@ import {
   getPortfolioHoldingDetailView,
   getPortfolioSecurityDetailView,
   getPortfolioView,
-  getRecommendationView
+  getRecommendationView,
 } from "@/lib/backend/services";
 import { getRepositories } from "@/lib/backend/repositories/factory";
 import type { Viewer } from "@/lib/auth/session";
@@ -104,13 +104,22 @@ type MobilePortfolioOverviewData = {
   };
 };
 
-type MobilePortfolioHoldingListItem = Omit<PortfolioData["holdings"][number], "href" | "securityHref">;
+type MobilePortfolioHoldingListItem = Omit<
+  PortfolioData["holdings"][number],
+  "href" | "securityHref"
+>;
 
-type MobilePortfolioAccountDetailData = Omit<PortfolioAccountDetailData, "holdings" | "trendContext" | "editContext"> & {
+type MobilePortfolioAccountDetailData = Omit<
+  PortfolioAccountDetailData,
+  "holdings" | "trendContext" | "editContext"
+> & {
   holdings: MobilePortfolioHoldingListItem[];
 };
 
-type MobilePortfolioHoldingDetailData = Omit<PortfolioHoldingDetailData, "holding" | "editContext"> & {
+type MobilePortfolioHoldingDetailData = Omit<
+  PortfolioHoldingDetailData,
+  "holding" | "editContext"
+> & {
   holding: Omit<PortfolioHoldingDetailData["holding"], "accountHref"> & {
     identity: {
       symbol: string;
@@ -120,13 +129,26 @@ type MobilePortfolioHoldingDetailData = Omit<PortfolioHoldingDetailData, "holdin
   };
 };
 
-type MobileSecurityAccountHoldingView = Omit<MobilePortfolioHoldingDetailData, "displayContext">;
+type MobileSecurityAccountHoldingView = Omit<
+  MobilePortfolioHoldingDetailData,
+  "displayContext"
+>;
 
-type MobilePortfolioSecurityDetailData = Omit<PortfolioSecurityDetailData, "relatedHoldings" | "heldPosition"> & {
-  relatedHoldings: Array<Omit<PortfolioSecurityDetailData["relatedHoldings"][number], "href">>;
-  heldPosition: null | Omit<NonNullable<PortfolioSecurityDetailData["heldPosition"]>, "accountViews"> & {
-    accountViews: MobileSecurityAccountHoldingView[];
-  };
+type MobilePortfolioSecurityDetailData = Omit<
+  PortfolioSecurityDetailData,
+  "relatedHoldings" | "heldPosition"
+> & {
+  relatedHoldings: Array<
+    Omit<PortfolioSecurityDetailData["relatedHoldings"][number], "href">
+  >;
+  heldPosition:
+    | null
+    | (Omit<
+        NonNullable<PortfolioSecurityDetailData["heldPosition"]>,
+        "accountViews"
+      > & {
+        accountViews: MobileSecurityAccountHoldingView[];
+      });
 };
 
 type MobileRecommendationPriority = Omit<
@@ -151,15 +173,20 @@ type MobileRecommendationsData = Omit<RecommendationsData, "priorities"> & {
 type MobileImportData = {
   manualSteps: { title: string; description: string }[];
   actionCards: { label: string; title: string; description: string }[];
-  existingAccounts: Array<ImportData["existingAccounts"][number] & {
-    displayName: string;
-    value: string;
-    detail: string;
-  }>;
+  existingAccounts: Array<
+    ImportData["existingAccounts"][number] & {
+      displayName: string;
+      value: string;
+      detail: string;
+    }
+  >;
   notes: string[];
 };
 
-function mapMobileHomeData(viewer: Viewer, payload: ApiSuccess<DashboardData & { context?: MobileHomeData["context"] }>): MobileHomeData {
+function mapMobileHomeData(
+  viewer: Viewer,
+  payload: ApiSuccess<DashboardData & { context?: MobileHomeData["context"] }>,
+): MobileHomeData {
   return {
     viewer,
     displayContext: payload.data.displayContext,
@@ -193,7 +220,9 @@ function mapMobileHomeData(viewer: Viewer, payload: ApiSuccess<DashboardData & {
 
 function mapMobilePortfolioOverviewData(
   viewer: Viewer,
-  payload: ApiSuccess<PortfolioData & { context?: MobilePortfolioOverviewData["context"] }>
+  payload: ApiSuccess<
+    PortfolioData & { context?: MobilePortfolioOverviewData["context"] }
+  >,
 ): MobilePortfolioOverviewData {
   return {
     viewer,
@@ -242,7 +271,9 @@ function mapMobilePortfolioOverviewData(
   };
 }
 
-function mapMobilePortfolioHoldingListItem(holding: PortfolioData["holdings"][number]): MobilePortfolioHoldingListItem {
+function mapMobilePortfolioHoldingListItem(
+  holding: PortfolioData["holdings"][number],
+): MobilePortfolioHoldingListItem {
   return {
     id: holding.id,
     symbol: holding.symbol,
@@ -265,7 +296,9 @@ function mapMobilePortfolioHoldingListItem(holding: PortfolioData["holdings"][nu
   };
 }
 
-function mapMobileAccountDetailData(data: PortfolioAccountDetailData): MobilePortfolioAccountDetailData {
+function mapMobileAccountDetailData(
+  data: PortfolioAccountDetailData,
+): MobilePortfolioAccountDetailData {
   return {
     displayContext: data.displayContext,
     account: data.account,
@@ -277,7 +310,9 @@ function mapMobileAccountDetailData(data: PortfolioAccountDetailData): MobilePor
   };
 }
 
-function mapMobileHoldingDetailData(data: PortfolioHoldingDetailData): MobilePortfolioHoldingDetailData {
+function mapMobileHoldingDetailData(
+  data: PortfolioHoldingDetailData,
+): MobilePortfolioHoldingDetailData {
   const { accountHref: _accountHref, ...holding } = data.holding;
 
   return {
@@ -298,12 +333,17 @@ function mapMobileHoldingDetailData(data: PortfolioHoldingDetailData): MobilePor
   };
 }
 
-function mapMobileSecurityAccountHoldingView(data: PortfolioHoldingDetailData): MobileSecurityAccountHoldingView {
-  const { displayContext: _displayContext, ...holdingDetail } = mapMobileHoldingDetailData(data);
+function mapMobileSecurityAccountHoldingView(
+  data: PortfolioHoldingDetailData,
+): MobileSecurityAccountHoldingView {
+  const { displayContext: _displayContext, ...holdingDetail } =
+    mapMobileHoldingDetailData(data);
   return holdingDetail;
 }
 
-function mapMobileSecurityDetailData(data: PortfolioSecurityDetailData): MobilePortfolioSecurityDetailData {
+function mapMobileSecurityDetailData(
+  data: PortfolioSecurityDetailData,
+): MobilePortfolioSecurityDetailData {
   return {
     displayContext: data.displayContext,
     security: data.security,
@@ -321,7 +361,9 @@ function mapMobileSecurityDetailData(data: PortfolioSecurityDetailData): MobileP
           aggregate: data.heldPosition.aggregate,
           accountOptions: data.heldPosition.accountOptions,
           accountSummaries: data.heldPosition.accountSummaries,
-          accountViews: data.heldPosition.accountViews.map(mapMobileSecurityAccountHoldingView),
+          accountViews: data.heldPosition.accountViews.map(
+            mapMobileSecurityAccountHoldingView,
+          ),
         }
       : null,
   };
@@ -329,7 +371,7 @@ function mapMobileSecurityDetailData(data: PortfolioSecurityDetailData): MobileP
 
 function mapMobileRecommendationsData(
   data: RecommendationsData,
-  preferenceContext: MobileRecommendationsData["preferenceContext"]
+  preferenceContext: MobileRecommendationsData["preferenceContext"],
 ): MobileRecommendationsData {
   return {
     ...data,
@@ -355,11 +397,13 @@ function mapMobileImportData(data: ImportData): MobileImportData {
       },
       {
         title: "再添加持仓",
-        description: "为账户添加股票、ETF、现金或贵金属持仓，保留原始交易币种。",
+        description:
+          "为账户添加股票、ETF、现金或贵金属持仓，保留原始交易币种。",
       },
       {
         title: "检查成本和市值",
-        description: "确认数量、成本、当前价格和市场归属，避免 CAD/USD 混在一起。",
+        description:
+          "确认数量、成本、当前价格和市场归属，避免 CAD/USD 混在一起。",
       },
       {
         title: "保存后回到组合",
@@ -391,7 +435,9 @@ function mapMobileImportData(data: ImportData): MobileImportData {
         currency: "CAD",
         maximumFractionDigits: 0,
       }).format(account.marketValueCad),
-      detail: [account.type, account.institution, account.currency].filter(Boolean).join(" · "),
+      detail: [account.type, account.institution, account.currency]
+        .filter(Boolean)
+        .join(" · "),
     })),
     notes: [
       "移动端 MVP 只保留手动/引导式导入，不迁移 CSV 上传和字段映射。",
@@ -409,7 +455,10 @@ export async function getMobileHomeView(userId: string, viewer: Viewer) {
   };
 }
 
-export async function getMobilePortfolioOverviewView(userId: string, viewer: Viewer) {
+export async function getMobilePortfolioOverviewView(
+  userId: string,
+  viewer: Viewer,
+) {
   const payload = await getPortfolioView(userId);
   return {
     data: mapMobilePortfolioOverviewData(viewer, payload),
@@ -417,18 +466,28 @@ export async function getMobilePortfolioOverviewView(userId: string, viewer: Vie
   };
 }
 
-export async function getMobilePortfolioAccountDetailView(userId: string, accountId: string) {
+export async function getMobilePortfolioAccountDetailView(
+  userId: string,
+  accountId: string,
+) {
   const payload = await getPortfolioAccountDetailView(userId, accountId);
   return {
-    data: payload.data.data ? mapMobileAccountDetailData(payload.data.data) : null,
+    data: payload.data.data
+      ? mapMobileAccountDetailData(payload.data.data)
+      : null,
     meta: payload.meta,
   };
 }
 
-export async function getMobilePortfolioHoldingDetailView(userId: string, holdingId: string) {
+export async function getMobilePortfolioHoldingDetailView(
+  userId: string,
+  holdingId: string,
+) {
   const payload = await getPortfolioHoldingDetailView(userId, holdingId);
   return {
-    data: payload.data.data ? mapMobileHoldingDetailData(payload.data.data) : null,
+    data: payload.data.data
+      ? mapMobileHoldingDetailData(payload.data.data)
+      : null,
     meta: payload.meta,
   };
 }
@@ -436,11 +495,17 @@ export async function getMobilePortfolioHoldingDetailView(userId: string, holdin
 export async function getMobilePortfolioSecurityDetailView(
   userId: string,
   symbol: string,
-  identity?: { exchange?: string | null; currency?: "CAD" | "USD" | null }
+  identity?: { exchange?: string | null; currency?: "CAD" | "USD" | null },
 ) {
-  const payload = await getPortfolioSecurityDetailView(userId, symbol, identity);
+  const payload = await getPortfolioSecurityDetailView(
+    userId,
+    symbol,
+    identity,
+  );
   return {
-    data: payload.data.data ? mapMobileSecurityDetailData(payload.data.data) : null,
+    data: payload.data.data
+      ? mapMobileSecurityDetailData(payload.data.data)
+      : null,
     meta: payload.meta,
   };
 }

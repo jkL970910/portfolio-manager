@@ -52,14 +52,18 @@ class LooLineChart extends StatelessWidget {
     }
 
     return SizedBox(
+      width: double.infinity,
       height: height,
-      child: CustomPaint(
-        painter: _LineChartPainter(
-          points: points,
-          lineColor: theme.colorScheme.primary,
-          fillColor: theme.colorScheme.primary.withValues(alpha: 0.12),
-          gridColor: theme.colorScheme.outlineVariant,
-          labelColor: theme.colorScheme.onSurfaceVariant,
+      child: LayoutBuilder(
+        builder: (context, constraints) => CustomPaint(
+          size: Size(constraints.maxWidth, height),
+          painter: _LineChartPainter(
+            points: points,
+            lineColor: theme.colorScheme.primary,
+            fillColor: theme.colorScheme.primary.withValues(alpha: 0.12),
+            gridColor: theme.colorScheme.outlineVariant,
+            labelColor: theme.colorScheme.onSurfaceVariant,
+          ),
         ),
       ),
     );
@@ -185,11 +189,12 @@ class _LineChartPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    const leftPadding = 4.0;
+    const leftPadding = 12.0;
+    const rightPadding = 12.0;
     const topPadding = 10.0;
     const bottomPadding = 30.0;
     final chartHeight = size.height - topPadding - bottomPadding;
-    final chartWidth = size.width - leftPadding;
+    final chartWidth = math.max(1.0, size.width - leftPadding - rightPadding);
     final values = points.map((point) => point.value).toList();
     final minValue = values.reduce(math.min);
     final maxValue = values.reduce(math.max);
@@ -200,7 +205,11 @@ class _LineChartPainter extends CustomPainter {
       ..strokeWidth = 1;
     for (final fraction in [0.25, 0.5, 0.75]) {
       final y = topPadding + chartHeight * fraction;
-      canvas.drawLine(Offset(leftPadding, y), Offset(size.width, y), gridPaint);
+      canvas.drawLine(
+        Offset(leftPadding, y),
+        Offset(size.width - rightPadding, y),
+        gridPaint,
+      );
     }
 
     final offsets = <Offset>[];
@@ -236,10 +245,19 @@ class _LineChartPainter extends CustomPainter {
       canvas.drawCircle(offset, 3, dotPaint);
     }
 
-    _paintText(canvas, points.first.label,
-        Offset(leftPadding, size.height - 22), labelColor);
-    _paintText(canvas, points.last.label,
-        Offset(size.width - 72, size.height - 22), labelColor);
+    _paintText(
+      canvas,
+      points.first.label,
+      Offset(leftPadding, size.height - 22),
+      labelColor,
+    );
+    _paintText(
+      canvas,
+      points.last.label,
+      Offset(size.width - rightPadding, size.height - 22),
+      labelColor,
+      alignRight: true,
+    );
   }
 
   @override
@@ -385,6 +403,7 @@ void _paintText(
   Offset offset,
   Color color, {
   bool centered = false,
+  bool alignRight = false,
 }) {
   final painter = TextPainter(
     text: TextSpan(
@@ -394,7 +413,11 @@ void _paintText(
     maxLines: 1,
     textDirection: TextDirection.ltr,
   )..layout(maxWidth: 82);
-  final dx = centered ? offset.dx - painter.width / 2 : offset.dx;
+  final dx = centered
+      ? offset.dx - painter.width / 2
+      : alignRight
+          ? offset.dx - painter.width
+          : offset.dx;
   final dy = centered ? offset.dy - painter.height / 2 : offset.dy;
   painter.paint(canvas, Offset(dx, dy));
 }

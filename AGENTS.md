@@ -161,8 +161,8 @@ Note: if `npm run lint` fails because ESLint 9 expects flat config, do not treat
 
 ## Current Priority Order
 
-1. Apply/verify migration `0004_portfolio_analysis_runs` in the target dev DB before relying on persistent analyzer cache.
-2. Manual mobile QA for AI quick scans, including `重新生成`, Health wording/score-level fixes, and `AI 最近分析`, using `docs/guides/mobile-manual-qa-sop.md` as the source of truth.
-3. Commit/push the analyzer refresh UI, Health wording fix, and recent analysis history after validation and user approval.
-4. External research is guarded off by default. The DB-backed job/usage ledger, local worker command, mobile job status visibility, cached market-data provider, and admin-only smoke enqueue tooling are in place. The provider reads only local cached data and requires explicit env flags. Local Postgres smoke validation passed for `VFV + TSX + CAD`, and mobile Settings QA passed for recent job visibility; next priority is deciding whether mobile needs cached-external result detail visibility.
-5. Holding-level deeper AI analysis and chart-heavy UX come after the core analyzer and external-research guardrails are stable.
+1. QA cached-external result visibility in mobile Settings from `AI 最近分析`.
+2. QA Security Detail `价格走势` freshness labels and confirm stale/fallback data is not presented as real market movement.
+3. Continue chart contract migration for account/portfolio/asset-class charts after Security Detail QA passes.
+4. Keep external research guarded off by default. The DB-backed job/usage ledger, local worker command, mobile job status visibility, cached market-data provider, and admin-only smoke enqueue tooling are in place. The provider reads only local cached data and requires explicit env flags.
+5. Evaluate QStash/Cloudflare Queues and real external data sources only after cached-external detail visibility and chart contracts are stable.
