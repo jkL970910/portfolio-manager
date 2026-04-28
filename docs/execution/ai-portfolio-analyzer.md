@@ -212,13 +212,16 @@ Next analyzer work:
   heavily on health output.
 - Flutter AI analysis cards expose `重新生成` after the first result and send
   `cacheStrategy: "refresh"` to bypass cached results.
+- Mobile Settings now exposes `AI 最近分析`, a compact history view backed by
+  `portfolio_analysis_runs`.
 - Account Health and account AI quick scan now separate two lenses:
   `账户内适配` for whether the account is a suitable home for its holdings, and
   `全组合目标参考` for how the account contributes to the total portfolio target.
 - Allocation gap copy must state whether the current percentage is above or
   below target. Do not describe an overweight sleeve as "只有".
 - Manually QA repeated AI quick scans from a real mobile URL.
-- Add cached external research only after cache/worker policy is explicit.
+- Next analyzer work: add explicit cache/worker policy before any external
+  research adapter.
 
 ## Deferred Work
 
@@ -226,7 +229,7 @@ P1:
 
 - cached news/institutional research
 - explicit user-triggered refresh
-- saved analysis history UI
+- saved analysis history detail/drilldown
 
 P2:
 

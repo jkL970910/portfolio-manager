@@ -125,6 +125,12 @@ export const mockRepositories: BackendRepositories = {
         .sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime())[0];
       return match ?? null;
     },
+    async listRecentByUserId(userId, limit) {
+      return portfolioAnalysisRuns
+        .filter((run) => run.userId === userId)
+        .sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime())
+        .slice(0, limit);
+    },
     async create(input) {
       const run: PortfolioAnalysisRun = {
         ...input,

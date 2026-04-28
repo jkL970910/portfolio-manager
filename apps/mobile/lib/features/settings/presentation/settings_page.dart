@@ -153,6 +153,8 @@ class _SettingsPageState extends State<SettingsPage> {
             ),
           ),
           const SizedBox(height: 16),
+          _RecentAnalysisCard(apiClient: widget.apiClient),
+          const SizedBox(height: 16),
           InvestmentPreferencesCard(apiClient: widget.apiClient),
           const SizedBox(height: 24),
           FilledButton.tonalIcon(
@@ -162,6 +164,151 @@ class _SettingsPageState extends State<SettingsPage> {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _RecentAnalysisCard extends StatefulWidget {
+  const _RecentAnalysisCard({required this.apiClient});
+
+  final LooApiClient apiClient;
+
+  @override
+  State<_RecentAnalysisCard> createState() => _RecentAnalysisCardState();
+}
+
+class _RecentAnalysisCardState extends State<_RecentAnalysisCard> {
+  late Future<List<_RecentAnalysisItem>> _items = _loadItems();
+
+  Future<List<_RecentAnalysisItem>> _loadItems() async {
+    final response = await widget.apiClient.getRecentAnalyzerRuns(limit: 5);
+    final data = response["data"];
+    final payload =
+        data is Map<String, dynamic> ? data : const <String, dynamic>{};
+    final rawItems = payload["items"];
+    return rawItems is List
+        ? rawItems
+            .whereType<Map<String, dynamic>>()
+            .map(_RecentAnalysisItem.fromJson)
+            .toList()
+        : const [];
+  }
+
+  void _refresh() {
+    setState(() {
+      _items = _loadItems();
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: FutureBuilder<List<_RecentAnalysisItem>>(
+          future: _items,
+          builder: (context, snapshot) {
+            final items = snapshot.data ?? const <_RecentAnalysisItem>[];
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    const Icon(Icons.history),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        "AI 最近分析",
+                        style: Theme.of(context).textTheme.titleLarge,
+                      ),
+                    ),
+                    IconButton(
+                      onPressed:
+                          snapshot.connectionState == ConnectionState.waiting
+                              ? null
+                              : _refresh,
+                      icon: const Icon(Icons.refresh),
+                      tooltip: "刷新记录",
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                const Text("展示最近保存的快扫结果；实时新闻/论坛研究仍未接入。"),
+                if (snapshot.connectionState == ConnectionState.waiting) ...[
+                  const SizedBox(height: 12),
+                  const LinearProgressIndicator(),
+                ] else if (snapshot.hasError) ...[
+                  const SizedBox(height: 12),
+                  Text(
+                    "分析记录暂时读取失败：${snapshot.error}",
+                    style:
+                        TextStyle(color: Theme.of(context).colorScheme.error),
+                  ),
+                ] else if (items.isEmpty) ...[
+                  const SizedBox(height: 12),
+                  const Text("还没有分析记录。先在标的、组合或账户页面生成一次 AI 快扫。"),
+                ] else ...[
+                  const SizedBox(height: 12),
+                  ...items.map(_RecentAnalysisTile.new),
+                ],
+              ],
+            );
+          },
+        ),
+      ),
+    );
+  }
+}
+
+class _RecentAnalysisTile extends StatelessWidget {
+  const _RecentAnalysisTile(this.item);
+
+  final _RecentAnalysisItem item;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListTile(
+      contentPadding: EdgeInsets.zero,
+      leading: const Icon(Icons.auto_awesome),
+      title: Text(item.title),
+      subtitle:
+          Text("${item.scopeLabel} · ${item.generatedAtLabel}\n${item.detail}"),
+      isThreeLine: true,
+    );
+  }
+}
+
+class _RecentAnalysisItem {
+  const _RecentAnalysisItem({
+    required this.scopeLabel,
+    required this.title,
+    required this.detail,
+    required this.generatedAt,
+  });
+
+  final String scopeLabel;
+  final String title;
+  final String detail;
+  final DateTime? generatedAt;
+
+  String get generatedAtLabel {
+    final value = generatedAt;
+    if (value == null) {
+      return "时间未知";
+    }
+    final local = value.toLocal();
+    String two(int number) => number.toString().padLeft(2, "0");
+    return "${local.month}/${local.day} ${two(local.hour)}:${two(local.minute)}";
+  }
+
+  factory _RecentAnalysisItem.fromJson(Map<String, dynamic> json) {
+    final rawGeneratedAt = json["generatedAt"];
+    return _RecentAnalysisItem(
+      scopeLabel: json["scopeLabel"] as String? ?? "AI 快扫",
+      title: json["title"] as String? ?? "AI 快扫记录",
+      detail: json["detail"] as String? ?? "",
+      generatedAt:
+          rawGeneratedAt is String ? DateTime.tryParse(rawGeneratedAt) : null,
     );
   }
 }

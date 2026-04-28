@@ -74,6 +74,7 @@ export interface PortfolioAnalysisRunRepository {
     targetKey: string;
     now: Date;
   }): Promise<PortfolioAnalysisRun | null>;
+  listRecentByUserId(userId: EntityId, limit: number): Promise<PortfolioAnalysisRun[]>;
   create(input: Omit<PortfolioAnalysisRun, "id" | "createdAt">): Promise<PortfolioAnalysisRun>;
 }
 

@@ -373,11 +373,13 @@ Next priority order:
 3. Manual QA account Health wording: account-level pages must show
    `账户内适配 + 全组合目标参考`, and overweight allocation copy must say
    `高于目标`, not `只有`.
-4. Commit/push the analyzer refresh UI and Health wording fix after
+4. Manual QA Settings `AI 最近分析` after generating at least one quick scan.
+5. Commit/push the analyzer refresh UI, Health wording fix, and recent analysis
+   history after
    validation.
-5. External research adapter design remains blocked until cache/worker policy
+6. External research adapter design remains blocked until cache/worker policy
    is explicit.
-6. Holding-level deeper AI analysis and chart-heavy UX after the core analyzer
+7. Holding-level deeper AI analysis and chart-heavy UX after the core analyzer
    flow is stable.
 
 Migration metadata status:

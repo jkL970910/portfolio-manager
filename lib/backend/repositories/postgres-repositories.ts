@@ -430,6 +430,15 @@ export const postgresRepositories: BackendRepositories = {
       });
       return row ? mapPortfolioAnalysisRun(row) : null;
     },
+    async listRecentByUserId(userId, limit) {
+      const db = getDb();
+      const rows = await db.query.portfolioAnalysisRuns.findMany({
+        where: eq(portfolioAnalysisRuns.userId, userId),
+        orderBy: desc(portfolioAnalysisRuns.createdAt),
+        limit
+      });
+      return rows.map(mapPortfolioAnalysisRun);
+    },
     async create(input) {
       const db = getDb();
       const [row] = await db
