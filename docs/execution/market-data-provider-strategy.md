@@ -3,7 +3,6 @@
 > [!IMPORTANT]
 > As of 2026-04-25, this project is now Flutter-first, mobile-first, Chinese-only, and Loo皇-themed. When this document conflicts with `docs/execution/flutter-mobile-migration-plan.md`, follow the migration plan first.
 
-
 ## Goal
 
 Add a stable market-data layer that supports:
@@ -86,8 +85,32 @@ Default cache policy:
 - search: 6 hours
 - normalization: 7 days
 - quote: 30 minutes
+- FX: 12 hours, with a conservative USD/CAD fallback when the provider is
+  limited or unavailable
+
+FX is now a separate data track:
+
+- `fx_rates` stores `base_currency + quote_currency + rate_date + rate`.
+- Quote refresh reads the latest stored FX rate, or a conservative fallback if
+  no stored value exists.
+- Quote refresh does not call a live FX API while refreshing USD holdings.
+- Mobile overview/portfolio and quote-refresh results now expose FX as-of,
+  source, and freshness so CAD total-asset figures can be audited by the user.
+- Live FX lookup may populate `fx_rates` in separate display/refresh paths, but
+  it should not change the holding's native quote currency or native price.
 
 If a provider call fails after a cached value exists, the service can return stale cached data instead of failing immediately.
+
+Provider limits must not break the product flow:
+
+- Batch refresh should return partial results instead of failing the whole
+  request after a provider limit.
+- Quote refresh should preserve previous holding prices when a provider is
+  limited.
+- FX conversion should fall back to the conservative local rate rather than
+  failing a USD holding refresh.
+- Mobile/API errors should use product-safe Chinese copy, not raw vendor
+  messages or SQL text.
 
 Current provider routing:
 
@@ -107,6 +130,9 @@ Quote identity is now explicit:
 - CAD positions must stay CAD-native at the holding row.
 - USD positions must stay USD-native at the holding row.
 - CAD conversion happens at aggregation / display time, not by changing a holding's native quote currency.
+- FX rate lookup is independent from security quote lookup; refreshing a USD
+  holding should not spend an extra equity quote credit just to compute CAD
+  display value.
 - A provider response whose currency does not match the requested holding currency is rejected.
 - Physical assets such as manually tracked gold should be marked `Other / Manual` so a stock ticker collision cannot overwrite them.
 
@@ -138,11 +164,19 @@ Market-data is already wired into:
 
 ## Next steps
 
-1. add a persisted quote-provider status / stale-age field so rows can explain whether a price is fresh, stale, or manual
-2. validate EODHD and Financial Modeling Prep as optional official fallbacks for Canadian symbols
+1. add persisted quote-provider status / stale-age fields so rows can explain whether a price is fresh, stale, limited, fallback, or manual
+2. move batch refresh into a queued worker with per-provider quota budgeting and retry-after behavior
 3. add durable cloud cache when the app moves beyond single-instance deployment
-4. introduce security-master persistence if import and recommendation logic start depending on richer security metadata
-5. add a commodity / metals provider or manual-price workflow for physical gold and other non-equity holdings
+4. validate official provider candidates before switching runtime data:
+   EODHD/FMP/QuoteMedia-style providers for North America, Alpha Vantage for
+   limited fallback/history, and region-specific providers only if licensing and
+   symbol coverage fit the portfolio
+5. keep iFinD/Tushare-style sources out of the P0 runtime path unless the
+   portfolio scope expands into China A-share/HK-market research, because they
+   add access/licensing complexity and do not solve the current US/CAD refresh
+   limit directly
+6. introduce security-master persistence if import and recommendation logic start depending on richer security metadata
+7. add a commodity / metals provider or manual-price workflow for physical gold and other non-equity holdings
 
 ## Important deployment note
 

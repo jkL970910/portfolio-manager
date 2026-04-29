@@ -4,7 +4,9 @@ import "../../../core/api/loo_api_client.dart";
 import "../../portfolio/presentation/account_detail_page.dart";
 import "../../portfolio/presentation/health_score_page.dart";
 import "../../portfolio/presentation/holding_detail_page.dart";
+import "../../shared/data/mobile_chart_models.dart";
 import "../../shared/data/mobile_models.dart";
+import "../../shared/presentation/loo_charts.dart";
 
 class OverviewPage extends StatefulWidget {
   const OverviewPage({
@@ -75,6 +77,18 @@ class _OverviewPageState extends State<OverviewPage> {
                   sliver: SliverList.list(
                     children: [
                       _MetricGrid(metrics: snapshot.data!.metrics),
+                      if (snapshot.data!.fxContext.hasContent) ...[
+                        const SizedBox(height: 18),
+                        _FxContextCard(snapshot.data!.fxContext),
+                      ],
+                      if (snapshot.data!.netWorthChart != null ||
+                          snapshot.data!.netWorthTrend.isNotEmpty) ...[
+                        const SizedBox(height: 18),
+                        _OverviewTrendCard(
+                          chart: snapshot.data!.netWorthChart,
+                          fallbackPoints: snapshot.data!.netWorthTrend,
+                        ),
+                      ],
                       const SizedBox(height: 18),
                       _HealthCard(
                         snapshot.data!.health,
@@ -156,6 +170,9 @@ class MobileHomeSnapshot {
     required this.health,
     required this.accounts,
     required this.topHoldings,
+    required this.netWorthTrend,
+    required this.netWorthChart,
+    required this.fxContext,
     required this.recommendationTheme,
     required this.recommendationReason,
   });
@@ -165,6 +182,9 @@ class MobileHomeSnapshot {
   final MobileHomeHealth health;
   final List<MobileAccountCard> accounts;
   final List<MobileHoldingCard> topHoldings;
+  final List<MobileHomeTrendPoint> netWorthTrend;
+  final MobileChartSeries? netWorthChart;
+  final MobileFxContext fxContext;
   final String recommendationTheme;
   final String recommendationReason;
 
@@ -185,6 +205,15 @@ class MobileHomeSnapshot {
       topHoldings: readJsonList(json, "topHoldings")
           .map(MobileHoldingCard.fromJson)
           .toList(),
+      netWorthTrend: readJsonList(json, "netWorthTrend")
+          .map(MobileHomeTrendPoint.fromJson)
+          .toList(),
+      netWorthChart: MobileChartSeries.fromJson(
+        (json["chartSeries"] is Map<String, dynamic>
+            ? json["chartSeries"] as Map<String, dynamic>
+            : const <String, dynamic>{})["netWorth"],
+      ),
+      fxContext: MobileFxContext.fromJson(json["displayContext"]),
       recommendationTheme: recommendation is Map<String, dynamic>
           ? recommendation["theme"] as String? ?? "暂无推荐主题"
           : "暂无推荐主题",
@@ -214,6 +243,29 @@ class MobileHomeHealth {
       status: json["status"] as String? ?? "待评估",
       highlights: (json["highlights"] as List?)?.whereType<String>().toList() ??
           const [],
+    );
+  }
+}
+
+class MobileHomeTrendPoint {
+  const MobileHomeTrendPoint({
+    required this.label,
+    required this.displayValue,
+    required this.chartValue,
+  });
+
+  final String label;
+  final String displayValue;
+  final double chartValue;
+
+  factory MobileHomeTrendPoint.fromJson(Map<String, dynamic> json) {
+    final rawValue = json["value"];
+    return MobileHomeTrendPoint(
+      label: json["label"] as String? ?? "未知日期",
+      displayValue: rawValue is num
+          ? rawValue.toStringAsFixed(2)
+          : rawValue?.toString() ?? "--",
+      chartValue: rawValue is num ? rawValue.toDouble() : 0,
     );
   }
 }
@@ -273,6 +325,41 @@ class _MetricGrid extends StatelessWidget {
           ),
         );
       },
+    );
+  }
+}
+
+class _FxContextCard extends StatelessWidget {
+  const _FxContextCard(this.context);
+
+  final MobileFxContext context;
+
+  @override
+  Widget build(BuildContext context) {
+    return _LooCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.currency_exchange),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text("FX 折算口径",
+                    style: Theme.of(context).textTheme.titleLarge),
+              ),
+              Chip(label: Text(this.context.statusLabel)),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(this.context.label),
+          if (this.context.note.isNotEmpty) ...[
+            const SizedBox(height: 6),
+            Text(this.context.note,
+                style: Theme.of(context).textTheme.bodySmall),
+          ],
+        ],
+      ),
     );
   }
 }
@@ -389,6 +476,88 @@ class _HoldingTile extends StatelessWidget {
           children: [
             Text(holding.value, style: Theme.of(context).textTheme.titleLarge),
             const Icon(Icons.chevron_right),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _OverviewTrendCard extends StatelessWidget {
+  const _OverviewTrendCard({
+    required this.chart,
+    required this.fallbackPoints,
+  });
+
+  final MobileChartSeries? chart;
+  final List<MobileHomeTrendPoint> fallbackPoints;
+
+  @override
+  Widget build(BuildContext context) {
+    final points = chart?.points
+            .map((point) => (
+                  label: point.label,
+                  displayValue: point.displayValue,
+                  chartValue: point.value,
+                ))
+            .toList() ??
+        fallbackPoints
+            .map((point) => (
+                  label: point.label,
+                  displayValue: point.displayValue,
+                  chartValue: point.chartValue,
+                ))
+            .toList();
+    if (points.length < 2) {
+      return const SizedBox.shrink();
+    }
+
+    final first = points.first;
+    final last = points.last;
+    final freshness = chart?.freshness;
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(chart?.title ?? "投资资产走势",
+                style: Theme.of(context).textTheme.titleLarge),
+            const SizedBox(height: 12),
+            LooLineChart(
+              points: points
+                  .map(
+                    (point) => LooLineChartPoint(
+                      label: point.label,
+                      value: point.chartValue,
+                    ),
+                  )
+                  .toList(),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              "${first.label} ${first.displayValue} → ${last.label} ${last.displayValue}",
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
+            if (freshness != null) ...[
+              const SizedBox(height: 10),
+              Chip(label: Text(freshness.label)),
+              const SizedBox(height: 6),
+              Text(
+                freshness.detail,
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+            ],
+            if (chart != null && chart!.notes.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              ...chart!.notes.take(2).map(
+                    (note) => Text(
+                      "· $note",
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                  ),
+            ],
           ],
         ),
       ),

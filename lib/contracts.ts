@@ -38,6 +38,9 @@ export interface DashboardData {
     currency: "CAD" | "USD";
     fxRateLabel: string;
     fxNote: string;
+    fxAsOf: string | null;
+    fxSource: string;
+    fxFreshness: "fresh" | "stale" | "fallback";
   };
   metrics: MetricCard[];
   accounts: {
@@ -79,6 +82,9 @@ export interface DashboardData {
     sourceDetail: string;
   };
   netWorthTrend: { label: string; value: number; rawDate?: string }[];
+  chartSeries?: {
+    netWorth?: MobileChartSeries;
+  };
   spendingMonthLabel: string;
   savingsPattern: string;
   investableCash: string;
@@ -104,6 +110,9 @@ export interface PortfolioData {
     currency: "CAD" | "USD";
     fxRateLabel: string;
     fxNote: string;
+    fxAsOf: string | null;
+    fxSource: string;
+    fxFreshness: "fresh" | "stale" | "fallback";
   };
   trendContext: {
     title: string;
@@ -114,6 +123,9 @@ export interface PortfolioData {
     sourceDetail: string;
   };
   performance: { label: string; value: number; rawDate?: string }[];
+  chartSeries?: {
+    portfolioValue?: MobileChartSeries;
+  };
   accountTypeAllocation: {
     id: string;
     name: string;
@@ -138,6 +150,9 @@ export interface PortfolioData {
     driftLabel: string;
     summary: string;
     actions: string[];
+    chartSeries?: {
+      valueHistory?: MobileChartSeries;
+    };
     holdings: {
       id: string;
       symbol: string;
@@ -168,6 +183,9 @@ export interface PortfolioData {
     typeId: string;
     typeLabel: string;
     performance: { label: string; value: number; rawDate?: string }[];
+    chartSeries?: {
+      accountValue?: MobileChartSeries;
+    };
     healthScore: {
       score: number;
       status: string;
@@ -314,6 +332,9 @@ export interface PortfolioAccountDetailData {
     currency: "CAD" | "USD";
     fxRateLabel: string;
     fxNote: string;
+    fxAsOf: string | null;
+    fxSource: string;
+    fxFreshness: "fresh" | "stale" | "fallback";
   };
   trendContext: {
     title: string;
@@ -343,6 +364,9 @@ export interface PortfolioAccountDetailData {
     detail?: string;
   }[];
   performance: { label: string; value: number; rawDate?: string }[];
+  chartSeries?: {
+    accountValue?: MobileChartSeries;
+  };
   allocation: { name: string; value: number }[];
   healthScore: PortfolioData["healthScore"];
   holdings: PortfolioData["holdings"];
@@ -380,6 +404,9 @@ export interface PortfolioHoldingDetailData {
     currency: "CAD" | "USD";
     fxRateLabel: string;
     fxNote: string;
+    fxAsOf: string | null;
+    fxSource: string;
+    fxFreshness: "fresh" | "stale" | "fallback";
   };
   holding: {
     id: string;
@@ -421,6 +448,9 @@ export interface PortfolioHoldingDetailData {
     }[];
   };
   performance: { label: string; value: number; rawDate?: string }[];
+  chartSeries?: {
+    holdingValue?: MobileChartSeries;
+  };
   portfolioRole: string[];
   healthSummary: {
     score: number;
@@ -470,6 +500,9 @@ export interface PortfolioSecurityDetailData {
     currency: "CAD" | "USD";
     fxRateLabel: string;
     fxNote: string;
+    fxAsOf: string | null;
+    fxSource: string;
+    fxFreshness: "fresh" | "stale" | "fallback";
   };
   security: {
     symbol: string;
@@ -571,6 +604,9 @@ export interface RecommendationsData {
     currency: "CAD" | "USD";
     fxRateLabel: string;
     fxNote: string;
+    fxAsOf: string | null;
+    fxSource: string;
+    fxFreshness: "fresh" | "stale" | "fallback";
   };
   contributionAmount: string;
   engine: {
@@ -637,6 +673,9 @@ export interface SpendingData {
     currency: "CAD" | "USD";
     fxRateLabel: string;
     fxNote: string;
+    fxAsOf: string | null;
+    fxSource: string;
+    fxFreshness: "fresh" | "stale" | "fallback";
   };
   metrics: MetricCard[];
   trend: { label: string; value: number }[];

@@ -1,6 +1,7 @@
 import "package:flutter/material.dart";
 
 import "../../../core/api/loo_api_client.dart";
+import "../../shared/data/mobile_chart_models.dart";
 import "../../shared/data/mobile_models.dart";
 import "../../shared/presentation/loo_charts.dart";
 import "holding_detail_page.dart";
@@ -24,6 +25,10 @@ class AssetClassDrilldownPage extends StatelessWidget {
         padding: const EdgeInsets.fromLTRB(20, 12, 20, 28),
         children: [
           _SummaryCard(item),
+          if (item.valueHistoryChart != null) ...[
+            const SizedBox(height: 16),
+            _AssetClassTrendCard(item.valueHistoryChart!),
+          ],
           const SizedBox(height: 16),
           const _SectionTitle("目标偏离"),
           const SizedBox(height: 8),
@@ -109,6 +114,67 @@ class _SummaryCard extends StatelessWidget {
               Text(item.summary),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _AssetClassTrendCard extends StatelessWidget {
+  const _AssetClassTrendCard(this.chart);
+
+  final MobileChartSeries chart;
+
+  @override
+  Widget build(BuildContext context) {
+    final points = chart.points;
+    if (points.length < 2) {
+      return const SizedBox.shrink();
+    }
+
+    final first = points.first;
+    final last = points.last;
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(chart.title, style: Theme.of(context).textTheme.titleLarge),
+            const SizedBox(height: 12),
+            LooLineChart(
+              points: points
+                  .map(
+                    (point) => LooLineChartPoint(
+                      label: point.label,
+                      value: point.value,
+                    ),
+                  )
+                  .toList(),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              "${first.label} ${first.displayValue} → ${last.label} ${last.displayValue}",
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
+            const SizedBox(height: 10),
+            Chip(label: Text(chart.freshness.label)),
+            const SizedBox(height: 6),
+            Text(
+              chart.freshness.detail,
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+            if (chart.notes.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              ...chart.notes.take(2).map(
+                    (note) => Text(
+                      "· $note",
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                  ),
+            ],
+          ],
         ),
       ),
     );

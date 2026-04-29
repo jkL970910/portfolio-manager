@@ -1,6 +1,6 @@
 # Mobile Chart Contracts
 
-Last updated: 2026-04-28
+Last updated: 2026-04-29
 
 ## Purpose
 
@@ -21,9 +21,17 @@ available.
 - Security Detail already renders a first-pass performance line chart.
 - Some backend series still fall back to reference curves when real replay data
   is shallow.
-- `security_price_history` currently stores `symbol + currency`, but not full
-  exchange/listing identity. This means CAD-vs-US separation is stronger than
-  ticker-only, but still not complete for all future cases.
+- `security_price_history` now stores `symbol + exchange + currency + date`.
+  This is the chart/history identity boundary for preventing US common shares,
+  CAD-listed versions, CDRs, and hedged listings from sharing one ticker-only
+  history series.
+- Portfolio quote refresh now writes one daily `security_price_history` point
+  per refreshed `symbol + exchange + currency`, and records/updates the
+  current-day portfolio snapshot through the existing recalculation path.
+- Overview and Portfolio value charts append/replace today's point from the
+  current state-table total, so the chart's latest point must match the visible
+  total asset / portfolio value card even when older exchange-aware history is
+  incomplete.
 
 ## Contract Rule
 
@@ -82,20 +90,22 @@ interface MobileChartSeries {
 
 P0 next chart work:
 
-1. Add a backend mapper that can emit `MobileChartSeries` for Security Detail.
-2. Keep existing `performance` fields temporarily for backward compatibility.
-3. Update Flutter `LooLineChartPoint` parsing to prefer the new chart DTO.
-4. Add tests proving `symbol + exchange + currency` survives chart payloads.
+1. Keep existing legacy `performance` arrays temporarily for backward
+   compatibility.
+2. Add tests whenever a new chart surface moves to `MobileChartSeries`.
+3. Move remaining non-chart historical/performance displays onto typed DTOs only
+   when Flutter needs richer interaction than a static list.
 
 P1:
 
-- Account and portfolio value replay chart DTOs.
-- Asset-class drilldown chart DTOs.
 - Tooltip/detail rendering in Flutter.
+- Multi-series comparison charts.
+- Add exchange/listing identity to `security_price_history` before relying on
+  it for symbols where the same ticker can trade in multiple markets with the
+  same currency.
 
 P2:
 
-- Multi-series comparison charts.
 - External/live source annotations.
 - Hosted worker refresh for expensive history hydration.
 - Data freshness dashboard for stale/fallback chart surfaces.
@@ -116,3 +126,23 @@ P2:
   status, latest cached date, and `symbol + exchange + currency` identity.
 - Flutter Security Detail prefers this DTO and shows the freshness label/detail
   below the line chart. Existing `performance` remains as a fallback.
+- Portfolio Overview now emits `chartSeries.portfolioValue`.
+- Mobile Overview now emits `chartSeries.netWorth`.
+- Flutter Portfolio and Overview pages render these chart DTOs with explicit
+  freshness/source labels. If real replay/snapshot history is shallow, the chart
+  is labeled as a reference curve instead of being presented as real movement.
+- Account Detail now emits `chartSeries.accountValue`.
+- Flutter Account Detail renders the account-level series directly below the
+  account summary and labels whether it came from local replay, snapshots, or a
+  reference fallback.
+- Asset Class drilldown items now emit `chartSeries.valueHistory`.
+- Flutter Asset Class drilldown pages render the sleeve-level series with the
+  same freshness/source labels.
+- Holding Detail now emits `chartSeries.holdingValue`.
+- Flutter Holding Detail renders the holding-level value series below the
+  summary, separate from Security Detail's price chart. This keeps
+  position-level value movement distinct from ticker-level price movement.
+- Portfolio quote refresh writes refreshed prices into daily history points and
+  returns `historyPointCount` plus `snapshotRecorded`, so mobile QA can verify
+  that refresh improves future chart freshness instead of only updating the
+  current holding rows.

@@ -101,6 +101,45 @@ class MobileFact {
   }
 }
 
+class MobileFxContext {
+  const MobileFxContext({
+    required this.label,
+    required this.note,
+    required this.asOf,
+    required this.source,
+    required this.freshness,
+  });
+
+  final String label;
+  final String note;
+  final String? asOf;
+  final String source;
+  final String freshness;
+
+  bool get hasContent => label.isNotEmpty || note.isNotEmpty;
+
+  String get statusLabel {
+    return switch (freshness) {
+      "fresh" => "最新",
+      "stale" => "可能过期",
+      "fallback" => "保守兜底",
+      _ => "未知",
+    };
+  }
+
+  factory MobileFxContext.fromJson(Object? value) {
+    final json =
+        value is Map<String, dynamic> ? value : const <String, dynamic>{};
+    return MobileFxContext(
+      label: json["fxRateLabel"] as String? ?? "",
+      note: json["fxNote"] as String? ?? "",
+      asOf: json["fxAsOf"] as String?,
+      source: json["fxSource"] as String? ?? "",
+      freshness: json["fxFreshness"] as String? ?? "fallback",
+    );
+  }
+}
+
 List<Map<String, dynamic>> readJsonList(Map<String, dynamic> json, String key) {
   final value = json[key];
   if (value is! List) {

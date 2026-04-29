@@ -158,6 +158,10 @@ function getExchangeOptionLabel(value: string, language: DisplayLanguage) {
 type DisplayContext = {
   currency: CurrencyCode;
   cadToDisplayRate: number;
+  usdToCadRate: number;
+  fxRateDate: string | null;
+  fxRateSource: string;
+  fxRateFreshness: "fresh" | "stale" | "fallback";
 };
 
 function convertCadToDisplay(valueCad: number, context: DisplayContext) {
@@ -175,13 +179,28 @@ function buildDisplayContext(
   language: DisplayLanguage,
 ) {
   const fxRate = context.currency === "CAD" ? 1 : context.cadToDisplayRate;
+  const freshnessLabel = pick(
+    language,
+    context.fxRateFreshness === "fresh"
+      ? "最新"
+      : context.fxRateFreshness === "stale"
+        ? "可能过期"
+        : "保守兜底",
+    context.fxRateFreshness,
+  );
+  const fxAsOf = context.fxRateDate ?? null;
+  const usdCadLabel = `1 USD = ${context.usdToCadRate.toFixed(4)} CAD`;
+  const fxSourceLabel =
+    context.fxRateSource === "fallback-static"
+      ? pick(language, "本地保守兜底", "local fallback")
+      : context.fxRateSource;
   return {
     currency: context.currency,
     fxRateLabel:
       context.currency === "CAD"
         ? pick(
             language,
-            "当前页面统一按 CAD 展示。",
+            `当前页面统一按 CAD 展示；USD 折算使用 ${usdCadLabel}。`,
             "Base analytics and display are in CAD.",
           )
         : `1 CAD = ${fxRate.toFixed(4)} USD`,
@@ -189,14 +208,17 @@ function buildDisplayContext(
       context.currency === "CAD"
         ? pick(
             language,
-            "现在按 CAD 看全局数据。就算某些持仓本来是 USD 计价，组合分析也会先统一折成 CAD。",
+            `USD 持仓仍保留 USD 原生报价；只在总资产/组合汇总时按独立 FX index 折成 CAD。FX 状态：${freshnessLabel}，日期：${fxAsOf ?? "暂无"}，来源：${fxSourceLabel}。`,
             "CAD is the active display currency. USD-native positions retain their own price inputs, while portfolio analytics stay normalized in CAD.",
           )
         : pick(
             language,
-            "现在按 USD 看页面金额。底层分析还是先按 CAD 算，再用最新缓存汇率换成 USD 给你看。",
+            `现在按 USD 看页面金额。底层分析仍先按 CAD 聚合，再用缓存 FX 展示；USD/CAD index 状态：${freshnessLabel}，日期：${fxAsOf ?? "none"}，来源：${fxSourceLabel}。`,
             "USD is the active display currency. Portfolio analytics remain normalized in CAD and are converted into USD for display using the latest cached USD/CAD FX rate.",
           ),
+    fxAsOf,
+    fxSource: context.fxRateSource,
+    fxFreshness: context.fxRateFreshness,
   };
 }
 
@@ -525,9 +547,14 @@ function buildSecurityPriceHistoryChartSeries(args: {
 }): MobileChartSeries {
   const normalizedSymbol = args.symbol.trim().toUpperCase();
   const requestedCurrency = args.currency ?? null;
+  const requestedExchange = args.exchange?.trim().toUpperCase() || null;
   const matchingHistory = (args.priceHistory ?? [])
     .filter(
-      (point) => !requestedCurrency || point.currency === requestedCurrency,
+      (point) =>
+        point.symbol.trim().toUpperCase() === normalizedSymbol &&
+        (!requestedCurrency || point.currency === requestedCurrency) &&
+        (!requestedExchange ||
+          (point.exchange?.trim().toUpperCase() || "") === requestedExchange),
     )
     .sort((left, right) => left.priceDate.localeCompare(right.priceDate));
   const realPoints = buildAbsolutePriceHistorySeries({
@@ -586,6 +613,215 @@ function buildSecurityPriceHistoryChartSeries(args: {
       ),
     ],
   };
+}
+
+type PortfolioValueSeriesSource = "replayed-prices" | "snapshots" | "reference";
+
+function getLatestSeriesDate(points: { rawDate?: string }[]): string | null {
+  return (
+    points
+      .map((point) => point.rawDate)
+      .filter((date): date is string => Boolean(date))
+      .sort()
+      .at(-1) ?? null
+  );
+}
+
+function buildPortfolioValueChartFreshness(args: {
+  source: PortfolioValueSeriesSource;
+  pointCount: number;
+  latestDate: string | null;
+  language: DisplayLanguage;
+  subjectLabel?: string;
+}) {
+  const subjectLabel =
+    args.subjectLabel ?? pick(args.language, "组合", "portfolio");
+  if (args.source === "reference" || args.pointCount < 2 || !args.latestDate) {
+    return {
+      status: "fallback" as const,
+      label: pick(args.language, "参考曲线", "Reference only"),
+      latestDate: args.latestDate,
+      detail: pick(
+        args.language,
+        `真实${subjectLabel}历史不足，当前曲线只是参考形状，不能当作真实${subjectLabel}走势。`,
+        `Real ${subjectLabel} history is too shallow, so this line is only a reference shape and should not be treated as actual ${subjectLabel} performance.`,
+      ),
+    };
+  }
+
+  const ageDays = Math.max(
+    0,
+    Math.floor(
+      (Date.now() - new Date(`${args.latestDate}T00:00:00.000Z`).getTime()) /
+        86400000,
+    ),
+  );
+  if (ageDays > 10) {
+    return {
+      status: "stale" as const,
+      label: pick(args.language, "可能过期", "Possibly stale"),
+      latestDate: args.latestDate,
+      detail: pick(
+        args.language,
+        `最近${subjectLabel}历史日期是 ${args.latestDate}，已经约 ${ageDays} 天没有更新。`,
+        `Latest ${subjectLabel} history date is ${args.latestDate}, about ${ageDays} days old.`,
+      ),
+    };
+  }
+
+  return {
+    status: "fresh" as const,
+    label: pick(args.language, "本地历史可用", "Local history available"),
+    latestDate: args.latestDate,
+    detail: pick(
+      args.language,
+      `最近${subjectLabel}历史日期是 ${args.latestDate}。`,
+      `Latest ${subjectLabel} history date is ${args.latestDate}.`,
+    ),
+  };
+}
+
+function buildPortfolioValueChartSeries(args: {
+  performance: { label: string; value: number; rawDate?: string }[];
+  source: PortfolioValueSeriesSource;
+  language: DisplayLanguage;
+  display: DisplayContext;
+  id?: string;
+  title?: string;
+  subjectLabel?: string;
+}): MobileChartSeries {
+  const latestDate = getLatestSeriesDate(args.performance);
+  const subjectLabel =
+    args.subjectLabel ?? pick(args.language, "组合", "portfolio");
+  const sourceNote =
+    args.source === "replayed-prices"
+      ? pick(
+          args.language,
+          `这条线来自本地${subjectLabel}持仓数量和缓存价格历史回放，不会在页面加载时触发实时外部请求。`,
+          `This line replays local ${subjectLabel} holdings and cached price history and does not trigger live external requests on page load.`,
+        )
+      : args.source === "snapshots"
+        ? pick(
+            args.language,
+            `这条线来自本地${subjectLabel}快照，用于展示已保存的${subjectLabel}历史。`,
+            `This line uses local ${subjectLabel} snapshots to show saved ${subjectLabel} history.`,
+          )
+        : pick(
+            args.language,
+            `真实${subjectLabel}历史不足，当前显示参考曲线，不代表真实${subjectLabel}走势。`,
+            `Real ${subjectLabel} history is too shallow; this is a reference curve, not actual ${subjectLabel} performance.`,
+          );
+
+  return {
+    id: args.id ?? "portfolio-value-history",
+    title:
+      args.title ??
+      pick(args.language, "组合价值走势", "Portfolio value trend"),
+    kind: "line",
+    valueType: "money",
+    currency: args.display.currency,
+    sourceMode: "local",
+    freshness: buildPortfolioValueChartFreshness({
+      source: args.source,
+      pointCount: args.performance.length,
+      latestDate,
+      language: args.language,
+      subjectLabel,
+    }),
+    points: args.performance.map((point) => ({
+      displayLabel: point.label,
+      rawDate: point.rawDate,
+      value: point.value,
+      displayValue: formatMoney(point.value, args.display.currency),
+    })),
+    notes: [
+      sourceNote,
+      pick(
+        args.language,
+        `显示币种：${args.display.currency}；底层组合分析仍以 CAD 归一化后再展示。`,
+        `Display currency: ${args.display.currency}; underlying portfolio analytics remain CAD-normalized before display conversion.`,
+      ),
+    ],
+  };
+}
+
+function buildHoldingValueHistorySeries(args: {
+  holding: HoldingPosition;
+  priceHistory?: SecurityPriceHistoryPoint[];
+  events?: PortfolioEvent[];
+  language: DisplayLanguage;
+  display: DisplayContext;
+}) {
+  const { holding, priceHistory = [], events = [], language, display } = args;
+  const normalizedSymbol = holding.symbol.trim().toUpperCase();
+  const normalizedExchange =
+    holding.exchangeOverride?.trim().toUpperCase() || "";
+  const holdingCurrency = holding.currency ?? "CAD";
+  const cadPerHoldingCurrency =
+    holdingCurrency === "CAD"
+      ? 1
+      : holding.lastPriceAmount && holding.lastPriceCad
+        ? holding.lastPriceCad / holding.lastPriceAmount
+        : null;
+
+  const relevantHistory = [...priceHistory]
+    .filter(
+      (point) =>
+        point.symbol.trim().toUpperCase() === normalizedSymbol &&
+        (point.exchange?.trim().toUpperCase() || "") === normalizedExchange &&
+        point.currency === holdingCurrency,
+    )
+    .sort((left, right) => left.priceDate.localeCompare(right.priceDate));
+
+  if (relevantHistory.length < 2 || cadPerHoldingCurrency == null) {
+    return null;
+  }
+
+  const latestDate = relevantHistory.at(-1)?.priceDate;
+  if (!latestDate) {
+    return null;
+  }
+
+  const sixMonthsAgo = new Date(`${latestDate}T00:00:00.000Z`);
+  sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+  const recentHistory = relevantHistory.filter(
+    (point) => new Date(`${point.priceDate}T00:00:00.000Z`) >= sixMonthsAgo,
+  );
+  if (recentHistory.length < 2) {
+    return null;
+  }
+
+  const currentQuantity = getHoldingQuantityForReplay(holding);
+  if (currentQuantity <= 0) {
+    return null;
+  }
+
+  const relevantEvents = events
+    .filter(
+      (event) =>
+        event.accountId === holding.accountId &&
+        event.symbol?.trim().toUpperCase() === normalizedSymbol &&
+        (!event.currency || event.currency === holdingCurrency),
+    )
+    .sort((left, right) => left.bookedAt.localeCompare(right.bookedAt));
+
+  const series = recentHistory
+    .map((point) => {
+      const futureDelta = relevantEvents
+        .filter((event) => event.bookedAt > point.priceDate)
+        .reduce((sum, event) => sum + getEventQuantityDelta(event), 0);
+      const quantityAtDate = Math.max(currentQuantity - futureDelta, 0);
+      const close = point.adjustedClose ?? point.close;
+      const valueCad = quantityAtDate * close * cadPerHoldingCurrency;
+      return {
+        label: formatSnapshotLabel(point.priceDate, language),
+        rawDate: point.priceDate,
+        value: round(convertCadToDisplay(valueCad, display), 2),
+      };
+    })
+    .filter((point) => point.value > 0);
+
+  return series.length >= 2 ? series : null;
 }
 
 function buildIndexedHeldPositionSeries(args: {
@@ -674,6 +910,30 @@ function getEventQuantityDelta(event: PortfolioEvent) {
   return quantity;
 }
 
+function normalizeReplayCurrency(
+  value: string | null | undefined,
+): CurrencyCode {
+  return value === "USD" ? "USD" : "CAD";
+}
+
+function getReplayIdentityKey(
+  symbol: string,
+  exchange: string | null | undefined,
+  currency: string | null | undefined,
+) {
+  return `${symbol.trim().toUpperCase()}::${exchange?.trim().toUpperCase() || ""}::${normalizeReplayCurrency(currency)}`;
+}
+
+function convertNativePriceToCad(
+  price: number,
+  currency: string | null | undefined,
+  display: DisplayContext,
+) {
+  return normalizeReplayCurrency(currency) === "USD"
+    ? price * display.usdToCadRate
+    : price;
+}
+
 function buildReplayedAggregateValueSeries(args: {
   holdings: HoldingPosition[];
   priceHistory: SecurityPriceHistoryPoint[];
@@ -699,23 +959,31 @@ function buildReplayedAggregateValueSeries(args: {
 
   const groupedCurrentQuantities = new Map<string, number>();
   for (const holding of relevantHoldings) {
-    const symbol = holding.symbol.trim().toUpperCase();
+    const key = getReplayIdentityKey(
+      holding.symbol,
+      holding.exchangeOverride,
+      holding.currency,
+    );
     groupedCurrentQuantities.set(
-      symbol,
-      (groupedCurrentQuantities.get(symbol) ?? 0) +
+      key,
+      (groupedCurrentQuantities.get(key) ?? 0) +
         getHoldingQuantityForReplay(holding),
     );
   }
 
   const historiesBySymbol = new Map<string, SecurityPriceHistoryPoint[]>();
   for (const point of priceHistory) {
-    const symbol = point.symbol.trim().toUpperCase();
-    if (!groupedCurrentQuantities.has(symbol)) {
+    const key = getReplayIdentityKey(
+      point.symbol,
+      point.exchange,
+      point.currency,
+    );
+    if (!groupedCurrentQuantities.has(key)) {
       continue;
     }
-    const list = historiesBySymbol.get(symbol) ?? [];
+    const list = historiesBySymbol.get(key) ?? [];
     list.push(point);
-    historiesBySymbol.set(symbol, list);
+    historiesBySymbol.set(key, list);
   }
 
   const allDates = [
@@ -741,13 +1009,15 @@ function buildReplayedAggregateValueSeries(args: {
   const groupedEvents = new Map<string, PortfolioEvent[]>();
   for (const event of events) {
     const symbol = event.symbol?.trim().toUpperCase();
-    if (!symbol || !groupedCurrentQuantities.has(symbol)) {
+    const key = symbol
+      ? getReplayIdentityKey(symbol, null, event.currency)
+      : null;
+    if (!key || !groupedCurrentQuantities.has(key)) {
       continue;
     }
     if (accountId && event.accountId !== accountId) {
       continue;
     }
-    const key = symbol;
     const list = groupedEvents.get(key) ?? [];
     list.push(event);
     groupedEvents.set(key, list);
@@ -761,12 +1031,12 @@ function buildReplayedAggregateValueSeries(args: {
 
   const latestSeenPriceBySymbol = new Map<string, number>();
   const pointers = new Map<string, number>();
-  for (const [symbol] of historiesBySymbol.entries()) {
-    pointers.set(symbol, 0);
+  for (const [key] of historiesBySymbol.entries()) {
+    pointers.set(key, 0);
     historiesBySymbol.set(
-      symbol,
+      key,
       historiesBySymbol
-        .get(symbol)!
+        .get(key)!
         .sort((left, right) => left.priceDate.localeCompare(right.priceDate)),
     );
   }
@@ -781,29 +1051,30 @@ function buildReplayedAggregateValueSeries(args: {
 
   const series = replayDates
     .map((date) => {
-      for (const [symbol, points] of historiesBySymbol.entries()) {
-        let pointer = pointers.get(symbol) ?? 0;
+      for (const [key, points] of historiesBySymbol.entries()) {
+        let pointer = pointers.get(key) ?? 0;
         while (pointer < points.length && points[pointer].priceDate <= date) {
           latestSeenPriceBySymbol.set(
-            symbol,
-            points[pointer].adjustedClose ?? points[pointer].close,
+            key,
+            convertNativePriceToCad(
+              points[pointer].adjustedClose ?? points[pointer].close,
+              points[pointer].currency,
+              display,
+            ),
           );
           pointer += 1;
         }
-        pointers.set(symbol, pointer);
+        pointers.set(key, pointer);
       }
 
       let totalValueCad = 0;
-      for (const [
-        symbol,
-        currentQuantity,
-      ] of groupedCurrentQuantities.entries()) {
-        const latestPrice = latestSeenPriceBySymbol.get(symbol);
+      for (const [key, currentQuantity] of groupedCurrentQuantities.entries()) {
+        const latestPrice = latestSeenPriceBySymbol.get(key);
         if (latestPrice == null) {
           continue;
         }
 
-        const futureDelta = (groupedEvents.get(symbol) ?? [])
+        const futureDelta = (groupedEvents.get(key) ?? [])
           .filter((event) => event.bookedAt > date)
           .reduce((sum, event) => sum + getEventQuantityDelta(event), 0);
         const quantityAtDate = currentQuantity - futureDelta;
@@ -839,6 +1110,24 @@ function buildAbsoluteSeriesFromSnapshots(args: {
     .filter((point) => Number.isFinite(point.value));
 
   return recent.length >= 2 ? recent : null;
+}
+
+function anchorSeriesToCurrentValue(args: {
+  series: { label: string; value: number; rawDate?: string }[];
+  currentValueCad: number;
+  language: DisplayLanguage;
+  display: DisplayContext;
+}) {
+  const today = new Date().toISOString().slice(0, 10);
+  const currentPoint = {
+    label: formatSnapshotLabel(today, args.language),
+    rawDate: today,
+    value: round(convertCadToDisplay(args.currentValueCad, args.display), 2),
+  };
+  const withoutToday = args.series.filter((point) => point.rawDate !== today);
+  return [...withoutToday, currentPoint].sort((left, right) =>
+    (left.rawDate ?? left.label).localeCompare(right.rawDate ?? right.label),
+  );
 }
 
 function buildCashBalanceSeries(args: {
@@ -901,6 +1190,10 @@ function buildCashBalanceSeries(args: {
       value: round(convertCadToDisplay(totalBalanceCad, display), 2),
     };
   });
+}
+
+function getCurrentCashBalanceCad(cashAccounts: CashAccount[]) {
+  return sum(cashAccounts.map((account) => account.currentBalanceCad));
 }
 
 function getMonthlyTransactionSeries(
@@ -1559,6 +1852,8 @@ export function buildDashboardData(args: {
     language,
   );
   const totalPortfolio = sum(accounts.map((account) => account.marketValueCad));
+  const currentCashBalanceCad = getCurrentCashBalanceCad(cashAccounts);
+  const totalNetWorthCad = totalPortfolio + currentCashBalanceCad;
   const availableRoom = sum(
     accounts.map((account) => account.contributionRoomCad ?? 0),
   );
@@ -1591,28 +1886,36 @@ export function buildDashboardData(args: {
     profile,
     accounts,
   );
+  const replayedInvestedAssetTrend = buildReplayedAggregateValueSeries({
+    holdings,
+    priceHistory,
+    events: portfolioEvents,
+    language,
+    display,
+  });
+  const snapshotInvestedAssetTrend = buildAbsoluteSeriesFromSnapshots({
+    snapshots,
+    language,
+    display,
+    getValue: (snapshot) => snapshot.totalValueCad,
+  });
   const investedAssetTrend =
-    buildReplayedAggregateValueSeries({
-      holdings,
-      priceHistory,
-      events: portfolioEvents,
-      language,
-      display,
-    }) ??
-    buildAbsoluteSeriesFromSnapshots({
-      snapshots,
-      language,
-      display,
-      getValue: (snapshot) => snapshot.totalValueCad,
-    }) ??
+    replayedInvestedAssetTrend ??
+    snapshotInvestedAssetTrend ??
     getSixMonthSeries(totalPortfolio, profile, getMonthLabels(language));
+  const investedAssetTrendSource: PortfolioValueSeriesSource =
+    replayedInvestedAssetTrend != null
+      ? "replayed-prices"
+      : snapshotInvestedAssetTrend != null
+        ? "snapshots"
+        : "reference";
   const cashBalanceTrend = buildCashBalanceSeries({
     cashAccounts,
     cashAccountBalanceEvents,
     language,
     display,
   });
-  const netWorthTrend =
+  const unanchoredNetWorthTrend =
     cashBalanceTrend && investedAssetTrend.length > 0
       ? investedAssetTrend.map((point) => {
           const cashPoint =
@@ -1627,17 +1930,27 @@ export function buildDashboardData(args: {
           };
         })
       : investedAssetTrend;
+  const netWorthTrend = anchorSeriesToCurrentValue({
+    series: unanchoredNetWorthTrend,
+    currentValueCad: totalNetWorthCad,
+    language,
+    display,
+  });
 
   return {
     displayContext: buildDisplayContext(display, language),
     metrics: [
       {
         label: pick(language, "总资产", "Total Portfolio"),
-        value: formatDisplayCurrency(totalPortfolio, display),
+        value: formatDisplayCurrency(totalNetWorthCad, display),
         detail: pick(
           language,
-          `你现在一共连了 ${accounts.length} 个账户`,
-          `${accounts.length} accounts connected`,
+          currentCashBalanceCad > 0
+            ? `投资账户 ${accounts.length} 个，已合并现金账户余额。`
+            : `你现在一共连了 ${accounts.length} 个投资账户`,
+          currentCashBalanceCad > 0
+            ? `${accounts.length} investment accounts plus cash balances.`
+            : `${accounts.length} investment accounts connected`,
         ),
       },
       {
@@ -1762,12 +2075,26 @@ export function buildDashboardData(args: {
       sourceDetail: cashBalanceTrend
         ? pick(
             language,
-            "真实持仓价格回放 + 现金余额历史",
-            "Replayed holding prices + cash balance history",
+            `${investedAssetTrendSource === "replayed-prices" ? "真实持仓价格回放" : investedAssetTrendSource === "snapshots" ? "组合历史快照" : "参考曲线"} + 现金余额历史`,
+            `${investedAssetTrendSource === "replayed-prices" ? "replayed holding prices" : investedAssetTrendSource === "snapshots" ? "portfolio snapshots" : "reference curve"} + cash balance history`,
           )
-        : pick(language, "真实持仓价格回放", "Replayed holding prices"),
+        : investedAssetTrendSource === "replayed-prices"
+          ? pick(language, "真实持仓价格回放", "Replayed holding prices")
+          : investedAssetTrendSource === "snapshots"
+            ? pick(language, "组合历史快照", "Portfolio snapshots")
+            : pick(language, "参考曲线", "Reference curve"),
     },
     netWorthTrend,
+    chartSeries: {
+      netWorth: buildPortfolioValueChartSeries({
+        performance: netWorthTrend,
+        source: investedAssetTrendSource,
+        language,
+        display,
+        id: "overview-net-worth-history",
+        title: pick(language, "总资产走势", "Total asset trend"),
+      }),
+    },
     spendingMonthLabel: getLatestMonthLabel(language),
     savingsPattern: formatCompactPercent(spending.savingsRate, 1),
     investableCash: formatDisplayCurrency(spending.investableCash, display),
@@ -1820,21 +2147,34 @@ export function buildPortfolioData(args: {
     language,
   });
   const totalPortfolio = sum(accounts.map((account) => account.marketValueCad));
-  const portfolioPerformance =
-    buildReplayedAggregateValueSeries({
-      holdings,
-      priceHistory,
-      events: portfolioEvents,
-      language,
-      display,
-    }) ??
-    buildAbsoluteSeriesFromSnapshots({
-      snapshots,
-      language,
-      display,
-      getValue: (snapshot) => snapshot.totalValueCad,
-    }) ??
-    getSixMonthSeries(totalPortfolio || 1, profile, getMonthLabels(language));
+  const replayedPortfolioPerformance = buildReplayedAggregateValueSeries({
+    holdings,
+    priceHistory,
+    events: portfolioEvents,
+    language,
+    display,
+  });
+  const snapshotPortfolioPerformance = buildAbsoluteSeriesFromSnapshots({
+    snapshots,
+    language,
+    display,
+    getValue: (snapshot) => snapshot.totalValueCad,
+  });
+  const portfolioPerformance = anchorSeriesToCurrentValue({
+    series:
+      replayedPortfolioPerformance ??
+      snapshotPortfolioPerformance ??
+      getSixMonthSeries(totalPortfolio || 1, profile, getMonthLabels(language)),
+    currentValueCad: totalPortfolio,
+    language,
+    display,
+  });
+  const portfolioPerformanceSource: PortfolioValueSeriesSource =
+    replayedPortfolioPerformance != null
+      ? "replayed-prices"
+      : snapshotPortfolioPerformance != null
+        ? "snapshots"
+        : "reference";
   const driftMap = new Map<string, number>();
   for (const [assetClass, targetPct] of targetAllocation.entries()) {
     driftMap.set(
@@ -1927,6 +2267,34 @@ export function buildPortfolioData(args: {
       const targetPct = round(targetAllocation.get(assetClass) ?? 0, 1);
       const driftPct = round(currentPct - targetPct, 1);
       const label = getAssetClassLabel(assetClass, language);
+      const replayedClassPerformance = buildReplayedAggregateValueSeries({
+        holdings: classHoldings,
+        priceHistory,
+        events: portfolioEvents,
+        language,
+        display,
+      });
+      const snapshotClassPerformance = buildAbsoluteSeriesFromSnapshots({
+        snapshots,
+        language,
+        display,
+        getValue: (snapshot) =>
+          sum(
+            classHoldings.map(
+              (holding) => snapshot.holdingBreakdown[holding.id] ?? 0,
+            ),
+          ),
+      });
+      const classPerformance =
+        replayedClassPerformance ??
+        snapshotClassPerformance ??
+        getSixMonthSeries(classValueCad, profile, getMonthLabels(language));
+      const classPerformanceSource: PortfolioValueSeriesSource =
+        replayedClassPerformance != null
+          ? "replayed-prices"
+          : snapshotClassPerformance != null
+            ? "snapshots"
+            : "reference";
       const actions =
         Math.abs(driftPct) <= 2
           ? [
@@ -1989,6 +2357,17 @@ export function buildPortfolioData(args: {
           `${label} is currently ${formatCompactPercent(currentPct, 1)} versus a ${formatCompactPercent(targetPct, 1)} target, a ${formatSignedPercent(driftPct, 1)} drift.`,
         ),
         actions,
+        chartSeries: {
+          valueHistory: buildPortfolioValueChartSeries({
+            performance: classPerformance,
+            source: classPerformanceSource,
+            language,
+            display,
+            id: "asset-class-value-history",
+            title: pick(language, `${label} 资产走势`, `${label} asset trend`),
+            subjectLabel: label,
+          }),
+        },
         holdings: classHoldings.slice(0, 12).map((holding) => ({
           id: holding.id,
           symbol: holding.symbol,
@@ -2062,27 +2441,52 @@ export function buildPortfolioData(args: {
         scopeLevel: "account",
       });
       const accountTotal = account.marketValueCad || 1;
+      const replayedAccountPerformance = buildReplayedAggregateValueSeries({
+        holdings,
+        priceHistory,
+        events: portfolioEvents,
+        language,
+        display,
+        accountId: account.id,
+      });
+      const snapshotAccountPerformance = buildAbsoluteSeriesFromSnapshots({
+        snapshots,
+        language,
+        display,
+        getValue: (snapshot) => snapshot.accountBreakdown[account.id] ?? 0,
+      });
+      const accountPerformance =
+        replayedAccountPerformance ??
+        snapshotAccountPerformance ??
+        getSixMonthSeries(accountTotal, profile, getMonthLabels(language));
+      const accountPerformanceSource: PortfolioValueSeriesSource =
+        replayedAccountPerformance != null
+          ? "replayed-prices"
+          : snapshotAccountPerformance != null
+            ? "snapshots"
+            : "reference";
+      const accountName = instanceLabelMap.get(account.id) ?? account.nickname;
       return {
         id: account.id,
-        name: instanceLabelMap.get(account.id) ?? account.nickname,
+        name: accountName,
         typeId: account.type,
         typeLabel: typeLabelMap.get(account.id) ?? account.type,
-        performance:
-          buildReplayedAggregateValueSeries({
-            holdings,
-            priceHistory,
-            events: portfolioEvents,
+        performance: accountPerformance,
+        chartSeries: {
+          accountValue: buildPortfolioValueChartSeries({
+            performance: accountPerformance,
+            source: accountPerformanceSource,
             language,
             display,
-            accountId: account.id,
-          }) ??
-          buildAbsoluteSeriesFromSnapshots({
-            snapshots,
-            language,
-            display,
-            getValue: (snapshot) => snapshot.accountBreakdown[account.id] ?? 0,
-          }) ??
-          getSixMonthSeries(accountTotal, profile, getMonthLabels(language)),
+            id: "account-value-history",
+            title: pick(
+              language,
+              `${accountName} 资产走势`,
+              `${accountName} asset trend`,
+            ),
+            subjectLabel: pick(language, "账户", "account"),
+          }),
+        },
         healthScore: {
           score: accountHealth.score,
           status: accountHealth.status,
@@ -2151,13 +2555,22 @@ export function buildPortfolioData(args: {
       scopeLabel: pick(language, "当前范围", "Current scope"),
       scopeDetail: pick(language, "仅投资资产", "Invested assets only"),
       sourceLabel: pick(language, "数据来源", "Data source"),
-      sourceDetail: pick(
-        language,
-        "真实持仓价格回放",
-        "Replayed holding prices",
-      ),
+      sourceDetail:
+        portfolioPerformanceSource === "replayed-prices"
+          ? pick(language, "真实持仓价格回放", "Replayed holding prices")
+          : portfolioPerformanceSource === "snapshots"
+            ? pick(language, "组合历史快照", "Portfolio snapshots")
+            : pick(language, "参考曲线", "Reference curve"),
     },
     performance: portfolioPerformance,
+    chartSeries: {
+      portfolioValue: buildPortfolioValueChartSeries({
+        performance: portfolioPerformance,
+        source: portfolioPerformanceSource,
+        language,
+        display,
+      }),
+    },
     accountTypeAllocation,
     accountInstanceAllocation,
     assetClassDrilldown,
@@ -2374,6 +2787,7 @@ export function buildPortfolioAccountDetailData(args: {
     },
     facts: [],
     performance: accountContext.performance,
+    chartSeries: accountContext.chartSeries,
     allocation,
     healthScore: accountContext.healthDetail,
     holdings: portfolio.holdings.filter(
@@ -2496,6 +2910,8 @@ export function buildPortfolioHoldingDetailData(args: {
   language: DisplayLanguage;
   accounts: InvestmentAccount[];
   holdings: HoldingPosition[];
+  portfolioEvents?: PortfolioEvent[];
+  priceHistory?: SecurityPriceHistoryPoint[];
   snapshots?: PortfolioSnapshot[];
   profile: PreferenceProfile;
   display: DisplayContext;
@@ -2505,6 +2921,8 @@ export function buildPortfolioHoldingDetailData(args: {
     language,
     accounts,
     holdings,
+    portfolioEvents = [],
+    priceHistory = [],
     snapshots = [],
     profile,
     display,
@@ -2556,6 +2974,23 @@ export function buildPortfolioHoldingDetailData(args: {
   const holdingHealth = health.holdingDrilldown.find(
     (item) => item.id === holdingId,
   );
+  const replayedHoldingValueSeries = buildHoldingValueHistorySeries({
+    holding: rawHolding,
+    priceHistory,
+    events: portfolioEvents,
+    language,
+    display,
+  });
+  const holdingValueSeries =
+    replayedHoldingValueSeries ??
+    getSixMonthSeries(
+      convertCadToDisplay(rawHolding.marketValueCad || 1, display),
+      profile,
+      getMonthLabels(language),
+    ).map((point) => ({
+      label: point.label,
+      value: point.value,
+    }));
 
   return {
     displayContext: portfolio.displayContext,
@@ -2627,6 +3062,25 @@ export function buildPortfolioHoldingDetailData(args: {
       label: point.label,
       value: round((point.value / (series[0]?.value || 1)) * 100, 1),
     })),
+    chartSeries: {
+      holdingValue: buildPortfolioValueChartSeries({
+        id: `holding-value-history-${rawHolding.id}`,
+        title: pick(
+          language,
+          `${rawHolding.symbol} 持仓价值走势`,
+          `${rawHolding.symbol} holding value trend`,
+        ),
+        performance: holdingValueSeries,
+        source: replayedHoldingValueSeries ? "replayed-prices" : "reference",
+        language,
+        display,
+        subjectLabel: pick(
+          language,
+          `${rawHolding.symbol} 持仓`,
+          `${rawHolding.symbol} holding`,
+        ),
+      }),
+    },
     portfolioRole: [
       pick(
         language,

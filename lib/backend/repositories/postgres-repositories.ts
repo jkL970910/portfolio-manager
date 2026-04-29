@@ -163,6 +163,7 @@ function mapSecurityPriceHistory(
   return {
     id: row.id,
     symbol: row.symbol,
+    exchange: row.exchange || null,
     priceDate: row.priceDate,
     close: toNumber(row.close),
     adjustedClose:
@@ -444,6 +445,23 @@ export const postgresRepositories: BackendRepositories = {
       const db = getDb();
       const rows = await db.query.securityPriceHistory.findMany({
         where: eq(securityPriceHistory.symbol, symbol.trim().toUpperCase()),
+        orderBy: desc(securityPriceHistory.priceDate),
+      });
+      return rows.map(mapSecurityPriceHistory);
+    },
+    async listByIdentity(input) {
+      const db = getDb();
+      const rows = await db.query.securityPriceHistory.findMany({
+        where: and(
+          eq(securityPriceHistory.symbol, input.symbol.trim().toUpperCase()),
+          eq(
+            securityPriceHistory.exchange,
+            input.exchange?.trim().toUpperCase() || "",
+          ),
+          input.currency
+            ? eq(securityPriceHistory.currency, input.currency)
+            : undefined,
+        ),
         orderBy: desc(securityPriceHistory.priceDate),
       });
       return rows.map(mapSecurityPriceHistory);

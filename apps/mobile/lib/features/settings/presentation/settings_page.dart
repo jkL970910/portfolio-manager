@@ -77,10 +77,19 @@ class _SettingsPageState extends State<SettingsPage> {
       final refreshed = result["refreshedHoldingCount"] ?? 0;
       final missing = result["missingQuoteCount"] ?? 0;
       final sampled = result["sampledSymbolCount"] ?? 0;
+      final historyPoints = result["historyPointCount"] ?? 0;
+      final snapshotRecorded = result["snapshotRecorded"] == true;
+      final fxRateLabel = result["fxRateLabel"] as String? ?? "";
       if (mounted) {
         setState(() {
-          _refreshResult =
-              "已刷新 $refreshed 笔持仓；检查 $sampled 个标的身份，$missing 个暂未拿到报价。";
+          _refreshResult = [
+            "已刷新 $refreshed 笔持仓",
+            "检查 $sampled 个标的身份",
+            "$missing 个暂未拿到报价",
+            "写入 $historyPoints 条价格历史",
+            snapshotRecorded ? "已记录今日组合快照" : "未记录新快照",
+            if (fxRateLabel.isNotEmpty) "FX：$fxRateLabel",
+          ].join("；");
           _refreshingQuotes = false;
         });
       }

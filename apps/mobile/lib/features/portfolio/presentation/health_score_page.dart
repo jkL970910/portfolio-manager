@@ -84,6 +84,10 @@ class _HealthScorePageState extends State<HealthScorePage> {
               padding: const EdgeInsets.fromLTRB(20, 12, 20, 28),
               children: [
                 _SummaryCard(data),
+                if (data.isAccountScope) ...[
+                  const SizedBox(height: 12),
+                  const _AccountScopeExplanationCard(),
+                ],
                 if (widget.accountId == null) ...[
                   const SizedBox(height: 12),
                   AiAnalysisCard(
@@ -197,6 +201,7 @@ class MobileHealthSnapshot {
     required this.scopeName,
     required this.scopeLabel,
     required this.scopeDetail,
+    required this.isAccountScope,
     required this.score,
     required this.status,
     required this.strongestDimension,
@@ -212,6 +217,7 @@ class MobileHealthSnapshot {
   final String scopeName;
   final String scopeLabel;
   final String scopeDetail;
+  final bool isAccountScope;
   final String score;
   final String status;
   final MobileHealthDimensionPair strongestDimension;
@@ -239,6 +245,7 @@ class MobileHealthSnapshot {
           (scopeData["type"] == "account"
               ? "账户级评分不要求单个账户复制全组合目标。"
               : "全组合评分按总目标配置、账户效率、集中度和风险平衡判断。"),
+      isAccountScope: scopeData["type"] == "account",
       score: "${healthData["score"] ?? "--"} 分",
       status: healthData["status"] as String? ?? "待评估",
       strongestDimension:
@@ -412,6 +419,32 @@ class _SummaryCard extends StatelessWidget {
                   "最弱：${data.weakestDimension.label} · ${data.weakestDimension.value}"),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _AccountScopeExplanationCard extends StatelessWidget {
+  const _AccountScopeExplanationCard();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text("评分口径", style: theme.textTheme.titleLarge),
+            const SizedBox(height: 8),
+            const Text("账户 Health 分成两个层级，不要求单个账户复制全组合目标。"),
+            const SizedBox(height: 10),
+            const Text("• 账户内适配：看这个账户自身属性、账户类型、持仓是否放得顺。"),
+            const SizedBox(height: 6),
+            const Text("• 全组合目标参考：看这个账户对总组合目标的贡献。"),
+          ],
         ),
       ),
     );

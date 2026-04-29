@@ -106,6 +106,16 @@ export const mockRepositories: BackendRepositories = {
         (point) => point.symbol.trim().toUpperCase() === normalized,
       );
     },
+    async listByIdentity(input) {
+      const normalizedSymbol = input.symbol.trim().toUpperCase();
+      const normalizedExchange = input.exchange?.trim().toUpperCase() || "";
+      return securityPriceHistory.filter(
+        (point) =>
+          point.symbol.trim().toUpperCase() === normalizedSymbol &&
+          (point.exchange?.trim().toUpperCase() || "") === normalizedExchange &&
+          (!input.currency || point.currency === input.currency),
+      );
+    },
   },
   preferences: {
     async getByUserId(userId) {

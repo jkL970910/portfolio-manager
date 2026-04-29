@@ -161,8 +161,8 @@ Note: if `npm run lint` fails because ESLint 9 expects flat config, do not treat
 
 ## Current Priority Order
 
-1. QA cached-external result visibility in mobile Settings from `AI 最近分析`.
-2. QA Security Detail `价格走势` freshness labels and confirm stale/fallback data is not presented as real market movement.
-3. Continue chart contract migration for account/portfolio/asset-class charts after Security Detail QA passes.
+1. QA mobile Overview `总资产走势`, Portfolio `组合价值走势`, and Account Detail account-value freshness labels. Reference curves must not be presented as real movement.
+2. Decide whether Holding Detail needs a dedicated account-specific chart beyond Security Detail. If yes, migrate it to `MobileChartSeries`; if not, document it as intentionally covered by Security Detail + Account Detail.
+3. Start preview stack stability hardening so API/DB/tunnel failures are detected before sending a phone QA URL.
 4. Keep external research guarded off by default. The DB-backed job/usage ledger, local worker command, mobile job status visibility, cached market-data provider, and admin-only smoke enqueue tooling are in place. The provider reads only local cached data and requires explicit env flags.
 5. Evaluate QStash/Cloudflare Queues and real external data sources only after cached-external detail visibility and chart contracts are stable.

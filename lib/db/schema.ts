@@ -235,6 +235,32 @@ export const cashAccountBalanceEvents = pgTable("cash_account_balance_events", {
     .defaultNow(),
 });
 
+export const fxRates = pgTable(
+  "fx_rates",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    baseCurrency: varchar("base_currency", { length: 3 }).notNull(),
+    quoteCurrency: varchar("quote_currency", { length: 3 }).notNull(),
+    rateDate: date("rate_date").notNull(),
+    rate: numeric("rate", { precision: 18, scale: 8 }).notNull(),
+    source: varchar("source", { length: 32 }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => ({
+    pairDateIdx: uniqueIndex("fx_rates_pair_date_idx").on(
+      table.baseCurrency,
+      table.quoteCurrency,
+      table.rateDate,
+    ),
+    pairIdx: index("fx_rates_pair_idx").on(
+      table.baseCurrency,
+      table.quoteCurrency,
+    ),
+  }),
+);
+
 export const preferenceProfiles = pgTable(
   "preference_profiles",
   {
@@ -387,6 +413,7 @@ export const securityPriceHistory = pgTable(
   {
     id: uuid("id").defaultRandom().primaryKey(),
     symbol: varchar("symbol", { length: 32 }).notNull(),
+    exchange: varchar("exchange", { length: 64 }).notNull().default(""),
     priceDate: date("price_date").notNull(),
     close: numeric("close", { precision: 14, scale: 4 }).notNull(),
     adjustedClose: numeric("adjusted_close", { precision: 14, scale: 4 }),
@@ -399,6 +426,8 @@ export const securityPriceHistory = pgTable(
   (table) => ({
     symbolDateIdx: uniqueIndex("security_price_history_symbol_date_idx").on(
       table.symbol,
+      table.exchange,
+      table.currency,
       table.priceDate,
     ),
   }),

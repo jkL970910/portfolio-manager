@@ -45,6 +45,7 @@ type MobileHomeData = {
     value: string;
   }>;
   netWorthTrend: DashboardData["netWorthTrend"];
+  chartSeries?: DashboardData["chartSeries"];
   healthScore: DashboardData["healthScore"];
   recommendation: DashboardData["recommendation"];
   context?: {
@@ -59,6 +60,7 @@ type MobilePortfolioOverviewData = {
   viewer: Viewer;
   displayContext: PortfolioData["displayContext"];
   performance: PortfolioData["performance"];
+  chartSeries?: PortfolioData["chartSeries"];
   accountTypeAllocation: PortfolioData["accountTypeAllocation"];
   accountInstanceAllocation: PortfolioData["accountInstanceAllocation"];
   assetClassDrilldown: PortfolioData["assetClassDrilldown"];
@@ -212,6 +214,7 @@ function mapMobileHomeData(
       value: holding.value,
     })),
     netWorthTrend: payload.data.netWorthTrend,
+    chartSeries: payload.data.chartSeries,
     healthScore: payload.data.healthScore,
     recommendation: payload.data.recommendation,
     context: payload.data.context,
@@ -228,6 +231,7 @@ function mapMobilePortfolioOverviewData(
     viewer,
     displayContext: payload.data.displayContext,
     performance: payload.data.performance,
+    chartSeries: payload.data.chartSeries,
     accountTypeAllocation: payload.data.accountTypeAllocation,
     accountInstanceAllocation: payload.data.accountInstanceAllocation,
     assetClassDrilldown: payload.data.assetClassDrilldown,
@@ -304,6 +308,7 @@ function mapMobileAccountDetailData(
     account: data.account,
     facts: data.facts,
     performance: data.performance,
+    chartSeries: data.chartSeries,
     allocation: data.allocation,
     healthScore: data.healthScore,
     holdings: data.holdings.map(mapMobilePortfolioHoldingListItem),
@@ -328,6 +333,7 @@ function mapMobileHoldingDetailData(
     facts: data.facts,
     marketData: data.marketData,
     performance: data.performance,
+    chartSeries: data.chartSeries,
     portfolioRole: data.portfolioRole,
     healthSummary: data.healthSummary,
   };

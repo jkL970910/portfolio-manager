@@ -5,6 +5,7 @@ import "account_detail_page.dart";
 import "asset_class_drilldown_page.dart";
 import "health_score_page.dart";
 import "holding_detail_page.dart";
+import "../../shared/data/mobile_chart_models.dart";
 import "../../shared/data/mobile_models.dart";
 import "../../shared/presentation/loo_charts.dart";
 
@@ -94,6 +95,19 @@ class _PortfolioPageState extends State<PortfolioPage> {
                           snapshot.data!.summaryPoints,
                           onTap: _openHealthScore,
                         ),
+                      if (snapshot.data!.fxContext.hasContent) ...[
+                        const SizedBox(height: 18),
+                        _FxContextCard(snapshot.data!.fxContext),
+                      ],
+                      if (!_isFiltered &&
+                          (snapshot.data!.portfolioValueChart != null ||
+                              snapshot.data!.performance.isNotEmpty)) ...[
+                        const SizedBox(height: 18),
+                        _PortfolioTrendCard(
+                          chart: snapshot.data!.portfolioValueChart,
+                          fallbackPoints: snapshot.data!.performance,
+                        ),
+                      ],
                       if (!_isFiltered &&
                           snapshot.data!.accountTypeAllocation.isNotEmpty) ...[
                         const SizedBox(height: 18),
@@ -205,6 +219,9 @@ class MobilePortfolioSnapshot {
     required this.quoteStatus,
     required this.healthScore,
     required this.summaryPoints,
+    required this.performance,
+    required this.portfolioValueChart,
+    required this.fxContext,
     required this.accountTypeAllocation,
     required this.accountInstanceAllocation,
     required this.assetClassDrilldown,
@@ -215,6 +232,9 @@ class MobilePortfolioSnapshot {
   final String quoteStatus;
   final String healthScore;
   final List<String> summaryPoints;
+  final List<MobilePortfolioPerformancePoint> performance;
+  final MobileChartSeries? portfolioValueChart;
+  final MobileFxContext fxContext;
   final List<MobilePortfolioAllocationPoint> accountTypeAllocation;
   final List<MobilePortfolioAllocationPoint> accountInstanceAllocation;
   final List<MobileAssetClassDrilldown> assetClassDrilldown;
@@ -239,6 +259,15 @@ class MobilePortfolioSnapshot {
       summaryPoints:
           (json["summaryPoints"] as List?)?.whereType<String>().toList() ??
               const [],
+      performance: readJsonList(json, "performance")
+          .map(MobilePortfolioPerformancePoint.fromJson)
+          .toList(),
+      portfolioValueChart: MobileChartSeries.fromJson(
+        (json["chartSeries"] is Map<String, dynamic>
+            ? json["chartSeries"] as Map<String, dynamic>
+            : const <String, dynamic>{})["portfolioValue"],
+      ),
+      fxContext: MobileFxContext.fromJson(json["displayContext"]),
       accountTypeAllocation: readJsonList(json, "accountTypeAllocation")
           .map(MobilePortfolioAllocationPoint.fromJson)
           .toList(),
@@ -261,9 +290,35 @@ class MobilePortfolioSnapshot {
       quoteStatus: "已筛选 $accountType 账户类型 · $quoteStatus",
       healthScore: healthScore,
       summaryPoints: summaryPoints,
+      performance: performance,
+      portfolioValueChart: portfolioValueChart,
+      fxContext: fxContext,
       accountTypeAllocation: accountTypeAllocation,
       accountInstanceAllocation: accountInstanceAllocation,
       assetClassDrilldown: assetClassDrilldown,
+    );
+  }
+}
+
+class MobilePortfolioPerformancePoint {
+  const MobilePortfolioPerformancePoint({
+    required this.label,
+    required this.displayValue,
+    required this.chartValue,
+  });
+
+  final String label;
+  final String displayValue;
+  final double chartValue;
+
+  factory MobilePortfolioPerformancePoint.fromJson(Map<String, dynamic> json) {
+    final rawValue = json["value"];
+    return MobilePortfolioPerformancePoint(
+      label: json["label"] as String? ?? "未知日期",
+      displayValue: rawValue is num
+          ? rawValue.toStringAsFixed(2)
+          : rawValue?.toString() ?? "--",
+      chartValue: rawValue is num ? rawValue.toDouble() : 0,
     );
   }
 }
@@ -306,6 +361,7 @@ class MobileAssetClassDrilldown {
     required this.driftLabel,
     required this.summary,
     required this.actions,
+    required this.valueHistoryChart,
     required this.holdings,
   });
 
@@ -320,6 +376,7 @@ class MobileAssetClassDrilldown {
   final String driftLabel;
   final String summary;
   final List<String> actions;
+  final MobileChartSeries? valueHistoryChart;
   final List<MobileHoldingCard> holdings;
 
   factory MobileAssetClassDrilldown.fromJson(Map<String, dynamic> json) {
@@ -336,6 +393,11 @@ class MobileAssetClassDrilldown {
       summary: json["summary"] as String? ?? "",
       actions:
           (json["actions"] as List?)?.whereType<String>().toList() ?? const [],
+      valueHistoryChart: MobileChartSeries.fromJson(
+        (json["chartSeries"] is Map<String, dynamic>
+            ? json["chartSeries"] as Map<String, dynamic>
+            : const <String, dynamic>{})["valueHistory"],
+      ),
       holdings: readJsonList(json, "holdings")
           .map(MobileHoldingCard.fromJson)
           .toList(),
@@ -428,6 +490,120 @@ class _FilterSummaryCard extends StatelessWidget {
               Expanded(child: Text("持仓 ${data.holdings.length} 个")),
             ],
           ),
+        ],
+      ),
+    );
+  }
+}
+
+class _FxContextCard extends StatelessWidget {
+  const _FxContextCard(this.context);
+
+  final MobileFxContext context;
+
+  @override
+  Widget build(BuildContext context) {
+    return _LooCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.currency_exchange),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text("FX 折算口径",
+                    style: Theme.of(context).textTheme.titleLarge),
+              ),
+              Chip(label: Text(this.context.statusLabel)),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(this.context.label),
+          if (this.context.note.isNotEmpty) ...[
+            const SizedBox(height: 6),
+            Text(this.context.note,
+                style: Theme.of(context).textTheme.bodySmall),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _PortfolioTrendCard extends StatelessWidget {
+  const _PortfolioTrendCard({
+    required this.chart,
+    required this.fallbackPoints,
+  });
+
+  final MobileChartSeries? chart;
+  final List<MobilePortfolioPerformancePoint> fallbackPoints;
+
+  @override
+  Widget build(BuildContext context) {
+    final points = chart?.points
+            .map((point) => (
+                  label: point.label,
+                  displayValue: point.displayValue,
+                  chartValue: point.value,
+                ))
+            .toList() ??
+        fallbackPoints
+            .map((point) => (
+                  label: point.label,
+                  displayValue: point.displayValue,
+                  chartValue: point.chartValue,
+                ))
+            .toList();
+    if (points.length < 2) {
+      return const SizedBox.shrink();
+    }
+
+    final first = points.first;
+    final last = points.last;
+    final freshness = chart?.freshness;
+
+    return _LooCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(chart?.title ?? "组合价值走势",
+              style: Theme.of(context).textTheme.titleLarge),
+          const SizedBox(height: 12),
+          LooLineChart(
+            points: points
+                .map(
+                  (point) => LooLineChartPoint(
+                    label: point.label,
+                    value: point.chartValue,
+                  ),
+                )
+                .toList(),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            "${first.label} ${first.displayValue} → ${last.label} ${last.displayValue}",
+            style: Theme.of(context).textTheme.bodyMedium,
+          ),
+          if (freshness != null) ...[
+            const SizedBox(height: 10),
+            Chip(label: Text(freshness.label)),
+            const SizedBox(height: 6),
+            Text(
+              freshness.detail,
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+          ],
+          if (chart != null && chart!.notes.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            ...chart!.notes.take(2).map(
+                  (note) => Text(
+                    "· $note",
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                ),
+          ],
         ],
       ),
     );

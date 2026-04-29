@@ -120,10 +120,21 @@ export interface PortfolioSnapshot {
 export interface SecurityPriceHistoryPoint {
   id: EntityId;
   symbol: string;
+  exchange?: string | null;
   priceDate: string;
   close: number;
   adjustedClose: number | null;
   currency: CurrencyCode;
+  source: string;
+  createdAt: string;
+}
+
+export interface FxRatePoint {
+  id: EntityId;
+  baseCurrency: CurrencyCode;
+  quoteCurrency: CurrencyCode;
+  rateDate: string;
+  rate: number;
   source: string;
   createdAt: string;
 }

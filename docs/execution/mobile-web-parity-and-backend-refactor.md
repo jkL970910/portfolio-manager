@@ -21,10 +21,10 @@ The project direction remains:
 | Feature area             | Legacy web surface                                                                               | Current Flutter surface                                                                                                                                                                                                              | Gap / decision                                                                                                                                    |
 | ------------------------ | ------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Auth                     | Login/register through web session                                                               | Mobile login, token persistence, refresh/retry, logout                                                                                                                                                                               | Mobile auth works, but backend refresh tokens are still stateless and logout is not server-revoking                                               |
-| Dashboard / Overview     | Dense dashboard with metrics, accounts, drift, charts, recommendation preview, spending rhythm   | Mobile overview with metrics, health entry, key accounts, top holdings, recommendation theme                                                                                                                                         | Mobile intentionally smaller; spending rhythm and full dashboard chart density are not migrated                                                   |
+| Dashboard / Overview     | Dense dashboard with metrics, accounts, drift, charts, recommendation preview, spending rhythm   | Mobile overview with metrics, health entry, key accounts, top holdings, recommendation theme, and net-worth / invested-asset trend freshness labels                                                                                  | Mobile intentionally smaller; spending rhythm and full dashboard chart density are not migrated                                                   |
 | Portfolio workspace      | Full account/holding workspace, filters, account/security/holding routing, repair/edit workflows | Portfolio overview, account detail, holding detail, security detail, health score, asset-class drilldown, account-type filtered view                                                                                                 | Mobile has core read/drilldown flows; full workspace filtering and all edit/repair paths are still incomplete                                     |
 | Portfolio health         | Dedicated web health page                                                                        | First-pass mobile health score page with drivers, radar, actions, account/holding drilldowns                                                                                                                                         | Mobile is usable; visual polish and deeper historical context remain                                                                              |
-| Charts                   | Web has donut, line, radar preview components                                                    | Flutter has first-pass line chart, allocation distribution, health radar/score widgets                                                                                                                                               | Mobile chart foundation exists; next step is standardized chart contracts in `docs/execution/mobile-chart-contracts.md`                           |
+| Charts                   | Web has donut, line, radar preview components                                                    | Flutter has first-pass line chart, allocation distribution, health radar/score widgets; Security, Overview, Portfolio value, Account Detail, Holding Detail, and Asset Class drilldown charts now use typed freshness contracts      | Remaining work is richer interactions/tooltips, not basic mobile chart coverage                                                                   |
 | Security detail          | Web security page and linked holding context                                                     | Mobile security detail with summary, facts, price trend, target drift, account distribution                                                                                                                                          | Security chart now has a typed series DTO with freshness/source labels; other detail sections still use read-model display data                   |
 | Holding detail           | Web holding route redirects into security context                                                | Mobile holding detail page exists and opens by holding id                                                                                                                                                                            | Mobile is now stronger for holding-specific drilldown than the current web redirect                                                               |
 | Recommendations          | Web recommendation page with run panel, ranking, scenarios, explanations, constraints            | Mobile recommendations with regenerate, scoring explanation, watchlist, scenarios, alternatives, execution steps                                                                                                                     | Mobile has strong first-pass parity; hard constraints still need backend model work                                                               |
@@ -364,32 +364,53 @@ Remaining work:
   number, out-of-range values, or min greater than max.
 - Health Score now consumes asset-class bands as effective target constraints,
   not only Recommendation gap scoring.
+- Mobile account Health now has a visible `评分口径` explanation card that
+  separates `账户内适配` from `全组合目标参考`, so account-level scores cannot be
+  read as a requirement that one account must mirror the total portfolio target.
+- Holding Detail now has its own `持仓价值走势` chart contract, separate from
+  Security Detail's ticker-level `价格走势`.
+- Portfolio quote refresh now writes daily price-history points keyed by
+  `symbol + exchange + currency + date` and exposes `historyPointCount` /
+  `snapshotRecorded` in the refresh response, so mobile QA can confirm refresh
+  improves future chart freshness.
+- FX rates now have an independent `fx_rates` store. Quote refresh reads stored
+  FX or a conservative fallback for CAD aggregation, instead of calling a live
+  FX API while refreshing USD holdings.
+- Mobile Overview, Portfolio, and Settings refresh results now expose FX
+  as-of/source/freshness, so total-asset CAD values can be traced back to the
+  exact stored/fallback USD/CAD rate being used.
+- Mobile Overview total-asset metric now uses the same net-worth scope as the
+  total-asset trend when cash-account balances are present: investment accounts
+  plus current cash balances. Pure investment assets should be shown as a
+  separate metric if needed, not mixed into the total-asset label.
+- Mobile Overview/Portfolio historical value replay now groups price history by
+  `symbol + exchange + currency` and converts USD prices through the FX index
+  before CAD aggregation. This prevents USD common shares and CAD CDR/listed
+  versions from being replayed with the same ticker-only price.
+- `security_price_history` now has exchange-aware identity through migration
+  `0008_security_price_history_exchange_identity`. Old exchange-less rows remain
+  available for compatibility but new refresh writes exchange-aware rows.
+- Overview and Portfolio value charts now append/replace today's point with the
+  current state-table total. Historical replay may still be incomplete for older
+  dates, but the latest chart point must agree with the visible total asset /
+  current portfolio value card.
 
 Next priority order:
 
-1. Apply/verify migration `0004_portfolio_analysis_runs` in the target dev DB.
-2. Manual QA that AI quick scans still generate normally, `重新生成` bypasses
-   cache, and repeated navigation/reload does not break the card.
-3. Manual QA account Health wording: account-level pages must show
-   `账户内适配 + 全组合目标参考`, and overweight allocation copy must say
-   `高于目标`, not `只有`.
-4. Manual QA Settings `AI 最近分析` after generating at least one quick scan.
-5. Commit/push the analyzer refresh UI, Health wording fix, and recent analysis
-   history after
-   validation.
-6. External research is now guarded off by default, and the worker/cost policy
-   plus source allowlist are exposed through the mobile policy API/settings
-   card. Next work is the actual background worker queue and persisted usage
-   counters before any live adapter. Background research is captured in
-   `docs/execution/external-research-worker-background-research.md`.
-7. Migration `0005_external_research_jobs` starts the DB-backed job/usage
-   ledger and mobile usage readout. Enqueue remains guarded off until worker
-   claim/succeed/fail logic and a provider adapter exist.
-8. Chart-heavy UX should now start with the mobile chart contract in
-   `docs/execution/mobile-chart-contracts.md`, then migrate Security Detail
-   before account/portfolio charts.
+1. Build the scheduled quote/FX/history worker boundary: quota budgeting,
+   retry-after handling, provider status persistence, and snapshot recording
+   outside user-facing requests.
+2. Add a mobile provider-status view so stale/fallback/limited/manual rows are
+   auditable without reading raw refresh errors.
+3. Normalize Flutter API contracts into typed DTOs and reduce page-level
+   `Map<String, dynamic>` parsing.
+4. Harden mobile auth: revocable refresh tokens, server-side logout, and
+   production storage policy.
+5. Start mobile spending/cash account monitoring as a separate account class
+   from investment accounts.
 
 Migration metadata status:
 
-- `drizzle/meta/_journal.json` now registers migrations `0001` through `0004`.
-- `npx drizzle-kit check` passes after the journal update.
+- `drizzle/meta/_journal.json` now registers migrations `0001` through `0008`.
+- Local Postgres `5434` has migrations `0006`, `0007`, and `0008` applied for
+  currency-aware history, independent FX rates, and exchange-aware history.

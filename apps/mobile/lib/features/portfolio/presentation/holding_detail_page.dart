@@ -1,7 +1,9 @@
 import "package:flutter/material.dart";
 
 import "../../../core/api/loo_api_client.dart";
+import "../../shared/data/mobile_chart_models.dart";
 import "../../shared/data/mobile_models.dart";
+import "../../shared/presentation/loo_charts.dart";
 import "account_detail_page.dart";
 import "detail_state_widgets.dart";
 import "security_detail_page.dart";
@@ -100,6 +102,10 @@ class _HoldingDetailPageState extends State<HoldingDetailPage> {
               children: [
                 _SummaryCard(data),
                 const SizedBox(height: 12),
+                if (data.holdingValueChart != null) ...[
+                  _HoldingTrendCard(data.holdingValueChart!),
+                  const SizedBox(height: 12),
+                ],
                 _MetricGrid(data),
                 const SizedBox(height: 12),
                 Row(
@@ -263,6 +269,7 @@ class MobileHoldingDetailSnapshot {
     required this.facts,
     required this.marketData,
     required this.performance,
+    required this.holdingValueChart,
     required this.portfolioRole,
     required this.healthSummary,
   });
@@ -293,6 +300,7 @@ class MobileHoldingDetailSnapshot {
   final List<MobileFact> facts;
   final MobileMarketData marketData;
   final List<MobilePerformancePoint> performance;
+  final MobileChartSeries? holdingValueChart;
   final List<String> portfolioRole;
   final MobileHealthSummary healthSummary;
 
@@ -351,6 +359,9 @@ class MobileHoldingDetailSnapshot {
       performance: readJsonList(json, "performance")
           .map(MobilePerformancePoint.fromJson)
           .toList(),
+      holdingValueChart: MobileChartSeries.fromJson(
+        (json["chartSeries"] as Map<String, dynamic>?)?["holdingValue"],
+      ),
       portfolioRole:
           (json["portfolioRole"] as List?)?.whereType<String>().toList() ??
               const [],
@@ -663,6 +674,72 @@ String _freshnessLabel(String variant) {
     "warning" => "需要刷新",
     _ => "报价待核",
   };
+}
+
+class _HoldingTrendCard extends StatelessWidget {
+  const _HoldingTrendCard(this.chart);
+
+  final MobileChartSeries chart;
+
+  @override
+  Widget build(BuildContext context) {
+    final points = chart.points
+        .map((point) => (
+              label: point.label,
+              displayValue: point.displayValue,
+              chartValue: point.value,
+            ))
+        .toList();
+    if (points.length < 2) {
+      return const SizedBox.shrink();
+    }
+
+    final first = points.first;
+    final last = points.last;
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(chart.title, style: Theme.of(context).textTheme.titleLarge),
+            const SizedBox(height: 12),
+            LooLineChart(
+              points: points
+                  .map(
+                    (point) => LooLineChartPoint(
+                      label: point.label,
+                      value: point.chartValue,
+                    ),
+                  )
+                  .toList(),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              "${first.label} ${first.displayValue} → ${last.label} ${last.displayValue}",
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
+            const SizedBox(height: 10),
+            Chip(label: Text(chart.freshness.label)),
+            const SizedBox(height: 6),
+            Text(
+              chart.freshness.detail,
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+            if (chart.notes.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              ...chart.notes.take(2).map(
+                    (note) => Text(
+                      "· $note",
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                  ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 class _MarketDataCard extends StatelessWidget {

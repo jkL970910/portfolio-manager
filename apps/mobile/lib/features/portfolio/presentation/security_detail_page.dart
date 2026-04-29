@@ -1,6 +1,7 @@
 import "package:flutter/material.dart";
 
 import "../../../core/api/loo_api_client.dart";
+import "../../shared/data/mobile_chart_models.dart";
 import "../../shared/data/mobile_models.dart";
 import "../../shared/presentation/loo_charts.dart";
 import "ai_analysis_card.dart";
@@ -262,72 +263,6 @@ class MobileSecurityDetailSnapshot {
           .map(MobileHoldingCard.fromJson)
           .toList(),
       heldPosition: MobileHeldPosition.fromJson(json["heldPosition"]),
-    );
-  }
-}
-
-class MobileChartSeries {
-  const MobileChartSeries({
-    required this.title,
-    required this.valueType,
-    required this.sourceMode,
-    required this.freshness,
-    required this.points,
-    required this.notes,
-  });
-
-  final String title;
-  final String valueType;
-  final String sourceMode;
-  final MobileChartFreshness freshness;
-  final List<MobileSecurityPerformancePoint> points;
-  final List<String> notes;
-
-  static MobileChartSeries? fromJson(Object? value) {
-    final json =
-        value is Map<String, dynamic> ? value : const <String, dynamic>{};
-    final rawPoints = json["points"];
-    final points = rawPoints is List
-        ? rawPoints
-            .whereType<Map<String, dynamic>>()
-            .map(MobileSecurityPerformancePoint.fromChartPointJson)
-            .toList()
-        : const <MobileSecurityPerformancePoint>[];
-
-    if (points.length < 2) return null;
-
-    return MobileChartSeries(
-      title: json["title"] as String? ?? "价格走势",
-      valueType: json["valueType"] as String? ?? "index",
-      sourceMode: json["sourceMode"] as String? ?? "local",
-      freshness: MobileChartFreshness.fromJson(json["freshness"]),
-      points: points,
-      notes: (json["notes"] as List?)?.whereType<String>().toList() ?? const [],
-    );
-  }
-}
-
-class MobileChartFreshness {
-  const MobileChartFreshness({
-    required this.status,
-    required this.label,
-    required this.latestDate,
-    required this.detail,
-  });
-
-  final String status;
-  final String label;
-  final String? latestDate;
-  final String detail;
-
-  factory MobileChartFreshness.fromJson(Object? value) {
-    final json =
-        value is Map<String, dynamic> ? value : const <String, dynamic>{};
-    return MobileChartFreshness(
-      status: json["status"] as String? ?? "fallback",
-      label: json["label"] as String? ?? "参考曲线",
-      latestDate: json["latestDate"] as String?,
-      detail: json["detail"] as String? ?? "请确认数据来源和更新时间。",
     );
   }
 }
@@ -792,7 +727,20 @@ class _PerformanceChartCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final points = chart?.points ?? fallbackPoints;
+    final points = chart?.points
+            .map((point) => (
+                  label: point.label,
+                  displayValue: point.displayValue,
+                  chartValue: point.value,
+                ))
+            .toList() ??
+        fallbackPoints
+            .map((point) => (
+                  label: point.label,
+                  displayValue: point.value,
+                  chartValue: point.chartValue,
+                ))
+            .toList();
     final first = points.first;
     final last = points.last;
     final freshness = chart?.freshness;
@@ -814,7 +762,7 @@ class _PerformanceChartCard extends StatelessWidget {
             ),
             const SizedBox(height: 12),
             Text(
-              "${first.label} ${first.value} → ${last.label} ${last.value}",
+              "${first.label} ${first.displayValue} → ${last.label} ${last.displayValue}",
               style: Theme.of(context).textTheme.bodyMedium,
             ),
             if (freshness != null) ...[

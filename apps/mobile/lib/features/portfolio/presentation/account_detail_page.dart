@@ -1,6 +1,7 @@
 import "package:flutter/material.dart";
 
 import "../../../core/api/loo_api_client.dart";
+import "../../shared/data/mobile_chart_models.dart";
 import "../../shared/data/mobile_models.dart";
 import "../../shared/presentation/loo_charts.dart";
 import "detail_state_widgets.dart";
@@ -100,6 +101,14 @@ class _AccountDetailPageState extends State<AccountDetailPage> {
               children: [
                 _SummaryCard(data),
                 const SizedBox(height: 12),
+                if (data.accountValueChart != null ||
+                    data.performance.isNotEmpty) ...[
+                  _AccountTrendCard(
+                    chart: data.accountValueChart,
+                    fallbackPoints: data.performance,
+                  ),
+                  const SizedBox(height: 12),
+                ],
                 _MetricGrid(data),
                 if (data.summaryPoints.isNotEmpty) ...[
                   const SizedBox(height: 16),
@@ -235,6 +244,8 @@ class MobileAccountDetailSnapshot {
     required this.room,
     required this.subtitle,
     required this.summaryPoints,
+    required this.performance,
+    required this.accountValueChart,
     required this.allocation,
     required this.healthScore,
     required this.facts,
@@ -251,6 +262,8 @@ class MobileAccountDetailSnapshot {
   final String room;
   final String subtitle;
   final List<String> summaryPoints;
+  final List<MobileAccountPerformancePoint> performance;
+  final MobileChartSeries? accountValueChart;
   final List<MobileAllocationPoint> allocation;
   final MobileAccountHealthScore healthScore;
   final List<MobileFact> facts;
@@ -279,6 +292,14 @@ class MobileAccountDetailSnapshot {
               ?.whereType<String>()
               .toList() ??
           const [],
+      performance: readJsonList(json, "performance")
+          .map(MobileAccountPerformancePoint.fromJson)
+          .toList(),
+      accountValueChart: MobileChartSeries.fromJson(
+        (json["chartSeries"] is Map<String, dynamic>
+            ? json["chartSeries"] as Map<String, dynamic>
+            : const <String, dynamic>{})["accountValue"],
+      ),
       allocation: readJsonList(json, "allocation")
           .map(MobileAllocationPoint.fromJson)
           .toList(),
@@ -328,6 +349,111 @@ class _SummaryCard extends StatelessWidget {
               ],
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class MobileAccountPerformancePoint {
+  const MobileAccountPerformancePoint({
+    required this.label,
+    required this.displayValue,
+    required this.chartValue,
+  });
+
+  final String label;
+  final String displayValue;
+  final double chartValue;
+
+  factory MobileAccountPerformancePoint.fromJson(Map<String, dynamic> json) {
+    final rawValue = json["value"];
+    return MobileAccountPerformancePoint(
+      label: json["label"] as String? ?? "未知日期",
+      displayValue: rawValue is num
+          ? rawValue.toStringAsFixed(2)
+          : rawValue?.toString() ?? "--",
+      chartValue: rawValue is num ? rawValue.toDouble() : 0,
+    );
+  }
+}
+
+class _AccountTrendCard extends StatelessWidget {
+  const _AccountTrendCard({
+    required this.chart,
+    required this.fallbackPoints,
+  });
+
+  final MobileChartSeries? chart;
+  final List<MobileAccountPerformancePoint> fallbackPoints;
+
+  @override
+  Widget build(BuildContext context) {
+    final points = chart?.points
+            .map((point) => (
+                  label: point.label,
+                  displayValue: point.displayValue,
+                  chartValue: point.value,
+                ))
+            .toList() ??
+        fallbackPoints
+            .map((point) => (
+                  label: point.label,
+                  displayValue: point.displayValue,
+                  chartValue: point.chartValue,
+                ))
+            .toList();
+    if (points.length < 2) {
+      return const SizedBox.shrink();
+    }
+
+    final first = points.first;
+    final last = points.last;
+    final freshness = chart?.freshness;
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(chart?.title ?? "账户资产走势",
+                style: Theme.of(context).textTheme.titleLarge),
+            const SizedBox(height: 12),
+            LooLineChart(
+              points: points
+                  .map(
+                    (point) => LooLineChartPoint(
+                      label: point.label,
+                      value: point.chartValue,
+                    ),
+                  )
+                  .toList(),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              "${first.label} ${first.displayValue} → ${last.label} ${last.displayValue}",
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
+            if (freshness != null) ...[
+              const SizedBox(height: 10),
+              Chip(label: Text(freshness.label)),
+              const SizedBox(height: 6),
+              Text(
+                freshness.detail,
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+            ],
+            if (chart != null && chart!.notes.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              ...chart!.notes.take(2).map(
+                    (note) => Text(
+                      "· $note",
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                  ),
+            ],
+          ],
         ),
       ),
     );

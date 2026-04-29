@@ -65,6 +65,11 @@ export interface PortfolioSnapshotRepository {
 
 export interface SecurityPriceHistoryRepository {
   listBySymbol(symbol: string): Promise<SecurityPriceHistoryPoint[]>;
+  listByIdentity(input: {
+    symbol: string;
+    exchange?: string | null;
+    currency?: string | null;
+  }): Promise<SecurityPriceHistoryPoint[]>;
 }
 
 export interface PreferenceRepository {
