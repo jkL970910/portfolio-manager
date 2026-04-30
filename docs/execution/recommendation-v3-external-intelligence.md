@@ -144,6 +144,9 @@ AI-guided workflow requirement:
   asks the 大臣 to produce a structured draft, fills the manual form, and
   requires an explicit save. Provider failures fall back to a deterministic
   local draft rather than blocking the user.
+- Product IA: expose only two top-level preference paths to reduce beginner
+  confusion: `新手引导` and `手动进阶`. Manual advanced editing may still group
+  basic allocation, recommendation rules, and advanced factors internally.
 
 V2.1 coverage vs V3 backlog:
 

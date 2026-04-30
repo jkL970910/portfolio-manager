@@ -147,6 +147,24 @@ class _InvestmentPreferencesCardState extends State<InvestmentPreferencesCard> {
     }
   }
 
+  Future<void> _openManualAdvancedEditor(MobilePreferenceProfile profile) async {
+    final choice = await showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) => const _ManualPreferenceHubSheet(),
+    );
+    if (!mounted || choice == null) {
+      return;
+    }
+    if (choice == "basic") {
+      await _openEditor(profile);
+    } else if (choice == "rules") {
+      await _openConstraintEditor(profile);
+    } else if (choice == "factors") {
+      await _openFactorEditor(profile);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return FutureBuilder<MobilePreferenceProfile>(
@@ -190,26 +208,30 @@ class _InvestmentPreferencesCardState extends State<InvestmentPreferencesCard> {
                       child: Text("投资偏好",
                           style: Theme.of(context).textTheme.titleLarge),
                     ),
-                    TextButton(
-                      onPressed: () => _openGuidedSetup(profile),
-                      child: const Text("引导"),
-                    ),
-                    TextButton(
-                      onPressed: () => _openConstraintEditor(profile),
-                      child: const Text("约束"),
-                    ),
-                    TextButton(
-                      onPressed: () => _openFactorEditor(profile),
-                      child: const Text("进阶"),
-                    ),
-                    TextButton(
-                      onPressed: () => _openEditor(profile),
-                      child: const Text("编辑"),
-                    ),
                   ],
                 ),
                 const SizedBox(height: 8),
                 Text(profile.summary),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: FilledButton.icon(
+                        onPressed: () => _openGuidedSetup(profile),
+                        icon: const Icon(Icons.auto_awesome),
+                        label: const Text("新手引导"),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: () => _openManualAdvancedEditor(profile),
+                        icon: const Icon(Icons.tune),
+                        label: const Text("手动进阶"),
+                      ),
+                    ),
+                  ],
+                ),
                 const SizedBox(height: 10),
                 Wrap(
                   spacing: 8,
@@ -977,6 +999,73 @@ class _ConstraintSecurityCandidate {
       "name": name,
       if (provider != null && provider!.isNotEmpty) "provider": provider,
     };
+  }
+}
+
+class _ManualPreferenceHubSheet extends StatelessWidget {
+  const _ManualPreferenceHubSheet();
+
+  @override
+  Widget build(BuildContext context) {
+    final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
+    return Padding(
+      padding: EdgeInsets.fromLTRB(20, 20, 20, bottomInset + 20),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text("手动进阶编辑", style: Theme.of(context).textTheme.headlineMedium),
+          const SizedBox(height: 8),
+          const Text("适合已经知道自己想怎么配置的用户。你可以分组修改所有参数。"),
+          const SizedBox(height: 16),
+          _ManualPreferenceChoice(
+            icon: Icons.pie_chart_outline,
+            title: "基础配置",
+            subtitle: "风险档位、目标配置、账户优先级、现金缓冲、再平衡容忍度。",
+            onTap: () => Navigator.of(context).pop("basic"),
+          ),
+          _ManualPreferenceChoice(
+            icon: Icons.rule,
+            title: "推荐规则",
+            subtitle: "观察列表、偏好/排除标的、账户规则、资产区间和允许标的类型。",
+            onTap: () => Navigator.of(context).pop("rules"),
+          ),
+          _ManualPreferenceChoice(
+            icon: Icons.psychology_alt_outlined,
+            title: "进阶因子",
+            subtitle: "行业/风格偏好、买房目标、税务敏感度、USD 路径和外部信息开关。",
+            onTap: () => Navigator.of(context).pop("factors"),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ManualPreferenceChoice extends StatelessWidget {
+  const _ManualPreferenceChoice({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: ListTile(
+        leading: Icon(icon),
+        title: Text(title),
+        subtitle: Text(subtitle),
+        trailing: const Icon(Icons.chevron_right),
+        onTap: onTap,
+      ),
+    );
   }
 }
 

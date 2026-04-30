@@ -162,3 +162,7 @@ P1 follow-up goals:
   GPT-5.5 when the user's AI Minister provider is enabled, otherwise it falls
   back to a deterministic local draft. In both cases it only fills the form;
   the user must explicitly save before preferences change.
+- Investment preference entry points are simplified to two user-facing paths:
+  `新手引导` for questionnaire/AI-assisted setup, and `手动进阶` for users who
+  want to directly edit basic allocation, recommendation rules, and advanced
+  factors.
