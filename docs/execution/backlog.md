@@ -43,15 +43,15 @@ See `docs/execution/mobile-web-parity-and-backend-refactor.md` for the current
 Flutter/Web feature gap matrix and why backend refactoring is now prioritized
 over simply adding more Flutter screens.
 
-| Rank | Feature                                       | Status      | Why now                                                                                                                                                 |
-| ---- | --------------------------------------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1    | Recommendation constraints v2                 | In Progress | Backend and mobile now support preferred/excluded identities, account rules, and asset-class bands; next is picker UX and tests.                        |
-| 2    | Cloud-ready quote/FX worker boundaries        | Planned     | Quote, FX, history, and snapshot refresh should move out of user-facing request paths with quota budgeting and retry behavior.                          |
-| 3    | Backend contract typing for Flutter           | In Progress | Settings market-data refresh, Overview / Portfolio, Recommendations, and Import guide/search DTOs are typed; continue Settings preferences DTO cleanup. |
-| 4    | Market-data identity and validation hardening | In Progress | Current quote/history paths preserve symbol, exchange, and currency; next is provider-grade scheduled history refresh.                                  |
-| 5    | Mobile auth hardening                         | Planned     | Current token refresh/logout behavior is good enough for MVP, not shared production use.                                                                |
-| 6    | Mobile spending migration                     | Planned     | Useful after investment core and backend boundaries are stable.                                                                                         |
-| 7    | Remaining mobile polish and parity            | Planned     | Add only after core contracts are safe.                                                                                                                 |
+| Rank | Feature                                       | Status      | Why now                                                                                                                                                                   |
+| ---- | --------------------------------------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1    | Recommendation constraints v2                 | In Progress | Backend and mobile now support preferred/excluded identities, account rules, and asset-class bands; next is picker UX and tests.                                          |
+| 2    | Cloud-ready quote/FX worker boundaries        | Planned     | Quote, FX, history, and snapshot refresh should move out of user-facing request paths with quota budgeting and retry behavior.                                            |
+| 3    | Backend contract typing for Flutter           | In Progress | Settings market-data refresh, Overview / Portfolio, Recommendations, Import, and Settings preference profile/guided draft DTOs are typed; continue detail-page DTO depth. |
+| 4    | Market-data identity and validation hardening | In Progress | Current quote/history paths preserve symbol, exchange, and currency; next is provider-grade scheduled history refresh.                                                    |
+| 5    | Mobile auth hardening                         | Planned     | Current token refresh/logout behavior is good enough for MVP, not shared production use.                                                                                  |
+| 6    | Mobile spending migration                     | Planned     | Useful after investment core and backend boundaries are stable.                                                                                                           |
+| 7    | Remaining mobile polish and parity            | Planned     | Add only after core contracts are safe.                                                                                                                                   |
 
 ## Product Roadmap Priorities That Still Matter
 
@@ -66,7 +66,7 @@ over simply adding more Flutter screens.
 | Watchlist and target constraints workflow | In Progress | Mobile can edit watchlist, strategy, tax-aware placement, and account priority constraints                                                                                                                                                                        |
 | Cloud-ready cache / worker boundaries     | In Progress | First-pass market-data refresh worker, persisted run ledger, mobile Settings run-status readout, and process-local provider retry-after guard exist; next is cron/cloud scheduling before heavier AI-agent jobs                                                   |
 | Quote-provider status UX                  | In Progress | Refresh results, Settings, holding rows, and price-history records now expose source/status lineage; remaining work is cloud-grade provider-limit persistence and deeper per-provider dashboards                                                                  |
-| AI-agent assisted analysis                | Planned     | Add after mobile shell and async boundaries are ready                                                                                                                                                                                                             |
+| Loo国 AI Minister assistant               | In Progress | Product direction is now cross-feature context Q&A plus structured analysis/drafts; current DTO work must prepare page context contracts instead of treating AI as a later bolt-on                                                                                |
 
 ## Deferred
 
@@ -82,10 +82,10 @@ over simply adding more Flutter screens.
 
 1. Add cron/cloud scheduling for the market-data worker and decide the deployment target.
 2. Persist provider retry-after state in database or Redis before multi-instance cloud deployment.
-3. Continue mobile DTO typing: Settings preferences next, then detail-page DTO depth.
+3. Continue mobile DTO typing: detail-page DTO depth next, while preserving AI Minister page-context fields.
 4. Harden mobile auth with revocable refresh tokens and production storage policy.
 5. Migrate spending/cash account monitoring into a dedicated mobile flow.
-6. Deepen AI-agent analysis after async market-data and research boundaries are stable.
+6. Deepen Loo国 AI Minister assistant after page-context DTOs, async market-data, and research boundaries are stable.
 
 ## Key Trade-offs
 

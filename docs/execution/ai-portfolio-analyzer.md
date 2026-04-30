@@ -1,6 +1,6 @@
-# AI Portfolio Analyzer Integration
+# Loo国 AI Minister Integration
 
-Last updated: 2026-04-28
+Last updated: 2026-04-30
 
 ## Purpose
 
@@ -13,16 +13,58 @@ contracts that Flutter can render consistently.
 
 ## Product Goal
 
-Add structured AI-assisted investment analysis for a Canadian investor across:
+Add a structured AI-assisted "Loo国大臣" layer for a Canadian investor across
+the whole mobile product. The agent is not limited to investment-preference
+recommendation or a standalone analyzer page. It should be able to answer
+context-aware user questions and explain what the user is seeing from any major
+feature surface, including:
 
+- overview / dashboard
+- portfolio workspace
+- account detail
+- holding detail
 - single security detail
 - portfolio health
 - recommendation explanations
+- import and symbol validation
+- settings / investment preferences
+- future spending and cash-account monitoring
 
-The first implementation must be deterministic and local. It should use existing
-portfolio, health, recommendation, quote, and market-identity data. Live news,
-institutional research, Reddit/forum sentiment, and long-running AI generation
-are deferred until cache/worker boundaries exist.
+The first implementation remains deterministic and local where possible. It
+should use existing portfolio, health, recommendation, quote, preference,
+import, and market-identity data. Live news, institutional research,
+Reddit/forum sentiment, and long-running AI generation are deferred until
+cache/worker boundaries exist.
+
+## Product Role: Loo国大臣
+
+The AI agent should behave as a product-owned assistant role:
+
+- It answers user questions in Chinese using the Loo国 / 大臣 theme.
+- It explains page-specific data in beginner-friendly language.
+- It can propose drafts, next steps, and warnings, but must not silently mutate
+  real user settings or portfolio data.
+- It must ground every answer in a structured page context DTO rather than
+  scraping Flutter widgets or relying on free-form page text.
+- It must preserve the current product boundary: AI explains and drafts;
+  backend validators and explicit user confirmation decide what is saved.
+
+Initial page-context examples:
+
+| Page / Feature            | Minister context input                                                                           | Useful answers                                                                    |
+| ------------------------- | ------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------- |
+| Overview                  | net worth metrics, trend freshness, FX context, health score, top accounts/holdings              | "为什么总资产变化了？", "哪些数据是参考曲线？", "今天最该检查什么？"              |
+| Portfolio                 | account cards, holding cards, asset-class allocation, quote lineage, chart freshness             | "哪个账户偏离最大？", "USD/CAD 换算怎么影响总资产？", "哪些报价可能过期？"        |
+| Account Detail            | account scope, holdings, account-level health, account-vs-total score lens                       | "这个账户适合放哪些资产？", "为什么账户评分和总组合评分不同？"                    |
+| Holding / Security Detail | resolved identity, exchange, currency, quote status, price chart, target drift, related holdings | "这是美股正股还是 CAD 版本？", "为什么价格没有刷新？", "这个标的在组合里做什么？" |
+| Recommendations           | recommendation run, constraints, strategy, watchlist, candidate scoring                          | "为什么推荐这个？", "为什么没有推荐某个标的？", "排除/偏好规则如何影响结果？"     |
+| Import                    | manual account/holding draft, symbol search/resolve result, exchange/currency validation         | "我应该选哪个交易所？", "为什么不能只填 ticker？", "CAD CDR 和 USD 正股区别？"    |
+| Settings / Preferences    | preference profile, guided session, draft, validation, constraints                               | "我该选什么风险等级？", "目标配置为什么要合计 100？", "这个偏好会怎样影响推荐？"  |
+| Future Spending           | cash account, transactions, budget/rhythm signals                                                | "这笔支出影响现金缓冲吗？", "是否需要调整投资金额？"                              |
+
+This means current DTO work must model AI context as a first-class contract, not
+as a future bolt-on. Mobile pages should gradually expose reusable context DTOs
+that can be sent to the minister API when the user explicitly asks a question.
 
 ## Non-Negotiable Domain Rules
 
@@ -57,6 +99,22 @@ The contract defines:
   `recommendation-run` scopes
 - bounded cache controls for user-triggered quick scans
 - result validation for disclaimers and source freshness honesty
+
+Future cross-page minister contracts should be added as product-owned backend
+contracts rather than Flutter-only shapes:
+
+- `MinisterPageContext`
+- `MinisterQuestionRequest`
+- `MinisterAnswerResult`
+- `MinisterSuggestedAction`
+- `GuidedPreferenceSession`
+- `PreferenceDraft`
+- `PreferenceDraftValidation`
+
+The first page-specific context contracts should reuse existing typed DTOs where
+possible instead of inventing parallel shapes. For example, Overview,
+Portfolio, Import, Recommendations, and Settings preference DTOs should become
+valid sources for minister context.
 
 Backend tests:
 

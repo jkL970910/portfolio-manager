@@ -124,11 +124,15 @@ boundaries before AI-agent features become central.
 
 ## Recommended Backend Refactor Priority
 
-1. AI portfolio analyzer integration
+1. Loo国 AI Minister integration
    - Convert the uploaded `portfolio-analyzer.skill` into product-owned
-     analysis contracts, not a raw Codex-only skill dependency.
-   - Start with structured JSON outputs that Flutter can render in Security
-     Detail, Portfolio Health, and Recommendations.
+     analysis and assistant contracts, not a raw Codex-only skill dependency.
+   - Treat the agent as the Loo国 "大臣": a cross-feature, context-aware
+     assistant that can answer user questions from Overview, Portfolio,
+     Account/Holding/Security Detail, Recommendations, Import, Settings, and
+     future Spending pages.
+   - Start with structured JSON outputs and page-context DTOs that Flutter can
+     render or pass to the assistant API.
    - Keep Canadian investor context, CAD base currency, account-tax awareness,
      risk guardrails, overlap checks, and source freshness/disclaimer rules.
    - Do not run full live web/forum research on every page load; gate expensive
@@ -165,13 +169,13 @@ boundaries before AI-agent features become central.
 
 ## Practical Next Development Slice
 
-The next implementation slice is now `AI portfolio analyzer integration`.
+The next implementation slice is now `Loo国 AI Minister integration`.
 
 This is P0 because the user explicitly wants the uploaded
 `portfolio-analyzer.skill` integrated into the product direction. The right
 implementation path is not to install and execute the skill directly. The skill
-should become a product-owned backend analysis specification with stable output
-contracts.
+should become a product-owned backend analysis and assistant specification with
+stable output contracts.
 
 Minimum useful scope:
 
@@ -181,12 +185,17 @@ Minimum useful scope:
   - single security quick scan
   - portfolio diagnostic quick scan
   - recommendation-run explanation
+  - cross-page minister Q&A
+  - AI-guided investment preference sessions and drafts
 - preserve the existing security identity rule: `symbol + exchange + currency`
   defines the instrument
 - start with deterministic/local analysis using existing portfolio, health,
   recommendation, quote, and market-identity data
 - defer live web/news/forum research until cache/worker boundaries exist
 - expose results to Flutter as JSON cards, not React artifacts
+- treat page context DTOs as first-class inputs, so the minister can answer
+  user questions without scraping UI text or relying on unstable page-shaped
+  maps
 
 `Recommendation constraints v2` remains active but moves underneath the AI
 analyzer work because it supplies important preference and guardrail inputs.
@@ -412,8 +421,12 @@ Next priority order:
      priority, constraint, and scenario parsing into typed Flutter DTOs.
    - Fourth slice extracted Import guide, existing account, action-card, and
      security-search candidate parsing into typed Flutter DTOs.
-   - Next slice should cover Settings preferences before deeper detail-page DTO
-     cleanup.
+   - Fifth slice extracted Settings preference profile, recommendation
+     constraints, guided draft, and target allocation models into typed Flutter
+     DTOs. This explicitly treats AI-guided preference setup as current-phase
+     model work, not a future bolt-on.
+   - Next slice should cover deeper detail-page DTO cleanup while preserving AI
+     Minister page-context fields.
 4. Harden mobile auth: revocable refresh tokens, server-side logout, and
    production storage policy.
 5. Start mobile spending/cash account monitoring as a separate account class

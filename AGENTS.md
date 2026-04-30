@@ -34,7 +34,9 @@ Stack:
 - Quote refresh should preserve each holding's native trading currency and convert only at portfolio/display aggregation time.
 - Mobile import should keep the current manual/guided flow. Do not add mobile CSV import unless explicitly requested.
 - Recommendation Constraints v2 is active: excluded/preferred securities, asset-class bands, account type rules, and security-type rules should remain backend-owned and validated.
-- The uploaded `portfolio-analyzer.skill` is P0 product direction, but it must be converted into backend-owned AI analysis contracts and JSON outputs. Do not directly use it as a runtime prompt, React artifact generator, or Flutter parser input.
+- The uploaded `portfolio-analyzer.skill` is P0 product direction, but it must be converted into backend-owned AI analysis / Loo国大臣 assistant contracts and JSON outputs. Do not directly use it as a runtime prompt, React artifact generator, or Flutter parser input.
+- AI agent work is not limited to investment preferences. Treat the future agent as a cross-feature Loo国大臣 that answers context-aware questions from Overview, Portfolio, Account/Holding/Security Detail, Recommendations, Import, Settings, and future Spending pages.
+- Page-context DTOs are part of the current phase. When creating DTOs, preserve the fields a future minister answer needs: identifiers, source freshness, security identity, validation status, user-visible explanation fields, and safe suggested actions.
 
 ## Commands
 
@@ -99,6 +101,7 @@ Note: if `npm run lint` fails because ESLint 9 expects flat config, do not treat
 - Preserve backward compatibility for existing preference/profile payloads unless explicitly changing a contract.
 - Keep mobile UI Chinese-only unless explicitly asked otherwise.
 - Keep AI/analysis outputs structured, source-aware, and disclaimer-aware.
+- Keep AI minister answers grounded in backend/page-context DTOs. Do not let the assistant infer financial identity from ticker-only text or raw Flutter UI copy.
 - Gate expensive AI, news, forum, quote-history, or research work behind explicit user action, caching, or future worker jobs.
 - Run the relevant checks before committing or pushing.
 
