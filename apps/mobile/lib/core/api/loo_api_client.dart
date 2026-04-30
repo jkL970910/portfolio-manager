@@ -73,6 +73,10 @@ class LooApiClient {
         "/api/mobile/analysis/external-research-jobs/recent?limit=$limit");
   }
 
+  Future<Map<String, dynamic>> askLooMinister(Map<String, dynamic> payload) {
+    return _postJson("/api/mobile/minister/ask", body: payload);
+  }
+
   Future<Map<String, dynamic>> getRecommendations() {
     return _getJson("/api/mobile/recommendations");
   }

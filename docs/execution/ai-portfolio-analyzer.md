@@ -143,6 +143,12 @@ Current status:
   - disabled live external research until worker/cache policy is enabled
   - reference-curve honesty, so reference charts cannot be marked as local real
     movement
+- Guarded backend question API exists at `POST /api/mobile/minister/ask`.
+  It is bearer/session protected, validates `LooMinisterQuestionRequest`, keeps
+  live external research disabled, and currently returns a deterministic local
+  `LooMinisterAnswerResult`.
+- Flutter API client exposes `askLooMinister(...)`; UI entry points are not
+  wired yet.
 
 Backend tests:
 
