@@ -408,8 +408,10 @@ Next priority order:
    - Second slice extracted Overview and Portfolio snapshot parsing into typed
      Flutter DTOs, including home health/trend, portfolio performance,
      allocation, and asset-class drilldown models.
-   - Next slices should cover Import / Recommendations / Settings preferences
-     before deeper detail-page DTO cleanup.
+   - Third slice extracted Recommendations snapshot, preference-context,
+     priority, constraint, and scenario parsing into typed Flutter DTOs.
+   - Next slices should cover Import / Settings preferences before deeper
+     detail-page DTO cleanup.
 4. Harden mobile auth: revocable refresh tokens, server-side logout, and
    production storage policy.
 5. Start mobile spending/cash account monitoring as a separate account class
