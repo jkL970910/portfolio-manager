@@ -433,10 +433,17 @@ Remaining work:
 
 Next priority order:
 
-1. Add market-data worker cron/cloud scheduling and decide the deployment target.
-2. Persist provider retry-after state in database or Redis before multi-instance
-   cloud deployment. The current guard is process-local by design.
-3. Normalize Flutter API contracts into typed DTOs and reduce page-level
+1. Stabilize P0.5 real-data AI foundations: scheduled quote/history/FX refresh,
+   provider retry-after persistence, and source/freshness lineage that AI can
+   trust.
+2. Productize the external consultation / `portfolio-analyzer.skill` pipeline
+   on cached real market data first. Live external research remains disabled
+   until worker/cache/provider quota policy is proven.
+3. Align AI 标的分析 and AI 大臣 around the same backend-owned context:
+   structured saved analysis for symbol/account/portfolio scopes, and
+   cross-page conversational explanation that references or triggers those
+   analyses instead of duplicating them.
+4. Normalize Flutter API contracts into typed DTOs and reduce page-level
    `Map<String, dynamic>` parsing.
    - Status: in progress.
    - First slice extracted Settings market-data refresh status parsing into
@@ -454,9 +461,11 @@ Next priority order:
      model work, not a future bolt-on.
    - Next slice should cover deeper detail-page DTO cleanup while preserving AI
      Minister page-context fields.
-4. Harden mobile auth: revocable refresh tokens, server-side logout, and
+5. Defer Mobile UI / IA overhaul to P1. Layout polish remains important, but it
+   should follow credible real-data AI/provider behavior rather than lead it.
+6. Harden mobile auth: revocable refresh tokens, server-side logout, and
    production storage policy.
-5. Start mobile spending/cash account monitoring as a separate account class
+7. Start mobile spending/cash account monitoring as a separate account class
    from investment accounts.
 
 Migration metadata status:

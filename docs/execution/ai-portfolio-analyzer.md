@@ -66,6 +66,29 @@ This means current DTO work must model AI context as a first-class contract, not
 as a future bolt-on. Mobile pages should gradually expose reusable context DTOs
 that can be sent to the minister API when the user explicitly asks a question.
 
+## P0.5 Focus: Real Data Before UI Overhaul
+
+Current priority is to prove the AI and external-consultation layer against
+real cached project data before spending a major slice on UI/IA redesign.
+
+P0.5 work order:
+
+1. Keep quote, price history, FX, and provider status as the source of truth.
+   AI must read those cached/backend-owned facts and must not invent freshness
+   or live-data claims.
+2. Productize the uploaded `portfolio-analyzer.skill` as an external
+   consultation pipeline that can run on cached market data first. Live external
+   sources stay disabled until worker scheduling, cache TTL, source limits, and
+   provider failure handling are proven.
+3. Separate the two AI surfaces:
+   - `AI 标的分析` produces structured, saved analysis for a
+     symbol/account/portfolio scope.
+   - `AI 大臣` is the cross-page conversational layer. It answers questions
+     using the current page context, cites known source/freshness state, and
+     references or triggers saved analysis instead of duplicating full reports.
+4. Keep mobile UI polish at P1 until real-data AI flows are reliable enough for
+   QA.
+
 ## Non-Negotiable Domain Rules
 
 - Keep CAD as the base reporting currency.
@@ -73,7 +96,11 @@ that can be sent to the minister API when the user explicitly asks a question.
 - Treat `symbol + exchange + currency` as security identity when available.
 - Do not merge US common shares with CAD-listed/CDR/CAD-hedged versions by
   symbol alone.
+- Native quote data stays in the listing currency; CAD display conversion uses
+  the independent FX cache only at aggregation/display time.
 - Include source freshness on every analysis result.
+- If a source is cached, stale, fallback, or disabled, the AI response must say
+  that plainly in Chinese.
 - Cache user-triggered analysis results before adding any live external
   research source.
 - Include non-advice disclaimers on every analysis result:
@@ -416,10 +443,13 @@ P1:
 - cached news/institutional research
 - explicit user-triggered refresh
 - saved analysis history detail/drilldown
-- background worker queue and persisted usage counters for external research
+- production-grade background scheduling and persisted provider-limit behavior
+  for external research
 - cached-external result detail visibility if mobile needs drilldown
 - standardized chart DTO migration, starting with Security Detail. See
   `docs/execution/mobile-chart-contracts.md`.
+- mobile UI / IA overhaul after P0.5 real-data AI/external-consultation flows
+  pass QA
 
 P2:
 
