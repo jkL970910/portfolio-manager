@@ -1,11 +1,11 @@
 import "package:flutter/material.dart";
 
 import "../../../core/api/loo_api_client.dart";
+import "../data/mobile_portfolio_models.dart";
 import "../../shared/data/mobile_chart_models.dart";
 import "../../shared/data/mobile_models.dart";
 import "../../shared/presentation/loo_charts.dart";
 import "holding_detail_page.dart";
-import "portfolio_page.dart";
 
 class AssetClassDrilldownPage extends StatelessWidget {
   const AssetClassDrilldownPage({
