@@ -103,10 +103,10 @@ The contract defines:
 Future cross-page minister contracts should be added as product-owned backend
 contracts rather than Flutter-only shapes:
 
-- `MinisterPageContext`
-- `MinisterQuestionRequest`
-- `MinisterAnswerResult`
-- `MinisterSuggestedAction`
+- `LooMinisterPageContext`
+- `LooMinisterQuestionRequest`
+- `LooMinisterAnswerResult`
+- `LooMinisterSuggestedAction`
 - `GuidedPreferenceSession`
 - `PreferenceDraft`
 - `PreferenceDraftValidation`
@@ -115,6 +115,23 @@ The first page-specific context contracts should reuse existing typed DTOs where
 possible instead of inventing parallel shapes. For example, Overview,
 Portfolio, Import, Recommendations, and Settings preference DTOs should become
 valid sources for minister context.
+
+Current status:
+
+- First backend contract slice exists in
+  `lib/backend/loo-minister-contracts.ts`.
+- Backend invariant tests exist in
+  `tests/backend/loo-minister-contracts.test.ts`.
+- The contract currently covers:
+  - cross-page `LooMinisterPageContext`
+  - `LooMinisterQuestionRequest`
+  - `LooMinisterAnswerResult`
+  - `LooMinisterSuggestedAction`
+  - security identity preservation with `symbol + exchange + currency`
+  - explicit confirmation for mutating / refresh / run-analysis actions
+  - disabled live external research until worker/cache policy is enabled
+  - reference-curve honesty, so reference charts cannot be marked as local real
+    movement
 
 Backend tests:
 
