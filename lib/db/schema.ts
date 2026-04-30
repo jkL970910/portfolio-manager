@@ -597,6 +597,65 @@ export const externalResearchUsageCounters = pgTable(
   }),
 );
 
+export const looMinisterSettings = pgTable(
+  "loo_minister_settings",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id),
+    mode: varchar("mode", { length: 24 }).notNull().default("local"),
+    model: varchar("model", { length: 64 }).notNull().default("gpt-5.5"),
+    encryptedApiKey: text("encrypted_api_key"),
+    apiKeyIv: varchar("api_key_iv", { length: 64 }),
+    apiKeyAuthTag: varchar("api_key_auth_tag", { length: 64 }),
+    apiKeyLast4: varchar("api_key_last4", { length: 8 }),
+    apiKeyUpdatedAt: timestamp("api_key_updated_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => ({
+    userUniqueIdx: uniqueIndex("loo_minister_settings_user_id_idx").on(
+      table.userId,
+    ),
+  }),
+);
+
+export const looMinisterUsageLogs = pgTable(
+  "loo_minister_usage_logs",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id),
+    page: varchar("page", { length: 40 }).notNull(),
+    mode: varchar("mode", { length: 24 }).notNull(),
+    provider: varchar("provider", { length: 32 }).notNull(),
+    model: varchar("model", { length: 64 }).notNull(),
+    status: varchar("status", { length: 24 }).notNull(),
+    inputTokens: integer("input_tokens"),
+    outputTokens: integer("output_tokens"),
+    totalTokens: integer("total_tokens"),
+    errorMessage: text("error_message"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => ({
+    userCreatedIdx: index("loo_minister_usage_user_created_idx").on(
+      table.userId,
+      table.createdAt,
+    ),
+    userStatusCreatedIdx: index(
+      "loo_minister_usage_user_status_created_idx",
+    ).on(table.userId, table.status, table.createdAt),
+  }),
+);
+
 export const marketDataRefreshRuns = pgTable(
   "market_data_refresh_runs",
   {

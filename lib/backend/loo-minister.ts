@@ -6,6 +6,11 @@ import {
   type LooMinisterQuestionRequest,
   looMinisterAnswerResultSchema,
 } from "@/lib/backend/loo-minister-contracts";
+import {
+  recordLooMinisterUsage,
+  resolveLooMinisterSettings,
+  type ResolvedLooMinisterSettings,
+} from "@/lib/backend/loo-minister-settings";
 import { PORTFOLIO_ANALYZER_DISCLAIMER } from "@/lib/backend/portfolio-analyzer-contracts";
 
 const pageLabels: Record<
@@ -80,12 +85,7 @@ function toAnswerSourceType(
     : sourceType;
 }
 
-export function getLooMinisterAnswer(
-  userId: string,
-  input: LooMinisterQuestionRequest,
-) {
-  void userId;
-
+function buildLocalAnswer(input: LooMinisterQuestionRequest) {
   const pageContext = input.pageContext;
   const answer: LooMinisterAnswerResult = {
     version: LOO_MINISTER_VERSION,
@@ -116,5 +116,326 @@ export function getLooMinisterAnswer(
     disclaimer: PORTFOLIO_ANALYZER_DISCLAIMER,
   };
 
-  return apiSuccess(looMinisterAnswerResultSchema.parse(answer), "service");
+  return looMinisterAnswerResultSchema.parse(answer);
+}
+
+const answerJsonSchema = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    version: { const: LOO_MINISTER_VERSION },
+    generatedAt: { type: "string" },
+    role: { const: "loo-minister" },
+    page: {
+      enum: [
+        "overview",
+        "portfolio",
+        "account-detail",
+        "holding-detail",
+        "security-detail",
+        "portfolio-health",
+        "recommendations",
+        "import",
+        "settings",
+        "spending",
+      ],
+    },
+    title: { type: "string" },
+    answer: { type: "string" },
+    keyPoints: { type: "array", items: { type: "string" }, maxItems: 8 },
+    suggestedActions: {
+      type: "array",
+      items: {
+        type: "object",
+        additionalProperties: false,
+        properties: {
+          id: { type: "string" },
+          label: { type: "string" },
+          detail: { type: "string" },
+          actionType: {
+            enum: [
+              "explain",
+              "navigate",
+              "open-form",
+              "create-draft",
+              "update-preferences",
+              "refresh-data",
+              "run-analysis",
+            ],
+          },
+          target: {
+            type: "object",
+            additionalProperties: false,
+            properties: {
+              page: {
+                enum: [
+                  "overview",
+                  "portfolio",
+                  "account-detail",
+                  "holding-detail",
+                  "security-detail",
+                  "portfolio-health",
+                  "recommendations",
+                  "import",
+                  "settings",
+                  "spending",
+                ],
+              },
+              route: { type: "string" },
+              accountId: { type: "string" },
+              holdingId: { type: "string" },
+              security: {
+                type: "object",
+                additionalProperties: false,
+                properties: {
+                  symbol: { type: "string" },
+                  exchange: { type: "string" },
+                  currency: { enum: ["CAD", "USD"] },
+                  name: { type: "string" },
+                  provider: { type: "string" },
+                  securityType: { type: "string" },
+                },
+                required: ["symbol"],
+              },
+            },
+          },
+          requiresConfirmation: { type: "boolean" },
+        },
+        required: [
+          "id",
+          "label",
+          "actionType",
+          "target",
+          "requiresConfirmation",
+        ],
+      },
+      maxItems: 8,
+    },
+    sources: {
+      type: "array",
+      items: {
+        type: "object",
+        additionalProperties: false,
+        properties: {
+          title: { type: "string" },
+          sourceType: {
+            enum: [
+              "page-context",
+              "portfolio-data",
+              "quote-cache",
+              "fx-cache",
+              "analysis-cache",
+              "manual",
+            ],
+          },
+          asOf: { type: ["string", "null"] },
+        },
+        required: ["title", "sourceType", "asOf"],
+      },
+      maxItems: 12,
+    },
+    disclaimer: {
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        zh: { type: "string" },
+        en: { type: "string" },
+      },
+      required: ["zh", "en"],
+    },
+  },
+  required: [
+    "version",
+    "generatedAt",
+    "role",
+    "page",
+    "title",
+    "answer",
+    "keyPoints",
+    "suggestedActions",
+    "sources",
+    "disclaimer",
+  ],
+};
+
+function extractOutputText(response: Record<string, unknown>) {
+  if (typeof response.output_text === "string") {
+    return response.output_text;
+  }
+
+  const output = response.output;
+  if (!Array.isArray(output)) {
+    return null;
+  }
+
+  for (const item of output) {
+    if (!item || typeof item !== "object") continue;
+    const content = (item as { content?: unknown }).content;
+    if (!Array.isArray(content)) continue;
+    for (const contentItem of content) {
+      if (!contentItem || typeof contentItem !== "object") continue;
+      const text = (contentItem as { text?: unknown }).text;
+      if (typeof text === "string" && text.trim()) {
+        return text;
+      }
+    }
+  }
+
+  return null;
+}
+
+function extractUsage(response: Record<string, unknown>) {
+  const usage = response.usage;
+  if (!usage || typeof usage !== "object") {
+    return {};
+  }
+  const value = usage as Record<string, unknown>;
+  return {
+    inputTokens:
+      typeof value.input_tokens === "number" ? value.input_tokens : null,
+    outputTokens:
+      typeof value.output_tokens === "number" ? value.output_tokens : null,
+    totalTokens:
+      typeof value.total_tokens === "number" ? value.total_tokens : null,
+  };
+}
+
+async function callOpenAiMinister(
+  input: LooMinisterQuestionRequest,
+  settings: ResolvedLooMinisterSettings,
+) {
+  if (!settings.apiKey) {
+    throw new Error("OpenAI API key is not configured.");
+  }
+
+  const response = await fetch("https://api.openai.com/v1/responses", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${settings.apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model: settings.model,
+      reasoning: {
+        effort: process.env.LOO_MINISTER_REASONING_EFFORT || "low",
+      },
+      text: {
+        verbosity: "low",
+        format: {
+          type: "json_schema",
+          name: "loo_minister_answer",
+          strict: true,
+          schema: answerJsonSchema,
+        },
+      },
+      input: [
+        {
+          role: "system",
+          content:
+            "你是 Loo国大臣。只用提供的页面 context 回答中文问题；不要编造实时行情、新闻或论坛结论；保留 symbol + exchange + currency 身份；所有投资相关回答必须包含不构成投资建议的免责声明。suggestedActions 只能从 pageContext.allowedActions 复制安全动作；不确定时返回空数组。",
+        },
+        {
+          role: "user",
+          content: JSON.stringify({
+            question: input.question,
+            answerStyle: input.answerStyle,
+            pageContext: input.pageContext,
+            outputContract: "LooMinisterAnswerResult",
+          }),
+        },
+      ],
+    }),
+  });
+
+  const payload = (await response.json().catch(() => ({}))) as Record<
+    string,
+    unknown
+  >;
+
+  if (!response.ok) {
+    const error = payload.error;
+    const message =
+      error && typeof error === "object" && "message" in error
+        ? String((error as { message?: unknown }).message)
+        : `OpenAI request failed with status ${response.status}.`;
+    throw new Error(message);
+  }
+
+  const outputText = extractOutputText(payload);
+  if (!outputText) {
+    throw new Error("OpenAI response did not include output text.");
+  }
+
+  const parsed = looMinisterAnswerResultSchema.parse(JSON.parse(outputText));
+  return {
+    answer: parsed,
+    usage: extractUsage(payload),
+  };
+}
+
+export async function getLooMinisterAnswer(
+  userId: string,
+  input: LooMinisterQuestionRequest,
+  options: {
+    settings?: ResolvedLooMinisterSettings;
+    persistUsage?: boolean;
+  } = {},
+) {
+  const settings =
+    options.settings ?? (await resolveLooMinisterSettings(userId));
+  const persistUsage = options.persistUsage ?? true;
+  const localAnswer = () => buildLocalAnswer(input);
+
+  if (
+    settings.mode !== "gpt-5.5" ||
+    !settings.providerEnabled ||
+    !settings.apiKey
+  ) {
+    const answer = localAnswer();
+    if (persistUsage) {
+      await recordLooMinisterUsage(userId, {
+        page: input.pageContext.page,
+        mode: settings.mode,
+        provider: "local",
+        model: settings.model,
+        status: settings.mode === "local" ? "success" : "fallback",
+        errorMessage:
+          settings.mode === "local"
+            ? null
+            : "GPT-5.5 mode is pending provider enablement or API key.",
+      });
+    }
+    return apiSuccess(answer, "service");
+  }
+
+  try {
+    const result = await callOpenAiMinister(input, settings);
+    if (persistUsage) {
+      await recordLooMinisterUsage(userId, {
+        page: input.pageContext.page,
+        mode: settings.mode,
+        provider: `openai-${settings.apiKeySource}`,
+        model: settings.model,
+        status: "success",
+        inputTokens: result.usage.inputTokens,
+        outputTokens: result.usage.outputTokens,
+        totalTokens: result.usage.totalTokens,
+      });
+    }
+    return apiSuccess(result.answer, "service");
+  } catch (error) {
+    const answer = localAnswer();
+    if (persistUsage) {
+      await recordLooMinisterUsage(userId, {
+        page: input.pageContext.page,
+        mode: settings.mode,
+        provider: `openai-${settings.apiKeySource}`,
+        model: settings.model,
+        status: "fallback",
+        errorMessage:
+          error instanceof Error ? error.message : "OpenAI provider failed.",
+      });
+    }
+    return apiSuccess(answer, "service");
+  }
 }

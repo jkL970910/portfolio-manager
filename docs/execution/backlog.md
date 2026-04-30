@@ -3,7 +3,7 @@
 > [!IMPORTANT]
 > As of 2026-04-25, this project is now Flutter-first, mobile-first, Chinese-only, and Loo皇-themed. When this document conflicts with `docs/execution/flutter-mobile-migration-plan.md`, follow the migration plan first.
 
-Last updated: 2026-04-29
+Last updated: 2026-04-30
 
 ## Objective
 
@@ -66,7 +66,7 @@ over simply adding more Flutter screens.
 | Watchlist and target constraints workflow | In Progress | Mobile can edit watchlist, strategy, tax-aware placement, and account priority constraints                                                                                                                                                                        |
 | Cloud-ready cache / worker boundaries     | In Progress | First-pass market-data refresh worker, persisted run ledger, mobile Settings run-status readout, and process-local provider retry-after guard exist; next is cron/cloud scheduling before heavier AI-agent jobs                                                   |
 | Quote-provider status UX                  | In Progress | Refresh results, Settings, holding rows, and price-history records now expose source/status lineage; remaining work is cloud-grade provider-limit persistence and deeper per-provider dashboards                                                                  |
-| Loo国 AI Minister assistant               | In Progress | Backend and Flutter first-pass page-context DTOs exist; guarded `/api/mobile/minister/ask` returns deterministic local answers; global floating 大臣 entry now receives Overview, Portfolio, Account, Holding, Security, and Health context                       |
+| Loo国 AI Minister assistant               | In Progress | Backend and Flutter first-pass page-context DTOs exist; global floating 大臣 entry receives Overview/Portfolio/detail/Health context; Settings can switch Local/GPT-5.5, save encrypted BYOK API key, and record minister usage logs                              |
 
 ## Deferred
 
@@ -78,11 +78,19 @@ over simply adding more Flutter screens.
 | English-mode support       | Explicitly dropped                          |
 | Desktop-first web polish   | Explicitly dropped as the primary direction |
 
+## P1 List
+
+| Feature                                      | Priority | Note                                                                                                               |
+| -------------------------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------ |
+| Per-investment-account AI Minister opt-in    | P1       | Let users enable/disable GPT analysis per TFSA/RRSP/FHSA/Taxable/account instance after global BYOK flow is stable |
+| Persist draggable Minister button position   | P1       | Current drag position is session-local; persist later after UX settles                                             |
+| Minister usage/cost dashboard with estimates | P1       | Current logs store provider/model/status/token counts; cost estimates can be added after pricing policy is fixed   |
+
 ## Recommended Build Order From Here
 
 1. Add cron/cloud scheduling for the market-data worker and decide the deployment target.
 2. Persist provider retry-after state in database or Redis before multi-instance cloud deployment.
-3. QA the floating Loo Minister entry on detail pages, then add GPT-5.5 backend provider integration behind an env flag.
+3. QA AI 大臣 Settings Local/GPT-5.5/BYOK flow and detail-page context.
 4. Harden mobile auth with revocable refresh tokens and production storage policy.
 5. Migrate spending/cash account monitoring into a dedicated mobile flow.
 6. Deepen Loo国 AI Minister assistant after page-context DTOs, async market-data, and research boundaries are stable.

@@ -5,54 +5,67 @@ import { LOO_MINISTER_VERSION } from "@/lib/backend/loo-minister-contracts";
 
 const now = "2026-04-30T04:00:00.000Z";
 
-test("Loo Minister deterministic answer uses page context and keeps disclaimer", () => {
-  const response = getLooMinisterAnswer("user_1", {
-    pageContext: {
-      version: LOO_MINISTER_VERSION,
-      page: "overview",
-      locale: "zh",
-      title: "Loo国总览",
-      asOf: now,
-      displayCurrency: "CAD",
-      subject: {},
-      dataFreshness: {
-        portfolioAsOf: now,
-        quotesAsOf: now,
-        fxAsOf: now,
-        chartFreshness: "fresh",
-        sourceMode: "local",
+test("Loo Minister deterministic answer uses page context and keeps disclaimer", async () => {
+  const response = await getLooMinisterAnswer(
+    "user_1",
+    {
+      pageContext: {
+        version: LOO_MINISTER_VERSION,
+        page: "overview",
+        locale: "zh",
+        title: "Loo国总览",
+        asOf: now,
+        displayCurrency: "CAD",
+        subject: {},
+        dataFreshness: {
+          portfolioAsOf: now,
+          quotesAsOf: now,
+          fxAsOf: now,
+          chartFreshness: "fresh",
+          sourceMode: "local",
+        },
+        facts: [
+          {
+            id: "net-worth",
+            label: "总资产",
+            value: "CAD 100,000",
+            source: "portfolio-data",
+          },
+        ],
+        warnings: ["US Equity 高于目标。"],
+        allowedActions: [
+          {
+            id: "open-health-score",
+            label: "查看健康分",
+            actionType: "navigate",
+            target: { page: "portfolio-health" },
+            requiresConfirmation: false,
+          },
+          {
+            id: "run-portfolio-analysis",
+            label: "运行 AI 组合快扫",
+            actionType: "run-analysis",
+            target: { page: "portfolio-health" },
+            requiresConfirmation: true,
+          },
+        ],
       },
-      facts: [
-        {
-          id: "net-worth",
-          label: "总资产",
-          value: "CAD 100,000",
-          source: "portfolio-data",
-        },
-      ],
-      warnings: ["US Equity 高于目标。"],
-      allowedActions: [
-        {
-          id: "open-health-score",
-          label: "查看健康分",
-          actionType: "navigate",
-          target: { page: "portfolio-health" },
-          requiresConfirmation: false,
-        },
-        {
-          id: "run-portfolio-analysis",
-          label: "运行 AI 组合快扫",
-          actionType: "run-analysis",
-          target: { page: "portfolio-health" },
-          requiresConfirmation: true,
-        },
-      ],
+      question: "为什么总资产曲线和卡片数字不同？",
+      answerStyle: "beginner",
+      cacheStrategy: "prefer-cache",
+      includeExternalResearch: false,
     },
-    question: "为什么总资产曲线和卡片数字不同？",
-    answerStyle: "beginner",
-    cacheStrategy: "prefer-cache",
-    includeExternalResearch: false,
-  });
+    {
+      settings: {
+        mode: "local",
+        model: "gpt-5.5",
+        apiKey: null,
+        apiKeySource: "none",
+        providerEnabled: false,
+      },
+      persistUsage: false,
+    },
+  );
 
   assert.equal(response.meta.source, "service");
   assert.equal(response.data.role, "loo-minister");
@@ -60,4 +73,64 @@ test("Loo Minister deterministic answer uses page context and keeps disclaimer",
   assert.match(response.data.answer, /总资产/);
   assert.match(response.data.disclaimer.zh, /不构成投资建议/);
   assert.equal(response.data.suggestedActions.length, 2);
+});
+
+test("Loo Minister GPT mode falls back safely when provider is not enabled", async () => {
+  const response = await getLooMinisterAnswer(
+    "user_1",
+    {
+      pageContext: {
+        version: LOO_MINISTER_VERSION,
+        page: "security-detail",
+        locale: "zh",
+        title: "NVDA 标的详情",
+        asOf: now,
+        displayCurrency: "CAD",
+        subject: {
+          security: {
+            symbol: "NVDA",
+            exchange: "NASDAQ",
+            currency: "USD",
+          },
+        },
+        dataFreshness: {
+          portfolioAsOf: now,
+          quotesAsOf: now,
+          fxAsOf: now,
+          chartFreshness: "fresh",
+          sourceMode: "cached-external",
+        },
+        facts: [
+          {
+            id: "security",
+            label: "标的身份",
+            value: "NVDA · NASDAQ · USD",
+            source: "portfolio-data",
+          },
+        ],
+        warnings: [],
+        allowedActions: [],
+      },
+      question: "这个标的和我的组合适配吗？",
+      answerStyle: "beginner",
+      cacheStrategy: "prefer-cache",
+      includeExternalResearch: false,
+    },
+    {
+      settings: {
+        mode: "gpt-5.5",
+        model: "gpt-5.5",
+        apiKey: null,
+        apiKeySource: "none",
+        providerEnabled: false,
+      },
+      persistUsage: false,
+    },
+  );
+
+  assert.equal(response.meta.source, "service");
+  assert.equal(response.data.page, "security-detail");
+  assert.match(response.data.answer, /本地 deterministic 回答/);
+  assert.match(response.data.answer, /NVDA/);
+  assert.match(response.data.disclaimer.zh, /不构成投资建议/);
 });

@@ -1,9 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getMobileViewerFromRequest } from "@/lib/auth/mobile-tokens";
-import { getLooMinisterAnswer } from "@/lib/backend/loo-minister";
-import { looMinisterQuestionRequestSchema } from "@/lib/backend/loo-minister-contracts";
 
-export async function POST(request: NextRequest) {
+import { getMobileViewerFromRequest } from "@/lib/auth/mobile-tokens";
+import {
+  getMobileLooMinisterSettings,
+  updateMobileLooMinisterSettings,
+} from "@/lib/backend/loo-minister-settings";
+import { looMinisterSettingsInputSchema } from "@/lib/backend/payload-schemas";
+
+export async function GET(request: NextRequest) {
+  const viewer = await getMobileViewerFromRequest(request);
+  if (!viewer) {
+    return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
+  }
+
+  return NextResponse.json(await getMobileLooMinisterSettings(viewer.id));
+}
+
+export async function PATCH(request: NextRequest) {
   const viewer = await getMobileViewerFromRequest(request);
   if (!viewer) {
     return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
@@ -19,13 +32,13 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const parsed = looMinisterQuestionRequestSchema.safeParse(body);
+  const parsed = looMinisterSettingsInputSchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json(
       {
         error:
           parsed.error.issues[0]?.message ??
-          "Invalid minister question payload.",
+          "Invalid AI Minister settings payload.",
       },
       { status: 400 },
     );
@@ -33,13 +46,13 @@ export async function POST(request: NextRequest) {
 
   try {
     return NextResponse.json(
-      await getLooMinisterAnswer(viewer.id, parsed.data),
+      await updateMobileLooMinisterSettings(viewer.id, parsed.data),
     );
   } catch (error) {
     const message =
       error instanceof Error
         ? error.message
-        : "Failed to build Loo Minister answer.";
+        : "Failed to update AI Minister settings.";
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

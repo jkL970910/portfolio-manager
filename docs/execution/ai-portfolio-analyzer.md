@@ -163,16 +163,24 @@ Current status:
 
 API integration plan:
 
-1. Add backend env switches: `OPENAI_API_KEY`,
-   `LOO_MINISTER_MODEL=gpt-5.5`, `LOO_MINISTER_PROVIDER_ENABLED=false` by
-   default.
-2. Keep `/api/mobile/minister/ask` as the only Flutter-facing endpoint.
-3. In `lib/backend/loo-minister.ts`, route to GPT-5.5 only when enabled and the
-   request passes the current DTO/schema guardrails.
-4. Use structured output compatible with `LooMinisterAnswerResult`; reject or
-   fallback if the model output fails validation.
-5. Keep live external research disabled until worker/cache/provider quota
+1. Backend env switches now exist: `LOO_MINISTER_PROVIDER_ENABLED=false`,
+   `LOO_MINISTER_ALLOW_SERVER_KEY=false`, `LOO_MINISTER_ENCRYPTION_SECRET`, and
+   `LOO_MINISTER_REASONING_EFFORT=low`. User-supplied OpenAI API keys are
+   encrypted server-side before storage.
+2. `/api/mobile/settings/ai-minister` exposes Local/GPT-5.5 mode, BYOK key
+   status, provider availability, and recent usage logs to Flutter Settings.
+3. `/api/mobile/minister/ask` remains the only Flutter-facing answer endpoint.
+   It routes to GPT-5.5 only when the user setting, provider env flag, and API
+   key are all present; otherwise it falls back to the deterministic local
+   answer.
+4. GPT output is parsed back into `LooMinisterAnswerResult` and validated before
+   being returned to mobile.
+5. `loo_minister_usage_logs` records page, mode, provider, model, status, token
+   counts when available, and fallback/error messages.
+6. Live external research stays disabled until worker/cache/provider quota
    boundaries are production-ready.
+7. Per-investment-account AI opt-in is intentionally P1, after the global
+   BYOK/user-setting flow is stable.
 
 Backend tests:
 

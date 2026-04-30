@@ -169,6 +169,8 @@ class _SettingsPageState extends State<SettingsPage> {
           const SizedBox(height: 16),
           _ExternalResearchPolicyCard(apiClient: widget.apiClient),
           const SizedBox(height: 16),
+          _AiMinisterSettingsCard(apiClient: widget.apiClient),
+          const SizedBox(height: 16),
           InvestmentPreferencesCard(apiClient: widget.apiClient),
           const SizedBox(height: 24),
           FilledButton.tonalIcon(
@@ -177,6 +179,324 @@ class _SettingsPageState extends State<SettingsPage> {
             label: const Text("退出 Loo国"),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _AiMinisterSettingsCard extends StatefulWidget {
+  const _AiMinisterSettingsCard({required this.apiClient});
+
+  final LooApiClient apiClient;
+
+  @override
+  State<_AiMinisterSettingsCard> createState() =>
+      _AiMinisterSettingsCardState();
+}
+
+class _AiMinisterSettingsCardState extends State<_AiMinisterSettingsCard> {
+  late Future<_AiMinisterSettings> _settings = _loadSettings();
+  final _apiKeyController = TextEditingController();
+  var _saving = false;
+  String? _message;
+
+  @override
+  void dispose() {
+    _apiKeyController.dispose();
+    super.dispose();
+  }
+
+  Future<_AiMinisterSettings> _loadSettings() async {
+    final response = await widget.apiClient.getAiMinisterSettings();
+    final data = response["data"];
+    final payload =
+        data is Map<String, dynamic> ? data : const <String, dynamic>{};
+    return _AiMinisterSettings.fromJson(payload);
+  }
+
+  void _refresh() {
+    setState(() {
+      _settings = _loadSettings();
+    });
+  }
+
+  Future<void> _save({String? mode, bool clearApiKey = false}) async {
+    if (_saving) return;
+    final current = await _settings;
+    final apiKey = _apiKeyController.text.trim();
+    setState(() {
+      _saving = true;
+      _message = null;
+    });
+
+    try {
+      final response = await widget.apiClient.updateAiMinisterSettings({
+        "mode": mode ?? current.mode,
+        if (apiKey.isNotEmpty) "apiKey": apiKey,
+        if (clearApiKey) "clearApiKey": true,
+      });
+      final data = response["data"];
+      final payload =
+          data is Map<String, dynamic> ? data : const <String, dynamic>{};
+      if (mounted) {
+        setState(() {
+          _apiKeyController.clear();
+          _settings = Future.value(_AiMinisterSettings.fromJson(payload));
+          _message = "AI 大臣设置已保存。";
+          _saving = false;
+        });
+      }
+    } catch (error) {
+      if (mounted) {
+        setState(() {
+          _message = error.toString();
+          _saving = false;
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: FutureBuilder<_AiMinisterSettings>(
+          future: _settings,
+          builder: (context, snapshot) {
+            final settings = snapshot.data;
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    const Icon(Icons.smart_toy_outlined),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        "AI 大臣设置",
+                        style: Theme.of(context).textTheme.titleLarge,
+                      ),
+                    ),
+                    IconButton(
+                      onPressed:
+                          snapshot.connectionState == ConnectionState.waiting
+                              ? null
+                              : _refresh,
+                      icon: const Icon(Icons.refresh),
+                      tooltip: "刷新设置",
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                const Text("默认本地大臣不产生 OpenAI 费用；开启 GPT-5.5 后会发送当前页面结构化摘要。"),
+                if (snapshot.connectionState == ConnectionState.waiting) ...[
+                  const SizedBox(height: 12),
+                  const LinearProgressIndicator(),
+                ] else if (snapshot.hasError) ...[
+                  const SizedBox(height: 12),
+                  Text(
+                    "AI 大臣设置暂时读取失败：${snapshot.error}",
+                    style:
+                        TextStyle(color: Theme.of(context).colorScheme.error),
+                  ),
+                ] else if (settings != null) ...[
+                  const SizedBox(height: 12),
+                  SegmentedButton<String>(
+                    segments: const [
+                      ButtonSegment(value: "local", label: Text("本地")),
+                      ButtonSegment(value: "gpt-5.5", label: Text("GPT-5.5")),
+                    ],
+                    selected: {settings.mode},
+                    onSelectionChanged:
+                        _saving ? null : (value) => _save(mode: value.first),
+                  ),
+                  const SizedBox(height: 12),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      Chip(label: Text(settings.effectiveModeLabel)),
+                      Chip(label: Text(settings.apiKeyLabel)),
+                      Chip(label: Text(settings.providerLabel)),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  Text(settings.privacyNote),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: _apiKeyController,
+                    obscureText: true,
+                    decoration: const InputDecoration(
+                      labelText: "OpenAI API Key",
+                      helperText: "只保存到后端加密存储；不会写入 Flutter 客户端。",
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: FilledButton.icon(
+                          onPressed: _saving ? null : () => _save(),
+                          icon: const Icon(Icons.save_outlined),
+                          label: Text(_saving ? "保存中..." : "保存设置"),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      OutlinedButton(
+                        onPressed: _saving || !settings.apiKeyConfigured
+                            ? null
+                            : () => _save(clearApiKey: true),
+                        child: const Text("清除 Key"),
+                      ),
+                    ],
+                  ),
+                  if (_message != null) ...[
+                    const SizedBox(height: 8),
+                    Text(
+                      _message!,
+                      style: TextStyle(
+                        color: _message!.contains("失败") ||
+                                _message!.contains("requires")
+                            ? Theme.of(context).colorScheme.error
+                            : Theme.of(context).colorScheme.primary,
+                      ),
+                    ),
+                  ],
+                  if (settings.recentUsage.isNotEmpty) ...[
+                    const SizedBox(height: 14),
+                    Text("最近调用",
+                        style: Theme.of(context).textTheme.titleMedium),
+                    const SizedBox(height: 6),
+                    ...settings.recentUsage.map(_AiMinisterUsageTile.new),
+                  ],
+                ],
+              ],
+            );
+          },
+        ),
+      ),
+    );
+  }
+}
+
+class _AiMinisterSettings {
+  const _AiMinisterSettings({
+    required this.mode,
+    required this.apiKeyConfigured,
+    required this.apiKeyLast4,
+    required this.serverKeyAvailable,
+    required this.providerEnabled,
+    required this.effectiveMode,
+    required this.privacyNote,
+    required this.recentUsage,
+  });
+
+  final String mode;
+  final bool apiKeyConfigured;
+  final String? apiKeyLast4;
+  final bool serverKeyAvailable;
+  final bool providerEnabled;
+  final String effectiveMode;
+  final String privacyNote;
+  final List<_AiMinisterUsage> recentUsage;
+
+  String get effectiveModeLabel {
+    return switch (effectiveMode) {
+      "gpt-5.5" => "实际使用 GPT-5.5",
+      "gpt-5.5-pending-key" => "GPT-5.5 待配置",
+      _ => "实际使用本地大臣",
+    };
+  }
+
+  String get apiKeyLabel {
+    if (apiKeyConfigured) {
+      return "用户 Key：****$apiKeyLast4";
+    }
+    if (serverKeyAvailable) {
+      return "可用服务器 Key";
+    }
+    return "未配置 API Key";
+  }
+
+  String get providerLabel {
+    return providerEnabled ? "Provider 已启用" : "Provider 未启用";
+  }
+
+  factory _AiMinisterSettings.fromJson(Map<String, dynamic> json) {
+    final rawUsage = json["recentUsage"];
+    return _AiMinisterSettings(
+      mode: json["mode"] as String? ?? "local",
+      apiKeyConfigured: json["apiKeyConfigured"] == true,
+      apiKeyLast4: json["apiKeyLast4"] as String?,
+      serverKeyAvailable: json["serverKeyAvailable"] == true,
+      providerEnabled: json["providerEnabled"] == true,
+      effectiveMode: json["effectiveMode"] as String? ?? "local",
+      privacyNote: json["privacyNote"] as String? ?? "仅发送当前页面结构化摘要。",
+      recentUsage: rawUsage is List
+          ? rawUsage
+              .whereType<Map<String, dynamic>>()
+              .map(_AiMinisterUsage.fromJson)
+              .toList()
+          : const [],
+    );
+  }
+}
+
+class _AiMinisterUsage {
+  const _AiMinisterUsage({
+    required this.page,
+    required this.provider,
+    required this.status,
+    required this.model,
+    required this.tokenLabel,
+    required this.createdAt,
+    this.errorMessage,
+  });
+
+  final String page;
+  final String provider;
+  final String status;
+  final String model;
+  final String tokenLabel;
+  final String createdAt;
+  final String? errorMessage;
+
+  factory _AiMinisterUsage.fromJson(Map<String, dynamic> json) {
+    return _AiMinisterUsage(
+      page: json["page"] as String? ?? "unknown",
+      provider: json["provider"] as String? ?? "local",
+      status: json["status"] as String? ?? "unknown",
+      model: json["model"] as String? ?? "gpt-5.5",
+      tokenLabel: json["tokenLabel"] as String? ?? "token 未返回",
+      createdAt: json["createdAt"] as String? ?? "",
+      errorMessage: json["errorMessage"] as String?,
+    );
+  }
+}
+
+class _AiMinisterUsageTile extends StatelessWidget {
+  const _AiMinisterUsageTile(this.item);
+
+  final _AiMinisterUsage item;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListTile(
+      contentPadding: EdgeInsets.zero,
+      dense: true,
+      leading: Icon(
+        item.status == "success"
+            ? Icons.check_circle_outline
+            : Icons.info_outline,
+      ),
+      title: Text("${item.page} · ${item.provider} · ${item.status}"),
+      subtitle: Text(
+        [
+          item.model,
+          item.tokenLabel,
+          if (item.errorMessage != null) item.errorMessage!,
+        ].join(" · "),
       ),
     );
   }
