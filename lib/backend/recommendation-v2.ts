@@ -577,6 +577,7 @@ export function buildRecommendationV2(args: {
       ),
       securitySymbol: best.security.candidate.symbol,
       securityName: best.security.candidate.name,
+      securityCurrency: best.security.candidate.currency,
       securityScore: best.security.score,
       preferenceFitScore: best.security.preferenceFitScore,
       allocationGapBeforePct: priority.gapPct,

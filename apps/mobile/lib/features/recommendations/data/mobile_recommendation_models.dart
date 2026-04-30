@@ -183,6 +183,8 @@ class MobileRecommendationPriority {
     required this.amount,
     required this.account,
     required this.security,
+    required this.securitySymbol,
+    required this.securityCurrency,
     required this.scoreline,
     required this.gapSummary,
     required this.whyThis,
@@ -198,6 +200,8 @@ class MobileRecommendationPriority {
   final String amount;
   final String account;
   final String security;
+  final String securitySymbol;
+  final String securityCurrency;
   final String scoreline;
   final String gapSummary;
   final List<String> whyThis;
@@ -214,6 +218,8 @@ class MobileRecommendationPriority {
       amount: json["amount"] as String? ?? "--",
       account: json["account"] as String? ?? "",
       security: json["security"] as String? ?? "",
+      securitySymbol: json["securitySymbol"] as String? ?? "",
+      securityCurrency: json["securityCurrency"] as String? ?? "",
       scoreline: json["scoreline"] as String? ?? "",
       gapSummary: json["gapSummary"] as String? ?? "",
       whyThis:

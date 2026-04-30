@@ -3,6 +3,7 @@ import "package:flutter/material.dart";
 import "../../../core/api/loo_api_client.dart";
 import "../data/mobile_recommendation_models.dart";
 import "../../discover/presentation/discover_page.dart";
+import "../../portfolio/presentation/security_detail_page.dart";
 
 class RecommendationsPage extends StatefulWidget {
   const RecommendationsPage({
@@ -210,7 +211,10 @@ class _RecommendationsPageState extends State<RecommendationsPage> {
                       else
                         ...snapshot.data!.priorities
                             .take(6)
-                            .map(_PriorityCard.new),
+                            .map((priority) => _PriorityCard(
+                                  priority: priority,
+                                  onOpenSecurity: _openSecurityDetail,
+                                )),
                       if (snapshot.data!.scenarios.isNotEmpty) ...[
                         const SizedBox(height: 16),
                         const _SectionTitle("情景比较"),
@@ -239,6 +243,27 @@ class _RecommendationsPageState extends State<RecommendationsPage> {
     Navigator.of(context).push(
       MaterialPageRoute<void>(
         builder: (_) => DiscoverPage(apiClient: widget.apiClient),
+      ),
+    );
+  }
+
+  void _openSecurityDetail(MobileRecommendationPriority priority) {
+    if (priority.securitySymbol.isEmpty) {
+      return;
+    }
+
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => SecurityDetailPage(
+          apiClient: widget.apiClient,
+          symbol: priority.securitySymbol,
+          fallbackTitle: priority.security.isNotEmpty
+              ? priority.security
+              : priority.securitySymbol,
+          currency: priority.securityCurrency.isNotEmpty
+              ? priority.securityCurrency
+              : null,
+        ),
       ),
     );
   }
@@ -598,9 +623,13 @@ class _SectionTitle extends StatelessWidget {
 }
 
 class _PriorityCard extends StatelessWidget {
-  const _PriorityCard(this.priority);
+  const _PriorityCard({
+    required this.priority,
+    required this.onOpenSecurity,
+  });
 
   final MobileRecommendationPriority priority;
+  final ValueChanged<MobileRecommendationPriority> onOpenSecurity;
 
   @override
   Widget build(BuildContext context) {
@@ -628,6 +657,17 @@ class _PriorityCard extends StatelessWidget {
             if (priority.scoreline.isNotEmpty) ...[
               const SizedBox(height: 10),
               _ScorelinePanel(priority),
+            ],
+            if (priority.securitySymbol.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: OutlinedButton.icon(
+                  onPressed: () => onOpenSecurity(priority),
+                  icon: const Icon(Icons.open_in_new),
+                  label: const Text("查看标的详情"),
+                ),
+              ),
             ],
             if (priority.intelligenceRefs.isNotEmpty) ...[
               const SizedBox(height: 12),

@@ -346,6 +346,7 @@ export interface RecommendationItem {
   explanation: string;
   securitySymbol?: string;
   securityName?: string;
+  securityCurrency?: CurrencyCode;
   securityScore?: number;
   preferenceFitScore?: number;
   allocationGapBeforePct?: number;

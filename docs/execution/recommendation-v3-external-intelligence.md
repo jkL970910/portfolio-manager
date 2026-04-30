@@ -174,6 +174,10 @@ Current bridge implementation:
   symbol/listing matches and `底层资产情报` when a ticker has CAD/US duplicate
   listings. The latter can explain company/fund context, but quote, FX, and
   freshness data still belong to the current listing only.
+- Recommendation priority cards expose a `查看标的详情` entry. New V2.1 runs carry
+  the lead security's trading currency into mobile detail navigation; older
+  runs without currency remain navigable but should be treated as unresolved
+  listing context until detail resolution returns canonical identity.
 - This bridge is deliberately an overlay, not a hidden scoring override.
   Deterministic V2.1 allocation/account/tax scoring remains the execution
   baseline until V3 has calibrated source quality, TTL, and stale-data tests.

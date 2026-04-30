@@ -4156,6 +4156,8 @@ export function buildRecommendationsData(args: {
         amount: formatDisplayCurrency(item.amountCad, display),
         account: getAccountTypeLabel(item.targetAccountType, language),
         security: leadSecurity,
+        securitySymbol: item.securitySymbol ?? item.tickerOptions[0] ?? "",
+        securityCurrency: item.securityCurrency,
         securityHref: item.securitySymbol
           ? `/portfolio/security/${encodeURIComponent(item.securitySymbol)}`
           : undefined,

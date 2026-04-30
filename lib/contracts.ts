@@ -661,6 +661,8 @@ export interface RecommendationsData {
     amount: string;
     account: string;
     security: string;
+    securitySymbol: string;
+    securityCurrency?: "CAD" | "USD";
     securityHref?: string;
     tickers: string;
     accountFit: string;
