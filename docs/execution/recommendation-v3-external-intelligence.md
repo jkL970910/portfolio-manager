@@ -116,6 +116,46 @@ Card behavior:
 Current factors are too shallow for the user's intended behavior. Add a richer
 profile that can express sector tilts, life goals, and account constraints.
 
+Implementation status:
+
+- Backend storage started in `preference_profiles.preference_factors`.
+- The first contract is intentionally JSONB so factor groups can iterate
+  without repeated table migrations.
+- Missing or partial payloads are normalized to safe defaults, so existing
+  preference forms remain backward compatible.
+- Flutter Settings now exposes manual `进阶` configuration, and guided setup
+  generates a Preference Factors V2 draft before applying it.
+- Recommendation V2.1 now consumes a small safe subset for candidate ordering
+  and explanation: preferred/avoided sectors, style/thematic tilts, risk
+  capacity, concentration tolerance, and near-term home-purchase risk buffer.
+- V2.1 does not let these factors override saved target allocation. V3 should
+  make the preference-fit overlay explicit in the output model.
+
+AI-guided workflow requirement:
+
+- AI 大臣 can ask beginner-friendly questions across goals, risk, sector/style,
+  tax, liquidity, and external-info preferences.
+- The AI must return a structured Preference Factors V2 payload, not free-form
+  prose.
+- Before applying, mobile must show the generated parameters and the user must
+  confirm or manually edit them.
+- Manual configuration remains available and can override AI-generated values.
+- First implementation: Settings `进阶` provides a narrative prompt box. It
+  asks the 大臣 to produce a structured draft, fills the manual form, and
+  requires an explicit save. Provider failures fall back to a deterministic
+  local draft rather than blocking the user.
+
+V2.1 coverage vs V3 backlog:
+
+| Area | V2.1 behavior | V3 upgrade |
+| ---- | ------------- | ---------- |
+| Sector/style tilts | Light boost/penalty for known static candidates | Dynamic candidate universe, sector exposure caps, style factor attribution |
+| Life goals | Home goal adds risk-buffer penalty to equity candidates | Goal buckets, timeline-aware cash/FHSA/down-payment planning |
+| Tax strategy | Still mostly existing account-type matrix | Real province/tax bracket/withholding/taxable turnover model |
+| External info | Not used in scoring | Cached news/filings/fundamentals/sentiment overlay with source freshness |
+| Candidate universe | Static curated ETF list plus manual candidate scoring | Verified identity universe from search/watchlist/holdings/provider metadata |
+| Validation | Unit tests for constraints and preference scoring direction | Backtests, scenario tests, stale-data checks, confidence calibration |
+
 New factor groups:
 
 #### Risk and behavior

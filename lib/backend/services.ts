@@ -49,6 +49,10 @@ import {
   DEFAULT_RECOMMENDATION_CONSTRAINTS,
   normalizeRecommendationConstraints,
 } from "@/lib/backend/recommendation-constraints";
+import {
+  DEFAULT_PREFERENCE_FACTORS,
+  normalizePreferenceFactors,
+} from "@/lib/backend/preference-factors";
 import { getDb } from "@/lib/db/client";
 import {
   allocationTargets,
@@ -109,6 +113,7 @@ export interface PreferenceProfileInput {
   rebalancingTolerancePct: number;
   watchlistSymbols: string[];
   recommendationConstraints?: RecommendationConstraints;
+  preferenceFactors?: unknown;
 }
 
 export interface RegisterUserInput {
@@ -126,7 +131,11 @@ export interface SaveGuidedAllocationDraftInput {
   answers: GuidedAllocationAnswers;
   suggestedProfile: Omit<
     PreferenceProfile,
-    "id" | "userId" | "watchlistSymbols" | "recommendationConstraints"
+    | "id"
+    | "userId"
+    | "watchlistSymbols"
+    | "recommendationConstraints"
+    | "preferenceFactors"
   >;
   assumptions: string[];
   rationale: string[];
@@ -394,6 +403,7 @@ function getDefaultPreferenceInput(
     rebalancingTolerancePct: 5,
     watchlistSymbols: [],
     recommendationConstraints: DEFAULT_RECOMMENDATION_CONSTRAINTS,
+    preferenceFactors: DEFAULT_PREFERENCE_FACTORS,
   };
 }
 
@@ -3174,7 +3184,11 @@ export async function getPreferenceView(userId: string) {
         answers: guidedDraftRow.answers as GuidedAllocationAnswers,
         suggestedProfile: guidedDraftRow.suggestedProfile as Omit<
           PreferenceProfile,
-          "id" | "userId" | "watchlistSymbols" | "recommendationConstraints"
+          | "id"
+          | "userId"
+          | "watchlistSymbols"
+          | "recommendationConstraints"
+          | "preferenceFactors"
         >,
         assumptions: guidedDraftRow.assumptions as string[],
         rationale: guidedDraftRow.rationale as string[],
@@ -3277,7 +3291,11 @@ export async function saveGuidedAllocationDraft(
       answers: updated.answers as GuidedAllocationAnswers,
       suggestedProfile: updated.suggestedProfile as Omit<
         PreferenceProfile,
-        "id" | "userId" | "watchlistSymbols" | "recommendationConstraints"
+        | "id"
+        | "userId"
+        | "watchlistSymbols"
+        | "recommendationConstraints"
+        | "preferenceFactors"
       >,
       assumptions: updated.assumptions as string[],
       rationale: updated.rationale as string[],
@@ -3303,7 +3321,11 @@ export async function saveGuidedAllocationDraft(
     answers: created.answers as GuidedAllocationAnswers,
     suggestedProfile: created.suggestedProfile as Omit<
       PreferenceProfile,
-      "id" | "userId" | "watchlistSymbols" | "recommendationConstraints"
+      | "id"
+      | "userId"
+      | "watchlistSymbols"
+      | "recommendationConstraints"
+      | "preferenceFactors"
     >,
     assumptions: created.assumptions as string[],
     rationale: created.rationale as string[],
@@ -3472,6 +3494,10 @@ export async function updatePreferenceProfile(
       : await resolveRecommendationConstraintSymbols(
           input.recommendationConstraints,
         );
+  const preferenceFactors =
+    input.preferenceFactors === undefined
+      ? normalizePreferenceFactors(profileRow.preferenceFactors)
+      : normalizePreferenceFactors(input.preferenceFactors);
 
   return db.transaction(async (tx) => {
     await tx
@@ -3487,6 +3513,7 @@ export async function updatePreferenceProfile(
         rebalancingTolerancePct: input.rebalancingTolerancePct,
         watchlistSymbols: input.watchlistSymbols,
         recommendationConstraints,
+        preferenceFactors,
         updatedAt: new Date(),
       })
       .where(eq(preferenceProfiles.id, profileRow.id));
@@ -3519,6 +3546,7 @@ export async function updatePreferenceProfile(
       rebalancingTolerancePct: input.rebalancingTolerancePct,
       watchlistSymbols: input.watchlistSymbols,
       recommendationConstraints,
+      preferenceFactors,
       updatedAt: new Date().toISOString(),
     };
   });
@@ -3637,6 +3665,7 @@ export async function registerUserWithCitizenProfile(
         rebalancingTolerancePct: defaultPreferences.rebalancingTolerancePct,
         watchlistSymbols: defaultPreferences.watchlistSymbols,
         recommendationConstraints: defaultPreferences.recommendationConstraints,
+        preferenceFactors: defaultPreferences.preferenceFactors,
       })
       .returning();
 

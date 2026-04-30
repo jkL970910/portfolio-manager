@@ -19,6 +19,7 @@ import {
   ExternalResearchUsageCounter,
 } from "@/lib/backend/models";
 import { BackendRepositories } from "@/lib/backend/repositories/interfaces";
+import { normalizePreferenceFactors } from "@/lib/backend/preference-factors";
 import { normalizeRecommendationConstraints } from "@/lib/backend/recommendation-constraints";
 
 const portfolioAnalysisRuns: PortfolioAnalysisRun[] = [];
@@ -128,6 +129,7 @@ export const mockRepositories: BackendRepositories = {
         recommendationConstraints: normalizeRecommendationConstraints(
           profile.recommendationConstraints,
         ),
+        preferenceFactors: normalizePreferenceFactors(profile.preferenceFactors),
       };
     },
   },

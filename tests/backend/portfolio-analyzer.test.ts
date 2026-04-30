@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import type { InvestmentAccount, HoldingPosition, PreferenceProfile, RecommendationRun } from "@/lib/backend/models";
+import { DEFAULT_PREFERENCE_FACTORS } from "@/lib/backend/preference-factors";
 import { DEFAULT_RECOMMENDATION_CONSTRAINTS } from "@/lib/backend/recommendation-constraints";
 import {
   buildAccountAnalyzerQuickScan,
@@ -107,6 +108,7 @@ function makeProfile(overrides: Partial<PreferenceProfile> = {}): PreferenceProf
     rebalancingTolerancePct: 5,
     watchlistSymbols: [],
     recommendationConstraints: DEFAULT_RECOMMENDATION_CONSTRAINTS,
+    preferenceFactors: DEFAULT_PREFERENCE_FACTORS,
     ...overrides
   };
 }

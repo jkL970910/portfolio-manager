@@ -66,6 +66,93 @@ const recommendationConstraintsSchema = z
     }
   });
 
+const preferenceFactorLevelSchema = z.enum(["low", "medium", "high"]);
+
+const boundedStringListSchema = z
+  .array(z.string().trim().min(1).max(80))
+  .max(20);
+
+const preferenceFactorsSchema = z.object({
+  behavior: z
+    .object({
+      riskCapacity: preferenceFactorLevelSchema.optional(),
+      maxDrawdownComfortPct: z.number().min(0).max(80).nullable().optional(),
+      volatilityComfort: preferenceFactorLevelSchema.optional(),
+      concentrationTolerance: preferenceFactorLevelSchema.optional(),
+      leverageAllowed: z.boolean().optional(),
+      optionsAllowed: z.boolean().optional(),
+      cryptoAllowed: z.boolean().optional(),
+    })
+    .optional(),
+  sectorTilts: z
+    .object({
+      preferredSectors: boundedStringListSchema.optional(),
+      avoidedSectors: boundedStringListSchema.optional(),
+      styleTilts: boundedStringListSchema.optional(),
+      thematicInterests: boundedStringListSchema.optional(),
+    })
+    .optional(),
+  lifeGoals: z
+    .object({
+      homePurchase: z
+        .object({
+          enabled: z.boolean().optional(),
+          horizonYears: z.number().min(0).max(50).nullable().optional(),
+          downPaymentTargetCad: z
+            .number()
+            .min(0)
+            .max(5000000)
+            .nullable()
+            .optional(),
+          priority: preferenceFactorLevelSchema.optional(),
+        })
+        .optional(),
+      emergencyFundTargetCad: z
+        .number()
+        .min(0)
+        .max(1000000)
+        .nullable()
+        .optional(),
+      expectedLargeExpenses: boundedStringListSchema.optional(),
+      retirementHorizonYears: z.number().min(0).max(80).nullable().optional(),
+    })
+    .optional(),
+  taxStrategy: z
+    .object({
+      province: z.string().trim().min(2).max(32).nullable().optional(),
+      marginalTaxBracket: preferenceFactorLevelSchema.nullable().optional(),
+      rrspDeductionPriority: preferenceFactorLevelSchema.optional(),
+      tfsaGrowthPriority: preferenceFactorLevelSchema.optional(),
+      fhsaHomeGoalPriority: preferenceFactorLevelSchema.optional(),
+      taxableTaxSensitivity: preferenceFactorLevelSchema.optional(),
+      dividendWithholdingSensitivity: preferenceFactorLevelSchema.optional(),
+      usdFundingPath: z.enum(["unknown", "available", "avoid"]).optional(),
+    })
+    .optional(),
+  liquidity: z
+    .object({
+      monthlyContributionCad: z
+        .number()
+        .min(0)
+        .max(1000000)
+        .nullable()
+        .optional(),
+      minimumTradeSizeCad: z.number().min(0).max(1000000).nullable().optional(),
+      liquidityNeed: preferenceFactorLevelSchema.optional(),
+      cashDuringUncertainty: preferenceFactorLevelSchema.optional(),
+    })
+    .optional(),
+  externalInfo: z
+    .object({
+      allowNewsSignals: z.boolean().optional(),
+      allowInstitutionalSignals: z.boolean().optional(),
+      allowCommunitySignals: z.boolean().optional(),
+      preferredFreshnessHours: z.number().int().min(1).max(168).optional(),
+      maxDailyExternalCalls: z.number().int().min(0).max(100).optional(),
+    })
+    .optional(),
+});
+
 export const preferenceProfileInputSchema = z
   .object({
     riskProfile: z.enum(["Conservative", "Balanced", "Growth"]),
@@ -85,6 +172,7 @@ export const preferenceProfileInputSchema = z
     rebalancingTolerancePct: z.number().int().min(0).max(50),
     watchlistSymbols: z.array(z.string().trim().min(1).max(32)).max(20),
     recommendationConstraints: recommendationConstraintsSchema.optional(),
+    preferenceFactors: preferenceFactorsSchema.optional(),
   })
   .superRefine((value, context) => {
     const total = value.targetAllocation.reduce(
@@ -99,6 +187,11 @@ export const preferenceProfileInputSchema = z
       });
     }
   });
+
+export const preferenceFactorsDraftRequestSchema = z.object({
+  narrative: z.string().trim().min(8).max(2000),
+  currentPreferenceFactors: preferenceFactorsSchema.optional(),
+});
 
 export const displayCurrencyInputSchema = z.object({
   currency: z.enum(["CAD", "USD"]),
@@ -537,6 +630,9 @@ export const guidedAllocationDraftSchema = z.object({
 
 export type PreferenceProfileInputPayload = z.infer<
   typeof preferenceProfileInputSchema
+>;
+export type PreferenceFactorsDraftRequestPayload = z.infer<
+  typeof preferenceFactorsDraftRequestSchema
 >;
 export type DisplayCurrencyInputPayload = z.infer<
   typeof displayCurrencyInputSchema

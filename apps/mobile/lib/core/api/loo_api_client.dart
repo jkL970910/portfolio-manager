@@ -275,6 +275,12 @@ class LooApiClient {
     return _patchJson("/api/mobile/settings/guided-draft", body: payload);
   }
 
+  Future<Map<String, dynamic>> createPreferenceFactorsDraft(
+      Map<String, dynamic> payload) {
+    return _postJson("/api/mobile/settings/preference-factors/draft",
+        body: payload);
+  }
+
   Future<Map<String, dynamic>> addWatchlistSymbol(String symbol) {
     return _postJson(
       "/api/mobile/settings/watchlist",

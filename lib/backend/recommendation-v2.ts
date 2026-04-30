@@ -75,6 +75,7 @@ export type CandidateSecurityScoreResult = {
   accountFitScore: number;
   taxFitScore: number;
   securityScore: number;
+  preferenceFitScore: number;
   fxPenaltyBps: number;
   summary: string;
   drivers: string[];
@@ -104,12 +105,16 @@ const SECURITY_UNIVERSE: Record<string, SecurityCandidate[]> = {
   "Canadian Equity": [
     { symbol: "VCN", name: "Vanguard FTSE Canada All Cap Index ETF", assetClass: "Canadian Equity", currency: "CAD", expenseBps: 6, liquidityScore: 94, tags: ["broad-market"] },
     { symbol: "XIC", name: "iShares Core S&P/TSX Capped Composite ETF", assetClass: "Canadian Equity", currency: "CAD", expenseBps: 6, liquidityScore: 95, tags: ["broad-market"] },
-    { symbol: "ZCN", name: "BMO S&P/TSX Capped Composite Index ETF", assetClass: "Canadian Equity", currency: "CAD", expenseBps: 6, liquidityScore: 90, tags: ["broad-market"] }
+    { symbol: "ZCN", name: "BMO S&P/TSX Capped Composite Index ETF", assetClass: "Canadian Equity", currency: "CAD", expenseBps: 6, liquidityScore: 90, tags: ["broad-market"] },
+    { symbol: "XIT", name: "iShares S&P/TSX Capped Information Technology Index ETF", assetClass: "Canadian Equity", currency: "CAD", expenseBps: 61, liquidityScore: 72, tags: ["sector", "technology", "growth"] },
+    { symbol: "XEG", name: "iShares S&P/TSX Capped Energy Index ETF", assetClass: "Canadian Equity", currency: "CAD", expenseBps: 61, liquidityScore: 82, tags: ["sector", "energy", "cyclical"] }
   ],
   "US Equity": [
     { symbol: "VFV", name: "Vanguard S&P 500 Index ETF", assetClass: "US Equity", currency: "CAD", expenseBps: 9, liquidityScore: 97, tags: ["cad-listed", "core"] },
     { symbol: "XUU", name: "iShares Core S&P U.S. Total Market Index ETF", assetClass: "US Equity", currency: "CAD", expenseBps: 7, liquidityScore: 92, tags: ["cad-listed", "core"] },
-    { symbol: "VTI", name: "Vanguard Total Stock Market ETF", assetClass: "US Equity", currency: "USD", expenseBps: 3, liquidityScore: 99, tags: ["usd-listed", "core"] }
+    { symbol: "VTI", name: "Vanguard Total Stock Market ETF", assetClass: "US Equity", currency: "USD", expenseBps: 3, liquidityScore: 99, tags: ["usd-listed", "core"] },
+    { symbol: "QQC", name: "Invesco NASDAQ 100 Index ETF", assetClass: "US Equity", currency: "CAD", expenseBps: 20, liquidityScore: 78, tags: ["cad-listed", "technology", "growth", "nasdaq-100"] },
+    { symbol: "XUS", name: "iShares Core S&P 500 Index ETF", assetClass: "US Equity", currency: "CAD", expenseBps: 10, liquidityScore: 88, tags: ["cad-listed", "core", "quality"] }
   ],
   "International Equity": [
     { symbol: "XEF", name: "iShares Core MSCI EAFE IMI Index ETF", assetClass: "International Equity", currency: "CAD", expenseBps: 22, liquidityScore: 90, tags: ["developed"] },
@@ -143,6 +148,109 @@ function round(value: number, digits = 2) {
 
 function clamp(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max);
+}
+
+function normalizeToken(value: string) {
+  return value.trim().toLowerCase();
+}
+
+function candidateMatchesAny(candidate: SecurityCandidate, tokens: string[]) {
+  if (tokens.length === 0) {
+    return false;
+  }
+  const candidateTokens = new Set(
+    [candidate.assetClass, candidate.securityType ?? "", ...candidate.tags]
+      .map(normalizeToken)
+      .filter(Boolean)
+  );
+  return tokens
+    .map(normalizeToken)
+    .some((token) =>
+      candidateTokens.has(token) ||
+      [...candidateTokens].some((candidateToken) =>
+        candidateToken.includes(token) || token.includes(candidateToken)
+      )
+    );
+}
+
+function getPreferenceFitAdjustment(
+  profile: PreferenceProfile,
+  candidate: SecurityCandidate,
+  existingHolding: HoldingPosition | undefined
+) {
+  const factors = profile.preferenceFactors;
+  const preferredTiltMatched =
+    candidateMatchesAny(candidate, factors.sectorTilts.preferredSectors) ||
+    candidateMatchesAny(candidate, factors.sectorTilts.styleTilts) ||
+    candidateMatchesAny(candidate, factors.sectorTilts.thematicInterests);
+  const avoidedTiltMatched = candidateMatchesAny(
+    candidate,
+    factors.sectorTilts.avoidedSectors
+  );
+  const isEquity =
+    candidate.assetClass === "Canadian Equity" ||
+    candidate.assetClass === "US Equity" ||
+    candidate.assetClass === "International Equity";
+  const riskCapacityBoost =
+    factors.behavior.riskCapacity === "high" && isEquity ? 0.03 : 0;
+  const lowRiskPenalty =
+    factors.behavior.riskCapacity === "low" && isEquity ? 0.06 : 0;
+  const preferredBoost = preferredTiltMatched ? 0.08 : 0;
+  const avoidedPenalty = avoidedTiltMatched ? 0.18 : 0;
+  const homeGoalPenalty =
+    factors.lifeGoals.homePurchase.enabled &&
+    factors.lifeGoals.homePurchase.priority === "high" &&
+    factors.lifeGoals.homePurchase.horizonYears != null &&
+    factors.lifeGoals.homePurchase.horizonYears <= 5 &&
+    isEquity
+      ? 0.04
+      : 0;
+  const concentrationThreshold =
+    factors.behavior.concentrationTolerance === "high"
+      ? 20
+      : factors.behavior.concentrationTolerance === "low"
+        ? 8
+        : 12;
+  const concentrationPenalty =
+    existingHolding && existingHolding.weightPct >= concentrationThreshold
+      ? factors.behavior.concentrationTolerance === "high"
+        ? 0.06
+        : factors.behavior.concentrationTolerance === "low"
+          ? 0.14
+          : 0.1
+      : 0;
+
+  return {
+    adjustment: clamp(
+      preferredBoost + riskCapacityBoost -
+        avoidedPenalty -
+        lowRiskPenalty -
+        homeGoalPenalty -
+        concentrationPenalty,
+      -0.32,
+      0.18
+    ),
+    score: round(
+      clamp(
+        70 +
+          preferredBoost * 100 +
+          riskCapacityBoost * 100 -
+          avoidedPenalty * 100 -
+          lowRiskPenalty * 100 -
+          homeGoalPenalty * 100 -
+          concentrationPenalty * 100,
+        0,
+        100
+      ),
+      1
+    ),
+    signals: [
+      ...(preferredTiltMatched ? ["preference-tilt-match"] : []),
+      ...(avoidedTiltMatched ? ["avoided-tilt-match"] : []),
+      ...(homeGoalPenalty > 0 ? ["home-goal-risk-buffer"] : []),
+      ...(concentrationPenalty > 0 ? ["concentration-tolerance"] : [])
+    ]
+  };
 }
 
 function getTargetAllocation(profile: PreferenceProfile) {
@@ -253,13 +361,15 @@ function scoreSecurityCandidate(
     ? 0
     : fxPolicy.brokerFxFrictionBps / 1000;
   const existingHolding = holdings.find((holding) => holding.symbol === candidate.symbol);
-  const concentrationPenalty = existingHolding && existingHolding.weightPct >= 12 ? 0.1 : 0;
   const exposureMatch = candidate.assetClass === assetClass ? 0.62 : 0.4;
+  const preferenceFit = getPreferenceFitAdjustment(profile, candidate, existingHolding);
 
-  const score = clamp(exposureMatch + watchlistBoost + preferredBoost + liquidityBoost - expensePenalty - (currencyPenalty / 10) - concentrationPenalty - securityTypePenalty, 0.05, 0.99);
+  const score = clamp(exposureMatch + watchlistBoost + preferredBoost + liquidityBoost + preferenceFit.adjustment - expensePenalty - (currencyPenalty / 10) - securityTypePenalty, 0.05, 0.99);
   return {
     candidate,
     score: round(score * 100, 1),
+    preferenceFitScore: preferenceFit.score,
+    preferenceSignals: preferenceFit.signals,
     fxPenaltyBps: (selectedAccount.currency ?? "CAD") === candidate.currency ? 0 : fxPolicy.brokerFxFrictionBps
   };
 }
@@ -336,6 +446,11 @@ function inferAssetClassFromSecurityType(securityType: string | null | undefined
 }
 
 function buildRunNotes(profile: PreferenceProfile, fxPolicy: FxPolicy, language: DisplayLanguage) {
+  const preferredTilts = [
+    ...profile.preferenceFactors.sectorTilts.preferredSectors,
+    ...profile.preferenceFactors.sectorTilts.styleTilts,
+    ...profile.preferenceFactors.sectorTilts.thematicInterests
+  ];
   return [
     pick(
       language,
@@ -349,7 +464,25 @@ function buildRunNotes(profile: PreferenceProfile, fxPolicy: FxPolicy, language:
     ),
     fxPolicy.hasUsdFundingPath
       ? pick(language, "已检测到 USD 入金路径，因此跨币种方案只会受到较轻的 FX 惩罚。", "A USD funding path is available, so cross-currency ideas carry only a light FX penalty.")
-      : pick(language, "未检测到 USD 入金路径，因此跨币种方案会承担更高的 FX 摩擦惩罚。", "No USD funding path was detected, so cross-currency ideas carry a higher FX friction penalty.")
+      : pick(language, "未检测到 USD 入金路径，因此跨币种方案会承担更高的 FX 摩擦惩罚。", "No USD funding path was detected, so cross-currency ideas carry a higher FX friction penalty."),
+    ...(preferredTilts.length > 0
+      ? [
+          pick(
+            language,
+            `V2.1 会轻量考虑你的进阶偏好：${preferredTilts.slice(0, 4).join(" / ")}。这些偏好只调整候选排序，不会覆盖目标配置。`,
+            `V2.1 lightly considers your advanced preferences: ${preferredTilts.slice(0, 4).join(" / ")}. These preferences adjust candidate order only; they do not override target allocation.`
+          )
+        ]
+      : []),
+    ...(profile.preferenceFactors.lifeGoals.homePurchase.enabled
+      ? [
+          pick(
+            language,
+            "已记录买房目标：V2.1 只做风险缓冲提示；真正的资金桶/时间线规划会放进 V3。",
+            "Home-purchase goal detected: V2.1 only adds risk-buffer hints; full bucket and timeline planning belongs in V3."
+          )
+        ]
+      : [])
   ];
 }
 
@@ -445,6 +578,7 @@ export function buildRecommendationV2(args: {
       securitySymbol: best.security.candidate.symbol,
       securityName: best.security.candidate.name,
       securityScore: best.security.score,
+      preferenceFitScore: best.security.preferenceFitScore,
       allocationGapBeforePct: priority.gapPct,
       allocationGapAfterPct: Math.max(0, postTradeGapPct),
       accountFitScore: round(best.placement.accountFitScore * 100, 1),
@@ -462,6 +596,8 @@ export function buildRecommendationV2(args: {
         accountFitScore: round(best.placement.accountFitScore * 100, 1),
         taxFitScore: round(best.placement.taxFitScore * 100, 1),
         securityScore: best.security.score,
+        preferenceFitScore: best.security.preferenceFitScore,
+        preferenceSignals: best.security.preferenceSignals,
         fxPolicy: fxPolicy.hasUsdFundingPath ? "usd-funded" : "retail-fx",
         fxPenaltyBps: best.security.fxPenaltyBps,
         minTradeApplied: rawAmount < 500,
@@ -482,13 +618,13 @@ export function buildRecommendationV2(args: {
   );
 
   return {
-    engineVersion: "v2",
+    engineVersion: "v2.1",
     objective: "target-tracking",
     confidenceScore,
     assumptions: buildRunNotes(profile, fxPolicy, language),
     notes: [
       pick(language, "这一版只帮你安排新增的钱，不会主动建议你先卖出旧持仓。", "This version only plans new money and does not ask you to sell old holdings first."),
-      pick(language, "账户匹配和税务放置现在还是规则型判断，后面还能继续变得更细。", "Account fit and tax placement are still rule-based and can get more detailed later."),
+      pick(language, "V2.1 已开始读取进阶偏好，但账户匹配、税务放置和标的 universe 仍然是规则型判断。", "V2.1 now reads advanced preferences, but account fit, tax placement, and the security universe remain rule-based."),
       fxPolicy.hasUsdFundingPath
         ? pick(language, "因为你有 USD 入金路径，系统不会自动回避美股，只会轻度考虑换汇成本。", "Because a USD funding path is available, the engine does not automatically avoid USD securities.")
         : pick(language, "因为系统没看到稳定的 USD 入金路径，美股方案会更容易被换汇成本压低。", "Because no stable USD funding path was detected, USD ideas are pushed down more by FX drag.")
@@ -537,7 +673,7 @@ export function scoreCandidateSecurity(args: {
   const fxPolicy = inferFxPolicy(accounts, holdings);
   const placement = scoreAccountPlacement(accounts, profile, assetClass, securityCandidate.currency, fxPolicy);
   const security = scoreSecurityCandidate(securityCandidate, assetClass, placement.account, holdings, profile, fxPolicy);
-  const score = round(((placement.accountFitScore * 100) + (placement.taxFitScore * 100) + security.score) / 3, 1);
+  const score = round(((placement.accountFitScore * 100) + (placement.taxFitScore * 100) + security.score + security.preferenceFitScore) / 4, 1);
   const verdict: CandidateSecurityScoreResult["verdict"] = score >= 80 ? "strong" : score >= 62 ? "watch" : "weak";
 
   return {
@@ -555,6 +691,7 @@ export function scoreCandidateSecurity(args: {
     accountFitScore: round(placement.accountFitScore * 100, 1),
     taxFitScore: round(placement.taxFitScore * 100, 1),
     securityScore: security.score,
+    preferenceFitScore: security.preferenceFitScore,
     fxPenaltyBps: security.fxPenaltyBps,
     summary: pick(
       language,
@@ -580,6 +717,11 @@ export function scoreCandidateSecurity(args: {
         `这支标的本身的候选分大约 ${security.score.toFixed(0)}/100。`,
         `The security itself scores about ${security.score.toFixed(0)}/100 as a candidate.`
       ),
+      pick(
+        language,
+        `它与当前进阶偏好的贴合度约 ${security.preferenceFitScore.toFixed(0)}/100。`,
+        `Its fit with the current advanced preferences is about ${security.preferenceFitScore.toFixed(0)}/100.`
+      ),
       profile.watchlistSymbols.includes(normalizedSymbol)
         ? pick(language, "它已经在你的观察列表里，所以引擎会给它一点额外加分。", "It is already on your watchlist, so the engine gives it a small watchlist bonus.")
         : pick(language, "它现在还不在你的观察列表里，所以没有拿到观察列表加分。", "It is not currently on your watchlist, so it gets no watchlist bonus.")
@@ -593,6 +735,12 @@ export function scoreCandidateSecurity(args: {
         : []),
       ...(existingHolding && existingHolding.weightPct >= 12
         ? [pick(language, `${normalizedSymbol} 已经在组合里占比较重，继续加之前要额外看集中度。`, `${normalizedSymbol} is already a relatively heavy position, so concentration needs another check before adding more.`)]
+        : []),
+      ...(security.preferenceSignals.includes("avoided-tilt-match")
+        ? [pick(language, `${normalizedSymbol} 命中了你想回避的行业或风格偏好，因此需要额外确认。`, `${normalizedSymbol} matches an avoided sector or style preference, so it needs extra confirmation.`)]
+        : []),
+      ...(security.preferenceSignals.includes("home-goal-risk-buffer")
+        ? [pick(language, "你的买房目标会压低部分权益候选的分数，避免短期资金承担过多波动。", "Your home-purchase goal reduces the score for some equity candidates to avoid too much short-horizon volatility.")]
         : [])
     ]
   };

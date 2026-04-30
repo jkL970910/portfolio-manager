@@ -21,6 +21,8 @@ export type RiskProfile = "Conservative" | "Balanced" | "Growth";
 export type TransitionPreference = "stay-close" | "gradual" | "direct";
 export type RecommendationStrategy = "tax-aware" | "target-first" | "balanced";
 export type PreferenceProfileSource = "manual" | "guided";
+export type PreferenceFactorLevel = "low" | "medium" | "high";
+export type UsdFundingPath = "unknown" | "available" | "avoid";
 export type GuidedAllocationGoal =
   | "retirement"
   | "home"
@@ -240,6 +242,58 @@ export interface RecommendationConstraints {
   allowedSecurityTypes: string[];
 }
 
+export interface PreferenceFactors {
+  behavior: {
+    riskCapacity: PreferenceFactorLevel;
+    maxDrawdownComfortPct: number | null;
+    volatilityComfort: PreferenceFactorLevel;
+    concentrationTolerance: PreferenceFactorLevel;
+    leverageAllowed: boolean;
+    optionsAllowed: boolean;
+    cryptoAllowed: boolean;
+  };
+  sectorTilts: {
+    preferredSectors: string[];
+    avoidedSectors: string[];
+    styleTilts: string[];
+    thematicInterests: string[];
+  };
+  lifeGoals: {
+    homePurchase: {
+      enabled: boolean;
+      horizonYears: number | null;
+      downPaymentTargetCad: number | null;
+      priority: PreferenceFactorLevel;
+    };
+    emergencyFundTargetCad: number | null;
+    expectedLargeExpenses: string[];
+    retirementHorizonYears: number | null;
+  };
+  taxStrategy: {
+    province: string | null;
+    marginalTaxBracket: PreferenceFactorLevel | null;
+    rrspDeductionPriority: PreferenceFactorLevel;
+    tfsaGrowthPriority: PreferenceFactorLevel;
+    fhsaHomeGoalPriority: PreferenceFactorLevel;
+    taxableTaxSensitivity: PreferenceFactorLevel;
+    dividendWithholdingSensitivity: PreferenceFactorLevel;
+    usdFundingPath: UsdFundingPath;
+  };
+  liquidity: {
+    monthlyContributionCad: number | null;
+    minimumTradeSizeCad: number | null;
+    liquidityNeed: PreferenceFactorLevel;
+    cashDuringUncertainty: PreferenceFactorLevel;
+  };
+  externalInfo: {
+    allowNewsSignals: boolean;
+    allowInstitutionalSignals: boolean;
+    allowCommunitySignals: boolean;
+    preferredFreshnessHours: number;
+    maxDailyExternalCalls: number;
+  };
+}
+
 export interface PreferenceProfile {
   id: EntityId;
   userId: EntityId;
@@ -254,6 +308,7 @@ export interface PreferenceProfile {
   rebalancingTolerancePct: number;
   watchlistSymbols: string[];
   recommendationConstraints: RecommendationConstraints;
+  preferenceFactors: PreferenceFactors;
   updatedAt?: string | null;
 }
 
@@ -271,7 +326,11 @@ export interface GuidedAllocationDraft {
   answers: GuidedAllocationAnswers;
   suggestedProfile: Omit<
     PreferenceProfile,
-    "id" | "userId" | "watchlistSymbols" | "recommendationConstraints"
+    | "id"
+    | "userId"
+    | "watchlistSymbols"
+    | "recommendationConstraints"
+    | "preferenceFactors"
   >;
   assumptions: string[];
   rationale: string[];
@@ -288,6 +347,7 @@ export interface RecommendationItem {
   securitySymbol?: string;
   securityName?: string;
   securityScore?: number;
+  preferenceFitScore?: number;
   allocationGapBeforePct?: number;
   allocationGapAfterPct?: number;
   accountFitScore?: number;
@@ -305,6 +365,8 @@ export interface RecommendationItem {
     accountFitScore: number;
     taxFitScore: number;
     securityScore: number;
+    preferenceFitScore?: number;
+    preferenceSignals?: string[];
     fxPolicy: string;
     fxPenaltyBps: number;
     minTradeApplied: boolean;

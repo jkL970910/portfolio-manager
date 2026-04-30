@@ -37,6 +37,7 @@ import {
 } from "@/lib/backend/models";
 import { BackendRepositories } from "@/lib/backend/repositories/interfaces";
 import { normalizeRecommendationConstraints } from "@/lib/backend/recommendation-constraints";
+import { normalizePreferenceFactors } from "@/lib/backend/preference-factors";
 
 function toNumber(value: string | number | null | undefined) {
   if (typeof value === "number") {
@@ -526,6 +527,9 @@ export const postgresRepositories: BackendRepositories = {
         recommendationConstraints: normalizeRecommendationConstraints(
           profileRow.recommendationConstraints,
         ),
+        preferenceFactors: normalizePreferenceFactors(
+          profileRow.preferenceFactors,
+        ),
         updatedAt: profileRow.updatedAt.toISOString(),
       };
     },
@@ -567,6 +571,14 @@ export const postgresRepositories: BackendRepositories = {
             item.securityScore == null
               ? undefined
               : toNumber(item.securityScore),
+          preferenceFitScore:
+            typeof (
+              item.rationale as RecommendationRun["items"][number]["rationale"]
+            )?.preferenceFitScore === "number"
+              ? (
+                  item.rationale as RecommendationRun["items"][number]["rationale"]
+                )?.preferenceFitScore
+              : undefined,
           allocationGapBeforePct:
             item.allocationGapBeforePct == null
               ? undefined

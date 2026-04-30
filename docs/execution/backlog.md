@@ -48,7 +48,7 @@ over simply adding more Flutter screens.
 | 1    | P0.5 real-data AI / external consultation     | In Progress | Before UI overhaul, make AI 标的分析, AI 大臣, and the portfolio-analyzer skill consume trustworthy cached quote/history/FX/provider data with explicit freshness/source boundaries. |
 | 2    | Cloud-ready quote/FX worker boundaries        | Planned     | Quote, FX, history, and snapshot refresh should move out of user-facing request paths with quota budgeting and retry behavior before heavier AI-agent jobs depend on them.       |
 | 3    | Recommendation V3 external intelligence       | Planned     | Upgrade V2 with cached external signals, richer preference factors, and Loo国今日秘闻 rather than forcing news/forum logic into the V2 rule engine.                              |
-| 4    | Preference Factors V2                         | Planned     | Current risk/target factors are too shallow for aggressive sector tilts, home goals, tax optimization, and style preferences.                                                    |
+| 4    | Preference Factors V2                         | In Progress | Backend JSONB contract, validation, Flutter manual editor, and guided-draft generation exist; next is AI 大臣问答式参数生成 and V3 deeper scoring.                                      |
 | 5    | Market-data identity and validation hardening | In Progress | Current quote/history paths preserve symbol, exchange, and currency; next is provider-grade scheduled history refresh and cached data QA.                                      |
 | 6    | Backend contract typing for Flutter           | In Progress | Settings market-data refresh, Overview / Portfolio, Recommendations, Import, and Settings preference profile/guided draft DTOs are typed; continue detail-page DTO depth.       |
 | 7    | Recommendation constraints v2                 | In Progress | Backend and mobile now support preferred/excluded identities, account rules, and asset-class bands; next is picker UX and tests.                                                |
@@ -72,7 +72,8 @@ over simply adding more Flutter screens.
 | Quote-provider status UX                  | In Progress | Refresh results, Settings, holding rows, price-history records, and persisted provider-limit snapshots now expose source/status lineage; remaining work is deeper per-provider dashboards                                                                                                  |
 | Loo国 AI Minister assistant               | In Progress | Backend and Flutter first-pass page-context DTOs exist; global floating 大臣 entry receives Overview/Portfolio/detail/Health context; Settings can switch Local/GPT-5.5, choose official OpenAI or OpenRouter-compatible provider, save encrypted BYOK API key, and surface usage/retry/failure observability |
 | P0.5 external consultation skill pipeline | In Progress | The uploaded `portfolio-analyzer.skill` is productized as cached/guarded analysis work. Next priority is proving it on real cached market data before enabling live external research adapters or UI-heavy redesign.                                                                        |
-| Recommendation V3 external intelligence   | Planned     | See `docs/execution/recommendation-v3-external-intelligence.md`. V3 should layer cached external signals and richer user preferences on top of the deterministic V2 engine.                                                                 |
+| Recommendation V2.1 preference fit        | In Progress | V2 now starts consuming Preference Factors V2 for light candidate ordering and explanation while preserving deterministic target-allocation/account-placement behavior.                                                                             |
+| Recommendation V3 external intelligence   | Planned     | See `docs/execution/recommendation-v3-external-intelligence.md`. V3 should layer dynamic candidate universe, tax/life-goal modeling, cached external signals, and explicit preference-fit scoring on top of the deterministic V2.1 baseline. |
 | Loo国今日秘闻                             | Planned     | Curated intelligence card for holdings/watchlist/recommendation candidates. It must be source/freshness-aware and must not become a raw news feed.                                                                                       |
 
 ## Deferred
@@ -100,7 +101,7 @@ over simply adding more Flutter screens.
 2. Run the external consultation / `portfolio-analyzer.skill` pipeline on cached real market data first; keep live external research disabled until worker/cache/provider quota policy is proven.
 3. Align AI 标的分析 and AI 大臣: AI 标的分析 produces structured saved analysis; 大臣 answers cross-page questions, explains current context, and references or triggers saved analysis instead of duplicating a full report.
 4. Define Recommendation V3 external-signal contracts before adding live news/forum adapters.
-5. Add Preference Factors V2 as optional backend fields with safe defaults.
+5. Extend Preference Factors V2 with AI 大臣问答式参数生成, using the same payload as the manual Flutter editor.
 6. Add a local/cached `Loo国今日秘闻` API before live provider integration.
 7. QA the real mobile URL for GPT-5.5/BYOK, cached-external analysis, provider status, history hydration, and CAD/USD identity separation.
 8. Continue backend contract typing for detail pages and AI context DTOs so mobile stops relying on page-level `Map<String, dynamic>` parsing.
@@ -143,3 +144,21 @@ P1 follow-up goals:
   `symbol + exchange + currency`, not ticker alone.
 - Loo国大臣 prompts now carry fact source tags and explicitly prefer
   `analysis-cache` / `cached-external` facts when present.
+- `0016_preference_factors` adds the first Preference Factors V2 storage
+  boundary. The current slice is backend-only: safe defaults, validation, and
+  persistence for behavior, sector/style tilt, life goals, tax strategy,
+  liquidity, and external-info preferences. Recommendation V3 and Flutter
+  editing will consume it in later slices.
+- Recommendation V2.1 now consumes a bounded subset of Preference Factors V2:
+  preferred/avoided sectors, style/thematic tilts, risk capacity,
+  concentration tolerance, and near-term home-purchase risk buffer. This only
+  adjusts candidate ordering/explanation; it does not override target
+  allocation.
+- Flutter Settings now has a `进阶` preference editor and the guided setup flow
+  generates a visible Preference Factors V2 draft before applying it. Manual
+  config remains the source of truth; AI-guided parameter generation should
+  reuse the same payload and display a diff before applying.
+- The `进阶` editor now includes a Loo国大臣 draft helper. The helper can call
+  GPT-5.5 when the user's AI Minister provider is enabled, otherwise it falls
+  back to a deterministic local draft. In both cases it only fills the form;
+  the user must explicitly save before preferences change.

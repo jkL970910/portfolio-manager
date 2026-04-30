@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import type { InvestmentAccount, PreferenceProfile } from "@/lib/backend/models";
+import { DEFAULT_PREFERENCE_FACTORS } from "@/lib/backend/preference-factors";
 import { DEFAULT_RECOMMENDATION_CONSTRAINTS } from "@/lib/backend/recommendation-constraints";
 import { buildRecommendationV2, scoreCandidateSecurity } from "@/lib/backend/recommendation-v2";
 
@@ -48,6 +49,7 @@ function makeProfile(overrides: Partial<PreferenceProfile> = {}): PreferenceProf
     rebalancingTolerancePct: 5,
     watchlistSymbols: [],
     recommendationConstraints: DEFAULT_RECOMMENDATION_CONSTRAINTS,
+    preferenceFactors: DEFAULT_PREFERENCE_FACTORS,
     ...overrides
   };
 }
@@ -94,6 +96,67 @@ test("preferred symbols improve candidate scoring without pinning absolute score
 
   assert.ok(preferred.securityScore > baseline.securityScore);
   assert.equal(preferred.preferredSymbolMatched, true);
+});
+
+test("advanced preference factors improve matching sector and style candidates", () => {
+  const baseline = scoreCandidateSecurity({
+    accounts,
+    holdings: [],
+    profile: makeProfile(),
+    language: "zh",
+    candidate: { symbol: "QQC", currency: "CAD", assetClass: "US Equity", securityType: "ETF" }
+  });
+  const tilted = scoreCandidateSecurity({
+    accounts,
+    holdings: [],
+    profile: makeProfile({
+      preferenceFactors: {
+        ...DEFAULT_PREFERENCE_FACTORS,
+        behavior: {
+          ...DEFAULT_PREFERENCE_FACTORS.behavior,
+          riskCapacity: "high"
+        },
+        sectorTilts: {
+          ...DEFAULT_PREFERENCE_FACTORS.sectorTilts,
+          preferredSectors: ["Technology"],
+          styleTilts: ["Growth"]
+        }
+      }
+    }),
+    language: "zh",
+    candidate: { symbol: "QQC", currency: "CAD", assetClass: "US Equity", securityType: "ETF" }
+  });
+
+  assert.ok(tilted.securityScore > baseline.securityScore);
+  assert.ok(tilted.preferenceFitScore > baseline.preferenceFitScore);
+});
+
+test("advanced preference factors penalize avoided sector candidates", () => {
+  const baseline = scoreCandidateSecurity({
+    accounts,
+    holdings: [],
+    profile: makeProfile(),
+    language: "zh",
+    candidate: { symbol: "XEG", currency: "CAD", assetClass: "Canadian Equity", securityType: "ETF" }
+  });
+  const avoided = scoreCandidateSecurity({
+    accounts,
+    holdings: [],
+    profile: makeProfile({
+      preferenceFactors: {
+        ...DEFAULT_PREFERENCE_FACTORS,
+        sectorTilts: {
+          ...DEFAULT_PREFERENCE_FACTORS.sectorTilts,
+          avoidedSectors: ["Energy"]
+        }
+      }
+    }),
+    language: "zh",
+    candidate: { symbol: "XEG", currency: "CAD", assetClass: "Canadian Equity", securityType: "ETF" }
+  });
+
+  assert.ok(avoided.securityScore < baseline.securityScore);
+  assert.ok(avoided.warnings.some((warning) => warning.includes("回避")));
 });
 
 test("allowed security types penalize disallowed candidates without requiring fixed score snapshots", () => {

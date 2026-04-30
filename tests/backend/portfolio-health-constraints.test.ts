@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import type { HoldingPosition, InvestmentAccount, PreferenceProfile } from "@/lib/backend/models";
 import { buildPortfolioHealthSummary } from "@/lib/backend/portfolio-health";
+import { DEFAULT_PREFERENCE_FACTORS } from "@/lib/backend/preference-factors";
 import { DEFAULT_RECOMMENDATION_CONSTRAINTS } from "@/lib/backend/recommendation-constraints";
 
 const accounts: InvestmentAccount[] = [
@@ -106,6 +107,7 @@ function makeProfile(overrides: Partial<PreferenceProfile> = {}): PreferenceProf
     rebalancingTolerancePct: 5,
     watchlistSymbols: [],
     recommendationConstraints: DEFAULT_RECOMMENDATION_CONSTRAINTS,
+    preferenceFactors: DEFAULT_PREFERENCE_FACTORS,
     ...overrides
   };
 }

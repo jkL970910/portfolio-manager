@@ -30,7 +30,83 @@ test("preference schema remains backward compatible without recommendation const
   assert.equal(parsed.success, true);
   if (parsed.success) {
     assert.equal(parsed.data.recommendationConstraints, undefined);
+    assert.equal(parsed.data.preferenceFactors, undefined);
   }
+});
+
+test("preference schema accepts richer preference factors for V3 planning", () => {
+  const parsed = preferenceProfileInputSchema.safeParse(makePreferencePayload({
+    preferenceFactors: {
+      behavior: {
+        riskCapacity: "high",
+        maxDrawdownComfortPct: 35,
+        volatilityComfort: "high",
+        concentrationTolerance: "high",
+        leverageAllowed: false,
+        optionsAllowed: false,
+        cryptoAllowed: false
+      },
+      sectorTilts: {
+        preferredSectors: ["Technology", "Energy"],
+        avoidedSectors: ["Tobacco"],
+        styleTilts: ["Growth", "Quality"],
+        thematicInterests: ["AI infrastructure"]
+      },
+      lifeGoals: {
+        homePurchase: {
+          enabled: true,
+          horizonYears: 4,
+          downPaymentTargetCad: 180000,
+          priority: "high"
+        },
+        emergencyFundTargetCad: 30000,
+        expectedLargeExpenses: ["Home down payment"],
+        retirementHorizonYears: 30
+      },
+      taxStrategy: {
+        province: "ON",
+        marginalTaxBracket: "medium",
+        rrspDeductionPriority: "medium",
+        tfsaGrowthPriority: "high",
+        fhsaHomeGoalPriority: "high",
+        taxableTaxSensitivity: "high",
+        dividendWithholdingSensitivity: "medium",
+        usdFundingPath: "available"
+      },
+      liquidity: {
+        monthlyContributionCad: 2500,
+        minimumTradeSizeCad: 500,
+        liquidityNeed: "medium",
+        cashDuringUncertainty: "low"
+      },
+      externalInfo: {
+        allowNewsSignals: true,
+        allowInstitutionalSignals: true,
+        allowCommunitySignals: false,
+        preferredFreshnessHours: 12,
+        maxDailyExternalCalls: 10
+      }
+    }
+  }));
+
+  assert.equal(parsed.success, true);
+  if (parsed.success) {
+    assert.equal(parsed.data.preferenceFactors?.behavior?.riskCapacity, "high");
+    assert.equal(parsed.data.preferenceFactors?.taxStrategy?.usdFundingPath, "available");
+  }
+});
+
+test("preference schema rejects invalid preference factor bounds", () => {
+  const parsed = preferenceProfileInputSchema.safeParse(makePreferencePayload({
+    preferenceFactors: {
+      behavior: { maxDrawdownComfortPct: 120 },
+      sectorTilts: {
+        preferredSectors: Array.from({ length: 21 }, (_, index) => `Sector${index}`)
+      }
+    }
+  }));
+
+  assert.equal(parsed.success, false);
 });
 
 test("preference schema accepts resolved recommendation security identities", () => {

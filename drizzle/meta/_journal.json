@@ -113,6 +113,13 @@
       "when": 1777561200000,
       "tag": "0015_market_data_provider_limits",
       "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1777564800000,
+      "tag": "0016_preference_factors",
+      "breakpoints": true
     }
   ]
 }

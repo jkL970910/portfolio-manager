@@ -14,6 +14,33 @@ const _assetClasses = [
 const _accountTypes = ["TFSA", "RRSP", "FHSA", "Taxable"];
 const _securityTypes = ["ETF", "Common Stock", "Commodity ETF"];
 
+String _formatNullableNumber(double? value) {
+  if (value == null) {
+    return "";
+  }
+  return value == value.roundToDouble()
+      ? value.toStringAsFixed(0)
+      : value.toStringAsFixed(2);
+}
+
+double? _parseNullableDouble(String value) {
+  final trimmed = value.trim();
+  if (trimmed.isEmpty) {
+    return null;
+  }
+  return double.tryParse(trimmed);
+}
+
+List<String> _parseTextList(String value, {int max = 20}) {
+  return value
+      .split(RegExp(r"[,，\n]+"))
+      .map((item) => item.trim())
+      .where((item) => item.isNotEmpty)
+      .toSet()
+      .take(max)
+      .toList();
+}
+
 class InvestmentPreferencesCard extends StatefulWidget {
   const InvestmentPreferencesCard({required this.apiClient, super.key});
 
@@ -103,6 +130,23 @@ class _InvestmentPreferencesCardState extends State<InvestmentPreferencesCard> {
     }
   }
 
+  Future<void> _openFactorEditor(MobilePreferenceProfile profile) async {
+    final saved = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) => _PreferenceFactorsSheet(
+        apiClient: widget.apiClient,
+        profile: profile,
+      ),
+    );
+    if (saved == true && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("进阶偏好已保存，V2.1 推荐会读取这些参数。")),
+      );
+      _refresh();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return FutureBuilder<MobilePreferenceProfile>(
@@ -155,6 +199,10 @@ class _InvestmentPreferencesCardState extends State<InvestmentPreferencesCard> {
                       child: const Text("约束"),
                     ),
                     TextButton(
+                      onPressed: () => _openFactorEditor(profile),
+                      child: const Text("进阶"),
+                    ),
+                    TextButton(
                       onPressed: () => _openEditor(profile),
                       child: const Text("编辑"),
                     ),
@@ -174,6 +222,8 @@ class _InvestmentPreferencesCardState extends State<InvestmentPreferencesCard> {
                     _InfoChip("税务", profile.taxAwarePlacement ? "开启" : "关闭"),
                   ],
                 ),
+                const SizedBox(height: 10),
+                Text("进阶偏好：${profile.preferenceFactors.summary}"),
                 const SizedBox(height: 12),
                 Text("目标配置", style: Theme.of(context).textTheme.titleMedium),
                 const SizedBox(height: 6),
@@ -930,6 +980,503 @@ class _ConstraintSecurityCandidate {
   }
 }
 
+class _PreferenceFactorsSheet extends StatefulWidget {
+  const _PreferenceFactorsSheet({
+    required this.apiClient,
+    required this.profile,
+  });
+
+  final LooApiClient apiClient;
+  final MobilePreferenceProfile profile;
+
+  @override
+  State<_PreferenceFactorsSheet> createState() => _PreferenceFactorsSheetState();
+}
+
+class _PreferenceFactorsSheetState extends State<_PreferenceFactorsSheet> {
+  late var _riskCapacity = widget.profile.preferenceFactors.riskCapacity;
+  late var _volatilityComfort =
+      widget.profile.preferenceFactors.volatilityComfort;
+  late var _concentrationTolerance =
+      widget.profile.preferenceFactors.concentrationTolerance;
+  late var _homePurchaseEnabled =
+      widget.profile.preferenceFactors.homePurchaseEnabled;
+  late var _homePurchasePriority =
+      widget.profile.preferenceFactors.homePurchasePriority;
+  late var _rrspPriority =
+      widget.profile.preferenceFactors.rrspDeductionPriority;
+  late var _tfsaPriority = widget.profile.preferenceFactors.tfsaGrowthPriority;
+  late var _fhsaPriority =
+      widget.profile.preferenceFactors.fhsaHomeGoalPriority;
+  late var _taxableSensitivity =
+      widget.profile.preferenceFactors.taxableTaxSensitivity;
+  late var _usdFundingPath = widget.profile.preferenceFactors.usdFundingPath;
+  late var _liquidityNeed = widget.profile.preferenceFactors.liquidityNeed;
+  late var _cashDuringUncertainty =
+      widget.profile.preferenceFactors.cashDuringUncertainty;
+  late var _allowNewsSignals =
+      widget.profile.preferenceFactors.allowNewsSignals;
+  late var _allowInstitutionalSignals =
+      widget.profile.preferenceFactors.allowInstitutionalSignals;
+  late var _allowCommunitySignals =
+      widget.profile.preferenceFactors.allowCommunitySignals;
+  late final _preferredSectorsController = TextEditingController(
+      text: widget.profile.preferenceFactors.preferredSectors.join(", "));
+  late final _avoidedSectorsController = TextEditingController(
+      text: widget.profile.preferenceFactors.avoidedSectors.join(", "));
+  late final _styleTiltsController = TextEditingController(
+      text: widget.profile.preferenceFactors.styleTilts.join(", "));
+  late final _themesController = TextEditingController(
+      text: widget.profile.preferenceFactors.thematicInterests.join(", "));
+  late final _homeHorizonController = TextEditingController(
+      text: _formatNullableNumber(
+          widget.profile.preferenceFactors.homePurchaseHorizonYears));
+  late final _homeDownPaymentController = TextEditingController(
+      text: _formatNullableNumber(
+          widget.profile.preferenceFactors.homeDownPaymentTargetCad));
+  late final _provinceController =
+      TextEditingController(text: widget.profile.preferenceFactors.province ?? "ON");
+  late final _monthlyContributionController = TextEditingController(
+      text: _formatNullableNumber(
+          widget.profile.preferenceFactors.monthlyContributionCad));
+  late final _minimumTradeController = TextEditingController(
+      text: _formatNullableNumber(
+          widget.profile.preferenceFactors.minimumTradeSizeCad));
+  final _ministerPromptController = TextEditingController();
+  var _saving = false;
+  var _drafting = false;
+  String? _error;
+  String? _draftSummary;
+  List<String> _draftRationale = const [];
+
+  @override
+  void dispose() {
+    _preferredSectorsController.dispose();
+    _avoidedSectorsController.dispose();
+    _styleTiltsController.dispose();
+    _themesController.dispose();
+    _homeHorizonController.dispose();
+    _homeDownPaymentController.dispose();
+    _provinceController.dispose();
+    _monthlyContributionController.dispose();
+    _minimumTradeController.dispose();
+    _ministerPromptController.dispose();
+    super.dispose();
+  }
+
+  void _applyFactorsToForm(MobilePreferenceFactors factors) {
+    setState(() {
+      _riskCapacity = factors.riskCapacity;
+      _volatilityComfort = factors.volatilityComfort;
+      _concentrationTolerance = factors.concentrationTolerance;
+      _homePurchaseEnabled = factors.homePurchaseEnabled;
+      _homePurchasePriority = factors.homePurchasePriority;
+      _rrspPriority = factors.rrspDeductionPriority;
+      _tfsaPriority = factors.tfsaGrowthPriority;
+      _fhsaPriority = factors.fhsaHomeGoalPriority;
+      _taxableSensitivity = factors.taxableTaxSensitivity;
+      _usdFundingPath = factors.usdFundingPath;
+      _liquidityNeed = factors.liquidityNeed;
+      _cashDuringUncertainty = factors.cashDuringUncertainty;
+      _allowNewsSignals = factors.allowNewsSignals;
+      _allowInstitutionalSignals = factors.allowInstitutionalSignals;
+      _allowCommunitySignals = factors.allowCommunitySignals;
+      _preferredSectorsController.text = factors.preferredSectors.join(", ");
+      _avoidedSectorsController.text = factors.avoidedSectors.join(", ");
+      _styleTiltsController.text = factors.styleTilts.join(", ");
+      _themesController.text = factors.thematicInterests.join(", ");
+      _homeHorizonController.text =
+          _formatNullableNumber(factors.homePurchaseHorizonYears);
+      _homeDownPaymentController.text =
+          _formatNullableNumber(factors.homeDownPaymentTargetCad);
+      _provinceController.text = factors.province ?? "ON";
+      _monthlyContributionController.text =
+          _formatNullableNumber(factors.monthlyContributionCad);
+      _minimumTradeController.text =
+          _formatNullableNumber(factors.minimumTradeSizeCad);
+    });
+  }
+
+  Future<void> _askMinisterForDraft() async {
+    final narrative = _ministerPromptController.text.trim();
+    if (narrative.length < 8) {
+      setState(() => _error = "请先描述你的目标、风险承受或偏好的行业/税务需求。");
+      return;
+    }
+
+    setState(() {
+      _drafting = true;
+      _error = null;
+      _draftSummary = null;
+      _draftRationale = const [];
+    });
+
+    try {
+      final response = await widget.apiClient.createPreferenceFactorsDraft({
+        "narrative": narrative,
+        "currentPreferenceFactors": widget.profile.preferenceFactors.toPayload(),
+      });
+      final data = response["data"];
+      if (data is! Map<String, dynamic>) {
+        throw const LooApiException("大臣草稿格式不正确。");
+      }
+      final factors = MobilePreferenceFactors.fromJson(data["preferenceFactors"]);
+      _applyFactorsToForm(factors);
+      if (mounted) {
+        setState(() {
+          _draftSummary = data["summary"] as String? ?? "大臣已生成进阶偏好草稿。";
+          _draftRationale =
+              (data["rationale"] as List?)?.whereType<String>().toList() ??
+                  const [];
+          _drafting = false;
+        });
+      }
+    } catch (error) {
+      if (mounted) {
+        setState(() {
+          _error = error.toString();
+          _drafting = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _save() async {
+    final factors = MobilePreferenceFactors(
+      riskCapacity: _riskCapacity,
+      volatilityComfort: _volatilityComfort,
+      concentrationTolerance: _concentrationTolerance,
+      leverageAllowed: false,
+      optionsAllowed: false,
+      cryptoAllowed: false,
+      preferredSectors: _parseTextList(_preferredSectorsController.text),
+      avoidedSectors: _parseTextList(_avoidedSectorsController.text),
+      styleTilts: _parseTextList(_styleTiltsController.text),
+      thematicInterests: _parseTextList(_themesController.text),
+      homePurchaseEnabled: _homePurchaseEnabled,
+      homePurchaseHorizonYears: _parseNullableDouble(_homeHorizonController.text),
+      homeDownPaymentTargetCad:
+          _parseNullableDouble(_homeDownPaymentController.text),
+      homePurchasePriority: _homePurchasePriority,
+      emergencyFundTargetCad: widget.profile.preferenceFactors.emergencyFundTargetCad,
+      retirementHorizonYears: widget.profile.preferenceFactors.retirementHorizonYears,
+      province: _provinceController.text.trim().isEmpty
+          ? null
+          : _provinceController.text.trim().toUpperCase(),
+      marginalTaxBracket: widget.profile.preferenceFactors.marginalTaxBracket,
+      rrspDeductionPriority: _rrspPriority,
+      tfsaGrowthPriority: _tfsaPriority,
+      fhsaHomeGoalPriority: _fhsaPriority,
+      taxableTaxSensitivity: _taxableSensitivity,
+      dividendWithholdingSensitivity:
+          widget.profile.preferenceFactors.dividendWithholdingSensitivity,
+      usdFundingPath: _usdFundingPath,
+      monthlyContributionCad:
+          _parseNullableDouble(_monthlyContributionController.text),
+      minimumTradeSizeCad: _parseNullableDouble(_minimumTradeController.text),
+      liquidityNeed: _liquidityNeed,
+      cashDuringUncertainty: _cashDuringUncertainty,
+      allowNewsSignals: _allowNewsSignals,
+      allowInstitutionalSignals: _allowInstitutionalSignals,
+      allowCommunitySignals: _allowCommunitySignals,
+      preferredFreshnessHours:
+          widget.profile.preferenceFactors.preferredFreshnessHours,
+      maxDailyExternalCalls: widget.profile.preferenceFactors.maxDailyExternalCalls,
+    );
+
+    setState(() {
+      _saving = true;
+      _error = null;
+    });
+
+    try {
+      await widget.apiClient.updateInvestmentPreferences({
+        "riskProfile": widget.profile.riskProfile,
+        "targetAllocation": widget.profile.targetAllocation
+            .map((target) => {
+                  "assetClass": target.assetClass,
+                  "targetPct": target.targetPct,
+                })
+            .toList(),
+        "accountFundingPriority": widget.profile.accountFundingPriority,
+        "taxAwarePlacement": widget.profile.taxAwarePlacement,
+        "cashBufferTargetCad": widget.profile.cashBufferTargetCad,
+        "transitionPreference": widget.profile.transitionPreference,
+        "recommendationStrategy": widget.profile.recommendationStrategy,
+        "source": "manual",
+        "rebalancingTolerancePct": widget.profile.rebalancingTolerancePct,
+        "watchlistSymbols": widget.profile.watchlistSymbols,
+        "preferenceFactors": factors.toPayload(),
+      });
+      if (mounted) {
+        Navigator.of(context).pop(true);
+      }
+    } catch (error) {
+      if (mounted) {
+        setState(() {
+          _error = error.toString();
+          _saving = false;
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
+    return Padding(
+      padding: EdgeInsets.fromLTRB(20, 20, 20, bottomInset + 20),
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text("进阶偏好", style: Theme.of(context).textTheme.headlineMedium),
+            const SizedBox(height: 8),
+            const Text("这些参数会影响 V2.1 的候选排序和解释；不会覆盖你的目标配置。"),
+            const SizedBox(height: 16),
+            TextField(
+              controller: _ministerPromptController,
+              enabled: !_saving && !_drafting,
+              minLines: 3,
+              maxLines: 5,
+              decoration: const InputDecoration(
+                labelText: "让大臣草拟参数",
+                helperText:
+                    "描述你的目标，例如：我更激进，偏科技能源，未来 5 年可能买房，也想做税务优化。",
+              ),
+            ),
+            const SizedBox(height: 10),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: _saving || _drafting ? null : _askMinisterForDraft,
+                icon: const Icon(Icons.auto_awesome),
+                label: Text(_drafting ? "大臣草拟中..." : "请大臣生成草稿"),
+              ),
+            ),
+            if (_draftSummary != null) ...[
+              const SizedBox(height: 10),
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text("大臣草稿已填入表单",
+                          style: Theme.of(context).textTheme.titleMedium),
+                      const SizedBox(height: 6),
+                      Text(_draftSummary!),
+                      const SizedBox(height: 6),
+                      ..._draftRationale.take(3).map((item) => Text("• $item")),
+                      const SizedBox(height: 6),
+                      const Text("确认无误后点击底部保存；你也可以先手动修改。"),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+            const SizedBox(height: 16),
+            _GuidedSelect(
+              label: "风险容量",
+              value: _riskCapacity,
+              items: const {"low": "低", "medium": "中", "high": "高"},
+              onChanged:
+                  _saving ? null : (value) => setState(() => _riskCapacity = value),
+            ),
+            _GuidedSelect(
+              label: "波动舒适度",
+              value: _volatilityComfort,
+              items: const {"low": "低", "medium": "中", "high": "高"},
+              onChanged: _saving
+                  ? null
+                  : (value) => setState(() => _volatilityComfort = value),
+            ),
+            _GuidedSelect(
+              label: "集中度容忍",
+              value: _concentrationTolerance,
+              items: const {"low": "低", "medium": "中", "high": "高"},
+              onChanged: _saving
+                  ? null
+                  : (value) => setState(() => _concentrationTolerance = value),
+            ),
+            _factorTextField(_preferredSectorsController, "偏好行业",
+                "例如 Technology, Energy；V2.1 会轻量加分。"),
+            _factorTextField(_avoidedSectorsController, "回避行业",
+                "例如 Tobacco；命中后会降低候选分。"),
+            _factorTextField(_styleTiltsController, "风格偏好",
+                "例如 Growth, Quality, Dividend。"),
+            _factorTextField(_themesController, "主题兴趣",
+                "例如 AI infrastructure, clean energy。"),
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              title: const Text("有买房/首付目标"),
+              value: _homePurchaseEnabled,
+              onChanged: _saving
+                  ? null
+                  : (value) => setState(() => _homePurchaseEnabled = value),
+            ),
+            if (_homePurchaseEnabled) ...[
+              TextField(
+                controller: _homeHorizonController,
+                enabled: !_saving,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(labelText: "买房时间线 年"),
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: _homeDownPaymentController,
+                enabled: !_saving,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(labelText: "首付目标 CAD"),
+              ),
+              const SizedBox(height: 10),
+              _GuidedSelect(
+                label: "买房目标优先级",
+                value: _homePurchasePriority,
+                items: const {"low": "低", "medium": "中", "high": "高"},
+                onChanged: _saving
+                    ? null
+                    : (value) => setState(() => _homePurchasePriority = value),
+              ),
+            ],
+            TextField(
+              controller: _provinceController,
+              enabled: !_saving,
+              textCapitalization: TextCapitalization.characters,
+              decoration: const InputDecoration(labelText: "税务省份"),
+            ),
+            const SizedBox(height: 10),
+            _GuidedSelect(
+              label: "RRSP 抵税优先级",
+              value: _rrspPriority,
+              items: const {"low": "低", "medium": "中", "high": "高"},
+              onChanged:
+                  _saving ? null : (value) => setState(() => _rrspPriority = value),
+            ),
+            _GuidedSelect(
+              label: "TFSA 成长优先级",
+              value: _tfsaPriority,
+              items: const {"low": "低", "medium": "中", "high": "高"},
+              onChanged:
+                  _saving ? null : (value) => setState(() => _tfsaPriority = value),
+            ),
+            _GuidedSelect(
+              label: "FHSA 买房优先级",
+              value: _fhsaPriority,
+              items: const {"low": "低", "medium": "中", "high": "高"},
+              onChanged:
+                  _saving ? null : (value) => setState(() => _fhsaPriority = value),
+            ),
+            _GuidedSelect(
+              label: "Taxable 税务敏感度",
+              value: _taxableSensitivity,
+              items: const {"low": "低", "medium": "中", "high": "高"},
+              onChanged: _saving
+                  ? null
+                  : (value) => setState(() => _taxableSensitivity = value),
+            ),
+            _GuidedSelect(
+              label: "USD 入金路径",
+              value: _usdFundingPath,
+              items: const {
+                "unknown": "未知",
+                "available": "可稳定使用",
+                "avoid": "尽量避免",
+              },
+              onChanged: _saving
+                  ? null
+                  : (value) => setState(() => _usdFundingPath = value),
+            ),
+            TextField(
+              controller: _monthlyContributionController,
+              enabled: !_saving,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(labelText: "月度新增资金 CAD"),
+            ),
+            const SizedBox(height: 10),
+            TextField(
+              controller: _minimumTradeController,
+              enabled: !_saving,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(labelText: "最小交易金额 CAD"),
+            ),
+            const SizedBox(height: 10),
+            _GuidedSelect(
+              label: "流动性需求",
+              value: _liquidityNeed,
+              items: const {"low": "低", "medium": "中", "high": "高"},
+              onChanged:
+                  _saving ? null : (value) => setState(() => _liquidityNeed = value),
+            ),
+            _GuidedSelect(
+              label: "不确定时期持现金意愿",
+              value: _cashDuringUncertainty,
+              items: const {"low": "低", "medium": "中", "high": "高"},
+              onChanged: _saving
+                  ? null
+                  : (value) => setState(() => _cashDuringUncertainty = value),
+            ),
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              title: const Text("允许新闻信号影响推荐"),
+              subtitle: const Text("当前只保存偏好；V3 接入外部信息后读取。"),
+              value: _allowNewsSignals,
+              onChanged: _saving
+                  ? null
+                  : (value) => setState(() => _allowNewsSignals = value),
+            ),
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              title: const Text("允许机构/基本面信号"),
+              value: _allowInstitutionalSignals,
+              onChanged: _saving
+                  ? null
+                  : (value) => setState(() => _allowInstitutionalSignals = value),
+            ),
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              title: const Text("允许社区情绪作为低置信参考"),
+              value: _allowCommunitySignals,
+              onChanged: _saving
+                  ? null
+                  : (value) => setState(() => _allowCommunitySignals = value),
+            ),
+            if (_error != null) ...[
+              const SizedBox(height: 12),
+              Text(_error!,
+                  style: TextStyle(color: Theme.of(context).colorScheme.error)),
+            ],
+            const SizedBox(height: 18),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton(
+                onPressed: _saving ? null : _save,
+                child: Text(_saving ? "保存中..." : "保存进阶偏好"),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _factorTextField(
+    TextEditingController controller,
+    String label,
+    String helper,
+  ) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: TextField(
+        controller: controller,
+        enabled: !_saving,
+        decoration: InputDecoration(labelText: label, helperText: helper),
+      ),
+    );
+  }
+}
+
 class _GuidedPreferenceSheet extends StatefulWidget {
   const _GuidedPreferenceSheet({
     required this.apiClient,
@@ -1057,6 +1604,8 @@ class _GuidedPreferenceSheetState extends State<_GuidedPreferenceSheet> {
                     Text("生成草稿", style: Theme.of(context).textTheme.titleLarge),
                     const SizedBox(height: 8),
                     Text(draft.summary),
+                    const SizedBox(height: 8),
+                    Text("进阶偏好：${draft.preferenceFactors.summary}"),
                     const SizedBox(height: 8),
                     ...draft.rationale.take(3).map((item) => Text("• $item")),
                   ],

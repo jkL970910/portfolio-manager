@@ -15,6 +15,7 @@ import {
   buildPortfolioHoldingDetailData,
   buildPortfolioSecurityDetailData,
 } from "@/lib/backend/view-builders";
+import { DEFAULT_PREFERENCE_FACTORS } from "@/lib/backend/preference-factors";
 
 const accounts: InvestmentAccount[] = [
   {
@@ -63,6 +64,7 @@ const profile: PreferenceProfile = {
   rebalancingTolerancePct: 5,
   watchlistSymbols: [],
   recommendationConstraints: DEFAULT_RECOMMENDATION_CONSTRAINTS,
+  preferenceFactors: DEFAULT_PREFERENCE_FACTORS,
 };
 
 const priceHistory: SecurityPriceHistoryPoint[] = [

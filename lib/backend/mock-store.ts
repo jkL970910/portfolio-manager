@@ -14,6 +14,7 @@ import {
   RecommendationRun,
   UserProfile
 } from "@/lib/backend/models";
+import { DEFAULT_PREFERENCE_FACTORS } from "@/lib/backend/preference-factors";
 
 export const users: UserProfile[] = [
   {
@@ -623,7 +624,8 @@ export const preferenceProfiles: PreferenceProfile[] = [
       avoidAccountTypes: [],
       preferredAccountTypes: [],
       allowedSecurityTypes: []
-    }
+    },
+    preferenceFactors: DEFAULT_PREFERENCE_FACTORS
   },
   {
     id: "pref_casey",
@@ -656,6 +658,20 @@ export const preferenceProfiles: PreferenceProfile[] = [
       avoidAccountTypes: [],
       preferredAccountTypes: [],
       allowedSecurityTypes: []
+    },
+    preferenceFactors: {
+      ...DEFAULT_PREFERENCE_FACTORS,
+      behavior: {
+        ...DEFAULT_PREFERENCE_FACTORS.behavior,
+        riskCapacity: "high",
+        volatilityComfort: "high",
+        concentrationTolerance: "high"
+      },
+      sectorTilts: {
+        ...DEFAULT_PREFERENCE_FACTORS.sectorTilts,
+        preferredSectors: ["Technology", "Energy"],
+        styleTilts: ["Growth"]
+      }
     }
   }
 ];

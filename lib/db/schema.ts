@@ -304,6 +304,7 @@ export const preferenceProfiles = pgTable(
     recommendationConstraints: jsonb("recommendation_constraints")
       .notNull()
       .default({}),
+    preferenceFactors: jsonb("preference_factors").notNull().default({}),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
