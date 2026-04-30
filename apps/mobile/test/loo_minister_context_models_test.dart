@@ -1,5 +1,6 @@
 import "package:flutter_test/flutter_test.dart";
 import "package:loo_wealth_mobile/features/overview/data/mobile_home_models.dart";
+import "package:loo_wealth_mobile/features/portfolio/data/mobile_portfolio_models.dart";
 import "package:loo_wealth_mobile/features/shared/data/mobile_chart_models.dart";
 import "package:loo_wealth_mobile/features/shared/data/loo_minister_context_models.dart";
 import "package:loo_wealth_mobile/features/shared/data/mobile_models.dart";
@@ -159,5 +160,87 @@ void main() {
     expect(factIds, contains("net-worth-chart"));
     expect(factIds, contains("recommendation-theme"));
     expect((json["warnings"] as List), contains("US Equity 高于目标。"));
+  });
+
+  test("builds portfolio minister context from typed portfolio snapshot", () {
+    const snapshot = MobilePortfolioSnapshot(
+      accounts: [],
+      holdings: [],
+      quoteStatus: "报价刚刚刷新",
+      healthScore: "78 分",
+      summaryPoints: ["US Equity 超过目标。"],
+      performance: [],
+      portfolioValueChart: MobileChartSeries(
+        title: "组合价值走势",
+        valueType: "money",
+        sourceMode: "local",
+        freshness: MobileChartFreshness(
+          status: "fresh",
+          label: "最新",
+          latestDate: "2026-04-30",
+          detail: "使用本地组合快照。",
+        ),
+        points: [
+          MobileChartPoint(
+            label: "4/29",
+            value: 99000,
+            displayValue: "CAD 99,000",
+            rawDate: "2026-04-29",
+          ),
+          MobileChartPoint(
+            label: "4/30",
+            value: 100000,
+            displayValue: "CAD 100,000",
+            rawDate: "2026-04-30",
+          ),
+        ],
+        notes: ["走势使用组合快照。"],
+      ),
+      fxContext: MobileFxContext(
+        label: "1 USD = 1.37 CAD",
+        note: "组合汇总使用 CAD。",
+        asOf: "2026-04-30T04:00:00.000Z",
+        source: "cached",
+        freshness: "fresh",
+      ),
+      accountTypeAllocation: [
+        MobilePortfolioAllocationPoint(
+          name: "TFSA",
+          value: 45,
+          displayValue: "45.0%",
+          detail: "免税账户",
+        ),
+      ],
+      accountInstanceAllocation: [],
+      assetClassDrilldown: [
+        MobileAssetClassDrilldown(
+          id: "us-equity",
+          name: "US Equity",
+          value: "CAD 42,000",
+          currentPct: 42,
+          targetPct: 32,
+          driftPct: 10,
+          current: "42.0%",
+          target: "32.0%",
+          driftLabel: "+10.0%",
+          summary: "高于目标",
+          actions: ["暂停新增 US Equity。"],
+          valueHistoryChart: null,
+          holdings: [],
+        ),
+      ],
+    );
+
+    final context = snapshot.toMinisterContext(asOf: now);
+    final json = context.toJson();
+    final factIds =
+        (json["facts"] as List).map((item) => item["id"] as String).toSet();
+
+    expect(context.isValidLocalShape, isTrue);
+    expect(json["page"], "portfolio");
+    expect(factIds, contains("quote-status"));
+    expect(factIds, contains("portfolio-value-chart"));
+    expect(factIds, contains("asset-class-us-equity"));
+    expect((json["warnings"] as List), contains("US Equity 超过目标。"));
   });
 }

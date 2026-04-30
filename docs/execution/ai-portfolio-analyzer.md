@@ -129,6 +129,10 @@ Current status:
 - Overview now builds a first page-specific minister context through
   `MobileHomeSnapshot.toMinisterContext(...)`, including metrics, health, FX
   context, chart freshness, recommendation theme, and safe allowed actions.
+- Portfolio now builds a page-specific minister context through
+  `MobilePortfolioSnapshot.toMinisterContext(...)`, including health score,
+  quote status, FX context, portfolio chart freshness, account allocation,
+  asset-class drift, and safe allowed actions.
 - The contract currently covers:
   - cross-page `LooMinisterPageContext`
   - `LooMinisterQuestionRequest`

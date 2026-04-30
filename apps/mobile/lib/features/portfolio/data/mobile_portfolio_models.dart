@@ -1,4 +1,5 @@
 import "../../shared/data/mobile_chart_models.dart";
+import "../../shared/data/loo_minister_context_models.dart";
 import "../../shared/data/mobile_models.dart";
 
 class MobilePortfolioSnapshot {
@@ -27,6 +28,104 @@ class MobilePortfolioSnapshot {
   final List<MobilePortfolioAllocationPoint> accountTypeAllocation;
   final List<MobilePortfolioAllocationPoint> accountInstanceAllocation;
   final List<MobileAssetClassDrilldown> assetClassDrilldown;
+
+  LooMinisterPageContext toMinisterContext({required String asOf}) {
+    final chart = portfolioValueChart;
+    return LooMinisterPageContext(
+      page: "portfolio",
+      title: "组合御览",
+      asOf: asOf,
+      displayCurrency: "CAD",
+      dataFreshness: LooMinisterDataFreshness(
+        fxAsOf: _toIsoDateTimeOrNull(fxContext.asOf),
+        chartFreshness: _toMinisterChartFreshness(chart?.freshness.status),
+        sourceMode: _toMinisterSourceMode(chart?.sourceMode),
+      ),
+      facts: [
+        LooMinisterFact(
+          id: "health-score",
+          label: "组合健康分",
+          value: healthScore,
+          detail: summaryPoints.take(3).join("；"),
+          source: "analysis-cache",
+        ),
+        LooMinisterFact(
+          id: "quote-status",
+          label: "报价状态",
+          value: quoteStatus,
+          source: "quote-cache",
+        ),
+        if (fxContext.hasContent)
+          LooMinisterFact(
+            id: "fx-context",
+            label: "FX 折算口径",
+            value: fxContext.label.isEmpty
+                ? fxContext.statusLabel
+                : fxContext.label,
+            detail: fxContext.note.isEmpty ? null : fxContext.note,
+            source: "fx-cache",
+          ),
+        if (chart != null)
+          LooMinisterFact(
+            id: "portfolio-value-chart",
+            label: chart.title,
+            value: chart.freshness.label,
+            detail: chart.freshness.detail,
+            source: "portfolio-data",
+          ),
+        LooMinisterFact(
+          id: "account-count",
+          label: "账户数量",
+          value: "${accounts.length} 个",
+        ),
+        LooMinisterFact(
+          id: "holding-count",
+          label: "持仓数量",
+          value: "${holdings.length} 个",
+        ),
+        ...accountTypeAllocation.take(5).map(
+              (point) => LooMinisterFact(
+                id: "account-type-${_slug(point.name)}",
+                label: "账户类型 ${point.name}",
+                value: point.displayValue,
+                detail: point.detail.isEmpty ? null : point.detail,
+              ),
+            ),
+        ...assetClassDrilldown.take(6).map(
+              (item) => LooMinisterFact(
+                id: "asset-class-${_slug(item.id.isEmpty ? item.name : item.id)}",
+                label: "资产类别 ${item.name}",
+                value: item.current,
+                detail: "目标 ${item.target} · 偏离 ${item.driftLabel}",
+                source: "analysis-cache",
+              ),
+            ),
+      ],
+      warnings: [
+        ...summaryPoints.take(4),
+        ...assetClassDrilldown
+            .where((item) => item.actions.isNotEmpty)
+            .take(4)
+            .map((item) => "${item.name}: ${item.actions.first}"),
+        if (chart != null && chart.notes.isNotEmpty) ...chart.notes.take(3),
+      ],
+      allowedActions: const [
+        LooMinisterSuggestedAction(
+          id: "open-health-score",
+          label: "查看组合健康分",
+          actionType: "navigate",
+          target: {"page": "portfolio-health"},
+        ),
+        LooMinisterSuggestedAction(
+          id: "run-portfolio-analysis",
+          label: "运行 AI 组合快扫",
+          actionType: "run-analysis",
+          target: {"page": "portfolio-health"},
+          requiresConfirmation: true,
+        ),
+      ],
+    );
+  }
 
   factory MobilePortfolioSnapshot.fromJson(Map<String, dynamic> json) {
     final quoteStatus = json["quoteStatus"];
@@ -87,6 +186,39 @@ class MobilePortfolioSnapshot {
       assetClassDrilldown: assetClassDrilldown,
     );
   }
+}
+
+String _toMinisterChartFreshness(String? value) {
+  return switch (value) {
+    "fresh" => "fresh",
+    "stale" => "stale",
+    "fallback" => "fallback",
+    "reference" => "reference",
+    _ => "unknown",
+  };
+}
+
+String _toMinisterSourceMode(String? value) {
+  return switch (value) {
+    "local" => "local",
+    "cached-external" => "cached-external",
+    "live-external" => "live-external",
+    "reference" => "reference",
+    _ => "local",
+  };
+}
+
+String? _toIsoDateTimeOrNull(String? value) {
+  if (value == null || value.isEmpty) return null;
+  return DateTime.tryParse(value)?.toUtc().toIso8601String();
+}
+
+String _slug(String value) {
+  return value
+      .trim()
+      .toLowerCase()
+      .replaceAll(RegExp(r"[^a-z0-9\u4e00-\u9fa5]+"), "-")
+      .replaceAll(RegExp(r"^-+|-+$"), "");
 }
 
 class MobilePortfolioPerformancePoint {
