@@ -126,6 +126,9 @@ Current status:
   `apps/mobile/lib/features/shared/data/loo_minister_context_models.dart`.
 - Flutter model tests exist in
   `apps/mobile/test/loo_minister_context_models_test.dart`.
+- Overview now builds a first page-specific minister context through
+  `MobileHomeSnapshot.toMinisterContext(...)`, including metrics, health, FX
+  context, chart freshness, recommendation theme, and safe allowed actions.
 - The contract currently covers:
   - cross-page `LooMinisterPageContext`
   - `LooMinisterQuestionRequest`

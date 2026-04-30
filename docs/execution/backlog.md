@@ -66,7 +66,7 @@ over simply adding more Flutter screens.
 | Watchlist and target constraints workflow | In Progress | Mobile can edit watchlist, strategy, tax-aware placement, and account priority constraints                                                                                                                                                                        |
 | Cloud-ready cache / worker boundaries     | In Progress | First-pass market-data refresh worker, persisted run ledger, mobile Settings run-status readout, and process-local provider retry-after guard exist; next is cron/cloud scheduling before heavier AI-agent jobs                                                   |
 | Quote-provider status UX                  | In Progress | Refresh results, Settings, holding rows, and price-history records now expose source/status lineage; remaining work is cloud-grade provider-limit persistence and deeper per-provider dashboards                                                                  |
-| Loo国 AI Minister assistant               | In Progress | Backend and Flutter first-pass page-context DTOs exist for cross-feature context Q&A plus structured analysis/drafts; next is wiring selected pages to produce context and adding the guarded question API                                                        |
+| Loo国 AI Minister assistant               | In Progress | Backend and Flutter first-pass page-context DTOs exist; Overview now builds a minister context with metrics, FX, chart freshness, recommendation theme, and safe actions; next is Portfolio context and guarded question API                                      |
 
 ## Deferred
 
@@ -82,7 +82,7 @@ over simply adding more Flutter screens.
 
 1. Add cron/cloud scheduling for the market-data worker and decide the deployment target.
 2. Persist provider retry-after state in database or Redis before multi-instance cloud deployment.
-3. Wire selected Flutter pages to build `LooMinisterPageContext`, then add the guarded question API.
+3. Wire Portfolio to build `LooMinisterPageContext`, then add the guarded question API.
 4. Harden mobile auth with revocable refresh tokens and production storage policy.
 5. Migrate spending/cash account monitoring into a dedicated mobile flow.
 6. Deepen Loo国 AI Minister assistant after page-context DTOs, async market-data, and research boundaries are stable.

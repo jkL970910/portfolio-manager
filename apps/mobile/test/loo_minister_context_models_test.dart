@@ -1,5 +1,8 @@
 import "package:flutter_test/flutter_test.dart";
+import "package:loo_wealth_mobile/features/overview/data/mobile_home_models.dart";
+import "package:loo_wealth_mobile/features/shared/data/mobile_chart_models.dart";
 import "package:loo_wealth_mobile/features/shared/data/loo_minister_context_models.dart";
+import "package:loo_wealth_mobile/features/shared/data/mobile_models.dart";
 
 void main() {
   const now = "2026-04-30T04:00:00.000Z";
@@ -91,5 +94,70 @@ void main() {
     );
 
     expect(context.isValidLocalShape, isFalse);
+  });
+
+  test("builds overview minister context from typed home snapshot", () {
+    const snapshot = MobileHomeSnapshot(
+      viewerName: "Loo国居民",
+      metrics: [
+        MobileMetric(label: "总资产", value: "CAD 100,000", detail: "当前净值"),
+      ],
+      health: MobileHomeHealth(
+        score: "82 分",
+        status: "稳定",
+        highlights: ["US Equity 高于目标。"],
+      ),
+      accounts: [],
+      topHoldings: [],
+      netWorthTrend: [],
+      netWorthChart: MobileChartSeries(
+        title: "总资产走势",
+        valueType: "money",
+        sourceMode: "local",
+        freshness: MobileChartFreshness(
+          status: "fresh",
+          label: "最新",
+          latestDate: "2026-04-30",
+          detail: "使用本地快照。",
+        ),
+        points: [
+          MobileChartPoint(
+            label: "4/29",
+            value: 99000,
+            displayValue: "CAD 99,000",
+            rawDate: "2026-04-29",
+          ),
+          MobileChartPoint(
+            label: "4/30",
+            value: 100000,
+            displayValue: "CAD 100,000",
+            rawDate: "2026-04-30",
+          ),
+        ],
+        notes: ["走势使用组合快照。"],
+      ),
+      fxContext: MobileFxContext(
+        label: "1 USD = 1.37 CAD",
+        note: "仅展示折算。",
+        asOf: "2026-04-30T04:00:00.000Z",
+        source: "cached",
+        freshness: "fresh",
+      ),
+      recommendationTheme: "补足固定收益",
+      recommendationReason: "当前组合波动略高。",
+    );
+
+    final context = snapshot.toMinisterContext(asOf: now);
+    final json = context.toJson();
+    final factIds =
+        (json["facts"] as List).map((item) => item["id"] as String).toSet();
+
+    expect(context.isValidLocalShape, isTrue);
+    expect(json["page"], "overview");
+    expect(factIds, contains("metric-总资产"));
+    expect(factIds, contains("fx-context"));
+    expect(factIds, contains("net-worth-chart"));
+    expect(factIds, contains("recommendation-theme"));
+    expect((json["warnings"] as List), contains("US Equity 高于目标。"));
   });
 }
