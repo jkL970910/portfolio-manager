@@ -33,22 +33,129 @@ class LooMinisterFloatingButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return FloatingActionButton.extended(
-      heroTag: "loo-minister",
-      onPressed: () {
-        showModalBottomSheet<void>(
-          context: context,
-          isScrollControlled: true,
-          useSafeArea: true,
-          builder: (_) => _LooMinisterSheet(
-            apiClient: apiClient,
-            pageContext: pageContext,
-            suggestedQuestion: suggestedQuestion,
-          ),
+    return Positioned.fill(
+      child: _DraggableMinisterButton(
+        apiClient: apiClient,
+        pageContext: pageContext,
+        suggestedQuestion: suggestedQuestion,
+      ),
+    );
+  }
+}
+
+class _DraggableMinisterButton extends StatefulWidget {
+  const _DraggableMinisterButton({
+    required this.apiClient,
+    required this.pageContext,
+    required this.suggestedQuestion,
+  });
+
+  final LooApiClient apiClient;
+  final LooMinisterPageContext pageContext;
+  final String suggestedQuestion;
+
+  @override
+  State<_DraggableMinisterButton> createState() =>
+      _DraggableMinisterButtonState();
+}
+
+class _DraggableMinisterButtonState extends State<_DraggableMinisterButton> {
+  static const _buttonWidth = 124.0;
+  static const _buttonHeight = 56.0;
+  static const _edgeMargin = 14.0;
+
+  Offset? _offset;
+  var _dragging = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final position = _clampOffset(
+          _offset ?? _initialOffset(constraints),
+          constraints,
+        );
+
+        return Stack(
+          children: [
+            AnimatedPositioned(
+              duration:
+                  _dragging ? Duration.zero : const Duration(milliseconds: 180),
+              curve: Curves.easeOutCubic,
+              left: position.dx,
+              top: position.dy,
+              width: _buttonWidth,
+              height: _buttonHeight,
+              child: GestureDetector(
+                onPanStart: (_) => setState(() => _dragging = true),
+                onPanUpdate: (details) {
+                  setState(() {
+                    _offset = _clampOffset(
+                      position + details.delta,
+                      constraints,
+                    );
+                  });
+                },
+                onPanEnd: (_) {
+                  final current = _clampOffset(
+                    _offset ?? position,
+                    constraints,
+                  );
+                  final snapLeft =
+                      current.dx + _buttonWidth / 2 < constraints.maxWidth / 2;
+                  setState(() {
+                    _dragging = false;
+                    _offset = _clampOffset(
+                      Offset(
+                        snapLeft
+                            ? _edgeMargin
+                            : constraints.maxWidth - _buttonWidth - _edgeMargin,
+                        current.dy,
+                      ),
+                      constraints,
+                    );
+                  });
+                },
+                child: FloatingActionButton.extended(
+                  heroTag: "loo-minister",
+                  onPressed: _openMinisterSheet,
+                  icon: const Icon(Icons.auto_awesome),
+                  label: const Text("问大臣"),
+                ),
+              ),
+            ),
+          ],
         );
       },
-      icon: const Icon(Icons.auto_awesome),
-      label: const Text("问大臣"),
+    );
+  }
+
+  Offset _initialOffset(BoxConstraints constraints) {
+    return Offset(
+      constraints.maxWidth - _buttonWidth - _edgeMargin,
+      constraints.maxHeight - _buttonHeight - _edgeMargin,
+    );
+  }
+
+  Offset _clampOffset(Offset offset, BoxConstraints constraints) {
+    final maxX = constraints.maxWidth - _buttonWidth - _edgeMargin;
+    final maxY = constraints.maxHeight - _buttonHeight - _edgeMargin;
+    return Offset(
+      offset.dx.clamp(_edgeMargin, maxX < _edgeMargin ? _edgeMargin : maxX),
+      offset.dy.clamp(_edgeMargin, maxY < _edgeMargin ? _edgeMargin : maxY),
+    );
+  }
+
+  void _openMinisterSheet() {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      builder: (_) => _LooMinisterSheet(
+        apiClient: widget.apiClient,
+        pageContext: widget.pageContext,
+        suggestedQuestion: widget.suggestedQuestion,
+      ),
     );
   }
 }

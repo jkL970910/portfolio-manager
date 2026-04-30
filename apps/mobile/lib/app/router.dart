@@ -69,11 +69,18 @@ class _MobileRootShellState extends State<MobileRootShell> {
     ];
 
     return Scaffold(
-      body: SafeArea(child: pages[_index]),
-      floatingActionButton: LooMinisterFloatingButton(
-        apiClient: widget.apiClient,
-        pageContext: _ministerContexts[_index] ?? _fallbackMinisterContext,
-        suggestedQuestion: _suggestedMinisterQuestion,
+      body: SafeArea(
+        child: Stack(
+          children: [
+            Positioned.fill(child: pages[_index]),
+            LooMinisterFloatingButton(
+              apiClient: widget.apiClient,
+              pageContext:
+                  _ministerContexts[_index] ?? _fallbackMinisterContext,
+              suggestedQuestion: _suggestedMinisterQuestion,
+            ),
+          ],
+        ),
       ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _index,
