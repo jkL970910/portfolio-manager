@@ -85,6 +85,20 @@
       "when": 1777514400000,
       "tag": "0011_loo_minister_gpt_settings",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1777550400000,
+      "tag": "0012_loo_minister_provider_routing",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1777554000000,
+      "tag": "0013_loo_minister_reasoning_effort",
+      "breakpoints": true
     }
   ]
 }

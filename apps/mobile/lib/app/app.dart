@@ -24,6 +24,7 @@ class LooWealthApp extends StatefulWidget {
 
 class _LooWealthAppState extends State<LooWealthApp> {
   late final MobileAuthStore _authStore;
+  final _navigatorKey = GlobalKey<NavigatorState>();
 
   MobileAuthSession? _session;
   LooMinisterPageContext? _ministerContext;
@@ -173,6 +174,7 @@ class _LooWealthAppState extends State<LooWealthApp> {
           );
 
     return MaterialApp(
+      navigatorKey: _navigatorKey,
       title: "Loo国的财富宝库",
       debugShowCheckedModeBanner: false,
       theme: buildLooTheme(),
@@ -189,6 +191,7 @@ class _LooWealthAppState extends State<LooWealthApp> {
               Positioned.fill(child: currentChild),
               LooMinisterFloatingButton(
                 apiClient: apiClient,
+                navigatorKey: _navigatorKey,
                 pageContext: _ministerContext ?? _fallbackMinisterContext,
                 suggestedQuestion: _suggestedMinisterQuestion,
               ),

@@ -107,6 +107,12 @@ export const displayCurrencyInputSchema = z.object({
 export const looMinisterSettingsInputSchema = z
   .object({
     mode: z.enum(["local", "gpt-5.5"]),
+    provider: z.enum(["official-openai", "openrouter-compatible"]).optional(),
+    model: z.string().trim().min(2).max(128).optional(),
+    reasoningEffort: z
+      .enum(["minimal", "low", "medium", "high", "xhigh"])
+      .optional(),
+    baseUrl: z.string().trim().url().max(240).optional(),
     apiKey: z.string().trim().min(20).max(512).optional(),
     clearApiKey: z.boolean().optional().default(false),
   })
@@ -116,6 +122,14 @@ export const looMinisterSettingsInputSchema = z
         code: z.ZodIssueCode.custom,
         path: ["apiKey"],
         message: "Cannot save and clear API key in the same request.",
+      });
+    }
+
+    if (value.provider === "official-openai" && value.baseUrl) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["baseUrl"],
+        message: "Official OpenAI provider does not accept a custom base URL.",
       });
     }
   });

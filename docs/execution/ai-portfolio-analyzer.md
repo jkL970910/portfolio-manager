@@ -156,25 +156,36 @@ Current status:
   first-pass page-context DTOs into the global minister scope. The floating
   entry remains above pushed detail routes instead of being limited to the
   bottom-tab shell.
-- GPT-5.5 integration should happen server-side through the OpenAI Responses
-  API with `OPENAI_API_KEY` in the backend environment. Flutter/Web must never
-  receive the raw API key. Keep the deterministic local answer as fallback when
-  `OPENAI_API_KEY` is absent or provider calls are disabled.
+- GPT-5.5 / external-model integration should happen server-side through a
+  Responses-compatible endpoint. Flutter/Web must never receive the raw API key.
+  Keep the deterministic local answer as fallback when the BYOK key is absent,
+  invalid, or provider calls are disabled.
 
 API integration plan:
 
 1. Backend env switches now exist: `LOO_MINISTER_PROVIDER_ENABLED=false`,
-   `LOO_MINISTER_ALLOW_SERVER_KEY=false`, `LOO_MINISTER_ENCRYPTION_SECRET`, and
-   `LOO_MINISTER_REASONING_EFFORT=low`. User-supplied OpenAI API keys are
-   encrypted server-side before storage.
-2. `/api/mobile/settings/ai-minister` exposes Local/GPT-5.5 mode, BYOK key
-   status, provider availability, and recent usage logs to Flutter Settings.
+   `LOO_MINISTER_ALLOW_SERVER_KEY=false`, `LOO_MINISTER_ENCRYPTION_SECRET`,
+   `LOO_MINISTER_REASONING_EFFORT=medium`, and
+   `LOO_MINISTER_DISABLE_RESPONSE_STORAGE=true`.
+   `LOO_MINISTER_OPENROUTER_BASE_URL` optionally sets the default
+   OpenRouter-compatible endpoint; the current local setup mirrors the Codex
+   router config with `https://openrouter.icu` and Responses wire, while model
+   and reasoning effort remain configurable. Current local defaults are model
+   `gpt-5.5` and reasoning effort `medium`. User-supplied API keys are encrypted
+   server-side before storage.
+2. `/api/mobile/settings/ai-minister` exposes Local/GPT-5.5 mode, provider
+   selection, model slug, reasoning effort, base URL, BYOK key status, provider
+   availability, and recent usage logs to Flutter Settings.
 3. `/api/mobile/minister/ask` remains the only Flutter-facing answer endpoint.
-   It routes to GPT-5.5 only when the user setting, provider env flag, and API
-   key are all present; otherwise it falls back to the deterministic local
-   answer.
+   It routes to the selected Responses-compatible endpoint only when the user
+   setting, provider env flag, and API key are all present; otherwise it falls
+   back to the deterministic local answer.
 4. GPT output is parsed back into `LooMinisterAnswerResult` and validated before
-   being returned to mobile.
+   being returned to mobile. Official OpenAI calls can use strict JSON Schema.
+   OpenRouter-compatible calls use a single-message plain-text context summary
+   with JSON object mode plus the same backend validator, because the current
+   router proxy can return 5xx for multi-message Responses input or raw JSON
+   context payloads.
 5. `loo_minister_usage_logs` records page, mode, provider, model, status, token
    counts when available, and fallback/error messages.
 6. Live external research stays disabled until worker/cache/provider quota

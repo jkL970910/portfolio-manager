@@ -605,7 +605,14 @@ export const looMinisterSettings = pgTable(
       .notNull()
       .references(() => users.id),
     mode: varchar("mode", { length: 24 }).notNull().default("local"),
-    model: varchar("model", { length: 64 }).notNull().default("gpt-5.5"),
+    provider: varchar("provider", { length: 40 })
+      .notNull()
+      .default("official-openai"),
+    model: varchar("model", { length: 128 }).notNull().default("gpt-5.5"),
+    reasoningEffort: varchar("reasoning_effort", { length: 16 })
+      .notNull()
+      .default("medium"),
+    baseUrl: varchar("base_url", { length: 240 }),
     encryptedApiKey: text("encrypted_api_key"),
     apiKeyIv: varchar("api_key_iv", { length: 64 }),
     apiKeyAuthTag: varchar("api_key_auth_tag", { length: 64 }),
@@ -635,7 +642,7 @@ export const looMinisterUsageLogs = pgTable(
     page: varchar("page", { length: 40 }).notNull(),
     mode: varchar("mode", { length: 24 }).notNull(),
     provider: varchar("provider", { length: 32 }).notNull(),
-    model: varchar("model", { length: 64 }).notNull(),
+    model: varchar("model", { length: 128 }).notNull(),
     status: varchar("status", { length: 24 }).notNull(),
     inputTokens: integer("input_tokens"),
     outputTokens: integer("output_tokens"),

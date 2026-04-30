@@ -85,15 +85,23 @@ function toAnswerSourceType(
     : sourceType;
 }
 
-function buildLocalAnswer(input: LooMinisterQuestionRequest) {
+function buildLocalAnswer(
+  input: LooMinisterQuestionRequest,
+  fallbackReason?: string,
+) {
   const pageContext = input.pageContext;
+  const fallbackNote = fallbackReason
+    ? `GPT-5.5 调用未成功，已降级为本地大臣答复。原因：${fallbackReason}\n`
+    : "";
   const answer: LooMinisterAnswerResult = {
     version: LOO_MINISTER_VERSION,
     generatedAt: new Date().toISOString(),
     role: "loo-minister",
     page: pageContext.page,
-    title: `${pageLabels[pageContext.page]}大臣答复`,
-    answer: buildAnswer(input),
+    title: fallbackReason
+      ? `${pageLabels[pageContext.page]}大臣本地降级答复`
+      : `${pageLabels[pageContext.page]}大臣答复`,
+    answer: `${fallbackNote}${buildAnswer(input)}`,
     keyPoints: [
       ...pageContext.facts
         .slice(0, 4)
@@ -117,6 +125,60 @@ function buildLocalAnswer(input: LooMinisterQuestionRequest) {
   };
 
   return looMinisterAnswerResultSchema.parse(answer);
+}
+
+function buildRouterCompatiblePrompt(input: LooMinisterQuestionRequest) {
+  const pageContext = input.pageContext;
+  const freshness = pageContext.dataFreshness;
+  const facts = pageContext.facts
+    .slice(0, 12)
+    .map(
+      (fact) =>
+        `- ${fact.label}: ${fact.value}${fact.detail ? ` (${fact.detail})` : ""}`,
+    )
+    .join("\n");
+  const warnings = pageContext.warnings
+    .slice(0, 6)
+    .map((warning) => `- ${warning}`)
+    .join("\n");
+  const subjectSecurity = pageContext.subject.security
+    ? [
+        pageContext.subject.security.symbol,
+        pageContext.subject.security.exchange,
+        pageContext.subject.security.currency,
+      ]
+        .filter(Boolean)
+        .join(" / ")
+    : "无";
+
+  return [
+    "你是 Loo国大臣。只使用下面的页面摘要回答中文问题。",
+    "不要编造实时行情、新闻或论坛结论；投资相关回答必须包含不构成投资建议的免责声明。",
+    "只返回合法 JSON object，不要 markdown，不要额外解释。",
+    "JSON 字段必须是：version, generatedAt, role, page, title, answer, keyPoints, suggestedActions, sources, disclaimer。",
+    `固定字段：version=${LOO_MINISTER_VERSION}; role=loo-minister; page=${pageContext.page}; suggestedActions=[]。`,
+    "sources 至少包含一个 {title, sourceType, asOf}，sourceType 可用 page-context、portfolio-data、quote-cache、fx-cache、analysis-cache、manual。",
+    `disclaimer 必须是 {"zh":"仅用于研究学习，不构成投资建议。","en":"For research and education only. This is not investment advice."}`,
+    "",
+    `页面：${pageContext.title}`,
+    `币种：${pageContext.displayCurrency}`,
+    `页面时间：${pageContext.asOf}`,
+    `标的身份：${subjectSecurity}`,
+    `数据新鲜度：portfolio=${freshness.portfolioAsOf ?? "未知"}; quotes=${freshness.quotesAsOf ?? "未知"}; fx=${freshness.fxAsOf ?? "未知"}; chart=${freshness.chartFreshness}; source=${freshness.sourceMode}`,
+    facts ? `关键事实：\n${facts}` : "关键事实：无",
+    warnings ? `页面提醒：\n${warnings}` : "页面提醒：无",
+    `用户问题：${input.question}`,
+    `回答风格：${input.answerStyle}`,
+  ].join("\n");
+}
+
+function sanitizeProviderError(message: string) {
+  return message
+    .replace(/sk-[A-Za-z0-9_-]+/g, (match) => {
+      const last4 = match.slice(-4);
+      return `sk-...${last4}`;
+    })
+    .slice(0, 500);
 }
 
 const answerJsonSchema = {
@@ -148,68 +210,12 @@ const answerJsonSchema = {
       items: {
         type: "object",
         additionalProperties: false,
-        properties: {
-          id: { type: "string" },
-          label: { type: "string" },
-          detail: { type: "string" },
-          actionType: {
-            enum: [
-              "explain",
-              "navigate",
-              "open-form",
-              "create-draft",
-              "update-preferences",
-              "refresh-data",
-              "run-analysis",
-            ],
-          },
-          target: {
-            type: "object",
-            additionalProperties: false,
-            properties: {
-              page: {
-                enum: [
-                  "overview",
-                  "portfolio",
-                  "account-detail",
-                  "holding-detail",
-                  "security-detail",
-                  "portfolio-health",
-                  "recommendations",
-                  "import",
-                  "settings",
-                  "spending",
-                ],
-              },
-              route: { type: "string" },
-              accountId: { type: "string" },
-              holdingId: { type: "string" },
-              security: {
-                type: "object",
-                additionalProperties: false,
-                properties: {
-                  symbol: { type: "string" },
-                  exchange: { type: "string" },
-                  currency: { enum: ["CAD", "USD"] },
-                  name: { type: "string" },
-                  provider: { type: "string" },
-                  securityType: { type: "string" },
-                },
-                required: ["symbol"],
-              },
-            },
-          },
-          requiresConfirmation: { type: "boolean" },
-        },
-        required: [
-          "id",
-          "label",
-          "actionType",
-          "target",
-          "requiresConfirmation",
-        ],
+        properties: {},
+        required: [],
       },
-      maxItems: 8,
+      minItems: 0,
+      // Product actions stay deterministic and confirmation-gated in app code.
+      maxItems: 0,
     },
     sources: {
       type: "array",
@@ -258,6 +264,19 @@ const answerJsonSchema = {
   ],
 };
 
+function getExternalTextFormat(settings: ResolvedLooMinisterSettings) {
+  if (settings.provider === "openrouter-compatible") {
+    return { type: "json_object" };
+  }
+
+  return {
+    type: "json_schema",
+    name: "loo_minister_answer",
+    strict: true,
+    schema: answerJsonSchema,
+  };
+}
+
 function extractOutputText(response: Record<string, unknown>) {
   if (typeof response.output_text === "string") {
     return response.output_text;
@@ -300,7 +319,38 @@ function extractUsage(response: Record<string, unknown>) {
   };
 }
 
-async function callOpenAiMinister(
+function buildExternalInput(
+  input: LooMinisterQuestionRequest,
+  settings: ResolvedLooMinisterSettings,
+) {
+  if (settings.provider === "openrouter-compatible") {
+    return [
+      {
+        role: "user",
+        content: buildRouterCompatiblePrompt(input),
+      },
+    ];
+  }
+
+  return [
+    {
+      role: "system",
+      content:
+        "你是 Loo国大臣。只用提供的页面 context 回答中文问题；不要编造实时行情、新闻或论坛结论；保留 symbol + exchange + currency 身份；所有投资相关回答必须包含不构成投资建议的免责声明。只返回合法 JSON object，不要 markdown。JSON 必须符合 LooMinisterAnswerResult：version、generatedAt、role、page、title、answer、keyPoints、suggestedActions、sources、disclaimer。role 必须是 loo-minister，suggestedActions 必须返回空数组，产品动作由本地应用控制。",
+    },
+    {
+      role: "user",
+      content: JSON.stringify({
+        question: input.question,
+        answerStyle: input.answerStyle,
+        pageContext: input.pageContext,
+        outputContract: "LooMinisterAnswerResult",
+      }),
+    },
+  ];
+}
+
+async function callExternalMinister(
   input: LooMinisterQuestionRequest,
   settings: ResolvedLooMinisterSettings,
 ) {
@@ -308,42 +358,54 @@ async function callOpenAiMinister(
     throw new Error("OpenAI API key is not configured.");
   }
 
-  const response = await fetch("https://api.openai.com/v1/responses", {
+  const maxAttempts = settings.provider === "openrouter-compatible" ? 2 : 1;
+  let lastError: unknown;
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    try {
+      return await callExternalMinisterOnce(input, settings);
+    } catch (error) {
+      lastError = error;
+      if (attempt === maxAttempts) {
+        throw error;
+      }
+    }
+  }
+
+  throw lastError instanceof Error
+    ? lastError
+    : new Error("OpenAI request failed.");
+}
+
+async function callExternalMinisterOnce(
+  input: LooMinisterQuestionRequest,
+  settings: ResolvedLooMinisterSettings,
+) {
+  const response = await fetch(settings.endpoint, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${settings.apiKey}`,
       "Content-Type": "application/json",
+      "HTTP-Referer": "http://localhost:3000",
+      "X-Title": "Loo Portfolio Manager",
     },
     body: JSON.stringify({
       model: settings.model,
+      store:
+        process.env.LOO_MINISTER_DISABLE_RESPONSE_STORAGE === "true"
+          ? false
+          : undefined,
       reasoning: {
-        effort: process.env.LOO_MINISTER_REASONING_EFFORT || "low",
+        effort: settings.reasoningEffort,
       },
-      text: {
-        verbosity: "low",
-        format: {
-          type: "json_schema",
-          name: "loo_minister_answer",
-          strict: true,
-          schema: answerJsonSchema,
-        },
-      },
-      input: [
-        {
-          role: "system",
-          content:
-            "你是 Loo国大臣。只用提供的页面 context 回答中文问题；不要编造实时行情、新闻或论坛结论；保留 symbol + exchange + currency 身份；所有投资相关回答必须包含不构成投资建议的免责声明。suggestedActions 只能从 pageContext.allowedActions 复制安全动作；不确定时返回空数组。",
-        },
-        {
-          role: "user",
-          content: JSON.stringify({
-            question: input.question,
-            answerStyle: input.answerStyle,
-            pageContext: input.pageContext,
-            outputContract: "LooMinisterAnswerResult",
-          }),
-        },
-      ],
+      text:
+        settings.provider === "openrouter-compatible"
+          ? { format: getExternalTextFormat(settings) }
+          : {
+              verbosity: "low",
+              format: getExternalTextFormat(settings),
+            },
+      input: buildExternalInput(input, settings),
     }),
   });
 
@@ -354,11 +416,17 @@ async function callOpenAiMinister(
 
   if (!response.ok) {
     const error = payload.error;
-    const message =
+    const providerName =
+      settings.provider === "openrouter-compatible"
+        ? "OpenRouter-compatible"
+        : "OpenAI";
+    const detail =
       error && typeof error === "object" && "message" in error
         ? String((error as { message?: unknown }).message)
-        : `OpenAI request failed with status ${response.status}.`;
-    throw new Error(message);
+        : "No provider error body.";
+    throw new Error(
+      `${providerName} request failed with status ${response.status} for ${settings.endpoint} using model ${settings.model}: ${detail}`,
+    );
   }
 
   const outputText = extractOutputText(payload);
@@ -384,37 +452,39 @@ export async function getLooMinisterAnswer(
   const settings =
     options.settings ?? (await resolveLooMinisterSettings(userId));
   const persistUsage = options.persistUsage ?? true;
-  const localAnswer = () => buildLocalAnswer(input);
+  const localAnswer = (fallbackReason?: string) =>
+    buildLocalAnswer(input, fallbackReason);
 
   if (
     settings.mode !== "gpt-5.5" ||
     !settings.providerEnabled ||
     !settings.apiKey
   ) {
-    const answer = localAnswer();
+    const fallbackReason =
+      settings.mode === "local"
+        ? undefined
+        : "GPT-5.5 provider 未启用或 API Key 未配置。";
+    const answer = localAnswer(fallbackReason);
     if (persistUsage) {
       await recordLooMinisterUsage(userId, {
         page: input.pageContext.page,
         mode: settings.mode,
-        provider: "local",
+        provider: settings.mode === "local" ? "local" : settings.provider,
         model: settings.model,
         status: settings.mode === "local" ? "success" : "fallback",
-        errorMessage:
-          settings.mode === "local"
-            ? null
-            : "GPT-5.5 mode is pending provider enablement or API key.",
+        errorMessage: settings.mode === "local" ? null : fallbackReason,
       });
     }
     return apiSuccess(answer, "service");
   }
 
   try {
-    const result = await callOpenAiMinister(input, settings);
+    const result = await callExternalMinister(input, settings);
     if (persistUsage) {
       await recordLooMinisterUsage(userId, {
         page: input.pageContext.page,
         mode: settings.mode,
-        provider: `openai-${settings.apiKeySource}`,
+        provider: `${settings.provider}-${settings.apiKeySource}`,
         model: settings.model,
         status: "success",
         inputTokens: result.usage.inputTokens,
@@ -424,16 +494,18 @@ export async function getLooMinisterAnswer(
     }
     return apiSuccess(result.answer, "service");
   } catch (error) {
-    const answer = localAnswer();
+    const errorMessage = sanitizeProviderError(
+      error instanceof Error ? error.message : "OpenAI provider failed.",
+    );
+    const answer = localAnswer(errorMessage);
     if (persistUsage) {
       await recordLooMinisterUsage(userId, {
         page: input.pageContext.page,
         mode: settings.mode,
-        provider: `openai-${settings.apiKeySource}`,
+        provider: `${settings.provider}-${settings.apiKeySource}`,
         model: settings.model,
         status: "fallback",
-        errorMessage:
-          error instanceof Error ? error.message : "OpenAI provider failed.",
+        errorMessage,
       });
     }
     return apiSuccess(answer, "service");

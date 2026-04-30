@@ -22,12 +22,14 @@ class LooMinisterCard extends StatefulWidget {
 class LooMinisterFloatingButton extends StatelessWidget {
   const LooMinisterFloatingButton({
     required this.apiClient,
+    required this.navigatorKey,
     required this.pageContext,
     required this.suggestedQuestion,
     super.key,
   });
 
   final LooApiClient apiClient;
+  final GlobalKey<NavigatorState> navigatorKey;
   final LooMinisterPageContext pageContext;
   final String suggestedQuestion;
 
@@ -36,6 +38,7 @@ class LooMinisterFloatingButton extends StatelessWidget {
     return Positioned.fill(
       child: _DraggableMinisterButton(
         apiClient: apiClient,
+        navigatorKey: navigatorKey,
         pageContext: pageContext,
         suggestedQuestion: suggestedQuestion,
       ),
@@ -46,11 +49,13 @@ class LooMinisterFloatingButton extends StatelessWidget {
 class _DraggableMinisterButton extends StatefulWidget {
   const _DraggableMinisterButton({
     required this.apiClient,
+    required this.navigatorKey,
     required this.pageContext,
     required this.suggestedQuestion,
   });
 
   final LooApiClient apiClient;
+  final GlobalKey<NavigatorState> navigatorKey;
   final LooMinisterPageContext pageContext;
   final String suggestedQuestion;
 
@@ -66,6 +71,8 @@ class _DraggableMinisterButtonState extends State<_DraggableMinisterButton> {
 
   Offset? _offset;
   var _dragging = false;
+  var _movedDuringGesture = false;
+  var _sheetOpen = false;
 
   @override
   Widget build(BuildContext context) {
@@ -78,52 +85,76 @@ class _DraggableMinisterButtonState extends State<_DraggableMinisterButton> {
 
         return Stack(
           children: [
-            AnimatedPositioned(
-              duration:
-                  _dragging ? Duration.zero : const Duration(milliseconds: 180),
-              curve: Curves.easeOutCubic,
-              left: position.dx,
-              top: position.dy,
-              width: _buttonWidth,
-              height: _buttonHeight,
-              child: GestureDetector(
-                onPanStart: (_) => setState(() => _dragging = true),
-                onPanUpdate: (details) {
-                  setState(() {
-                    _offset = _clampOffset(
-                      position + details.delta,
+            if (!_sheetOpen)
+              AnimatedPositioned(
+                duration: _dragging
+                    ? Duration.zero
+                    : const Duration(milliseconds: 180),
+                curve: Curves.easeOutCubic,
+                left: position.dx,
+                top: position.dy,
+                width: _buttonWidth,
+                height: _buttonHeight,
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: _openMinisterSheet,
+                  onPanStart: (_) {
+                    setState(() {
+                      _dragging = true;
+                      _movedDuringGesture = false;
+                    });
+                  },
+                  onPanUpdate: (details) {
+                    setState(() {
+                      _movedDuringGesture = true;
+                      _offset = _clampOffset(
+                        position + details.delta,
+                        constraints,
+                      );
+                    });
+                  },
+                  onPanCancel: () {
+                    setState(() {
+                      _dragging = false;
+                      _movedDuringGesture = false;
+                    });
+                  },
+                  onPanEnd: (_) {
+                    final current = _clampOffset(
+                      _offset ?? position,
                       constraints,
                     );
-                  });
-                },
-                onPanEnd: (_) {
-                  final current = _clampOffset(
-                    _offset ?? position,
-                    constraints,
-                  );
-                  final snapLeft =
-                      current.dx + _buttonWidth / 2 < constraints.maxWidth / 2;
-                  setState(() {
-                    _dragging = false;
-                    _offset = _clampOffset(
-                      Offset(
-                        snapLeft
-                            ? _edgeMargin
-                            : constraints.maxWidth - _buttonWidth - _edgeMargin,
-                        current.dy,
-                      ),
-                      constraints,
-                    );
-                  });
-                },
-                child: FloatingActionButton.extended(
-                  heroTag: "loo-minister",
-                  onPressed: _openMinisterSheet,
-                  icon: const Icon(Icons.auto_awesome),
-                  label: const Text("问大臣"),
+                    final snapLeft = current.dx + _buttonWidth / 2 <
+                        constraints.maxWidth / 2;
+                    setState(() {
+                      _dragging = false;
+                      _offset = _clampOffset(
+                        Offset(
+                          snapLeft
+                              ? _edgeMargin
+                              : constraints.maxWidth -
+                                  _buttonWidth -
+                                  _edgeMargin,
+                          current.dy,
+                        ),
+                        constraints,
+                      );
+                    });
+                    if (!_movedDuringGesture) {
+                      _openMinisterSheet();
+                    }
+                    _movedDuringGesture = false;
+                  },
+                  child: AbsorbPointer(
+                    child: FloatingActionButton.extended(
+                      heroTag: "loo-minister",
+                      onPressed: () {},
+                      icon: const Icon(Icons.auto_awesome),
+                      label: const Text("问大臣"),
+                    ),
+                  ),
                 ),
               ),
-            ),
           ],
         );
       },
@@ -147,16 +178,31 @@ class _DraggableMinisterButtonState extends State<_DraggableMinisterButton> {
   }
 
   void _openMinisterSheet() {
+    if (_sheetOpen) {
+      return;
+    }
+
+    final sheetContext = widget.navigatorKey.currentContext;
+    if (sheetContext == null) {
+      return;
+    }
+
+    setState(() => _sheetOpen = true);
     showModalBottomSheet<void>(
-      context: context,
+      context: sheetContext,
       isScrollControlled: true,
+      useRootNavigator: true,
       useSafeArea: true,
       builder: (_) => _LooMinisterSheet(
         apiClient: widget.apiClient,
         pageContext: widget.pageContext,
         suggestedQuestion: widget.suggestedQuestion,
       ),
-    );
+    ).whenComplete(() {
+      if (mounted) {
+        setState(() => _sheetOpen = false);
+      }
+    });
   }
 }
 

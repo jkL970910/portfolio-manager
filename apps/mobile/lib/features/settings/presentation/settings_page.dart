@@ -197,12 +197,16 @@ class _AiMinisterSettingsCard extends StatefulWidget {
 class _AiMinisterSettingsCardState extends State<_AiMinisterSettingsCard> {
   late Future<_AiMinisterSettings> _settings = _loadSettings();
   final _apiKeyController = TextEditingController();
+  final _modelController = TextEditingController();
+  final _baseUrlController = TextEditingController();
   var _saving = false;
   String? _message;
 
   @override
   void dispose() {
     _apiKeyController.dispose();
+    _modelController.dispose();
+    _baseUrlController.dispose();
     super.dispose();
   }
 
@@ -220,10 +224,17 @@ class _AiMinisterSettingsCardState extends State<_AiMinisterSettingsCard> {
     });
   }
 
-  Future<void> _save({String? mode, bool clearApiKey = false}) async {
+  Future<void> _save({
+    String? mode,
+    String? provider,
+    String? reasoningEffort,
+    bool clearApiKey = false,
+  }) async {
     if (_saving) return;
     final current = await _settings;
     final apiKey = _apiKeyController.text.trim();
+    final model = _modelController.text.trim();
+    final baseUrl = _baseUrlController.text.trim();
     setState(() {
       _saving = true;
       _message = null;
@@ -232,6 +243,10 @@ class _AiMinisterSettingsCardState extends State<_AiMinisterSettingsCard> {
     try {
       final response = await widget.apiClient.updateAiMinisterSettings({
         "mode": mode ?? current.mode,
+        "provider": provider ?? current.provider,
+        "reasoningEffort": reasoningEffort ?? current.reasoningEffort,
+        if (model.isNotEmpty) "model": model,
+        if (baseUrl.isNotEmpty) "baseUrl": baseUrl,
         if (apiKey.isNotEmpty) "apiKey": apiKey,
         if (clearApiKey) "clearApiKey": true,
       });
@@ -241,6 +256,8 @@ class _AiMinisterSettingsCardState extends State<_AiMinisterSettingsCard> {
       if (mounted) {
         setState(() {
           _apiKeyController.clear();
+          _modelController.clear();
+          _baseUrlController.clear();
           _settings = Future.value(_AiMinisterSettings.fromJson(payload));
           _message = "AI 大臣设置已保存。";
           _saving = false;
@@ -305,11 +322,28 @@ class _AiMinisterSettingsCardState extends State<_AiMinisterSettingsCard> {
                   SegmentedButton<String>(
                     segments: const [
                       ButtonSegment(value: "local", label: Text("本地")),
-                      ButtonSegment(value: "gpt-5.5", label: Text("GPT-5.5")),
+                      ButtonSegment(value: "gpt-5.5", label: Text("外部 GPT")),
                     ],
                     selected: {settings.mode},
                     onSelectionChanged:
                         _saving ? null : (value) => _save(mode: value.first),
+                  ),
+                  const SizedBox(height: 10),
+                  SegmentedButton<String>(
+                    segments: const [
+                      ButtonSegment(
+                        value: "official-openai",
+                        label: Text("OpenAI 官方"),
+                      ),
+                      ButtonSegment(
+                        value: "openrouter-compatible",
+                        label: Text("Router"),
+                      ),
+                    ],
+                    selected: {settings.provider},
+                    onSelectionChanged: _saving
+                        ? null
+                        : (value) => _save(provider: value.first),
                   ),
                   const SizedBox(height: 12),
                   Wrap(
@@ -317,18 +351,62 @@ class _AiMinisterSettingsCardState extends State<_AiMinisterSettingsCard> {
                     runSpacing: 8,
                     children: [
                       Chip(label: Text(settings.effectiveModeLabel)),
-                      Chip(label: Text(settings.apiKeyLabel)),
                       Chip(label: Text(settings.providerLabel)),
+                      Chip(label: Text("模型：${settings.model}")),
+                      Chip(label: Text("推理：${settings.reasoningEffortLabel}")),
+                      Chip(label: Text(settings.apiKeyLabel)),
+                      Chip(label: Text(settings.providerEnabledLabel)),
                     ],
                   ),
                   const SizedBox(height: 10),
                   Text(settings.privacyNote),
                   const SizedBox(height: 12),
                   TextField(
+                    controller: _modelController,
+                    decoration: InputDecoration(
+                      labelText: "模型",
+                      helperText: "留空保持当前；Router 模式填写对应平台的 model slug。",
+                      hintText: settings.model,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  SegmentedButton<String>(
+                    segments: const [
+                      ButtonSegment(value: "low", label: Text("低")),
+                      ButtonSegment(value: "medium", label: Text("中")),
+                      ButtonSegment(value: "high", label: Text("高")),
+                      ButtonSegment(value: "xhigh", label: Text("极高")),
+                    ],
+                    selected: {settings.reasoningEffort},
+                    onSelectionChanged: _saving
+                        ? null
+                        : (value) => _save(reasoningEffort: value.first),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    "推理强度越高通常越慢、越贵；默认中档适合当前大臣问答。",
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                  const SizedBox(height: 10),
+                  TextField(
+                    controller: _baseUrlController,
+                    enabled: settings.provider == "openrouter-compatible",
+                    decoration: InputDecoration(
+                      labelText: "Router Base URL",
+                      helperText:
+                          "留空使用默认；自定义兼容域名通常填 https://openrouter.icu，官方 OpenRouter 可填完整 /api/v1/responses。",
+                      hintText: settings.baseUrl ??
+                          "https://openrouter.ai/api/v1/responses",
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  TextField(
                     controller: _apiKeyController,
                     obscureText: true,
-                    decoration: const InputDecoration(
-                      labelText: "OpenAI API Key",
+                    decoration: InputDecoration(
+                      labelText: settings.provider == "openrouter-compatible"
+                          ? "Router API Key"
+                          : "OpenAI API Key",
                       helperText: "只保存到后端加密存储；不会写入 Flutter 客户端。",
                     ),
                   ),
@@ -383,6 +461,11 @@ class _AiMinisterSettingsCardState extends State<_AiMinisterSettingsCard> {
 class _AiMinisterSettings {
   const _AiMinisterSettings({
     required this.mode,
+    required this.provider,
+    required this.providerLabel,
+    required this.model,
+    required this.reasoningEffort,
+    required this.baseUrl,
     required this.apiKeyConfigured,
     required this.apiKeyLast4,
     required this.serverKeyAvailable,
@@ -393,6 +476,11 @@ class _AiMinisterSettings {
   });
 
   final String mode;
+  final String provider;
+  final String providerLabel;
+  final String model;
+  final String reasoningEffort;
+  final String? baseUrl;
   final bool apiKeyConfigured;
   final String? apiKeyLast4;
   final bool serverKeyAvailable;
@@ -403,8 +491,8 @@ class _AiMinisterSettings {
 
   String get effectiveModeLabel {
     return switch (effectiveMode) {
-      "gpt-5.5" => "实际使用 GPT-5.5",
-      "gpt-5.5-pending-key" => "GPT-5.5 待配置",
+      "gpt-5.5" => "实际使用外部 GPT",
+      "gpt-5.5-pending-key" => "外部 GPT 待配置",
       _ => "实际使用本地大臣",
     };
   }
@@ -419,14 +507,30 @@ class _AiMinisterSettings {
     return "未配置 API Key";
   }
 
-  String get providerLabel {
+  String get providerEnabledLabel {
     return providerEnabled ? "Provider 已启用" : "Provider 未启用";
+  }
+
+  String get reasoningEffortLabel {
+    return switch (reasoningEffort) {
+      "minimal" => "最低",
+      "low" => "低",
+      "medium" => "中",
+      "high" => "高",
+      "xhigh" => "极高",
+      _ => reasoningEffort,
+    };
   }
 
   factory _AiMinisterSettings.fromJson(Map<String, dynamic> json) {
     final rawUsage = json["recentUsage"];
     return _AiMinisterSettings(
       mode: json["mode"] as String? ?? "local",
+      provider: json["provider"] as String? ?? "official-openai",
+      providerLabel: json["providerLabel"] as String? ?? "OpenAI 官方",
+      model: json["model"] as String? ?? "gpt-5.5",
+      reasoningEffort: json["reasoningEffort"] as String? ?? "medium",
+      baseUrl: json["baseUrl"] as String?,
       apiKeyConfigured: json["apiKeyConfigured"] == true,
       apiKeyLast4: json["apiKeyLast4"] as String?,
       serverKeyAvailable: json["serverKeyAvailable"] == true,
