@@ -156,12 +156,6 @@ class _HoldingDetailPageState extends State<HoldingDetailPage> {
                 const _SectionTitle("Loo国健康度"),
                 const SizedBox(height: 8),
                 _HealthCard(data.healthSummary),
-                if (data.performance.isNotEmpty) ...[
-                  const SizedBox(height: 16),
-                  const _SectionTitle("表现记录"),
-                  const SizedBox(height: 8),
-                  ...data.performance.take(6).map(_PerformanceTile.new),
-                ],
               ],
             ),
           );
@@ -1000,23 +994,6 @@ class _HealthCard extends StatelessWidget {
                 ),
           ],
         ),
-      ),
-    );
-  }
-}
-
-class _PerformanceTile extends StatelessWidget {
-  const _PerformanceTile(this.point);
-
-  final MobilePerformancePoint point;
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      child: ListTile(
-        title: Text(point.label),
-        trailing:
-            Text(point.value, style: Theme.of(context).textTheme.titleLarge),
       ),
     );
   }

@@ -554,7 +554,9 @@ class _AiMinisterUsage {
     required this.status,
     required this.model,
     required this.tokenLabel,
+    required this.retryLabel,
     required this.createdAt,
+    this.failureKind,
     this.errorMessage,
   });
 
@@ -563,7 +565,9 @@ class _AiMinisterUsage {
   final String status;
   final String model;
   final String tokenLabel;
+  final String retryLabel;
   final String createdAt;
+  final String? failureKind;
   final String? errorMessage;
 
   factory _AiMinisterUsage.fromJson(Map<String, dynamic> json) {
@@ -573,7 +577,9 @@ class _AiMinisterUsage {
       status: json["status"] as String? ?? "unknown",
       model: json["model"] as String? ?? "gpt-5.5",
       tokenLabel: json["tokenLabel"] as String? ?? "token 未返回",
+      retryLabel: json["retryLabel"] as String? ?? "未重试",
       createdAt: json["createdAt"] as String? ?? "",
+      failureKind: json["failureKind"] as String?,
       errorMessage: json["errorMessage"] as String?,
     );
   }
@@ -599,6 +605,8 @@ class _AiMinisterUsageTile extends StatelessWidget {
         [
           item.model,
           item.tokenLabel,
+          item.retryLabel,
+          if (item.failureKind != null) item.failureKind!,
           if (item.errorMessage != null) item.errorMessage!,
         ].join(" · "),
       ),

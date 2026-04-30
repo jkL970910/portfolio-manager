@@ -9,7 +9,10 @@ import {
   getQuoteFromTwelveData,
   searchSecuritiesWithTwelveData,
 } from "@/lib/market-data/twelve-data";
-import { getQuoteFromYahooFinance } from "@/lib/market-data/yahoo-finance";
+import {
+  getHistoricalSeriesFromYahooFinance,
+  getQuoteFromYahooFinance,
+} from "@/lib/market-data/yahoo-finance";
 import type {
   SecurityHistoricalPoint,
   SecurityQuote,
@@ -330,12 +333,47 @@ export async function getSecurityHistoricalSeries(
       staleOnErrorMs: 60 * 1000,
     },
     async () => {
+      if (
+        isCanadianQuoteRequest(normalizedExchange, normalizedCurrency) &&
+        !isProviderLimited("yahoo-finance")
+      ) {
+        const yahooResults = await getHistoricalSeriesFromYahooFinance(
+          trimmed,
+          normalizedExchange,
+          normalizedCurrency,
+        ).catch((error) => {
+          const message =
+            error instanceof Error ? error.message.toLowerCase() : "";
+          if (message.includes("rate limit")) {
+            throw error;
+          }
+          return [];
+        });
+        if (hasDenseHistory(yahooResults)) {
+          return yahooResults;
+        }
+      }
+
       const twelveResults = await getHistoricalSeriesFromTwelveData(
         trimmed,
         normalizedExchange,
       ).catch(() => []);
       if (hasDenseHistory(twelveResults)) {
         return twelveResults;
+      }
+
+      if (
+        !isCanadianQuoteRequest(normalizedExchange, normalizedCurrency) &&
+        !isProviderLimited("yahoo-finance")
+      ) {
+        const yahooResults = await getHistoricalSeriesFromYahooFinance(
+          trimmed,
+          normalizedExchange,
+          normalizedCurrency,
+        ).catch(() => []);
+        if (hasDenseHistory(yahooResults)) {
+          return yahooResults;
+        }
       }
 
       const alphaResults = await getHistoricalSeriesFromAlphaVantage(

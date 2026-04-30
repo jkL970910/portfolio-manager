@@ -319,6 +319,32 @@ function extractUsage(response: Record<string, unknown>) {
   };
 }
 
+function classifyMinisterProviderFailure(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error);
+  if (/status 5\d\d/.test(message)) return "provider_5xx";
+  if (/status 4\d\d/.test(message)) return "provider_4xx";
+  if (/did not include output text/.test(message)) return "empty_output";
+  if (/JSON/.test(message)) return "invalid_json";
+  if (/ZodError|validation|Invalid/.test(message)) return "contract_invalid";
+  return "provider_error";
+}
+
+function getRetryCount(error: unknown) {
+  const cause = error instanceof Error ? error.cause : null;
+  if (!cause || typeof cause !== "object") return 0;
+  const retryCount = (cause as { retryCount?: unknown }).retryCount;
+  return typeof retryCount === "number" ? retryCount : 0;
+}
+
+function getFailureKind(error: unknown) {
+  const cause = error instanceof Error ? error.cause : null;
+  if (cause && typeof cause === "object") {
+    const failureKind = (cause as { failureKind?: unknown }).failureKind;
+    if (typeof failureKind === "string" && failureKind) return failureKind;
+  }
+  return classifyMinisterProviderFailure(error);
+}
+
 function buildExternalInput(
   input: LooMinisterQuestionRequest,
   settings: ResolvedLooMinisterSettings,
@@ -360,21 +386,37 @@ async function callExternalMinister(
 
   const maxAttempts = settings.provider === "openrouter-compatible" ? 2 : 1;
   let lastError: unknown;
+  let attemptsUsed = 0;
 
   for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    attemptsUsed = attempt;
     try {
-      return await callExternalMinisterOnce(input, settings);
+      const result = await callExternalMinisterOnce(input, settings);
+      return {
+        ...result,
+        retryCount: attemptsUsed - 1,
+      };
     } catch (error) {
       lastError = error;
       if (attempt === maxAttempts) {
-        throw error;
+        const finalError =
+          error instanceof Error ? error : new Error(String(error));
+        finalError.cause = {
+          retryCount: attemptsUsed - 1,
+          failureKind: classifyMinisterProviderFailure(error),
+        };
+        throw finalError;
       }
     }
   }
 
-  throw lastError instanceof Error
-    ? lastError
-    : new Error("OpenAI request failed.");
+  const finalError =
+    lastError instanceof Error ? lastError : new Error("OpenAI request failed.");
+  finalError.cause = {
+    retryCount: Math.max(0, attemptsUsed - 1),
+    failureKind: classifyMinisterProviderFailure(lastError),
+  };
+  throw finalError;
 }
 
 async function callExternalMinisterOnce(
@@ -490,6 +532,7 @@ export async function getLooMinisterAnswer(
         inputTokens: result.usage.inputTokens,
         outputTokens: result.usage.outputTokens,
         totalTokens: result.usage.totalTokens,
+        retryCount: result.retryCount,
       });
     }
     return apiSuccess(result.answer, "service");
@@ -505,6 +548,8 @@ export async function getLooMinisterAnswer(
         provider: `${settings.provider}-${settings.apiKeySource}`,
         model: settings.model,
         status: "fallback",
+        retryCount: getRetryCount(error),
+        failureKind: getFailureKind(error),
         errorMessage,
       });
     }

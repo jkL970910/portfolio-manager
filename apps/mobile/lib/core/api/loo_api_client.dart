@@ -180,6 +180,11 @@ class LooApiClient {
         "/api/mobile/portfolio/securities/${Uri.encodeComponent(symbol)}$suffix");
   }
 
+  Future<Map<String, dynamic>> refreshPortfolioSecurityQuote(String symbol) {
+    return _postJson(
+        "/api/mobile/portfolio/securities/${Uri.encodeComponent(symbol)}/refresh-price");
+  }
+
   Future<void> deletePortfolioAccount(String accountId) async {
     await _deleteJson(
         "/api/mobile/portfolio/accounts/${Uri.encodeComponent(accountId)}/manage");

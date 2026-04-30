@@ -33,6 +33,9 @@ export interface LooMinisterUsageItem {
   model: string;
   status: string;
   tokenLabel: string;
+  retryLabel: string;
+  retryCount: number;
+  failureKind: string | null;
   errorMessage: string | null;
   createdAt: string;
 }
@@ -57,6 +60,8 @@ export interface LooMinisterUsageInsert {
   inputTokens?: number | null;
   outputTokens?: number | null;
   totalTokens?: number | null;
+  retryCount?: number | null;
+  failureKind?: string | null;
   errorMessage?: string | null;
 }
 
@@ -219,6 +224,10 @@ async function getRecentUsage(userId: string): Promise<LooMinisterUsageItem[]> {
     status: row.status,
     tokenLabel:
       row.totalTokens == null ? "token 未返回" : `${row.totalTokens} tokens`,
+    retryLabel:
+      row.retryCount > 0 ? `已重试 ${row.retryCount} 次` : "未重试",
+    retryCount: row.retryCount,
+    failureKind: row.failureKind ?? null,
     errorMessage: row.errorMessage ?? null,
     createdAt: row.createdAt.toISOString(),
   }));
@@ -366,6 +375,8 @@ export async function recordLooMinisterUsage(
         inputTokens: usage.inputTokens ?? null,
         outputTokens: usage.outputTokens ?? null,
         totalTokens: usage.totalTokens ?? null,
+        retryCount: usage.retryCount ?? 0,
+        failureKind: usage.failureKind ?? null,
         errorMessage: usage.errorMessage ?? null,
       });
   } catch {

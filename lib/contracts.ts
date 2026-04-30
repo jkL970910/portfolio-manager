@@ -528,6 +528,8 @@ export interface PortfolioSecurityDetailData {
     lastPrice: string;
     quoteTimestamp: string;
     freshnessVariant: "success" | "warning" | "neutral";
+    quoteStatus?: string | null;
+    quoteStatusLabel?: string;
   };
   facts: {
     label: string;

@@ -99,6 +99,13 @@
       "when": 1777554000000,
       "tag": "0013_loo_minister_reasoning_effort",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1777557600000,
+      "tag": "0014_loo_minister_usage_observability",
+      "breakpoints": true
     }
   ]
 }

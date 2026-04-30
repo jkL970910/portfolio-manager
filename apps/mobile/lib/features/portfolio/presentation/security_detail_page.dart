@@ -32,6 +32,7 @@ class SecurityDetailPage extends StatefulWidget {
 
 class _SecurityDetailPageState extends State<SecurityDetailPage> {
   late Future<MobileSecurityDetailSnapshot?> _snapshot;
+  bool _isRefreshingQuote = false;
 
   @override
   void initState() {
@@ -71,6 +72,32 @@ class _SecurityDetailPageState extends State<SecurityDetailPage> {
     });
   }
 
+  Future<void> _refreshQuote() async {
+    setState(() {
+      _isRefreshingQuote = true;
+    });
+
+    try {
+      await widget.apiClient.refreshPortfolioSecurityQuote(widget.symbol);
+      _refresh();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("已刷新这个标的的报价，并重新加载走势。")),
+      );
+    } on LooApiException catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(error.message)),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isRefreshingQuote = false;
+        });
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -99,6 +126,7 @@ class _SecurityDetailPageState extends State<SecurityDetailPage> {
           }
 
           final data = snapshot.data!;
+          final priceHistoryChart = data.priceHistoryChart;
           return RefreshIndicator(
             onRefresh: () async => _refresh(),
             child: ListView(
@@ -106,6 +134,8 @@ class _SecurityDetailPageState extends State<SecurityDetailPage> {
               children: [
                 _SummaryCard(
                   data,
+                  isRefreshingQuote: _isRefreshingQuote,
+                  onRefreshQuote: _refreshQuote,
                 ),
                 const SizedBox(height: 12),
                 AiAnalysisCard(
@@ -124,14 +154,12 @@ class _SecurityDetailPageState extends State<SecurityDetailPage> {
                 ),
                 const SizedBox(height: 12),
                 _MetricGrid(data),
-                if (data.priceHistoryChart != null ||
-                    data.performance.isNotEmpty) ...[
+                if (priceHistoryChart != null) ...[
                   const SizedBox(height: 16),
                   const _SectionTitle("价格走势"),
                   const SizedBox(height: 8),
                   _PerformanceChartCard(
-                    chart: data.priceHistoryChart,
-                    fallbackPoints: data.performance,
+                    chart: priceHistoryChart,
                   ),
                 ],
                 const SizedBox(height: 16),
@@ -205,6 +233,7 @@ class MobileSecurityDetailSnapshot {
     required this.lastPrice,
     required this.quoteTimestamp,
     required this.freshnessVariant,
+    required this.quoteStatusLabel,
     required this.subtitle,
     required this.marketData,
     required this.analysis,
@@ -225,6 +254,7 @@ class MobileSecurityDetailSnapshot {
   final String lastPrice;
   final String quoteTimestamp;
   final String freshnessVariant;
+  final String quoteStatusLabel;
   final String subtitle;
   final MobileSecurityMarketData marketData;
   final MobileSecurityAnalysis analysis;
@@ -367,6 +397,12 @@ class MobileSecurityDetailSnapshot {
       quoteTimestamp: securityData["quoteTimestamp"] as String? ?? "",
       freshnessVariant:
           securityData["freshnessVariant"] as String? ?? "neutral",
+      quoteStatusLabel: securityData["quoteStatusLabel"] as String? ??
+          switch (securityData["freshnessVariant"] as String? ?? "neutral") {
+            "success" => "报价较新",
+            "warning" => "报价可能过期",
+            _ => "报价待确认",
+          },
       subtitle: [
         securityData["assetClass"] as String? ?? "",
         securityData["sector"] as String? ?? "",
@@ -395,9 +431,15 @@ class MobileSecurityDetailSnapshot {
 }
 
 class _SummaryCard extends StatelessWidget {
-  const _SummaryCard(this.data);
+  const _SummaryCard(
+    this.data, {
+    required this.isRefreshingQuote,
+    required this.onRefreshQuote,
+  });
 
   final MobileSecurityDetailSnapshot data;
+  final bool isRefreshingQuote;
+  final VoidCallback onRefreshQuote;
 
   @override
   Widget build(BuildContext context) {
@@ -432,7 +474,7 @@ class _SummaryCard extends StatelessWidget {
                     ),
                   ),
                   _StatusPill(
-                      label: _freshnessLabel(data.freshnessVariant),
+                      label: data.quoteStatusLabel,
                       color: freshnessColor),
                 ],
               ),
@@ -444,6 +486,18 @@ class _SummaryCard extends StatelessWidget {
                 const SizedBox(height: 8),
                 Text(data.quoteTimestamp, style: theme.textTheme.bodySmall),
               ],
+              const SizedBox(height: 14),
+              FilledButton.icon(
+                onPressed: isRefreshingQuote ? null : onRefreshQuote,
+                icon: isRefreshingQuote
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.refresh),
+                label: Text(isRefreshingQuote ? "刷新中" : "刷新此标的"),
+              ),
             ],
           ),
         ),
@@ -846,31 +900,71 @@ class _ProgressMetric extends StatelessWidget {
 class _PerformanceChartCard extends StatelessWidget {
   const _PerformanceChartCard({
     required this.chart,
-    required this.fallbackPoints,
   });
 
-  final MobileChartSeries? chart;
-  final List<MobileSecurityPerformancePoint> fallbackPoints;
+  final MobileChartSeries chart;
 
   @override
   Widget build(BuildContext context) {
-    final points = chart?.points
-            .map((point) => (
-                  label: point.label,
-                  displayValue: point.displayValue,
-                  chartValue: point.value,
-                ))
-            .toList() ??
-        fallbackPoints
-            .map((point) => (
-                  label: point.label,
-                  displayValue: point.value,
-                  chartValue: point.chartValue,
-                ))
-            .toList();
+    final freshness = chart.freshness;
+    final isReferenceOnly = freshness.status == "fallback";
+
+    if (isReferenceOnly) {
+      return Card(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(
+                    Icons.info_outline,
+                    color: Theme.of(context).colorScheme.primary,
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      "真实价格历史不足",
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              Chip(label: Text(freshness.label)),
+              const SizedBox(height: 8),
+              Text(
+                freshness.detail,
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+              if (chart.notes.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                ...chart.notes.take(2).map(
+                      (note) => Text(
+                        "· $note",
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                    ),
+              ],
+            ],
+          ),
+        ),
+      );
+    }
+
+    final points = chart.points
+        .map((point) => (
+              label: point.label,
+              displayValue: point.displayValue,
+              chartValue: point.value,
+            ))
+        .toList();
+    if (points.length < 2) {
+      return const _TextCard("真实价格历史不足，暂不绘制价格走势。");
+    }
     final first = points.first;
     final last = points.last;
-    final freshness = chart?.freshness;
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -892,18 +986,16 @@ class _PerformanceChartCard extends StatelessWidget {
               "${first.label} ${first.displayValue} → ${last.label} ${last.displayValue}",
               style: Theme.of(context).textTheme.bodyMedium,
             ),
-            if (freshness != null) ...[
-              const SizedBox(height: 10),
-              Chip(label: Text(freshness.label)),
-              const SizedBox(height: 6),
-              Text(
-                freshness.detail,
-                style: Theme.of(context).textTheme.bodySmall,
-              ),
-            ],
-            if (chart != null && chart!.notes.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            Chip(label: Text(freshness.label)),
+            const SizedBox(height: 6),
+            Text(
+              freshness.detail,
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+            if (chart.notes.isNotEmpty) ...[
               const SizedBox(height: 8),
-              ...chart!.notes.take(2).map(
+              ...chart.notes.take(2).map(
                     (note) => Text(
                       "· $note",
                       style: Theme.of(context).textTheme.bodySmall,
@@ -1081,14 +1173,6 @@ Color _freshnessColor(BuildContext context, String variant) {
     "success" => Colors.green.shade700,
     "warning" => Colors.orange.shade800,
     _ => Theme.of(context).colorScheme.onSurfaceVariant,
-  };
-}
-
-String _freshnessLabel(String variant) {
-  return switch (variant) {
-    "success" => "报价新鲜",
-    "warning" => "需要刷新",
-    _ => "报价待核",
   };
 }
 

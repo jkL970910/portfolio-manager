@@ -45,13 +45,13 @@ over simply adding more Flutter screens.
 
 | Rank | Feature                                       | Status      | Why now                                                                                                                                                                   |
 | ---- | --------------------------------------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1    | Recommendation constraints v2                 | In Progress | Backend and mobile now support preferred/excluded identities, account rules, and asset-class bands; next is picker UX and tests.                                          |
-| 2    | Cloud-ready quote/FX worker boundaries        | Planned     | Quote, FX, history, and snapshot refresh should move out of user-facing request paths with quota budgeting and retry behavior.                                            |
-| 3    | Backend contract typing for Flutter           | In Progress | Settings market-data refresh, Overview / Portfolio, Recommendations, Import, and Settings preference profile/guided draft DTOs are typed; continue detail-page DTO depth. |
-| 4    | Market-data identity and validation hardening | In Progress | Current quote/history paths preserve symbol, exchange, and currency; next is provider-grade scheduled history refresh.                                                    |
-| 5    | Mobile auth hardening                         | Planned     | Current token refresh/logout behavior is good enough for MVP, not shared production use.                                                                                  |
-| 6    | Mobile spending migration                     | Planned     | Useful after investment core and backend boundaries are stable.                                                                                                           |
-| 7    | Remaining mobile polish and parity            | Planned     | Add only after core contracts are safe.                                                                                                                                   |
+| 1    | Mobile UI / IA overhaul                       | Planned     | Current mobile feature coverage is usable, but QA shows too many cramped layouts, display shortages, debug-like labels, and unclear content hierarchy.                    |
+| 2    | Recommendation constraints v2                 | In Progress | Backend and mobile now support preferred/excluded identities, account rules, and asset-class bands; next is picker UX and tests.                                          |
+| 3    | Cloud-ready quote/FX worker boundaries        | Planned     | Quote, FX, history, and snapshot refresh should move out of user-facing request paths with quota budgeting and retry behavior.                                            |
+| 4    | Backend contract typing for Flutter           | In Progress | Settings market-data refresh, Overview / Portfolio, Recommendations, Import, and Settings preference profile/guided draft DTOs are typed; continue detail-page DTO depth. |
+| 5    | Market-data identity and validation hardening | In Progress | Current quote/history paths preserve symbol, exchange, and currency; next is provider-grade scheduled history refresh.                                                    |
+| 6    | Mobile auth hardening                         | Planned     | Current token refresh/logout behavior is good enough for MVP, not shared production use.                                                                                  |
+| 7    | Mobile spending migration                     | Planned     | Useful after investment core and backend boundaries are stable.                                                                                                           |
 
 ## Product Roadmap Priorities That Still Matter
 
@@ -60,13 +60,14 @@ over simply adding more Flutter screens.
 | Mobile guided investment setup            | Implemented | First-pass guided draft flow exists in Flutter settings                                                                                                                                                                                                                                        |
 | Mobile health score drilldown             | Implemented | First-pass score, charts, holding links, account-type filtered views, and account-scope scoring explanation exist                                                                                                                                                                              |
 | Mobile chart foundation                   | Implemented | First-pass reusable line, allocation distribution, health radar, and typed freshness charts for overview/portfolio/account/holding/security/asset-class pages exist                                                                                                                            |
+| Mobile UI / IA overhaul                   | Planned     | New large task: reduce debug-like copy, fix cramped card layouts, improve page content hierarchy, unify status labels, and make primary actions/critical data easier to scan on phone screens                                                                                                      |
 | Mobile asset/security analysis depth      | In Progress | Security detail and asset-class drilldown now include target drift and correction actions                                                                                                                                                                                                      |
-| Real historical performance               | In Progress | Quote refresh records daily price history/current-day snapshots, uses independent stored FX rates for CAD aggregation, stores history by symbol+exchange+currency, and anchors chart latest points to current totals; next work is scheduled refresh/worker depth                              |
+| Real historical performance               | In Progress | Quote refresh records daily price history/current-day snapshots, uses independent stored FX rates for CAD aggregation, stores history by symbol+exchange+currency, backfills safe older exchange-less rows, and anchors chart latest points to current totals; next work is scheduled refresh/worker depth |
 | Richer import review persistence          | In Progress | Build soon                                                                                                                                                                                                                                                                                     |
 | Watchlist and target constraints workflow | In Progress | Mobile can edit watchlist, strategy, tax-aware placement, and account priority constraints                                                                                                                                                                                                     |
 | Cloud-ready cache / worker boundaries     | In Progress | First-pass market-data refresh worker, persisted run ledger, mobile Settings run-status readout, and process-local provider retry-after guard exist; next is cron/cloud scheduling before heavier AI-agent jobs                                                                                |
 | Quote-provider status UX                  | In Progress | Refresh results, Settings, holding rows, and price-history records now expose source/status lineage; remaining work is cloud-grade provider-limit persistence and deeper per-provider dashboards                                                                                               |
-| Loo国 AI Minister assistant               | In Progress | Backend and Flutter first-pass page-context DTOs exist; global floating 大臣 entry receives Overview/Portfolio/detail/Health context; Settings can switch Local/GPT-5.5, choose official OpenAI or OpenRouter-compatible provider, save encrypted BYOK API key, and record minister usage logs |
+| Loo国 AI Minister assistant               | In Progress | Backend and Flutter first-pass page-context DTOs exist; global floating 大臣 entry receives Overview/Portfolio/detail/Health context; Settings can switch Local/GPT-5.5, choose official OpenAI or OpenRouter-compatible provider, save encrypted BYOK API key, and surface usage/retry/failure observability |
 
 ## Deferred
 
@@ -88,12 +89,31 @@ over simply adding more Flutter screens.
 
 ## Recommended Build Order From Here
 
-1. Add cron/cloud scheduling for the market-data worker and decide the deployment target.
-2. Persist provider retry-after state in database or Redis before multi-instance cloud deployment.
-3. QA AI 大臣 Settings Local/GPT-5.5/BYOK flow and detail-page context.
-4. Harden mobile auth with revocable refresh tokens and production storage policy.
-5. Migrate spending/cash account monitoring into a dedicated mobile flow.
-6. Deepen Loo国 AI Minister assistant after page-context DTOs, async market-data, and research boundaries are stable.
+1. Run a mobile UI / information-architecture overhaul across Overview, Portfolio, detail pages, Health, Recommendations, Import, and Settings.
+2. Add cron/cloud scheduling for the market-data worker and decide the deployment target.
+3. Persist provider retry-after state in database or Redis before multi-instance cloud deployment.
+4. QA AI 大臣 Settings Local/GPT-5.5/BYOK flow and detail-page context.
+5. Harden mobile auth with revocable refresh tokens and production storage policy.
+6. Migrate spending/cash account monitoring into a dedicated mobile flow.
+7. Deepen Loo国 AI Minister assistant after page-context DTOs, async market-data, and research boundaries are stable.
+
+## Mobile UI / IA Overhaul Scope
+
+Treat this as a large product task, not a one-card visual cleanup.
+
+P0 goals:
+
+- Remove debug-like wording from user-facing cards, especially provider internals, raw fallback labels, and implementation explanations that belong in Settings or QA only.
+- Fix display shortages on phone screens: avoid truncated labels, oversized values, crowded two-column cards, and floating controls covering content.
+- Rebuild detail-page order around user intent: top summary, primary action, real chart/status, then deeper explanation.
+- Standardize status language across quote freshness, chart freshness, AI fallback, and provider limits so “needs refresh” is not shown after a successful refresh.
+- Keep Loo国 tone, but make it concise and actionable rather than verbose.
+
+P1 goals:
+
+- Add reusable mobile section/card patterns for dense financial data.
+- Add page-specific empty/loading/error states with less technical copy.
+- Add visual hierarchy for “real data”, “cached data”, “reference/fallback”, and “action needed”.
 
 ## Key Trade-offs
 

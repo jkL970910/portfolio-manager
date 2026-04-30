@@ -1,6 +1,6 @@
 # Mobile Chart Contracts
 
-Last updated: 2026-04-29
+Last updated: 2026-04-30
 
 ## Purpose
 
@@ -18,9 +18,11 @@ available.
   - `LooLineChart`
   - `LooDistributionBar`
   - `LooRadarChart`
-- Security Detail already renders a first-pass performance line chart.
+- Security Detail renders `chartSeries.priceHistory` when exchange-aware local
+  price history is available.
 - Some backend series still fall back to reference curves when real replay data
-  is shallow.
+  is shallow, but Security Detail must not draw synthetic `performance` index
+  points as a price chart.
 - `security_price_history` now stores `symbol + exchange + currency + date`.
   This is the chart/history identity boundary for preventing US common shares,
   CAD-listed versions, CDRs, and hedged listings from sharing one ticker-only
@@ -100,9 +102,7 @@ P1:
 
 - Tooltip/detail rendering in Flutter.
 - Multi-series comparison charts.
-- Add exchange/listing identity to `security_price_history` before relying on
-  it for symbols where the same ticker can trade in multiple markets with the
-  same currency.
+- Hosted worker/backfill for broader exchange-aware history hydration.
 
 P2:
 
@@ -124,8 +124,9 @@ P2:
 - Security Detail now emits `chartSeries.priceHistory`.
 - The series includes raw numeric points, display values, source mode, freshness
   status, latest cached date, and `symbol + exchange + currency` identity.
-- Flutter Security Detail prefers this DTO and shows the freshness label/detail
-  below the line chart. Existing `performance` remains as a fallback.
+- Flutter Security Detail renders this DTO and shows the freshness label/detail
+  below the line chart. It no longer uses legacy `performance` arrays to draw a
+  synthetic linear price chart when `chartSeries.priceHistory` is absent.
 - Portfolio Overview now emits `chartSeries.portfolioValue`.
 - Mobile Overview now emits `chartSeries.netWorth`.
 - Flutter Portfolio and Overview pages render these chart DTOs with explicit
@@ -146,3 +147,8 @@ P2:
   returns `historyPointCount` plus `snapshotRecorded`, so mobile QA can verify
   that refresh improves future chart freshness instead of only updating the
   current holding rows.
+- `scripts/backfill-security-history-exchange.ts` / `npm run
+  backfill:security-history-exchange` performs a non-destructive local data
+  repair for older exchange-less history rows. It copies rows into the single
+  matching non-empty holding exchange for the same `symbol + currency`; it does
+  not delete old rows and does not copy across currencies.

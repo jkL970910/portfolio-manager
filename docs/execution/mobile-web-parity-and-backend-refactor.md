@@ -1,6 +1,6 @@
 # Mobile/Web Parity And Backend Refactor Plan
 
-Last updated: 2026-04-29
+Last updated: 2026-04-30
 
 ## Purpose
 
@@ -33,6 +33,33 @@ The project direction remains:
 | Settings / preferences   | Web has guided setup, manual workbench, profile/citizen panel, preference source context         | Mobile has guided draft, manual edit, recommendation constraint edit, display currency, quote refresh                                                                                                                                | Citizen/admin profile depth and some web workbench density are not migrated                                                                       |
 | Spending                 | Web has spending page and import separation                                                      | Mobile has no meaningful spending tab yet                                                                                                                                                                                            | Deferred until investment core and backend boundaries are stable                                                                                  |
 | Brand / Loo page         | Web has brand page                                                                               | Mobile theme applies Loo identity in app shell and pages                                                                                                                                                                             | No separate mobile brand page needed now                                                                                                          |
+
+## Current Mobile UX Risk
+
+The mobile app now has enough migrated functionality that UI/IA quality is a
+product blocker, not a cosmetic follow-up.
+
+Observed issues from manual phone QA:
+
+- Many pages expose backend/debug concepts too directly, including provider
+  status, fallback labels, retry/failure internals, and source explanations.
+- Detail pages have too many equal-weight cards, making the most important
+  action or data point hard to identify.
+- Some status chips use misleading wording, for example implying a quote still
+  needs refresh after the backend already recorded a fresh quote.
+- Charts and historical summaries can look like fake/mock data when fallback or
+  legacy performance arrays are presented without strong enough hierarchy.
+- Floating controls can cover content and should be considered in every dense
+  detail-page layout.
+
+UI overhaul priority:
+
+1. Redesign detail-page hierarchy first: Security, Holding, Account, Asset Class,
+   and Health pages.
+2. Then clean Overview and Portfolio cards so totals, source/freshness, and
+   primary navigation are easier to scan.
+3. Then simplify Recommendations, Import, and Settings copy so advanced/debug
+   details move behind expandable sections or Settings diagnostics.
 
 ## Why Backend Refactor Is Needed Now
 

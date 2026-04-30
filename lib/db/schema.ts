@@ -647,6 +647,8 @@ export const looMinisterUsageLogs = pgTable(
     inputTokens: integer("input_tokens"),
     outputTokens: integer("output_tokens"),
     totalTokens: integer("total_tokens"),
+    retryCount: integer("retry_count").notNull().default(0),
+    failureKind: varchar("failure_kind", { length: 40 }),
     errorMessage: text("error_message"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()

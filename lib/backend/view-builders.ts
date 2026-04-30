@@ -3651,6 +3651,7 @@ export function buildPortfolioSecurityDetailData(args: {
       securityType: pick(language, "正在识别", "Resolving"),
       exchange:
         referenceHolding?.exchangeOverride ??
+        normalizedExchange ??
         pick(language, "正在识别", "Resolving"),
       marketSector: pick(language, "正在识别", "Resolving"),
       lastPrice:
@@ -3660,6 +3661,10 @@ export function buildPortfolioSecurityDetailData(args: {
         referenceViewHolding?.lastUpdated ??
         pick(language, "还没刷新过", "Not refreshed yet"),
       freshnessVariant: referenceViewHolding?.freshnessVariant ?? "neutral",
+      quoteStatus: referenceHolding?.quoteStatus ?? null,
+      quoteStatusLabel: referenceHolding
+        ? getHoldingQuoteStatusLabel(referenceHolding, language)
+        : pick(language, "报价待确认", "Quote unverified"),
     },
     facts: [
       {

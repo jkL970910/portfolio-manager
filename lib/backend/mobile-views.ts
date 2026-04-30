@@ -366,13 +366,26 @@ function mapMobileSecurityAccountHoldingView(
 function mapMobileSecurityDetailData(
   data: PortfolioSecurityDetailData,
 ): MobilePortfolioSecurityDetailData {
+  const chartIdentity = data.chartSeries?.priceHistory?.identity;
+  const securityExchange =
+    data.security.exchange === "正在识别" ||
+    data.security.exchange === "Resolving" ||
+    data.security.exchange === "未知交易所" ||
+    data.security.exchange === "Unknown exchange"
+      ? (chartIdentity?.exchange ?? data.security.exchange)
+      : data.security.exchange;
+
   return {
     displayContext: data.displayContext,
-    security: data.security,
+    security: {
+      ...data.security,
+      exchange: securityExchange,
+    },
     facts: data.facts,
     marketData: data.marketData,
     analysis: data.analysis,
     performance: data.performance,
+    chartSeries: data.chartSeries,
     summaryPoints: data.summaryPoints,
     relatedHoldings: data.relatedHoldings.map((holding) => {
       const { href: _href, ...rest } = holding;

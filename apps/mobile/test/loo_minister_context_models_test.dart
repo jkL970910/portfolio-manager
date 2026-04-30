@@ -327,6 +327,7 @@ void main() {
       lastPrice: "CAD 150",
       quoteTimestamp: "2026-04-30T04:00:00.000Z",
       freshnessVariant: "success",
+      quoteStatusLabel: "报价较新",
       subtitle: "US Equity · ETF · TSX",
       marketData: MobileSecurityMarketData(
         summary: "报价来自缓存。",

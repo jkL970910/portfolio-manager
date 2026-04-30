@@ -187,7 +187,10 @@ API integration plan:
    router proxy can return 5xx for multi-message Responses input or raw JSON
    context payloads.
 5. `loo_minister_usage_logs` records page, mode, provider, model, status, token
-   counts when available, and fallback/error messages.
+   counts when available, retry count, failure kind, and fallback/error
+   messages. Flutter Settings surfaces these fields in recent-call rows so QA
+   can distinguish provider 5xx, empty output, invalid JSON, and contract
+   validation failures without querying the database.
 6. Live external research stays disabled until worker/cache/provider quota
    boundaries are production-ready.
 7. Per-investment-account AI opt-in is intentionally P1, after the global

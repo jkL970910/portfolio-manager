@@ -1,4 +1,7 @@
-import type { SecurityQuote } from "@/lib/market-data/types";
+import type {
+  SecurityHistoricalPoint,
+  SecurityQuote,
+} from "@/lib/market-data/types";
 import {
   markProviderLimited,
   readRetryAfterSeconds,
@@ -15,6 +18,15 @@ type YahooChartResponse = {
         regularMarketPrice?: number;
         previousClose?: number;
         regularMarketTime?: number;
+      };
+      timestamp?: number[];
+      indicators?: {
+        quote?: Array<{
+          close?: Array<number | null>;
+        }>;
+        adjclose?: Array<{
+          adjclose?: Array<number | null>;
+        }>;
       };
     }>;
     error?: {
@@ -127,4 +139,84 @@ export async function getQuoteFromYahooFinance(
     provider: "yahoo-finance",
     delayed: true,
   };
+}
+
+export async function getHistoricalSeriesFromYahooFinance(
+  symbol: string,
+  exchange?: string | null,
+  currency?: string | null,
+): Promise<SecurityHistoricalPoint[]> {
+  const yahooSymbol = toYahooSymbol(symbol, exchange, currency);
+  const expectedCurrency = currency?.trim().toUpperCase() || null;
+  const url = new URL(
+    `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(yahooSymbol)}`,
+  );
+  url.searchParams.set("range", "1y");
+  url.searchParams.set("interval", "1d");
+  url.searchParams.set("includePrePost", "false");
+  url.searchParams.set("events", "history");
+
+  const response = await fetch(url, {
+    cache: "no-store",
+    headers: {
+      Accept: "application/json",
+      "User-Agent":
+        "Mozilla/5.0 (compatible; PortfolioManager/1.0; +https://localhost)",
+    },
+  });
+
+  if (response.status === 404) {
+    return [];
+  }
+  if (response.status === 429) {
+    const message = "Yahoo Finance history rate limit reached.";
+    markProviderLimited({
+      provider: "yahoo-finance",
+      reason: message,
+      retryAfterSeconds: readRetryAfterSeconds(response.headers),
+    });
+    throw new Error(message);
+  }
+  if (!response.ok) {
+    throw new Error(
+      `Yahoo Finance history failed with status ${response.status}.`,
+    );
+  }
+
+  const payload = (await response.json()) as YahooChartResponse;
+  const result = payload.chart?.result?.[0];
+  const meta = result?.meta;
+  if (!result || !meta) {
+    return [];
+  }
+
+  const quoteCurrency = meta.currency?.trim().toUpperCase() || null;
+  if (expectedCurrency && quoteCurrency && quoteCurrency !== expectedCurrency) {
+    return [];
+  }
+
+  const timestamps = result.timestamp ?? [];
+  const closes = result.indicators?.quote?.[0]?.close ?? [];
+  const adjustedCloses = result.indicators?.adjclose?.[0]?.adjclose ?? [];
+
+  return timestamps
+    .map<SecurityHistoricalPoint | null>((timestamp, index) => {
+      const close = Number(closes[index]);
+      if (!Number.isFinite(timestamp) || !Number.isFinite(close) || close <= 0) {
+        return null;
+      }
+
+      const adjustedClose = Number(adjustedCloses[index]);
+      return {
+        symbol: symbol.trim().toUpperCase(),
+        date: new Date(timestamp * 1000).toISOString().slice(0, 10),
+        close,
+        adjustedClose: Number.isFinite(adjustedClose) ? adjustedClose : null,
+        currency: quoteCurrency ?? expectedCurrency,
+        exchange:
+          exchange?.trim() || meta.exchangeName || meta.fullExchangeName || null,
+        provider: "yahoo-finance",
+      };
+    })
+    .filter((point): point is SecurityHistoricalPoint => point !== null);
 }
