@@ -66,7 +66,7 @@ over simply adding more Flutter screens.
 | Watchlist and target constraints workflow | In Progress | Mobile can edit watchlist, strategy, tax-aware placement, and account priority constraints                                                                                                                                                                        |
 | Cloud-ready cache / worker boundaries     | In Progress | First-pass market-data refresh worker, persisted run ledger, mobile Settings run-status readout, and process-local provider retry-after guard exist; next is cron/cloud scheduling before heavier AI-agent jobs                                                   |
 | Quote-provider status UX                  | In Progress | Refresh results, Settings, holding rows, and price-history records now expose source/status lineage; remaining work is cloud-grade provider-limit persistence and deeper per-provider dashboards                                                                  |
-| Loo国 AI Minister assistant               | In Progress | Backend and Flutter first-pass page-context DTOs exist; guarded `/api/mobile/minister/ask` returns deterministic local answers; mobile shell now owns a floating 大臣 entry, with Overview/Portfolio context wired first                                          |
+| Loo国 AI Minister assistant               | In Progress | Backend and Flutter first-pass page-context DTOs exist; guarded `/api/mobile/minister/ask` returns deterministic local answers; global floating 大臣 entry now receives Overview, Portfolio, Account, Holding, Security, and Health context                       |
 
 ## Deferred
 
@@ -82,7 +82,7 @@ over simply adding more Flutter screens.
 
 1. Add cron/cloud scheduling for the market-data worker and decide the deployment target.
 2. Persist provider retry-after state in database or Redis before multi-instance cloud deployment.
-3. QA the floating Loo Minister entry, then add detail-page context reporting for account / holding / security pages.
+3. QA the floating Loo Minister entry on detail pages, then add GPT-5.5 backend provider integration behind an env flag.
 4. Harden mobile auth with revocable refresh tokens and production storage policy.
 5. Migrate spending/cash account monitoring into a dedicated mobile flow.
 6. Deepen Loo国 AI Minister assistant after page-context DTOs, async market-data, and research boundaries are stable.

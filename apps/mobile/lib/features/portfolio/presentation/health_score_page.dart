@@ -1,8 +1,10 @@
 import "package:flutter/material.dart";
 
 import "../../../core/api/loo_api_client.dart";
+import "../../shared/data/loo_minister_context_models.dart";
 import "../../shared/data/mobile_models.dart";
 import "../../shared/presentation/loo_charts.dart";
+import "../../shared/presentation/loo_minister_scope.dart";
 import "account_type_portfolio_page.dart";
 import "ai_analysis_card.dart";
 import "detail_state_widgets.dart";
@@ -41,7 +43,17 @@ class _HealthScorePageState extends State<HealthScorePage> {
       throw const LooApiException("健康评分格式不正确。");
     }
 
-    return MobileHealthSnapshot.fromJson(data);
+    final snapshot = MobileHealthSnapshot.fromJson(data);
+    if (mounted) {
+      LooMinisterScope.report(
+        context,
+        snapshot.toMinisterContext(
+          accountId: widget.accountId,
+          asOf: DateTime.now().toUtc().toIso8601String(),
+        ),
+      );
+    }
+    return snapshot;
   }
 
   void _refresh() {
@@ -229,6 +241,83 @@ class MobileHealthSnapshot {
   final List<MobileHealthDrilldownItem> accountDrilldown;
   final List<MobileHealthDrilldownItem> holdingDrilldown;
 
+  LooMinisterPageContext toMinisterContext({
+    required String? accountId,
+    required String asOf,
+  }) {
+    return LooMinisterPageContext(
+      page: "portfolio-health",
+      title: scopeName,
+      asOf: asOf,
+      subject: LooMinisterSubject(accountId: accountId),
+      facts: [
+        LooMinisterFact(
+          id: "health-score",
+          label: "健康分",
+          value: score,
+          detail: status,
+          source: "analysis-cache",
+        ),
+        LooMinisterFact(
+          id: "health-scope",
+          label: "评分口径",
+          value: scopeLabel,
+          detail: scopeDetail,
+          source: "analysis-cache",
+        ),
+        LooMinisterFact(
+          id: "strongest-dimension",
+          label: "最强维度",
+          value: "${strongestDimension.label} · ${strongestDimension.value}",
+          source: "analysis-cache",
+        ),
+        LooMinisterFact(
+          id: "weakest-dimension",
+          label: "最弱维度",
+          value: "${weakestDimension.label} · ${weakestDimension.value}",
+          source: "analysis-cache",
+        ),
+        ...radar.take(6).map(
+              (point) => LooMinisterFact(
+                id: "radar-${_slug(point.dimension)}",
+                label: "雷达 ${point.dimension}",
+                value: "${point.value.round()} 分",
+                source: "analysis-cache",
+              ),
+            ),
+        ...dimensions.take(6).map(
+              (dimension) => LooMinisterFact(
+                id: "dimension-${_slug(dimension.label)}",
+                label: dimension.label,
+                value: dimension.score,
+                detail: dimension.summary,
+                source: "analysis-cache",
+              ),
+            ),
+      ],
+      warnings: [
+        ...highlights.take(5),
+        ...actionQueue.take(5),
+        ...dimensions.expand((dimension) => dimension.actions.take(2)).take(6),
+      ],
+      allowedActions: [
+        LooMinisterSuggestedAction(
+          id: isAccountScope
+              ? "run-account-analysis"
+              : "run-portfolio-analysis",
+          label: isAccountScope ? "运行 AI 账户快扫" : "运行 AI 组合快扫",
+          actionType: "run-analysis",
+          target: {
+            "scope": isAccountScope ? "account" : "portfolio",
+            if (accountId != null && accountId.isNotEmpty)
+              "accountId": accountId,
+          },
+          requiresConfirmation: true,
+        ),
+      ],
+    );
+  }
+
   factory MobileHealthSnapshot.fromJson(Map<String, dynamic> json) {
     final scope = json["scope"];
     final health = json["health"];
@@ -374,6 +463,14 @@ class MobileHealthDrilldownItem {
           (json["actions"] as List?)?.whereType<String>().toList() ?? const [],
     );
   }
+}
+
+String _slug(String value) {
+  return value
+      .trim()
+      .toLowerCase()
+      .replaceAll(RegExp(r"[^a-z0-9\u4e00-\u9fa5]+"), "-")
+      .replaceAll(RegExp(r"^-+|-+$"), "");
 }
 
 class _SummaryCard extends StatelessWidget {

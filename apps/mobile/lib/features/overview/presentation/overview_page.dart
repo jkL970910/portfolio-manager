@@ -6,19 +6,17 @@ import "../../portfolio/presentation/account_detail_page.dart";
 import "../../portfolio/presentation/health_score_page.dart";
 import "../../portfolio/presentation/holding_detail_page.dart";
 import "../../shared/data/mobile_chart_models.dart";
-import "../../shared/data/loo_minister_context_models.dart";
 import "../../shared/data/mobile_models.dart";
 import "../../shared/presentation/loo_charts.dart";
+import "../../shared/presentation/loo_minister_scope.dart";
 
 class OverviewPage extends StatefulWidget {
   const OverviewPage({
     required this.apiClient,
-    this.onMinisterContextChanged,
     super.key,
   });
 
   final LooApiClient apiClient;
-  final ValueChanged<LooMinisterPageContext>? onMinisterContextChanged;
 
   @override
   State<OverviewPage> createState() => _OverviewPageState();
@@ -41,10 +39,13 @@ class _OverviewPageState extends State<OverviewPage> {
     }
 
     final snapshot = MobileHomeSnapshot.fromJson(data);
-    widget.onMinisterContextChanged?.call(
-      snapshot.toMinisterContext(
-          asOf: DateTime.now().toUtc().toIso8601String()),
-    );
+    if (mounted) {
+      LooMinisterScope.report(
+        context,
+        snapshot.toMinisterContext(
+            asOf: DateTime.now().toUtc().toIso8601String()),
+      );
+    }
     return snapshot;
   }
 

@@ -152,6 +152,27 @@ Current status:
   Portfolio report their page-context DTOs into the shell, so the same floating
   entry can answer with current page context without injecting a separate card
   into every page.
+- Account Detail, Holding Detail, Security Detail, and Health pages now report
+  first-pass page-context DTOs into the global minister scope. The floating
+  entry remains above pushed detail routes instead of being limited to the
+  bottom-tab shell.
+- GPT-5.5 integration should happen server-side through the OpenAI Responses
+  API with `OPENAI_API_KEY` in the backend environment. Flutter/Web must never
+  receive the raw API key. Keep the deterministic local answer as fallback when
+  `OPENAI_API_KEY` is absent or provider calls are disabled.
+
+API integration plan:
+
+1. Add backend env switches: `OPENAI_API_KEY`,
+   `LOO_MINISTER_MODEL=gpt-5.5`, `LOO_MINISTER_PROVIDER_ENABLED=false` by
+   default.
+2. Keep `/api/mobile/minister/ask` as the only Flutter-facing endpoint.
+3. In `lib/backend/loo-minister.ts`, route to GPT-5.5 only when enabled and the
+   request passes the current DTO/schema guardrails.
+4. Use structured output compatible with `LooMinisterAnswerResult`; reject or
+   fallback if the model output fails validation.
+5. Keep live external research disabled until worker/cache/provider quota
+   boundaries are production-ready.
 
 Backend tests:
 

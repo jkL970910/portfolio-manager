@@ -5,6 +5,9 @@ import "../core/auth/mobile_auth_session.dart";
 import "../core/auth/mobile_auth_store.dart";
 import "../core/theme/loo_theme.dart";
 import "../features/auth/presentation/login_page.dart";
+import "../features/shared/data/loo_minister_context_models.dart";
+import "../features/shared/presentation/loo_minister_card.dart";
+import "../features/shared/presentation/loo_minister_scope.dart";
 import "router.dart";
 
 class LooWealthApp extends StatefulWidget {
@@ -23,6 +26,7 @@ class _LooWealthAppState extends State<LooWealthApp> {
   late final MobileAuthStore _authStore;
 
   MobileAuthSession? _session;
+  LooMinisterPageContext? _ministerContext;
   Future<String?>? _refreshInFlight;
   var _loading = true;
 
@@ -106,6 +110,7 @@ class _LooWealthAppState extends State<LooWealthApp> {
 
     setState(() {
       _session = session;
+      _ministerContext = null;
     });
   }
 
@@ -117,6 +122,17 @@ class _LooWealthAppState extends State<LooWealthApp> {
 
     setState(() {
       _session = null;
+      _ministerContext = null;
+    });
+  }
+
+  void _setMinisterContext(LooMinisterPageContext pageContext) {
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      _ministerContext = pageContext;
     });
   }
 
@@ -148,27 +164,83 @@ class _LooWealthAppState extends State<LooWealthApp> {
   @override
   Widget build(BuildContext context) {
     final session = _session;
+    final apiClient = session == null
+        ? null
+        : LooApiClient(
+            accessToken: session.accessToken,
+            refreshAccessToken: _refreshAccessToken,
+            onUnauthorized: _clearSession,
+          );
 
     return MaterialApp(
       title: "Loo国的财富宝库",
       debugShowCheckedModeBanner: false,
       theme: buildLooTheme(),
+      builder: (context, child) {
+        final currentChild = child ?? const SizedBox.shrink();
+        if (_loading || session == null || apiClient == null) {
+          return currentChild;
+        }
+
+        return LooMinisterScope(
+          onContextChanged: _setMinisterContext,
+          child: Stack(
+            children: [
+              Positioned.fill(child: currentChild),
+              LooMinisterFloatingButton(
+                apiClient: apiClient,
+                pageContext: _ministerContext ?? _fallbackMinisterContext,
+                suggestedQuestion: _suggestedMinisterQuestion,
+              ),
+            ],
+          ),
+        );
+      },
       home: _loading
           ? const _StartupScreen()
           : session == null
               ? LoginPage(onAuthenticated: _setSession)
               : MobileRootShell(
-                  apiClient: LooApiClient(
-                    accessToken: session.accessToken,
-                    refreshAccessToken: _refreshAccessToken,
-                    onUnauthorized: _clearSession,
-                  ),
+                  apiClient: apiClient!,
                   viewerName: session.viewerName,
                   baseCurrency: session.baseCurrency,
                   onDisplayCurrencyChanged: _setDisplayCurrency,
                   onLogout: _logout,
                 ),
     );
+  }
+
+  LooMinisterPageContext get _fallbackMinisterContext {
+    return LooMinisterPageContext(
+      page: "overview",
+      title: "Loo国",
+      asOf: DateTime.now().toUtc().toIso8601String(),
+      displayCurrency: _session?.baseCurrency ?? "CAD",
+      facts: const [
+        LooMinisterFact(
+          id: "active-app",
+          label: "当前应用",
+          value: "Loo国财富宝库",
+          source: "system",
+        ),
+      ],
+      warnings: const ["当前页面还没有完整结构化上下文，大臣会先给出保守解释。"],
+    );
+  }
+
+  String get _suggestedMinisterQuestion {
+    return switch (_ministerContext?.page) {
+      "overview" => "为什么总资产曲线和卡片数字可能不同？",
+      "portfolio" => "当前组合最应该先检查什么？",
+      "account-detail" => "这个账户的健康度应该怎么看？",
+      "holding-detail" => "这个持仓最大的风险和作用是什么？",
+      "security-detail" => "这个标的和我的组合适配吗？",
+      "portfolio-health" => "健康分里最应该先修正什么？",
+      "recommendations" => "这些推荐应该怎么优先看？",
+      "import" => "手动导入时如何避免 CAD 和 USD 标的混淆？",
+      "settings" => "我的投资偏好设置有什么需要注意？",
+      _ => "这个页面我应该重点看什么？",
+    };
   }
 }
 

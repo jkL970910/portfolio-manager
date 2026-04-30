@@ -2,8 +2,10 @@ import "package:flutter/material.dart";
 
 import "../../../core/api/loo_api_client.dart";
 import "../../shared/data/mobile_chart_models.dart";
+import "../../shared/data/loo_minister_context_models.dart";
 import "../../shared/data/mobile_models.dart";
 import "../../shared/presentation/loo_charts.dart";
+import "../../shared/presentation/loo_minister_scope.dart";
 import "account_detail_page.dart";
 import "detail_state_widgets.dart";
 import "security_detail_page.dart";
@@ -44,7 +46,16 @@ class _HoldingDetailPageState extends State<HoldingDetailPage> {
       throw const LooApiException("持仓详情格式不正确。");
     }
 
-    return MobileHoldingDetailSnapshot.fromJson(data);
+    final snapshot = MobileHoldingDetailSnapshot.fromJson(data);
+    if (mounted) {
+      LooMinisterScope.report(
+        context,
+        snapshot.toMinisterContext(
+          asOf: DateTime.now().toUtc().toIso8601String(),
+        ),
+      );
+    }
+    return snapshot;
   }
 
   void _refresh() {
@@ -308,6 +319,126 @@ class MobileHoldingDetailSnapshot {
   final List<String> portfolioRole;
   final MobileHealthSummary healthSummary;
 
+  LooMinisterPageContext toMinisterContext({required String asOf}) {
+    final chart = holdingValueChart;
+    final listingExchange = identityExchange.isNotEmpty
+        ? identityExchange
+        : exchange.isNotEmpty
+            ? exchange
+            : null;
+    final listingCurrency =
+        currency == "CAD" || currency == "USD" ? currency : null;
+    return LooMinisterPageContext(
+      page: "holding-detail",
+      title: "$symbol持仓详情",
+      asOf: asOf,
+      displayCurrency: currency.isEmpty ? "CAD" : currency,
+      subject: LooMinisterSubject(
+        holdingId: id,
+        accountId: accountId.isEmpty ? null : accountId,
+        security: listingExchange != null && listingCurrency != null
+            ? LooMinisterSecurityIdentity(
+                symbol: symbol,
+                exchange: listingExchange,
+                currency: listingCurrency,
+                name: name,
+                provider: quoteProvider.isEmpty ? null : quoteProvider,
+                securityType: securityType,
+              )
+            : null,
+      ),
+      dataFreshness: LooMinisterDataFreshness(
+        quotesAsOf: _toIsoDateTimeOrNull(lastUpdated),
+        chartFreshness: _toMinisterChartFreshness(chart?.freshness.status),
+        sourceMode: _toMinisterSourceMode(chart?.sourceMode),
+      ),
+      facts: [
+        LooMinisterFact(id: "holding-value", label: "持仓市值", value: value),
+        if (lastPrice.isNotEmpty && lastPrice != "--")
+          LooMinisterFact(
+            id: "last-price",
+            label: "最新价格",
+            value: lastPrice,
+            source: "quote-cache",
+          ),
+        if (gainLoss.isNotEmpty)
+          LooMinisterFact(id: "gain-loss", label: "持仓盈亏", value: gainLoss),
+        if (portfolioShare.isNotEmpty)
+          LooMinisterFact(
+            id: "portfolio-share",
+            label: "组合占比",
+            value: portfolioShare,
+          ),
+        if (accountShare.isNotEmpty)
+          LooMinisterFact(
+            id: "account-share",
+            label: "账户占比",
+            value: accountShare,
+          ),
+        LooMinisterFact(
+          id: "quote-status",
+          label: "报价状态",
+          value: quoteStatusLabel,
+          detail: quoteLine,
+          source: "quote-cache",
+        ),
+        LooMinisterFact(
+          id: "health-score",
+          label: "持仓健康分",
+          value: healthSummary.score,
+          detail: healthSummary.status,
+          source: "analysis-cache",
+        ),
+        if (chart != null)
+          LooMinisterFact(
+            id: "holding-value-chart",
+            label: chart.title,
+            value: chart.freshness.label,
+            detail: chart.freshness.detail,
+            source: "portfolio-data",
+          ),
+        ...facts.take(5).map(
+              (fact) => LooMinisterFact(
+                id: "fact-${_slug(fact.label)}",
+                label: fact.label,
+                value: fact.value,
+                detail: fact.detail,
+              ),
+            ),
+      ],
+      warnings: [
+        marketData.summary,
+        ...marketData.notes.take(3),
+        ...portfolioRole.take(3),
+        healthSummary.summary,
+        ...healthSummary.drivers.take(3),
+        ...healthSummary.actions.take(3),
+        if (chart != null && chart.notes.isNotEmpty) ...chart.notes.take(3),
+      ].where((item) => item.isNotEmpty).toList(),
+      allowedActions: const [
+        LooMinisterSuggestedAction(
+          id: "open-account-detail",
+          label: "查看所属账户",
+          actionType: "navigate",
+          target: {"page": "account-detail"},
+        ),
+        LooMinisterSuggestedAction(
+          id: "open-security-detail",
+          label: "查看标的详情",
+          actionType: "navigate",
+          target: {"page": "security-detail"},
+        ),
+        LooMinisterSuggestedAction(
+          id: "run-security-analysis",
+          label: "运行 AI 标的快扫",
+          actionType: "run-analysis",
+          target: {"scope": "security"},
+          requiresConfirmation: true,
+        ),
+      ],
+    );
+  }
+
   factory MobileHoldingDetailSnapshot.fromJson(Map<String, dynamic> json) {
     final holding = json["holding"];
     final holdingData =
@@ -451,6 +582,39 @@ class MobileHealthSummary {
           (json["actions"] as List?)?.whereType<String>().toList() ?? const [],
     );
   }
+}
+
+String _toMinisterChartFreshness(String? value) {
+  return switch (value) {
+    "fresh" => "fresh",
+    "stale" => "stale",
+    "fallback" => "fallback",
+    "reference" => "reference",
+    _ => "unknown",
+  };
+}
+
+String _toMinisterSourceMode(String? value) {
+  return switch (value) {
+    "local" => "local",
+    "cached-external" => "cached-external",
+    "live-external" => "live-external",
+    "reference" => "reference",
+    _ => "local",
+  };
+}
+
+String? _toIsoDateTimeOrNull(String? value) {
+  if (value == null || value.isEmpty) return null;
+  return DateTime.tryParse(value)?.toUtc().toIso8601String();
+}
+
+String _slug(String value) {
+  return value
+      .trim()
+      .toLowerCase()
+      .replaceAll(RegExp(r"[^a-z0-9\u4e00-\u9fa5]+"), "-")
+      .replaceAll(RegExp(r"^-+|-+$"), "");
 }
 
 class _SummaryCard extends StatelessWidget {

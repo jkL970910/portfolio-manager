@@ -2,8 +2,10 @@ import "package:flutter/material.dart";
 
 import "../../../core/api/loo_api_client.dart";
 import "../../shared/data/mobile_chart_models.dart";
+import "../../shared/data/loo_minister_context_models.dart";
 import "../../shared/data/mobile_models.dart";
 import "../../shared/presentation/loo_charts.dart";
+import "../../shared/presentation/loo_minister_scope.dart";
 import "detail_state_widgets.dart";
 import "health_score_page.dart";
 import "holding_detail_page.dart";
@@ -44,7 +46,17 @@ class _AccountDetailPageState extends State<AccountDetailPage> {
       throw const LooApiException("账户详情格式不正确。");
     }
 
-    return MobileAccountDetailSnapshot.fromJson(data);
+    final snapshot = MobileAccountDetailSnapshot.fromJson(data);
+    if (mounted) {
+      LooMinisterScope.report(
+        context,
+        snapshot.toMinisterContext(
+          accountId: widget.accountId,
+          asOf: DateTime.now().toUtc().toIso8601String(),
+        ),
+      );
+    }
+    return snapshot;
   }
 
   void _refresh() {
@@ -268,6 +280,92 @@ class MobileAccountDetailSnapshot {
   final MobileAccountHealthScore healthScore;
   final List<MobileFact> facts;
   final List<MobileHoldingCard> holdings;
+
+  LooMinisterPageContext toMinisterContext({
+    required String accountId,
+    required String asOf,
+  }) {
+    final chart = accountValueChart;
+    return LooMinisterPageContext(
+      page: "account-detail",
+      title: "$name账户详情",
+      asOf: asOf,
+      displayCurrency: currency.isEmpty ? "CAD" : currency,
+      subject: LooMinisterSubject(accountId: accountId),
+      dataFreshness: LooMinisterDataFreshness(
+        chartFreshness: _toMinisterChartFreshness(chart?.freshness.status),
+        sourceMode: _toMinisterSourceMode(chart?.sourceMode),
+      ),
+      facts: [
+        LooMinisterFact(id: "account-value", label: "账户市值", value: value),
+        if (gainLoss.isNotEmpty)
+          LooMinisterFact(id: "gain-loss", label: "账户盈亏", value: gainLoss),
+        if (portfolioShare.isNotEmpty)
+          LooMinisterFact(
+            id: "portfolio-share",
+            label: "组合占比",
+            value: portfolioShare,
+          ),
+        LooMinisterFact(
+          id: "health-score",
+          label: "账户健康分",
+          value: healthScore.score,
+          detail: healthScore.status,
+          source: "analysis-cache",
+        ),
+        LooMinisterFact(
+          id: "holding-count",
+          label: "持仓数量",
+          value: "${holdings.length} 个",
+        ),
+        if (chart != null)
+          LooMinisterFact(
+            id: "account-value-chart",
+            label: chart.title,
+            value: chart.freshness.label,
+            detail: chart.freshness.detail,
+            source: "portfolio-data",
+          ),
+        ...allocation.take(5).map(
+              (item) => LooMinisterFact(
+                id: "allocation-${_slug(item.name)}",
+                label: "账户配置 ${item.name}",
+                value: item.value,
+                source: "analysis-cache",
+              ),
+            ),
+        ...facts.take(5).map(
+              (fact) => LooMinisterFact(
+                id: "fact-${_slug(fact.label)}",
+                label: fact.label,
+                value: fact.value,
+                detail: fact.detail,
+              ),
+            ),
+      ],
+      warnings: [
+        ...summaryPoints.take(4),
+        ...healthScore.highlights.take(3),
+        ...healthScore.actions.take(3),
+        if (chart != null && chart.notes.isNotEmpty) ...chart.notes.take(3),
+      ],
+      allowedActions: const [
+        LooMinisterSuggestedAction(
+          id: "open-account-health",
+          label: "查看账户健康巡查",
+          actionType: "navigate",
+          target: {"page": "portfolio-health"},
+        ),
+        LooMinisterSuggestedAction(
+          id: "run-account-analysis",
+          label: "运行 AI 账户快扫",
+          actionType: "run-analysis",
+          target: {"scope": "account"},
+          requiresConfirmation: true,
+        ),
+      ],
+    );
+  }
 
   factory MobileAccountDetailSnapshot.fromJson(Map<String, dynamic> json) {
     final account = json["account"];
@@ -509,6 +607,34 @@ class MobileAccountHealthScore {
           const [],
     );
   }
+}
+
+String _toMinisterChartFreshness(String? value) {
+  return switch (value) {
+    "fresh" => "fresh",
+    "stale" => "stale",
+    "fallback" => "fallback",
+    "reference" => "reference",
+    _ => "unknown",
+  };
+}
+
+String _toMinisterSourceMode(String? value) {
+  return switch (value) {
+    "local" => "local",
+    "cached-external" => "cached-external",
+    "live-external" => "live-external",
+    "reference" => "reference",
+    _ => "local",
+  };
+}
+
+String _slug(String value) {
+  return value
+      .trim()
+      .toLowerCase()
+      .replaceAll(RegExp(r"[^a-z0-9\u4e00-\u9fa5]+"), "-")
+      .replaceAll(RegExp(r"^-+|-+$"), "");
 }
 
 class _MetricGrid extends StatelessWidget {

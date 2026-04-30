@@ -1,6 +1,10 @@
 import "package:flutter_test/flutter_test.dart";
 import "package:loo_wealth_mobile/features/overview/data/mobile_home_models.dart";
 import "package:loo_wealth_mobile/features/portfolio/data/mobile_portfolio_models.dart";
+import "package:loo_wealth_mobile/features/portfolio/presentation/account_detail_page.dart";
+import "package:loo_wealth_mobile/features/portfolio/presentation/health_score_page.dart";
+import "package:loo_wealth_mobile/features/portfolio/presentation/holding_detail_page.dart";
+import "package:loo_wealth_mobile/features/portfolio/presentation/security_detail_page.dart";
 import "package:loo_wealth_mobile/features/shared/data/mobile_chart_models.dart";
 import "package:loo_wealth_mobile/features/shared/data/loo_minister_context_models.dart";
 import "package:loo_wealth_mobile/features/shared/data/mobile_models.dart";
@@ -242,5 +246,155 @@ void main() {
     expect(factIds, contains("portfolio-value-chart"));
     expect(factIds, contains("asset-class-us-equity"));
     expect((json["warnings"] as List), contains("US Equity 超过目标。"));
+  });
+
+  test("builds detail-page minister contexts with stable subjects", () {
+    const account = MobileAccountDetailSnapshot(
+      name: "TFSA",
+      typeId: "TFSA",
+      institution: "WS",
+      currency: "CAD",
+      value: "CAD 50,000",
+      gainLoss: "+CAD 2,000",
+      portfolioShare: "50.0%",
+      room: "可用额度 CAD 10,000",
+      subtitle: "TFSA · WS · 50.0%",
+      summaryPoints: ["账户集中在 US Equity。"],
+      performance: [],
+      accountValueChart: null,
+      allocation: [],
+      healthScore: MobileAccountHealthScore(
+        score: "78 分",
+        status: "需巡查",
+        highlights: ["集中度偏高。"],
+        actions: ["补充固定收益。"],
+      ),
+      facts: [],
+      holdings: [],
+    );
+
+    const holding = MobileHoldingDetailSnapshot(
+      id: "holding-1",
+      symbol: "VFV",
+      name: "Vanguard S&P 500 Index ETF",
+      accountId: "account-1",
+      accountName: "TFSA",
+      currency: "CAD",
+      identityExchange: "TSX",
+      accountType: "TFSA",
+      assetClass: "US Equity",
+      sector: "ETF",
+      exchange: "TSX",
+      securityType: "ETF",
+      value: "CAD 12,000",
+      lastPrice: "CAD 150",
+      lastUpdated: "2026-04-30T04:00:00.000Z",
+      freshnessVariant: "success",
+      quoteProvider: "cache",
+      quoteStatusLabel: "报价较新",
+      portfolioShare: "12.0%",
+      accountShare: "24.0%",
+      gainLoss: "+CAD 500",
+      subtitle: "TFSA · 12.0% · +CAD 500",
+      quantityLine: "80 shares",
+      quoteLine: "报价较新 · cache · CAD 150",
+      fxLine: "",
+      facts: [],
+      marketData: MobileMarketData(
+        summary: "行情来自本地缓存。",
+        notes: ["按 TSX/CAD 身份读取。"],
+        facts: [],
+      ),
+      performance: [],
+      holdingValueChart: null,
+      portfolioRole: ["提供 US Equity 暴露。"],
+      healthSummary: MobileHealthSummary(
+        score: "75 分",
+        status: "可持有",
+        summary: "需要关注集中度。",
+        drivers: ["US Equity 已高于目标。"],
+        actions: ["新增资金优先补其他资产。"],
+      ),
+    );
+
+    const security = MobileSecurityDetailSnapshot(
+      symbol: "VFV",
+      name: "Vanguard S&P 500 Index ETF",
+      assetClass: "US Equity",
+      sector: "ETF",
+      currency: "CAD",
+      exchange: "TSX",
+      lastPrice: "CAD 150",
+      quoteTimestamp: "2026-04-30T04:00:00.000Z",
+      freshnessVariant: "success",
+      subtitle: "US Equity · ETF · TSX",
+      marketData: MobileSecurityMarketData(
+        summary: "报价来自缓存。",
+        notes: ["CAD listing。"],
+        facts: [],
+      ),
+      analysis: MobileSecurityAnalysis(
+        assetClassLabel: "US Equity",
+        targetAllocation: "32.0%",
+        currentAllocation: "42.0%",
+        driftLabel: "+10.0%",
+        portfolioShare: "12.0%",
+        targetAllocationPct: 32,
+        currentAllocationPct: 42,
+        portfolioSharePct: 12,
+        summary: "US Equity 高于目标。",
+      ),
+      performance: [],
+      priceHistoryChart: null,
+      summaryPoints: ["CAD 版本不得混同 USD 正股。"],
+      facts: [],
+      relatedHoldings: [],
+      heldPosition: null,
+    );
+
+    final accountContext =
+        account.toMinisterContext(accountId: "account-1", asOf: now);
+    final holdingContext = holding.toMinisterContext(asOf: now);
+    final securityContext = security.toMinisterContext(asOf: now);
+
+    expect(accountContext.isValidLocalShape, isTrue);
+    expect(accountContext.toJson()["subject"]["accountId"], "account-1");
+    expect(holdingContext.isValidLocalShape, isTrue);
+    expect(holdingContext.toJson()["subject"]["holdingId"], "holding-1");
+    expect(
+      holdingContext.toJson()["subject"]["security"]["currency"],
+      "CAD",
+    );
+    expect(securityContext.isValidLocalShape, isTrue);
+    expect(securityContext.toJson()["subject"]["security"]["exchange"], "TSX");
+  });
+
+  test("builds portfolio health minister context", () {
+    const snapshot = MobileHealthSnapshot(
+      scopeName: "全组合健康",
+      scopeLabel: "全组合健康",
+      scopeDetail: "按总目标配置和风险平衡判断。",
+      isAccountScope: false,
+      score: "81 分",
+      status: "稳定",
+      strongestDimension:
+          MobileHealthDimensionPair(label: "账户效率", value: "90 分"),
+      weakestDimension: MobileHealthDimensionPair(label: "资产配置", value: "66 分"),
+      highlights: ["US Equity 高于目标。"],
+      actionQueue: ["补充固定收益。"],
+      radar: [MobileHealthRadarPoint(dimension: "配置", value: 66)],
+      dimensions: [],
+      accountDrilldown: [],
+      holdingDrilldown: [],
+    );
+
+    final context = snapshot.toMinisterContext(accountId: null, asOf: now);
+    final json = context.toJson();
+
+    expect(context.isValidLocalShape, isTrue);
+    expect(json["page"], "portfolio-health");
+    expect((json["facts"] as List).map((item) => item["id"]),
+        contains("health-score"));
+    expect((json["warnings"] as List), contains("US Equity 高于目标。"));
   });
 }
