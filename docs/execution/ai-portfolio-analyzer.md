@@ -148,9 +148,10 @@ Current status:
   live external research disabled, and currently returns a deterministic local
   `LooMinisterAnswerResult`.
 - Flutter API client exposes `askLooMinister(...)`.
-- Overview now has the first user-triggered `问 Loo国大臣` card. It sends the
-  current `MobileHomeSnapshot.toMinisterContext(...)` payload to the guarded
-  API and renders the deterministic local answer, key points, and disclaimer.
+- Mobile shell now owns a persistent floating `问大臣` entry. Overview and
+  Portfolio report their page-context DTOs into the shell, so the same floating
+  entry can answer with current page context without injecting a separate card
+  into every page.
 
 Backend tests:
 

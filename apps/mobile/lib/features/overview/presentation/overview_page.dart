@@ -6,17 +6,19 @@ import "../../portfolio/presentation/account_detail_page.dart";
 import "../../portfolio/presentation/health_score_page.dart";
 import "../../portfolio/presentation/holding_detail_page.dart";
 import "../../shared/data/mobile_chart_models.dart";
+import "../../shared/data/loo_minister_context_models.dart";
 import "../../shared/data/mobile_models.dart";
-import "../../shared/presentation/loo_minister_card.dart";
 import "../../shared/presentation/loo_charts.dart";
 
 class OverviewPage extends StatefulWidget {
   const OverviewPage({
     required this.apiClient,
+    this.onMinisterContextChanged,
     super.key,
   });
 
   final LooApiClient apiClient;
+  final ValueChanged<LooMinisterPageContext>? onMinisterContextChanged;
 
   @override
   State<OverviewPage> createState() => _OverviewPageState();
@@ -38,7 +40,12 @@ class _OverviewPageState extends State<OverviewPage> {
       throw const LooApiException("总览数据格式不正确。");
     }
 
-    return MobileHomeSnapshot.fromJson(data);
+    final snapshot = MobileHomeSnapshot.fromJson(data);
+    widget.onMinisterContextChanged?.call(
+      snapshot.toMinisterContext(
+          asOf: DateTime.now().toUtc().toIso8601String()),
+    );
+    return snapshot;
   }
 
   void _refresh() {
@@ -91,15 +98,6 @@ class _OverviewPageState extends State<OverviewPage> {
                           fallbackPoints: snapshot.data!.netWorthTrend,
                         ),
                       ],
-                      const SizedBox(height: 18),
-                      LooMinisterCard(
-                        apiClient: widget.apiClient,
-                        pageContext: snapshot.data!.toMinisterContext(
-                          asOf: DateTime.now().toUtc().toIso8601String(),
-                        ),
-                        suggestedQuestion: "为什么总资产曲线和卡片数字可能不同？",
-                      ),
-                      const SizedBox(height: 18),
                       _HealthCard(
                         snapshot.data!.health,
                         onTap: _openHealthScore,

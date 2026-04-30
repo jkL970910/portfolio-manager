@@ -7,6 +7,7 @@ import "asset_class_drilldown_page.dart";
 import "health_score_page.dart";
 import "holding_detail_page.dart";
 import "../../shared/data/mobile_chart_models.dart";
+import "../../shared/data/loo_minister_context_models.dart";
 import "../../shared/data/mobile_models.dart";
 import "../../shared/presentation/loo_charts.dart";
 
@@ -14,12 +15,14 @@ class PortfolioPage extends StatefulWidget {
   const PortfolioPage({
     required this.apiClient,
     this.accountTypeFilter,
+    this.onMinisterContextChanged,
     this.title,
     super.key,
   });
 
   final LooApiClient apiClient;
   final String? accountTypeFilter;
+  final ValueChanged<LooMinisterPageContext>? onMinisterContextChanged;
   final String? title;
 
   @override
@@ -45,10 +48,21 @@ class _PortfolioPageState extends State<PortfolioPage> {
     final snapshot = MobilePortfolioSnapshot.fromJson(data);
     final accountTypeFilter = widget.accountTypeFilter;
     if (accountTypeFilter == null || accountTypeFilter.isEmpty) {
+      widget.onMinisterContextChanged?.call(
+        snapshot.toMinisterContext(
+          asOf: DateTime.now().toUtc().toIso8601String(),
+        ),
+      );
       return snapshot;
     }
 
-    return snapshot.filteredByAccountType(accountTypeFilter);
+    final filteredSnapshot = snapshot.filteredByAccountType(accountTypeFilter);
+    widget.onMinisterContextChanged?.call(
+      filteredSnapshot.toMinisterContext(
+        asOf: DateTime.now().toUtc().toIso8601String(),
+      ),
+    );
+    return filteredSnapshot;
   }
 
   void _refresh() {

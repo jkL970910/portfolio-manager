@@ -19,6 +19,91 @@ class LooMinisterCard extends StatefulWidget {
   State<LooMinisterCard> createState() => _LooMinisterCardState();
 }
 
+class LooMinisterFloatingButton extends StatelessWidget {
+  const LooMinisterFloatingButton({
+    required this.apiClient,
+    required this.pageContext,
+    required this.suggestedQuestion,
+    super.key,
+  });
+
+  final LooApiClient apiClient;
+  final LooMinisterPageContext pageContext;
+  final String suggestedQuestion;
+
+  @override
+  Widget build(BuildContext context) {
+    return FloatingActionButton.extended(
+      heroTag: "loo-minister",
+      onPressed: () {
+        showModalBottomSheet<void>(
+          context: context,
+          isScrollControlled: true,
+          useSafeArea: true,
+          builder: (_) => _LooMinisterSheet(
+            apiClient: apiClient,
+            pageContext: pageContext,
+            suggestedQuestion: suggestedQuestion,
+          ),
+        );
+      },
+      icon: const Icon(Icons.auto_awesome),
+      label: const Text("问大臣"),
+    );
+  }
+}
+
+class _LooMinisterSheet extends StatelessWidget {
+  const _LooMinisterSheet({
+    required this.apiClient,
+    required this.pageContext,
+    required this.suggestedQuestion,
+  });
+
+  final LooApiClient apiClient;
+  final LooMinisterPageContext pageContext;
+  final String suggestedQuestion;
+
+  @override
+  Widget build(BuildContext context) {
+    return DraggableScrollableSheet(
+      expand: false,
+      initialChildSize: 0.72,
+      minChildSize: 0.42,
+      maxChildSize: 0.92,
+      builder: (context, scrollController) {
+        return SingleChildScrollView(
+          controller: scrollController,
+          padding: EdgeInsets.only(
+            left: 16,
+            right: 16,
+            top: 10,
+            bottom: MediaQuery.of(context).viewInsets.bottom + 16,
+          ),
+          child: Column(
+            children: [
+              Container(
+                width: 48,
+                height: 5,
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.outlineVariant,
+                  borderRadius: BorderRadius.circular(999),
+                ),
+              ),
+              const SizedBox(height: 10),
+              LooMinisterCard(
+                apiClient: apiClient,
+                pageContext: pageContext,
+                suggestedQuestion: suggestedQuestion,
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
 class _LooMinisterCardState extends State<LooMinisterCard> {
   late final TextEditingController _questionController =
       TextEditingController(text: widget.suggestedQuestion);
