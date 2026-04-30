@@ -142,6 +142,15 @@ P1 follow-up goals:
   after restart.
 - External consultation cached market-data now filters price history by
   `symbol + exchange + currency`, not ticker alone.
+- AI 标的/组合/账户快扫 now consumes cached quote lineage, security price
+  history, and portfolio snapshot freshness when available. Analysis results
+  expose `quoteSourceSummary`, `quoteFreshnessSummary`, price-history point
+  counts, fallback counts, and market-data sources so stale/reference data is
+  visible instead of hidden inside the AI explanation.
+- Mobile Recommendations now includes a first-pass `Loo国今日秘闻` card sourced
+  from cached analysis runs. This is an intelligence overlay only: it does not
+  automatically change deterministic V2.1 ordering, and it must not trigger
+  live news/forum research on page load.
 - Loo国大臣 prompts now carry fact source tags and explicitly prefer
   `analysis-cache` / `cached-external` facts when present.
 - `0016_preference_factors` adds the first Preference Factors V2 storage

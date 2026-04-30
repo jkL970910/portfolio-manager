@@ -3,7 +3,9 @@ import {
   HoldingPosition,
   InvestmentAccount,
   PreferenceProfile,
-  RecommendationRun
+  PortfolioSnapshot,
+  RecommendationRun,
+  SecurityPriceHistoryPoint
 } from "@/lib/backend/models";
 import { buildPortfolioHealthSummary } from "@/lib/backend/portfolio-health";
 import {
@@ -24,6 +26,21 @@ function latestIso(values: Array<string | null | undefined>, fallback: string) {
     .filter((value): value is string => Boolean(value))
     .sort()
     .at(-1) ?? fallback;
+}
+
+function asIsoDateTime(value: string | null | undefined) {
+  if (!value) {
+    return null;
+  }
+  return value.includes("T") ? value : `${value}T00:00:00.000Z`;
+}
+
+function latestIsoOrNull(values: Array<string | null | undefined>) {
+  return values
+    .map(asIsoDateTime)
+    .filter((value): value is string => Boolean(value))
+    .sort()
+    .at(-1) ?? null;
 }
 
 function sum(values: number[]) {
@@ -69,7 +86,180 @@ function getTaxNotes(args: {
 }
 
 function getQuoteFreshness(holdings: HoldingPosition[], generatedAt: string) {
-  return latestIso(holdings.map((holding) => holding.updatedAt), generatedAt);
+  return latestIso(
+    holdings.map(
+      (holding) =>
+        holding.lastQuoteSuccessAt ??
+        holding.quoteProviderTimestamp ??
+        holding.updatedAt,
+    ),
+    generatedAt,
+  );
+}
+
+export interface AnalyzerMarketDataContext {
+  priceHistory?: SecurityPriceHistoryPoint[];
+  portfolioSnapshots?: PortfolioSnapshot[];
+}
+
+function normalizeIdentityPart(value: string | null | undefined) {
+  const normalized = value?.trim().toUpperCase();
+  return normalized || null;
+}
+
+function filterHistoryForIdentity(
+  priceHistory: SecurityPriceHistoryPoint[],
+  identity: AnalyzerSecurityIdentity,
+) {
+  const symbol = normalizeIdentityPart(identity.symbol);
+  const exchange = normalizeIdentityPart(identity.exchange);
+  const currency = normalizeIdentityPart(identity.currency);
+  return priceHistory.filter((point) => {
+    const pointSymbol = normalizeIdentityPart(point.symbol);
+    const pointExchange = normalizeIdentityPart(point.exchange);
+    const pointCurrency = normalizeIdentityPart(point.currency);
+    return (
+      pointSymbol === symbol &&
+      (!exchange || pointExchange === exchange) &&
+      (!currency || pointCurrency === currency)
+    );
+  });
+}
+
+function buildMarketDataSummary(args: {
+  holdings: HoldingPosition[];
+  priceHistory?: SecurityPriceHistoryPoint[];
+  portfolioSnapshots?: PortfolioSnapshot[];
+  generatedAt: string;
+}) {
+  const priceHistory = args.priceHistory ?? [];
+  const snapshots = args.portfolioSnapshots ?? [];
+  const quoteProviders = [
+    ...new Set(
+      args.holdings
+        .map((holding) => holding.quoteProvider)
+        .filter((value): value is string => Boolean(value)),
+    ),
+  ];
+  const quoteStatuses = [
+    ...new Set(
+      args.holdings
+        .map((holding) => holding.quoteStatus)
+        .filter((value): value is string => Boolean(value)),
+    ),
+  ];
+  const historyProviders = [
+    ...new Set(
+      priceHistory
+        .map((point) => point.provider ?? point.source)
+        .filter((value): value is string => Boolean(value)),
+    ),
+  ];
+  const fallbackPointCount = priceHistory.filter(
+    (point) => point.freshness === "fallback" || point.isReference,
+  ).length;
+  const stalePointCount = priceHistory.filter(
+    (point) => point.freshness === "stale",
+  ).length;
+  const latestHistoryAsOf = latestIsoOrNull(
+    priceHistory.map((point) => point.priceDate),
+  );
+  const latestHoldingQuoteAsOf = latestIsoOrNull(
+    args.holdings.map(
+      (holding) =>
+        holding.lastQuoteSuccessAt ??
+        holding.quoteProviderTimestamp ??
+        holding.updatedAt,
+    ),
+  );
+  const latestSnapshot = [...snapshots].sort((left, right) =>
+    right.snapshotDate.localeCompare(left.snapshotDate),
+  )[0];
+  const quotesAsOf =
+    latestHoldingQuoteAsOf ??
+    latestHistoryAsOf ??
+    asIsoDateTime(latestSnapshot?.snapshotDate) ??
+    null;
+  const hasCachedMarketData =
+    quoteProviders.length > 0 ||
+    historyProviders.length > 0 ||
+    snapshots.some((snapshot) => snapshot.sourceMode === "cached-external");
+  const quoteSourceSummary =
+    quoteProviders.length > 0 || historyProviders.length > 0
+      ? [
+          quoteProviders.length > 0
+            ? `quotes=${quoteProviders.slice(0, 3).join("/")}`
+            : null,
+          historyProviders.length > 0
+            ? `history=${historyProviders.slice(0, 3).join("/")}`
+            : null,
+        ]
+          .filter(Boolean)
+          .join("；")
+      : null;
+  const quoteFreshnessSummary = [
+    quoteStatuses.length > 0
+      ? `quoteStatus=${quoteStatuses.slice(0, 4).join("/")}`
+      : null,
+    priceHistory.length > 0 ? `historyPoints=${priceHistory.length}` : null,
+    fallbackPointCount > 0 ? `fallbackPoints=${fallbackPointCount}` : null,
+    stalePointCount > 0 ? `stalePoints=${stalePointCount}` : null,
+  ]
+    .filter(Boolean)
+    .join("；");
+
+  return {
+    sourceMode: hasCachedMarketData ? "cached-external" as const : "local" as const,
+    quotesAsOf,
+    quoteSourceSummary,
+    quoteFreshnessSummary: quoteFreshnessSummary || null,
+    priceHistoryPointCount: priceHistory.length,
+    fallbackPointCount,
+    latestSnapshot,
+    sources: [
+      ...(quoteProviders.length > 0
+        ? [
+            {
+              title: `Cached holding quotes: ${quoteProviders.slice(0, 3).join(" / ")}`,
+              sourceType: "quote-cache" as const,
+              date: latestHoldingQuoteAsOf?.slice(0, 10),
+            },
+          ]
+        : []),
+      ...(historyProviders.length > 0
+        ? [
+            {
+              title: `Cached price history: ${historyProviders.slice(0, 3).join(" / ")}`,
+              sourceType: "market-data" as const,
+              date: latestHistoryAsOf?.slice(0, 10),
+            },
+          ]
+        : []),
+      ...(latestSnapshot
+        ? [
+            {
+              title: `Portfolio snapshot: ${latestSnapshot.sourceMode ?? latestSnapshot.sourceVersion}`,
+              sourceType: "portfolio-data" as const,
+              date: latestSnapshot.snapshotDate,
+            },
+          ]
+        : []),
+    ],
+    warnings: [
+      ...(priceHistory.length === 0
+        ? ["没有匹配的缓存价格历史；分析不能把走势图当作实时市场结论。"]
+        : []),
+      ...(fallbackPointCount > 0
+        ? [`价格历史含 ${fallbackPointCount} 个参考/兜底点，AI 只能低置信使用。`]
+        : []),
+      ...(stalePointCount > 0
+        ? [`价格历史含 ${stalePointCount} 个 stale 点，需要刷新后再提高置信度。`]
+        : []),
+      ...(quoteProviders.length === 0
+        ? ["持仓行没有可审计 quote provider；分析只能使用本地持仓字段。"]
+        : []),
+    ],
+  };
 }
 
 export function buildSecurityAnalyzerQuickScan(args: {
@@ -77,6 +267,7 @@ export function buildSecurityAnalyzerQuickScan(args: {
   accounts: InvestmentAccount[];
   holdings: HoldingPosition[];
   profile: PreferenceProfile;
+  marketData?: AnalyzerMarketDataContext;
   generatedAt?: string;
 }): PortfolioAnalyzerResult {
   const generatedAt = args.generatedAt ?? new Date().toISOString();
@@ -98,6 +289,17 @@ export function buildSecurityAnalyzerQuickScan(args: {
     .map((holding) => getHoldingAccount(holding, args.accounts)?.type)
     .filter((type): type is AccountType => Boolean(type)))];
   const taxNotes = getTaxNotes({ holdings: matchingHoldings, accounts: args.accounts });
+  const identity = { ...args.identity, symbol: normalizedSymbol };
+  const matchingHistory = filterHistoryForIdentity(
+    args.marketData?.priceHistory ?? [],
+    identity,
+  );
+  const marketData = buildMarketDataSummary({
+    holdings: matchingHoldings,
+    priceHistory: matchingHistory,
+    portfolioSnapshots: args.marketData?.portfolioSnapshots,
+    generatedAt,
+  });
 
   return assertAnalyzerResult({
     version: PORTFOLIO_ANALYZER_VERSION,
@@ -105,23 +307,45 @@ export function buildSecurityAnalyzerQuickScan(args: {
     mode: "quick",
     generatedAt,
     identity: {
-      ...args.identity,
-      symbol: normalizedSymbol
+      ...identity
     },
     dataFreshness: {
       portfolioAsOf: latestIso(args.holdings.map((holding) => holding.updatedAt), generatedAt),
-      quotesAsOf: matchingHoldings.length > 0 ? getQuoteFreshness(matchingHoldings, generatedAt) : null,
+      quotesAsOf: marketData.quotesAsOf,
       externalResearchAsOf: null,
-      sourceMode: "local"
+      sourceMode: marketData.sourceMode,
+      quoteSourceSummary: marketData.quoteSourceSummary,
+      quoteFreshnessSummary: marketData.quoteFreshnessSummary,
+      priceHistoryPointCount: marketData.priceHistoryPointCount,
+      fallbackPointCount: marketData.fallbackPointCount
     },
     summary: {
       title: `${normalizedSymbol} AI 快速分析`,
       thesis: matchingHoldings.length > 0
-        ? `${normalizedSymbol} 当前在组合中约占 ${round(heldWeightPct, 1)}%，本轮只基于本地组合、账户、偏好和报价缓存分析。`
+        ? `${normalizedSymbol} 当前在组合中约占 ${round(heldWeightPct, 1)}%，本轮基于本地组合、账户、偏好、缓存报价和价格历史分析。`
         : `${normalizedSymbol} 当前没有匹配到真实持仓，本轮只保留标的身份并等待后续接入候选/外部研究。`,
-      confidence: matchingHoldings.length > 0 ? "medium" : "low"
+      confidence:
+        matchingHoldings.length > 0 && marketData.priceHistoryPointCount > 0
+          ? "medium"
+          : "low"
     },
     scorecards: [
+      {
+        id: "market-data-freshness",
+        label: "缓存行情可信度",
+        score: Math.max(
+          20,
+          Math.min(
+            90,
+            45 +
+              Math.min(marketData.priceHistoryPointCount, 60) -
+              marketData.fallbackPointCount * 6,
+          ),
+        ),
+        rationale: marketData.quoteFreshnessSummary
+          ? `行情口径：${marketData.quoteFreshnessSummary}。`
+          : "没有足够缓存行情，不能把分析当成实时研究。"
+      },
       {
         id: "portfolio-weight",
         label: "组合权重",
@@ -138,6 +362,12 @@ export function buildSecurityAnalyzerQuickScan(args: {
       }
     ],
     risks: [
+      ...marketData.warnings.map((warning) => ({
+        severity: "medium" as const,
+        title: "行情缓存限制",
+        detail: warning,
+        relatedIdentity: identity
+      })),
       ...(heldWeightPct >= 15 ? [{
         severity: "high" as const,
         title: "单一标的权重偏高",
@@ -156,6 +386,9 @@ export function buildSecurityAnalyzerQuickScan(args: {
       accountTypes.length > 0
         ? `当前匹配持仓分布在 ${accountTypes.join(" / ")}。`
         : "当前没有匹配到账户内真实持仓。",
+      marketData.quoteSourceSummary
+        ? `行情来源：${marketData.quoteSourceSummary}。`
+        : "行情来源：当前没有可审计 provider，只能低置信使用本地字段。",
       "分析身份保留 symbol、exchange、currency，避免 CAD 版本和美股正股混淆。"
     ],
     actionItems: [
@@ -167,7 +400,8 @@ export function buildSecurityAnalyzerQuickScan(args: {
     ],
     sources: [
       { title: "Local holdings and account data", sourceType: "portfolio-data" },
-      { title: "Cached holding quote fields", sourceType: "quote-cache" }
+      { title: "Cached holding quote fields", sourceType: "quote-cache" },
+      ...marketData.sources
     ],
     disclaimer: PORTFOLIO_ANALYZER_DISCLAIMER
   });
@@ -177,6 +411,7 @@ export function buildPortfolioAnalyzerQuickScan(args: {
   accounts: InvestmentAccount[];
   holdings: HoldingPosition[];
   profile: PreferenceProfile;
+  marketData?: AnalyzerMarketDataContext;
   generatedAt?: string;
 }): PortfolioAnalyzerResult {
   const generatedAt = args.generatedAt ?? new Date().toISOString();
@@ -188,6 +423,12 @@ export function buildPortfolioAnalyzerQuickScan(args: {
   });
   const largestHolding = [...args.holdings].sort((left, right) => right.weightPct - left.weightPct)[0];
   const taxNotes = getTaxNotes({ holdings: args.holdings, accounts: args.accounts });
+  const marketData = buildMarketDataSummary({
+    holdings: args.holdings,
+    priceHistory: args.marketData?.priceHistory,
+    portfolioSnapshots: args.marketData?.portfolioSnapshots,
+    generatedAt,
+  });
 
   return assertAnalyzerResult({
     version: PORTFOLIO_ANALYZER_VERSION,
@@ -196,22 +437,44 @@ export function buildPortfolioAnalyzerQuickScan(args: {
     generatedAt,
     dataFreshness: {
       portfolioAsOf: latestIso(args.holdings.map((holding) => holding.updatedAt), generatedAt),
-      quotesAsOf: getQuoteFreshness(args.holdings, generatedAt),
+      quotesAsOf: marketData.quotesAsOf ?? getQuoteFreshness(args.holdings, generatedAt),
       externalResearchAsOf: null,
-      sourceMode: "local"
+      sourceMode: marketData.sourceMode,
+      quoteSourceSummary: marketData.quoteSourceSummary,
+      quoteFreshnessSummary: marketData.quoteFreshnessSummary,
+      priceHistoryPointCount: marketData.priceHistoryPointCount,
+      fallbackPointCount: marketData.fallbackPointCount
     },
     summary: {
       title: "组合 AI 快速诊断",
-      thesis: `当前组合健康分为 ${health.score}，本轮只使用本地持仓、账户、偏好和健康分结果生成诊断。`,
+      thesis: `当前组合健康分为 ${health.score}，本轮使用本地持仓、账户、偏好、健康分和缓存行情来源生成诊断。`,
       confidence: "medium"
     },
-    scorecards: health.dimensions.map((dimension) => ({
-      id: dimension.id,
-      label: dimension.label,
-      score: dimension.score,
-      rationale: dimension.summary
-    })),
+    scorecards: [
+      {
+        id: "market-data-freshness",
+        label: "缓存行情可信度",
+        score: Math.max(
+          20,
+          Math.min(90, 45 + Math.min(marketData.priceHistoryPointCount, 60) - marketData.fallbackPointCount * 6),
+        ),
+        rationale: marketData.quoteFreshnessSummary
+          ? `行情口径：${marketData.quoteFreshnessSummary}。`
+          : "没有足够缓存行情，组合快扫只能低置信使用本地字段。"
+      },
+      ...health.dimensions.map((dimension) => ({
+        id: dimension.id,
+        label: dimension.label,
+        score: dimension.score,
+        rationale: dimension.summary
+      }))
+    ],
     risks: [
+      ...marketData.warnings.map((warning) => ({
+        severity: "medium" as const,
+        title: "行情缓存限制",
+        detail: warning
+      })),
       ...health.dimensions
         .filter((dimension) => dimension.score < 68)
         .map((dimension) => ({
@@ -228,6 +491,9 @@ export function buildPortfolioAnalyzerQuickScan(args: {
     ].slice(0, 12),
     taxNotes,
     portfolioFit: [
+      marketData.quoteSourceSummary
+        ? `行情来源：${marketData.quoteSourceSummary}。`
+        : "行情来源：当前没有可审计 provider，只能低置信使用本地字段。",
       ...health.highlights,
       ...health.actionQueue.slice(0, 3)
     ].slice(0, 12),
@@ -239,7 +505,8 @@ export function buildPortfolioAnalyzerQuickScan(args: {
     sources: [
       { title: "Local portfolio health summary", sourceType: "portfolio-data" },
       { title: "Local holdings and account data", sourceType: "portfolio-data" },
-      { title: "Cached holding quote fields", sourceType: "quote-cache" }
+      { title: "Cached holding quote fields", sourceType: "quote-cache" },
+      ...marketData.sources
     ],
     disclaimer: PORTFOLIO_ANALYZER_DISCLAIMER
   });
@@ -250,6 +517,7 @@ export function buildAccountAnalyzerQuickScan(args: {
   accounts: InvestmentAccount[];
   holdings: HoldingPosition[];
   profile: PreferenceProfile;
+  marketData?: AnalyzerMarketDataContext;
   generatedAt?: string;
 }): PortfolioAnalyzerResult {
   const generatedAt = args.generatedAt ?? new Date().toISOString();
@@ -269,6 +537,18 @@ export function buildAccountAnalyzerQuickScan(args: {
   const largestHolding = [...accountHoldings].sort((left, right) => right.weightPct - left.weightPct)[0];
   const taxNotes = getTaxNotes({ holdings: accountHoldings, accounts: [args.account] });
   const accountLabel = `${args.account.nickname} (${args.account.type})`;
+  const accountHistorySymbols = new Set(
+    accountHoldings.map((holding) => holding.symbol.trim().toUpperCase()),
+  );
+  const accountHistory = (args.marketData?.priceHistory ?? []).filter((point) =>
+    accountHistorySymbols.has(point.symbol.trim().toUpperCase()),
+  );
+  const marketData = buildMarketDataSummary({
+    holdings: accountHoldings,
+    priceHistory: accountHistory,
+    portfolioSnapshots: args.marketData?.portfolioSnapshots,
+    generatedAt,
+  });
 
   return assertAnalyzerResult({
     version: PORTFOLIO_ANALYZER_VERSION,
@@ -277,9 +557,13 @@ export function buildAccountAnalyzerQuickScan(args: {
     generatedAt,
     dataFreshness: {
       portfolioAsOf: latestIso(accountHoldings.map((holding) => holding.updatedAt), generatedAt),
-      quotesAsOf: accountHoldings.length > 0 ? getQuoteFreshness(accountHoldings, generatedAt) : null,
+      quotesAsOf: marketData.quotesAsOf,
       externalResearchAsOf: null,
-      sourceMode: "local"
+      sourceMode: marketData.sourceMode,
+      quoteSourceSummary: marketData.quoteSourceSummary,
+      quoteFreshnessSummary: marketData.quoteFreshnessSummary,
+      priceHistoryPointCount: marketData.priceHistoryPointCount,
+      fallbackPointCount: marketData.fallbackPointCount
     },
     summary: {
       title: `${accountLabel} AI 账户快扫`,
@@ -287,6 +571,17 @@ export function buildAccountAnalyzerQuickScan(args: {
       confidence: accountHoldings.length > 0 ? "medium" : "low"
     },
     scorecards: [
+      {
+        id: "market-data-freshness",
+        label: "缓存行情可信度",
+        score: Math.max(
+          20,
+          Math.min(90, 45 + Math.min(marketData.priceHistoryPointCount, 60) - marketData.fallbackPointCount * 6),
+        ),
+        rationale: marketData.quoteFreshnessSummary
+          ? `行情口径：${marketData.quoteFreshnessSummary}。`
+          : "没有足够缓存行情，账户快扫只能低置信使用本地字段。"
+      },
       {
         id: "account-health",
         label: "账户综合分",
@@ -319,6 +614,11 @@ export function buildAccountAnalyzerQuickScan(args: {
       }))
     ].slice(0, 8),
     risks: [
+      ...marketData.warnings.map((warning) => ({
+        severity: "medium" as const,
+        title: "行情缓存限制",
+        detail: warning
+      })),
       ...health.dimensions
         .filter((dimension) => dimension.score < 68)
         .map((dimension) => ({
@@ -343,6 +643,9 @@ export function buildAccountAnalyzerQuickScan(args: {
       : [`${args.account.type} 的账户位置会影响税务效率；本轮只基于本地账户类型和持仓币种提示。`],
     portfolioFit: [
       "本账户分析分两个口径：账户内适配看账户属性是否合适；全组合目标参考看它对总组合配置有没有帮助。",
+      marketData.quoteSourceSummary
+        ? `行情来源：${marketData.quoteSourceSummary}。`
+        : "行情来源：当前没有可审计 provider，只能低置信使用本地字段。",
       ...health.highlights,
       `账户类型：${args.account.type}；账户币种：${args.account.currency ?? "CAD"}。`,
       `当前账户内持仓数：${accountHoldings.length}。`
@@ -355,7 +658,8 @@ export function buildAccountAnalyzerQuickScan(args: {
     sources: [
       { title: "Local account health summary", sourceType: "portfolio-data" },
       { title: "Local account holdings", sourceType: "portfolio-data" },
-      { title: "Cached holding quote fields", sourceType: "quote-cache" }
+      { title: "Cached holding quote fields", sourceType: "quote-cache" },
+      ...marketData.sources
     ],
     disclaimer: PORTFOLIO_ANALYZER_DISCLAIMER
   });

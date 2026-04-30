@@ -1,6 +1,12 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import type { InvestmentAccount, HoldingPosition, PreferenceProfile, RecommendationRun } from "@/lib/backend/models";
+import type {
+  HoldingPosition,
+  InvestmentAccount,
+  PreferenceProfile,
+  RecommendationRun,
+  SecurityPriceHistoryPoint
+} from "@/lib/backend/models";
 import { DEFAULT_PREFERENCE_FACTORS } from "@/lib/backend/preference-factors";
 import { DEFAULT_RECOMMENDATION_CONSTRAINTS } from "@/lib/backend/recommendation-constraints";
 import {
@@ -49,6 +55,11 @@ const holdings: HoldingPosition[] = [
     securityTypeOverride: "Common Stock",
     exchangeOverride: "NASDAQ",
     marketValueCad: 18000,
+    lastPriceAmount: 180,
+    quoteProvider: "twelve-data",
+    quoteSourceMode: "cached-external",
+    quoteStatus: "success",
+    lastQuoteSuccessAt: generatedAt,
     weightPct: 18,
     gainLossPct: 6,
     updatedAt: generatedAt
@@ -65,6 +76,10 @@ const holdings: HoldingPosition[] = [
     securityTypeOverride: "Common Stock",
     exchangeOverride: "NEO",
     marketValueCad: 2000,
+    quoteProvider: "yahoo-finance",
+    quoteSourceMode: "cached-external",
+    quoteStatus: "success",
+    lastQuoteSuccessAt: generatedAt,
     weightPct: 2,
     gainLossPct: 1,
     updatedAt: generatedAt
@@ -84,6 +99,43 @@ const holdings: HoldingPosition[] = [
     weightPct: 20,
     gainLossPct: 3,
     updatedAt: generatedAt
+  }
+];
+
+const priceHistory: SecurityPriceHistoryPoint[] = [
+  {
+    id: "history_us_amzn",
+    symbol: "AMZN",
+    exchange: "NASDAQ",
+    priceDate: "2026-04-27",
+    close: 180,
+    adjustedClose: 180,
+    currency: "USD",
+    source: "provider",
+    provider: "twelve-data",
+    sourceMode: "cached-external",
+    freshness: "fresh",
+    refreshRunId: "run_1",
+    isReference: false,
+    fallbackReason: null,
+    createdAt: generatedAt
+  },
+  {
+    id: "history_cad_amzn",
+    symbol: "AMZN",
+    exchange: "NEO",
+    priceDate: "2026-04-27",
+    close: 30,
+    adjustedClose: 30,
+    currency: "CAD",
+    source: "provider",
+    provider: "yahoo-finance",
+    sourceMode: "cached-external",
+    freshness: "fresh",
+    refreshRunId: "run_1",
+    isReference: false,
+    fallbackReason: null,
+    createdAt: generatedAt
   }
 ];
 
@@ -129,6 +181,29 @@ test("security analyzer quick scan matches by full identity, not ticker alone", 
   assert.ok(result.portfolioFit.some((item) => item.includes("symbol、exchange、currency")));
 });
 
+test("security analyzer quick scan consumes cached market data by identity", () => {
+  const result = buildSecurityAnalyzerQuickScan({
+    identity: { symbol: "AMZN", exchange: "NEO", currency: "CAD", name: "Amazon CDR" },
+    accounts,
+    holdings,
+    profile: makeProfile(),
+    marketData: { priceHistory },
+    generatedAt
+  });
+
+  assert.equal(result.dataFreshness.sourceMode, "cached-external");
+  assert.equal(result.dataFreshness.priceHistoryPointCount, 1);
+  assert.match(result.dataFreshness.quoteSourceSummary ?? "", /yahoo-finance/);
+  assert.ok(
+    result.sources.some((source) =>
+      source.title.includes("Cached price history")
+    )
+  );
+  assert.ok(
+    result.scorecards.some((card) => card.id === "market-data-freshness")
+  );
+});
+
 test("portfolio analyzer cache key preserves security listing identity", () => {
   const usdCommon = buildPortfolioAnalyzerCacheKey({
     scope: "security",
@@ -159,7 +234,7 @@ test("portfolio analyzer quick scan returns local structured analysis with discl
   });
 
   assert.equal(result.scope, "portfolio");
-  assert.equal(result.dataFreshness.sourceMode, "local");
+  assert.equal(result.dataFreshness.sourceMode, "cached-external");
   assert.ok(result.scorecards.length > 0);
   assert.ok(result.risks.some((risk) => risk.title.includes("集中度")));
   assert.match(result.disclaimer.zh, /不构成投资建议/);

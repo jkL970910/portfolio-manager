@@ -4139,6 +4139,7 @@ export function buildRecommendationsData(args: {
             "The system first chooses the best account home, then picks a security inside that sleeve.",
           ),
         ],
+    intelligenceBriefs: [],
     priorities: (latestRun?.items ?? []).map((item, index) => {
       const leadSecurity =
         item.securitySymbol && item.securityName

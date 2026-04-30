@@ -163,6 +163,18 @@ V2.1 coverage vs V3 backlog:
 | Candidate universe | Static curated ETF list plus manual candidate scoring | Verified identity universe from search/watchlist/holdings/provider metadata |
 | Validation | Unit tests for constraints and preference scoring direction | Backtests, scenario tests, stale-data checks, confidence calibration |
 
+Current bridge implementation:
+
+- AI quick-scan results consume cached quote lineage, security price history,
+  and portfolio snapshot metadata when available.
+- Recommendation mobile view surfaces cached AI/market-data analysis as
+  `Loo国今日秘闻` so users can see relevant context before acting on a recommendation.
+- This bridge is deliberately an overlay, not a hidden scoring override.
+  Deterministic V2.1 allocation/account/tax scoring remains the execution
+  baseline until V3 has calibrated source quality, TTL, and stale-data tests.
+- Live news/forum/institutional adapters remain disabled on page load. Any future
+  provider must run through the worker/cache/TTL boundary first.
+
 New factor groups:
 
 #### Risk and behavior

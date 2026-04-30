@@ -162,6 +162,9 @@ class MobileAiAnalysisResult {
     required this.sources,
     required this.disclaimerZh,
     required this.sourceMode,
+    required this.quotesAsOf,
+    required this.quoteSourceSummary,
+    required this.quoteFreshnessSummary,
   });
 
   final String title;
@@ -175,6 +178,9 @@ class MobileAiAnalysisResult {
   final List<String> sources;
   final String disclaimerZh;
   final String sourceMode;
+  final String? quotesAsOf;
+  final String? quoteSourceSummary;
+  final String? quoteFreshnessSummary;
 
   factory MobileAiAnalysisResult.fromJson(Map<String, dynamic> json) {
     final summary = _readMap(json["summary"]);
@@ -199,6 +205,9 @@ class MobileAiAnalysisResult {
           .toList(),
       disclaimerZh: disclaimer["zh"] as String? ?? "仅用于研究学习，不构成投资建议。",
       sourceMode: dataFreshness["sourceMode"] as String? ?? "local",
+      quotesAsOf: dataFreshness["quotesAsOf"] as String?,
+      quoteSourceSummary: dataFreshness["quoteSourceSummary"] as String?,
+      quoteFreshnessSummary: dataFreshness["quoteFreshnessSummary"] as String?,
     );
   }
 }
@@ -280,6 +289,21 @@ class _AnalysisResultView extends StatelessWidget {
         const SizedBox(height: 8),
         _MetaPill(
             "置信度 ${_confidenceLabel(data.confidence)} · ${_sourceModeLabel(data.sourceMode)}"),
+        if (data.quoteSourceSummary != null ||
+            data.quoteFreshnessSummary != null ||
+            data.quotesAsOf != null) ...[
+          const SizedBox(height: 8),
+          Text(
+            [
+              if (data.quotesAsOf != null)
+                "行情截至 ${data.quotesAsOf!.substring(0, 10)}",
+              if (data.quoteSourceSummary != null) data.quoteSourceSummary!,
+              if (data.quoteFreshnessSummary != null)
+                data.quoteFreshnessSummary!,
+            ].join(" · "),
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+        ],
         if (data.scorecards.isNotEmpty) ...[
           const SizedBox(height: 14),
           ...data.scorecards.take(4).map(_ScorecardRow.new),

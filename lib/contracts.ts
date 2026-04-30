@@ -634,6 +634,21 @@ export interface RecommendationsData {
     tone?: "default" | "muted" | "warning";
   }[];
   explainer: string[];
+  intelligenceBriefs: {
+    id: string;
+    title: string;
+    detail: string;
+    sourceLabel: string;
+    sourceMode: "local" | "cached-external" | "live-external";
+    freshnessLabel: string;
+    generatedAt: string;
+    symbols: string[];
+    sources: {
+      title: string;
+      sourceType: string;
+      date?: string;
+    }[];
+  }[];
   priorities: {
     id: string;
     assetClass: string;

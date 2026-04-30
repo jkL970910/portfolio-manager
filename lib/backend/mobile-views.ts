@@ -18,6 +18,7 @@ import {
   getRecommendationView,
 } from "@/lib/backend/services";
 import { getRepositories } from "@/lib/backend/repositories/factory";
+import type { PortfolioAnalysisRun } from "@/lib/backend/models";
 import type { Viewer } from "@/lib/auth/session";
 
 type MobileHomeData = {
@@ -408,9 +409,11 @@ function mapMobileSecurityDetailData(
 function mapMobileRecommendationsData(
   data: RecommendationsData,
   preferenceContext: MobileRecommendationsData["preferenceContext"],
+  intelligenceBriefs: RecommendationsData["intelligenceBriefs"] = [],
 ): MobileRecommendationsData {
   return {
     ...data,
+    intelligenceBriefs,
     preferenceContext,
     priorities: data.priorities.map((priority) => {
       const {
@@ -422,6 +425,87 @@ function mapMobileRecommendationsData(
       return rest;
     }),
   };
+}
+
+function readResultMap(run: PortfolioAnalysisRun) {
+  return run.result && typeof run.result === "object"
+    ? run.result
+    : {};
+}
+
+function readNestedMap(value: unknown) {
+  return value && typeof value === "object"
+    ? value as Record<string, unknown>
+    : {};
+}
+
+function mapRecommendationIntelligenceBriefs(
+  runs: PortfolioAnalysisRun[],
+): RecommendationsData["intelligenceBriefs"] {
+  return runs.slice(0, 5).map((run) => {
+    const result = readResultMap(run);
+    const summary = readNestedMap(result.summary);
+    const dataFreshness = readNestedMap(result.dataFreshness);
+    const identity = readNestedMap(result.identity);
+    const rawSources = Array.isArray(result.sources) ? result.sources : [];
+    const symbols = [
+      typeof identity.symbol === "string" ? identity.symbol : null,
+      typeof identity.exchange === "string" ? identity.exchange : null,
+      typeof identity.currency === "string" ? identity.currency : null,
+    ].filter((value): value is string => Boolean(value));
+    const sourceMode =
+      run.sourceMode === "cached-external" || run.sourceMode === "live-external"
+        ? run.sourceMode
+        : "local";
+    const sourceLabel = sourceMode === "cached-external"
+      ? "缓存外部情报"
+      : sourceMode === "live-external"
+        ? "实时外部情报"
+        : "本地快扫";
+    const quotesAsOf =
+      typeof dataFreshness.quotesAsOf === "string"
+        ? dataFreshness.quotesAsOf
+        : null;
+    const quoteSource =
+      typeof dataFreshness.quoteSourceSummary === "string"
+        ? dataFreshness.quoteSourceSummary
+        : null;
+    const freshnessLabel = [
+      quotesAsOf ? `行情 ${quotesAsOf.slice(0, 10)}` : null,
+      quoteSource,
+    ].filter(Boolean).join(" · ") || "暂无行情新鲜度";
+
+    return {
+      id: run.id,
+      title:
+        typeof summary.title === "string" && summary.title.trim()
+          ? summary.title
+          : "Loo国秘闻",
+      detail:
+        typeof summary.thesis === "string" && summary.thesis.trim()
+          ? summary.thesis
+          : "这条情报来自已缓存的分析记录。",
+      sourceLabel,
+      sourceMode,
+      freshnessLabel,
+      generatedAt: run.generatedAt,
+      symbols,
+      sources: rawSources.slice(0, 4).map((source) => {
+        const value = readNestedMap(source);
+        return {
+          title:
+            typeof value.title === "string" && value.title.trim()
+              ? value.title
+              : "来源",
+          sourceType:
+            typeof value.sourceType === "string"
+              ? value.sourceType
+              : "portfolio-data",
+          date: typeof value.date === "string" ? value.date : undefined,
+        };
+      }),
+    };
+  });
 }
 
 function mapMobileImportData(data: ImportData): MobileImportData {
@@ -547,9 +631,10 @@ export async function getMobilePortfolioSecurityDetailView(
 }
 
 export async function getMobileRecommendationsView(userId: string) {
-  const [payload, profile] = await Promise.all([
+  const [payload, profile, analysisRuns] = await Promise.all([
     getRecommendationView(userId),
     getRepositories().preferences.getByUserId(userId),
+    getRepositories().analysisRuns.listRecentByUserId(userId, 5),
   ]);
   return {
     data: mapMobileRecommendationsData(payload.data, {
@@ -562,7 +647,7 @@ export async function getMobileRecommendationsView(userId: string) {
       watchlistSymbols: profile.watchlistSymbols,
       recommendationConstraints: profile.recommendationConstraints,
       preferenceFactors: profile.preferenceFactors,
-    }),
+    }, mapRecommendationIntelligenceBriefs(analysisRuns)),
     meta: payload.meta,
   };
 }

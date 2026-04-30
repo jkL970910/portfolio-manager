@@ -286,6 +286,11 @@ Current status:
 
 - First backend builder slice is implemented in
   `lib/backend/portfolio-analyzer.ts`.
+- Quick-scan builders now consume cached market-data lineage when available:
+  holding quote provider/status fields, security price history keyed by
+  `symbol + exchange + currency`, and portfolio snapshot freshness. Results
+  expose quote source/freshness summaries, price-history point counts, fallback
+  point counts, and market-data sources.
 - Backend tests are implemented in
   `tests/backend/portfolio-analyzer.test.ts`.
 - The builder now supports local quick-scan results for:
@@ -325,6 +330,9 @@ Recommendation-run quick scan should use:
 Remaining P0-B backend work:
 
 - Service/API adapters now call the quick-scan builders with real user data.
+- Service adapters now pass cached price history and portfolio snapshots into
+  quick scans. Missing or fallback history lowers confidence and is shown as a
+  limitation instead of being hidden.
 - Protected mobile route exists at `POST /api/mobile/analysis/quick-scan`.
 - Flutter API client exposes `createAnalyzerQuickScan(...)`.
 - Persistence table `portfolio_analysis_runs` exists in migration `0004`.

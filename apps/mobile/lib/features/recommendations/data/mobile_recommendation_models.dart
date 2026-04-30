@@ -6,6 +6,7 @@ class MobileRecommendationsSnapshot {
     required this.engineLine,
     required this.inputs,
     required this.preferenceContext,
+    required this.intelligenceBriefs,
     required this.explainer,
     required this.priorities,
     required this.scenarios,
@@ -16,6 +17,7 @@ class MobileRecommendationsSnapshot {
   final String engineLine;
   final List<MobileRecommendationInput> inputs;
   final MobilePreferenceContext preferenceContext;
+  final List<MobileIntelligenceBrief> intelligenceBriefs;
   final List<String> explainer;
   final List<MobileRecommendationPriority> priorities;
   final List<MobileRecommendationScenario> scenarios;
@@ -38,6 +40,9 @@ class MobileRecommendationsSnapshot {
           .toList(),
       preferenceContext:
           MobilePreferenceContext.fromJson(json["preferenceContext"]),
+      intelligenceBriefs: readJsonList(json, "intelligenceBriefs")
+          .map(MobileIntelligenceBrief.fromJson)
+          .toList(),
       explainer: (json["explainer"] as List?)?.whereType<String>().toList() ??
           const [],
       priorities: readJsonList(json, "priorities")
@@ -47,6 +52,50 @@ class MobileRecommendationsSnapshot {
           .map(MobileRecommendationScenario.fromJson)
           .toList(),
       notes: (json["notes"] as List?)?.whereType<String>().toList() ?? const [],
+    );
+  }
+}
+
+class MobileIntelligenceBrief {
+  const MobileIntelligenceBrief({
+    required this.id,
+    required this.title,
+    required this.detail,
+    required this.sourceLabel,
+    required this.freshnessLabel,
+    required this.generatedAt,
+    required this.symbols,
+    required this.sources,
+  });
+
+  final String id;
+  final String title;
+  final String detail;
+  final String sourceLabel;
+  final String freshnessLabel;
+  final String generatedAt;
+  final List<String> symbols;
+  final List<MobileRecommendationInput> sources;
+
+  factory MobileIntelligenceBrief.fromJson(Map<String, dynamic> json) {
+    return MobileIntelligenceBrief(
+      id: json["id"] as String? ?? "",
+      title: json["title"] as String? ?? "Loo国秘闻",
+      detail: json["detail"] as String? ?? "",
+      sourceLabel: json["sourceLabel"] as String? ?? "本地快扫",
+      freshnessLabel: json["freshnessLabel"] as String? ?? "暂无行情新鲜度",
+      generatedAt: json["generatedAt"] as String? ?? "",
+      symbols:
+          (json["symbols"] as List?)?.whereType<String>().toList() ?? const [],
+      sources: readJsonList(json, "sources").map((source) {
+        return MobileRecommendationInput(
+          label: source["sourceType"] as String? ?? "source",
+          value: [
+            source["title"] as String? ?? "来源",
+            source["date"] as String?,
+          ].whereType<String>().where((item) => item.isNotEmpty).join(" · "),
+        );
+      }).toList(),
     );
   }
 }

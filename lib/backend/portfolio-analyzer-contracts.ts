@@ -66,7 +66,17 @@ export const portfolioAnalyzerResultSchema = z.object({
     portfolioAsOf: z.string().datetime(),
     quotesAsOf: z.string().datetime().nullable(),
     externalResearchAsOf: z.string().datetime().nullable(),
-    sourceMode: z.enum(["local", "cached-external", "live-external"])
+    sourceMode: z.enum(["local", "cached-external", "live-external"]),
+    quoteSourceSummary: z.string().trim().min(1).max(240).nullable().optional(),
+    quoteFreshnessSummary: z
+      .string()
+      .trim()
+      .min(1)
+      .max(240)
+      .nullable()
+      .optional(),
+    priceHistoryPointCount: z.number().int().min(0).optional(),
+    fallbackPointCount: z.number().int().min(0).optional()
   }),
   summary: z.object({
     title: z.string().trim().min(1).max(120),

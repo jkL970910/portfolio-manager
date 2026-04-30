@@ -7,11 +7,14 @@ import {
   portfolioAnalyzerResultSchema
 } from "@/lib/backend/portfolio-analyzer-contracts";
 import {
+  AnalyzerMarketDataContext,
   buildAccountAnalyzerQuickScan,
   buildPortfolioAnalyzerQuickScan,
   buildRecommendationRunAnalyzerQuickScan,
   buildSecurityAnalyzerQuickScan
 } from "@/lib/backend/portfolio-analyzer";
+import type { AnalyzerSecurityIdentity } from "@/lib/backend/portfolio-analyzer-contracts";
+import type { HoldingPosition, SecurityPriceHistoryPoint } from "@/lib/backend/models";
 
 function normalizePart(value: string | null | undefined) {
   return value?.trim().toUpperCase() || "_";
@@ -53,6 +56,67 @@ function expiresAtFrom(now: Date, maxCacheAgeSeconds: number) {
 
 function shouldUseCache(input: PortfolioAnalyzerRequest) {
   return input.cacheStrategy === "prefer-cache" && !input.includeExternalResearch;
+}
+
+function normalizeIdentityPart(value: string | null | undefined) {
+  const normalized = value?.trim().toUpperCase();
+  return normalized || null;
+}
+
+async function loadAnalyzerMarketDataContext(args: {
+  userId: string;
+  holdings: HoldingPosition[];
+  identity?: AnalyzerSecurityIdentity | null;
+}): Promise<AnalyzerMarketDataContext> {
+  const repositories = getRepositories();
+  const portfolioSnapshotsPromise = repositories.snapshots.listByUserId(args.userId);
+
+  const identities = args.identity
+    ? [args.identity]
+    : args.holdings.map((holding) => ({
+        symbol: holding.symbol,
+        exchange: holding.exchangeOverride ?? null,
+        currency: holding.currency ?? null,
+      }));
+  const uniqueIdentities = [
+    ...new Map(
+      identities
+        .map((identity) => ({
+          symbol: normalizeIdentityPart(identity.symbol),
+          exchange: normalizeIdentityPart(identity.exchange),
+          currency: normalizeIdentityPart(identity.currency),
+        }))
+        .filter((identity) => identity.symbol)
+        .map((identity) => [
+          `${identity.symbol}:${identity.exchange ?? "_"}:${identity.currency ?? "_"}`,
+          identity,
+        ]),
+    ).values(),
+  ];
+  const historyLists = await Promise.all(
+    uniqueIdentities.map((identity) =>
+      identity.exchange || identity.currency
+        ? repositories.securityPriceHistory.listByIdentity({
+            symbol: identity.symbol!,
+            exchange: identity.exchange,
+            currency: identity.currency,
+          })
+        : repositories.securityPriceHistory.listBySymbol(identity.symbol!),
+    ),
+  );
+
+  const byHistoryKey = new Map<string, SecurityPriceHistoryPoint>();
+  for (const point of historyLists.flat()) {
+    byHistoryKey.set(
+      `${point.symbol}:${point.exchange ?? ""}:${point.currency}:${point.priceDate}`,
+      point,
+    );
+  }
+
+  return {
+    priceHistory: [...byHistoryKey.values()],
+    portfolioSnapshots: await portfolioSnapshotsPromise,
+  };
 }
 
 async function readCachedAnalyzerResult(
@@ -126,7 +190,8 @@ export async function getPortfolioAnalyzerQuickScan(userId: string, input: Portf
     result = buildPortfolioAnalyzerQuickScan({
       accounts,
       holdings,
-      profile
+      profile,
+      marketData: await loadAnalyzerMarketDataContext({ userId, holdings })
     });
   } else if (input.scope === "account") {
     const account = accounts.find((item) => item.id === input.accountId);
@@ -138,7 +203,11 @@ export async function getPortfolioAnalyzerQuickScan(userId: string, input: Portf
       account,
       accounts,
       holdings,
-      profile
+      profile,
+      marketData: await loadAnalyzerMarketDataContext({
+        userId,
+        holdings: holdings.filter((item) => item.accountId === input.accountId),
+      })
     });
   } else if (input.scope === "security") {
     const holding = input.holdingId
@@ -162,7 +231,12 @@ export async function getPortfolioAnalyzerQuickScan(userId: string, input: Portf
       identity,
       accounts,
       holdings,
-      profile
+      profile,
+      marketData: await loadAnalyzerMarketDataContext({
+        userId,
+        holdings,
+        identity,
+      })
     });
   } else {
     const latestRun = await repositories.recommendations.getLatestByUserId(userId);
