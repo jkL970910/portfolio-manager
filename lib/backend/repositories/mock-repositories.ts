@@ -8,6 +8,8 @@ import {
   importJobs,
   portfolioEvents,
   portfolioSnapshots,
+  securities,
+  securityAliases,
   securityPriceHistory,
   preferenceProfiles,
   recommendationRuns,
@@ -107,6 +109,11 @@ export const mockRepositories: BackendRepositories = {
         (point) => point.symbol.trim().toUpperCase() === normalized,
       );
     },
+    async listBySecurityId(securityId) {
+      return securityPriceHistory.filter(
+        (point) => point.securityId === securityId,
+      );
+    },
     async listByIdentity(input) {
       const normalizedSymbol = input.symbol.trim().toUpperCase();
       const normalizedExchange = input.exchange?.trim().toUpperCase() || "";
@@ -116,6 +123,74 @@ export const mockRepositories: BackendRepositories = {
           (point.exchange?.trim().toUpperCase() || "") === normalizedExchange &&
           (!input.currency || point.currency === input.currency),
       );
+    },
+  },
+  securities: {
+    async getById(securityId) {
+      return securities.find((security) => security.id === securityId) ?? null;
+    },
+    async findByCanonicalIdentity(input) {
+      return securities.find(
+        (security) =>
+          security.symbol === input.symbol.trim().toUpperCase() &&
+          security.canonicalExchange === input.canonicalExchange &&
+          security.currency === input.currency,
+      ) ?? null;
+    },
+    async findByAlias(input) {
+      const alias = securityAliases.find(
+        (item) =>
+          item.aliasType === input.aliasType &&
+          item.aliasValue === input.aliasValue &&
+          (!input.provider || item.provider === input.provider),
+      );
+      if (!alias) {
+        return null;
+      }
+      return securities.find((security) => security.id === alias.securityId) ?? null;
+    },
+    async upsertCanonical(input) {
+      const existing = securities.find(
+        (security) =>
+          security.symbol === input.symbol.trim().toUpperCase() &&
+          security.canonicalExchange === input.canonicalExchange &&
+          security.currency === input.currency,
+      );
+      if (existing) {
+        Object.assign(existing, {
+          ...input,
+          symbol: input.symbol.trim().toUpperCase(),
+          updatedAt: new Date().toISOString(),
+        });
+        return existing;
+      }
+      const security = {
+        ...input,
+        id: `security_${securities.length + 1}`,
+        symbol: input.symbol.trim().toUpperCase(),
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+      securities.push(security);
+      return security;
+    },
+    async addAlias(input) {
+      const existing = securityAliases.find(
+        (alias) =>
+          alias.aliasType === input.aliasType &&
+          alias.aliasValue === input.aliasValue &&
+          alias.provider === input.provider,
+      );
+      if (existing) {
+        return existing;
+      }
+      const alias = {
+        ...input,
+        id: `security_alias_${securityAliases.length + 1}`,
+        createdAt: new Date().toISOString(),
+      };
+      securityAliases.push(alias);
+      return alias;
     },
   },
   preferences: {

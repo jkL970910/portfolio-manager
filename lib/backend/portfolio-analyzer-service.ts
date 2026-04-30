@@ -40,6 +40,9 @@ export function buildPortfolioAnalyzerCacheKey(input: PortfolioAnalyzerRequest) 
   }
 
   const identity = input.security;
+  if (identity?.securityId) {
+    return `${prefix}:security-id:${identity.securityId}`;
+  }
   return [
     prefix,
     "security",
@@ -74,6 +77,7 @@ async function loadAnalyzerMarketDataContext(args: {
   const identities = args.identity
     ? [args.identity]
     : args.holdings.map((holding) => ({
+        securityId: holding.securityId ?? null,
         symbol: holding.symbol,
         exchange: holding.exchangeOverride ?? null,
         currency: holding.currency ?? null,
@@ -82,27 +86,38 @@ async function loadAnalyzerMarketDataContext(args: {
     ...new Map(
       identities
         .map((identity) => ({
+          securityId: identity.securityId ?? null,
           symbol: normalizeIdentityPart(identity.symbol),
           exchange: normalizeIdentityPart(identity.exchange),
           currency: normalizeIdentityPart(identity.currency),
         }))
-        .filter((identity) => identity.symbol)
+        .filter((identity) => identity.securityId || identity.symbol)
         .map((identity) => [
-          `${identity.symbol}:${identity.exchange ?? "_"}:${identity.currency ?? "_"}`,
+          identity.securityId
+            ? `security-id:${identity.securityId}`
+            : `${identity.symbol}:${identity.exchange ?? "_"}:${identity.currency ?? "_"}`,
           identity,
         ]),
     ).values(),
   ];
   const historyLists = await Promise.all(
-    uniqueIdentities.map((identity) =>
-      identity.exchange || identity.currency
-        ? repositories.securityPriceHistory.listByIdentity({
-            symbol: identity.symbol!,
-            exchange: identity.exchange,
-            currency: identity.currency,
-          })
-        : repositories.securityPriceHistory.listBySymbol(identity.symbol!),
-    ),
+    uniqueIdentities.map(async (identity) => {
+      if (identity.securityId) {
+        return repositories.securityPriceHistory.listBySecurityId(
+          identity.securityId,
+        );
+      }
+
+      if (!identity.exchange) {
+        return [];
+      }
+
+      return repositories.securityPriceHistory.listByIdentity({
+        symbol: identity.symbol!,
+        exchange: identity.exchange,
+        currency: identity.currency,
+      });
+    }),
   );
 
   const byHistoryKey = new Map<string, SecurityPriceHistoryPoint>();
@@ -122,7 +137,11 @@ async function loadAnalyzerMarketDataContext(args: {
 async function readCachedAnalyzerResult(
   userId: string,
   input: PortfolioAnalyzerRequest,
-  targetKey: string
+  targetKey: string,
+  freshnessContext?: {
+    holdings: HoldingPosition[];
+    marketData: AnalyzerMarketDataContext;
+  },
 ) {
   if (!shouldUseCache(input)) {
     return null;
@@ -135,11 +154,47 @@ async function readCachedAnalyzerResult(
       targetKey,
       now: new Date()
     });
+    if (
+      cached &&
+      freshnessContext &&
+      isAnalyzerCacheOlderThanMarketData(cached.generatedAt, freshnessContext)
+    ) {
+      return null;
+    }
     return cached ? portfolioAnalyzerResultSchema.parse(cached.result) : null;
   } catch (error) {
     console.warn("Portfolio analyzer cache read skipped.", error);
     return null;
   }
+}
+
+export function isAnalyzerCacheOlderThanMarketData(
+  generatedAt: string,
+  context: {
+    holdings: HoldingPosition[];
+    marketData: AnalyzerMarketDataContext;
+  },
+) {
+  const cacheTime = new Date(generatedAt).getTime();
+  if (!Number.isFinite(cacheTime)) {
+    return true;
+  }
+
+  const latestMarketDataTime = [
+    ...context.holdings.flatMap((holding) => [
+      holding.lastQuoteSuccessAt,
+      holding.quoteProviderTimestamp,
+    ]),
+    ...(context.marketData.priceHistory ?? []).map((point) => point.createdAt),
+    ...(context.marketData.portfolioSnapshots ?? []).map(
+      (snapshot) => snapshot.createdAt,
+    ),
+  ]
+    .map((value) => (value ? new Date(value).getTime() : Number.NaN))
+    .filter(Number.isFinite)
+    .sort((left, right) => right - left)[0];
+
+  return latestMarketDataTime != null && latestMarketDataTime > cacheTime;
 }
 
 async function persistAnalyzerResult(
@@ -173,10 +228,6 @@ export async function getPortfolioAnalyzerQuickScan(userId: string, input: Portf
   const repositories = getRepositories();
   const targetKey = buildPortfolioAnalyzerCacheKey(input);
   assertExternalResearchAllowed(input);
-  const cached = await readCachedAnalyzerResult(userId, input, targetKey);
-  if (cached) {
-    return apiSuccess(cached, "database");
-  }
 
   const [accounts, holdings, profile] = await Promise.all([
     repositories.accounts.listByUserId(userId),
@@ -185,13 +236,22 @@ export async function getPortfolioAnalyzerQuickScan(userId: string, input: Portf
   ]);
 
   let result: PortfolioAnalyzerResult;
+  let cached: PortfolioAnalyzerResult | null = null;
 
   if (input.scope === "portfolio") {
+    const marketData = await loadAnalyzerMarketDataContext({ userId, holdings });
+    cached = await readCachedAnalyzerResult(userId, input, targetKey, {
+      holdings,
+      marketData,
+    });
+    if (cached) {
+      return apiSuccess(cached, "database");
+    }
     result = buildPortfolioAnalyzerQuickScan({
       accounts,
       holdings,
       profile,
-      marketData: await loadAnalyzerMarketDataContext({ userId, holdings })
+      marketData,
     });
   } else if (input.scope === "account") {
     const account = accounts.find((item) => item.id === input.accountId);
@@ -199,15 +259,26 @@ export async function getPortfolioAnalyzerQuickScan(userId: string, input: Portf
       throw new Error("Requested account is not available for quick analysis.");
     }
 
+    const scopedHoldings = holdings.filter(
+      (item) => item.accountId === input.accountId,
+    );
+    const marketData = await loadAnalyzerMarketDataContext({
+      userId,
+      holdings: scopedHoldings,
+    });
+    cached = await readCachedAnalyzerResult(userId, input, targetKey, {
+      holdings: scopedHoldings,
+      marketData,
+    });
+    if (cached) {
+      return apiSuccess(cached, "database");
+    }
     result = buildAccountAnalyzerQuickScan({
       account,
       accounts,
       holdings,
       profile,
-      marketData: await loadAnalyzerMarketDataContext({
-        userId,
-        holdings: holdings.filter((item) => item.accountId === input.accountId),
-      })
+      marketData,
     });
   } else if (input.scope === "security") {
     const holding = input.holdingId
@@ -216,6 +287,7 @@ export async function getPortfolioAnalyzerQuickScan(userId: string, input: Portf
     const identity = input.security ?? (holding
       ? {
           symbol: holding.symbol,
+          securityId: holding.securityId ?? null,
           exchange: holding.exchangeOverride ?? null,
           currency: holding.currency ?? null,
           name: holding.name,
@@ -227,18 +299,40 @@ export async function getPortfolioAnalyzerQuickScan(userId: string, input: Portf
       throw new Error("Security analysis requires a resolved security identity or holding id.");
     }
 
+    const scopedHoldings = holdings.filter((item) => {
+      const sameSymbol =
+        item.symbol.trim().toUpperCase() === identity.symbol.trim().toUpperCase();
+      const sameSecurity =
+        !identity.securityId || item.securityId === identity.securityId;
+      const sameExchange =
+        !identity.exchange || item.exchangeOverride === identity.exchange;
+      const sameCurrency = !identity.currency || item.currency === identity.currency;
+      return sameSecurity && sameSymbol && sameExchange && sameCurrency;
+    });
+    const marketData = await loadAnalyzerMarketDataContext({
+      userId,
+      holdings,
+      identity,
+    });
+    cached = await readCachedAnalyzerResult(userId, input, targetKey, {
+      holdings: scopedHoldings,
+      marketData,
+    });
+    if (cached) {
+      return apiSuccess(cached, "database");
+    }
     result = buildSecurityAnalyzerQuickScan({
       identity,
       accounts,
       holdings,
       profile,
-      marketData: await loadAnalyzerMarketDataContext({
-        userId,
-        holdings,
-        identity,
-      })
+      marketData,
     });
   } else {
+    cached = await readCachedAnalyzerResult(userId, input, targetKey);
+    if (cached) {
+      return apiSuccess(cached, "database");
+    }
     const latestRun = await repositories.recommendations.getLatestByUserId(userId);
     if (latestRun.id !== input.recommendationRunId) {
       throw new Error("Requested recommendation run is not available for quick analysis.");

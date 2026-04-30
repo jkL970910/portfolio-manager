@@ -90,6 +90,7 @@ import {
   getSecurityQuote,
   resolveSecurity,
 } from "@/lib/market-data/service";
+import { resolveCanonicalSecurityIdentity } from "@/lib/market-data/security-identity";
 import type {
   SecurityQuote,
   SecurityResolution,
@@ -737,6 +738,27 @@ function normalizeExchangeCode(value: string | null | undefined) {
   return value?.trim().toUpperCase() || "";
 }
 
+async function resolveSecurityIdentityForHolding(holding: HoldingPosition) {
+  if (holding.securityId) {
+    const existing = await getRepositories().securities.getById(
+      holding.securityId,
+    );
+    if (existing) {
+      return existing;
+    }
+  }
+
+  return resolveCanonicalSecurityIdentity({
+    symbol: holding.symbol,
+    exchange: holding.exchangeOverride ?? holding.quoteExchange ?? null,
+    currency: holding.currency ?? holding.quoteCurrency ?? "CAD",
+    name: holding.name,
+    securityType: holding.securityTypeOverride ?? null,
+    marketSector: holding.marketSectorOverride ?? null,
+    provider: holding.quoteProvider ?? null,
+  });
+}
+
 function parseProviderTimestamp(value: string | null | undefined) {
   if (!value) {
     return null;
@@ -1216,6 +1238,7 @@ async function upsertSecurityPriceHistoryPoints(
     .insert(securityPriceHistory)
     .values(
       points.map((point) => ({
+        securityId: point.securityId ?? null,
         symbol: point.symbol.trim().toUpperCase(),
         exchange: normalizeExchangeCode(point.exchange),
         priceDate: point.priceDate,
@@ -1241,6 +1264,7 @@ async function upsertSecurityPriceHistoryPoints(
       ],
       set: {
         close: sql`excluded.close`,
+        securityId: sql`excluded.security_id`,
         adjustedClose: sql`excluded.adjusted_close`,
         currency: sql`excluded.currency`,
         source: sql`excluded.source`,
@@ -1266,6 +1290,7 @@ async function upsertSecurityPriceHistoryPointsInTransaction(
     .insert(securityPriceHistory)
     .values(
       points.map((point) => ({
+        securityId: point.securityId ?? null,
         symbol: point.symbol.trim().toUpperCase(),
         exchange: normalizeExchangeCode(point.exchange),
         priceDate: point.priceDate,
@@ -1291,6 +1316,7 @@ async function upsertSecurityPriceHistoryPointsInTransaction(
       ],
       set: {
         close: sql`excluded.close`,
+        securityId: sql`excluded.security_id`,
         adjustedClose: sql`excluded.adjusted_close`,
         source: sql`excluded.source`,
         provider: sql`excluded.provider`,
@@ -1966,7 +1992,11 @@ export async function getPortfolioHoldingDetailView(
 export async function getPortfolioSecurityDetailView(
   userId: string,
   symbol: string,
-  identity?: { exchange?: string | null; currency?: CurrencyCode | null },
+  identity?: {
+    securityId?: string | null;
+    exchange?: string | null;
+    currency?: CurrencyCode | null;
+  },
 ) {
   const repositories = getRepositories();
   const normalizedSymbol = symbol.trim().toUpperCase();
@@ -1976,7 +2006,6 @@ export async function getPortfolioSecurityDetailView(
     userHoldings,
     userEvents,
     userSnapshots,
-    userPriceHistory,
     profile,
   ] = await Promise.all([
     repositories.users.getById(userId),
@@ -1984,10 +2013,9 @@ export async function getPortfolioSecurityDetailView(
     repositories.holdings.listByUserId(userId),
     repositories.portfolioEvents.listByUserId(userId),
     repositories.snapshots.listByUserId(userId),
-    repositories.securityPriceHistory.listBySymbol(normalizedSymbol),
     repositories.preferences.getByUserId(userId),
   ]);
-  let hydratedPriceHistory = userPriceHistory;
+  let hydratedPriceHistory: SecurityPriceHistoryPoint[] = [];
 
   const display = await buildServiceDisplayContext(user.baseCurrency);
 
@@ -2005,15 +2033,22 @@ export async function getPortfolioSecurityDetailView(
     userHoldings.find(
       (holding) => holding.symbol.trim().toUpperCase() === normalizedSymbol,
     );
-  hydratedPriceHistory =
-    referenceHolding || identity?.exchange || identity?.currency
-      ? await repositories.securityPriceHistory.listByIdentity({
+  const requestedSecurity = identity?.securityId
+    ? await repositories.securities.getById(identity.securityId)
+    : null;
+  const canonicalSecurity =
+    requestedSecurity ??
+    (referenceHolding
+      ? await resolveSecurityIdentityForHolding(referenceHolding)
+      : await resolveCanonicalSecurityIdentity({
           symbol: normalizedSymbol,
-          exchange:
-            referenceHolding?.exchangeOverride ?? identity?.exchange ?? null,
-          currency: referenceHolding?.currency ?? identity?.currency ?? null,
-        })
-      : userPriceHistory;
+          exchange: identity?.exchange ?? null,
+          currency: identity?.currency ?? null,
+          name: normalizedSymbol,
+        }));
+  hydratedPriceHistory = await repositories.securityPriceHistory.listBySecurityId(
+    canonicalSecurity.id,
+  );
   if (
     hydratedPriceHistory.length < 2 ||
     historyNeedsHigherDensity(hydratedPriceHistory)
@@ -2023,22 +2058,20 @@ export async function getPortfolioSecurityDetailView(
         normalizedSymbol,
         {
           exchange: referenceHolding?.exchangeOverride ?? null,
-          currency: referenceHolding?.currency ?? null,
+          currency: referenceHolding?.currency ?? canonicalSecurity.currency,
         },
       );
       if (historyResponse.results.length > 0) {
         const mappedPoints: SecurityPriceHistoryPoint[] =
           historyResponse.results.map((point, index) => ({
             id: `fetched-${normalizedSymbol}-${point.date}-${index}`,
-            symbol: normalizedSymbol,
-            exchange: normalizeExchangeCode(
-              referenceHolding?.exchangeOverride ?? identity?.exchange,
-            ),
+            securityId: canonicalSecurity.id,
+            symbol: canonicalSecurity.symbol,
+            exchange: canonicalSecurity.canonicalExchange,
             priceDate: point.date,
             close: point.close,
             adjustedClose: point.adjustedClose ?? null,
-            currency:
-              (point.currency ?? "CAD").toUpperCase() === "USD" ? "USD" : "CAD",
+            currency: canonicalSecurity.currency,
             source: point.provider,
             provider: point.provider,
             sourceMode: point.provider === "fallback" ? "fallback" : "provider",
@@ -2059,7 +2092,7 @@ export async function getPortfolioSecurityDetailView(
         }
       }
     } catch {
-      hydratedPriceHistory = userPriceHistory;
+      hydratedPriceHistory = [];
     }
   }
 
@@ -2073,8 +2106,9 @@ export async function getPortfolioSecurityDetailView(
     profile,
     display,
     symbol: normalizedSymbol,
-    exchange: identity?.exchange ?? null,
-    currency: identity?.currency ?? null,
+    securityId: canonicalSecurity.id,
+    exchange: canonicalSecurity.canonicalExchange,
+    currency: canonicalSecurity.currency,
   });
 
   if (!data) {
@@ -2096,8 +2130,8 @@ export async function getPortfolioSecurityDetailView(
       },
     })),
     getSecurityQuote(data.security.symbol, {
-      exchange: referenceHolding?.exchangeOverride ?? null,
-      currency: referenceHolding?.currency ?? data.security.currency,
+      exchange: canonicalSecurity.canonicalExchange,
+      currency: canonicalSecurity.currency,
     }).catch(() => ({
       result: {
         symbol: data.security.symbol,
@@ -2113,6 +2147,7 @@ export async function getPortfolioSecurityDetailView(
   const resolution = resolutionResponse.result;
   const quote = quoteResponse.result;
 
+  data.security.securityId = canonicalSecurity.id;
   data.security.name = resolution.name ?? data.security.name;
   data.security.securityType = formatSecurityTypeLabel(resolution.securityType);
   data.security.exchange =
@@ -2237,11 +2272,32 @@ export async function updateHoldingPosition(
         : Number(holding.gainLossPct);
     const previousQuantity =
       holding.quantity == null ? null : Number(holding.quantity);
+    const nextExchange =
+      input.exchangeOverride !== undefined
+        ? input.exchangeOverride
+        : holding.exchangeOverride;
+    const nextSecurityType =
+      input.securityTypeOverride !== undefined
+        ? input.securityTypeOverride
+        : holding.securityTypeOverride;
+    const nextMarketSector =
+      input.marketSectorOverride !== undefined
+        ? input.marketSectorOverride
+        : holding.marketSectorOverride;
+    const security = await resolveCanonicalSecurityIdentity({
+      symbol: holding.symbol,
+      exchange: nextExchange ?? null,
+      currency,
+      name: input.name ?? holding.name,
+      securityType: nextSecurityType ?? null,
+      marketSector: nextMarketSector ?? null,
+    });
 
     await tx
       .update(holdingPositions)
       .set({
         accountId: targetAccount.id,
+        securityId: security.id,
         name: input.name ?? holding.name,
         currency,
         quantity: quantity == null ? null : quantity.toFixed(6),
@@ -2269,17 +2325,9 @@ export async function updateHoldingPosition(
             ? input.sectorOverride
             : holding.sectorOverride,
         securityTypeOverride:
-          input.securityTypeOverride !== undefined
-            ? input.securityTypeOverride
-            : holding.securityTypeOverride,
-        exchangeOverride:
-          input.exchangeOverride !== undefined
-            ? input.exchangeOverride
-            : holding.exchangeOverride,
-        marketSectorOverride:
-          input.marketSectorOverride !== undefined
-            ? input.marketSectorOverride
-            : holding.marketSectorOverride,
+          nextSecurityType,
+        exchangeOverride: nextExchange,
+        marketSectorOverride: nextMarketSector,
         updatedAt: new Date(),
       })
       .where(eq(holdingPositions.id, holding.id));
@@ -2392,51 +2440,48 @@ async function getHydratedSecurityPriceHistoryForHoldings(
   holdings: HoldingPosition[],
 ) {
   const repositories = getRepositories();
-  const byIdentity = new Map<string, HoldingPosition[]>();
+  const byIdentity = new Map<
+    string,
+    { securityId: string; symbol: string; exchange: string; currency: CurrencyCode; holdings: HoldingPosition[] }
+  >();
   for (const holding of holdings) {
-    const symbol = holding.symbol.trim().toUpperCase();
-    const exchange = normalizeExchangeCode(holding.exchangeOverride);
-    const currency = normalizeCurrencyCode(
-      (holding.currency as string) || "CAD",
-    );
-    const key = `${symbol}::${exchange}::${currency}`;
-    const group = byIdentity.get(key) ?? [];
-    group.push(holding);
+    const security = await resolveSecurityIdentityForHolding(holding);
+    const key = security.id;
+    const group = byIdentity.get(key) ?? {
+      securityId: security.id,
+      symbol: security.symbol,
+      exchange: security.canonicalExchange,
+      currency: security.currency,
+      holdings: [],
+    };
+    group.holdings.push(holding);
     byIdentity.set(key, group);
   }
 
   const results = await Promise.all(
-    [...byIdentity.entries()].map(async ([key, groupedHoldings]) => {
-      const [symbol, exchange, currency] = key.split("::") as [
-        string,
-        string,
-        CurrencyCode,
-      ];
-      const existing = await repositories.securityPriceHistory.listByIdentity({
-        symbol,
-        exchange,
-        currency,
-      });
+    [...byIdentity.values()].map(async (identity) => {
+      const existing = await repositories.securityPriceHistory.listBySecurityId(
+        identity.securityId,
+      );
       if (!historyNeedsHigherDensity(existing)) {
         return existing;
       }
 
-      const reference = groupedHoldings[0];
       try {
-        const fetched = await getSecurityHistoricalSeries(symbol, {
-          exchange: reference?.exchangeOverride ?? null,
-          currency: reference?.currency ?? null,
+        const fetched = await getSecurityHistoricalSeries(identity.symbol, {
+          exchange: identity.exchange,
+          currency: identity.currency,
         });
         const mappedPoints: SecurityPriceHistoryPoint[] = fetched.results.map(
           (point, index) => ({
-            id: `fetched-${symbol}-${point.date}-${index}`,
-            symbol,
-            exchange,
+            id: `fetched-${identity.symbol}-${point.date}-${index}`,
+            securityId: identity.securityId,
+            symbol: identity.symbol,
+            exchange: identity.exchange,
             priceDate: point.date,
             close: point.close,
             adjustedClose: point.adjustedClose ?? null,
-            currency:
-              (point.currency ?? "CAD").toUpperCase() === "USD" ? "USD" : "CAD",
+            currency: identity.currency,
             source: point.provider,
             provider: point.provider,
             sourceMode: point.provider === "fallback" ? "fallback" : "provider",
@@ -2523,12 +2568,21 @@ export async function createHoldingPosition(
       costBasisCad != null && costBasisCad > 0
         ? round(((marketValueCad - costBasisCad) / costBasisCad) * 100, 2)
         : 0;
+    const security = await resolveCanonicalSecurityIdentity({
+      symbol: input.symbol,
+      exchange: input.exchange ?? null,
+      currency,
+      name: input.name ?? input.symbol,
+      securityType: input.securityType ?? null,
+      marketSector: input.marketSector ?? null,
+    });
 
     const [created] = await tx
       .insert(holdingPositions)
       .values({
         userId,
         accountId,
+        securityId: security.id,
         symbol: input.symbol.trim().toUpperCase(),
         name: input.name?.trim() || input.symbol.trim().toUpperCase(),
         assetClass: input.assetClass,
@@ -4563,19 +4617,27 @@ export async function refreshPortfolioQuotes(
   const db = getDb();
   const repositories = getRepositories();
   const holdings = await repositories.holdings.listByUserId(userId);
+  const resolvedHoldings = await Promise.all(
+    holdings.map(async (holding) => ({
+      holding,
+      security: await resolveSecurityIdentityForHolding(holding),
+    })),
+  );
+  const resolvedHoldingById = new Map(
+    resolvedHoldings.map((entry) => [entry.holding.id, entry.security]),
+  );
   const uniqueSymbols = [
     ...new Map(
-      holdings
-        .map((holding) => ({
-          symbol: holding.symbol.trim().toUpperCase(),
-          exchange: holding.exchangeOverride?.trim() || null,
-          currency: normalizeCurrencyCode(
-            (holding.currency as string) || "CAD",
-          ),
+      resolvedHoldings
+        .map(({ security }) => ({
+          securityId: security.id,
+          symbol: security.symbol,
+          exchange: security.canonicalExchange,
+          currency: security.currency,
         }))
         .filter((holding) => holding.symbol)
         .map((holding) => [
-          `${holding.symbol}::${holding.exchange ?? ""}::${holding.currency}`,
+          holding.securityId,
           holding,
         ]),
     ).values(),
@@ -4603,10 +4665,7 @@ export async function refreshPortfolioQuotes(
   quoteResults.results.forEach((quote, index) => {
     const request = uniqueSymbols[index];
     if (request && Number.isFinite(quote.price) && quote.price > 0) {
-      quoteMap.set(
-        `${request.symbol}::${request.exchange ?? ""}::${request.currency}`,
-        quote,
-      );
+      quoteMap.set(request.securityId, quote);
     }
   });
 
@@ -4620,17 +4679,15 @@ export async function refreshPortfolioQuotes(
     if (!quote || !Number.isFinite(quote.price) || quote.price <= 0) {
       return;
     }
-    const currency = normalizeCurrencyCode(
-      quote.currency || request.currency || "CAD",
-    );
     const point: SecurityPriceHistoryPoint = {
-      id: `quote-refresh-${request.symbol}-${request.exchange ?? "default"}-${currency}-${refreshedDate}`,
+      id: `quote-refresh-${request.securityId}-${refreshedDate}`,
+      securityId: request.securityId,
       symbol: request.symbol,
       exchange: normalizeExchangeCode(request.exchange),
       priceDate: refreshedDate,
       close: quote.price,
       adjustedClose: null,
-      currency,
+      currency: request.currency,
       source: `quote-refresh-${quote.provider}`,
       provider: quote.provider,
       sourceMode: getQuoteSourceMode(quote),
@@ -4641,7 +4698,7 @@ export async function refreshPortfolioQuotes(
       createdAt: refreshedAt.toISOString(),
     };
     historyPointMap.set(
-      `${point.symbol}::${point.exchange ?? ""}::${point.currency}::${point.priceDate}`,
+      `${point.securityId ?? point.symbol}::${point.priceDate}`,
       point,
     );
   });
@@ -4659,10 +4716,11 @@ export async function refreshPortfolioQuotes(
       const requestedCurrency = normalizeCurrencyCode(
         (holding.currency as string) || "CAD",
       );
-      const quoteKey = `${holding.symbol.trim().toUpperCase()}::${holding.exchangeOverride?.trim() || ""}::${requestedCurrency}`;
+      const security = resolvedHoldingById.get(holding.id);
+      const quoteKey = security?.id ?? "";
       const quote = quoteMap.get(quoteKey);
       if (!quote) {
-        missingQuoteKeys.add(quoteKey);
+        missingQuoteKeys.add(quoteKey || holding.id);
         const missingStatus = getMissingQuoteStatus(holding);
         await tx
           .update(holdingPositions)
@@ -4670,7 +4728,10 @@ export async function refreshPortfolioQuotes(
             quoteSourceMode: missingStatus.sourceMode,
             quoteStatus: missingStatus.status,
             quoteCurrency: requestedCurrency,
-            quoteExchange: normalizeExchangeCode(holding.exchangeOverride),
+            securityId: security?.id ?? null,
+            quoteExchange:
+              security?.canonicalExchange ??
+              normalizeExchangeCode(holding.exchangeOverride),
             lastQuoteAttemptedAt: refreshedAt,
             lastQuoteErrorCode: missingStatus.errorCode,
             lastQuoteErrorMessage: missingStatus.errorMessage,
@@ -4705,6 +4766,7 @@ export async function refreshPortfolioQuotes(
         .update(holdingPositions)
         .set({
           currency: requestedCurrency,
+          securityId: security?.id ?? null,
           lastPriceAmount: quote.price.toFixed(4),
           lastPriceCad: priceInCad.toFixed(4),
           marketValueAmount: currentMarketValue.toFixed(2),
@@ -4714,7 +4776,9 @@ export async function refreshPortfolioQuotes(
           quoteStatus: getQuoteStatus(quote),
           quoteCurrency: requestedCurrency,
           quoteExchange: normalizeExchangeCode(
-            quote.exchange || holding.exchangeOverride,
+            quote.exchange ||
+              security?.canonicalExchange ||
+              holding.exchangeOverride,
           ),
           quoteProviderTimestamp: parseProviderTimestamp(quote.timestamp),
           lastQuoteAttemptedAt: refreshedAt,
@@ -4754,49 +4818,128 @@ export async function refreshPortfolioQuotes(
 export async function refreshPortfolioSecurityQuote(
   userId: string,
   symbol: string,
+  identity?: {
+    securityId?: string | null;
+    exchange?: string | null;
+    currency?: CurrencyCode | null;
+  },
 ) {
   const normalizedSymbol = symbol.trim().toUpperCase();
+  const requestedExchange = normalizeExchangeCode(identity?.exchange);
+  const requestedSecurityId = identity?.securityId?.trim() || null;
+  const requestedCurrency = identity?.currency
+    ? normalizeCurrencyCode(identity.currency)
+    : null;
   const db = getDb();
   const repositories = getRepositories();
   const holdings = (await repositories.holdings.listByUserId(userId)).filter(
-    (holding) => holding.symbol.trim().toUpperCase() === normalizedSymbol,
+    (holding) => {
+      const sameSymbol = holding.symbol.trim().toUpperCase() === normalizedSymbol;
+      const sameSecurity =
+        !requestedSecurityId || holding.securityId === requestedSecurityId;
+      const sameExchange =
+        !requestedExchange ||
+        normalizeExchangeCode(holding.exchangeOverride) === requestedExchange;
+      const sameCurrency =
+        !requestedCurrency ||
+        normalizeCurrencyCode((holding.currency as string) || "CAD") ===
+          requestedCurrency;
+      return sameSecurity && sameSymbol && sameExchange && sameCurrency;
+    },
+  );
+
+  const resolvedHoldings = await Promise.all(
+    holdings.map(async (holding) => ({
+      holding,
+      security: await resolveSecurityIdentityForHolding(holding),
+    })),
+  );
+  const resolvedHoldingById = new Map(
+    resolvedHoldings.map((entry) => [entry.holding.id, entry.security]),
+  );
+  const matchedHoldingIds = new Set(
+    resolvedHoldings.map((entry) => entry.holding.id),
   );
 
   const uniqueSymbols = [
     ...new Map(
-      holdings
-        .map((holding) => ({
-          symbol: holding.symbol.trim().toUpperCase(),
-          exchange: holding.exchangeOverride?.trim() || null,
-          currency: normalizeCurrencyCode(
-            (holding.currency as string) || "CAD",
-          ),
+      resolvedHoldings
+        .map(({ security }) => ({
+          securityId: security.id,
+          symbol: security.symbol,
+          exchange: security.canonicalExchange,
+          currency: security.currency,
         }))
         .filter((holding) => holding.symbol)
-        .map((holding) => [
-          `${holding.symbol}::${holding.exchange ?? ""}::${holding.currency}`,
-          holding,
-        ]),
+        .map((holding) => [holding.securityId, holding]),
     ).values(),
   ];
   const usdToCadFx = await getStoredOrFallbackFxContext("USD", "CAD");
 
   if (uniqueSymbols.length === 0) {
-    const quote = await getSecurityQuote(normalizedSymbol).catch(() => null);
+    const quote = await getSecurityQuote(normalizedSymbol, {
+      exchange: requestedExchange || null,
+      currency: requestedCurrency,
+    }).catch(() => null);
+    const quoteFound = Boolean(quote?.result?.price && quote.result.price > 0);
+    const refreshedAt = new Date();
+    const refreshedDate = refreshedAt.toISOString().slice(0, 10);
+    const quoteCurrency = normalizeCurrencyCode(
+      quote?.result?.currency || requestedCurrency || "CAD",
+    );
+    const quoteExchange = normalizeExchangeCode(
+      quote?.result?.exchange || requestedExchange,
+    );
+    const requestedSecurity = requestedSecurityId
+      ? await repositories.securities.getById(requestedSecurityId)
+      : null;
+    const canonicalSecurity =
+      requestedSecurity ??
+      (await resolveCanonicalSecurityIdentity({
+        symbol: normalizedSymbol,
+        exchange: quoteExchange || requestedExchange || null,
+        currency: quoteCurrency,
+        provider: quote?.result?.provider ?? null,
+      }));
+
+    if (quoteFound) {
+      await db.transaction(async (tx) => {
+        await upsertSecurityPriceHistoryPointsInTransaction(tx, [
+          {
+            id: `quote-refresh-${canonicalSecurity.id}-${refreshedDate}`,
+            securityId: canonicalSecurity.id,
+            symbol: canonicalSecurity.symbol,
+            exchange: canonicalSecurity.canonicalExchange,
+            priceDate: refreshedDate,
+            close: quote!.result.price,
+            adjustedClose: null,
+            currency: canonicalSecurity.currency,
+            source: `quote-refresh-${quote!.result.provider}`,
+            provider: quote!.result.provider,
+            sourceMode: getQuoteSourceMode(quote!.result),
+            freshness: getQuoteStatus(quote!.result),
+            refreshRunId: null,
+            isReference: false,
+            fallbackReason: null,
+            createdAt: refreshedAt.toISOString(),
+          },
+        ]);
+      });
+    }
 
     return {
       symbol: normalizedSymbol,
       matchedHoldingCount: 0,
       refreshedHoldingCount: 0,
-      missingQuoteCount: quote?.result?.price && quote.result.price > 0 ? 0 : 1,
+      missingQuoteCount: quoteFound ? 0 : 1,
       sampledSymbolCount: 1,
       ambiguousHoldingCount: 0,
-      quoteFound: Boolean(quote?.result?.price && quote.result.price > 0),
-      quotePrice:
-        quote?.result?.price && quote.result.price > 0
-          ? quote.result.price
-          : null,
-      quoteCurrency: quote?.result?.currency ?? null,
+      quoteFound,
+      quotePrice: quoteFound ? (quote?.result.price ?? null) : null,
+      securityId: canonicalSecurity.id,
+      quoteCurrency: quote?.result?.currency ?? canonicalSecurity.currency,
+      historyPointCount: quoteFound ? 1 : 0,
+      snapshotRecorded: false,
       fxRateLabel: formatFxRefreshLabel(usdToCadFx),
       fxAsOf: usdToCadFx.rateDate,
       fxSource: usdToCadFx.source,
@@ -4812,7 +4955,7 @@ export async function refreshPortfolioSecurityQuote(
     const request = uniqueSymbols[index];
     if (request && Number.isFinite(quote.price) && quote.price > 0) {
       quoteMap.set(
-        `${request.symbol}::${request.exchange ?? ""}::${request.currency}`,
+        request.securityId,
         quote,
       );
     }
@@ -4828,17 +4971,15 @@ export async function refreshPortfolioSecurityQuote(
     if (!quote || !Number.isFinite(quote.price) || quote.price <= 0) {
       return;
     }
-    const currency = normalizeCurrencyCode(
-      quote.currency || request.currency || "CAD",
-    );
     const point: SecurityPriceHistoryPoint = {
-      id: `quote-refresh-${request.symbol}-${request.exchange ?? "default"}-${currency}-${refreshedDate}`,
+      id: `quote-refresh-${request.securityId}-${refreshedDate}`,
+      securityId: request.securityId,
       symbol: request.symbol,
       exchange: normalizeExchangeCode(request.exchange),
       priceDate: refreshedDate,
       close: quote.price,
       adjustedClose: null,
-      currency,
+      currency: request.currency,
       source: `quote-refresh-${quote.provider}`,
       provider: quote.provider,
       sourceMode: getQuoteSourceMode(quote),
@@ -4849,7 +4990,7 @@ export async function refreshPortfolioSecurityQuote(
       createdAt: refreshedAt.toISOString(),
     };
     historyPointMap.set(
-      `${point.symbol}::${point.exchange ?? ""}::${point.currency}::${point.priceDate}`,
+      `${point.securityId ?? point.symbol}::${point.priceDate}`,
       point,
     );
   });
@@ -4867,14 +5008,18 @@ export async function refreshPortfolioSecurityQuote(
       if (holding.symbol.trim().toUpperCase() !== normalizedSymbol) {
         continue;
       }
+      if (!matchedHoldingIds.has(holding.id)) {
+        continue;
+      }
 
       const requestedCurrency = normalizeCurrencyCode(
         (holding.currency as string) || "CAD",
       );
-      const quoteKey = `${holding.symbol.trim().toUpperCase()}::${holding.exchangeOverride?.trim() || ""}::${requestedCurrency}`;
+      const security = resolvedHoldingById.get(holding.id);
+      const quoteKey = security?.id ?? "";
       const quote = quoteMap.get(quoteKey);
       if (!quote) {
-        missingQuoteKeys.add(quoteKey);
+        missingQuoteKeys.add(quoteKey || holding.id);
         const missingStatus = getMissingQuoteStatus(holding);
         await tx
           .update(holdingPositions)
@@ -4882,7 +5027,10 @@ export async function refreshPortfolioSecurityQuote(
             quoteSourceMode: missingStatus.sourceMode,
             quoteStatus: missingStatus.status,
             quoteCurrency: requestedCurrency,
-            quoteExchange: normalizeExchangeCode(holding.exchangeOverride),
+            securityId: security?.id ?? null,
+            quoteExchange:
+              security?.canonicalExchange ??
+              normalizeExchangeCode(holding.exchangeOverride),
             lastQuoteAttemptedAt: refreshedAt,
             lastQuoteErrorCode: missingStatus.errorCode,
             lastQuoteErrorMessage: missingStatus.errorMessage,
@@ -4918,6 +5066,7 @@ export async function refreshPortfolioSecurityQuote(
         .update(holdingPositions)
         .set({
           currency: requestedCurrency,
+          securityId: security?.id ?? null,
           lastPriceAmount: quote.price.toFixed(4),
           lastPriceCad: priceInCad.toFixed(4),
           marketValueAmount: currentMarketValue.toFixed(2),
@@ -4927,7 +5076,9 @@ export async function refreshPortfolioSecurityQuote(
           quoteStatus: getQuoteStatus(quote),
           quoteCurrency: requestedCurrency,
           quoteExchange: normalizeExchangeCode(
-            quote.exchange || holding.exchangeOverride,
+            quote.exchange ||
+              security?.canonicalExchange ||
+              holding.exchangeOverride,
           ),
           quoteProviderTimestamp: parseProviderTimestamp(quote.timestamp),
           lastQuoteAttemptedAt: refreshedAt,
@@ -5017,7 +5168,26 @@ export async function createRecommendationRun(
       })
       .returning();
 
-    const items = recommendation.items;
+    const items = await Promise.all(
+      recommendation.items.map(async (item) => {
+        if (!item.securitySymbol) {
+          return item;
+        }
+        const security = await resolveCanonicalSecurityIdentity({
+          symbol: item.securitySymbol,
+          currency: item.securityCurrency ?? "CAD",
+          name: item.securityName ?? item.securitySymbol,
+          securityType: "ETF",
+        });
+        return {
+          ...item,
+          securityId: security.id,
+          securityExchange: security.canonicalExchange,
+          securityMicCode: security.micCode,
+          securityCurrency: security.currency,
+        };
+      }),
+    );
 
     if (items.length > 0) {
       await tx.insert(recommendationItems).values(
@@ -5026,8 +5196,12 @@ export async function createRecommendationRun(
           assetClass: item.assetClass,
           amountCad: item.amountCad.toFixed(2),
           targetAccountType: item.targetAccountType,
+          securityId: item.securityId ?? null,
           securitySymbol: item.securitySymbol ?? null,
           securityName: item.securityName ?? null,
+          securityExchange: item.securityExchange ?? null,
+          securityMicCode: item.securityMicCode ?? null,
+          securityCurrency: item.securityCurrency ?? null,
           securityScore: item.securityScore?.toFixed(2) ?? null,
           allocationGapBeforePct:
             item.allocationGapBeforePct?.toFixed(2) ?? null,

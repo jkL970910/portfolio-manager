@@ -168,10 +168,13 @@ class LooApiClient {
 
   Future<Map<String, dynamic>> getPortfolioSecurityDetail(
     String symbol, {
+    String? securityId,
     String? exchange,
     String? currency,
   }) {
     final query = {
+      if (securityId != null && securityId.isNotEmpty)
+        "securityId": securityId,
       if (exchange != null && exchange.isNotEmpty) "exchange": exchange,
       if (currency != null && currency.isNotEmpty) "currency": currency,
     };
@@ -180,9 +183,21 @@ class LooApiClient {
         "/api/mobile/portfolio/securities/${Uri.encodeComponent(symbol)}$suffix");
   }
 
-  Future<Map<String, dynamic>> refreshPortfolioSecurityQuote(String symbol) {
+  Future<Map<String, dynamic>> refreshPortfolioSecurityQuote(
+    String symbol, {
+    String? securityId,
+    String? exchange,
+    String? currency,
+  }) {
+    final query = {
+      if (securityId != null && securityId.isNotEmpty)
+        "securityId": securityId,
+      if (exchange != null && exchange.isNotEmpty) "exchange": exchange,
+      if (currency != null && currency.isNotEmpty) "currency": currency,
+    };
+    final suffix = query.isEmpty ? "" : "?${Uri(queryParameters: query).query}";
     return _postJson(
-        "/api/mobile/portfolio/securities/${Uri.encodeComponent(symbol)}/refresh-price");
+        "/api/mobile/portfolio/securities/${Uri.encodeComponent(symbol)}/refresh-price$suffix");
   }
 
   Future<void> deletePortfolioAccount(String accountId) async {

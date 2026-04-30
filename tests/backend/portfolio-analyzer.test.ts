@@ -15,7 +15,10 @@ import {
   buildRecommendationRunAnalyzerQuickScan,
   buildSecurityAnalyzerQuickScan
 } from "@/lib/backend/portfolio-analyzer";
-import { buildPortfolioAnalyzerCacheKey } from "@/lib/backend/portfolio-analyzer-service";
+import {
+  buildPortfolioAnalyzerCacheKey,
+  isAnalyzerCacheOlderThanMarketData
+} from "@/lib/backend/portfolio-analyzer-service";
 
 const generatedAt = "2026-04-28T04:00:00.000Z";
 
@@ -45,6 +48,7 @@ const accounts: InvestmentAccount[] = [
 const holdings: HoldingPosition[] = [
   {
     id: "holding_us_amzn",
+    securityId: "security_amzn_us",
     userId: "user_test",
     accountId: "acct_tfsa",
     symbol: "AMZN",
@@ -66,6 +70,7 @@ const holdings: HoldingPosition[] = [
   },
   {
     id: "holding_cad_amzn",
+    securityId: "security_amzn_cad",
     userId: "user_test",
     accountId: "acct_rrsp",
     symbol: "AMZN",
@@ -105,6 +110,7 @@ const holdings: HoldingPosition[] = [
 const priceHistory: SecurityPriceHistoryPoint[] = [
   {
     id: "history_us_amzn",
+    securityId: "security_amzn_us",
     symbol: "AMZN",
     exchange: "NASDAQ",
     priceDate: "2026-04-27",
@@ -122,6 +128,7 @@ const priceHistory: SecurityPriceHistoryPoint[] = [
   },
   {
     id: "history_cad_amzn",
+    securityId: "security_amzn_cad",
     symbol: "AMZN",
     exchange: "NEO",
     priceDate: "2026-04-27",
@@ -167,7 +174,13 @@ function makeProfile(overrides: Partial<PreferenceProfile> = {}): PreferenceProf
 
 test("security analyzer quick scan matches by full identity, not ticker alone", () => {
   const result = buildSecurityAnalyzerQuickScan({
-    identity: { symbol: "AMZN", exchange: "NEO", currency: "CAD", name: "Amazon CDR" },
+    identity: {
+      securityId: "security_amzn_cad",
+      symbol: "AMZN",
+      exchange: "NEO",
+      currency: "CAD",
+      name: "Amazon CDR"
+    },
     accounts,
     holdings,
     profile: makeProfile(),
@@ -183,7 +196,13 @@ test("security analyzer quick scan matches by full identity, not ticker alone", 
 
 test("security analyzer quick scan consumes cached market data by identity", () => {
   const result = buildSecurityAnalyzerQuickScan({
-    identity: { symbol: "AMZN", exchange: "NEO", currency: "CAD", name: "Amazon CDR" },
+    identity: {
+      securityId: "security_amzn_cad",
+      symbol: "AMZN",
+      exchange: "NEO",
+      currency: "CAD",
+      name: "Amazon CDR"
+    },
     accounts,
     holdings,
     profile: makeProfile(),
@@ -202,6 +221,84 @@ test("security analyzer quick scan consumes cached market data by identity", () 
   assert.ok(
     result.scorecards.some((card) => card.id === "market-data-freshness")
   );
+  assert.ok(
+    (result.scorecards.find((card) => card.id === "market-data-freshness")
+      ?.score ?? 0) > 45
+  );
+});
+
+test("security analyzer quick scan uses security id when provider exchange labels differ", () => {
+  const result = buildSecurityAnalyzerQuickScan({
+    identity: {
+      securityId: "security_xbb_cad",
+      symbol: "XBB",
+      exchange: "Toronto Stock Exchange",
+      currency: "CAD",
+      name: "iShares Core Canadian Universe Bond Index ETF"
+    },
+    accounts,
+    holdings,
+    profile: makeProfile(),
+    marketData: {
+      priceHistory: [
+        {
+          ...priceHistory[0],
+          id: "history_xbb_tsx",
+          securityId: "security_xbb_cad",
+          symbol: "XBB",
+          exchange: "TSX",
+          currency: "CAD",
+          provider: "yahoo-finance",
+          source: "quote-refresh-yahoo-finance",
+          freshness: "fresh",
+          isReference: false,
+          createdAt: generatedAt
+        }
+      ]
+    },
+    generatedAt
+  });
+
+  const freshness = result.scorecards.find(
+    (card) => card.id === "market-data-freshness"
+  );
+  assert.equal(result.dataFreshness.priceHistoryPointCount, 1);
+  assert.match(result.dataFreshness.quoteSourceSummary ?? "", /yahoo-finance/);
+  assert.ok((freshness?.score ?? 0) > 45);
+});
+
+test("security analyzer quick scan does not fall back across currency", () => {
+  const result = buildSecurityAnalyzerQuickScan({
+    identity: {
+      symbol: "XBB",
+      exchange: "Toronto Stock Exchange",
+      currency: "USD",
+      name: "iShares Core Canadian Universe Bond Index ETF"
+    },
+    accounts,
+    holdings,
+    profile: makeProfile(),
+    marketData: {
+      priceHistory: [
+        {
+          ...priceHistory[0],
+          id: "history_xbb_tsx_cad",
+          securityId: "security_xbb_cad",
+          symbol: "XBB",
+          exchange: "TSX",
+          currency: "CAD",
+          provider: "yahoo-finance",
+          source: "quote-refresh-yahoo-finance",
+          freshness: "fresh",
+          isReference: false,
+          createdAt: generatedAt
+        }
+      ]
+    },
+    generatedAt
+  });
+
+  assert.equal(result.dataFreshness.priceHistoryPointCount, 0);
 });
 
 test("portfolio analyzer cache key preserves security listing identity", () => {
@@ -223,6 +320,37 @@ test("portfolio analyzer cache key preserves security listing identity", () => {
   });
 
   assert.notEqual(usdCommon, cadListed);
+});
+
+test("portfolio analyzer cache is stale when refreshed market data is newer", () => {
+  assert.equal(
+    isAnalyzerCacheOlderThanMarketData("2026-04-30T12:00:00.000Z", {
+      holdings: [
+        {
+          ...holdings[0],
+          lastQuoteSuccessAt: "2026-04-30T12:10:00.000Z",
+        },
+      ],
+      marketData: { priceHistory: [], portfolioSnapshots: [] },
+    }),
+    true,
+  );
+
+  assert.equal(
+    isAnalyzerCacheOlderThanMarketData("2026-04-30T12:10:00.000Z", {
+      holdings: [],
+      marketData: {
+        priceHistory: [
+          {
+            ...priceHistory[0],
+            createdAt: "2026-04-30T12:09:00.000Z",
+          },
+        ],
+        portfolioSnapshots: [],
+      },
+    }),
+    false,
+  );
 });
 
 test("portfolio analyzer quick scan returns local structured analysis with disclaimers", () => {

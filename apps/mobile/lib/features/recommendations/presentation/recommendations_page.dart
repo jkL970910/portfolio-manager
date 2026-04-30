@@ -256,10 +256,15 @@ class _RecommendationsPageState extends State<RecommendationsPage> {
       MaterialPageRoute<void>(
         builder: (_) => SecurityDetailPage(
           apiClient: widget.apiClient,
+          securityId:
+              priority.securityId.isNotEmpty ? priority.securityId : null,
           symbol: priority.securitySymbol,
           fallbackTitle: priority.security.isNotEmpty
               ? priority.security
               : priority.securitySymbol,
+          exchange: priority.securityExchange.isNotEmpty
+              ? priority.securityExchange
+              : null,
           currency: priority.securityCurrency.isNotEmpty
               ? priority.securityCurrency
               : null,

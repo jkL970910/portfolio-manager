@@ -15,6 +15,7 @@ class SecurityDetailPage extends StatefulWidget {
     required this.apiClient,
     required this.symbol,
     required this.fallbackTitle,
+    this.securityId,
     this.exchange,
     this.currency,
     super.key,
@@ -23,6 +24,7 @@ class SecurityDetailPage extends StatefulWidget {
   final LooApiClient apiClient;
   final String symbol;
   final String fallbackTitle;
+  final String? securityId;
   final String? exchange;
   final String? currency;
 
@@ -33,6 +35,7 @@ class SecurityDetailPage extends StatefulWidget {
 class _SecurityDetailPageState extends State<SecurityDetailPage> {
   late Future<MobileSecurityDetailSnapshot?> _snapshot;
   bool _isRefreshingQuote = false;
+  String? _securityId;
 
   @override
   void initState() {
@@ -43,6 +46,7 @@ class _SecurityDetailPageState extends State<SecurityDetailPage> {
   Future<MobileSecurityDetailSnapshot?> _loadSnapshot() async {
     final response = await widget.apiClient.getPortfolioSecurityDetail(
       widget.symbol,
+      securityId: widget.securityId,
       exchange: widget.exchange,
       currency: widget.currency,
     );
@@ -55,6 +59,7 @@ class _SecurityDetailPageState extends State<SecurityDetailPage> {
     }
 
     final snapshot = MobileSecurityDetailSnapshot.fromJson(data);
+    _securityId = snapshot.securityId.isNotEmpty ? snapshot.securityId : null;
     if (mounted) {
       LooMinisterScope.report(
         context,
@@ -78,7 +83,12 @@ class _SecurityDetailPageState extends State<SecurityDetailPage> {
     });
 
     try {
-      await widget.apiClient.refreshPortfolioSecurityQuote(widget.symbol);
+      await widget.apiClient.refreshPortfolioSecurityQuote(
+        widget.symbol,
+        securityId: _securityId ?? widget.securityId,
+        exchange: widget.exchange,
+        currency: widget.currency,
+      );
       _refresh();
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -141,10 +151,16 @@ class _SecurityDetailPageState extends State<SecurityDetailPage> {
                 AiAnalysisCard(
                   apiClient: widget.apiClient,
                   title: "AI 标的快扫",
+                  refreshKey: [
+                    data.quoteTimestamp,
+                    data.priceHistoryChart?.freshness.latestDate,
+                  ].where((part) => part != null && part.isNotEmpty).join("|"),
                   payload: {
                     "scope": "security",
                     "mode": "quick",
                     "security": {
+                      if (data.securityId.isNotEmpty)
+                        "securityId": data.securityId,
                       "symbol": data.symbol,
                       if (data.exchange.isNotEmpty) "exchange": data.exchange,
                       if (data.currency.isNotEmpty) "currency": data.currency,
@@ -224,6 +240,7 @@ class _SecurityDetailPageState extends State<SecurityDetailPage> {
 
 class MobileSecurityDetailSnapshot {
   const MobileSecurityDetailSnapshot({
+    required this.securityId,
     required this.symbol,
     required this.name,
     required this.assetClass,
@@ -245,6 +262,7 @@ class MobileSecurityDetailSnapshot {
     required this.heldPosition,
   });
 
+  final String securityId;
   final String symbol;
   final String name;
   final String assetClass;
@@ -387,6 +405,7 @@ class MobileSecurityDetailSnapshot {
         security is Map<String, dynamic> ? security : const <String, dynamic>{};
 
     return MobileSecurityDetailSnapshot(
+      securityId: securityData["securityId"] as String? ?? "",
       symbol: securityData["symbol"] as String? ?? "--",
       name: securityData["name"] as String? ?? "未知标的",
       assetClass: securityData["assetClass"] as String? ?? "",

@@ -735,7 +735,11 @@ export async function getMobilePortfolioHoldingDetailView(
 export async function getMobilePortfolioSecurityDetailView(
   userId: string,
   symbol: string,
-  identity?: { exchange?: string | null; currency?: "CAD" | "USD" | null },
+  identity?: {
+    securityId?: string | null;
+    exchange?: string | null;
+    currency?: "CAD" | "USD" | null;
+  },
 ) {
   const payload = await getPortfolioSecurityDetailView(
     userId,

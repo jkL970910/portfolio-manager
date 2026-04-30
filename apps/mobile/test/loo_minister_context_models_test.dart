@@ -318,6 +318,7 @@ void main() {
     );
 
     const security = MobileSecurityDetailSnapshot(
+      securityId: "security_vfv_cad",
       symbol: "VFV",
       name: "Vanguard S&P 500 Index ETF",
       assetClass: "US Equity",

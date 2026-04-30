@@ -12,6 +12,7 @@ import {
   uuid,
   varchar,
 } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 
 export const users = pgTable(
   "users",
@@ -108,70 +109,80 @@ export const investmentAccounts = pgTable("investment_accounts", {
     .defaultNow(),
 });
 
-export const holdingPositions = pgTable("holding_positions", {
-  id: uuid("id").defaultRandom().primaryKey(),
-  userId: uuid("user_id")
-    .notNull()
-    .references(() => users.id),
-  accountId: uuid("account_id")
-    .notNull()
-    .references(() => investmentAccounts.id),
-  symbol: varchar("symbol", { length: 32 }).notNull(),
-  name: varchar("name", { length: 160 }).notNull(),
-  assetClass: varchar("asset_class", { length: 64 }).notNull(),
-  assetClassOverride: varchar("asset_class_override", { length: 64 }),
-  sector: varchar("sector", { length: 64 }).notNull(),
-  sectorOverride: varchar("sector_override", { length: 64 }),
-  currency: varchar("currency", { length: 3 }).notNull().default("CAD"),
-  securityTypeOverride: varchar("security_type_override", { length: 32 }),
-  exchangeOverride: varchar("exchange_override", { length: 64 }),
-  marketSectorOverride: varchar("market_sector_override", { length: 64 }),
-  quantity: numeric("quantity", { precision: 18, scale: 6 }),
-  avgCostPerShareAmount: numeric("avg_cost_per_share_amount", {
-    precision: 14,
-    scale: 4,
+export const holdingPositions = pgTable(
+  "holding_positions",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id),
+    accountId: uuid("account_id")
+      .notNull()
+      .references(() => investmentAccounts.id),
+    securityId: uuid("security_id").references(() => securities.id),
+    symbol: varchar("symbol", { length: 32 }).notNull(),
+    name: varchar("name", { length: 160 }).notNull(),
+    assetClass: varchar("asset_class", { length: 64 }).notNull(),
+    assetClassOverride: varchar("asset_class_override", { length: 64 }),
+    sector: varchar("sector", { length: 64 }).notNull(),
+    sectorOverride: varchar("sector_override", { length: 64 }),
+    currency: varchar("currency", { length: 3 }).notNull().default("CAD"),
+    securityTypeOverride: varchar("security_type_override", { length: 32 }),
+    exchangeOverride: varchar("exchange_override", { length: 64 }),
+    marketSectorOverride: varchar("market_sector_override", { length: 64 }),
+    quantity: numeric("quantity", { precision: 18, scale: 6 }),
+    avgCostPerShareAmount: numeric("avg_cost_per_share_amount", {
+      precision: 14,
+      scale: 4,
+    }),
+    costBasisAmount: numeric("cost_basis_amount", { precision: 14, scale: 2 }),
+    lastPriceAmount: numeric("last_price_amount", { precision: 14, scale: 4 }),
+    marketValueAmount: numeric("market_value_amount", {
+      precision: 14,
+      scale: 2,
+    })
+      .notNull()
+      .default("0"),
+    avgCostPerShareCad: numeric("avg_cost_per_share_cad", {
+      precision: 14,
+      scale: 4,
+    }),
+    costBasisCad: numeric("cost_basis_cad", { precision: 14, scale: 2 }),
+    lastPriceCad: numeric("last_price_cad", { precision: 14, scale: 4 }),
+    marketValueCad: numeric("market_value_cad", {
+      precision: 14,
+      scale: 2,
+    }).notNull(),
+    quoteProvider: varchar("quote_provider", { length: 32 }),
+    quoteSourceMode: varchar("quote_source_mode", { length: 32 }),
+    quoteStatus: varchar("quote_status", { length: 32 }),
+    quoteCurrency: varchar("quote_currency", { length: 3 }),
+    quoteExchange: varchar("quote_exchange", { length: 64 }),
+    quoteProviderTimestamp: timestamp("quote_provider_timestamp", {
+      withTimezone: true,
+    }),
+    lastQuoteAttemptedAt: timestamp("last_quote_attempted_at", {
+      withTimezone: true,
+    }),
+    lastQuoteSuccessAt: timestamp("last_quote_success_at", {
+      withTimezone: true,
+    }),
+    lastQuoteErrorCode: varchar("last_quote_error_code", { length: 64 }),
+    lastQuoteErrorMessage: text("last_quote_error_message"),
+    marketDataRefreshRunId: uuid("market_data_refresh_run_id"),
+    weightPct: numeric("weight_pct", { precision: 7, scale: 2 }).notNull(),
+    gainLossPct: numeric("gain_loss_pct", { precision: 7, scale: 2 }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => ({
+    securityIdx: index("holding_positions_security_idx").on(table.securityId),
   }),
-  costBasisAmount: numeric("cost_basis_amount", { precision: 14, scale: 2 }),
-  lastPriceAmount: numeric("last_price_amount", { precision: 14, scale: 4 }),
-  marketValueAmount: numeric("market_value_amount", { precision: 14, scale: 2 })
-    .notNull()
-    .default("0"),
-  avgCostPerShareCad: numeric("avg_cost_per_share_cad", {
-    precision: 14,
-    scale: 4,
-  }),
-  costBasisCad: numeric("cost_basis_cad", { precision: 14, scale: 2 }),
-  lastPriceCad: numeric("last_price_cad", { precision: 14, scale: 4 }),
-  marketValueCad: numeric("market_value_cad", {
-    precision: 14,
-    scale: 2,
-  }).notNull(),
-  quoteProvider: varchar("quote_provider", { length: 32 }),
-  quoteSourceMode: varchar("quote_source_mode", { length: 32 }),
-  quoteStatus: varchar("quote_status", { length: 32 }),
-  quoteCurrency: varchar("quote_currency", { length: 3 }),
-  quoteExchange: varchar("quote_exchange", { length: 64 }),
-  quoteProviderTimestamp: timestamp("quote_provider_timestamp", {
-    withTimezone: true,
-  }),
-  lastQuoteAttemptedAt: timestamp("last_quote_attempted_at", {
-    withTimezone: true,
-  }),
-  lastQuoteSuccessAt: timestamp("last_quote_success_at", {
-    withTimezone: true,
-  }),
-  lastQuoteErrorCode: varchar("last_quote_error_code", { length: 64 }),
-  lastQuoteErrorMessage: text("last_quote_error_message"),
-  marketDataRefreshRunId: uuid("market_data_refresh_run_id"),
-  weightPct: numeric("weight_pct", { precision: 7, scale: 2 }).notNull(),
-  gainLossPct: numeric("gain_loss_pct", { precision: 7, scale: 2 }).notNull(),
-  createdAt: timestamp("created_at", { withTimezone: true })
-    .notNull()
-    .defaultNow(),
-  updatedAt: timestamp("updated_at", { withTimezone: true })
-    .notNull()
-    .defaultNow(),
-});
+);
 
 export const portfolioEditLogs = pgTable("portfolio_edit_logs", {
   id: uuid("id").defaultRandom().primaryKey(),
@@ -275,6 +286,65 @@ export const fxRates = pgTable(
       table.baseCurrency,
       table.quoteCurrency,
     ),
+  }),
+);
+
+export const securities = pgTable(
+  "securities",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    symbol: varchar("symbol", { length: 32 }).notNull(),
+    canonicalExchange: varchar("canonical_exchange", { length: 64 }).notNull(),
+    micCode: varchar("mic_code", { length: 16 }),
+    currency: varchar("currency", { length: 3 }).notNull(),
+    name: varchar("name", { length: 240 }).notNull(),
+    securityType: varchar("security_type", { length: 64 }),
+    marketSector: varchar("market_sector", { length: 64 }),
+    country: varchar("country", { length: 64 }),
+    underlyingId: varchar("underlying_id", { length: 120 }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => ({
+    listingUniqueIdx: uniqueIndex("securities_listing_unique_idx").on(
+      table.symbol,
+      table.canonicalExchange,
+      table.currency,
+    ),
+    micUniqueIdx: uniqueIndex("securities_mic_symbol_currency_idx").on(
+      table.micCode,
+      table.symbol,
+      table.currency,
+    ),
+    underlyingIdx: index("securities_underlying_idx").on(table.underlyingId),
+  }),
+);
+
+export const securityAliases = pgTable(
+  "security_aliases",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    securityId: uuid("security_id")
+      .notNull()
+      .references(() => securities.id),
+    aliasType: varchar("alias_type", { length: 32 }).notNull(),
+    aliasValue: varchar("alias_value", { length: 160 }).notNull(),
+    provider: varchar("provider", { length: 64 }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => ({
+    aliasUniqueIdx: uniqueIndex("security_aliases_value_unique_idx").on(
+      table.aliasType,
+      table.aliasValue,
+      table.provider,
+    ),
+    securityIdx: index("security_aliases_security_idx").on(table.securityId),
   }),
 );
 
@@ -383,8 +453,12 @@ export const recommendationItems = pgTable("recommendation_items", {
   assetClass: varchar("asset_class", { length: 64 }).notNull(),
   amountCad: numeric("amount_cad", { precision: 14, scale: 2 }).notNull(),
   targetAccountType: varchar("target_account_type", { length: 24 }).notNull(),
+  securityId: uuid("security_id").references(() => securities.id),
   securitySymbol: varchar("security_symbol", { length: 32 }),
   securityName: varchar("security_name", { length: 160 }),
+  securityExchange: varchar("security_exchange", { length: 64 }),
+  securityMicCode: varchar("security_mic_code", { length: 16 }),
+  securityCurrency: varchar("security_currency", { length: 3 }),
   securityScore: numeric("security_score", { precision: 6, scale: 2 }),
   allocationGapBeforePct: numeric("allocation_gap_before_pct", {
     precision: 7,
@@ -430,6 +504,7 @@ export const securityPriceHistory = pgTable(
   "security_price_history",
   {
     id: uuid("id").defaultRandom().primaryKey(),
+    securityId: uuid("security_id").references(() => securities.id),
     symbol: varchar("symbol", { length: 32 }).notNull(),
     exchange: varchar("exchange", { length: 64 }).notNull().default(""),
     priceDate: date("price_date").notNull(),
@@ -455,6 +530,13 @@ export const securityPriceHistory = pgTable(
       table.exchange,
       table.currency,
       table.priceDate,
+    ),
+    securityDateIdx: index("security_price_history_security_date_idx").on(
+      table.securityId,
+      table.priceDate,
+    ).where(sql`${table.securityId} IS NOT NULL`),
+    securityIdx: index("security_price_history_security_idx").on(
+      table.securityId,
     ),
   }),
 );

@@ -12,11 +12,25 @@ export async function POST(
   }
 
   const { symbol } = await params;
+  const currencyParam = request.nextUrl.searchParams
+    .get("currency")
+    ?.trim()
+    .toUpperCase();
 
   try {
     const data = await refreshPortfolioSecurityQuote(
       viewer.id,
       decodeURIComponent(symbol),
+      {
+        securityId: request.nextUrl.searchParams.get("securityId"),
+        exchange: request.nextUrl.searchParams.get("exchange"),
+        currency:
+          currencyParam === "USD"
+            ? "USD"
+            : currencyParam === "CAD"
+              ? "CAD"
+              : null,
+      },
     );
     return NextResponse.json({ data }, { status: 200 });
   } catch (error) {

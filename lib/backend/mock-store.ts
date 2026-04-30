@@ -12,6 +12,8 @@ import {
   SecurityPriceHistoryPoint,
   PreferenceProfile,
   RecommendationRun,
+  SecurityAliasRecord,
+  SecurityRecord,
   UserProfile
 } from "@/lib/backend/models";
 import { DEFAULT_PREFERENCE_FACTORS } from "@/lib/backend/preference-factors";
@@ -253,6 +255,9 @@ export const transactions: CashflowTransaction[] = [
     direction: "inflow"
   }
 ];
+
+export const securities: SecurityRecord[] = [];
+export const securityAliases: SecurityAliasRecord[] = [];
 
 export const cashAccounts: CashAccount[] = [
   {

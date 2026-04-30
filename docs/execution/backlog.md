@@ -90,6 +90,7 @@ over simply adding more Flutter screens.
 
 | Feature                                      | Priority | Note                                                                                                               |
 | -------------------------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------ |
+| Security Identity Registry                   | P0       | Canonical `security_id` registry with exchange aliases, provider symbols, underlying-vs-listing separation, and DB unique constraints. This replaces ticker/exchange string fallback as the final identity solution. |
 | Per-investment-account AI Minister opt-in    | P1       | Let users enable/disable GPT analysis per TFSA/RRSP/FHSA/Taxable/account instance after global BYOK flow is stable |
 | Persist draggable Minister button position   | P1       | Current drag position is session-local; persist later after UX settles                                             |
 | Minister usage/cost dashboard with estimates | P1       | Current logs store provider/model/status/token counts; cost estimates can be added after pricing policy is fixed   |
@@ -98,16 +99,17 @@ over simply adding more Flutter screens.
 ## Recommended Build Order From Here
 
 1. Stabilize P0.5 real-data foundations: scheduled quote/history/FX refresh, provider retry-after persistence, and source/freshness lineage that AI can trust.
-2. Run the external consultation / `portfolio-analyzer.skill` pipeline on cached real market data first; keep live external research disabled until worker/cache/provider quota policy is proven.
-3. Align AI 标的分析 and AI 大臣: AI 标的分析 produces structured saved analysis; 大臣 answers cross-page questions, explains current context, and references or triggers saved analysis instead of duplicating a full report.
-4. Define Recommendation V3 external-signal contracts before adding live news/forum adapters.
-5. Extend Preference Factors V2 with AI 大臣问答式参数生成, using the same payload as the manual Flutter editor.
-6. Add a local/cached `Loo国今日秘闻` API before live provider integration.
-7. QA the real mobile URL for GPT-5.5/BYOK, cached-external analysis, provider status, history hydration, and CAD/USD identity separation.
-8. Continue backend contract typing for detail pages and AI context DTOs so mobile stops relying on page-level `Map<String, dynamic>` parsing.
-9. Harden mobile auth with revocable refresh tokens and production storage policy.
-10. Move Mobile UI / IA overhaul to P1 after the data/AI layer is credible.
-11. Migrate spending/cash account monitoring into a dedicated mobile flow.
+2. Complete Security Identity Registry P0 before deeper Recommendation V3 scoring: canonical `security_id` must become the shared join key for holdings, price history, recommendations, AI analysis, and external intelligence.
+3. Run the external consultation / `portfolio-analyzer.skill` pipeline on cached real market data first; keep live external research disabled until worker/cache/provider quota policy is proven.
+4. Align AI 标的分析 and AI 大臣: AI 标的分析 produces structured saved analysis; 大臣 answers cross-page questions, explains current context, and references or triggers saved analysis instead of duplicating a full report.
+5. Define Recommendation V3 external-signal contracts before adding live news/forum adapters.
+6. Extend Preference Factors V2 with AI 大臣问答式参数生成, using the same payload as the manual Flutter editor.
+7. Add a local/cached `Loo国今日秘闻` API before live provider integration.
+8. QA the real mobile URL for GPT-5.5/BYOK, cached-external analysis, provider status, history hydration, and CAD/USD identity separation.
+9. Continue backend contract typing for detail pages and AI context DTOs so mobile stops relying on page-level `Map<String, dynamic>` parsing.
+10. Harden mobile auth with revocable refresh tokens and production storage policy.
+11. Move Mobile UI / IA overhaul to P1 after the data/AI layer is credible.
+12. Migrate spending/cash account monitoring into a dedicated mobile flow.
 
 ## P1 Mobile UI / IA Overhaul Scope
 
@@ -136,6 +138,50 @@ P1 follow-up goals:
 - avoid fake "real-time" promises without sustainable market-data support
 
 ## P0.5 Implementation Notes
+
+### Security Identity Registry P0
+
+Goal: replace ticker/exchange-string fallback with a durable canonical security
+registry. This is required before Recommendation V3 and external intelligence
+can safely combine real market data, cached analysis, and provider research.
+
+Final identity model:
+
+- `securities`: one row per concrete listing, keyed by
+  `symbol + canonical_exchange + currency`.
+- `security_aliases`: provider/exchange/MIC aliases pointing to exactly one
+  `security_id`.
+- `underlying_id`: groups related listings for company/fund-level intelligence,
+  without sharing listing-level quote/history/FX data.
+
+Implementation status:
+
+1. P0-A complete: registry tables, resolver, alias canonicalization, and tests.
+2. P0-B complete: `security_id` backfill exists for holdings, security price
+   history, and recommendation items. Old symbol/exchange/currency columns stay
+   as audit/display fields.
+3. P0-C complete: quote/history refresh writes and reads listing data by
+   `security_id`; strict legacy identity matching remains only for requests that
+   still lack a resolved registry id.
+4. P0-D complete: recommendation items carry `security_id`, canonical exchange,
+   MIC, and trading currency into mobile navigation.
+5. P0-E complete for listing-level AI cache: analyzer target keys, cached market
+   data lookup, and security quick-scan payloads prefer `security_id`. Shared
+   `underlying_id` intelligence remains the basis for Recommendation V3 news /
+   forum aggregation.
+6. P0-F complete: `npm run audit:security-identity` reports missing registry
+   ids, duplicate same-listing history rows, and listing-specific alias
+   conflicts. It never auto-merges or deletes rows.
+
+Guardrails:
+
+- CAD/USD listings must remain separate `security_id` values.
+- Provider aliases such as `TSX`, `XTSE`, `Toronto Stock Exchange`, and
+  `XBB.TO` must point to the same canonical listing.
+- Listing-level facts include price, history, quote provider, refresh status,
+  FX, and chart freshness.
+- Underlying-level facts include company/fund news, broad thesis, industry
+  context, and non-price external research.
 
 - `0015_market_data_provider_limits` persists provider retry-after windows so
   multi-process/cloud refresh jobs do not immediately forget `429` responses

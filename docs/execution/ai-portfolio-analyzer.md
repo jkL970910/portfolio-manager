@@ -93,7 +93,9 @@ P0.5 work order:
 
 - Keep CAD as the base reporting currency.
 - Preserve native trading currency on every holding/security.
-- Treat `symbol + exchange + currency` as security identity when available.
+- Treat `security_id` as the canonical listing identity. `symbol + exchange +
+  currency` is only a strict legacy/audit identity when a registry id is not
+  available; never use ticker-only fallback for market data joins.
 - Do not merge US common shares with CAD-listed/CDR/CAD-hedged versions by
   symbol alone.
 - Native quote data stays in the listing currency; CAD display conversion uses
@@ -333,6 +335,17 @@ Remaining P0-B backend work:
 - Service adapters now pass cached price history and portfolio snapshots into
   quick scans. Missing or fallback history lowers confidence and is shown as a
   limitation instead of being hidden.
+- Analyzer cache reuse is invalidated when refreshed quote/history/snapshot data
+  is newer than the cached AI result. Security Detail also re-runs the visible
+  AI quick scan after a successful quote refresh if a result was already shown,
+  so stale `缓存行情可信度` scorecards do not remain on screen.
+- `缓存行情可信度` now separates "no market cache" from "fresh quote but shallow
+  history": a single refreshed quote should lift the score out of the 45-point
+  fallback band, while still warning that trend analysis needs deeper history.
+- Security analysis cache keys and cached price-history lookup now prefer
+  canonical `security_id`. Exchange-label differences such as `TSX` vs
+  `Toronto Stock Exchange` must resolve through the registry, not through
+  ticker-only or symbol+currency fuzzy fallback.
 - Protected mobile route exists at `POST /api/mobile/analysis/quick-scan`.
 - Flutter API client exposes `createAnalyzerQuickScan(...)`.
 - Persistence table `portfolio_analysis_runs` exists in migration `0004`.

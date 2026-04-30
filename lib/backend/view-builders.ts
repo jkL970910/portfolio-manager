@@ -3284,6 +3284,7 @@ export function buildPortfolioSecurityDetailData(args: {
   profile: PreferenceProfile;
   display: DisplayContext;
   symbol: string;
+  securityId?: string | null;
   exchange?: string | null;
   currency?: CurrencyCode | null;
 }): PortfolioSecurityDetailData | null {
@@ -3297,6 +3298,7 @@ export function buildPortfolioSecurityDetailData(args: {
     profile,
     display,
     symbol,
+    securityId,
     exchange,
     currency,
   } = args;
@@ -3304,11 +3306,13 @@ export function buildPortfolioSecurityDetailData(args: {
   const normalizedExchange = exchange?.trim().toUpperCase() || null;
   const normalizedCurrency = currency ?? null;
   const matchesRequestedIdentity = (holding: HoldingPosition) =>
-    holding.symbol.trim().toUpperCase() === normalizedSymbol &&
-    (!normalizedCurrency || holding.currency === normalizedCurrency) &&
-    (!normalizedExchange ||
-      (holding.exchangeOverride?.trim().toUpperCase() || "") ===
-        normalizedExchange);
+    securityId
+      ? holding.securityId === securityId
+      : holding.symbol.trim().toUpperCase() === normalizedSymbol &&
+        (!normalizedCurrency || holding.currency === normalizedCurrency) &&
+        (!normalizedExchange ||
+          (holding.exchangeOverride?.trim().toUpperCase() || "") ===
+            normalizedExchange);
   const portfolio = buildPortfolioData({
     language,
     accounts,
@@ -4156,7 +4160,10 @@ export function buildRecommendationsData(args: {
         amount: formatDisplayCurrency(item.amountCad, display),
         account: getAccountTypeLabel(item.targetAccountType, language),
         security: leadSecurity,
+        securityId: item.securityId ?? undefined,
         securitySymbol: item.securitySymbol ?? item.tickerOptions[0] ?? "",
+        securityExchange: item.securityExchange ?? undefined,
+        securityMicCode: item.securityMicCode ?? undefined,
         securityCurrency: item.securityCurrency,
         securityHref: item.securitySymbol
           ? `/portfolio/security/${encodeURIComponent(item.securitySymbol)}`

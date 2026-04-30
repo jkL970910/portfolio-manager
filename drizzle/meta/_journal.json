@@ -120,6 +120,20 @@
       "when": 1777564800000,
       "tag": "0016_preference_factors",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1777568400000,
+      "tag": "0017_security_identity_registry",
+      "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1777572000000,
+      "tag": "0018_security_identity_references",
+      "breakpoints": true
     }
   ]
 }

@@ -81,6 +81,7 @@ export interface HoldingPosition {
   id: EntityId;
   userId: EntityId;
   accountId: EntityId;
+  securityId?: EntityId | null;
   symbol: string;
   name: string;
   assetClass: string;
@@ -119,6 +120,38 @@ export interface HoldingPosition {
   updatedAt?: string | null;
 }
 
+export type SecurityAliasType =
+  | "exchange-label"
+  | "mic-code"
+  | "provider-symbol"
+  | "provider-exchange"
+  | "figi"
+  | "manual";
+
+export interface SecurityRecord {
+  id: EntityId;
+  symbol: string;
+  canonicalExchange: string;
+  micCode: string | null;
+  currency: CurrencyCode;
+  name: string;
+  securityType: string | null;
+  marketSector: string | null;
+  country: string | null;
+  underlyingId: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface SecurityAliasRecord {
+  id: EntityId;
+  securityId: EntityId;
+  aliasType: SecurityAliasType;
+  aliasValue: string;
+  provider: string | null;
+  createdAt: string;
+}
+
 export interface PortfolioSnapshot {
   id: EntityId;
   userId: EntityId;
@@ -137,6 +170,7 @@ export interface PortfolioSnapshot {
 
 export interface SecurityPriceHistoryPoint {
   id: EntityId;
+  securityId?: EntityId | null;
   symbol: string;
   exchange?: string | null;
   priceDate: string;
@@ -344,8 +378,11 @@ export interface RecommendationItem {
   targetAccountType: AccountType;
   tickerOptions: string[];
   explanation: string;
+  securityId?: EntityId | null;
   securitySymbol?: string;
   securityName?: string;
+  securityExchange?: string | null;
+  securityMicCode?: string | null;
   securityCurrency?: CurrencyCode;
   securityScore?: number;
   preferenceFitScore?: number;

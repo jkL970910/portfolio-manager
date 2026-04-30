@@ -8,6 +8,7 @@ class AiAnalysisCard extends StatefulWidget {
     required this.payload,
     this.title = "AI 分析",
     this.description = "基于当前组合、账户、偏好和本地报价缓存生成，不包含实时新闻或论坛情绪。",
+    this.refreshKey,
     super.key,
   });
 
@@ -15,6 +16,7 @@ class AiAnalysisCard extends StatefulWidget {
   final Map<String, dynamic> payload;
   final String title;
   final String description;
+  final String? refreshKey;
 
   @override
   State<AiAnalysisCard> createState() => _AiAnalysisCardState();
@@ -24,6 +26,19 @@ class _AiAnalysisCardState extends State<AiAnalysisCard> {
   Future<MobileAiAnalysisResult>? _analysis;
   bool _hasResult = false;
   bool _isLoading = false;
+
+  @override
+  void didUpdateWidget(covariant AiAnalysisCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (
+      widget.refreshKey != null &&
+      oldWidget.refreshKey != widget.refreshKey &&
+      _hasResult &&
+      !_isLoading
+    ) {
+      _runAnalysis(refresh: true);
+    }
+  }
 
   void _runAnalysis({bool refresh = false}) {
     setState(() {

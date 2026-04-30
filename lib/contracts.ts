@@ -517,6 +517,7 @@ export interface PortfolioSecurityDetailData {
     fxFreshness: "fresh" | "stale" | "fallback";
   };
   security: {
+    securityId?: string;
     symbol: string;
     name: string;
     assetClass: string;
@@ -661,7 +662,10 @@ export interface RecommendationsData {
     amount: string;
     account: string;
     security: string;
+    securityId?: string;
     securitySymbol: string;
+    securityExchange?: string;
+    securityMicCode?: string;
     securityCurrency?: "CAD" | "USD";
     securityHref?: string;
     tickers: string;

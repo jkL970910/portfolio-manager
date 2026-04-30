@@ -16,6 +16,8 @@ import {
   preferenceProfiles,
   recommendationItems,
   recommendationRuns,
+  securities,
+  securityAliases,
   securityPriceHistory,
   users,
 } from "@/lib/db/schema";
@@ -30,7 +32,9 @@ import {
   PortfolioEvent,
   PortfolioAnalysisRun,
   PortfolioSnapshot,
+  SecurityAliasRecord,
   SecurityPriceHistoryPoint,
+  SecurityRecord,
   PreferenceProfile,
   RecommendationRun,
   UserProfile,
@@ -91,6 +95,36 @@ function mapImportJob(row: typeof importJobs.$inferSelect): ImportJob {
     status: row.status as ImportJob["status"],
     sourceType: row.sourceType as "csv",
     fileName: row.fileName,
+    createdAt: row.createdAt.toISOString(),
+  };
+}
+
+function mapSecurity(row: typeof securities.$inferSelect): SecurityRecord {
+  return {
+    id: row.id,
+    symbol: row.symbol,
+    canonicalExchange: row.canonicalExchange,
+    micCode: row.micCode ?? null,
+    currency: row.currency as SecurityRecord["currency"],
+    name: row.name,
+    securityType: row.securityType ?? null,
+    marketSector: row.marketSector ?? null,
+    country: row.country ?? null,
+    underlyingId: row.underlyingId ?? null,
+    createdAt: row.createdAt.toISOString(),
+    updatedAt: row.updatedAt.toISOString(),
+  };
+}
+
+function mapSecurityAlias(
+  row: typeof securityAliases.$inferSelect,
+): SecurityAliasRecord {
+  return {
+    id: row.id,
+    securityId: row.securityId,
+    aliasType: row.aliasType as SecurityAliasRecord["aliasType"],
+    aliasValue: row.aliasValue,
+    provider: row.provider ?? null,
     createdAt: row.createdAt.toISOString(),
   };
 }
@@ -168,6 +202,7 @@ function mapSecurityPriceHistory(
 ): SecurityPriceHistoryPoint {
   return {
     id: row.id,
+    securityId: row.securityId ?? null,
     symbol: row.symbol,
     exchange: row.exchange || null,
     priceDate: row.priceDate,
@@ -184,6 +219,37 @@ function mapSecurityPriceHistory(
     fallbackReason: row.fallbackReason ?? null,
     createdAt: row.createdAt.toISOString(),
   };
+}
+
+function dedupeSecurityPriceHistoryByDate(
+  points: SecurityPriceHistoryPoint[],
+) {
+  const byDate = new Map<string, SecurityPriceHistoryPoint>();
+  for (const point of points) {
+    if (!byDate.has(point.priceDate)) {
+      byDate.set(point.priceDate, point);
+    }
+  }
+  return [...byDate.values()];
+}
+
+function dedupeSecurityPriceHistoryByIdentityDate(
+  points: SecurityPriceHistoryPoint[],
+) {
+  const byIdentityDate = new Map<string, SecurityPriceHistoryPoint>();
+  for (const point of points) {
+    const key = [
+      point.securityId ?? "",
+      point.symbol,
+      point.exchange ?? "",
+      point.currency,
+      point.priceDate,
+    ].join("::");
+    if (!byIdentityDate.has(key)) {
+      byIdentityDate.set(key, point);
+    }
+  }
+  return [...byIdentityDate.values()];
 }
 
 function mapPortfolioEvent(
@@ -354,6 +420,7 @@ export const postgresRepositories: BackendRepositories = {
             id: row.id,
             userId: row.userId,
             accountId: row.accountId,
+            securityId: row.securityId ?? null,
             symbol: row.symbol,
             name: row.name,
             assetClass: row.assetClassOverride ?? row.assetClass,
@@ -471,9 +538,25 @@ export const postgresRepositories: BackendRepositories = {
       const db = getDb();
       const rows = await db.query.securityPriceHistory.findMany({
         where: eq(securityPriceHistory.symbol, symbol.trim().toUpperCase()),
-        orderBy: desc(securityPriceHistory.priceDate),
+        orderBy: [
+          desc(securityPriceHistory.priceDate),
+          desc(securityPriceHistory.createdAt),
+        ],
       });
-      return rows.map(mapSecurityPriceHistory);
+      return dedupeSecurityPriceHistoryByIdentityDate(
+        rows.map(mapSecurityPriceHistory),
+      );
+    },
+    async listBySecurityId(securityId) {
+      const db = getDb();
+      const rows = await db.query.securityPriceHistory.findMany({
+        where: eq(securityPriceHistory.securityId, securityId),
+        orderBy: [
+          desc(securityPriceHistory.priceDate),
+          desc(securityPriceHistory.createdAt),
+        ],
+      });
+      return dedupeSecurityPriceHistoryByDate(rows.map(mapSecurityPriceHistory));
     },
     async listByIdentity(input) {
       const db = getDb();
@@ -488,9 +571,123 @@ export const postgresRepositories: BackendRepositories = {
             ? eq(securityPriceHistory.currency, input.currency)
             : undefined,
         ),
-        orderBy: desc(securityPriceHistory.priceDate),
+        orderBy: [
+          desc(securityPriceHistory.priceDate),
+          desc(securityPriceHistory.createdAt),
+        ],
       });
-      return rows.map(mapSecurityPriceHistory);
+      return dedupeSecurityPriceHistoryByDate(rows.map(mapSecurityPriceHistory));
+    },
+  },
+  securities: {
+    async getById(securityId) {
+      const db = getDb();
+      const row = await db.query.securities.findFirst({
+        where: eq(securities.id, securityId),
+      });
+      return row ? mapSecurity(row) : null;
+    },
+    async findByCanonicalIdentity(input) {
+      const db = getDb();
+      const row = await db.query.securities.findFirst({
+        where: and(
+          eq(securities.symbol, input.symbol.trim().toUpperCase()),
+          eq(securities.canonicalExchange, input.canonicalExchange),
+          eq(securities.currency, input.currency),
+        ),
+      });
+      return row ? mapSecurity(row) : null;
+    },
+    async findByAlias(input) {
+      const db = getDb();
+      const alias = await db.query.securityAliases.findFirst({
+        where: and(
+          eq(securityAliases.aliasType, input.aliasType),
+          eq(securityAliases.aliasValue, input.aliasValue),
+          input.provider
+            ? eq(securityAliases.provider, input.provider)
+            : undefined,
+        ),
+      });
+      if (!alias) {
+        return null;
+      }
+      const row = await db.query.securities.findFirst({
+        where: eq(securities.id, alias.securityId),
+      });
+      return row ? mapSecurity(row) : null;
+    },
+    async upsertCanonical(input) {
+      const db = getDb();
+      const [row] = await db
+        .insert(securities)
+        .values({
+          symbol: input.symbol.trim().toUpperCase(),
+          canonicalExchange: input.canonicalExchange,
+          micCode: input.micCode,
+          currency: input.currency,
+          name: input.name,
+          securityType: input.securityType,
+          marketSector: input.marketSector,
+          country: input.country,
+          underlyingId: input.underlyingId,
+        })
+        .onConflictDoUpdate({
+          target: [
+            securities.symbol,
+            securities.canonicalExchange,
+            securities.currency,
+          ],
+          set: {
+            micCode: input.micCode,
+            name: input.name,
+            securityType: input.securityType,
+            marketSector: input.marketSector,
+            country: input.country,
+            underlyingId: input.underlyingId,
+            updatedAt: new Date(),
+          },
+        })
+        .returning();
+      if (!row) {
+        throw new Error("Failed to upsert security identity.");
+      }
+      return mapSecurity(row);
+    },
+    async addAlias(input) {
+      const db = getDb();
+      const [row] = await db
+        .insert(securityAliases)
+        .values({
+          securityId: input.securityId,
+          aliasType: input.aliasType,
+          aliasValue: input.aliasValue,
+          provider: input.provider,
+        })
+        .onConflictDoNothing({
+          target: [
+            securityAliases.aliasType,
+            securityAliases.aliasValue,
+            securityAliases.provider,
+          ],
+        })
+        .returning();
+      if (row) {
+        return mapSecurityAlias(row);
+      }
+      const existing = await db.query.securityAliases.findFirst({
+        where: and(
+          eq(securityAliases.aliasType, input.aliasType),
+          eq(securityAliases.aliasValue, input.aliasValue),
+          input.provider
+            ? eq(securityAliases.provider, input.provider)
+            : undefined,
+        ),
+      });
+      if (!existing) {
+        throw new Error("Failed to add security alias.");
+      }
+      return mapSecurityAlias(existing);
     },
   },
   preferences: {
@@ -565,8 +762,14 @@ export const postgresRepositories: BackendRepositories = {
             item.targetAccountType as RecommendationRun["items"][number]["targetAccountType"],
           tickerOptions: item.tickerOptions as string[],
           explanation: item.explanation,
+          securityId: item.securityId ?? null,
           securitySymbol: item.securitySymbol ?? undefined,
           securityName: item.securityName ?? undefined,
+          securityExchange: item.securityExchange ?? null,
+          securityMicCode: item.securityMicCode ?? null,
+          securityCurrency:
+            (item.securityCurrency as RecommendationRun["items"][number]["securityCurrency"]) ??
+            undefined,
           securityScore:
             item.securityScore == null
               ? undefined

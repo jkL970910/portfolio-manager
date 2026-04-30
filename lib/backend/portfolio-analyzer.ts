@@ -53,6 +53,7 @@ function assertAnalyzerResult(result: PortfolioAnalyzerResult): PortfolioAnalyze
 
 function getHoldingIdentity(holding: HoldingPosition): AnalyzerSecurityIdentity {
   return {
+    securityId: holding.securityId ?? null,
     symbol: holding.symbol,
     exchange: holding.exchangeOverride ?? null,
     currency: holding.currency ?? null,
@@ -111,6 +112,10 @@ function filterHistoryForIdentity(
   priceHistory: SecurityPriceHistoryPoint[],
   identity: AnalyzerSecurityIdentity,
 ) {
+  if (identity.securityId) {
+    return priceHistory.filter((point) => point.securityId === identity.securityId);
+  }
+
   const symbol = normalizeIdentityPart(identity.symbol);
   const exchange = normalizeIdentityPart(identity.exchange);
   const currency = normalizeIdentityPart(identity.currency);
@@ -161,6 +166,10 @@ function buildMarketDataSummary(args: {
   const stalePointCount = priceHistory.filter(
     (point) => point.freshness === "stale",
   ).length;
+  const freshHistoryPointCount = Math.max(
+    0,
+    priceHistory.length - fallbackPointCount - stalePointCount,
+  );
   const latestHistoryAsOf = latestIsoOrNull(
     priceHistory.map((point) => point.priceDate),
   );
@@ -201,6 +210,7 @@ function buildMarketDataSummary(args: {
     quoteStatuses.length > 0
       ? `quoteStatus=${quoteStatuses.slice(0, 4).join("/")}`
       : null,
+    latestHistoryAsOf ? `historyAsOf=${latestHistoryAsOf.slice(0, 10)}` : null,
     priceHistory.length > 0 ? `historyPoints=${priceHistory.length}` : null,
     fallbackPointCount > 0 ? `fallbackPoints=${fallbackPointCount}` : null,
     stalePointCount > 0 ? `stalePoints=${stalePointCount}` : null,
@@ -214,7 +224,10 @@ function buildMarketDataSummary(args: {
     quoteSourceSummary,
     quoteFreshnessSummary: quoteFreshnessSummary || null,
     priceHistoryPointCount: priceHistory.length,
+    freshHistoryPointCount,
     fallbackPointCount,
+    stalePointCount,
+    quoteProviderCount: quoteProviders.length,
     latestSnapshot,
     sources: [
       ...(quoteProviders.length > 0
@@ -249,17 +262,39 @@ function buildMarketDataSummary(args: {
       ...(priceHistory.length === 0
         ? ["没有匹配的缓存价格历史；分析不能把走势图当作实时市场结论。"]
         : []),
+      ...(priceHistory.length > 0 && priceHistory.length < 5
+        ? ["缓存里只有最近报价或少量历史点；可以用于确认当前报价，但还不能支撑趋势判断。"]
+        : []),
       ...(fallbackPointCount > 0
         ? [`价格历史含 ${fallbackPointCount} 个参考/兜底点，AI 只能低置信使用。`]
         : []),
       ...(stalePointCount > 0
         ? [`价格历史含 ${stalePointCount} 个 stale 点，需要刷新后再提高置信度。`]
         : []),
-      ...(quoteProviders.length === 0
+      ...(quoteProviders.length === 0 && historyProviders.length === 0
         ? ["持仓行没有可审计 quote provider；分析只能使用本地持仓字段。"]
         : []),
     ],
   };
+}
+
+function getMarketDataConfidenceScore(marketData: ReturnType<typeof buildMarketDataSummary>) {
+  const hasAnyRealMarketData =
+    marketData.quoteProviderCount > 0 || marketData.freshHistoryPointCount > 0;
+  if (!hasAnyRealMarketData) {
+    return 45;
+  }
+
+  const baseScore = marketData.freshHistoryPointCount >= 5 ? 70 : 62;
+  const historyDepthBonus = Math.min(marketData.freshHistoryPointCount, 25);
+  const providerBonus = marketData.quoteProviderCount > 0 ? 8 : 0;
+  const penalty =
+    marketData.fallbackPointCount * 8 + marketData.stalePointCount * 4;
+
+  return Math.max(
+    35,
+    Math.min(90, baseScore + historyDepthBonus + providerBonus - penalty),
+  );
 }
 
 export function buildSecurityAnalyzerQuickScan(args: {
@@ -333,15 +368,7 @@ export function buildSecurityAnalyzerQuickScan(args: {
       {
         id: "market-data-freshness",
         label: "缓存行情可信度",
-        score: Math.max(
-          20,
-          Math.min(
-            90,
-            45 +
-              Math.min(marketData.priceHistoryPointCount, 60) -
-              marketData.fallbackPointCount * 6,
-          ),
-        ),
+        score: getMarketDataConfidenceScore(marketData),
         rationale: marketData.quoteFreshnessSummary
           ? `行情口径：${marketData.quoteFreshnessSummary}。`
           : "没有足够缓存行情，不能把分析当成实时研究。"
@@ -454,10 +481,7 @@ export function buildPortfolioAnalyzerQuickScan(args: {
       {
         id: "market-data-freshness",
         label: "缓存行情可信度",
-        score: Math.max(
-          20,
-          Math.min(90, 45 + Math.min(marketData.priceHistoryPointCount, 60) - marketData.fallbackPointCount * 6),
-        ),
+        score: getMarketDataConfidenceScore(marketData),
         rationale: marketData.quoteFreshnessSummary
           ? `行情口径：${marketData.quoteFreshnessSummary}。`
           : "没有足够缓存行情，组合快扫只能低置信使用本地字段。"
@@ -574,10 +598,7 @@ export function buildAccountAnalyzerQuickScan(args: {
       {
         id: "market-data-freshness",
         label: "缓存行情可信度",
-        score: Math.max(
-          20,
-          Math.min(90, 45 + Math.min(marketData.priceHistoryPointCount, 60) - marketData.fallbackPointCount * 6),
-        ),
+        score: getMarketDataConfidenceScore(marketData),
         rationale: marketData.quoteFreshnessSummary
           ? `行情口径：${marketData.quoteFreshnessSummary}。`
           : "没有足够缓存行情，账户快扫只能低置信使用本地字段。"

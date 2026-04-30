@@ -11,7 +11,9 @@ import {
   PortfolioEvent,
   PortfolioAnalysisRun,
   PortfolioSnapshot,
+  SecurityAliasRecord,
   SecurityPriceHistoryPoint,
+  SecurityRecord,
   PreferenceProfile,
   RecommendationRun,
   UserProfile,
@@ -65,11 +67,32 @@ export interface PortfolioSnapshotRepository {
 
 export interface SecurityPriceHistoryRepository {
   listBySymbol(symbol: string): Promise<SecurityPriceHistoryPoint[]>;
+  listBySecurityId(securityId: EntityId): Promise<SecurityPriceHistoryPoint[]>;
   listByIdentity(input: {
     symbol: string;
     exchange?: string | null;
     currency?: string | null;
   }): Promise<SecurityPriceHistoryPoint[]>;
+}
+
+export interface SecurityRepository {
+  getById(securityId: EntityId): Promise<SecurityRecord | null>;
+  findByCanonicalIdentity(input: {
+    symbol: string;
+    canonicalExchange: string;
+    currency: SecurityRecord["currency"];
+  }): Promise<SecurityRecord | null>;
+  findByAlias(input: {
+    aliasType: SecurityAliasRecord["aliasType"];
+    aliasValue: string;
+    provider?: string | null;
+  }): Promise<SecurityRecord | null>;
+  upsertCanonical(
+    input: Omit<SecurityRecord, "id" | "createdAt" | "updatedAt">,
+  ): Promise<SecurityRecord>;
+  addAlias(
+    input: Omit<SecurityAliasRecord, "id" | "createdAt">,
+  ): Promise<SecurityAliasRecord>;
 }
 
 export interface PreferenceRepository {
@@ -148,6 +171,7 @@ export interface BackendRepositories {
   portfolioEvents: PortfolioEventRepository;
   snapshots: PortfolioSnapshotRepository;
   securityPriceHistory: SecurityPriceHistoryRepository;
+  securities: SecurityRepository;
   preferences: PreferenceRepository;
   recommendations: RecommendationRepository;
   analysisRuns: PortfolioAnalysisRunRepository;

@@ -4,10 +4,12 @@ import { postgresRepositories } from "@/lib/backend/repositories/postgres-reposi
 
 export type RepositoryMode = "mock" | "postgres-drizzle";
 
-const repositoryMode = (process.env.REPOSITORY_MODE ?? "mock") as RepositoryMode;
+export function getRepositoryMode(): RepositoryMode {
+  return (process.env.REPOSITORY_MODE ?? "mock") as RepositoryMode;
+}
 
 export function getRepositories(): BackendRepositories {
-  switch (repositoryMode) {
+  switch (getRepositoryMode()) {
     case "mock":
       return mockRepositories;
     case "postgres-drizzle":
