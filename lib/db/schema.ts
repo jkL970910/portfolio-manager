@@ -146,6 +146,23 @@ export const holdingPositions = pgTable("holding_positions", {
     precision: 14,
     scale: 2,
   }).notNull(),
+  quoteProvider: varchar("quote_provider", { length: 32 }),
+  quoteSourceMode: varchar("quote_source_mode", { length: 32 }),
+  quoteStatus: varchar("quote_status", { length: 32 }),
+  quoteCurrency: varchar("quote_currency", { length: 3 }),
+  quoteExchange: varchar("quote_exchange", { length: 64 }),
+  quoteProviderTimestamp: timestamp("quote_provider_timestamp", {
+    withTimezone: true,
+  }),
+  lastQuoteAttemptedAt: timestamp("last_quote_attempted_at", {
+    withTimezone: true,
+  }),
+  lastQuoteSuccessAt: timestamp("last_quote_success_at", {
+    withTimezone: true,
+  }),
+  lastQuoteErrorCode: varchar("last_quote_error_code", { length: 64 }),
+  lastQuoteErrorMessage: text("last_quote_error_message"),
+  marketDataRefreshRunId: uuid("market_data_refresh_run_id"),
   weightPct: numeric("weight_pct", { precision: 7, scale: 2 }).notNull(),
   gainLossPct: numeric("gain_loss_pct", { precision: 7, scale: 2 }).notNull(),
   createdAt: timestamp("created_at", { withTimezone: true })
@@ -419,6 +436,14 @@ export const securityPriceHistory = pgTable(
     adjustedClose: numeric("adjusted_close", { precision: 14, scale: 4 }),
     currency: varchar("currency", { length: 3 }).notNull().default("CAD"),
     source: varchar("source", { length: 32 }).notNull(),
+    provider: varchar("provider", { length: 32 }),
+    sourceMode: varchar("source_mode", { length: 32 })
+      .notNull()
+      .default("provider"),
+    freshness: varchar("freshness", { length: 24 }).notNull().default("fresh"),
+    refreshRunId: uuid("refresh_run_id"),
+    isReference: boolean("is_reference").notNull().default(false),
+    fallbackReason: text("fallback_reason"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -450,6 +475,13 @@ export const portfolioSnapshots = pgTable(
     sourceVersion: varchar("source_version", { length: 32 })
       .notNull()
       .default("v1"),
+    sourceMode: varchar("source_mode", { length: 32 })
+      .notNull()
+      .default("snapshot"),
+    freshness: varchar("freshness", { length: 24 }).notNull().default("fresh"),
+    refreshRunId: uuid("refresh_run_id"),
+    isReference: boolean("is_reference").notNull().default(false),
+    fallbackReason: text("fallback_reason"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -562,6 +594,52 @@ export const externalResearchUsageCounters = pgTable(
     userDateScopeIdx: uniqueIndex(
       "external_research_usage_user_date_scope_idx",
     ).on(table.userId, table.counterDate, table.scope),
+  }),
+);
+
+export const marketDataRefreshRuns = pgTable(
+  "market_data_refresh_runs",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    userId: uuid("user_id").references(() => users.id),
+    scope: varchar("scope", { length: 32 })
+      .notNull()
+      .default("portfolio-quotes"),
+    status: varchar("status", { length: 24 }).notNull(),
+    triggeredBy: varchar("triggered_by", { length: 32 })
+      .notNull()
+      .default("worker"),
+    workerId: varchar("worker_id", { length: 120 }),
+    sampledSymbolCount: integer("sampled_symbol_count").notNull().default(0),
+    refreshedHoldingCount: integer("refreshed_holding_count")
+      .notNull()
+      .default(0),
+    missingQuoteCount: integer("missing_quote_count").notNull().default(0),
+    historyPointCount: integer("history_point_count").notNull().default(0),
+    snapshotRecorded: boolean("snapshot_recorded").notNull().default(false),
+    fxRateLabel: text("fx_rate_label"),
+    fxAsOf: date("fx_as_of"),
+    fxSource: varchar("fx_source", { length: 64 }),
+    fxFreshness: varchar("fx_freshness", { length: 24 }),
+    providerStatusJson: jsonb("provider_status_json").notNull().default({}),
+    errorMessage: text("error_message"),
+    startedAt: timestamp("started_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    finishedAt: timestamp("finished_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => ({
+    userCreatedIdx: index("market_data_refresh_runs_user_created_idx").on(
+      table.userId,
+      table.createdAt,
+    ),
+    statusCreatedIdx: index("market_data_refresh_runs_status_created_idx").on(
+      table.status,
+      table.createdAt,
+    ),
   }),
 );
 

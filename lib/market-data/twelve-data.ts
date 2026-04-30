@@ -1,5 +1,14 @@
 import { getMarketDataConfig } from "@/lib/market-data/config";
-import type { SecurityHistoricalPoint, SecurityQuote, SecuritySearchResult, SupportedAssetType } from "@/lib/market-data/types";
+import {
+  markProviderLimited,
+  readRetryAfterSeconds,
+} from "@/lib/market-data/provider-limits";
+import type {
+  SecurityHistoricalPoint,
+  SecurityQuote,
+  SecuritySearchResult,
+  SupportedAssetType,
+} from "@/lib/market-data/types";
 
 interface TwelveDataSymbolResult {
   symbol?: string;
@@ -75,7 +84,9 @@ function mapInstrumentType(value?: string): SupportedAssetType {
   }
 }
 
-export async function searchSecuritiesWithTwelveData(query: string): Promise<SecuritySearchResult[]> {
+export async function searchSecuritiesWithTwelveData(
+  query: string,
+): Promise<SecuritySearchResult[]> {
   const { twelveDataApiKey } = getMarketDataConfig();
   if (!twelveDataApiKey) {
     return [];
@@ -86,8 +97,19 @@ export async function searchSecuritiesWithTwelveData(query: string): Promise<Sec
   url.searchParams.set("apikey", twelveDataApiKey);
 
   const response = await fetch(url, { cache: "no-store" });
+  if (response.status === 429) {
+    const message = "Twelve Data search rate limit reached.";
+    markProviderLimited({
+      provider: "twelve-data",
+      reason: message,
+      retryAfterSeconds: readRetryAfterSeconds(response.headers),
+    });
+    throw new Error(message);
+  }
   if (!response.ok) {
-    throw new Error(`Twelve Data search failed with status ${response.status}.`);
+    throw new Error(
+      `Twelve Data search failed with status ${response.status}.`,
+    );
   }
 
   const payload = (await response.json()) as TwelveDataSearchResponse;
@@ -104,11 +126,14 @@ export async function searchSecuritiesWithTwelveData(query: string): Promise<Sec
       country: item.country ?? null,
       currency: item.currency ?? null,
       type: mapInstrumentType(item.instrument_type),
-      provider: "twelve-data"
+      provider: "twelve-data",
     }));
 }
 
-function getCandidateExchanges(exchange?: string | null, currency?: string | null) {
+function getCandidateExchanges(
+  exchange?: string | null,
+  currency?: string | null,
+) {
   const normalizedExchange = exchange?.trim();
   if (normalizedExchange) {
     return [normalizedExchange];
@@ -124,7 +149,10 @@ function getCandidateExchanges(exchange?: string | null, currency?: string | nul
   }
 }
 
-async function fetchTwelveDataQuote(symbol: string, exchange?: string | null): Promise<SecurityQuote | null> {
+async function fetchTwelveDataQuote(
+  symbol: string,
+  exchange?: string | null,
+): Promise<SecurityQuote | null> {
   const { twelveDataApiKey } = getMarketDataConfig();
   if (!twelveDataApiKey) {
     return null;
@@ -138,13 +166,28 @@ async function fetchTwelveDataQuote(symbol: string, exchange?: string | null): P
   url.searchParams.set("apikey", twelveDataApiKey);
 
   const response = await fetch(url, { cache: "no-store" });
+  if (response.status === 429) {
+    const message = "Twelve Data quote rate limit reached.";
+    markProviderLimited({
+      provider: "twelve-data",
+      reason: message,
+      retryAfterSeconds: readRetryAfterSeconds(response.headers),
+    });
+    throw new Error(message);
+  }
   if (!response.ok) {
     throw new Error(`Twelve Data quote failed with status ${response.status}.`);
   }
 
   const payload = (await response.json()) as TwelveDataPriceResponse;
   if (payload.code === 429) {
-    throw new Error(payload.message || "Twelve Data quote rate limit reached.");
+    const message = payload.message || "Twelve Data quote rate limit reached.";
+    markProviderLimited({
+      provider: "twelve-data",
+      reason: message,
+      retryAfterSeconds: readRetryAfterSeconds(response.headers),
+    });
+    throw new Error(message);
   }
 
   const price = Number(payload.price);
@@ -160,35 +203,49 @@ async function fetchTwelveDataQuote(symbol: string, exchange?: string | null): P
     currency: payload.currency ?? null,
     timestamp: new Date().toISOString(),
     provider: "twelve-data",
-    delayed: true
+    delayed: true,
   };
 }
 
-export async function getQuoteFromTwelveData(symbol: string, exchange?: string | null, currency?: string | null): Promise<SecurityQuote | null> {
+export async function getQuoteFromTwelveData(
+  symbol: string,
+  exchange?: string | null,
+  currency?: string | null,
+): Promise<SecurityQuote | null> {
   const expectedCurrency = currency?.trim().toUpperCase() || null;
 
-  for (const candidateExchange of getCandidateExchanges(exchange, expectedCurrency)) {
+  for (const candidateExchange of getCandidateExchanges(
+    exchange,
+    expectedCurrency,
+  )) {
     const quote = await fetchTwelveDataQuote(symbol, candidateExchange);
     if (!quote) {
       continue;
     }
 
     const quoteCurrency = quote.currency?.trim().toUpperCase() || null;
-    if (expectedCurrency && quoteCurrency && quoteCurrency !== expectedCurrency) {
+    if (
+      expectedCurrency &&
+      quoteCurrency &&
+      quoteCurrency !== expectedCurrency
+    ) {
       continue;
     }
 
     return {
       ...quote,
       currency: quoteCurrency ?? expectedCurrency,
-      exchange: exchange?.trim() || quote.exchange || candidateExchange
+      exchange: exchange?.trim() || quote.exchange || candidateExchange,
     };
   }
 
   return null;
 }
 
-export async function getHistoricalSeriesFromTwelveData(symbol: string, exchange?: string | null): Promise<SecurityHistoricalPoint[]> {
+export async function getHistoricalSeriesFromTwelveData(
+  symbol: string,
+  exchange?: string | null,
+): Promise<SecurityHistoricalPoint[]> {
   const { twelveDataApiKey } = getMarketDataConfig();
   if (!twelveDataApiKey) {
     return [];
@@ -205,8 +262,19 @@ export async function getHistoricalSeriesFromTwelveData(symbol: string, exchange
   url.searchParams.set("apikey", twelveDataApiKey);
 
   const response = await fetch(url, { cache: "no-store" });
+  if (response.status === 429) {
+    const message = "Twelve Data time series rate limit reached.";
+    markProviderLimited({
+      provider: "twelve-data",
+      reason: message,
+      retryAfterSeconds: readRetryAfterSeconds(response.headers),
+    });
+    throw new Error(message);
+  }
   if (!response.ok) {
-    throw new Error(`Twelve Data time series failed with status ${response.status}.`);
+    throw new Error(
+      `Twelve Data time series failed with status ${response.status}.`,
+    );
   }
 
   const payload = (await response.json()) as TwelveDataTimeSeriesResponse;
@@ -227,7 +295,7 @@ export async function getHistoricalSeriesFromTwelveData(symbol: string, exchange
         adjustedClose: null,
         currency: payload.meta?.currency ?? null,
         exchange: payload.meta?.exchange ?? exchange ?? null,
-        provider: "twelve-data" as const
+        provider: "twelve-data" as const,
       };
     })
     .filter((value): value is SecurityHistoricalPoint => value !== null);

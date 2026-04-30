@@ -100,6 +100,17 @@ export interface HoldingPosition {
   costBasisCad?: number | null;
   lastPriceCad?: number | null;
   marketValueCad: number;
+  quoteProvider?: string | null;
+  quoteSourceMode?: string | null;
+  quoteStatus?: string | null;
+  quoteCurrency?: CurrencyCode | null;
+  quoteExchange?: string | null;
+  quoteProviderTimestamp?: string | null;
+  lastQuoteAttemptedAt?: string | null;
+  lastQuoteSuccessAt?: string | null;
+  lastQuoteErrorCode?: string | null;
+  lastQuoteErrorMessage?: string | null;
+  marketDataRefreshRunId?: string | null;
   weightPct: number;
   gainLossPct: number;
   createdAt?: string | null;
@@ -114,6 +125,11 @@ export interface PortfolioSnapshot {
   accountBreakdown: Record<string, number>;
   holdingBreakdown: Record<string, number>;
   sourceVersion: string;
+  sourceMode?: string | null;
+  freshness?: string | null;
+  refreshRunId?: string | null;
+  isReference?: boolean;
+  fallbackReason?: string | null;
   createdAt: string;
 }
 
@@ -126,6 +142,12 @@ export interface SecurityPriceHistoryPoint {
   adjustedClose: number | null;
   currency: CurrencyCode;
   source: string;
+  provider?: string | null;
+  sourceMode?: string | null;
+  freshness?: string | null;
+  refreshRunId?: string | null;
+  isReference?: boolean;
+  fallbackReason?: string | null;
   createdAt: string;
 }
 

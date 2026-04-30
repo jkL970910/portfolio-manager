@@ -70,6 +70,10 @@ export interface DashboardData {
     lastPrice: string;
     lastUpdated: string;
     freshnessVariant: "success" | "warning" | "neutral";
+    quoteProvider?: string | null;
+    quoteSourceMode?: string | null;
+    quoteStatus?: string | null;
+    quoteStatusLabel?: string;
     weight: string;
     value: string;
   }[];
@@ -319,6 +323,10 @@ export interface PortfolioData {
     lastPrice: string;
     lastUpdated: string;
     freshnessVariant: "success" | "warning" | "neutral";
+    quoteProvider?: string | null;
+    quoteSourceMode?: string | null;
+    quoteStatus?: string | null;
+    quoteStatusLabel?: string;
     portfolioShare: string;
     accountShare: string;
     gainLoss: string;
@@ -426,6 +434,10 @@ export interface PortfolioHoldingDetailData {
     lastPrice: string;
     lastUpdated: string;
     freshnessVariant: "success" | "warning" | "neutral";
+    quoteProvider?: string | null;
+    quoteSourceMode?: string | null;
+    quoteStatus?: string | null;
+    quoteStatusLabel?: string;
     portfolioShare: string;
     accountShare: string;
     gainLoss: string;

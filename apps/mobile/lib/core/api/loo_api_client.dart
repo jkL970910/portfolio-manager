@@ -275,6 +275,10 @@ class LooApiClient {
     return _postJson("/api/mobile/portfolio/refresh-prices");
   }
 
+  Future<Map<String, dynamic>> getMarketDataRefreshRuns({int limit = 5}) {
+    return _getJson("/api/mobile/market-data/refresh-runs/recent?limit=$limit");
+  }
+
   Future<Map<String, dynamic>> login({
     required String email,
     required String password,

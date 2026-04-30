@@ -1,6 +1,6 @@
 # Mobile/Web Parity And Backend Refactor Plan
 
-Last updated: 2026-04-28
+Last updated: 2026-04-29
 
 ## Purpose
 
@@ -397,11 +397,9 @@ Remaining work:
 
 Next priority order:
 
-1. Build the scheduled quote/FX/history worker boundary: quota budgeting,
-   retry-after handling, provider status persistence, and snapshot recording
-   outside user-facing requests.
-2. Add a mobile provider-status view so stale/fallback/limited/manual rows are
-   auditable without reading raw refresh errors.
+1. Add market-data worker cron/cloud scheduling and decide the deployment target.
+2. Persist provider retry-after state in database or Redis before multi-instance
+   cloud deployment. The current guard is process-local by design.
 3. Normalize Flutter API contracts into typed DTOs and reduce page-level
    `Map<String, dynamic>` parsing.
 4. Harden mobile auth: revocable refresh tokens, server-side logout, and
@@ -411,6 +409,8 @@ Next priority order:
 
 Migration metadata status:
 
-- `drizzle/meta/_journal.json` now registers migrations `0001` through `0008`.
-- Local Postgres `5434` has migrations `0006`, `0007`, and `0008` applied for
-  currency-aware history, independent FX rates, and exchange-aware history.
+- `drizzle/meta/_journal.json` now registers migrations `0001` through `0010`.
+- Local Postgres `5434` has migrations `0006`, `0007`, `0008`, `0009`, and
+  `0010` applied for currency-aware history, independent FX rates,
+  exchange-aware history, market-data refresh run tracking, and row-level
+  market-data source lineage.

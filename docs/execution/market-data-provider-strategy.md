@@ -77,6 +77,40 @@ The project now includes:
 - `GET /api/market-data/resolve?symbol=...`
 - `GET /api/market-data/quote?symbol=...`
 - `GET /api/market-data/quotes?symbols=...`
+- `npm run worker:market-data:once`
+
+The first-pass market-data worker records each run in
+`market_data_refresh_runs`. It uses the same quote refresh path as the mobile
+manual refresh, but it is callable from scripts/cron/cloud scheduling and keeps
+per-user run status, quota budget context, FX source/as-of, refreshed holding
+count, missing quote count, history writes, and snapshot status.
+
+Mobile Settings now reads this ledger through
+`GET /api/mobile/market-data/refresh-runs/recent`, so both manual refreshes and
+background worker runs can be audited without checking raw database rows.
+
+Provider limit handling is intentionally conservative:
+
+- 429 / API-credit responses from Twelve Data and Yahoo Finance mark that
+  provider as temporarily limited in a process-local registry.
+- If the provider returns `Retry-After`, the app uses that value; otherwise it
+  falls back to `MARKET_DATA_PROVIDER_RETRY_AFTER_SECONDS` or 15 minutes.
+- While a provider is marked limited, quote refresh skips that provider and
+  preserves previous usable holding prices through fallback quote behavior.
+- Refresh run records include the active provider-limit snapshot so Settings can
+  show which provider is limited and roughly when retry is safe.
+
+Row-level source lineage is now persisted:
+
+- `holding_positions` stores current quote provider, source mode, status,
+  quote identity, provider timestamp, last attempted/successful quote refresh,
+  last error, and the linked refresh run id.
+- `security_price_history` stores provider, source mode, freshness,
+  refresh-run id, reference/fallback markers, and fallback reason.
+- `portfolio_snapshots` stores source mode, freshness, refresh-run id, and
+  fallback/reference markers.
+- Flutter holding rows and Holding Detail surface quote source/status labels so
+  stale/fallback/provider-limited values are visible before opening raw data.
 
 The implementation includes an in-process TTL cache to reduce provider usage during local development and single-instance deployments.
 
@@ -164,9 +198,11 @@ Market-data is already wired into:
 
 ## Next steps
 
-1. add persisted quote-provider status / stale-age fields so rows can explain whether a price is fresh, stale, limited, fallback, or manual
-2. move batch refresh into a queued worker with per-provider quota budgeting and retry-after behavior
-3. add durable cloud cache when the app moves beyond single-instance deployment
+1. add cron/cloud scheduling and durable cache when the app moves beyond single-instance deployment
+2. persist provider limits in the database or Redis before multi-instance cloud
+   deployment; the current registry is process-local by design
+3. add deeper provider dashboards if the app starts using multiple paid data
+   sources concurrently
 4. validate official provider candidates before switching runtime data:
    EODHD/FMP/QuoteMedia-style providers for North America, Alpha Vantage for
    limited fallback/history, and region-specific providers only if licensing and

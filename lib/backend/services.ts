@@ -90,6 +90,7 @@ import type {
   SecurityQuote,
   SecurityResolution,
 } from "@/lib/market-data/types";
+import { getProviderLimitSnapshot } from "@/lib/market-data/provider-limits";
 import { pick } from "@/lib/i18n/ui";
 
 type DbTransaction = Parameters<
@@ -726,6 +727,54 @@ function normalizeExchangeCode(value: string | null | undefined) {
   return value?.trim().toUpperCase() || "";
 }
 
+function parseProviderTimestamp(value: string | null | undefined) {
+  if (!value) {
+    return null;
+  }
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function getQuoteSourceMode(quote: SecurityQuote) {
+  return quote.provider === "fallback" ? "fallback" : "provider";
+}
+
+function getQuoteStatus(quote: SecurityQuote) {
+  return quote.provider === "fallback" ? "fallback" : "fresh";
+}
+
+function getMissingQuoteStatus(holding: typeof holdingPositions.$inferSelect) {
+  const activeProviderLimit = getProviderLimitSnapshot().some(
+    (item) => item.limited,
+  );
+  if (activeProviderLimit) {
+    return {
+      sourceMode: "stale-cache",
+      status: "provider-limited",
+      errorCode: "provider-limited",
+      errorMessage:
+        "Provider is temporarily limited; existing price was preserved.",
+    };
+  }
+
+  if (holding.lastPriceAmount != null && Number(holding.lastPriceAmount) > 0) {
+    return {
+      sourceMode: "stale-cache",
+      status: "stale",
+      errorCode: "no-current-quote",
+      errorMessage:
+        "No current quote returned; previous usable price was preserved.",
+    };
+  }
+
+  return {
+    sourceMode: "missing",
+    status: "missing",
+    errorCode: "no-quote",
+    errorMessage: "No usable quote was returned for this holding identity.",
+  };
+}
+
 async function buildServiceDisplayContext(currency: CurrencyCode) {
   const [cadToDisplayFx, usdToCadFx] = await Promise.all([
     getStoredOrFallbackFxContext("CAD", currency),
@@ -835,7 +884,15 @@ async function normalizeManualHolding(
   };
 }
 
-async function recalculatePortfolioState(tx: DbTransaction, userId: string) {
+async function recalculatePortfolioState(
+  tx: DbTransaction,
+  userId: string,
+  options: {
+    refreshRunId?: string | null;
+    sourceMode?: string;
+    freshness?: string;
+  } = {},
+) {
   const refreshedHoldings = await tx
     .select()
     .from(holdingPositions)
@@ -903,7 +960,7 @@ async function recalculatePortfolioState(tx: DbTransaction, userId: string) {
       .where(eq(investmentAccounts.id, account.id));
   }
 
-  await upsertCurrentPortfolioSnapshot(tx, userId);
+  await upsertCurrentPortfolioSnapshot(tx, userId, options);
 }
 
 async function createPortfolioEditLog(
@@ -962,6 +1019,11 @@ async function createPortfolioEvent(
 async function upsertCurrentPortfolioSnapshot(
   tx: DbTransaction,
   userId: string,
+  options: {
+    refreshRunId?: string | null;
+    sourceMode?: string;
+    freshness?: string;
+  } = {},
 ) {
   const accounts = await tx.query.investmentAccounts.findMany({
     where: eq(investmentAccounts.userId, userId),
@@ -1000,6 +1062,11 @@ async function upsertCurrentPortfolioSnapshot(
         accountBreakdownJson,
         holdingBreakdownJson,
         sourceVersion: "runtime-v1",
+        sourceMode: options.sourceMode ?? "snapshot",
+        freshness: options.freshness ?? "fresh",
+        refreshRunId: options.refreshRunId ?? null,
+        isReference: false,
+        fallbackReason: null,
       })
       .where(eq(portfolioSnapshots.id, existing.id));
     return;
@@ -1012,6 +1079,11 @@ async function upsertCurrentPortfolioSnapshot(
     accountBreakdownJson,
     holdingBreakdownJson,
     sourceVersion: "runtime-v1",
+    sourceMode: options.sourceMode ?? "snapshot",
+    freshness: options.freshness ?? "fresh",
+    refreshRunId: options.refreshRunId ?? null,
+    isReference: false,
+    fallbackReason: null,
   });
 }
 
@@ -1142,6 +1214,12 @@ async function upsertSecurityPriceHistoryPoints(
           point.adjustedClose == null ? null : point.adjustedClose.toFixed(4),
         currency: point.currency,
         source: point.source,
+        provider: point.provider ?? null,
+        sourceMode: point.sourceMode ?? "provider",
+        freshness: point.freshness ?? "fresh",
+        refreshRunId: point.refreshRunId ?? null,
+        isReference: point.isReference ?? false,
+        fallbackReason: point.fallbackReason ?? null,
       })),
     )
     .onConflictDoUpdate({
@@ -1156,6 +1234,12 @@ async function upsertSecurityPriceHistoryPoints(
         adjustedClose: sql`excluded.adjusted_close`,
         currency: sql`excluded.currency`,
         source: sql`excluded.source`,
+        provider: sql`excluded.provider`,
+        sourceMode: sql`excluded.source_mode`,
+        freshness: sql`excluded.freshness`,
+        refreshRunId: sql`excluded.refresh_run_id`,
+        isReference: sql`excluded.is_reference`,
+        fallbackReason: sql`excluded.fallback_reason`,
       },
     });
 }
@@ -1180,6 +1264,12 @@ async function upsertSecurityPriceHistoryPointsInTransaction(
           point.adjustedClose == null ? null : point.adjustedClose.toFixed(4),
         currency: point.currency,
         source: point.source,
+        provider: point.provider ?? null,
+        sourceMode: point.sourceMode ?? "provider",
+        freshness: point.freshness ?? "fresh",
+        refreshRunId: point.refreshRunId ?? null,
+        isReference: point.isReference ?? false,
+        fallbackReason: point.fallbackReason ?? null,
       })),
     )
     .onConflictDoUpdate({
@@ -1193,6 +1283,12 @@ async function upsertSecurityPriceHistoryPointsInTransaction(
         close: sql`excluded.close`,
         adjustedClose: sql`excluded.adjusted_close`,
         source: sql`excluded.source`,
+        provider: sql`excluded.provider`,
+        sourceMode: sql`excluded.source_mode`,
+        freshness: sql`excluded.freshness`,
+        refreshRunId: sql`excluded.refresh_run_id`,
+        isReference: sql`excluded.is_reference`,
+        fallbackReason: sql`excluded.fallback_reason`,
       },
     });
 }
@@ -1934,6 +2030,15 @@ export async function getPortfolioSecurityDetailView(
             currency:
               (point.currency ?? "CAD").toUpperCase() === "USD" ? "USD" : "CAD",
             source: point.provider,
+            provider: point.provider,
+            sourceMode: point.provider === "fallback" ? "fallback" : "provider",
+            freshness: point.provider === "fallback" ? "fallback" : "fresh",
+            refreshRunId: null,
+            isReference: point.provider === "fallback",
+            fallbackReason:
+              point.provider === "fallback"
+                ? "Provider returned fallback history."
+                : null,
             createdAt: new Date().toISOString(),
           }));
         hydratedPriceHistory = mappedPoints;
@@ -2323,6 +2428,15 @@ async function getHydratedSecurityPriceHistoryForHoldings(
             currency:
               (point.currency ?? "CAD").toUpperCase() === "USD" ? "USD" : "CAD",
             source: point.provider,
+            provider: point.provider,
+            sourceMode: point.provider === "fallback" ? "fallback" : "provider",
+            freshness: point.provider === "fallback" ? "fallback" : "fresh",
+            refreshRunId: null,
+            isReference: point.provider === "fallback",
+            fallbackReason:
+              point.provider === "fallback"
+                ? "Provider returned fallback history."
+                : null,
             createdAt: new Date().toISOString(),
           }),
         );
@@ -4415,6 +4529,7 @@ export async function createGuidedImportAccount(
 
 export async function refreshPortfolioQuotes(
   userId: string,
+  options: { refreshRunId?: string | null } = {},
 ): Promise<RefreshPortfolioQuotesResult> {
   const db = getDb();
   const repositories = getRepositories();
@@ -4488,6 +4603,12 @@ export async function refreshPortfolioQuotes(
       adjustedClose: null,
       currency,
       source: `quote-refresh-${quote.provider}`,
+      provider: quote.provider,
+      sourceMode: getQuoteSourceMode(quote),
+      freshness: getQuoteStatus(quote),
+      refreshRunId: options.refreshRunId ?? null,
+      isReference: false,
+      fallbackReason: null,
       createdAt: refreshedAt.toISOString(),
     };
     historyPointMap.set(
@@ -4513,6 +4634,20 @@ export async function refreshPortfolioQuotes(
       const quote = quoteMap.get(quoteKey);
       if (!quote) {
         missingQuoteKeys.add(quoteKey);
+        const missingStatus = getMissingQuoteStatus(holding);
+        await tx
+          .update(holdingPositions)
+          .set({
+            quoteSourceMode: missingStatus.sourceMode,
+            quoteStatus: missingStatus.status,
+            quoteCurrency: requestedCurrency,
+            quoteExchange: normalizeExchangeCode(holding.exchangeOverride),
+            lastQuoteAttemptedAt: refreshedAt,
+            lastQuoteErrorCode: missingStatus.errorCode,
+            lastQuoteErrorMessage: missingStatus.errorMessage,
+            marketDataRefreshRunId: options.refreshRunId ?? null,
+          })
+          .where(eq(holdingPositions.id, holding.id));
         continue;
       }
       const priceInCad =
@@ -4545,6 +4680,19 @@ export async function refreshPortfolioQuotes(
           lastPriceCad: priceInCad.toFixed(4),
           marketValueAmount: currentMarketValue.toFixed(2),
           marketValueCad: currentMarketValueCad.toFixed(2),
+          quoteProvider: quote.provider,
+          quoteSourceMode: getQuoteSourceMode(quote),
+          quoteStatus: getQuoteStatus(quote),
+          quoteCurrency: requestedCurrency,
+          quoteExchange: normalizeExchangeCode(
+            quote.exchange || holding.exchangeOverride,
+          ),
+          quoteProviderTimestamp: parseProviderTimestamp(quote.timestamp),
+          lastQuoteAttemptedAt: refreshedAt,
+          lastQuoteSuccessAt: refreshedAt,
+          lastQuoteErrorCode: null,
+          lastQuoteErrorMessage: null,
+          marketDataRefreshRunId: options.refreshRunId ?? null,
           gainLossPct: gainLossPct.toFixed(2),
           updatedAt: refreshedAt,
         })
@@ -4553,7 +4701,11 @@ export async function refreshPortfolioQuotes(
       refreshedHoldingCount += 1;
     }
 
-    await recalculatePortfolioState(tx, userId);
+    await recalculatePortfolioState(tx, userId, {
+      refreshRunId: options.refreshRunId ?? null,
+      sourceMode: "quote-refresh",
+      freshness: refreshedHoldingCount > 0 ? "fresh" : "stale",
+    });
   });
 
   return {
@@ -4659,6 +4811,12 @@ export async function refreshPortfolioSecurityQuote(
       adjustedClose: null,
       currency,
       source: `quote-refresh-${quote.provider}`,
+      provider: quote.provider,
+      sourceMode: getQuoteSourceMode(quote),
+      freshness: getQuoteStatus(quote),
+      refreshRunId: null,
+      isReference: false,
+      fallbackReason: null,
       createdAt: refreshedAt.toISOString(),
     };
     historyPointMap.set(
@@ -4688,6 +4846,20 @@ export async function refreshPortfolioSecurityQuote(
       const quote = quoteMap.get(quoteKey);
       if (!quote) {
         missingQuoteKeys.add(quoteKey);
+        const missingStatus = getMissingQuoteStatus(holding);
+        await tx
+          .update(holdingPositions)
+          .set({
+            quoteSourceMode: missingStatus.sourceMode,
+            quoteStatus: missingStatus.status,
+            quoteCurrency: requestedCurrency,
+            quoteExchange: normalizeExchangeCode(holding.exchangeOverride),
+            lastQuoteAttemptedAt: refreshedAt,
+            lastQuoteErrorCode: missingStatus.errorCode,
+            lastQuoteErrorMessage: missingStatus.errorMessage,
+            marketDataRefreshRunId: null,
+          })
+          .where(eq(holdingPositions.id, holding.id));
         continue;
       }
 
@@ -4721,6 +4893,19 @@ export async function refreshPortfolioSecurityQuote(
           lastPriceCad: priceInCad.toFixed(4),
           marketValueAmount: currentMarketValue.toFixed(2),
           marketValueCad: currentMarketValueCad.toFixed(2),
+          quoteProvider: quote.provider,
+          quoteSourceMode: getQuoteSourceMode(quote),
+          quoteStatus: getQuoteStatus(quote),
+          quoteCurrency: requestedCurrency,
+          quoteExchange: normalizeExchangeCode(
+            quote.exchange || holding.exchangeOverride,
+          ),
+          quoteProviderTimestamp: parseProviderTimestamp(quote.timestamp),
+          lastQuoteAttemptedAt: refreshedAt,
+          lastQuoteSuccessAt: refreshedAt,
+          lastQuoteErrorCode: null,
+          lastQuoteErrorMessage: null,
+          marketDataRefreshRunId: null,
           gainLossPct: gainLossPct.toFixed(2),
           updatedAt: refreshedAt,
         })
@@ -4730,7 +4915,10 @@ export async function refreshPortfolioSecurityQuote(
     }
 
     if (refreshedHoldingCount > 0) {
-      await recalculatePortfolioState(tx, userId);
+      await recalculatePortfolioState(tx, userId, {
+        sourceMode: "quote-refresh",
+        freshness: "fresh",
+      });
     }
   });
 

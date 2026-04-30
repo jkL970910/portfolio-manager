@@ -64,8 +64,8 @@ over simply adding more Flutter screens.
 | Real historical performance               | In Progress | Quote refresh records daily price history/current-day snapshots, uses independent stored FX rates for CAD aggregation, stores history by symbol+exchange+currency, and anchors chart latest points to current totals; next work is scheduled refresh/worker depth |
 | Richer import review persistence          | In Progress | Build soon                                                                                                                                                                                                                                                        |
 | Watchlist and target constraints workflow | In Progress | Mobile can edit watchlist, strategy, tax-aware placement, and account priority constraints                                                                                                                                                                        |
-| Cloud-ready cache / worker boundaries     | Planned     | Next priority: queue worker, quota budgeting, retry-after behavior, persisted provider status, and scheduled FX/quote/history refresh before adding heavier AI-agent jobs                                                                                         |
-| Quote-provider status UX                  | In Progress | Refresh results now expose history writes, snapshot recording, and FX as-of/source/freshness; provider limit/stale/fallback status dashboard is still needed                                                                                                      |
+| Cloud-ready cache / worker boundaries     | In Progress | First-pass market-data refresh worker, persisted run ledger, mobile Settings run-status readout, and process-local provider retry-after guard exist; next is cron/cloud scheduling before heavier AI-agent jobs                                                   |
+| Quote-provider status UX                  | In Progress | Refresh results, Settings, holding rows, and price-history records now expose source/status lineage; remaining work is cloud-grade provider-limit persistence and deeper per-provider dashboards                                                                  |
 | AI-agent assisted analysis                | Planned     | Add after mobile shell and async boundaries are ready                                                                                                                                                                                                             |
 
 ## Deferred
@@ -80,8 +80,8 @@ over simply adding more Flutter screens.
 
 ## Recommended Build Order From Here
 
-1. Implement scheduled quote/FX/history worker boundaries with quota budgeting.
-2. Persist provider status, retry-after, stale/fallback state, and worker run history.
+1. Add cron/cloud scheduling for the market-data worker and decide the deployment target.
+2. Persist provider retry-after state in database or Redis before multi-instance cloud deployment.
 3. Normalize mobile API contracts into typed DTOs instead of page-level maps.
 4. Harden mobile auth with revocable refresh tokens and production storage policy.
 5. Migrate spending/cash account monitoring into a dedicated mobile flow.

@@ -55,6 +55,12 @@ class MobileHoldingCard {
     required this.value,
     required this.detail,
     required this.accountType,
+    required this.lastUpdated,
+    required this.freshnessVariant,
+    required this.quoteProvider,
+    required this.quoteSourceMode,
+    required this.quoteStatus,
+    required this.quoteStatusLabel,
   });
 
   final String id;
@@ -63,20 +69,48 @@ class MobileHoldingCard {
   final String value;
   final String detail;
   final String accountType;
+  final String lastUpdated;
+  final String freshnessVariant;
+  final String? quoteProvider;
+  final String? quoteSourceMode;
+  final String? quoteStatus;
+  final String quoteStatusLabel;
 
   factory MobileHoldingCard.fromJson(Map<String, dynamic> json) {
     final symbol = json["symbol"] as String? ?? "--";
     final account = json["account"] as String? ?? "";
     final weight =
         json["weight"] as String? ?? json["portfolioShare"] as String? ?? "";
+    final lastUpdated = json["lastUpdated"] as String? ?? "";
+    final freshnessVariant = json["freshnessVariant"] as String? ?? "neutral";
+    final quoteStatusLabel = json["quoteStatusLabel"] as String? ??
+        switch (freshnessVariant) {
+          "success" => "报价较新",
+          "warning" => "报价可能过期",
+          _ => "报价待确认",
+        };
+    final quoteProvider = json["quoteProvider"] as String?;
+    final quoteStatus = [
+      quoteStatusLabel,
+      if (quoteProvider != null && quoteProvider.isNotEmpty) quoteProvider,
+      if (lastUpdated.isNotEmpty) lastUpdated,
+    ].join(" · ");
 
     return MobileHoldingCard(
       id: json["id"] as String? ?? symbol,
       symbol: symbol,
       name: json["name"] as String? ?? "未知标的",
       value: json["value"] as String? ?? "--",
-      detail: [account, weight].where((item) => item.isNotEmpty).join(" · "),
+      detail: [account, weight, quoteStatus]
+          .where((item) => item.isNotEmpty)
+          .join(" · "),
       accountType: json["accountType"] as String? ?? "",
+      lastUpdated: lastUpdated,
+      freshnessVariant: freshnessVariant,
+      quoteProvider: quoteProvider,
+      quoteSourceMode: json["quoteSourceMode"] as String?,
+      quoteStatus: json["quoteStatus"] as String?,
+      quoteStatusLabel: quoteStatusLabel,
     );
   }
 }

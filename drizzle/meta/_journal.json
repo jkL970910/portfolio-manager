@@ -64,6 +64,20 @@
       "when": 1777485600000,
       "tag": "0008_security_price_history_exchange_identity",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1777489200000,
+      "tag": "0009_market_data_refresh_runs",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1777492800000,
+      "tag": "0010_market_data_source_lineage",
+      "breakpoints": true
     }
   ]
 }

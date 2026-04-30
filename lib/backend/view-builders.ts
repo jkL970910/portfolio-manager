@@ -1415,6 +1415,30 @@ function getHoldingFreshnessVariant(
   return "neutral";
 }
 
+function getHoldingQuoteTimestamp(holding: HoldingPosition) {
+  return holding.lastQuoteSuccessAt ?? holding.updatedAt ?? null;
+}
+
+function getHoldingQuoteStatusLabel(
+  holding: HoldingPosition,
+  language: DisplayLanguage,
+) {
+  switch (holding.quoteStatus) {
+    case "fresh":
+      return pick(language, "报价较新", "Fresh quote");
+    case "stale":
+      return pick(language, "沿用旧报价", "Using stale quote");
+    case "provider-limited":
+      return pick(language, "Provider 限流，沿用旧报价", "Provider limited");
+    case "fallback":
+      return pick(language, "保守兜底报价", "Fallback quote");
+    case "missing":
+      return pick(language, "暂未拿到报价", "Quote missing");
+    default:
+      return pick(language, "报价待确认", "Quote unverified");
+  }
+}
+
 function sanitizeRecommendationNotes(notes: string[] | null | undefined) {
   return (notes ?? []).filter((note) => {
     const normalized = note.trim();
@@ -1439,7 +1463,8 @@ function getPortfolioQuoteStatus(
   language: DisplayLanguage,
 ) {
   const quotedHoldings = holdings.filter(
-    (holding) => (holding.lastPriceCad ?? 0) > 0 && holding.updatedAt,
+    (holding) =>
+      (holding.lastPriceCad ?? 0) > 0 && getHoldingQuoteTimestamp(holding),
   );
   const coverage =
     holdings.length > 0
@@ -1463,7 +1488,7 @@ function getPortfolioQuoteStatus(
   }
 
   const latestUpdatedAt = quotedHoldings
-    .map((holding) => new Date(holding.updatedAt!))
+    .map((holding) => new Date(getHoldingQuoteTimestamp(holding)!))
     .sort((left, right) => right.getTime() - left.getTime())[0];
 
   const ageMs = Date.now() - latestUpdatedAt.getTime();
@@ -2040,8 +2065,17 @@ export function buildDashboardData(args: {
           display,
           language,
         ),
-        lastUpdated: formatHoldingLastUpdated(holding.updatedAt, language),
-        freshnessVariant: getHoldingFreshnessVariant(holding.updatedAt),
+        lastUpdated: formatHoldingLastUpdated(
+          getHoldingQuoteTimestamp(holding),
+          language,
+        ),
+        freshnessVariant: getHoldingFreshnessVariant(
+          getHoldingQuoteTimestamp(holding),
+        ),
+        quoteProvider: holding.quoteProvider ?? null,
+        quoteSourceMode: holding.quoteSourceMode ?? null,
+        quoteStatus: holding.quoteStatus ?? null,
+        quoteStatusLabel: getHoldingQuoteStatusLabel(holding, language),
         weight: formatCompactPercent(holding.weightPct, 1),
         value: formatMoneyForDisplay(
           holding.marketValueAmount,
@@ -2641,8 +2675,17 @@ export function buildPortfolioData(args: {
             display,
             language,
           ),
-          lastUpdated: formatHoldingLastUpdated(holding.updatedAt, language),
-          freshnessVariant: getHoldingFreshnessVariant(holding.updatedAt),
+          lastUpdated: formatHoldingLastUpdated(
+            getHoldingQuoteTimestamp(holding),
+            language,
+          ),
+          freshnessVariant: getHoldingFreshnessVariant(
+            getHoldingQuoteTimestamp(holding),
+          ),
+          quoteProvider: holding.quoteProvider ?? null,
+          quoteSourceMode: holding.quoteSourceMode ?? null,
+          quoteStatus: holding.quoteStatus ?? null,
+          quoteStatusLabel: getHoldingQuoteStatusLabel(holding, language),
           portfolioShare: formatCompactPercent(holding.weightPct, 1),
           accountShare: formatCompactPercent(accountSharePct, 1),
           gainLoss: formatSignedPercent(holding.gainLossPct, 1),
@@ -3031,6 +3074,10 @@ export function buildPortfolioHoldingDetailData(args: {
       lastPrice: viewHolding.lastPrice,
       lastUpdated: viewHolding.lastUpdated,
       freshnessVariant: viewHolding.freshnessVariant,
+      quoteProvider: viewHolding.quoteProvider ?? null,
+      quoteSourceMode: viewHolding.quoteSourceMode ?? null,
+      quoteStatus: viewHolding.quoteStatus ?? null,
+      quoteStatusLabel: viewHolding.quoteStatusLabel,
       portfolioShare: viewHolding.portfolioShare,
       accountShare: viewHolding.accountShare,
       gainLoss: viewHolding.gainLoss,

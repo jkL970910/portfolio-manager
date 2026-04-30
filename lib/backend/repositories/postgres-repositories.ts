@@ -153,6 +153,11 @@ function mapSnapshot(
       ]),
     ),
     sourceVersion: row.sourceVersion,
+    sourceMode: row.sourceMode,
+    freshness: row.freshness,
+    refreshRunId: row.refreshRunId ?? null,
+    isReference: row.isReference,
+    fallbackReason: row.fallbackReason ?? null,
     createdAt: row.createdAt.toISOString(),
   };
 }
@@ -170,6 +175,12 @@ function mapSecurityPriceHistory(
       row.adjustedClose == null ? null : toNumber(row.adjustedClose),
     currency: row.currency as SecurityPriceHistoryPoint["currency"],
     source: row.source,
+    provider: row.provider ?? null,
+    sourceMode: row.sourceMode,
+    freshness: row.freshness,
+    refreshRunId: row.refreshRunId ?? null,
+    isReference: row.isReference,
+    fallbackReason: row.fallbackReason ?? null,
     createdAt: row.createdAt.toISOString(),
   };
 }
@@ -373,6 +384,20 @@ export const postgresRepositories: BackendRepositories = {
             costBasisCad,
             lastPriceCad,
             marketValueCad,
+            quoteProvider: row.quoteProvider ?? null,
+            quoteSourceMode: row.quoteSourceMode ?? null,
+            quoteStatus: row.quoteStatus ?? null,
+            quoteCurrency:
+              (row.quoteCurrency as HoldingPosition["quoteCurrency"]) ?? null,
+            quoteExchange: row.quoteExchange ?? null,
+            quoteProviderTimestamp:
+              row.quoteProviderTimestamp?.toISOString() ?? null,
+            lastQuoteAttemptedAt:
+              row.lastQuoteAttemptedAt?.toISOString() ?? null,
+            lastQuoteSuccessAt: row.lastQuoteSuccessAt?.toISOString() ?? null,
+            lastQuoteErrorCode: row.lastQuoteErrorCode ?? null,
+            lastQuoteErrorMessage: row.lastQuoteErrorMessage ?? null,
+            marketDataRefreshRunId: row.marketDataRefreshRunId ?? null,
             weightPct: toNumber(row.weightPct),
             gainLossPct: toNumber(row.gainLossPct),
             createdAt: row.createdAt.toISOString(),

@@ -259,6 +259,8 @@ class MobileHoldingDetailSnapshot {
     required this.lastPrice,
     required this.lastUpdated,
     required this.freshnessVariant,
+    required this.quoteProvider,
+    required this.quoteStatusLabel,
     required this.portfolioShare,
     required this.accountShare,
     required this.gainLoss,
@@ -290,6 +292,8 @@ class MobileHoldingDetailSnapshot {
   final String lastPrice;
   final String lastUpdated;
   final String freshnessVariant;
+  final String quoteProvider;
+  final String quoteStatusLabel;
   final String portfolioShare;
   final String accountShare;
   final String gainLoss;
@@ -333,6 +337,8 @@ class MobileHoldingDetailSnapshot {
       lastPrice: holdingData["lastPrice"] as String? ?? "--",
       lastUpdated: holdingData["lastUpdated"] as String? ?? "",
       freshnessVariant: holdingData["freshnessVariant"] as String? ?? "neutral",
+      quoteProvider: holdingData["quoteProvider"] as String? ?? "",
+      quoteStatusLabel: holdingData["quoteStatusLabel"] as String? ?? "报价待确认",
       portfolioShare: holdingData["portfolioShare"] as String? ?? "",
       accountShare: holdingData["accountShare"] as String? ?? "",
       gainLoss: holdingData["gainLoss"] as String? ?? "",
@@ -347,6 +353,8 @@ class MobileHoldingDetailSnapshot {
         holdingData["costBasis"] as String? ?? "",
       ].where((item) => item.isNotEmpty).join(" · "),
       quoteLine: [
+        holdingData["quoteStatusLabel"] as String? ?? "",
+        holdingData["quoteProvider"] as String? ?? "",
         holdingData["lastPrice"] as String? ?? "",
         holdingData["lastUpdated"] as String? ?? "",
       ].where((item) => item.isNotEmpty).join(" · "),

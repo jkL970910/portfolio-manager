@@ -2,53 +2,84 @@ import { getProviderHealth } from "@/lib/market-data/config";
 import { getOrSetCached } from "@/lib/market-data/cache";
 import { getMarketDataConfig } from "@/lib/market-data/config";
 import { getHistoricalSeriesFromAlphaVantage } from "@/lib/market-data/alpha-vantage";
+import { isProviderLimited } from "@/lib/market-data/provider-limits";
 import { resolveSecurityWithOpenFigi } from "@/lib/market-data/openfigi";
-import { getHistoricalSeriesFromTwelveData, getQuoteFromTwelveData, searchSecuritiesWithTwelveData } from "@/lib/market-data/twelve-data";
+import {
+  getHistoricalSeriesFromTwelveData,
+  getQuoteFromTwelveData,
+  searchSecuritiesWithTwelveData,
+} from "@/lib/market-data/twelve-data";
 import { getQuoteFromYahooFinance } from "@/lib/market-data/yahoo-finance";
-import type { SecurityHistoricalPoint, SecurityQuote, SecurityResolution, SecuritySearchResult } from "@/lib/market-data/types";
+import type {
+  SecurityHistoricalPoint,
+  SecurityQuote,
+  SecurityResolution,
+  SecuritySearchResult,
+} from "@/lib/market-data/types";
 
 type SecurityQuoteOptions = {
   exchange?: string | null;
   currency?: string | null;
 };
 
-function isCanadianQuoteRequest(exchange?: string | null, currency?: string | null) {
+function isCanadianQuoteRequest(
+  exchange?: string | null,
+  currency?: string | null,
+) {
   const normalizedCurrency = currency?.trim().toUpperCase() || null;
   const normalizedExchange = exchange?.trim().toUpperCase() || null;
-  return normalizedCurrency === "CAD"
-    || normalizedExchange === "TSX"
-    || normalizedExchange === "TSXV"
-    || normalizedExchange === "NEO"
-    || normalizedExchange === "CBOE"
-    || normalizedExchange === "CBOE CANADA"
-    || Boolean(normalizedExchange?.startsWith("NEO-"));
+  return (
+    normalizedCurrency === "CAD" ||
+    normalizedExchange === "TSX" ||
+    normalizedExchange === "TSXV" ||
+    normalizedExchange === "NEO" ||
+    normalizedExchange === "CBOE" ||
+    normalizedExchange === "CBOE CANADA" ||
+    Boolean(normalizedExchange?.startsWith("NEO-"))
+  );
 }
 
-async function getRoutedQuote(symbol: string, exchange?: string | null, currency?: string | null) {
+async function getRoutedQuote(
+  symbol: string,
+  exchange?: string | null,
+  currency?: string | null,
+) {
   if (exchange?.trim().toUpperCase() === "OTHER / MANUAL") {
     return null;
   }
 
   if (isCanadianQuoteRequest(exchange, currency)) {
-    const yahooQuote = await getQuoteFromYahooFinance(symbol, exchange, currency).catch((error) => {
-      const message = error instanceof Error ? error.message.toLowerCase() : "";
-      if (message.includes("rate limit")) {
-        throw error;
-      }
-      return null;
-    });
+    const yahooQuote = isProviderLimited("yahoo-finance")
+      ? null
+      : await getQuoteFromYahooFinance(symbol, exchange, currency).catch(
+          (error) => {
+            const message =
+              error instanceof Error ? error.message.toLowerCase() : "";
+            if (message.includes("rate limit")) {
+              throw error;
+            }
+            return null;
+          },
+        );
     if (yahooQuote) {
       return yahooQuote;
     }
   }
 
-  const twelveQuote = await getQuoteFromTwelveData(symbol, exchange, currency);
+  const twelveQuote = isProviderLimited("twelve-data")
+    ? null
+    : await getQuoteFromTwelveData(symbol, exchange, currency);
   if (twelveQuote) {
     return twelveQuote;
   }
 
-  if (!isCanadianQuoteRequest(exchange, currency)) {
-    return getQuoteFromYahooFinance(symbol, exchange, currency).catch(() => null);
+  if (
+    !isCanadianQuoteRequest(exchange, currency) &&
+    !isProviderLimited("yahoo-finance")
+  ) {
+    return getQuoteFromYahooFinance(symbol, exchange, currency).catch(
+      () => null,
+    );
   }
 
   return null;
@@ -59,43 +90,65 @@ function hasDenseHistory(points: SecurityHistoricalPoint[]) {
     return false;
   }
 
-  const sorted = [...points].sort((left, right) => left.date.localeCompare(right.date));
+  const sorted = [...points].sort((left, right) =>
+    left.date.localeCompare(right.date),
+  );
   const latest = sorted[sorted.length - 1];
   const previous = sorted[sorted.length - 2];
   if (!latest || !previous) {
     return false;
   }
 
-  const dayGap = (new Date(latest.date).getTime() - new Date(previous.date).getTime()) / (1000 * 60 * 60 * 24);
+  const dayGap =
+    (new Date(latest.date).getTime() - new Date(previous.date).getTime()) /
+    (1000 * 60 * 60 * 24);
   return dayGap <= 7;
 }
 
-export async function searchSecurities(query: string): Promise<{ results: SecuritySearchResult[]; providerHealth: ReturnType<typeof getProviderHealth> }> {
+export async function searchSecurities(
+  query: string,
+): Promise<{
+  results: SecuritySearchResult[];
+  providerHealth: ReturnType<typeof getProviderHealth>;
+}> {
   const trimmed = query.trim();
   if (trimmed.length < 1) {
     return { results: [], providerHealth: getProviderHealth() };
   }
 
   const { searchCacheTtlSeconds } = getMarketDataConfig();
-  const results = await getOrSetCached(`market-data:search:${trimmed.toLowerCase()}`, {
-    ttlMs: searchCacheTtlSeconds * 1000,
-    staleOnErrorMs: searchCacheTtlSeconds * 1000
-  }, async () => searchSecuritiesWithTwelveData(trimmed));
+  const results = await getOrSetCached(
+    `market-data:search:${trimmed.toLowerCase()}`,
+    {
+      ttlMs: searchCacheTtlSeconds * 1000,
+      staleOnErrorMs: searchCacheTtlSeconds * 1000,
+    },
+    async () => searchSecuritiesWithTwelveData(trimmed),
+  );
 
   return { results, providerHealth: getProviderHealth() };
 }
 
-export async function resolveSecurity(symbol: string): Promise<{ result: SecurityResolution; providerHealth: ReturnType<typeof getProviderHealth> }> {
+export async function resolveSecurity(
+  symbol: string,
+): Promise<{
+  result: SecurityResolution;
+  providerHealth: ReturnType<typeof getProviderHealth>;
+}> {
   const trimmed = symbol.trim().toUpperCase();
   if (!trimmed) {
     throw new Error("Security symbol is required.");
   }
 
   const { resolveCacheTtlSeconds } = getMarketDataConfig();
-  const openFigiResult = await getOrSetCached(`market-data:resolve:${trimmed}`, {
-    ttlMs: resolveCacheTtlSeconds * 1000,
-    staleOnErrorMs: resolveCacheTtlSeconds * 1000
-  }, async () => resolveSecurityWithOpenFigi(trimmed));
+  const openFigiResult = await getOrSetCached(
+    `market-data:resolve:${trimmed}`,
+    {
+      ttlMs: resolveCacheTtlSeconds * 1000,
+      staleOnErrorMs: resolveCacheTtlSeconds * 1000,
+    },
+    async () => resolveSecurityWithOpenFigi(trimmed),
+  );
 
   if (openFigiResult) {
     return { result: openFigiResult, providerHealth: getProviderHealth() };
@@ -111,16 +164,19 @@ export async function resolveSecurity(symbol: string): Promise<{ result: Securit
       shareClassFigi: null,
       securityType: null,
       marketSector: null,
-      provider: "fallback"
+      provider: "fallback",
     },
-    providerHealth: getProviderHealth()
+    providerHealth: getProviderHealth(),
   };
 }
 
 export async function getSecurityQuote(
   symbol: string,
-  options?: SecurityQuoteOptions
-): Promise<{ result: SecurityQuote; providerHealth: ReturnType<typeof getProviderHealth> }> {
+  options?: SecurityQuoteOptions,
+): Promise<{
+  result: SecurityQuote;
+  providerHealth: ReturnType<typeof getProviderHealth>;
+}> {
   const trimmed = symbol.trim().toUpperCase();
   const normalizedExchange = options?.exchange?.trim() || null;
   const normalizedCurrency = options?.currency?.trim().toUpperCase() || null;
@@ -133,12 +189,16 @@ export async function getSecurityQuote(
     "market-data:quote:v4",
     trimmed,
     normalizedExchange?.toLowerCase() ?? "no-exchange",
-    normalizedCurrency?.toLowerCase() ?? "no-currency"
+    normalizedCurrency?.toLowerCase() ?? "no-currency",
   ].join(":");
-  const quote = await getOrSetCached(cacheKey, {
-    ttlMs: quoteCacheTtlSeconds * 1000,
-    staleOnErrorMs: quoteCacheTtlSeconds * 1000
-  }, async () => getRoutedQuote(trimmed, normalizedExchange, normalizedCurrency));
+  const quote = await getOrSetCached(
+    cacheKey,
+    {
+      ttlMs: quoteCacheTtlSeconds * 1000,
+      staleOnErrorMs: quoteCacheTtlSeconds * 1000,
+    },
+    async () => getRoutedQuote(trimmed, normalizedExchange, normalizedCurrency),
+  );
 
   if (quote) {
     return { result: quote, providerHealth: getProviderHealth() };
@@ -152,28 +212,44 @@ export async function getSecurityQuote(
       currency: null,
       timestamp: new Date().toISOString(),
       provider: "fallback",
-      delayed: true
+      delayed: true,
     },
-    providerHealth: getProviderHealth()
+    providerHealth: getProviderHealth(),
   };
 }
 
 export async function getBatchSecurityQuotes(
-  symbols: Array<string | { symbol: string; exchange?: string | null; currency?: string | null }>
-): Promise<{ results: SecurityQuote[]; providerHealth: ReturnType<typeof getProviderHealth> }> {
-  const uniqueSymbols = [...new Map(
-    symbols
-      .map((entry) => typeof entry === "string"
-        ? { symbol: entry.trim().toUpperCase(), exchange: null as string | null, currency: null as string | null }
-        : {
-            symbol: entry.symbol.trim().toUpperCase(),
-            exchange: entry.exchange?.trim() || null,
-            currency: entry.currency?.trim().toUpperCase() || null
-          }
-      )
-      .filter((entry) => entry.symbol)
-      .map((entry) => [`${entry.symbol}::${entry.exchange ?? ""}::${entry.currency ?? ""}`, entry])
-  ).values()];
+  symbols: Array<
+    | string
+    | { symbol: string; exchange?: string | null; currency?: string | null }
+  >,
+): Promise<{
+  results: SecurityQuote[];
+  providerHealth: ReturnType<typeof getProviderHealth>;
+}> {
+  const uniqueSymbols = [
+    ...new Map(
+      symbols
+        .map((entry) =>
+          typeof entry === "string"
+            ? {
+                symbol: entry.trim().toUpperCase(),
+                exchange: null as string | null,
+                currency: null as string | null,
+              }
+            : {
+                symbol: entry.symbol.trim().toUpperCase(),
+                exchange: entry.exchange?.trim() || null,
+                currency: entry.currency?.trim().toUpperCase() || null,
+              },
+        )
+        .filter((entry) => entry.symbol)
+        .map((entry) => [
+          `${entry.symbol}::${entry.exchange ?? ""}::${entry.currency ?? ""}`,
+          entry,
+        ]),
+    ).values(),
+  ];
   const results: SecurityQuote[] = [];
   let rateLimited = false;
   for (const entry of uniqueSymbols) {
@@ -184,7 +260,7 @@ export async function getBatchSecurityQuotes(
       currency: entry.currency,
       timestamp: new Date().toISOString(),
       provider: "fallback" as const,
-      delayed: true
+      delayed: true,
     };
 
     if (rateLimited) {
@@ -193,11 +269,27 @@ export async function getBatchSecurityQuotes(
     }
 
     try {
-      const quote = await getSecurityQuote(entry.symbol, { exchange: entry.exchange, currency: entry.currency });
+      if (
+        isProviderLimited("twelve-data") &&
+        isProviderLimited("yahoo-finance")
+      ) {
+        rateLimited = true;
+        results.push(fallbackQuote);
+        continue;
+      }
+
+      const quote = await getSecurityQuote(entry.symbol, {
+        exchange: entry.exchange,
+        currency: entry.currency,
+      });
       results.push(quote.result);
     } catch (error) {
       const message = error instanceof Error ? error.message.toLowerCase() : "";
-      if (message.includes("twelve data") || message.includes("api credits")) {
+      if (
+        message.includes("twelve data") ||
+        message.includes("api credits") ||
+        message.includes("rate limit")
+      ) {
         rateLimited = true;
       }
       results.push(fallbackQuote);
@@ -206,14 +298,17 @@ export async function getBatchSecurityQuotes(
 
   return {
     results,
-    providerHealth: getProviderHealth()
+    providerHealth: getProviderHealth(),
   };
 }
 
 export async function getSecurityHistoricalSeries(
   symbol: string,
-  options?: SecurityQuoteOptions
-): Promise<{ results: SecurityHistoricalPoint[]; providerHealth: ReturnType<typeof getProviderHealth> }> {
+  options?: SecurityQuoteOptions,
+): Promise<{
+  results: SecurityHistoricalPoint[];
+  providerHealth: ReturnType<typeof getProviderHealth>;
+}> {
   const trimmed = symbol.trim().toUpperCase();
   const normalizedExchange = options?.exchange?.trim() || null;
   const normalizedCurrency = options?.currency?.trim().toUpperCase() || null;
@@ -226,27 +321,38 @@ export async function getSecurityHistoricalSeries(
     "market-data:history:v3",
     trimmed,
     normalizedExchange?.toLowerCase() ?? "no-exchange",
-    normalizedCurrency?.toLowerCase() ?? "no-currency"
+    normalizedCurrency?.toLowerCase() ?? "no-currency",
   ].join(":");
-  const results = await getOrSetCached(cacheKey, {
-    ttlMs: quoteCacheTtlSeconds * 1000,
-    staleOnErrorMs: 60 * 1000
-  }, async () => {
-    const twelveResults = await getHistoricalSeriesFromTwelveData(trimmed, normalizedExchange).catch(() => []);
-    if (hasDenseHistory(twelveResults)) {
+  const results = await getOrSetCached(
+    cacheKey,
+    {
+      ttlMs: quoteCacheTtlSeconds * 1000,
+      staleOnErrorMs: 60 * 1000,
+    },
+    async () => {
+      const twelveResults = await getHistoricalSeriesFromTwelveData(
+        trimmed,
+        normalizedExchange,
+      ).catch(() => []);
+      if (hasDenseHistory(twelveResults)) {
+        return twelveResults;
+      }
+
+      const alphaResults = await getHistoricalSeriesFromAlphaVantage(
+        trimmed,
+        normalizedExchange,
+        normalizedCurrency,
+      );
+      if (alphaResults.length >= 2) {
+        return alphaResults;
+      }
+
       return twelveResults;
-    }
-
-    const alphaResults = await getHistoricalSeriesFromAlphaVantage(trimmed, normalizedExchange, normalizedCurrency);
-    if (alphaResults.length >= 2) {
-      return alphaResults;
-    }
-
-    return twelveResults;
-  });
+    },
+  );
 
   return {
     results: results ?? [],
-    providerHealth: getProviderHealth()
+    providerHealth: getProviderHealth(),
   };
 }

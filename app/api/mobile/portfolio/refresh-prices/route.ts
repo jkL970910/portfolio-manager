@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getMobileViewerFromRequest } from "@/lib/auth/mobile-tokens";
-import { refreshPortfolioQuotes } from "@/lib/backend/services";
+import { refreshPortfolioQuotesWithRunLedger } from "@/lib/backend/market-data-refresh-runs";
 
 export async function POST(request: NextRequest) {
   const viewer = await getMobileViewerFromRequest(request);
@@ -8,19 +8,23 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
   }
 
-  try {
-    const data = await refreshPortfolioQuotes(viewer.id);
-    return NextResponse.json({ data }, { status: 200 });
-  } catch (error) {
-    const rawMessage =
-      error instanceof Error
-        ? error.message
-        : "Portfolio quote refresh failed.";
+  const result = await refreshPortfolioQuotesWithRunLedger({
+    userId: viewer.id,
+    triggeredBy: "manual",
+  });
+
+  if (!result.ok) {
     const message =
-      rawMessage.toLowerCase().includes("api credits") ||
-      rawMessage.toLowerCase().includes("rate limit")
+      result.errorMessage.toLowerCase().includes("api credits") ||
+      result.errorMessage.toLowerCase().includes("rate limit") ||
+      result.errorMessage.toLowerCase().includes("quota")
         ? "行情服务暂时限流。已保留现有价格，请稍后再试。"
         : "组合行情刷新失败。请稍后再试，现有价格不会被清空。";
     return NextResponse.json({ error: message }, { status: 500 });
   }
+
+  return NextResponse.json(
+    { data: { ...result.data, refreshRunId: result.runId } },
+    { status: 200 },
+  );
 }

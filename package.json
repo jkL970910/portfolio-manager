@@ -32,7 +32,8 @@
     "remote:stack:attach": "tmux attach -t portfolio-remote-dev",
     "remote:stack:status": "bash ./scripts/status-remote-dev-stack.sh",
     "worker:external-research:once": "tsx ./scripts/external-research-worker-once.ts",
-    "worker:external-research:enqueue-smoke": "tsx ./scripts/external-research-enqueue-smoke.ts"
+    "worker:external-research:enqueue-smoke": "tsx ./scripts/external-research-enqueue-smoke.ts",
+    "worker:market-data:once": "tsx ./scripts/market-data-refresh-worker-once.ts"
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",

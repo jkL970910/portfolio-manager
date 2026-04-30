@@ -41,6 +41,10 @@ type MobileHomeData = {
     lastPrice: string;
     lastUpdated: string;
     freshnessVariant: "success" | "warning" | "neutral";
+    quoteProvider?: string | null;
+    quoteSourceMode?: string | null;
+    quoteStatus?: string | null;
+    quoteStatusLabel?: string;
     weight: string;
     value: string;
   }>;
@@ -92,6 +96,10 @@ type MobilePortfolioOverviewData = {
     lastPrice: string;
     lastUpdated: string;
     freshnessVariant: "success" | "warning" | "neutral";
+    quoteProvider?: string | null;
+    quoteSourceMode?: string | null;
+    quoteStatus?: string | null;
+    quoteStatusLabel?: string;
     portfolioShare: string;
     accountShare: string;
     gainLoss: string;
@@ -210,6 +218,10 @@ function mapMobileHomeData(
       lastPrice: holding.lastPrice,
       lastUpdated: holding.lastUpdated,
       freshnessVariant: holding.freshnessVariant,
+      quoteProvider: holding.quoteProvider,
+      quoteSourceMode: holding.quoteSourceMode,
+      quoteStatus: holding.quoteStatus,
+      quoteStatusLabel: holding.quoteStatusLabel,
       weight: holding.weight,
       value: holding.value,
     })),
@@ -263,6 +275,10 @@ function mapMobilePortfolioOverviewData(
       lastPrice: holding.lastPrice,
       lastUpdated: holding.lastUpdated,
       freshnessVariant: holding.freshnessVariant,
+      quoteProvider: holding.quoteProvider,
+      quoteSourceMode: holding.quoteSourceMode,
+      quoteStatus: holding.quoteStatus,
+      quoteStatusLabel: holding.quoteStatusLabel,
       portfolioShare: holding.portfolioShare,
       accountShare: holding.accountShare,
       gainLoss: holding.gainLoss,

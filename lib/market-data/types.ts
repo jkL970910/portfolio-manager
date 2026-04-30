@@ -59,4 +59,12 @@ export interface ProviderHealth {
   openFigiConfigured: boolean;
   twelveDataConfigured: boolean;
   yahooFinanceConfigured: boolean;
+  providerLimits?: {
+    provider: string;
+    limited: boolean;
+    reason: string | null;
+    retryAfterSeconds: number | null;
+    limitedUntil: string | null;
+    recordedAt: string | null;
+  }[];
 }
