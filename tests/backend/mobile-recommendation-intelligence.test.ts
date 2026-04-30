@@ -1,13 +1,17 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import type { RecommendationsData } from "@/lib/contracts";
-import { mapRecommendationIntelligenceRefs } from "@/lib/backend/mobile-views";
+import {
+  buildRecommendationV3Overlay,
+  mapRecommendationIntelligenceRefs,
+} from "@/lib/backend/mobile-views";
 
 function brief(
   id: string,
   symbol: string,
   exchange: string,
   currency: string,
+  securityId?: string,
 ): RecommendationsData["intelligenceBriefs"][number] {
   return {
     id,
@@ -18,32 +22,82 @@ function brief(
     freshnessLabel: "行情 2026-04-30",
     generatedAt: "2026-04-30T12:00:00.000Z",
     symbols: [symbol, exchange, currency],
-    identity: { symbol, exchange, currency },
+    identity: { securityId, symbol, exchange, currency },
     sources: [],
   };
 }
 
-test("recommendation intelligence refs attach only unambiguous symbol matches", () => {
+function priority(
+  overrides: Partial<RecommendationsData["priorities"][number]> = {},
+): RecommendationsData["priorities"][number] {
+  return {
+    id: "priority_us_equity",
+    assetClass: "US Equity",
+    description: "补足 US Equity 缺口",
+    amount: "CA$2,500",
+    account: "RRSP",
+    security: "VFV - Vanguard S&P 500",
+    securityId: "sec_vfv_cad",
+    securitySymbol: "VFV",
+    securityExchange: "TSX",
+    securityCurrency: "CAD",
+    tickers: "VFV, XUU",
+    accountFit: "RRSP 顺手",
+    scoreline: "",
+    gapSummary: "",
+    alternatives: [],
+    intelligenceRefs: [],
+    whyThis: [],
+    whyNot: [],
+    constraints: [],
+    execution: [],
+    v3Overlay: {
+      baselineScore: 74,
+      externalInsightScore: null,
+      preferenceFitScore: 82,
+      finalScore: 75.2,
+      confidenceLabel: "V2.1 规则评分，等待缓存外部情报校准",
+      sourceMode: "local",
+      signals: ["行业/风格偏好命中"],
+      riskFlags: [],
+      explanation: "base",
+    },
+    ...overrides,
+  };
+}
+
+test("recommendation intelligence refs prefer exact security identity matches", () => {
   const refs = mapRecommendationIntelligenceRefs(
-    { security: "NVDA - NVIDIA", tickers: "NVDA, VOO" },
+    {
+      security: "NVDA - NVIDIA",
+      securityId: "sec_nvda_us",
+      securitySymbol: "NVDA",
+      securityExchange: "NASDAQ",
+      securityCurrency: "USD",
+      tickers: "NVDA, VOO",
+    },
     [
-      brief("brief_nvda", "NVDA", "NASDAQ", "USD"),
-      brief("brief_xef", "XEF", "TSX", "CAD"),
+      brief("brief_nvda_us", "NVDA", "NASDAQ", "USD", "sec_nvda_us"),
+      brief("brief_nvda_cad", "NVDA", "NEO", "CAD", "sec_nvda_cad"),
     ],
   );
 
   assert.equal(refs.length, 1);
-  assert.equal(refs[0]?.id, "brief_nvda");
+  assert.equal(refs[0]?.id, "brief_nvda_us");
   assert.equal(refs[0]?.scope, "listing");
   assert.equal(refs[0]?.listingLabel, "NVDA · NASDAQ · USD");
 });
 
-test("recommendation intelligence refs downgrade ambiguous CAD and US listings to underlying context", () => {
+test("recommendation intelligence refs use underlying context when identity is unresolved", () => {
   const refs = mapRecommendationIntelligenceRefs(
-    { security: "AMZN - Amazon", tickers: "AMZN" },
+    {
+      security: "AMZN - Amazon",
+      securitySymbol: "AMZN",
+      tickers: "AMZN",
+    },
     [
-      brief("brief_amzn_us", "AMZN", "NASDAQ", "USD"),
-      brief("brief_amzn_cad", "AMZN", "NEO", "CAD"),
+      brief("brief_amzn_us", "AMZN", "NASDAQ", "USD", "sec_amzn_us"),
+      brief("brief_amzn_cad", "AMZN", "NEO", "CAD", "sec_amzn_cad"),
     ],
   );
 
@@ -51,4 +105,39 @@ test("recommendation intelligence refs downgrade ambiguous CAD and US listings t
   assert.equal(refs[0]?.scope, "underlying");
   assert.equal(refs[0]?.scopeLabel, "底层资产情报");
   assert.equal(refs[1]?.scope, "underlying");
+});
+
+test("recommendation intelligence refs can fall back to exact listing identity", () => {
+  const refs = mapRecommendationIntelligenceRefs(
+    {
+      security: "VFV - Vanguard S&P 500",
+      securitySymbol: "VFV",
+      securityExchange: "TSX",
+      securityCurrency: "CAD",
+      tickers: "VFV",
+    },
+    [
+      brief("brief_vfv_cad", "VFV", "TSX", "CAD"),
+      brief("brief_vfv_us", "VFV", "NYSE", "USD"),
+    ],
+  );
+
+  assert.equal(refs.length, 1);
+  assert.equal(refs[0]?.id, "brief_vfv_cad");
+  assert.equal(refs[0]?.scope, "listing");
+});
+
+test("recommendation V3 overlay weights cached external intelligence explicitly", () => {
+  const briefs = [
+    brief("brief_vfv_cad", "VFV", "TSX", "CAD", "sec_vfv_cad"),
+  ];
+  const refs = mapRecommendationIntelligenceRefs(priority(), briefs);
+  const overlay = buildRecommendationV3Overlay(priority(), refs, briefs);
+
+  assert.ok(overlay);
+  assert.equal(overlay.sourceMode, "cached-external");
+  assert.equal(overlay.externalInsightScore, 68);
+  assert.equal(overlay.finalScore, 74.3);
+  assert.match(overlay.explanation, /V3 最终分/);
+  assert.ok(overlay.signals.some((signal) => signal.includes("当前 listing")));
 });

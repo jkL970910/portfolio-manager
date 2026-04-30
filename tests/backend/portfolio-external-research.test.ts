@@ -90,12 +90,12 @@ test("cached market-data provider reads local cache only when explicitly enabled
     request: {
       scope: "security",
       mode: "quick",
-      security: { symbol: "VFV", currency: "CAD" },
+      security: { symbol: "VFV", exchange: "TSX", currency: "CAD" },
       cacheStrategy: "prefer-cache",
       maxCacheAgeSeconds: 21600,
       includeExternalResearch: true,
     },
-    targetKey: "security:VFV:no-exchange:CAD",
+    targetKey: "security:VFV:TSX:CAD",
     allowedSources: enabledSources,
     now: new Date("2026-04-28T12:00:00.000Z"),
   });
@@ -145,7 +145,7 @@ test("cached market-data provider keeps exchange and currency identity separate"
   );
   assert.ok(
     result.summaryPoints.some((point) =>
-      point.includes("symbol=VFV, exchange=NASDAQ, currency=USD"),
+      point.includes("securityId=未指定, symbol=VFV, exchange=NASDAQ, currency=USD"),
     ),
   );
 

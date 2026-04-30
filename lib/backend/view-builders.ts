@@ -3880,6 +3880,80 @@ export function buildPortfolioSecurityDetailData(args: {
     heldPosition,
   };
 }
+
+function formatPreferenceSignalLabels(
+  signals: string[],
+  language: DisplayLanguage,
+) {
+  const labels: Record<string, { zh: string; en: string }> = {
+    "preference-tilt-match": {
+      zh: "行业/风格偏好命中",
+      en: "sector/style preference match",
+    },
+    "avoided-tilt-match": {
+      zh: "避开行业命中",
+      en: "avoided sector match",
+    },
+    "home-goal-risk-buffer": {
+      zh: "买房目标风险缓冲",
+      en: "home-goal risk buffer",
+    },
+    "concentration-tolerance": {
+      zh: "集中度容忍约束",
+      en: "concentration tolerance",
+    },
+  };
+
+  return signals.map((signal) => {
+    const label = labels[signal];
+    return label ? pick(language, label.zh, label.en) : signal;
+  });
+}
+
+function buildBaseRecommendationV3Overlay(
+  item: RecommendationRun["items"][number],
+  language: DisplayLanguage,
+): NonNullable<RecommendationsData["priorities"][number]["v3Overlay"]> {
+  const scoreInputs = [
+    item.securityScore,
+    item.accountFitScore,
+    item.taxFitScore,
+  ].filter((score): score is number => typeof score === "number");
+  const baselineScore = scoreInputs.length > 0
+    ? round(sum(scoreInputs) / scoreInputs.length, 1)
+    : 60;
+  const preferenceFitScore =
+    typeof item.preferenceFitScore === "number"
+      ? round(item.preferenceFitScore, 1)
+      : null;
+  const finalScore = round(
+    baselineScore * 0.85 + (preferenceFitScore ?? baselineScore) * 0.15,
+    1,
+  );
+
+  return {
+    baselineScore,
+    externalInsightScore: null,
+    preferenceFitScore,
+    finalScore,
+    confidenceLabel: pick(
+      language,
+      "V2.1 规则评分，等待缓存外部情报校准",
+      "V2.1 rule score; waiting for cached external evidence calibration",
+    ),
+    sourceMode: "local",
+    signals: item.rationale?.preferenceSignals?.length
+      ? formatPreferenceSignalLabels(item.rationale.preferenceSignals, language)
+      : [],
+    riskFlags: [],
+    explanation: pick(
+      language,
+      "当前分数由配置缺口、账户放置、税务友好度和进阶偏好组成；外部情报尚未参与加权。",
+      "Current score combines allocation gap, account placement, tax fit, and advanced preferences; external intelligence is not weighted yet.",
+    ),
+  };
+}
+
 export function buildRecommendationsData(args: {
   language: DisplayLanguage;
   profile: PreferenceProfile;
@@ -4179,8 +4253,8 @@ export function buildRecommendationsData(args: {
             : getAccountTypeFit(item.targetAccountType, language),
         scoreline: pick(
           language,
-          `Loo皇给这条路的印象是：标的合适度 ${item.securityScore?.toFixed(0) ?? "--"} / 账户顺手度 ${item.accountFitScore?.toFixed(0) ?? "--"} / 税务友好度 ${item.taxFitScore?.toFixed(0) ?? "--"}`,
-          `Security fit ${item.securityScore?.toFixed(0) ?? "--"} / Account fit ${item.accountFitScore?.toFixed(0) ?? "--"} / Tax fit ${item.taxFitScore?.toFixed(0) ?? "--"}`,
+          `Loo皇给这条路的印象是：标的合适度 ${item.securityScore?.toFixed(0) ?? "--"} / 偏好契合 ${item.preferenceFitScore?.toFixed(0) ?? "--"} / 账户顺手度 ${item.accountFitScore?.toFixed(0) ?? "--"} / 税务友好度 ${item.taxFitScore?.toFixed(0) ?? "--"}`,
+          `Security fit ${item.securityScore?.toFixed(0) ?? "--"} / Preference fit ${item.preferenceFitScore?.toFixed(0) ?? "--"} / Account fit ${item.accountFitScore?.toFixed(0) ?? "--"} / Tax fit ${item.taxFitScore?.toFixed(0) ?? "--"}`,
         ),
         gapSummary:
           item.allocationGapBeforePct != null &&
@@ -4210,6 +4284,7 @@ export function buildRecommendationsData(args: {
           href: `/portfolio/security/${encodeURIComponent(symbol)}`,
         })),
         intelligenceRefs: [],
+        v3Overlay: buildBaseRecommendationV3Overlay(item, language),
         whyThis: [
           item.rationale
             ? pick(
@@ -4267,6 +4342,17 @@ export function buildRecommendationsData(args: {
                   "你还没有设置偏好标的，所以这次没有额外偏好加权。",
                   "No preferred-symbol rule is set, so no explicit preference boost was applied.",
                 ),
+          item.rationale?.preferenceSignals?.length
+            ? pick(
+                language,
+                `进阶偏好也参与了排序：${formatPreferenceSignalLabels(item.rationale.preferenceSignals, language).join(" / ")}。`,
+                `Advanced preference factors also affected ranking: ${formatPreferenceSignalLabels(item.rationale.preferenceSignals, language).join(" / ")}.`,
+              )
+            : pick(
+                language,
+                "这条推荐没有明显命中进阶偏好因子，主要仍由配置缺口和账户放置决定。",
+                "This idea did not materially hit advanced preference factors; allocation gap and account placement remain the main drivers.",
+              ),
         ],
         whyNot: [
           alternatives.length > 0
@@ -4408,6 +4494,23 @@ export function buildRecommendationsData(args: {
               profile.recommendationConstraints.allowedSecurityTypes.length > 0
                 ? ("warning" as const)
                 : ("neutral" as const),
+          },
+          {
+            label: pick(language, "进阶偏好因子", "Advanced preference factors"),
+            detail: item.rationale?.preferenceSignals?.length
+              ? pick(
+                  language,
+                  `本轮命中：${formatPreferenceSignalLabels(item.rationale.preferenceSignals, language).join(" / ")}；偏好契合 ${item.preferenceFitScore?.toFixed(0) ?? "--"}/100。`,
+                  `Matched: ${formatPreferenceSignalLabels(item.rationale.preferenceSignals, language).join(" / ")}; preference fit ${item.preferenceFitScore?.toFixed(0) ?? "--"}/100.`,
+                )
+              : pick(
+                  language,
+                  `当前偏好契合 ${item.preferenceFitScore?.toFixed(0) ?? "--"}/100；未检测到强偏好加权。`,
+                  `Current preference fit ${item.preferenceFitScore?.toFixed(0) ?? "--"}/100; no strong preference adjustment was detected.`,
+                ),
+            variant: item.rationale?.preferenceSignals?.length
+              ? ("success" as const)
+              : ("neutral" as const),
           },
         ],
         execution: [

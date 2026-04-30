@@ -169,6 +169,8 @@ export const holdings: HoldingPosition[] = [
     name: "Vanguard S&P 500",
     assetClass: "US Equity",
     sector: "Technology",
+    currency: "CAD",
+    exchangeOverride: "TSX",
     marketValueCad: 35600,
     weightPct: 15.8,
     gainLossPct: 16.2
@@ -588,12 +590,12 @@ export const securityPriceHistory: SecurityPriceHistoryPoint[] = [
   { id: "price_xeqt_4", symbol: "XEQT", priceDate: "2026-01-01", close: 33.8, adjustedClose: null, currency: "CAD", source: "seed", createdAt: "2026-01-01T00:00:00.000Z" },
   { id: "price_xeqt_5", symbol: "XEQT", priceDate: "2026-02-01", close: 34.4, adjustedClose: null, currency: "CAD", source: "seed", createdAt: "2026-02-01T00:00:00.000Z" },
   { id: "price_xeqt_6", symbol: "XEQT", priceDate: "2026-03-01", close: 35.2, adjustedClose: null, currency: "CAD", source: "seed", createdAt: "2026-03-01T00:00:00.000Z" },
-  { id: "price_vfv_1", symbol: "VFV", priceDate: "2025-10-01", close: 118.2, adjustedClose: null, currency: "CAD", source: "seed", createdAt: "2025-10-01T00:00:00.000Z" },
-  { id: "price_vfv_2", symbol: "VFV", priceDate: "2025-11-01", close: 121.4, adjustedClose: null, currency: "CAD", source: "seed", createdAt: "2025-11-01T00:00:00.000Z" },
-  { id: "price_vfv_3", symbol: "VFV", priceDate: "2025-12-01", close: 123.9, adjustedClose: null, currency: "CAD", source: "seed", createdAt: "2025-12-01T00:00:00.000Z" },
-  { id: "price_vfv_4", symbol: "VFV", priceDate: "2026-01-01", close: 126.5, adjustedClose: null, currency: "CAD", source: "seed", createdAt: "2026-01-01T00:00:00.000Z" },
-  { id: "price_vfv_5", symbol: "VFV", priceDate: "2026-02-01", close: 129.1, adjustedClose: null, currency: "CAD", source: "seed", createdAt: "2026-02-01T00:00:00.000Z" },
-  { id: "price_vfv_6", symbol: "VFV", priceDate: "2026-03-01", close: 132.8, adjustedClose: null, currency: "CAD", source: "seed", createdAt: "2026-03-01T00:00:00.000Z" }
+  { id: "price_vfv_1", symbol: "VFV", exchange: "TSX", priceDate: "2025-10-01", close: 118.2, adjustedClose: null, currency: "CAD", source: "seed", createdAt: "2025-10-01T00:00:00.000Z" },
+  { id: "price_vfv_2", symbol: "VFV", exchange: "TSX", priceDate: "2025-11-01", close: 121.4, adjustedClose: null, currency: "CAD", source: "seed", createdAt: "2025-11-01T00:00:00.000Z" },
+  { id: "price_vfv_3", symbol: "VFV", exchange: "TSX", priceDate: "2025-12-01", close: 123.9, adjustedClose: null, currency: "CAD", source: "seed", createdAt: "2025-12-01T00:00:00.000Z" },
+  { id: "price_vfv_4", symbol: "VFV", exchange: "TSX", priceDate: "2026-01-01", close: 126.5, adjustedClose: null, currency: "CAD", source: "seed", createdAt: "2026-01-01T00:00:00.000Z" },
+  { id: "price_vfv_5", symbol: "VFV", exchange: "TSX", priceDate: "2026-02-01", close: 129.1, adjustedClose: null, currency: "CAD", source: "seed", createdAt: "2026-02-01T00:00:00.000Z" },
+  { id: "price_vfv_6", symbol: "VFV", exchange: "TSX", priceDate: "2026-03-01", close: 132.8, adjustedClose: null, currency: "CAD", source: "seed", createdAt: "2026-03-01T00:00:00.000Z" }
 ];
 
 export const preferenceProfiles: PreferenceProfile[] = [

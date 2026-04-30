@@ -411,8 +411,20 @@ function mapMobileRecommendationsData(
   preferenceContext: MobileRecommendationsData["preferenceContext"],
   intelligenceBriefs: RecommendationsData["intelligenceBriefs"] = [],
 ): MobileRecommendationsData {
+  const externalBriefCount = intelligenceBriefs.filter(
+    (brief) => brief.sourceMode !== "local",
+  ).length;
   return {
     ...data,
+    engine: {
+      ...data.engine,
+      version: externalBriefCount > 0
+        ? "V3 Overlay / V2.1 Core"
+        : data.engine.version,
+      objective: externalBriefCount > 0
+        ? `${data.engine.objective} · 已接入 ${externalBriefCount} 条缓存外部情报`
+        : data.engine.objective,
+    },
     intelligenceBriefs,
     preferenceContext,
     priorities: data.priorities.map((priority) => {
@@ -422,12 +434,39 @@ function mapMobileRecommendationsData(
         relatedLinks: _relatedLinks,
         ...rest
       } = priority;
+      const intelligenceRefs = mapRecommendationIntelligenceRefs(
+        rest,
+        intelligenceBriefs,
+      );
+      const v3Overlay = buildRecommendationV3Overlay(
+        rest,
+        intelligenceRefs,
+        intelligenceBriefs,
+      );
       return {
         ...rest,
-        intelligenceRefs: mapRecommendationIntelligenceRefs(
-          rest,
-          intelligenceBriefs,
-        ),
+        v3Overlay,
+        constraints: [
+          ...rest.constraints,
+          ...(intelligenceRefs.length > 0
+            ? [
+                {
+                  label: "外部情报覆盖",
+                  detail:
+                    `已关联 ${intelligenceRefs.length} 条缓存秘闻；V3 外部情报分 ${v3Overlay?.externalInsightScore?.toFixed(0) ?? "--"}/100，最终分 ${v3Overlay?.finalScore.toFixed(0) ?? "--"}/100。`,
+                  variant: "success" as const,
+                },
+              ]
+            : [
+                {
+                  label: "外部情报覆盖",
+                  detail:
+                    "当前推荐没有匹配到同一 listing 的缓存秘闻；排序仍基于 V2.1 规则和已保存偏好。",
+                  variant: "neutral" as const,
+                },
+              ]),
+        ],
+        intelligenceRefs,
       };
     }),
   };
@@ -436,10 +475,31 @@ function mapMobileRecommendationsData(
 export function mapRecommendationIntelligenceRefs(
   priority: Pick<
     RecommendationsData["priorities"][number],
-    "security" | "tickers"
+    | "security"
+    | "securityId"
+    | "securitySymbol"
+    | "securityExchange"
+    | "securityCurrency"
+    | "tickers"
   >,
   intelligenceBriefs: RecommendationsData["intelligenceBriefs"],
 ): RecommendationsData["priorities"][number]["intelligenceRefs"] {
+  const exactSecurityRefs = priority.securityId
+    ? intelligenceBriefs.filter((brief) =>
+        brief.identity.securityId === priority.securityId
+      )
+    : [];
+  const exactListingRefs = exactSecurityRefs.length > 0
+    ? exactSecurityRefs
+    : intelligenceBriefs.filter((brief) =>
+        briefMatchesPriorityListing(brief, priority)
+      );
+  if (exactListingRefs.length > 0) {
+    return exactListingRefs.slice(0, 2).map((brief) =>
+      mapIntelligenceBriefRef(brief, "listing")
+    );
+  }
+
   const symbols = getRecommendationPrioritySymbols(priority);
   if (symbols.size === 0) {
     return [];
@@ -450,47 +510,128 @@ export function mapRecommendationIntelligenceRefs(
       symbols.has(normalizeSymbolKey(brief.identity.symbol)),
     )
     .slice(0, 2)
-    .map((brief) => {
-      const scope = isAmbiguousRecommendationBrief(brief, intelligenceBriefs)
-        ? "underlying"
-        : "listing";
-      return {
-        id: brief.id,
-        title: brief.title,
-        detail: brief.detail,
-        sourceLabel: brief.sourceLabel,
-        freshnessLabel: brief.freshnessLabel,
-        scope,
-        scopeLabel: scope === "underlying"
-          ? "底层资产情报"
-          : "当前上市版本情报",
-        listingLabel: getBriefListingLabel(brief),
-      };
-    });
+    .map((brief) => mapIntelligenceBriefRef(brief, "underlying"));
 }
 
-function isAmbiguousRecommendationBrief(
+function mapIntelligenceBriefRef(
   brief: RecommendationsData["intelligenceBriefs"][number],
+  scope: RecommendationsData["priorities"][number]["intelligenceRefs"][number]["scope"],
+) {
+  return {
+    id: brief.id,
+    title: brief.title,
+    detail: brief.detail,
+    sourceLabel: brief.sourceLabel,
+    freshnessLabel: brief.freshnessLabel,
+    scope,
+    scopeLabel: scope === "underlying"
+      ? "底层资产情报"
+      : "当前上市版本情报",
+    listingLabel: getBriefListingLabel(brief),
+  };
+}
+
+export function buildRecommendationV3Overlay(
+  priority: RecommendationsData["priorities"][number],
+  intelligenceRefs: RecommendationsData["priorities"][number]["intelligenceRefs"],
   intelligenceBriefs: RecommendationsData["intelligenceBriefs"],
-) {
-  const symbol = normalizeSymbolKey(brief.identity.symbol);
-  const listingKeys = new Set(
-    intelligenceBriefs
-      .filter((item) => normalizeSymbolKey(item.identity.symbol) === symbol)
-      .map(getBriefListingKey),
-  );
+): RecommendationsData["priorities"][number]["v3Overlay"] {
+  const base = priority.v3Overlay;
+  if (!base) {
+    return undefined;
+  }
 
-  return listingKeys.size > 1;
+  if (intelligenceRefs.length === 0) {
+    return base;
+  }
+
+  const matchedBriefs = intelligenceRefs
+    .map((ref) => intelligenceBriefs.find((brief) => brief.id === ref.id))
+    .filter((brief): brief is RecommendationsData["intelligenceBriefs"][number] =>
+      Boolean(brief)
+    );
+  const hasListingRef = intelligenceRefs.some((ref) => ref.scope === "listing");
+  const hasExternalRef = matchedBriefs.some((brief) =>
+    brief.sourceMode !== "local"
+  );
+  const newestGeneratedAt = matchedBriefs
+    .map((brief) => Date.parse(brief.generatedAt))
+    .filter((value) => Number.isFinite(value))
+    .sort((left, right) => right - left)[0];
+  const ageDays = newestGeneratedAt
+    ? Math.max(0, (Date.now() - newestGeneratedAt) / 86_400_000)
+    : null;
+  const stalePenalty = ageDays == null
+    ? 6
+    : ageDays > 14
+      ? 14
+      : ageDays > 7
+        ? 8
+        : ageDays > 2
+          ? 4
+          : 0;
+  const scopeBoost = hasListingRef ? 10 : 3;
+  const sourceBoost = hasExternalRef ? 8 : 2;
+  const externalInsightScore = clampScore(
+    50 + scopeBoost + sourceBoost - stalePenalty,
+  );
+  const preferenceFitScore = base.preferenceFitScore ?? base.baselineScore;
+  const finalScore = clampScore(
+    base.baselineScore * 0.7 +
+      preferenceFitScore * 0.15 +
+      externalInsightScore * 0.15,
+  );
+  const riskFlags = [
+    ...base.riskFlags,
+    ...(!hasListingRef ? ["仅匹配到底层资产情报，不能当作当前 listing 报价依据。"] : []),
+    ...(stalePenalty >= 8 ? ["外部情报较旧，需要刷新后再作为高权重参考。"] : []),
+  ];
+
+  return {
+    ...base,
+    externalInsightScore,
+    finalScore,
+    confidenceLabel: hasListingRef
+      ? "V3 已按当前上市版本缓存情报校准"
+      : "V3 仅按底层资产情报轻量校准",
+    sourceMode: hasExternalRef ? "cached-external" : "local",
+    signals: [
+      ...base.signals,
+      hasListingRef ? "当前 listing 情报命中" : "底层资产情报命中",
+      hasExternalRef ? "缓存外部研究可用" : "本地 AI 快扫可用",
+    ],
+    riskFlags,
+    explanation:
+      `V3 最终分 = V2.1 基线 ${base.baselineScore.toFixed(0)} * 70% + 偏好契合 ${preferenceFitScore.toFixed(0)} * 15% + 外部情报 ${externalInsightScore.toFixed(0)} * 15%。`,
+  };
 }
 
-function getBriefListingKey(
+function clampScore(value: number) {
+  return Math.min(100, Math.max(0, Math.round(value * 10) / 10));
+}
+
+function briefMatchesPriorityListing(
   brief: RecommendationsData["intelligenceBriefs"][number],
+  priority: Pick<
+    RecommendationsData["priorities"][number],
+    "securitySymbol" | "securityExchange" | "securityCurrency"
+  >,
 ) {
-  return [
-    normalizeSymbolKey(brief.identity.symbol),
-    normalizeSymbolKey(brief.identity.exchange ?? ""),
-    normalizeSymbolKey(brief.identity.currency ?? ""),
-  ].join("|");
+  if (!priority.securitySymbol) {
+    return false;
+  }
+  const sameSymbol =
+    normalizeSymbolKey(brief.identity.symbol) ===
+    normalizeSymbolKey(priority.securitySymbol);
+  const sameExchange = priority.securityExchange
+    ? normalizeSymbolKey(brief.identity.exchange ?? "") ===
+      normalizeSymbolKey(priority.securityExchange)
+    : false;
+  const sameCurrency = priority.securityCurrency
+    ? normalizeSymbolKey(brief.identity.currency ?? "") ===
+      normalizeSymbolKey(priority.securityCurrency)
+    : false;
+  return sameSymbol && sameExchange && sameCurrency;
 }
 
 function getBriefListingLabel(
@@ -555,6 +696,10 @@ function mapRecommendationIntelligenceBriefs(
       typeof identity.symbol === "string" && identity.symbol.trim()
         ? identity.symbol.trim().toUpperCase()
         : "UNKNOWN";
+    const securityId =
+      typeof identity.securityId === "string" && identity.securityId.trim()
+        ? identity.securityId.trim()
+        : undefined;
     const exchange =
       typeof identity.exchange === "string" && identity.exchange.trim()
         ? identity.exchange.trim().toUpperCase()
@@ -606,6 +751,7 @@ function mapRecommendationIntelligenceBriefs(
       generatedAt: run.generatedAt,
       symbols,
       identity: {
+        securityId,
         symbol,
         exchange,
         currency,

@@ -193,6 +193,7 @@ class MobileRecommendationPriority {
     required this.whyNot,
     required this.alternatives,
     required this.intelligenceRefs,
+    required this.v3Overlay,
     required this.constraints,
     required this.execution,
   });
@@ -212,6 +213,7 @@ class MobileRecommendationPriority {
   final List<String> whyNot;
   final List<String> alternatives;
   final List<MobileRecommendationIntelligenceRef> intelligenceRefs;
+  final MobileRecommendationV3Overlay? v3Overlay;
   final List<MobileRecommendationConstraint> constraints;
   final List<MobileRecommendationInput> execution;
 
@@ -238,12 +240,68 @@ class MobileRecommendationPriority {
       intelligenceRefs: readJsonList(json, "intelligenceRefs")
           .map(MobileRecommendationIntelligenceRef.fromJson)
           .toList(),
+      v3Overlay: json["v3Overlay"] is Map<String, dynamic>
+          ? MobileRecommendationV3Overlay.fromJson(
+              json["v3Overlay"] as Map<String, dynamic>,
+            )
+          : null,
       constraints: readJsonList(json, "constraints")
           .map(MobileRecommendationConstraint.fromJson)
           .toList(),
       execution: readJsonList(json, "execution")
           .map(MobileRecommendationInput.fromJson)
           .toList(),
+    );
+  }
+}
+
+class MobileRecommendationV3Overlay {
+  const MobileRecommendationV3Overlay({
+    required this.baselineScore,
+    required this.externalInsightScore,
+    required this.preferenceFitScore,
+    required this.finalScore,
+    required this.confidenceLabel,
+    required this.sourceMode,
+    required this.signals,
+    required this.riskFlags,
+    required this.explanation,
+  });
+
+  final double baselineScore;
+  final double? externalInsightScore;
+  final double? preferenceFitScore;
+  final double finalScore;
+  final String confidenceLabel;
+  final String sourceMode;
+  final List<String> signals;
+  final List<String> riskFlags;
+  final String explanation;
+
+  factory MobileRecommendationV3Overlay.fromJson(Map<String, dynamic> json) {
+    double readScore(String key, double fallback) {
+      final value = json[key];
+      return value is num ? value.toDouble() : fallback;
+    }
+
+    double? readOptionalScore(String key) {
+      final value = json[key];
+      return value is num ? value.toDouble() : null;
+    }
+
+    return MobileRecommendationV3Overlay(
+      baselineScore: readScore("baselineScore", 0),
+      externalInsightScore: readOptionalScore("externalInsightScore"),
+      preferenceFitScore: readOptionalScore("preferenceFitScore"),
+      finalScore: readScore("finalScore", 0),
+      confidenceLabel: json["confidenceLabel"] as String? ?? "",
+      sourceMode: json["sourceMode"] as String? ?? "local",
+      signals:
+          (json["signals"] as List?)?.whereType<String>().toList() ?? const [],
+      riskFlags:
+          (json["riskFlags"] as List?)?.whereType<String>().toList() ??
+              const [],
+      explanation: json["explanation"] as String? ?? "",
     );
   }
 }

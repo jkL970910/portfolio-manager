@@ -76,6 +76,7 @@ export function mapExternalResearchJobForMobile(job: ExternalResearchJob) {
   const identity =
     security && typeof security.symbol === "string"
       ? {
+          securityId: security.securityId ?? null,
           symbol: security.symbol,
           exchange: security.exchange ?? null,
           currency: security.currency ?? null,

@@ -663,6 +663,10 @@ class _PriorityCard extends StatelessWidget {
               const SizedBox(height: 10),
               _ScorelinePanel(priority),
             ],
+            if (priority.v3Overlay != null) ...[
+              const SizedBox(height: 10),
+              _V3OverlayPanel(priority.v3Overlay!),
+            ],
             if (priority.securitySymbol.isNotEmpty) ...[
               const SizedBox(height: 12),
               Align(
@@ -791,6 +795,74 @@ class _ScorelinePanel extends StatelessWidget {
             if (priority.gapSummary.isNotEmpty) ...[
               const SizedBox(height: 8),
               Text(priority.gapSummary),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _V3OverlayPanel extends StatelessWidget {
+  const _V3OverlayPanel(this.overlay);
+
+  final MobileRecommendationV3Overlay overlay;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    String score(double? value) =>
+        value == null ? "--" : value.toStringAsFixed(0);
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: theme.colorScheme.secondaryContainer.withValues(alpha: 0.38),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: theme.colorScheme.outlineVariant),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.auto_awesome_outlined, size: 18),
+                const SizedBox(width: 6),
+                Text("V3 情报评分", style: theme.textTheme.titleMedium),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                _InfoPill("最终 ${score(overlay.finalScore)}"),
+                _InfoPill("V2.1 ${score(overlay.baselineScore)}"),
+                _InfoPill("偏好 ${score(overlay.preferenceFitScore)}"),
+                _InfoPill("情报 ${score(overlay.externalInsightScore)}"),
+              ],
+            ),
+            if (overlay.confidenceLabel.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Text(overlay.confidenceLabel),
+            ],
+            if (overlay.explanation.isNotEmpty) ...[
+              const SizedBox(height: 6),
+              Text(overlay.explanation, style: theme.textTheme.bodySmall),
+            ],
+            if (overlay.signals.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Text("命中：${overlay.signals.take(3).join(" / ")}"),
+            ],
+            if (overlay.riskFlags.isNotEmpty) ...[
+              const SizedBox(height: 6),
+              Text(
+                "注意：${overlay.riskFlags.take(2).join(" / ")}",
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.error,
+                ),
+              ),
             ],
           ],
         ),

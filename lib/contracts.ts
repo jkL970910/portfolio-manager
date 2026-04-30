@@ -645,6 +645,7 @@ export interface RecommendationsData {
     generatedAt: string;
     symbols: string[];
     identity: {
+      securityId?: string;
       symbol: string;
       exchange?: string;
       currency?: string;
@@ -687,6 +688,17 @@ export interface RecommendationsData {
       scopeLabel: string;
       listingLabel: string;
     }[];
+    v3Overlay?: {
+      baselineScore: number;
+      externalInsightScore: number | null;
+      preferenceFitScore: number | null;
+      finalScore: number;
+      confidenceLabel: string;
+      sourceMode: "local" | "cached-external" | "live-external";
+      signals: string[];
+      riskFlags: string[];
+      explanation: string;
+    };
     whyThis: string[];
     whyNot: string[];
     constraints: {

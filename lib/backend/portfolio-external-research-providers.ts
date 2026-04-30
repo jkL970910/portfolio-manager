@@ -112,19 +112,25 @@ export const cachedMarketDataResearchProvider: ExternalResearchProvider = {
 
     const expectedCurrency = normalizeNullable(security?.currency);
     const expectedExchange = normalizeNullable(security?.exchange);
+    const expectedSecurityId = security?.securityId?.trim() || null;
     const repositories = getRepositories();
     const [holdings, priceHistory] = await Promise.all([
       repositories.holdings.listByUserId(input.userId),
-      expectedExchange
+      expectedSecurityId
+        ? repositories.securityPriceHistory.listBySecurityId(expectedSecurityId)
+        : expectedExchange && expectedCurrency
         ? repositories.securityPriceHistory.listByIdentity({
             symbol,
             exchange: expectedExchange,
             currency: expectedCurrency,
           })
-        : repositories.securityPriceHistory.listBySymbol(symbol),
+        : Promise.resolve([]),
     ]);
 
     const matchingHoldings = holdings.filter((holding) => {
+      if (expectedSecurityId) {
+        return holding.securityId === expectedSecurityId;
+      }
       const holdingSymbol = normalizeNullable(holding.symbol);
       const holdingCurrency = normalizeNullable(holding.currency ?? "CAD");
       const holdingExchange = normalizeNullable(holding.exchangeOverride);
@@ -164,9 +170,12 @@ export const cachedMarketDataResearchProvider: ExternalResearchProvider = {
           ? `缓存来源：${latestPoint.source}；provider=${latestPoint.provider ?? "未知"}；freshness=${latestPoint.freshness ?? "未知"}。`
           : "缓存来源：无可用价格历史。",
         `组合内匹配持仓 ${matchingHoldings.length} 笔，CAD 市值约 ${Math.round(totalMarketValueCad).toLocaleString("en-CA")}。`,
-        `身份匹配使用 symbol=${symbol}, exchange=${expectedExchange ?? "未指定"}, currency=${expectedCurrency ?? "未指定"}。`,
+        `身份匹配使用 securityId=${expectedSecurityId ?? "未指定"}, symbol=${symbol}, exchange=${expectedExchange ?? "未指定"}, currency=${expectedCurrency ?? "未指定"}。`,
       ],
       risks: [
+        ...(!expectedSecurityId && (!expectedExchange || !expectedCurrency)
+          ? ["缺少 securityId 或完整 listing 身份；已跳过 ticker-only 行情关联，避免 CAD/USD 混淆。"]
+          : []),
         ...(matchingHistory.length === 0
           ? ["缓存行情为空；不能把该结果当成实时市场研究。"]
           : []),

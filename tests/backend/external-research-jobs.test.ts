@@ -224,6 +224,7 @@ test("external research job mobile mapping exposes readable security identity", 
   const mapped = mapExternalResearchJobForMobile(job);
   assert.equal(mapped.targetLabel, "VFV · TSX · CAD");
   assert.deepEqual(mapped.identity, {
+    securityId: null,
     symbol: "VFV",
     exchange: "TSX",
     currency: "CAD",
@@ -274,11 +275,11 @@ test("external research worker can persist cached market-data results when expli
   const job = await mockRepositories.externalResearchJobs.create({
     userId: "user_casey",
     scope: "security",
-    targetKey: "security:VFV:no-exchange:CAD",
+    targetKey: "security:VFV:TSX:CAD",
     request: {
       scope: "security",
       mode: "quick",
-      security: { symbol: "VFV", currency: "CAD" },
+      security: { symbol: "VFV", exchange: "TSX", currency: "CAD" },
       cacheStrategy: "prefer-cache",
       maxCacheAgeSeconds: 21600,
       includeExternalResearch: true,

@@ -159,7 +159,7 @@ V2.1 coverage vs V3 backlog:
 | Sector/style tilts | Light boost/penalty for known static candidates | Dynamic candidate universe, sector exposure caps, style factor attribution |
 | Life goals | Home goal adds risk-buffer penalty to equity candidates | Goal buckets, timeline-aware cash/FHSA/down-payment planning |
 | Tax strategy | Still mostly existing account-type matrix | Real province/tax bracket/withholding/taxable turnover model |
-| External info | Not used in scoring | Cached news/filings/fundamentals/sentiment overlay with source freshness |
+| External info | Visible overlay from cached analysis runs; not a hidden scoring override | Cached news/filings/fundamentals/sentiment overlay with calibrated source freshness |
 | Candidate universe | Static curated ETF list plus manual candidate scoring | Verified identity universe from search/watchlist/holdings/provider metadata |
 | Validation | Unit tests for constraints and preference scoring direction | Backtests, scenario tests, stale-data checks, confidence calibration |
 
@@ -170,10 +170,27 @@ Current bridge implementation:
 - Recommendation mobile view surfaces cached AI/market-data analysis as
   `Loo国今日秘闻` so users can see relevant context before acting on a recommendation.
 - Recommendation priority cards can now show `相关秘闻` references from cached
-  analysis runs. The bridge uses two levels: `当前上市版本情报` for unambiguous
-  symbol/listing matches and `底层资产情报` when a ticker has CAD/US duplicate
-  listings. The latter can explain company/fund context, but quote, FX, and
-  freshness data still belong to the current listing only.
+  analysis runs. The bridge uses canonical identity first: exact `security_id`
+  matches are `当前上市版本情报`, exact `symbol + exchange + currency` is the strict
+  fallback for older records, and unresolved ticker-only matches are downgraded
+  to `底层资产情报`. The latter can explain company/fund context, but quote, FX,
+  and freshness data still belong to the current listing only.
+- Mobile labels this layer as `V3 Overlay / V2.1 Core` when cached intelligence
+  exists. This is intentionally honest: V3 evidence is surfaced and linked, but
+  deterministic V2.1 still owns target-allocation/account/tax execution.
+- Each priority now carries a V3 overlay DTO:
+  - `baselineScore`: V2.1 security/account/tax baseline
+  - `preferenceFitScore`: Preference Factors V2 contribution
+  - `externalInsightScore`: cached analysis/external-intelligence contribution
+  - `finalScore`: transparent weighted result
+  - `signals` and `riskFlags`: user-visible explanation of what changed
+- Current V3 weighting is intentionally conservative: 70% V2.1 deterministic
+  baseline, 15% Preference Factors V2, and 15% cached intelligence. This
+  prevents a stale or shallow external signal from overpowering saved allocation
+  and account rules.
+- Recommendation cards now expose `偏好契合` and named `进阶偏好因子` impacts so
+  Preference Factors V2 can be verified from the result page, not only from
+  Settings.
 - Recommendation priority cards expose a `查看标的详情` entry. New V2.1 runs carry
   the lead security's trading currency into mobile detail navigation; older
   runs without currency remain navigable but should be treated as unresolved
@@ -348,19 +365,25 @@ personalized decision layer that connects:
 
 P0.5:
 
-1. Finish current cached market-data / provider status foundation.
-2. Add docs and contract for Recommendation V3 external signals.
-3. Add Preference Factors V2 backend schema as optional fields with safe
+1. Complete: current cached market-data / provider status foundation.
+2. Complete: docs and contract for Recommendation V3 external signals.
+3. Complete: Preference Factors V2 backend schema as optional fields with safe
    defaults.
-4. Add a local-only `今日秘闻` API that surfaces cached provider/portfolio
-   signals before live news adapters.
+4. In progress: local-only `今日秘闻` surface from cached provider/portfolio
+   signals before live news adapters. Current implementation is embedded in the
+   mobile recommendations payload; a standalone API can be added when other
+   pages need the same curated feed.
+5. In progress: identity-safe external research provider. Cached market-data
+   research now requires `security_id` or complete `symbol + exchange +
+   currency`; ticker-only fallback is intentionally skipped.
 
 P1:
 
 1. Add first structured news/announcement adapter behind worker/cache flags.
-2. Add V3 recommendation overlay using cached external documents.
-3. Add mobile `今日秘闻` card.
-4. Add guided preference questions for sector/style/life/tax factors.
+2. Calibrate V3 scoring from richer cached external documents instead of the
+   current conservative source/scope/freshness heuristic.
+3. Add standalone `今日秘闻` API if Overview/Portfolio/大臣 need the same feed.
+4. Add deeper guided preference questions for sector/style/life/tax factors.
 
 P2:
 
