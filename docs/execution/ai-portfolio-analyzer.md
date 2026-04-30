@@ -147,8 +147,10 @@ Current status:
   It is bearer/session protected, validates `LooMinisterQuestionRequest`, keeps
   live external research disabled, and currently returns a deterministic local
   `LooMinisterAnswerResult`.
-- Flutter API client exposes `askLooMinister(...)`; UI entry points are not
-  wired yet.
+- Flutter API client exposes `askLooMinister(...)`.
+- Overview now has the first user-triggered `问 Loo国大臣` card. It sends the
+  current `MobileHomeSnapshot.toMinisterContext(...)` payload to the guarded
+  API and renders the deterministic local answer, key points, and disclaimer.
 
 Backend tests:
 

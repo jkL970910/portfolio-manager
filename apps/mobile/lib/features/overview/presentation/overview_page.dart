@@ -7,6 +7,7 @@ import "../../portfolio/presentation/health_score_page.dart";
 import "../../portfolio/presentation/holding_detail_page.dart";
 import "../../shared/data/mobile_chart_models.dart";
 import "../../shared/data/mobile_models.dart";
+import "../../shared/presentation/loo_minister_card.dart";
 import "../../shared/presentation/loo_charts.dart";
 
 class OverviewPage extends StatefulWidget {
@@ -90,6 +91,14 @@ class _OverviewPageState extends State<OverviewPage> {
                           fallbackPoints: snapshot.data!.netWorthTrend,
                         ),
                       ],
+                      const SizedBox(height: 18),
+                      LooMinisterCard(
+                        apiClient: widget.apiClient,
+                        pageContext: snapshot.data!.toMinisterContext(
+                          asOf: DateTime.now().toUtc().toIso8601String(),
+                        ),
+                        suggestedQuestion: "为什么总资产曲线和卡片数字可能不同？",
+                      ),
                       const SizedBox(height: 18),
                       _HealthCard(
                         snapshot.data!.health,
