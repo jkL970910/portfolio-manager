@@ -328,8 +328,7 @@ class MobilePreferenceFactors {
       emergencyFundTargetCad: _number(lifeGoals["emergencyFundTargetCad"]),
       retirementHorizonYears: _number(lifeGoals["retirementHorizonYears"]),
       province: (taxStrategy["province"] as String?)?.trim(),
-      marginalTaxBracket:
-          _nullableLevel(taxStrategy["marginalTaxBracket"]),
+      marginalTaxBracket: _nullableLevel(taxStrategy["marginalTaxBracket"]),
       rrspDeductionPriority:
           _level(taxStrategy["rrspDeductionPriority"], fallback: "medium"),
       tfsaGrowthPriority:
@@ -475,6 +474,11 @@ class MobileGuidedDraft {
     required String volatility,
     required String priority,
     required String cashNeed,
+    String sectorTilt = "broad",
+    String homePlan = "none",
+    String taxFocus = "medium",
+    String usdFundingPath = "unknown",
+    bool allowExternalSignals = false,
   }) {
     var score = 0;
     if (horizon == "long") score += 1;
@@ -509,7 +513,7 @@ class MobileGuidedDraft {
       );
     }
 
-    if (goal == "home" || cashNeed == "high") {
+    if (goal == "home" || homePlan != "none" || cashNeed == "high") {
       adjust("Fixed Income", 5);
       adjust("Cash", 5);
       adjust("US Equity", -10);
@@ -517,6 +521,14 @@ class MobileGuidedDraft {
       adjust("International Equity", 4);
       adjust("Fixed Income", -2);
       adjust("Cash", -2);
+    }
+    if (sectorTilt == "tech-energy" && volatility == "high") {
+      adjust("US Equity", 4);
+      adjust("Fixed Income", -2);
+      adjust("Cash", -2);
+    } else if (sectorTilt == "dividend-quality") {
+      adjust("Canadian Equity", 3);
+      adjust("US Equity", -3);
     }
 
     final transitionPreference = priority == "stay-close"
@@ -529,7 +541,8 @@ class MobileGuidedDraft {
         : priority == "stay-close"
             ? "balanced"
             : "target-first";
-    final taxAwarePlacement = priority == "tax-efficiency";
+    final taxAwarePlacement =
+        priority == "tax-efficiency" || taxFocus == "high";
     final cashBufferTargetCad = cashNeed == "high"
         ? 15000.0
         : cashNeed == "medium"
@@ -540,13 +553,28 @@ class MobileGuidedDraft {
         : volatility == "high"
             ? 14
             : 10;
-    final accountFundingPriority = goal == "home"
+    final accountFundingPriority = goal == "home" || homePlan == "active"
         ? ["FHSA", "TFSA", "RRSP"]
         : goal == "retirement"
             ? ["RRSP", "TFSA", "Taxable"]
             : priority == "tax-efficiency"
                 ? ["TFSA", "RRSP", "Taxable"]
                 : ["TFSA", "Taxable", "RRSP"];
+    final homePurchaseEnabled = goal == "home" || homePlan != "none";
+    final preferredSectors = switch (sectorTilt) {
+      "tech-energy" => const ["Technology", "Energy"],
+      "dividend-quality" => const ["Financial Services", "Utilities"],
+      "canada-home" => const ["Canadian Equity"],
+      _ => const <String>[],
+    };
+    final styleTilts = switch (sectorTilt) {
+      "tech-energy" => const ["Growth"],
+      "dividend-quality" => const ["Dividend", "Quality"],
+      _ => volatility == "high" ? const ["Growth"] : const <String>[],
+    };
+    final thematicInterests = sectorTilt == "tech-energy"
+        ? const ["AI infrastructure", "Energy transition"]
+        : const <String>[];
     final preferenceFactors = MobilePreferenceFactors(
       riskCapacity: volatility == "high" && horizon == "long"
           ? "high"
@@ -558,22 +586,21 @@ class MobileGuidedDraft {
       leverageAllowed: false,
       optionsAllowed: false,
       cryptoAllowed: false,
-      preferredSectors: volatility == "high" && goal == "wealth"
-          ? const ["Technology", "Energy"]
-          : const [],
+      preferredSectors: preferredSectors,
       avoidedSectors: const [],
-      styleTilts: volatility == "high" ? const ["Growth"] : const [],
-      thematicInterests: const [],
-      homePurchaseEnabled: goal == "home",
-      homePurchaseHorizonYears: goal == "home"
+      styleTilts: styleTilts,
+      thematicInterests: thematicInterests,
+      homePurchaseEnabled: homePurchaseEnabled,
+      homePurchaseHorizonYears: homePurchaseEnabled
           ? horizon == "short"
               ? 2
               : horizon == "medium"
                   ? 5
                   : 8
           : null,
-      homeDownPaymentTargetCad: goal == "home" ? 150000 : null,
-      homePurchasePriority: goal == "home" ? "high" : "medium",
+      homeDownPaymentTargetCad: homePurchaseEnabled ? 150000 : null,
+      homePurchasePriority:
+          goal == "home" || homePlan == "active" ? "high" : "medium",
       emergencyFundTargetCad: cashBufferTargetCad * 2,
       retirementHorizonYears: goal == "retirement"
           ? horizon == "short"
@@ -584,19 +611,19 @@ class MobileGuidedDraft {
           : null,
       province: "ON",
       marginalTaxBracket: null,
-      rrspDeductionPriority: priority == "tax-efficiency" ? "high" : "medium",
+      rrspDeductionPriority: taxFocus == "high" ? "high" : "medium",
       tfsaGrowthPriority: "high",
-      fhsaHomeGoalPriority: goal == "home" ? "high" : "medium",
-      taxableTaxSensitivity: priority == "tax-efficiency" ? "high" : "medium",
+      fhsaHomeGoalPriority: homePurchaseEnabled ? "high" : "medium",
+      taxableTaxSensitivity: taxFocus,
       dividendWithholdingSensitivity: "medium",
-      usdFundingPath: "unknown",
+      usdFundingPath: usdFundingPath,
       monthlyContributionCad: null,
       minimumTradeSizeCad: 500,
       liquidityNeed: cashNeed,
       cashDuringUncertainty: cashNeed == "high" ? "high" : "medium",
-      allowNewsSignals: false,
-      allowInstitutionalSignals: false,
-      allowCommunitySignals: false,
+      allowNewsSignals: allowExternalSignals,
+      allowInstitutionalSignals: allowExternalSignals,
+      allowCommunitySignals: allowExternalSignals,
       preferredFreshnessHours: 24,
       maxDailyExternalCalls: 5,
     );
@@ -608,6 +635,11 @@ class MobileGuidedDraft {
         "volatility": volatility,
         "priority": priority,
         "cashNeed": cashNeed,
+        "sectorTilt": sectorTilt,
+        "homePlan": homePlan,
+        "taxFocus": taxFocus,
+        "usdFundingPath": usdFundingPath,
+        "allowExternalSignals": allowExternalSignals.toString(),
       },
       riskProfile: riskProfile,
       targetAllocation: allocation,
@@ -623,11 +655,17 @@ class MobileGuidedDraft {
         "期限：$horizon",
         "波动承受：$volatility",
         "现金需求：$cashNeed",
+        "行业/风格：$sectorTilt",
+        "税务关注：$taxFocus",
         "进阶偏好：${preferenceFactors.summary}",
       ],
       rationale: [
         "根据期限、目标和波动承受度，将风险档位设为 $riskProfile。",
         taxAwarePlacement ? "启用税务感知放置，优先使用更合适的账户桶。" : "使用较简洁的账户匹配规则。",
+        sectorTilt == "broad"
+            ? "未设置明显行业倾向，保持更宽的分散度。"
+            : "根据行业/风格回答写入 Preference Factors V2。",
+        homePurchaseEnabled ? "识别到买房或首付目标，提升流动性和 FHSA 相关参数。" : "未开启买房目标。",
         "调整节奏设为 $transitionPreference，推荐策略设为 $recommendationStrategy。",
       ],
     );

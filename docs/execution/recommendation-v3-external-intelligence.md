@@ -147,6 +147,10 @@ AI-guided workflow requirement:
 - Product IA: expose only two top-level preference paths to reduce beginner
   confusion: `新手引导` and `手动进阶`. Manual advanced editing may still group
   basic allocation, recommendation rules, and advanced factors internally.
+- `新手引导` is the primary beginner path and must walk through the full
+  Preference Factors V2 surface. It should produce a complete deterministic
+  draft first, then let AI 大臣 refine the structured factors when provider
+  access is available. The user must still review and apply the final draft.
 
 V2.1 coverage vs V3 backlog:
 

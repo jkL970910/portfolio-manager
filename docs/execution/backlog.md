@@ -166,3 +166,8 @@ P1 follow-up goals:
   `新手引导` for questionnaire/AI-assisted setup, and `手动进阶` for users who
   want to directly edit basic allocation, recommendation rules, and advanced
   factors.
+- `新手引导` must cover the full Preference Factors V2 surface, not only the old
+  five allocation questions. It should include sector/style tilts, buy-home
+  planning, tax priority, USD funding path, liquidity, and external information
+  consent. AI 大臣 assistance belongs inside this beginner flow as a structured
+  draft helper before the user applies changes.

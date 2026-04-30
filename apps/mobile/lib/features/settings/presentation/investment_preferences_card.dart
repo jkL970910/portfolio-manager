@@ -147,7 +147,8 @@ class _InvestmentPreferencesCardState extends State<InvestmentPreferencesCard> {
     }
   }
 
-  Future<void> _openManualAdvancedEditor(MobilePreferenceProfile profile) async {
+  Future<void> _openManualAdvancedEditor(
+      MobilePreferenceProfile profile) async {
     final choice = await showModalBottomSheet<String>(
       context: context,
       isScrollControlled: true,
@@ -233,15 +234,19 @@ class _InvestmentPreferencesCardState extends State<InvestmentPreferencesCard> {
                   ],
                 ),
                 const SizedBox(height: 10),
+                Text("已应用参数摘要", style: Theme.of(context).textTheme.titleMedium),
+                const SizedBox(height: 4),
+                const Text("这些不是单独的输入框，而是由新手引导或手动进阶保存后的推导结果。"),
+                const SizedBox(height: 8),
                 Wrap(
                   spacing: 8,
                   runSpacing: 8,
                   children: [
-                    _InfoChip("风险", profile.riskProfileLabel),
-                    _InfoChip("再平衡", "${profile.rebalancingTolerancePct}%"),
-                    _InfoChip("现金",
+                    _InfoChip("风险档位", profile.riskProfileLabel),
+                    _InfoChip("再平衡阈值", "${profile.rebalancingTolerancePct}%"),
+                    _InfoChip("现金缓冲",
                         "\$${profile.cashBufferTargetCad.toStringAsFixed(0)}"),
-                    _InfoChip("税务", profile.taxAwarePlacement ? "开启" : "关闭"),
+                    _InfoChip("税务放置", profile.taxAwarePlacement ? "开启" : "关闭"),
                   ],
                 ),
                 const SizedBox(height: 10),
@@ -1079,7 +1084,8 @@ class _PreferenceFactorsSheet extends StatefulWidget {
   final MobilePreferenceProfile profile;
 
   @override
-  State<_PreferenceFactorsSheet> createState() => _PreferenceFactorsSheetState();
+  State<_PreferenceFactorsSheet> createState() =>
+      _PreferenceFactorsSheetState();
 }
 
 class _PreferenceFactorsSheetState extends State<_PreferenceFactorsSheet> {
@@ -1123,8 +1129,8 @@ class _PreferenceFactorsSheetState extends State<_PreferenceFactorsSheet> {
   late final _homeDownPaymentController = TextEditingController(
       text: _formatNullableNumber(
           widget.profile.preferenceFactors.homeDownPaymentTargetCad));
-  late final _provinceController =
-      TextEditingController(text: widget.profile.preferenceFactors.province ?? "ON");
+  late final _provinceController = TextEditingController(
+      text: widget.profile.preferenceFactors.province ?? "ON");
   late final _monthlyContributionController = TextEditingController(
       text: _formatNullableNumber(
           widget.profile.preferenceFactors.monthlyContributionCad));
@@ -1203,13 +1209,15 @@ class _PreferenceFactorsSheetState extends State<_PreferenceFactorsSheet> {
     try {
       final response = await widget.apiClient.createPreferenceFactorsDraft({
         "narrative": narrative,
-        "currentPreferenceFactors": widget.profile.preferenceFactors.toPayload(),
+        "currentPreferenceFactors":
+            widget.profile.preferenceFactors.toPayload(),
       });
       final data = response["data"];
       if (data is! Map<String, dynamic>) {
         throw const LooApiException("大臣草稿格式不正确。");
       }
-      final factors = MobilePreferenceFactors.fromJson(data["preferenceFactors"]);
+      final factors =
+          MobilePreferenceFactors.fromJson(data["preferenceFactors"]);
       _applyFactorsToForm(factors);
       if (mounted) {
         setState(() {
@@ -1243,12 +1251,15 @@ class _PreferenceFactorsSheetState extends State<_PreferenceFactorsSheet> {
       styleTilts: _parseTextList(_styleTiltsController.text),
       thematicInterests: _parseTextList(_themesController.text),
       homePurchaseEnabled: _homePurchaseEnabled,
-      homePurchaseHorizonYears: _parseNullableDouble(_homeHorizonController.text),
+      homePurchaseHorizonYears:
+          _parseNullableDouble(_homeHorizonController.text),
       homeDownPaymentTargetCad:
           _parseNullableDouble(_homeDownPaymentController.text),
       homePurchasePriority: _homePurchasePriority,
-      emergencyFundTargetCad: widget.profile.preferenceFactors.emergencyFundTargetCad,
-      retirementHorizonYears: widget.profile.preferenceFactors.retirementHorizonYears,
+      emergencyFundTargetCad:
+          widget.profile.preferenceFactors.emergencyFundTargetCad,
+      retirementHorizonYears:
+          widget.profile.preferenceFactors.retirementHorizonYears,
       province: _provinceController.text.trim().isEmpty
           ? null
           : _provinceController.text.trim().toUpperCase(),
@@ -1270,7 +1281,8 @@ class _PreferenceFactorsSheetState extends State<_PreferenceFactorsSheet> {
       allowCommunitySignals: _allowCommunitySignals,
       preferredFreshnessHours:
           widget.profile.preferenceFactors.preferredFreshnessHours,
-      maxDailyExternalCalls: widget.profile.preferenceFactors.maxDailyExternalCalls,
+      maxDailyExternalCalls:
+          widget.profile.preferenceFactors.maxDailyExternalCalls,
     );
 
     setState(() {
@@ -1331,8 +1343,7 @@ class _PreferenceFactorsSheetState extends State<_PreferenceFactorsSheet> {
               maxLines: 5,
               decoration: const InputDecoration(
                 labelText: "让大臣草拟参数",
-                helperText:
-                    "描述你的目标，例如：我更激进，偏科技能源，未来 5 年可能买房，也想做税务优化。",
+                helperText: "描述你的目标，例如：我更激进，偏科技能源，未来 5 年可能买房，也想做税务优化。",
               ),
             ),
             const SizedBox(height: 10),
@@ -1370,8 +1381,9 @@ class _PreferenceFactorsSheetState extends State<_PreferenceFactorsSheet> {
               label: "风险容量",
               value: _riskCapacity,
               items: const {"low": "低", "medium": "中", "high": "高"},
-              onChanged:
-                  _saving ? null : (value) => setState(() => _riskCapacity = value),
+              onChanged: _saving
+                  ? null
+                  : (value) => setState(() => _riskCapacity = value),
             ),
             _GuidedSelect(
               label: "波动舒适度",
@@ -1391,10 +1403,10 @@ class _PreferenceFactorsSheetState extends State<_PreferenceFactorsSheet> {
             ),
             _factorTextField(_preferredSectorsController, "偏好行业",
                 "例如 Technology, Energy；V2.1 会轻量加分。"),
-            _factorTextField(_avoidedSectorsController, "回避行业",
-                "例如 Tobacco；命中后会降低候选分。"),
-            _factorTextField(_styleTiltsController, "风格偏好",
-                "例如 Growth, Quality, Dividend。"),
+            _factorTextField(
+                _avoidedSectorsController, "回避行业", "例如 Tobacco；命中后会降低候选分。"),
+            _factorTextField(
+                _styleTiltsController, "风格偏好", "例如 Growth, Quality, Dividend。"),
             _factorTextField(_themesController, "主题兴趣",
                 "例如 AI infrastructure, clean energy。"),
             SwitchListTile(
@@ -1440,22 +1452,25 @@ class _PreferenceFactorsSheetState extends State<_PreferenceFactorsSheet> {
               label: "RRSP 抵税优先级",
               value: _rrspPriority,
               items: const {"low": "低", "medium": "中", "high": "高"},
-              onChanged:
-                  _saving ? null : (value) => setState(() => _rrspPriority = value),
+              onChanged: _saving
+                  ? null
+                  : (value) => setState(() => _rrspPriority = value),
             ),
             _GuidedSelect(
               label: "TFSA 成长优先级",
               value: _tfsaPriority,
               items: const {"low": "低", "medium": "中", "high": "高"},
-              onChanged:
-                  _saving ? null : (value) => setState(() => _tfsaPriority = value),
+              onChanged: _saving
+                  ? null
+                  : (value) => setState(() => _tfsaPriority = value),
             ),
             _GuidedSelect(
               label: "FHSA 买房优先级",
               value: _fhsaPriority,
               items: const {"low": "低", "medium": "中", "high": "高"},
-              onChanged:
-                  _saving ? null : (value) => setState(() => _fhsaPriority = value),
+              onChanged: _saving
+                  ? null
+                  : (value) => setState(() => _fhsaPriority = value),
             ),
             _GuidedSelect(
               label: "Taxable 税务敏感度",
@@ -1495,8 +1510,9 @@ class _PreferenceFactorsSheetState extends State<_PreferenceFactorsSheet> {
               label: "流动性需求",
               value: _liquidityNeed,
               items: const {"low": "低", "medium": "中", "high": "高"},
-              onChanged:
-                  _saving ? null : (value) => setState(() => _liquidityNeed = value),
+              onChanged: _saving
+                  ? null
+                  : (value) => setState(() => _liquidityNeed = value),
             ),
             _GuidedSelect(
               label: "不确定时期持现金意愿",
@@ -1521,7 +1537,8 @@ class _PreferenceFactorsSheetState extends State<_PreferenceFactorsSheet> {
               value: _allowInstitutionalSignals,
               onChanged: _saving
                   ? null
-                  : (value) => setState(() => _allowInstitutionalSignals = value),
+                  : (value) =>
+                      setState(() => _allowInstitutionalSignals = value),
             ),
             SwitchListTile(
               contentPadding: EdgeInsets.zero,
@@ -1585,7 +1602,17 @@ class _GuidedPreferenceSheetState extends State<_GuidedPreferenceSheet> {
   var _volatility = "medium";
   var _priority = "balanced";
   var _cashNeed = "medium";
+  var _sectorTilt = "broad";
+  var _homePlan = "none";
+  var _taxFocus = "medium";
+  var _usdFundingPath = "unknown";
+  var _allowExternalSignals = false;
+  final _narrativeController = TextEditingController();
+  MobilePreferenceFactors? _ministerFactors;
+  String? _ministerSummary;
+  List<String> _ministerRationale = const [];
   var _saving = false;
+  var _drafting = false;
   String? _error;
 
   MobileGuidedDraft get _draft => MobileGuidedDraft.fromAnswers(
@@ -1594,10 +1621,85 @@ class _GuidedPreferenceSheetState extends State<_GuidedPreferenceSheet> {
         volatility: _volatility,
         priority: _priority,
         cashNeed: _cashNeed,
+        sectorTilt: _sectorTilt,
+        homePlan: _homePlan,
+        taxFocus: _taxFocus,
+        usdFundingPath: _usdFundingPath,
+        allowExternalSignals: _allowExternalSignals,
       );
+
+  @override
+  void dispose() {
+    _narrativeController.dispose();
+    super.dispose();
+  }
+
+  MobilePreferenceFactors _effectiveFactors(MobileGuidedDraft draft) {
+    return _ministerFactors ?? draft.preferenceFactors;
+  }
+
+  String _composeMinisterNarrative(MobileGuidedDraft draft) {
+    final userText = _narrativeController.text.trim();
+    return [
+      "请根据以下新手问答，为 Preference Factors V2 生成完整草稿。",
+      "目标: $_goal",
+      "期限: $_horizon",
+      "波动承受: $_volatility",
+      "推荐优先级: $_priority",
+      "现金需求: $_cashNeed",
+      "行业/风格倾向: $_sectorTilt",
+      "买房计划: $_homePlan",
+      "税务关注: $_taxFocus",
+      "USD 入金路径: $_usdFundingPath",
+      "允许外部信息: $_allowExternalSignals",
+      "当前本地草稿: ${draft.preferenceFactors.toPayload()}",
+      if (userText.isNotEmpty) "用户补充: $userText",
+    ].join("\n");
+  }
+
+  Future<void> _askMinisterForFullDraft() async {
+    final draft = _draft;
+    setState(() {
+      _drafting = true;
+      _error = null;
+      _ministerSummary = null;
+      _ministerRationale = const [];
+    });
+
+    try {
+      final response = await widget.apiClient.createPreferenceFactorsDraft({
+        "narrative": _composeMinisterNarrative(draft),
+        "currentPreferenceFactors": draft.preferenceFactors.toPayload(),
+      });
+      final data = response["data"];
+      if (data is! Map<String, dynamic>) {
+        throw const LooApiException("大臣草稿格式不正确。");
+      }
+      final factors =
+          MobilePreferenceFactors.fromJson(data["preferenceFactors"]);
+      if (mounted) {
+        setState(() {
+          _ministerFactors = factors;
+          _ministerSummary = data["summary"] as String? ?? "大臣已补全进阶参数。";
+          _ministerRationale =
+              (data["rationale"] as List?)?.whereType<String>().toList() ??
+                  const [];
+          _drafting = false;
+        });
+      }
+    } catch (error) {
+      if (mounted) {
+        setState(() {
+          _error = error.toString();
+          _drafting = false;
+        });
+      }
+    }
+  }
 
   Future<void> _apply() async {
     final draft = _draft;
+    final factors = _effectiveFactors(draft);
     setState(() {
       _saving = true;
       _error = null;
@@ -1607,6 +1709,7 @@ class _GuidedPreferenceSheetState extends State<_GuidedPreferenceSheet> {
       await widget.apiClient.saveGuidedPreferenceDraft(draft.toDraftPayload());
       await widget.apiClient.updateInvestmentPreferences({
         ...draft.suggestedProfilePayload,
+        "preferenceFactors": factors.toPayload(),
         "source": "guided",
         "watchlistSymbols": widget.profile.watchlistSymbols,
       });
@@ -1627,6 +1730,7 @@ class _GuidedPreferenceSheetState extends State<_GuidedPreferenceSheet> {
   Widget build(BuildContext context) {
     final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
     final draft = _draft;
+    final factors = _effectiveFactors(draft);
     return Padding(
       padding: EdgeInsets.fromLTRB(20, 20, 20, bottomInset + 20),
       child: SingleChildScrollView(
@@ -1636,7 +1740,7 @@ class _GuidedPreferenceSheetState extends State<_GuidedPreferenceSheet> {
           children: [
             Text("引导式偏好设置", style: Theme.of(context).textTheme.headlineMedium),
             const SizedBox(height: 8),
-            const Text("回答 5 个问题，Loo皇会生成一套可直接应用的投资规则。"),
+            const Text("回答核心问题后，Loo皇会先生成完整本地草稿；你也可以请大臣补全进阶参数再应用。"),
             const SizedBox(height: 16),
             _GuidedSelect(
               label: "目标",
@@ -1647,23 +1751,34 @@ class _GuidedPreferenceSheetState extends State<_GuidedPreferenceSheet> {
                 "wealth": "财富增长",
                 "capital-preservation": "本金保护",
               },
-              onChanged:
-                  _saving ? null : (value) => setState(() => _goal = value),
+              onChanged: _saving || _drafting
+                  ? null
+                  : (value) => setState(() {
+                        _goal = value;
+                        _ministerFactors = null;
+                      }),
             ),
             _GuidedSelect(
               label: "投资期限",
               value: _horizon,
               items: const {"short": "短期", "medium": "中期", "long": "长期"},
-              onChanged:
-                  _saving ? null : (value) => setState(() => _horizon = value),
+              onChanged: _saving || _drafting
+                  ? null
+                  : (value) => setState(() {
+                        _horizon = value;
+                        _ministerFactors = null;
+                      }),
             ),
             _GuidedSelect(
               label: "波动承受",
               value: _volatility,
               items: const {"low": "低", "medium": "中", "high": "高"},
-              onChanged: _saving
+              onChanged: _saving || _drafting
                   ? null
-                  : (value) => setState(() => _volatility = value),
+                  : (value) => setState(() {
+                        _volatility = value;
+                        _ministerFactors = null;
+                      }),
             ),
             _GuidedSelect(
               label: "推荐优先级",
@@ -1673,15 +1788,112 @@ class _GuidedPreferenceSheetState extends State<_GuidedPreferenceSheet> {
                 "balanced": "平衡",
                 "stay-close": "贴近现状",
               },
-              onChanged:
-                  _saving ? null : (value) => setState(() => _priority = value),
+              onChanged: _saving || _drafting
+                  ? null
+                  : (value) => setState(() {
+                        _priority = value;
+                        _ministerFactors = null;
+                      }),
             ),
             _GuidedSelect(
               label: "现金需求",
               value: _cashNeed,
               items: const {"low": "低", "medium": "中", "high": "高"},
-              onChanged:
-                  _saving ? null : (value) => setState(() => _cashNeed = value),
+              onChanged: _saving || _drafting
+                  ? null
+                  : (value) => setState(() {
+                        _cashNeed = value;
+                        _ministerFactors = null;
+                      }),
+            ),
+            _GuidedSelect(
+              label: "行业/风格倾向",
+              value: _sectorTilt,
+              items: const {
+                "broad": "保持宽分散",
+                "tech-energy": "偏科技/能源成长",
+                "dividend-quality": "偏分红/质量",
+                "canada-home": "偏加拿大/买房相关",
+              },
+              onChanged: _saving || _drafting
+                  ? null
+                  : (value) => setState(() {
+                        _sectorTilt = value;
+                        _ministerFactors = null;
+                      }),
+            ),
+            _GuidedSelect(
+              label: "买房计划",
+              value: _homePlan,
+              items: const {
+                "none": "暂时没有",
+                "possible": "未来可能买房",
+                "active": "已有明确首付目标",
+              },
+              onChanged: _saving || _drafting
+                  ? null
+                  : (value) => setState(() {
+                        _homePlan = value;
+                        _ministerFactors = null;
+                      }),
+            ),
+            _GuidedSelect(
+              label: "税务优化关注",
+              value: _taxFocus,
+              items: const {"low": "低", "medium": "中", "high": "高"},
+              onChanged: _saving || _drafting
+                  ? null
+                  : (value) => setState(() {
+                        _taxFocus = value;
+                        _ministerFactors = null;
+                      }),
+            ),
+            _GuidedSelect(
+              label: "USD 入金/换汇路径",
+              value: _usdFundingPath,
+              items: const {
+                "unknown": "还不确定",
+                "available": "可稳定使用",
+                "avoid": "尽量避免",
+              },
+              onChanged: _saving || _drafting
+                  ? null
+                  : (value) => setState(() {
+                        _usdFundingPath = value;
+                        _ministerFactors = null;
+                      }),
+            ),
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              title: const Text("允许外部信息辅助推荐"),
+              subtitle: const Text("V3 会读取该偏好，结合新闻/研究信息但仍显示来源和新鲜度。"),
+              value: _allowExternalSignals,
+              onChanged: _saving || _drafting
+                  ? null
+                  : (value) => setState(() {
+                        _allowExternalSignals = value;
+                        _ministerFactors = null;
+                      }),
+            ),
+            TextField(
+              controller: _narrativeController,
+              enabled: !_saving && !_drafting,
+              minLines: 2,
+              maxLines: 4,
+              decoration: const InputDecoration(
+                labelText: "补充说明 可选",
+                helperText: "例如：我更激进，偏科技能源，5 年内可能买房，也想考虑税务优化。",
+              ),
+            ),
+            const SizedBox(height: 10),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed:
+                    _saving || _drafting ? null : _askMinisterForFullDraft,
+                icon: const Icon(Icons.auto_awesome),
+                label: Text(_drafting ? "大臣补全中..." : "请大臣补全进阶参数"),
+              ),
             ),
             const SizedBox(height: 12),
             Card(
@@ -1694,7 +1906,31 @@ class _GuidedPreferenceSheetState extends State<_GuidedPreferenceSheet> {
                     const SizedBox(height: 8),
                     Text(draft.summary),
                     const SizedBox(height: 8),
-                    Text("进阶偏好：${draft.preferenceFactors.summary}"),
+                    Text("由问答推导出的参数",
+                        style: Theme.of(context).textTheme.titleMedium),
+                    const SizedBox(height: 6),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        _InfoChip("风险档位", draft.riskLabel),
+                        _InfoChip("再平衡阈值", "${draft.rebalancingTolerancePct}%"),
+                        _InfoChip("现金缓冲",
+                            "\$${draft.cashBufferTargetCad.toStringAsFixed(0)}"),
+                        _InfoChip(
+                            "税务放置", draft.taxAwarePlacement ? "开启" : "关闭"),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Text("进阶偏好：${factors.summary}"),
+                    if (_ministerSummary != null) ...[
+                      const SizedBox(height: 8),
+                      Text("大臣补全：$_ministerSummary"),
+                      const SizedBox(height: 6),
+                      ..._ministerRationale
+                          .take(3)
+                          .map((item) => Text("• $item")),
+                    ],
                     const SizedBox(height: 8),
                     ...draft.rationale.take(3).map((item) => Text("• $item")),
                   ],
