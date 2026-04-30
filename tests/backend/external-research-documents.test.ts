@@ -5,6 +5,7 @@ import {
   ExternalResearchDocument,
   rankExternalResearchDocuments,
 } from "@/lib/backend/external-research-documents";
+import { mockRepositories } from "@/lib/backend/repositories/mock-repositories";
 
 function document(
   overrides: Partial<ExternalResearchDocument> = {},
@@ -153,4 +154,55 @@ test("external research result excludes expired and unresolved documents from pr
   assert.match(result.summaryPoints.join("\n"), /VFV distribution update/);
   assert.ok(result.risks.some((risk) => risk.includes("已过期")));
   assert.ok(result.risks.some((risk) => risk.includes("缺少 securityId")));
+});
+
+test("external research document repository upserts and lists fresh identity-scoped records", async () => {
+  const saved = await mockRepositories.externalResearchDocuments.create({
+    userId: "user_doc_repo",
+    providerDocumentId: "provider_doc_1",
+    sourceType: "news",
+    providerId: "news",
+    sourceName: "Test News",
+    title: "Original title",
+    summary: "Original summary",
+    url: "https://example.com/original",
+    publishedAt: "2026-04-30T10:00:00.000Z",
+    capturedAt: "2026-04-30T10:05:00.000Z",
+    expiresAt: "2026-05-01T10:00:00.000Z",
+    language: "en",
+    security: {
+      securityId: "sec_vfv_cad",
+      symbol: "VFV",
+      exchange: "TSX",
+      currency: "CAD",
+    },
+    underlyingId: "VANGUARD-SP-500",
+    confidence: "medium",
+    sentiment: "neutral",
+    relevanceScore: 70,
+    sourceReliability: 85,
+    keyPoints: ["Original point"],
+    riskFlags: [],
+    tags: ["etf"],
+    rawPayload: { provider: "test" },
+  });
+  const updated = await mockRepositories.externalResearchDocuments.create({
+    ...saved,
+    title: "Updated title",
+    relevanceScore: 90,
+  });
+
+  const fresh = await mockRepositories.externalResearchDocuments.listFreshByUserId(
+    "user_doc_repo",
+    {
+      now: new Date("2026-04-30T12:00:00.000Z"),
+      limit: 5,
+      securityId: "sec_vfv_cad",
+    },
+  );
+
+  assert.equal(updated.id, saved.id);
+  assert.equal(fresh.length, 1);
+  assert.equal(fresh[0]?.title, "Updated title");
+  assert.equal(fresh[0]?.relevanceScore, 90);
 });

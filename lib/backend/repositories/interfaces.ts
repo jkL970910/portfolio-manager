@@ -1,6 +1,7 @@
 import {
   CashflowTransaction,
   EntityId,
+  ExternalResearchDocumentRecord,
   ExternalResearchJob,
   ExternalResearchUsageCounter,
   HoldingPosition,
@@ -157,6 +158,24 @@ export interface ExternalResearchUsageCounterRepository {
   }): Promise<ExternalResearchUsageCounter>;
 }
 
+export interface ExternalResearchDocumentRepository {
+  create(
+    input: Omit<ExternalResearchDocumentRecord, "id" | "createdAt" | "updatedAt">,
+  ): Promise<ExternalResearchDocumentRecord>;
+  listFreshByUserId(
+    userId: EntityId,
+    params: {
+      now: Date;
+      limit: number;
+      securityId?: EntityId | null;
+      symbol?: string | null;
+      exchange?: string | null;
+      currency?: string | null;
+      underlyingId?: string | null;
+    },
+  ): Promise<ExternalResearchDocumentRecord[]>;
+}
+
 export interface ImportJobRepository {
   getLatestByUserId(userId: EntityId): Promise<ImportJob>;
 }
@@ -177,5 +196,6 @@ export interface BackendRepositories {
   analysisRuns: PortfolioAnalysisRunRepository;
   externalResearchJobs: ExternalResearchJobRepository;
   externalResearchUsageCounters: ExternalResearchUsageCounterRepository;
+  externalResearchDocuments: ExternalResearchDocumentRepository;
   importJobs: ImportJobRepository;
 }

@@ -680,6 +680,70 @@ export const externalResearchUsageCounters = pgTable(
   }),
 );
 
+export const externalResearchDocuments = pgTable(
+  "external_research_documents",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id),
+    providerDocumentId: varchar("provider_document_id", { length: 160 })
+      .notNull(),
+    sourceType: varchar("source_type", { length: 32 }).notNull(),
+    providerId: varchar("provider_id", { length: 64 }).notNull(),
+    sourceName: varchar("source_name", { length: 120 }).notNull(),
+    title: varchar("title", { length: 240 }).notNull(),
+    summary: text("summary").notNull(),
+    url: text("url"),
+    publishedAt: timestamp("published_at", { withTimezone: true }),
+    capturedAt: timestamp("captured_at", { withTimezone: true }).notNull(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    language: varchar("language", { length: 16 }).notNull().default("unknown"),
+    securityId: uuid("security_id").references(() => securities.id),
+    symbol: varchar("symbol", { length: 32 }),
+    exchange: varchar("exchange", { length: 64 }),
+    currency: varchar("currency", { length: 3 }),
+    securityName: varchar("security_name", { length: 160 }),
+    securityProvider: varchar("security_provider", { length: 64 }),
+    securityType: varchar("security_type", { length: 64 }),
+    underlyingId: varchar("underlying_id", { length: 120 }),
+    confidence: varchar("confidence", { length: 16 }).notNull(),
+    sentiment: varchar("sentiment", { length: 16 }).notNull(),
+    relevanceScore: integer("relevance_score").notNull(),
+    sourceReliability: integer("source_reliability").notNull(),
+    keyPoints: jsonb("key_points").notNull().default([]),
+    riskFlags: jsonb("risk_flags").notNull().default([]),
+    tags: jsonb("tags").notNull().default([]),
+    rawPayload: jsonb("raw_payload").notNull().default({}),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => ({
+    providerDocumentUniqueIdx: uniqueIndex(
+      "external_research_documents_provider_doc_idx",
+    ).on(table.userId, table.providerId, table.providerDocumentId),
+    userExpiresIdx: index("external_research_documents_user_expires_idx").on(
+      table.userId,
+      table.expiresAt,
+    ),
+    securityIdx: index("external_research_documents_security_idx").on(
+      table.securityId,
+    ),
+    identityIdx: index("external_research_documents_identity_idx").on(
+      table.symbol,
+      table.exchange,
+      table.currency,
+    ),
+    underlyingIdx: index("external_research_documents_underlying_idx").on(
+      table.underlyingId,
+    ),
+  }),
+);
+
 export const looMinisterSettings = pgTable(
   "loo_minister_settings",
   {

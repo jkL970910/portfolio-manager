@@ -5,6 +5,7 @@ import {
   cashAccountBalanceEvents,
   cashAccounts,
   cashflowTransactions,
+  externalResearchDocuments,
   externalResearchJobs,
   externalResearchUsageCounters,
   holdingPositions,
@@ -27,6 +28,7 @@ import {
   InvestmentAccount,
   CashAccount,
   CashAccountBalanceEvent,
+  ExternalResearchDocumentRecord,
   ExternalResearchJob,
   ExternalResearchUsageCounter,
   PortfolioEvent,
@@ -326,6 +328,53 @@ function mapExternalResearchUsageCounter(
     scope: row.scope as ExternalResearchUsageCounter["scope"],
     runCount: row.runCount,
     symbolCount: row.symbolCount,
+    createdAt: row.createdAt.toISOString(),
+    updatedAt: row.updatedAt.toISOString(),
+  };
+}
+
+function mapExternalResearchDocument(
+  row: typeof externalResearchDocuments.$inferSelect,
+): ExternalResearchDocumentRecord {
+  return {
+    id: row.id,
+    userId: row.userId,
+    providerDocumentId: row.providerDocumentId,
+    sourceType: row.sourceType as ExternalResearchDocumentRecord["sourceType"],
+    providerId: row.providerId,
+    sourceName: row.sourceName,
+    title: row.title,
+    summary: row.summary,
+    url: row.url ?? null,
+    publishedAt: row.publishedAt?.toISOString() ?? null,
+    capturedAt: row.capturedAt.toISOString(),
+    expiresAt: row.expiresAt.toISOString(),
+    language: row.language as ExternalResearchDocumentRecord["language"],
+    security: row.securityId || row.symbol
+      ? {
+          securityId: row.securityId ?? null,
+          symbol: row.symbol ?? null,
+          exchange: row.exchange ?? null,
+          currency:
+            (row.currency as ExternalResearchDocumentRecord["security"] extends infer S
+              ? S extends { currency?: infer C }
+                ? C
+                : never
+              : never) ?? null,
+          name: row.securityName ?? null,
+          provider: row.securityProvider ?? null,
+          securityType: row.securityType ?? null,
+        }
+      : null,
+    underlyingId: row.underlyingId ?? null,
+    confidence: row.confidence as ExternalResearchDocumentRecord["confidence"],
+    sentiment: row.sentiment as ExternalResearchDocumentRecord["sentiment"],
+    relevanceScore: row.relevanceScore,
+    sourceReliability: row.sourceReliability,
+    keyPoints: row.keyPoints as string[],
+    riskFlags: row.riskFlags as string[],
+    tags: row.tags as string[],
+    rawPayload: row.rawPayload as Record<string, unknown>,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   };
@@ -1000,6 +1049,109 @@ export const postgresRepositories: BackendRepositories = {
         throw new Error("Failed to increment external research usage.");
       }
       return mapExternalResearchUsageCounter(row);
+    },
+  },
+  externalResearchDocuments: {
+    async create(input) {
+      const db = getDb();
+      const [row] = await db
+        .insert(externalResearchDocuments)
+        .values({
+          userId: input.userId,
+          providerDocumentId: input.providerDocumentId,
+          sourceType: input.sourceType,
+          providerId: input.providerId,
+          sourceName: input.sourceName,
+          title: input.title,
+          summary: input.summary,
+          url: input.url,
+          publishedAt: input.publishedAt
+            ? new Date(input.publishedAt)
+            : null,
+          capturedAt: new Date(input.capturedAt),
+          expiresAt: new Date(input.expiresAt),
+          language: input.language,
+          securityId: input.security?.securityId ?? null,
+          symbol: input.security?.symbol ?? null,
+          exchange: input.security?.exchange ?? null,
+          currency: input.security?.currency ?? null,
+          securityName: input.security?.name ?? null,
+          securityProvider: input.security?.provider ?? null,
+          securityType: input.security?.securityType ?? null,
+          underlyingId: input.underlyingId,
+          confidence: input.confidence,
+          sentiment: input.sentiment,
+          relevanceScore: input.relevanceScore,
+          sourceReliability: input.sourceReliability,
+          keyPoints: input.keyPoints,
+          riskFlags: input.riskFlags,
+          tags: input.tags,
+          rawPayload: input.rawPayload,
+        })
+        .onConflictDoUpdate({
+          target: [
+            externalResearchDocuments.userId,
+            externalResearchDocuments.providerId,
+            externalResearchDocuments.providerDocumentId,
+          ],
+          set: {
+            title: input.title,
+            summary: input.summary,
+            url: input.url,
+            publishedAt: input.publishedAt
+              ? new Date(input.publishedAt)
+              : null,
+            capturedAt: new Date(input.capturedAt),
+            expiresAt: new Date(input.expiresAt),
+            confidence: input.confidence,
+            sentiment: input.sentiment,
+            relevanceScore: input.relevanceScore,
+            sourceReliability: input.sourceReliability,
+            keyPoints: input.keyPoints,
+            riskFlags: input.riskFlags,
+            tags: input.tags,
+            rawPayload: input.rawPayload,
+            updatedAt: new Date(),
+          },
+        })
+        .returning();
+      if (!row) {
+        throw new Error("Failed to persist external research document.");
+      }
+      return mapExternalResearchDocument(row);
+    },
+    async listFreshByUserId(userId, params) {
+      const db = getDb();
+      const symbol = params.symbol?.trim().toUpperCase() || null;
+      const exchange = params.exchange?.trim().toUpperCase() || null;
+      const currency = params.currency?.trim().toUpperCase() || null;
+      const rows = await db.query.externalResearchDocuments.findMany({
+        where: and(
+          eq(externalResearchDocuments.userId, userId),
+          gt(externalResearchDocuments.expiresAt, params.now),
+          params.securityId
+            ? eq(externalResearchDocuments.securityId, params.securityId)
+            : undefined,
+          !params.securityId && symbol
+            ? eq(externalResearchDocuments.symbol, symbol)
+            : undefined,
+          !params.securityId && exchange
+            ? eq(externalResearchDocuments.exchange, exchange)
+            : undefined,
+          !params.securityId && currency
+            ? eq(externalResearchDocuments.currency, currency)
+            : undefined,
+          params.underlyingId
+            ? eq(externalResearchDocuments.underlyingId, params.underlyingId)
+            : undefined,
+        ),
+        orderBy: [
+          desc(externalResearchDocuments.relevanceScore),
+          desc(externalResearchDocuments.capturedAt),
+        ],
+        limit: Math.min(Math.max(Math.trunc(params.limit), 1), 50),
+      });
+      return rows.map(mapExternalResearchDocument);
     },
   },
   importJobs: {

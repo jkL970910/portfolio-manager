@@ -15,7 +15,10 @@ import {
   recommendationRuns,
   transactions,
 } from "@/lib/backend/mock-store";
-import { PortfolioAnalysisRun } from "@/lib/backend/models";
+import {
+  ExternalResearchDocumentRecord,
+  PortfolioAnalysisRun,
+} from "@/lib/backend/models";
 import {
   ExternalResearchJob,
   ExternalResearchUsageCounter,
@@ -27,6 +30,7 @@ import { normalizeRecommendationConstraints } from "@/lib/backend/recommendation
 const portfolioAnalysisRuns: PortfolioAnalysisRun[] = [];
 const externalResearchJobs: ExternalResearchJob[] = [];
 const externalResearchUsageCounters: ExternalResearchUsageCounter[] = [];
+const externalResearchDocuments: ExternalResearchDocumentRecord[] = [];
 
 export const mockRepositories: BackendRepositories = {
   users: {
@@ -357,6 +361,64 @@ export const mockRepositories: BackendRepositories = {
       };
       externalResearchUsageCounters.push(counter);
       return counter;
+    },
+  },
+  externalResearchDocuments: {
+    async create(input) {
+      const existing = externalResearchDocuments.find(
+        (document) =>
+          document.userId === input.userId &&
+          document.providerId === input.providerId &&
+          document.providerDocumentId === input.providerDocumentId,
+      );
+      const now = new Date().toISOString();
+      if (existing) {
+        Object.assign(existing, input, { updatedAt: now });
+        return existing;
+      }
+      const document: ExternalResearchDocumentRecord = {
+        id: `external_research_document_${externalResearchDocuments.length + 1}`,
+        createdAt: now,
+        updatedAt: now,
+        ...input,
+      };
+      externalResearchDocuments.unshift(document);
+      return document;
+    },
+    async listFreshByUserId(userId, params) {
+      const symbol = params.symbol?.trim().toUpperCase() || null;
+      const exchange = params.exchange?.trim().toUpperCase() || null;
+      const currency = params.currency?.trim().toUpperCase() || null;
+      return externalResearchDocuments
+        .filter((document) => document.userId === userId)
+        .filter((document) => Date.parse(document.expiresAt) > params.now.getTime())
+        .filter((document) =>
+          params.securityId
+            ? document.security?.securityId === params.securityId
+            : true,
+        )
+        .filter((document) =>
+          !params.securityId && symbol
+            ? document.security?.symbol?.trim().toUpperCase() === symbol
+            : true,
+        )
+        .filter((document) =>
+          !params.securityId && exchange
+            ? document.security?.exchange?.trim().toUpperCase() === exchange
+            : true,
+        )
+        .filter((document) =>
+          !params.securityId && currency
+            ? document.security?.currency === currency
+            : true,
+        )
+        .filter((document) =>
+          params.underlyingId
+            ? document.underlyingId === params.underlyingId
+            : true,
+        )
+        .sort((left, right) => right.relevanceScore - left.relevanceScore)
+        .slice(0, Math.min(Math.max(Math.trunc(params.limit), 1), 50));
     },
   },
   importJobs: {

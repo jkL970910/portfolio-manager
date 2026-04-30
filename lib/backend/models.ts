@@ -487,6 +487,42 @@ export interface ExternalResearchUsageCounter {
   updatedAt: string;
 }
 
+export interface ExternalResearchDocumentRecord {
+  id: EntityId;
+  userId: EntityId;
+  providerDocumentId: string;
+  sourceType: "market-data" | "news" | "forum" | "institutional" | "manual";
+  providerId: string;
+  sourceName: string;
+  title: string;
+  summary: string;
+  url: string | null;
+  publishedAt: string | null;
+  capturedAt: string;
+  expiresAt: string;
+  language: "zh" | "en" | "unknown";
+  security: {
+    securityId?: EntityId | null;
+    symbol?: string | null;
+    exchange?: string | null;
+    currency?: CurrencyCode | null;
+    name?: string | null;
+    provider?: string | null;
+    securityType?: string | null;
+  } | null;
+  underlyingId: string | null;
+  confidence: "low" | "medium" | "high";
+  sentiment: "positive" | "neutral" | "negative" | "mixed";
+  relevanceScore: number;
+  sourceReliability: number;
+  keyPoints: string[];
+  riskFlags: string[];
+  tags: string[];
+  rawPayload: Record<string, unknown>;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface ImportJob {
   id: EntityId;
   userId: EntityId;

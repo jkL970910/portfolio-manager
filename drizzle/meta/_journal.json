@@ -134,6 +134,13 @@
       "when": 1777572000000,
       "tag": "0018_security_identity_references",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1777586400000,
+      "tag": "0019_external_research_documents",
+      "breakpoints": true
     }
   ]
 }
