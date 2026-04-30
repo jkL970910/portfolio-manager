@@ -211,6 +211,11 @@ Guardrails:
   `baselineScore`, `preferenceFitScore`, `externalInsightScore`, `finalScore`,
   `signals`, and `riskFlags`. Current weighting is conservative at 70% V2.1
   baseline, 15% Preference Factors V2, and 15% cached intelligence.
+- External research now has a source-agnostic structured document contract for
+  future news/announcement/forum/institutional adapters. Documents carry source
+  type, identity scope, TTL, confidence, sentiment, relevance, reliability, key
+  points, and risk flags. Ticker-only documents are unresolved and cannot be
+  used as listing-level evidence.
 - Loo国大臣 prompts now carry fact source tags and explicitly prefer
   `analysis-cache` / `cached-external` facts when present.
 - `0016_preference_factors` adds the first Preference Factors V2 storage

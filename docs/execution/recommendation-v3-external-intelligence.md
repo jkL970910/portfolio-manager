@@ -278,6 +278,25 @@ Suggested tables:
 - `daily_intelligence_items`
 - `preference_factor_profile`
 
+Current structured document boundary:
+
+- `lib/backend/external-research-documents.ts` defines the first source-agnostic
+  external research document contract.
+- Every future adapter must normalize into this shape before Recommendation V3
+  reads it:
+  - source type: market-data / news / forum / institutional / manual
+  - identity: `security_id` or complete `symbol + exchange + currency`, with
+    optional `underlying_id` for company/fund-level context
+  - freshness: `publishedAt`, `capturedAt`, `expiresAt`
+  - scoring inputs: confidence, sentiment, relevance, source reliability
+  - user-visible content: title, summary, key points, risk flags, source URL
+- The ranking layer intentionally separates `listing`, `underlying`, `macro`,
+  and `unresolved` scopes. Ticker-only documents are unresolved and cannot be
+  used as listing-level evidence.
+- The current implementation is contract/test level plus provider-result
+  builder. DB persistence for `external_research_documents` remains the next
+  step before live news/announcement adapters are enabled.
+
 ## Source Strategy
 
 Recommended order:
