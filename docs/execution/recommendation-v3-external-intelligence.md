@@ -169,6 +169,11 @@ Current bridge implementation:
   and portfolio snapshot metadata when available.
 - Recommendation mobile view surfaces cached AI/market-data analysis as
   `Loo国今日秘闻` so users can see relevant context before acting on a recommendation.
+- Recommendation priority cards can now show `相关秘闻` references from cached
+  analysis runs. The bridge uses two levels: `当前上市版本情报` for unambiguous
+  symbol/listing matches and `底层资产情报` when a ticker has CAD/US duplicate
+  listings. The latter can explain company/fund context, but quote, FX, and
+  freshness data still belong to the current listing only.
 - This bridge is deliberately an overlay, not a hidden scoring override.
   Deterministic V2.1 allocation/account/tax scoring remains the execution
   baseline until V3 has calibrated source quality, TTL, and stale-data tests.

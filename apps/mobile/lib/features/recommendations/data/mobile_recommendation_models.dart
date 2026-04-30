@@ -188,6 +188,7 @@ class MobileRecommendationPriority {
     required this.whyThis,
     required this.whyNot,
     required this.alternatives,
+    required this.intelligenceRefs,
     required this.constraints,
     required this.execution,
   });
@@ -202,6 +203,7 @@ class MobileRecommendationPriority {
   final List<String> whyThis;
   final List<String> whyNot;
   final List<String> alternatives;
+  final List<MobileRecommendationIntelligenceRef> intelligenceRefs;
   final List<MobileRecommendationConstraint> constraints;
   final List<MobileRecommendationInput> execution;
 
@@ -221,12 +223,46 @@ class MobileRecommendationPriority {
       alternatives:
           (json["alternatives"] as List?)?.whereType<String>().toList() ??
               const [],
+      intelligenceRefs: readJsonList(json, "intelligenceRefs")
+          .map(MobileRecommendationIntelligenceRef.fromJson)
+          .toList(),
       constraints: readJsonList(json, "constraints")
           .map(MobileRecommendationConstraint.fromJson)
           .toList(),
       execution: readJsonList(json, "execution")
           .map(MobileRecommendationInput.fromJson)
           .toList(),
+    );
+  }
+}
+
+class MobileRecommendationIntelligenceRef {
+  const MobileRecommendationIntelligenceRef({
+    required this.title,
+    required this.detail,
+    required this.sourceLabel,
+    required this.freshnessLabel,
+    required this.scopeLabel,
+    required this.listingLabel,
+  });
+
+  final String title;
+  final String detail;
+  final String sourceLabel;
+  final String freshnessLabel;
+  final String scopeLabel;
+  final String listingLabel;
+
+  factory MobileRecommendationIntelligenceRef.fromJson(
+    Map<String, dynamic> json,
+  ) {
+    return MobileRecommendationIntelligenceRef(
+      title: json["title"] as String? ?? "Loo国秘闻",
+      detail: json["detail"] as String? ?? "",
+      sourceLabel: json["sourceLabel"] as String? ?? "本地快扫",
+      freshnessLabel: json["freshnessLabel"] as String? ?? "暂无行情新鲜度",
+      scopeLabel: json["scopeLabel"] as String? ?? "底层资产情报",
+      listingLabel: json["listingLabel"] as String? ?? "",
     );
   }
 }

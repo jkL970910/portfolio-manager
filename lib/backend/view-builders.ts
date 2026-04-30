@@ -4200,6 +4200,7 @@ export function buildRecommendationsData(args: {
           label: symbol,
           href: `/portfolio/security/${encodeURIComponent(symbol)}`,
         })),
+        intelligenceRefs: [],
         whyThis: [
           item.rationale
             ? pick(

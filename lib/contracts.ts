@@ -643,6 +643,11 @@ export interface RecommendationsData {
     freshnessLabel: string;
     generatedAt: string;
     symbols: string[];
+    identity: {
+      symbol: string;
+      exchange?: string;
+      currency?: string;
+    };
     sources: {
       title: string;
       sourceType: string;
@@ -665,6 +670,16 @@ export interface RecommendationsData {
     alternativeLinks?: {
       label: string;
       href: string;
+    }[];
+    intelligenceRefs: {
+      id: string;
+      title: string;
+      detail: string;
+      sourceLabel: string;
+      freshnessLabel: string;
+      scope: "underlying" | "listing";
+      scopeLabel: string;
+      listingLabel: string;
     }[];
     whyThis: string[];
     whyNot: string[];

@@ -422,9 +422,112 @@ function mapMobileRecommendationsData(
         relatedLinks: _relatedLinks,
         ...rest
       } = priority;
-      return rest;
+      return {
+        ...rest,
+        intelligenceRefs: mapRecommendationIntelligenceRefs(
+          rest,
+          intelligenceBriefs,
+        ),
+      };
     }),
   };
+}
+
+export function mapRecommendationIntelligenceRefs(
+  priority: Pick<
+    RecommendationsData["priorities"][number],
+    "security" | "tickers"
+  >,
+  intelligenceBriefs: RecommendationsData["intelligenceBriefs"],
+): RecommendationsData["priorities"][number]["intelligenceRefs"] {
+  const symbols = getRecommendationPrioritySymbols(priority);
+  if (symbols.size === 0) {
+    return [];
+  }
+
+  return intelligenceBriefs
+    .filter((brief) =>
+      symbols.has(normalizeSymbolKey(brief.identity.symbol)),
+    )
+    .slice(0, 2)
+    .map((brief) => {
+      const scope = isAmbiguousRecommendationBrief(brief, intelligenceBriefs)
+        ? "underlying"
+        : "listing";
+      return {
+        id: brief.id,
+        title: brief.title,
+        detail: brief.detail,
+        sourceLabel: brief.sourceLabel,
+        freshnessLabel: brief.freshnessLabel,
+        scope,
+        scopeLabel: scope === "underlying"
+          ? "底层资产情报"
+          : "当前上市版本情报",
+        listingLabel: getBriefListingLabel(brief),
+      };
+    });
+}
+
+function isAmbiguousRecommendationBrief(
+  brief: RecommendationsData["intelligenceBriefs"][number],
+  intelligenceBriefs: RecommendationsData["intelligenceBriefs"],
+) {
+  const symbol = normalizeSymbolKey(brief.identity.symbol);
+  const listingKeys = new Set(
+    intelligenceBriefs
+      .filter((item) => normalizeSymbolKey(item.identity.symbol) === symbol)
+      .map(getBriefListingKey),
+  );
+
+  return listingKeys.size > 1;
+}
+
+function getBriefListingKey(
+  brief: RecommendationsData["intelligenceBriefs"][number],
+) {
+  return [
+    normalizeSymbolKey(brief.identity.symbol),
+    normalizeSymbolKey(brief.identity.exchange ?? ""),
+    normalizeSymbolKey(brief.identity.currency ?? ""),
+  ].join("|");
+}
+
+function getBriefListingLabel(
+  brief: RecommendationsData["intelligenceBriefs"][number],
+) {
+  return [
+    brief.identity.symbol,
+    brief.identity.exchange,
+    brief.identity.currency,
+  ].filter(Boolean).join(" · ");
+}
+
+function getRecommendationPrioritySymbols(
+  priority: Pick<
+    RecommendationsData["priorities"][number],
+    "security" | "tickers"
+  >,
+) {
+  const symbols = new Set<string>();
+  const leadSymbol = priority.security.split(/\s|-/)[0];
+  const candidates = [
+    leadSymbol,
+    ...priority.tickers.split(/[,\s/]+/),
+  ];
+
+  for (const candidate of candidates) {
+    const normalized = normalizeSymbolKey(candidate);
+    if (normalized) {
+      symbols.add(normalized);
+    }
+  }
+
+  return symbols;
+}
+
+function normalizeSymbolKey(value: string) {
+  return value.trim().toUpperCase().replace(/[^A-Z0-9.:-]/g, "");
 }
 
 function readResultMap(run: PortfolioAnalysisRun) {
@@ -448,10 +551,22 @@ function mapRecommendationIntelligenceBriefs(
     const dataFreshness = readNestedMap(result.dataFreshness);
     const identity = readNestedMap(result.identity);
     const rawSources = Array.isArray(result.sources) ? result.sources : [];
+    const symbol =
+      typeof identity.symbol === "string" && identity.symbol.trim()
+        ? identity.symbol.trim().toUpperCase()
+        : "UNKNOWN";
+    const exchange =
+      typeof identity.exchange === "string" && identity.exchange.trim()
+        ? identity.exchange.trim().toUpperCase()
+        : undefined;
+    const currency =
+      typeof identity.currency === "string" && identity.currency.trim()
+        ? identity.currency.trim().toUpperCase()
+        : undefined;
     const symbols = [
-      typeof identity.symbol === "string" ? identity.symbol : null,
-      typeof identity.exchange === "string" ? identity.exchange : null,
-      typeof identity.currency === "string" ? identity.currency : null,
+      symbol,
+      exchange,
+      currency,
     ].filter((value): value is string => Boolean(value));
     const sourceMode =
       run.sourceMode === "cached-external" || run.sourceMode === "live-external"
@@ -490,6 +605,11 @@ function mapRecommendationIntelligenceBriefs(
       freshnessLabel,
       generatedAt: run.generatedAt,
       symbols,
+      identity: {
+        symbol,
+        exchange,
+        currency,
+      },
       sources: rawSources.slice(0, 4).map((source) => {
         const value = readNestedMap(source);
         return {

@@ -629,6 +629,10 @@ class _PriorityCard extends StatelessWidget {
               const SizedBox(height: 10),
               _ScorelinePanel(priority),
             ],
+            if (priority.intelligenceRefs.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              _PriorityIntelligenceSection(priority.intelligenceRefs),
+            ],
             if (priority.whyThis.isNotEmpty) ...[
               const SizedBox(height: 12),
               _ExplanationSection(
@@ -658,6 +662,58 @@ class _PriorityCard extends StatelessWidget {
                 items: priority.alternatives,
               ),
             ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _PriorityIntelligenceSection extends StatelessWidget {
+  const _PriorityIntelligenceSection(this.items);
+
+  final List<MobileRecommendationIntelligenceRef> items;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: theme.colorScheme.tertiaryContainer.withValues(alpha: 0.32),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: theme.colorScheme.outlineVariant),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text("相关秘闻", style: theme.textTheme.titleMedium),
+            const SizedBox(height: 6),
+            const Text("这些只是缓存情报引用，用来解释背景；底层资产情报可跨 CAD/USD 版本参考，具体价格和刷新状态仍以当前 listing 为准。"),
+            ...items.take(2).map((item) {
+              return Padding(
+                padding: const EdgeInsets.only(top: 10),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(item.title, style: theme.textTheme.titleSmall),
+                    const SizedBox(height: 4),
+                    Text(item.detail),
+                    const SizedBox(height: 4),
+                    Text(
+                      [
+                        item.sourceLabel,
+                        item.scopeLabel,
+                        item.freshnessLabel,
+                        item.listingLabel,
+                      ].where((part) => part.isNotEmpty).join(" · "),
+                      style: theme.textTheme.bodySmall,
+                    ),
+                  ],
+                ),
+              );
+            }),
           ],
         ),
       ),

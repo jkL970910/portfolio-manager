@@ -151,6 +151,10 @@ P1 follow-up goals:
   from cached analysis runs. This is an intelligence overlay only: it does not
   automatically change deterministic V2.1 ordering, and it must not trigger
   live news/forum research on page load.
+- Recommendation priority cards now attach cached intelligence references at
+  two levels: unambiguous matches are `当前上市版本情报`; CAD/US duplicate tickers
+  are downgraded to `底层资产情报` so company/fund context can be reused without
+  pretending that quote, FX, or freshness data belongs to the current listing.
 - Loo国大臣 prompts now carry fact source tags and explicitly prefer
   `analysis-cache` / `cached-external` facts when present.
 - `0016_preference_factors` adds the first Preference Factors V2 storage
