@@ -122,6 +122,10 @@ Current status:
   `lib/backend/loo-minister-contracts.ts`.
 - Backend invariant tests exist in
   `tests/backend/loo-minister-contracts.test.ts`.
+- First Flutter context DTO slice exists in
+  `apps/mobile/lib/features/shared/data/loo_minister_context_models.dart`.
+- Flutter model tests exist in
+  `apps/mobile/test/loo_minister_context_models_test.dart`.
 - The contract currently covers:
   - cross-page `LooMinisterPageContext`
   - `LooMinisterQuestionRequest`
