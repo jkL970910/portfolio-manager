@@ -711,6 +711,26 @@ export const marketDataRefreshRuns = pgTable(
   }),
 );
 
+export const marketDataProviderLimits = pgTable(
+  "market_data_provider_limits",
+  {
+    provider: varchar("provider", { length: 64 }).primaryKey(),
+    reason: text("reason").notNull(),
+    limitedUntil: timestamp("limited_until", { withTimezone: true }).notNull(),
+    recordedAt: timestamp("recorded_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => ({
+    limitedUntilIdx: index("market_data_provider_limits_until_idx").on(
+      table.limitedUntil,
+    ),
+  }),
+);
+
 export const importJobs = pgTable("import_jobs", {
   id: uuid("id").defaultRandom().primaryKey(),
   userId: uuid("user_id")

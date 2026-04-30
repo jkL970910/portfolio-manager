@@ -4,6 +4,10 @@ class MarketDataRefreshStatus {
     required this.latestProviderStatusLabel,
     required this.latestFxLabel,
     required this.latestFxFreshnessLabel,
+    required this.latestManualStatusLabel,
+    required this.latestManualProviderStatusLabel,
+    required this.latestManualFxLabel,
+    required this.latestManualFxFreshnessLabel,
     required this.items,
   });
 
@@ -11,6 +15,10 @@ class MarketDataRefreshStatus {
   final String latestProviderStatusLabel;
   final String? latestFxLabel;
   final String? latestFxFreshnessLabel;
+  final String latestManualStatusLabel;
+  final String latestManualProviderStatusLabel;
+  final String? latestManualFxLabel;
+  final String? latestManualFxFreshnessLabel;
   final List<MarketDataRefreshRunItem> items;
 
   factory MarketDataRefreshStatus.fromApiResponse(Map<String, dynamic> json) {
@@ -25,12 +33,31 @@ class MarketDataRefreshStatus {
         ? json["summary"] as Map<String, dynamic>
         : const <String, dynamic>{};
     final rawItems = json["items"];
+    String? readSummaryString(String key) {
+      final value = summary[key];
+      return value is String ? value : null;
+    }
+
     return MarketDataRefreshStatus(
-      latestStatusLabel: summary["latestStatusLabel"] as String? ?? "还没有刷新记录",
+      latestStatusLabel: readSummaryString("latestStatusLabel") ?? "还没有刷新记录",
       latestProviderStatusLabel:
-          summary["latestProviderStatusLabel"] as String? ?? "尚未执行过行情刷新。",
-      latestFxLabel: summary["latestFxLabel"] as String?,
-      latestFxFreshnessLabel: summary["latestFxFreshnessLabel"] as String?,
+          readSummaryString("latestProviderStatusLabel") ?? "尚未执行过行情刷新。",
+      latestFxLabel: readSummaryString("latestFxLabel"),
+      latestFxFreshnessLabel: readSummaryString("latestFxFreshnessLabel"),
+      latestManualStatusLabel:
+          readSummaryString("latestManualStatusLabel") ??
+              readSummaryString("latestStatusLabel") ??
+              "还没有手动刷新记录",
+      latestManualProviderStatusLabel:
+          readSummaryString("latestManualProviderStatusLabel") ??
+              readSummaryString("latestProviderStatusLabel") ??
+              "尚未执行过手动行情刷新。",
+      latestManualFxLabel:
+          readSummaryString("latestManualFxLabel") ??
+              readSummaryString("latestFxLabel"),
+      latestManualFxFreshnessLabel:
+          readSummaryString("latestManualFxFreshnessLabel") ??
+              readSummaryString("latestFxFreshnessLabel"),
       items: rawItems is List
           ? rawItems
               .whereType<Map<String, dynamic>>()
@@ -46,6 +73,7 @@ class MarketDataRefreshRunItem {
     required this.scopeLabel,
     required this.status,
     required this.statusLabel,
+    required this.triggeredBy,
     required this.triggerLabel,
     required this.sampledSymbolCount,
     required this.refreshedHoldingCount,
@@ -63,6 +91,7 @@ class MarketDataRefreshRunItem {
   final String scopeLabel;
   final String status;
   final String statusLabel;
+  final String triggeredBy;
   final String triggerLabel;
   final int sampledSymbolCount;
   final int refreshedHoldingCount;
@@ -100,6 +129,8 @@ class MarketDataRefreshRunItem {
   String get subtitle {
     return [
       "$triggerLabel · $createdAtLabel · $durationLabel",
+      if (isSkippedWorker)
+        "这是后台 worker 的预算保护跳过，不代表手动行情刷新失败。",
       "检查 $sampledSymbolCount 个标的；刷新 $refreshedHoldingCount 笔持仓；缺失 $missingQuoteCount；历史 $historyPointCount 条；${snapshotRecorded ? "已记录快照" : "未记录快照"}",
       if (fxRateLabel != null && fxRateLabel!.isNotEmpty) fxRateLabel!,
       if (fxFreshnessLabel != null && fxFreshnessLabel!.isNotEmpty)
@@ -109,6 +140,14 @@ class MarketDataRefreshRunItem {
     ].join("\n");
   }
 
+  String get titleLabel {
+    return "$triggerLabel · $scopeLabel · $statusLabel";
+  }
+
+  bool get isSkippedWorker {
+    return triggeredBy == "worker" && status == "skipped";
+  }
+
   factory MarketDataRefreshRunItem.fromJson(Map<String, dynamic> json) {
     final rawCreatedAt = json["createdAt"];
     final rawProviderLimits = json["providerLimits"];
@@ -116,6 +155,7 @@ class MarketDataRefreshRunItem {
       scopeLabel: json["scopeLabel"] as String? ?? "组合行情",
       status: json["status"] as String? ?? "unknown",
       statusLabel: json["statusLabel"] as String? ?? "状态未知",
+      triggeredBy: json["triggeredBy"] as String? ?? "system",
       triggerLabel: json["triggerLabel"] as String? ?? "系统刷新",
       sampledSymbolCount: json["sampledSymbolCount"] as int? ?? 0,
       refreshedHoldingCount: json["refreshedHoldingCount"] as int? ?? 0,

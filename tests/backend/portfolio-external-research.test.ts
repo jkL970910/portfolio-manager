@@ -108,6 +108,50 @@ test("cached market-data provider reads local cache only when explicitly enabled
   clearExternalResearchEnv();
 });
 
+test("cached market-data provider keeps exchange and currency identity separate", async () => {
+  process.env.PORTFOLIO_ANALYZER_EXTERNAL_RESEARCH = "enabled";
+  process.env.PORTFOLIO_ANALYZER_EXTERNAL_WORKER = "enabled";
+  process.env.PORTFOLIO_ANALYZER_EXTERNAL_PROVIDERS = "enabled";
+  process.env.PORTFOLIO_ANALYZER_EXTERNAL_ADAPTERS = "enabled";
+  process.env.PORTFOLIO_ANALYZER_EXTERNAL_SOURCE_MARKET_DATA = "enabled";
+
+  const enabledSources = getEnabledExternalResearchSources(
+    getExternalResearchPolicy(),
+  );
+  const result = await fetchCachedExternalResearch({
+    userId: "user_casey",
+    request: {
+      scope: "security",
+      mode: "quick",
+      security: { symbol: "VFV", exchange: "NASDAQ", currency: "USD" },
+      cacheStrategy: "prefer-cache",
+      maxCacheAgeSeconds: 21600,
+      includeExternalResearch: true,
+    },
+    targetKey: "security:VFV:NASDAQ:USD",
+    allowedSources: enabledSources,
+    now: new Date("2026-04-28T12:00:00.000Z"),
+  });
+
+  assert.ok(
+    result.summaryPoints.some((point) =>
+      point.includes("缓存行情覆盖 0 条 VFV 价格历史"),
+    ),
+  );
+  assert.ok(
+    result.risks.some((risk) =>
+      risk.includes("组合内没有找到完全匹配的持仓"),
+    ),
+  );
+  assert.ok(
+    result.summaryPoints.some((point) =>
+      point.includes("symbol=VFV, exchange=NASDAQ, currency=USD"),
+    ),
+  );
+
+  clearExternalResearchEnv();
+});
+
 test("external research request is rejected before live adapters exist", () => {
   delete process.env.PORTFOLIO_ANALYZER_EXTERNAL_RESEARCH;
 

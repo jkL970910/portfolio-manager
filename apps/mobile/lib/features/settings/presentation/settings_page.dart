@@ -670,7 +670,9 @@ class _MarketDataStatusCardState extends State<_MarketDataStatusCard> {
                   ],
                 ),
                 const SizedBox(height: 6),
-                const Text("记录手动刷新和后台任务结果，帮助判断价格、FX、历史曲线是否可信。"),
+                const Text(
+                  "顶部优先显示最近手动刷新；下方历史包含后台 worker 的预算保护记录。",
+                ),
                 if (snapshot.connectionState == ConnectionState.waiting) ...[
                   const SizedBox(height: 12),
                   const LinearProgressIndicator(),
@@ -691,15 +693,21 @@ class _MarketDataStatusCardState extends State<_MarketDataStatusCard> {
                     runSpacing: 8,
                     children: [
                       Chip(label: Text(status.latestStatusLabel)),
-                      if (status.latestFxLabel != null)
-                        Chip(label: Text(status.latestFxLabel!)),
-                      if (status.latestFxFreshnessLabel != null)
-                        Chip(label: Text(status.latestFxFreshnessLabel!)),
+                      Chip(label: Text("手动：${status.latestManualStatusLabel}")),
+                      if (status.latestManualFxLabel != null)
+                        Chip(label: Text(status.latestManualFxLabel!)),
+                      if (status.latestManualFxFreshnessLabel != null)
+                        Chip(label: Text(status.latestManualFxFreshnessLabel!)),
                     ],
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    status.latestProviderStatusLabel,
+                    status.latestManualProviderStatusLabel,
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    "最近任意任务：${status.latestStatusLabel} · ${status.latestProviderStatusLabel}",
                     style: Theme.of(context).textTheme.bodySmall,
                   ),
                   const Divider(),
@@ -725,7 +733,7 @@ class _MarketDataRefreshRunTile extends StatelessWidget {
       contentPadding: EdgeInsets.zero,
       dense: true,
       leading: Icon(_statusIcon(item.status)),
-      title: Text("${item.scopeLabel} · ${item.statusLabel}"),
+      title: Text(item.titleLabel),
       subtitle: Text(item.subtitle),
       isThreeLine: true,
     );

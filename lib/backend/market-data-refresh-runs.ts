@@ -3,7 +3,7 @@ import { apiSuccess } from "@/lib/backend/contracts";
 import { refreshPortfolioQuotes } from "@/lib/backend/services";
 import { getDb } from "@/lib/db/client";
 import { marketDataRefreshRuns } from "@/lib/db/schema";
-import { getProviderLimitSnapshot } from "@/lib/market-data/provider-limits";
+import { getProviderLimitSnapshotPersisted } from "@/lib/market-data/provider-limits";
 
 type MarketDataRefreshTrigger = "manual" | "worker";
 
@@ -199,7 +199,7 @@ export async function refreshPortfolioQuotesWithRunLedger(input: {
     const data = await refreshPortfolioQuotes(input.userId, {
       refreshRunId: run.id,
     });
-    const providerLimits = getProviderLimitSnapshot();
+    const providerLimits = await getProviderLimitSnapshotPersisted();
     const status = data.missingQuoteCount > 0 ? "partial" : "success";
     await db
       .update(marketDataRefreshRuns)
@@ -229,7 +229,7 @@ export async function refreshPortfolioQuotesWithRunLedger(input: {
     return { ok: true as const, data, runId: run.id, status };
   } catch (error) {
     const errorMessage = readErrorMessage(error);
-    const providerLimits = getProviderLimitSnapshot();
+    const providerLimits = await getProviderLimitSnapshotPersisted();
     await db
       .update(marketDataRefreshRuns)
       .set({
@@ -265,6 +265,8 @@ export async function getMobileMarketDataRefreshRuns(
   });
   const items = runs.map(mapMarketDataRefreshRunForMobile);
   const latest = items[0] ?? null;
+  const latestManual =
+    items.find((item) => item.triggeredBy === "manual") ?? latest;
 
   return apiSuccess(
     {
@@ -274,6 +276,12 @@ export async function getMobileMarketDataRefreshRuns(
           latest?.providerStatusLabel ?? "尚未执行过行情刷新。",
         latestFxLabel: latest?.fxRateLabel ?? null,
         latestFxFreshnessLabel: latest?.fxFreshnessLabel ?? null,
+        latestManualStatusLabel:
+          latestManual?.statusLabel ?? "还没有手动刷新记录",
+        latestManualProviderStatusLabel:
+          latestManual?.providerStatusLabel ?? "尚未执行过手动行情刷新。",
+        latestManualFxLabel: latestManual?.fxRateLabel ?? null,
+        latestManualFxFreshnessLabel: latestManual?.fxFreshnessLabel ?? null,
       },
       items,
     },

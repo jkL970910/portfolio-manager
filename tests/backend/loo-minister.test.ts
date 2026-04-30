@@ -185,6 +185,13 @@ test("Loo Minister provider fallback redacts API keys in user-visible reason", a
               value: "CAD 100,000",
               source: "portfolio-data",
             },
+            {
+              id: "latest-analysis",
+              label: "最近 AI 分析",
+              value: "缓存外部研究指出 VFV 价格历史不足",
+              detail: "sourceMode=cached-external",
+              source: "analysis-cache",
+            },
           ],
           warnings: [],
           allowedActions: [],
@@ -307,6 +314,13 @@ test("Loo Minister can call an OpenRouter-compatible Responses endpoint", async 
               value: "CAD 100,000",
               source: "portfolio-data",
             },
+            {
+              id: "latest-analysis",
+              label: "最近 AI 分析",
+              value: "缓存外部研究指出 VFV 价格历史不足",
+              detail: "sourceMode=cached-external",
+              source: "analysis-cache",
+            },
           ],
           warnings: [],
           allowedActions: [],
@@ -341,6 +355,14 @@ test("Loo Minister can call an OpenRouter-compatible Responses endpoint", async 
     assert.match(
       ((requestedInput as Array<{ content?: string }>)[0]?.content ?? ""),
       /关键事实/,
+    );
+    assert.match(
+      ((requestedInput as Array<{ content?: string }>)[0]?.content ?? ""),
+      /source=analysis-cache/,
+    );
+    assert.match(
+      ((requestedInput as Array<{ content?: string }>)[0]?.content ?? ""),
+      /优先引用它/,
     );
     assert.equal(response.data.title, "总览大臣答复");
     assert.doesNotMatch(response.data.answer, /本地 deterministic 回答/);

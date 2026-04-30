@@ -52,7 +52,7 @@ async function getRoutedQuote(
   }
 
   if (isCanadianQuoteRequest(exchange, currency)) {
-    const yahooQuote = isProviderLimited("yahoo-finance")
+    const yahooQuote = (await isProviderLimited("yahoo-finance"))
       ? null
       : await getQuoteFromYahooFinance(symbol, exchange, currency).catch(
           (error) => {
@@ -69,7 +69,7 @@ async function getRoutedQuote(
     }
   }
 
-  const twelveQuote = isProviderLimited("twelve-data")
+  const twelveQuote = (await isProviderLimited("twelve-data"))
     ? null
     : await getQuoteFromTwelveData(symbol, exchange, currency);
   if (twelveQuote) {
@@ -78,7 +78,7 @@ async function getRoutedQuote(
 
   if (
     !isCanadianQuoteRequest(exchange, currency) &&
-    !isProviderLimited("yahoo-finance")
+    !(await isProviderLimited("yahoo-finance"))
   ) {
     return getQuoteFromYahooFinance(symbol, exchange, currency).catch(
       () => null,
@@ -273,8 +273,8 @@ export async function getBatchSecurityQuotes(
 
     try {
       if (
-        isProviderLimited("twelve-data") &&
-        isProviderLimited("yahoo-finance")
+        (await isProviderLimited("twelve-data")) &&
+        (await isProviderLimited("yahoo-finance"))
       ) {
         rateLimited = true;
         results.push(fallbackQuote);
@@ -335,7 +335,7 @@ export async function getSecurityHistoricalSeries(
     async () => {
       if (
         isCanadianQuoteRequest(normalizedExchange, normalizedCurrency) &&
-        !isProviderLimited("yahoo-finance")
+        !(await isProviderLimited("yahoo-finance"))
       ) {
         const yahooResults = await getHistoricalSeriesFromYahooFinance(
           trimmed,
@@ -364,7 +364,7 @@ export async function getSecurityHistoricalSeries(
 
       if (
         !isCanadianQuoteRequest(normalizedExchange, normalizedCurrency) &&
-        !isProviderLimited("yahoo-finance")
+        !(await isProviderLimited("yahoo-finance"))
       ) {
         const yahooResults = await getHistoricalSeriesFromYahooFinance(
           trimmed,

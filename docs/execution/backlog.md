@@ -47,12 +47,14 @@ over simply adding more Flutter screens.
 | ---- | --------------------------------------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 1    | P0.5 real-data AI / external consultation     | In Progress | Before UI overhaul, make AI 标的分析, AI 大臣, and the portfolio-analyzer skill consume trustworthy cached quote/history/FX/provider data with explicit freshness/source boundaries. |
 | 2    | Cloud-ready quote/FX worker boundaries        | Planned     | Quote, FX, history, and snapshot refresh should move out of user-facing request paths with quota budgeting and retry behavior before heavier AI-agent jobs depend on them.       |
-| 3    | Market-data identity and validation hardening | In Progress | Current quote/history paths preserve symbol, exchange, and currency; next is provider-grade scheduled history refresh and cached data QA.                                      |
-| 4    | Backend contract typing for Flutter           | In Progress | Settings market-data refresh, Overview / Portfolio, Recommendations, Import, and Settings preference profile/guided draft DTOs are typed; continue detail-page DTO depth.       |
-| 5    | Recommendation constraints v2                 | In Progress | Backend and mobile now support preferred/excluded identities, account rules, and asset-class bands; next is picker UX and tests.                                                |
-| 6    | Mobile auth hardening                         | Planned     | Current token refresh/logout behavior is good enough for MVP, not shared production use.                                                                                        |
-| 7    | Mobile spending migration                     | Planned     | Useful after investment core and backend boundaries are stable.                                                                                                                 |
-| 8    | Mobile UI / IA overhaul                       | P1 Planned  | Current mobile feature coverage is usable, but QA shows cramped layouts, display shortages, debug-like labels, and unclear content hierarchy. Defer until real-data AI flows pass. |
+| 3    | Recommendation V3 external intelligence       | Planned     | Upgrade V2 with cached external signals, richer preference factors, and Loo国今日秘闻 rather than forcing news/forum logic into the V2 rule engine.                              |
+| 4    | Preference Factors V2                         | Planned     | Current risk/target factors are too shallow for aggressive sector tilts, home goals, tax optimization, and style preferences.                                                    |
+| 5    | Market-data identity and validation hardening | In Progress | Current quote/history paths preserve symbol, exchange, and currency; next is provider-grade scheduled history refresh and cached data QA.                                      |
+| 6    | Backend contract typing for Flutter           | In Progress | Settings market-data refresh, Overview / Portfolio, Recommendations, Import, and Settings preference profile/guided draft DTOs are typed; continue detail-page DTO depth.       |
+| 7    | Recommendation constraints v2                 | In Progress | Backend and mobile now support preferred/excluded identities, account rules, and asset-class bands; next is picker UX and tests.                                                |
+| 8    | Mobile auth hardening                         | Planned     | Current token refresh/logout behavior is good enough for MVP, not shared production use.                                                                                        |
+| 9    | Mobile spending migration                     | Planned     | Useful after investment core and backend boundaries are stable.                                                                                                                 |
+| 10   | Mobile UI / IA overhaul                       | P1 Planned  | Current mobile feature coverage is usable, but QA shows cramped layouts, display shortages, debug-like labels, and unclear content hierarchy. Defer until real-data AI flows pass. |
 
 ## Product Roadmap Priorities That Still Matter
 
@@ -66,10 +68,12 @@ over simply adding more Flutter screens.
 | Real historical performance               | In Progress | Quote refresh records daily price history/current-day snapshots, uses independent stored FX rates for CAD aggregation, stores history by symbol+exchange+currency, backfills safe older exchange-less rows, and anchors chart latest points to current totals; next work is scheduled refresh/worker depth |
 | Richer import review persistence          | In Progress | Build soon                                                                                                                                                                                                                                                                                     |
 | Watchlist and target constraints workflow | In Progress | Mobile can edit watchlist, strategy, tax-aware placement, and account priority constraints                                                                                                                                                                                                     |
-| Cloud-ready cache / worker boundaries     | In Progress | First-pass market-data refresh worker, persisted run ledger, mobile Settings run-status readout, and process-local provider retry-after guard exist; next is cron/cloud scheduling before heavier AI-agent jobs                                                                                |
-| Quote-provider status UX                  | In Progress | Refresh results, Settings, holding rows, and price-history records now expose source/status lineage; remaining work is cloud-grade provider-limit persistence and deeper per-provider dashboards                                                                                               |
+| Cloud-ready cache / worker boundaries     | In Progress | First-pass market-data refresh worker, persisted run ledger, mobile Settings run-status readout, and DB-backed provider retry-after guard exist; next is cron/cloud scheduling before heavier AI-agent jobs                                                                                |
+| Quote-provider status UX                  | In Progress | Refresh results, Settings, holding rows, price-history records, and persisted provider-limit snapshots now expose source/status lineage; remaining work is deeper per-provider dashboards                                                                                                  |
 | Loo国 AI Minister assistant               | In Progress | Backend and Flutter first-pass page-context DTOs exist; global floating 大臣 entry receives Overview/Portfolio/detail/Health context; Settings can switch Local/GPT-5.5, choose official OpenAI or OpenRouter-compatible provider, save encrypted BYOK API key, and surface usage/retry/failure observability |
 | P0.5 external consultation skill pipeline | In Progress | The uploaded `portfolio-analyzer.skill` is productized as cached/guarded analysis work. Next priority is proving it on real cached market data before enabling live external research adapters or UI-heavy redesign.                                                                        |
+| Recommendation V3 external intelligence   | Planned     | See `docs/execution/recommendation-v3-external-intelligence.md`. V3 should layer cached external signals and richer user preferences on top of the deterministic V2 engine.                                                                 |
+| Loo国今日秘闻                             | Planned     | Curated intelligence card for holdings/watchlist/recommendation candidates. It must be source/freshness-aware and must not become a raw news feed.                                                                                       |
 
 ## Deferred
 
@@ -95,11 +99,14 @@ over simply adding more Flutter screens.
 1. Stabilize P0.5 real-data foundations: scheduled quote/history/FX refresh, provider retry-after persistence, and source/freshness lineage that AI can trust.
 2. Run the external consultation / `portfolio-analyzer.skill` pipeline on cached real market data first; keep live external research disabled until worker/cache/provider quota policy is proven.
 3. Align AI 标的分析 and AI 大臣: AI 标的分析 produces structured saved analysis; 大臣 answers cross-page questions, explains current context, and references or triggers saved analysis instead of duplicating a full report.
-4. QA the real mobile URL for GPT-5.5/BYOK, cached-external analysis, provider status, history hydration, and CAD/USD identity separation.
-5. Continue backend contract typing for detail pages and AI context DTOs so mobile stops relying on page-level `Map<String, dynamic>` parsing.
-6. Harden mobile auth with revocable refresh tokens and production storage policy.
-7. Move Mobile UI / IA overhaul to P1 after the data/AI layer is credible.
-8. Migrate spending/cash account monitoring into a dedicated mobile flow.
+4. Define Recommendation V3 external-signal contracts before adding live news/forum adapters.
+5. Add Preference Factors V2 as optional backend fields with safe defaults.
+6. Add a local/cached `Loo国今日秘闻` API before live provider integration.
+7. QA the real mobile URL for GPT-5.5/BYOK, cached-external analysis, provider status, history hydration, and CAD/USD identity separation.
+8. Continue backend contract typing for detail pages and AI context DTOs so mobile stops relying on page-level `Map<String, dynamic>` parsing.
+9. Harden mobile auth with revocable refresh tokens and production storage policy.
+10. Move Mobile UI / IA overhaul to P1 after the data/AI layer is credible.
+11. Migrate spending/cash account monitoring into a dedicated mobile flow.
 
 ## P1 Mobile UI / IA Overhaul Scope
 
@@ -126,3 +133,13 @@ P1 follow-up goals:
 - move read-heavy flows before complex write-heavy workflows
 - keep Chinese-only and Loo皇 theme mandatory
 - avoid fake "real-time" promises without sustainable market-data support
+
+## P0.5 Implementation Notes
+
+- `0015_market_data_provider_limits` persists provider retry-after windows so
+  multi-process/cloud refresh jobs do not immediately forget `429` responses
+  after restart.
+- External consultation cached market-data now filters price history by
+  `symbol + exchange + currency`, not ticker alone.
+- Loo国大臣 prompts now carry fact source tags and explicitly prefer
+  `analysis-cache` / `cached-external` facts when present.

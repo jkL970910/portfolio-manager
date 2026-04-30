@@ -115,7 +115,13 @@ export const cachedMarketDataResearchProvider: ExternalResearchProvider = {
     const repositories = getRepositories();
     const [holdings, priceHistory] = await Promise.all([
       repositories.holdings.listByUserId(input.userId),
-      repositories.securityPriceHistory.listBySymbol(symbol),
+      expectedExchange
+        ? repositories.securityPriceHistory.listByIdentity({
+            symbol,
+            exchange: expectedExchange,
+            currency: expectedCurrency,
+          })
+        : repositories.securityPriceHistory.listBySymbol(symbol),
     ]);
 
     const matchingHoldings = holdings.filter((holding) => {
@@ -130,10 +136,15 @@ export const cachedMarketDataResearchProvider: ExternalResearchProvider = {
     });
     const matchingHistory = priceHistory.filter(
       (point) =>
-        !expectedCurrency ||
-        normalizeNullable(point.currency) === expectedCurrency,
+        (!expectedCurrency ||
+          normalizeNullable(point.currency) === expectedCurrency) &&
+        (!expectedExchange ||
+          normalizeNullable(point.exchange) === expectedExchange),
     );
     const latestPoint = matchingHistory[0] ?? null;
+    const staleOrFallbackPoints = matchingHistory.filter((point) =>
+      ["stale", "fallback"].includes(point.freshness ?? ""),
+    ).length;
     const totalMarketValueCad = matchingHoldings.reduce(
       (sum, holding) => sum + holding.marketValueCad,
       0,
@@ -149,12 +160,20 @@ export const cachedMarketDataResearchProvider: ExternalResearchProvider = {
         latestPoint
           ? `最近缓存收盘价：${latestPoint.currency} ${latestPoint.close.toFixed(2)}，日期 ${latestPoint.priceDate}。`
           : "没有找到匹配币种的缓存价格历史。",
+        latestPoint
+          ? `缓存来源：${latestPoint.source}；provider=${latestPoint.provider ?? "未知"}；freshness=${latestPoint.freshness ?? "未知"}。`
+          : "缓存来源：无可用价格历史。",
         `组合内匹配持仓 ${matchingHoldings.length} 笔，CAD 市值约 ${Math.round(totalMarketValueCad).toLocaleString("en-CA")}。`,
         `身份匹配使用 symbol=${symbol}, exchange=${expectedExchange ?? "未指定"}, currency=${expectedCurrency ?? "未指定"}。`,
       ],
       risks: [
         ...(matchingHistory.length === 0
           ? ["缓存行情为空；不能把该结果当成实时市场研究。"]
+          : []),
+        ...(staleOrFallbackPoints > 0
+          ? [
+              `缓存价格历史中有 ${staleOrFallbackPoints} 条 stale/fallback 点；AI 只能把它当成参考数据。`,
+            ]
           : []),
         ...(matchingHoldings.length === 0
           ? ["组合内没有找到完全匹配的持仓；请确认交易所和币种是否正确。"]

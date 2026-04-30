@@ -436,13 +436,22 @@ Next priority order:
 1. Stabilize P0.5 real-data AI foundations: scheduled quote/history/FX refresh,
    provider retry-after persistence, and source/freshness lineage that AI can
    trust.
+   - Status: in progress.
+   - `market_data_provider_limits` now persists provider retry-after windows for
+     DB-backed Settings/run-ledger snapshots and cloud/multi-process readiness.
 2. Productize the external consultation / `portfolio-analyzer.skill` pipeline
    on cached real market data first. Live external research remains disabled
    until worker/cache/provider quota policy is proven.
+   - Status: in progress.
+   - Cached market-data external consultation now uses full
+     `symbol + exchange + currency` identity when reading local price history.
 3. Align AI 标的分析 and AI 大臣 around the same backend-owned context:
    structured saved analysis for symbol/account/portfolio scopes, and
    cross-page conversational explanation that references or triggers those
    analyses instead of duplicating them.
+   - Status: in progress.
+   - 大臣 prompts now include fact source tags and prefer `analysis-cache` /
+     `cached-external` facts when present.
 4. Normalize Flutter API contracts into typed DTOs and reduce page-level
    `Map<String, dynamic>` parsing.
    - Status: in progress.
@@ -471,6 +480,8 @@ Next priority order:
 Migration metadata status:
 
 - `drizzle/meta/_journal.json` now registers migrations `0001` through `0010`.
+- It also registers later mobile/AI migrations through
+  `0015_market_data_provider_limits`.
 - Local Postgres `5434` has migrations `0006`, `0007`, `0008`, `0009`, and
   `0010` applied for currency-aware history, independent FX rates,
   exchange-aware history, market-data refresh run tracking, and row-level

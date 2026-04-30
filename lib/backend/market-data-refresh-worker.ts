@@ -6,7 +6,7 @@ import {
   marketDataRefreshRuns,
   users,
 } from "@/lib/db/schema";
-import { getProviderLimitSnapshot } from "@/lib/market-data/provider-limits";
+import { getProviderLimitSnapshotPersisted } from "@/lib/market-data/provider-limits";
 
 function normalizePositiveInteger(
   value: number | undefined,
@@ -152,7 +152,7 @@ export async function runMarketDataRefreshWorkerOnce(input?: {
       const result = await refreshPortfolioQuotes(user.id, {
         refreshRunId: run.id,
       });
-      const providerLimits = getProviderLimitSnapshot();
+      const providerLimits = await getProviderLimitSnapshotPersisted();
       const status = result.missingQuoteCount > 0 ? "partial" : "success";
       await db
         .update(marketDataRefreshRuns)
@@ -194,7 +194,7 @@ export async function runMarketDataRefreshWorkerOnce(input?: {
         error instanceof Error
           ? error.message
           : "Market-data refresh failed unexpectedly.";
-      const providerLimits = getProviderLimitSnapshot();
+      const providerLimits = await getProviderLimitSnapshotPersisted();
       await db
         .update(marketDataRefreshRuns)
         .set({
