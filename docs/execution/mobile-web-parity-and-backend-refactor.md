@@ -402,6 +402,11 @@ Next priority order:
    cloud deployment. The current guard is process-local by design.
 3. Normalize Flutter API contracts into typed DTOs and reduce page-level
    `Map<String, dynamic>` parsing.
+   - Status: in progress.
+   - First slice extracted Settings market-data refresh status parsing into
+     typed Flutter DTOs.
+   - Next slices should cover Overview and Portfolio snapshots before deeper
+     write flows.
 4. Harden mobile auth: revocable refresh tokens, server-side logout, and
    production storage policy.
 5. Start mobile spending/cash account monitoring as a separate account class
