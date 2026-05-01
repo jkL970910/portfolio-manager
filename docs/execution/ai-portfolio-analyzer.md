@@ -615,11 +615,21 @@ Next analyzer work:
   three cached `Loo国今日秘闻` facts, matched by listing identity when the page
   has a resolved security subject. This keeps 大臣 as a cross-page explainer
   over the same analysis layer rather than a duplicate report generator.
-- Candidate-buy-fit questions now get a dedicated backend context enrichment:
-  current exposure, Preference Factors V2 summary, target allocation, latest
-  recommendation match, cached intelligence, and source freshness. This makes
-  questions such as "这个标的适合买入吗？" answerable even when the security is not
-  currently held.
+- Whole-portfolio, Health, and Recommendation answers now get a backend-owned
+  `portfolio-context.v1` DTO before local or GPT answers are generated. It
+  carries total assets/cash, account weights, asset allocation gaps,
+  concentration, Health summary, Preference Factors V2, latest recommendation,
+  cached intelligence, analysis-cache summaries, and freshness boundaries.
+- Security/Holding detail answers get a separate backend-owned
+  `security-context.v1` DTO. It carries listing identity, current holding
+  exposure, economic exposure, market/freshness state, cached intelligence,
+  analysis-cache summaries, context completeness, and identity rules.
+  Candidate-buy-fit questions derive a third `candidate-fit.v1` DTO from that
+  shared security context plus Preference Factors V2 and the latest
+  recommendation run. `currentExposure=0` means "not currently held" only; it is
+  not a blocker. Provider answers that still use 0% or missing page context as a
+  reason to refuse analysis are replaced by the deterministic local answer and
+  logged as `candidate_fit_quality_guard`.
 - Provider retry-after windows are now persisted in
   `market_data_provider_limits`; refresh ledgers can snapshot DB-backed limits
   for Settings QA and later cloud workers.

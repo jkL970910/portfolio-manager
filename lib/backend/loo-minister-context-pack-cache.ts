@@ -2,6 +2,7 @@ export type LooMinisterContextPackKind =
   | "project-knowledge"
   | "preference"
   | "recommendation"
+  | "portfolio"
   | "security"
   | "external-intelligence"
   | "chat-subjects";
@@ -29,6 +30,7 @@ export const LOO_MINISTER_CONTEXT_PACK_TTL_MS = {
   projectKnowledge: 60 * 60 * 1000,
   preference: 2 * 60 * 1000,
   recommendation: 2 * 60 * 1000,
+  portfolio: 60 * 1000,
   security: 60 * 1000,
   externalIntelligence: 2 * 60 * 1000,
   chatSubjects: 60 * 1000,

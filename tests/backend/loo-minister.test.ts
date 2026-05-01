@@ -139,7 +139,7 @@ test("Loo Minister GPT mode falls back safely when provider is not enabled", asy
   assert.equal(response.data.page, "security-detail");
   assert.match(response.data.title, /本地降级/);
   assert.match(response.data.answer, /GPT-5.5 provider 未启用/);
-  assert.match(response.data.answer, /候选标的适配问题/);
+  assert.match(response.data.answer, /candidate-fit DTO/);
   assert.match(response.data.answer, /NVDA/);
   assert.match(response.data.disclaimer.zh, /不构成投资建议/);
 });
@@ -369,11 +369,82 @@ test("Loo Minister answers candidate buy-fit questions without treating zero hol
     },
   );
 
-  assert.match(response.data.answer, /候选标的适配问题/);
-  assert.match(response.data.answer, /0% 只代表现在没持有/);
+  assert.match(response.data.answer, /candidate-new-buy DTO/);
+  assert.match(response.data.answer, /0% 只代表当前未持有/);
   assert.match(response.data.answer, /偏好适配/);
   assert.match(response.data.answer, /推荐引擎/);
   assert.match(response.data.disclaimer.zh, /不构成投资建议/);
+});
+
+test("Loo Minister infers candidate economic exposure when page asset class is unknown", async () => {
+  const response = await getLooMinisterAnswer(
+    "user_casey",
+    {
+      pageContext: {
+        version: LOO_MINISTER_VERSION,
+        page: "security-detail",
+        locale: "zh",
+        title: "XBB 标的详情",
+        asOf: now,
+        displayCurrency: "CAD",
+        subject: {
+          security: {
+            securityId: "security_xbb_tsx_cad",
+            symbol: "XBB",
+            exchange: "TSX",
+            currency: "CAD",
+            name: "iShares Core Canadian Universe Bond Index ETF",
+          },
+        },
+        dataFreshness: {
+          portfolioAsOf: now,
+          quotesAsOf: now,
+          fxAsOf: now,
+          chartFreshness: "stale",
+          sourceMode: "cached-external",
+        },
+        facts: [
+          {
+            id: "last-price",
+            label: "最新价格",
+            value: "CAD 27.97",
+            source: "quote-cache",
+          },
+          {
+            id: "asset-class",
+            label: "资产类别",
+            value: "未知",
+            source: "analysis-cache",
+          },
+        ],
+        warnings: ["当前没有该标的持仓。"],
+        allowedActions: [],
+      },
+      question: "这个标的适合买入吗？",
+      answerStyle: "beginner",
+      cacheStrategy: "prefer-cache",
+      includeExternalResearch: false,
+    },
+    {
+      settings: {
+        mode: "local",
+        provider: "official-openai",
+        model: "gpt-5.5",
+        reasoningEffort: "medium",
+        endpoint: "https://api.openai.com/v1/responses",
+        apiKey: null,
+        apiKeySource: "none",
+        providerEnabled: false,
+      },
+      persistUsage: false,
+    },
+  );
+
+  assert.match(response.data.answer, /candidate-new-buy DTO/);
+  assert.match(response.data.answer, /底层经济暴露：Fixed Income/);
+  assert.match(response.data.answer, /目标 10\.0%/);
+  assert.doesNotMatch(response.data.answer, /资产类别未确认/);
+  assert.doesNotMatch(response.data.answer, /不能.*判断.*适配/);
 });
 
 test("Loo Minister hydrates comparison security context from a ticker mention", async () => {
@@ -500,6 +571,64 @@ test("Loo Minister explains Health Score with portfolio and account lenses", asy
   assert.match(response.data.answer, /全组合 Health/);
   assert.match(response.data.answer, /账户级 Health/);
   assert.match(response.data.answer, /配置偏离/);
+});
+
+test("Loo Minister uses portfolio context DTO for whole-portfolio holding questions", async () => {
+  const response = await getLooMinisterAnswer(
+    "user_casey",
+    {
+      pageContext: {
+        version: LOO_MINISTER_VERSION,
+        page: "portfolio",
+        locale: "zh",
+        title: "Loo国组合",
+        asOf: now,
+        displayCurrency: "CAD",
+        subject: {},
+        dataFreshness: {
+          portfolioAsOf: now,
+          quotesAsOf: now,
+          fxAsOf: now,
+          chartFreshness: "fresh",
+          sourceMode: "cached-external",
+        },
+        facts: [
+          {
+            id: "portfolio-total",
+            label: "组合总值",
+            value: "CAD 106,900",
+            source: "portfolio-data",
+          },
+        ],
+        warnings: [],
+        allowedActions: [],
+      },
+      question: "整体持仓最大风险是什么？下一步怎么调整？",
+      answerStyle: "beginner",
+      cacheStrategy: "prefer-cache",
+      includeExternalResearch: false,
+    },
+    {
+      settings: {
+        mode: "local",
+        provider: "official-openai",
+        model: "gpt-5.5",
+        reasoningEffort: "medium",
+        endpoint: "https://api.openai.com/v1/responses",
+        apiKey: null,
+        apiKeySource: "none",
+        providerEnabled: false,
+      },
+      persistUsage: false,
+    },
+  );
+
+  assert.match(response.data.answer, /portfolio-context\.v1/);
+  assert.match(response.data.answer, /投资资产/);
+  assert.match(response.data.answer, /前五大持仓/);
+  assert.match(response.data.answer, /Health/);
+  assert.match(response.data.answer, /偏好/);
+  assert.doesNotMatch(response.data.answer, /投资偏好现在应理解/);
 });
 
 test("Loo Minister explains recommendation constraints and V3 overlay boundaries", async () => {
@@ -691,6 +820,129 @@ test("Loo Minister explains security detail without ticker-only merging", async 
   assert.match(response.data.answer, /不会只按 ticker 合并/);
   assert.match(response.data.answer, /数据新鲜度/);
   assert.match(response.data.answer, /Preference Factors/);
+});
+
+test("Loo Minister uses security context DTO for non-buy security questions", async () => {
+  const response = await getLooMinisterAnswer(
+    "user_casey",
+    {
+      pageContext: {
+        version: LOO_MINISTER_VERSION,
+        page: "security-detail",
+        locale: "zh",
+        title: "VFV 标的详情",
+        asOf: now,
+        displayCurrency: "CAD",
+        subject: {
+          security: {
+            securityId: "security_vfv_cad",
+            symbol: "VFV",
+            exchange: "TSX",
+            currency: "CAD",
+            name: "Vanguard S&P 500 Index ETF",
+          },
+        },
+        dataFreshness: {
+          portfolioAsOf: now,
+          quotesAsOf: now,
+          fxAsOf: now,
+          chartFreshness: "fresh",
+          sourceMode: "cached-external",
+        },
+        facts: [
+          {
+            id: "asset-class",
+            label: "资产类别",
+            value: "US Equity",
+            source: "analysis-cache",
+          },
+          {
+            id: "last-price",
+            label: "最新价格",
+            value: "CAD 132.80",
+            source: "quote-cache",
+          },
+        ],
+        warnings: [],
+        allowedActions: [],
+      },
+      question: "这个标的最大的风险和作用是什么？",
+      answerStyle: "beginner",
+      cacheStrategy: "prefer-cache",
+      includeExternalResearch: false,
+    },
+    {
+      settings: {
+        mode: "local",
+        provider: "official-openai",
+        model: "gpt-5.5",
+        reasoningEffort: "medium",
+        endpoint: "https://api.openai.com/v1/responses",
+        apiKey: null,
+        apiKeySource: "none",
+        providerEnabled: false,
+      },
+      persistUsage: false,
+    },
+  );
+
+  assert.match(response.data.answer, /security-context\.v1/);
+  assert.match(response.data.answer, /VFV · TSX · CAD/);
+  assert.match(response.data.answer, /底层经济暴露 US Equity/);
+  assert.match(response.data.answer, /持仓上下文/);
+  assert.match(response.data.answer, /15\.8%/);
+  assert.doesNotMatch(response.data.answer, /candidate-new-buy DTO/);
+});
+
+test("Loo Minister builds security context from holding detail without explicit security subject", async () => {
+  const response = await getLooMinisterAnswer(
+    "user_casey",
+    {
+      pageContext: {
+        version: LOO_MINISTER_VERSION,
+        page: "holding-detail",
+        locale: "zh",
+        title: "VFV 持仓详情",
+        asOf: now,
+        displayCurrency: "CAD",
+        subject: {
+          holdingId: "hold_vfv_casey",
+        },
+        dataFreshness: {
+          portfolioAsOf: now,
+          quotesAsOf: now,
+          fxAsOf: now,
+          chartFreshness: "fresh",
+          sourceMode: "cached-external",
+        },
+        facts: [],
+        warnings: [],
+        allowedActions: [],
+      },
+      question: "这个持仓需要注意什么风险？",
+      answerStyle: "beginner",
+      cacheStrategy: "prefer-cache",
+      includeExternalResearch: false,
+    },
+    {
+      settings: {
+        mode: "local",
+        provider: "official-openai",
+        model: "gpt-5.5",
+        reasoningEffort: "medium",
+        endpoint: "https://api.openai.com/v1/responses",
+        apiKey: null,
+        apiKeySource: "none",
+        providerEnabled: false,
+      },
+      persistUsage: false,
+    },
+  );
+
+  assert.match(response.data.answer, /security-context\.v1/);
+  assert.match(response.data.answer, /VFV · TSX · CAD/);
+  assert.match(response.data.answer, /已持有 listing/);
+  assert.match(response.data.answer, /US Equity/);
 });
 
 test("Loo Minister hands analysis requests off to confirmed run-analysis actions", async () => {
@@ -1051,6 +1303,214 @@ test("Loo Minister can call an OpenRouter-compatible Responses endpoint", async 
     globalThis.fetch = originalFetch;
     process.env.LOO_MINISTER_REASONING_EFFORT = originalReasoningEffort;
     process.env.LOO_MINISTER_DISABLE_RESPONSE_STORAGE = originalDisableStorage;
+  }
+});
+
+test("Loo Minister OpenRouter prompt prioritizes candidate fit context", async () => {
+  const originalFetch = globalThis.fetch;
+  let requestedPrompt = "";
+
+  globalThis.fetch = async (_input, init) => {
+    const body = JSON.parse(String(init?.body ?? "{}")) as {
+      input?: Array<{ content?: string }>;
+    };
+    requestedPrompt = body.input?.[0]?.content ?? "";
+
+    return new Response(
+      JSON.stringify({
+        output_text: JSON.stringify({
+          version: LOO_MINISTER_VERSION,
+          generatedAt: now,
+          role: "loo-minister",
+          page: "security-detail",
+          title: "标的大臣答复",
+          answer: "我会按候选买入问题处理，0% 只代表当前未持有，不代表无法分析。",
+          keyPoints: ["候选标的适配口径: 0% 不是无法分析"],
+          suggestedActions: [],
+          sources: [
+            {
+              title: "XBB 标的详情 页面上下文",
+              sourceType: "page-context",
+              asOf: now,
+            },
+          ],
+          disclaimer: {
+            zh: "仅用于研究学习，不构成投资建议。",
+            en: "For research and education only. This is not investment advice.",
+          },
+        }),
+      }),
+      {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      },
+    );
+  };
+
+  try {
+    await getLooMinisterAnswer(
+      "user_casey",
+      {
+        pageContext: {
+          version: LOO_MINISTER_VERSION,
+          page: "security-detail",
+          locale: "zh",
+          title: "XBB 标的详情",
+          asOf: now,
+          displayCurrency: "CAD",
+          subject: {
+            security: {
+              securityId: "security_xbb_tsx_cad",
+              symbol: "XBB",
+              exchange: "TSX",
+              currency: "CAD",
+              name: "iShares Core Canadian Universe Bond Index ETF",
+            },
+          },
+          dataFreshness: {
+            portfolioAsOf: now,
+            quotesAsOf: now,
+            fxAsOf: now,
+            chartFreshness: "stale",
+            sourceMode: "cached-external",
+          },
+          facts: [
+            ...Array.from({ length: 16 }, (_, index) => ({
+              id: `filler-${index}`,
+              label: `低优先级事实 ${index}`,
+              value: "不应挤掉候选适配上下文",
+              source: "portfolio-data" as const,
+            })),
+            {
+              id: "asset-class",
+              label: "资产类别",
+              value: "未知",
+              source: "analysis-cache" as const,
+            },
+          ],
+          warnings: [],
+          allowedActions: [],
+        },
+        question: "这个标的适合买入吗？",
+        answerStyle: "beginner",
+        cacheStrategy: "prefer-cache",
+        includeExternalResearch: false,
+      },
+      {
+        settings: {
+          mode: "gpt-5.5",
+          provider: "openrouter-compatible",
+          model: "gpt-5.5",
+          reasoningEffort: "medium",
+          endpoint: "https://openrouter.icu/v1/responses",
+          apiKey: "sk-router-test",
+          apiKeySource: "user",
+          providerEnabled: true,
+        },
+        persistUsage: false,
+      },
+    );
+
+    assert.match(requestedPrompt, /候选适配 DTO/);
+    assert.match(requestedPrompt, /"analysisMode":"candidate-new-buy"/);
+    assert.match(requestedPrompt, /"assetClass":"Fixed Income"/);
+    assert.match(requestedPrompt, /currentExposurePct=0 never blocks/);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("Loo Minister replaces misleading candidate fit provider answers", async () => {
+  const originalFetch = globalThis.fetch;
+
+  globalThis.fetch = async () =>
+    new Response(
+      JSON.stringify({
+        output_text: JSON.stringify({
+          version: LOO_MINISTER_VERSION,
+          generatedAt: now,
+          role: "loo-minister",
+          page: "security-detail",
+          title: "标的大臣答复",
+          answer:
+            "当前页面没有足够组合上下文判断这个标的是否适配，因此 XBB 当前组合占比 0% 就不能继续分析。",
+          keyPoints: ["上下文不足"],
+          suggestedActions: [],
+          sources: [
+            {
+              title: "XBB 标的详情 页面上下文",
+              sourceType: "page-context",
+              asOf: now,
+            },
+          ],
+          disclaimer: {
+            zh: "仅用于研究学习，不构成投资建议。",
+            en: "For research and education only. This is not investment advice.",
+          },
+        }),
+      }),
+      {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      },
+    );
+
+  try {
+    const response = await getLooMinisterAnswer(
+      "user_casey",
+      {
+        pageContext: {
+          version: LOO_MINISTER_VERSION,
+          page: "security-detail",
+          locale: "zh",
+          title: "XBB 标的详情",
+          asOf: now,
+          displayCurrency: "CAD",
+          subject: {
+            security: {
+              securityId: "security_xbb_tsx_cad",
+              symbol: "XBB",
+              exchange: "TSX",
+              currency: "CAD",
+              name: "iShares Core Canadian Universe Bond Index ETF",
+            },
+          },
+          dataFreshness: {
+            portfolioAsOf: now,
+            quotesAsOf: now,
+            fxAsOf: now,
+            chartFreshness: "stale",
+            sourceMode: "cached-external",
+          },
+          facts: [],
+          warnings: [],
+          allowedActions: [],
+        },
+        question: "这个标的适合买入吗？",
+        answerStyle: "beginner",
+        cacheStrategy: "prefer-cache",
+        includeExternalResearch: false,
+      },
+      {
+        settings: {
+          mode: "gpt-5.5",
+          provider: "openrouter-compatible",
+          model: "gpt-5.5",
+          reasoningEffort: "medium",
+          endpoint: "https://openrouter.icu/v1/responses",
+          apiKey: "sk-router-test",
+          apiKeySource: "user",
+          providerEnabled: true,
+        },
+        persistUsage: false,
+      },
+    );
+
+    assert.match(response.data.answer, /未通过候选适配校验/);
+    assert.match(response.data.answer, /0% 只代表当前未持有/);
+    assert.doesNotMatch(response.data.answer, /就不能继续分析/);
+  } finally {
+    globalThis.fetch = originalFetch;
   }
 });
 
