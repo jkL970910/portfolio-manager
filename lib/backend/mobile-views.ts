@@ -575,9 +575,19 @@ export function buildRecommendationV3Overlay(
           : 0;
   const scopeBoost = hasListingRef ? 10 : 3;
   const sourceBoost = hasExternalRef ? 8 : 2;
-  const externalInsightScore = clampScore(
-    50 + scopeBoost + sourceBoost - stalePenalty,
-  );
+  const documentEvidenceScores = matchedBriefs
+    .map((brief) => getBriefEvidenceScore(brief, {
+      scopeBoost,
+      sourceBoost,
+      stalePenalty,
+    }))
+    .filter((value): value is number => value != null);
+  const externalInsightScore = documentEvidenceScores.length > 0
+    ? clampScore(
+        documentEvidenceScores.reduce((sum, value) => sum + value, 0) /
+          documentEvidenceScores.length,
+      )
+    : clampScore(50 + scopeBoost + sourceBoost - stalePenalty);
   const preferenceFitScore = base.preferenceFitScore ?? base.baselineScore;
   const finalScore = clampScore(
     base.baselineScore * 0.7 +
@@ -586,6 +596,7 @@ export function buildRecommendationV3Overlay(
   );
   const riskFlags = [
     ...base.riskFlags,
+    ...matchedBriefs.flatMap((brief) => brief.riskFlags ?? []).slice(0, 3),
     ...(!hasListingRef ? ["仅匹配到底层资产情报，不能当作当前 listing 报价依据。"] : []),
     ...(stalePenalty >= 8 ? ["外部情报较旧，需要刷新后再作为高权重参考。"] : []),
   ];
@@ -611,6 +622,37 @@ export function buildRecommendationV3Overlay(
 
 function clampScore(value: number) {
   return Math.min(100, Math.max(0, Math.round(value * 10) / 10));
+}
+
+function getBriefEvidenceScore(
+  brief: RecommendationsData["intelligenceBriefs"][number],
+  context: {
+    scopeBoost: number;
+    sourceBoost: number;
+    stalePenalty: number;
+  },
+) {
+  if (
+    typeof brief.relevanceScore !== "number" ||
+    typeof brief.sourceReliability !== "number"
+  ) {
+    return null;
+  }
+  const confidenceBoost = brief.confidence === "high"
+    ? 12
+    : brief.confidence === "medium"
+      ? 6
+      : 0;
+  const riskPenalty = Math.min((brief.riskFlags ?? []).length * 4, 12);
+  return clampScore(
+    brief.relevanceScore * 0.45 +
+      brief.sourceReliability * 0.25 +
+      confidenceBoost +
+      context.scopeBoost +
+      context.sourceBoost -
+      context.stalePenalty -
+      riskPenalty,
+  );
 }
 
 function briefMatchesPriorityListing(
@@ -773,6 +815,10 @@ function mapRecommendationIntelligenceBriefs(
           date: typeof value.date === "string" ? value.date : undefined,
         };
       }),
+      confidence: undefined,
+      relevanceScore: undefined,
+      sourceReliability: undefined,
+      riskFlags: [],
     };
   });
 }
@@ -832,6 +878,10 @@ function mapExternalResearchDocumentBriefs(
             document.capturedAt.slice(0, 10),
         },
       ],
+      confidence: document.confidence,
+      relevanceScore: document.relevanceScore,
+      sourceReliability: document.sourceReliability,
+      riskFlags: document.riskFlags,
     };
   });
 }

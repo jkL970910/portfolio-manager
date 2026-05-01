@@ -141,3 +141,42 @@ test("recommendation V3 overlay weights cached external intelligence explicitly"
   assert.match(overlay.explanation, /V3 最终分/);
   assert.ok(overlay.signals.some((signal) => signal.includes("当前 listing")));
 });
+
+test("recommendation V3 overlay uses persisted document evidence scores", () => {
+  const documentBrief: RecommendationsData["intelligenceBriefs"][number] = {
+    ...brief("doc_xbb_cad", "XBB", "TSX", "CAD", "sec_xbb_cad"),
+    generatedAt: new Date().toISOString(),
+    confidence: "high",
+    relevanceScore: 78,
+    sourceReliability: 82,
+    riskFlags: ["缓存行情仍需要人工复核"],
+  };
+  const candidate = priority({
+    security: "XBB - iShares Core Canadian Universe Bond Index ETF",
+    securityId: "sec_xbb_cad",
+    securitySymbol: "XBB",
+    securityExchange: "TSX",
+    securityCurrency: "CAD",
+    tickers: "XBB",
+    v3Overlay: {
+      baselineScore: 66,
+      externalInsightScore: null,
+      preferenceFitScore: 70,
+      finalScore: 67,
+      confidenceLabel: "V2.1 规则评分，等待缓存外部情报校准",
+      sourceMode: "local",
+      signals: [],
+      riskFlags: [],
+      explanation: "base",
+    },
+  });
+  const refs = mapRecommendationIntelligenceRefs(candidate, [documentBrief]);
+  const overlay = buildRecommendationV3Overlay(candidate, refs, [documentBrief]);
+
+  assert.ok(overlay);
+  assert.equal(overlay.externalInsightScore, 81.6);
+  assert.equal(overlay.finalScore, 68.9);
+  assert.ok(
+    overlay.riskFlags.some((flag) => flag.includes("缓存行情仍需要人工复核")),
+  );
+});

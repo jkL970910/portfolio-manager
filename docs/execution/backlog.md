@@ -211,6 +211,10 @@ Guardrails:
   `baselineScore`, `preferenceFitScore`, `externalInsightScore`, `finalScore`,
   `signals`, and `riskFlags`. Current weighting is conservative at 70% V2.1
   baseline, 15% Preference Factors V2, and 15% cached intelligence.
+- When a V3 match comes from a persisted external research document, cached
+  intelligence scoring uses document `confidence`, `relevanceScore`,
+  `sourceReliability`, and `riskFlags` instead of only the older fixed
+  source/scope/freshness heuristic.
 - External research now has a source-agnostic structured document contract for
   future news/announcement/forum/institutional adapters. Documents carry source
   type, identity scope, TTL, confidence, sentiment, relevance, reliability, key

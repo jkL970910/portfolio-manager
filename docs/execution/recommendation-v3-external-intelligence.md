@@ -304,6 +304,10 @@ Current structured document boundary:
   matching. This keeps the recommendation bridge usable even when the analysis
   run is only a compact report and the richer source document needs to remain
   queryable.
+- Recommendation V3 overlay now reads document evidence fields when available:
+  `confidence`, `relevanceScore`, `sourceReliability`, and `riskFlags`. Saved
+  analysis runs without those fields still use the conservative source/scope/
+  freshness heuristic.
 
 ## Source Strategy
 
@@ -409,8 +413,9 @@ P0.5:
 P1:
 
 1. Add first structured news/announcement adapter behind worker/cache flags.
-2. Calibrate V3 scoring from richer cached external documents instead of the
-   current conservative source/scope/freshness heuristic.
+2. Deepen V3 scoring calibration with more source types, backtests, and
+   source-specific stale-data rules. The first document-evidence scoring bridge
+   is implemented for cached market-data documents.
 3. Add standalone `今日秘闻` API if Overview/Portfolio/大臣 need the same feed.
 4. Add deeper guided preference questions for sector/style/life/tax factors.
 

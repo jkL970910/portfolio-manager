@@ -655,6 +655,10 @@ export interface RecommendationsData {
       sourceType: string;
       date?: string;
     }[];
+    confidence?: "low" | "medium" | "high";
+    relevanceScore?: number;
+    sourceReliability?: number;
+    riskFlags?: string[];
   }[];
   priorities: {
     id: string;
