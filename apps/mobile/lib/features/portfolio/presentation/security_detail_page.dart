@@ -1,6 +1,8 @@
 import "package:flutter/material.dart";
 
 import "../../../core/api/loo_api_client.dart";
+import "../../intelligence/data/daily_intelligence_models.dart";
+import "../../intelligence/presentation/daily_intelligence_card.dart";
 import "../../shared/data/mobile_chart_models.dart";
 import "../../shared/data/loo_minister_context_models.dart";
 import "../../shared/data/mobile_models.dart";
@@ -34,6 +36,7 @@ class SecurityDetailPage extends StatefulWidget {
 
 class _SecurityDetailPageState extends State<SecurityDetailPage> {
   late Future<MobileSecurityDetailSnapshot?> _snapshot;
+  late Future<MobileDailyIntelligenceSnapshot> _dailyIntelligence;
   bool _isRefreshingQuote = false;
   String? _securityId;
 
@@ -41,6 +44,7 @@ class _SecurityDetailPageState extends State<SecurityDetailPage> {
   void initState() {
     super.initState();
     _snapshot = _loadSnapshot();
+    _dailyIntelligence = _loadDailyIntelligence();
   }
 
   Future<MobileSecurityDetailSnapshot?> _loadSnapshot() async {
@@ -71,9 +75,19 @@ class _SecurityDetailPageState extends State<SecurityDetailPage> {
     return snapshot;
   }
 
+  Future<MobileDailyIntelligenceSnapshot> _loadDailyIntelligence() async {
+    final response = await widget.apiClient.getDailyIntelligence(limit: 8);
+    final data = response["data"];
+    if (data is! Map<String, dynamic>) {
+      throw const LooApiException("今日秘闻数据格式不正确。");
+    }
+    return MobileDailyIntelligenceSnapshot.fromJson(data);
+  }
+
   void _refresh() {
     setState(() {
       _snapshot = _loadSnapshot();
+      _dailyIntelligence = _loadDailyIntelligence();
     });
   }
 
@@ -169,6 +183,25 @@ class _SecurityDetailPageState extends State<SecurityDetailPage> {
                   },
                 ),
                 const SizedBox(height: 12),
+                FutureBuilder<MobileDailyIntelligenceSnapshot>(
+                  future: _dailyIntelligence,
+                  builder: (context, intelligenceSnapshot) {
+                    return DailyIntelligenceCard(
+                      snapshot: intelligenceSnapshot.hasData
+                          ? _filterIntelligenceForSecurity(
+                              intelligenceSnapshot.data!,
+                              data,
+                            )
+                          : null,
+                      isLoading: intelligenceSnapshot.connectionState ==
+                          ConnectionState.waiting,
+                      errorMessage: intelligenceSnapshot.hasError
+                          ? intelligenceSnapshot.error.toString()
+                          : null,
+                    );
+                  },
+                ),
+                const SizedBox(height: 12),
                 _MetricGrid(data),
                 if (priceHistoryChart != null) ...[
                   const SizedBox(height: 16),
@@ -234,6 +267,42 @@ class _SecurityDetailPageState extends State<SecurityDetailPage> {
           fallbackTitle: holding.symbol,
         ),
       ),
+    );
+  }
+
+  MobileDailyIntelligenceSnapshot _filterIntelligenceForSecurity(
+    MobileDailyIntelligenceSnapshot snapshot,
+    MobileSecurityDetailSnapshot security,
+  ) {
+    final securityId = security.securityId.trim();
+    final symbol = security.symbol.trim().toUpperCase();
+    final exchange = security.exchange.trim().toUpperCase();
+    final currency = security.currency.trim().toUpperCase();
+    final items = snapshot.items.where((item) {
+      final identity = item.identity;
+      if (securityId.isNotEmpty && identity.securityId == securityId) {
+        return true;
+      }
+
+      final itemSymbol = identity.symbol.trim().toUpperCase();
+      final itemExchange = identity.exchange.trim().toUpperCase();
+      final itemCurrency = identity.currency.trim().toUpperCase();
+      return symbol.isNotEmpty &&
+          exchange.isNotEmpty &&
+          currency.isNotEmpty &&
+          itemSymbol == symbol &&
+          itemExchange == exchange &&
+          itemCurrency == currency;
+    }).toList();
+
+    return MobileDailyIntelligenceSnapshot(
+      generatedAt: snapshot.generatedAt,
+      disclaimer: snapshot.disclaimer,
+      manualTriggerOnly: snapshot.manualTriggerOnly,
+      items: items,
+      emptyTitle: "暂时没有该标的秘闻",
+      emptyDetail:
+          "当前只显示同一 securityId，或完整 symbol/exchange/currency 匹配的缓存情报；不会用 ticker-only 情报混入这个 listing。",
     );
   }
 }
@@ -493,8 +562,7 @@ class _SummaryCard extends StatelessWidget {
                     ),
                   ),
                   _StatusPill(
-                      label: data.quoteStatusLabel,
-                      color: freshnessColor),
+                      label: data.quoteStatusLabel, color: freshnessColor),
                 ],
               ),
               const SizedBox(height: 10),

@@ -156,7 +156,7 @@ test("Loo Minister enriches answers with cached daily intelligence", async () =>
     url: null,
     publishedAt: "2026-04-30T00:00:00.000Z",
     capturedAt: now,
-    expiresAt: "2026-05-01T04:00:00.000Z",
+    expiresAt: "2099-05-01T04:00:00.000Z",
     language: "zh",
     security: {
       securityId: "sec_vfv_cad",

@@ -20,7 +20,7 @@ test("daily intelligence maps persisted research documents into mobile-safe card
     url: null,
     publishedAt: "2026-04-30T00:00:00.000Z",
     capturedAt: now.toISOString(),
-    expiresAt: "2026-05-01T15:00:00.000Z",
+    expiresAt: "2099-05-01T15:00:00.000Z",
     language: "zh",
     security: {
       securityId: "sec_vfv_cad",
@@ -71,7 +71,7 @@ test("daily intelligence endpoint combines documents and saved analysis without 
     url: null,
     publishedAt: "2026-04-30T00:00:00.000Z",
     capturedAt: now.toISOString(),
-    expiresAt: "2026-05-01T16:00:00.000Z",
+    expiresAt: "2099-05-01T16:00:00.000Z",
     language: "zh",
     security: {
       securityId: "sec_xbb_cad",
@@ -108,7 +108,7 @@ test("daily intelligence endpoint combines documents and saved analysis without 
     },
     sourceMode: "local",
     generatedAt: "2026-04-30T15:45:00.000Z",
-    expiresAt: "2026-05-01T15:45:00.000Z",
+    expiresAt: "2099-05-01T15:45:00.000Z",
   });
 
   const response = await getMobileDailyIntelligenceView(
