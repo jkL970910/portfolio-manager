@@ -576,3 +576,111 @@ test("Loo Minister retries an empty OpenRouter-compatible response once", async 
     globalThis.fetch = originalFetch;
   }
 });
+
+test("Loo Minister tolerates provider source dates that are display strings", async () => {
+  const originalFetch = globalThis.fetch;
+
+  globalThis.fetch = async () =>
+    new Response(
+      JSON.stringify({
+        output_text: JSON.stringify({
+          version: LOO_MINISTER_VERSION,
+          generatedAt: now,
+          role: "loo-minister",
+          page: "security-detail",
+          title: "标的大臣答复",
+          answer: "大臣按当前标的页面 context 给出真实模型答复。",
+          keyPoints: ["最新价格: CAD 54.58"],
+          suggestedActions: [],
+          sources: [
+            {
+              title: "XAW 页面上下文",
+              sourceType: "page-context",
+              asOf: now,
+            },
+            {
+              title: "Yahoo Finance 缓存报价",
+              sourceType: "quote-cache",
+              asOf: "5月1日 12:43",
+            },
+          ],
+          disclaimer: {
+            zh: "仅用于研究学习，不构成投资建议。",
+            en: "For research and education only. This is not investment advice.",
+          },
+        }),
+        usage: {
+          input_tokens: 100,
+          output_tokens: 50,
+          total_tokens: 150,
+        },
+      }),
+      {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      },
+    );
+
+  try {
+    const response = await getLooMinisterAnswer(
+      "user_1",
+      {
+        pageContext: {
+          version: LOO_MINISTER_VERSION,
+          page: "security-detail",
+          locale: "zh",
+          title: "XAW 标的详情",
+          asOf: now,
+          displayCurrency: "CAD",
+          subject: {
+            security: {
+              symbol: "XAW",
+              exchange: "TSX",
+              currency: "CAD",
+            },
+          },
+          dataFreshness: {
+            portfolioAsOf: now,
+            quotesAsOf: now,
+            fxAsOf: now,
+            chartFreshness: "fresh",
+            sourceMode: "cached-external",
+          },
+          facts: [
+            {
+              id: "last-price",
+              label: "最新价格",
+              value: "CAD 54.58",
+              source: "quote-cache",
+            },
+          ],
+          warnings: [],
+          allowedActions: [],
+        },
+        question: "这个标的和我的组合适配吗？",
+        answerStyle: "beginner",
+        cacheStrategy: "prefer-cache",
+        includeExternalResearch: false,
+      },
+      {
+        settings: {
+          mode: "gpt-5.5",
+          provider: "openrouter-compatible",
+          model: "gpt-5.5",
+          reasoningEffort: "medium",
+          endpoint: "https://openrouter.icu/v1/responses",
+          apiKey: "sk-router-test",
+          apiKeySource: "user",
+          providerEnabled: true,
+        },
+        persistUsage: false,
+      },
+    );
+
+    assert.equal(response.data.title, "标的大臣答复");
+    assert.doesNotMatch(response.data.answer, /本地降级/);
+    assert.equal(response.data.sources[1]?.asOf, null);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});

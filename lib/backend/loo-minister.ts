@@ -323,6 +323,40 @@ function extractUsage(response: Record<string, unknown>) {
   };
 }
 
+function isIsoDateTime(value: unknown) {
+  return typeof value === "string" &&
+    /^\d{4}-\d{2}-\d{2}T/.test(value) &&
+    !Number.isNaN(Date.parse(value));
+}
+
+function sanitizeExternalMinisterAnswerPayload(
+  value: unknown,
+): Record<string, unknown> {
+  if (!value || typeof value !== "object") {
+    return {};
+  }
+
+  const answer = value as Record<string, unknown>;
+  const sources = Array.isArray(answer.sources) ? answer.sources : [];
+
+  return {
+    ...answer,
+    generatedAt: isIsoDateTime(answer.generatedAt)
+      ? answer.generatedAt
+      : new Date().toISOString(),
+    sources: sources.map((source) => {
+      if (!source || typeof source !== "object") {
+        return source;
+      }
+      const sourceData = source as Record<string, unknown>;
+      return {
+        ...sourceData,
+        asOf: isIsoDateTime(sourceData.asOf) ? sourceData.asOf : null,
+      };
+    }),
+  };
+}
+
 function classifyMinisterProviderFailure(error: unknown) {
   const message = error instanceof Error ? error.message : String(error);
   if (/status 5\d\d/.test(message)) return "provider_5xx";
@@ -571,7 +605,9 @@ async function callExternalMinisterOnce(
     throw new Error("OpenAI response did not include output text.");
   }
 
-  const parsed = looMinisterAnswerResultSchema.parse(JSON.parse(outputText));
+  const parsed = looMinisterAnswerResultSchema.parse(
+    sanitizeExternalMinisterAnswerPayload(JSON.parse(outputText)),
+  );
   return {
     answer: parsed,
     usage: extractUsage(payload),
