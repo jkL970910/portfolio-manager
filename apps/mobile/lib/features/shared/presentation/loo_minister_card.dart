@@ -1,3 +1,5 @@
+import "dart:async";
+
 import "package:flutter/material.dart";
 
 import "../../../core/api/loo_api_client.dart";
@@ -258,32 +260,88 @@ class _LooMinisterSheet extends StatelessWidget {
 }
 
 class _LooMinisterCardState extends State<LooMinisterCard> {
+  static const _ministerSlowThreshold = Duration(seconds: 12);
+
   late final TextEditingController _questionController =
       TextEditingController(text: widget.suggestedQuestion);
   final List<_MinisterChatMessage> _messages = [];
+  final List<Timer> _phaseTimers = [];
   var _loading = false;
+  String? _phaseLabel;
   String? _sessionId;
 
   @override
   void dispose() {
+    _clearPhaseTimers();
     _questionController.dispose();
     super.dispose();
   }
 
-  Future<void> _askMinister() async {
-    final question = _questionController.text.trim();
-    if (question.length < 2) {
-      throw const LooApiException("请先输入至少 2 个字的问题。");
-    }
-
+  Future<Map<String, dynamic>> _requestMinister(
+    String question, {
+    required String answerMode,
+  }) async {
     final request = LooMinisterQuestionRequest(
       pageContext: widget.pageContext,
       question: question,
     ).toJson();
-    final response = await widget.apiClient.askLooMinisterChat({
+    return widget.apiClient.askLooMinisterChat({
       ...request,
+      "answerMode": answerMode,
       if (_sessionId != null) "sessionId": _sessionId,
     });
+  }
+
+  void _clearPhaseTimers() {
+    for (final timer in _phaseTimers) {
+      timer.cancel();
+    }
+    _phaseTimers.clear();
+  }
+
+  void _schedulePhaseUpdates() {
+    _clearPhaseTimers();
+    _setPhase("整理当前页面上下文...");
+    _phaseTimers.add(Timer(const Duration(milliseconds: 700), () {
+      _setPhase("补齐标的/项目资料...");
+    }));
+    _phaseTimers.add(Timer(const Duration(seconds: 2), () {
+      _setPhase("询问 GPT-5.5 或等待本地策略...");
+    }));
+  }
+
+  void _setPhase(String label) {
+    if (!mounted || !_loading) {
+      return;
+    }
+    setState(() => _phaseLabel = label);
+  }
+
+  Future<_MinisterTimeoutChoice?> _showTimeoutChoice() {
+    return showDialog<_MinisterTimeoutChoice>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text("大臣回复较慢"),
+        content: const Text(
+          "GPT/Router 还在等待。你可以继续等真实模型答复，也可以改用本地大臣先给出基于缓存和页面 context 的答复。",
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext)
+                .pop(_MinisterTimeoutChoice.continueWaiting),
+            child: const Text("继续等 GPT"),
+          ),
+          FilledButton(
+            onPressed: () =>
+                Navigator.of(dialogContext).pop(_MinisterTimeoutChoice.useLocal),
+            child: const Text("改用本地大臣"),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _applyMinisterResponse(Map<String, dynamic> response) async {
     final data = response["data"];
     if (data is! Map<String, dynamic>) {
       throw const LooApiException("Loo国大臣答复格式不正确。");
@@ -303,6 +361,35 @@ class _LooMinisterCardState extends State<LooMinisterCard> {
     });
   }
 
+  Future<void> _askMinister(String question) async {
+    _schedulePhaseUpdates();
+    final remoteFuture = _requestMinister(question, answerMode: "auto");
+    final firstResult = await Future.any<Object>([
+      remoteFuture,
+      Future<_MinisterSlowResponse>.delayed(
+        _ministerSlowThreshold,
+        () => const _MinisterSlowResponse(),
+      ),
+    ]);
+
+    if (firstResult is Map<String, dynamic>) {
+      await _applyMinisterResponse(firstResult);
+      return;
+    }
+
+    _setPhase("GPT/Router 响应较慢，等待你的选择...");
+    final choice = await _showTimeoutChoice();
+    if (choice == _MinisterTimeoutChoice.useLocal) {
+      _setPhase("切换本地大臣答复...");
+      final localResponse = await _requestMinister(question, answerMode: "local");
+      await _applyMinisterResponse(localResponse);
+      return;
+    }
+
+    _setPhase("继续等待 GPT-5.5 答复...");
+    await _applyMinisterResponse(await remoteFuture);
+  }
+
   void _submit() {
     final question = _questionController.text.trim();
     if (question.length < 2 || _loading) {
@@ -313,7 +400,7 @@ class _LooMinisterCardState extends State<LooMinisterCard> {
       _loading = true;
       _messages.add(_MinisterChatMessage.user(question));
     });
-    _askMinister().catchError((Object error) {
+    _askMinister(question).catchError((Object error) {
       if (mounted) {
         setState(() {
           _messages.add(_MinisterChatMessage.error(error.toString()));
@@ -321,7 +408,11 @@ class _LooMinisterCardState extends State<LooMinisterCard> {
       }
     }).whenComplete(() {
       if (mounted) {
-        setState(() => _loading = false);
+        _clearPhaseTimers();
+        setState(() {
+          _loading = false;
+          _phaseLabel = null;
+        });
       }
     });
   }
@@ -382,6 +473,11 @@ class _LooMinisterCardState extends State<LooMinisterCard> {
             ),
             if (_loading) ...[
               const SizedBox(height: 12),
+              Text(
+                _phaseLabel ?? "大臣思考中...",
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+              const SizedBox(height: 6),
               const LinearProgressIndicator(),
             ],
           ],
@@ -390,6 +486,12 @@ class _LooMinisterCardState extends State<LooMinisterCard> {
     );
   }
 }
+
+class _MinisterSlowResponse {
+  const _MinisterSlowResponse();
+}
+
+enum _MinisterTimeoutChoice { continueWaiting, useLocal }
 
 class _MinisterChatMessage {
   const _MinisterChatMessage._({
@@ -461,12 +563,14 @@ class LooMinisterAnswer {
     required this.title,
     required this.answer,
     required this.keyPoints,
+    required this.suggestedActions,
     required this.disclaimer,
   });
 
   final String title;
   final String answer;
   final List<String> keyPoints;
+  final List<LooMinisterSuggestedAction> suggestedActions;
   final String disclaimer;
 
   factory LooMinisterAnswer.fromJson(Map<String, dynamic> json) {
@@ -476,9 +580,27 @@ class LooMinisterAnswer {
       answer: json["answer"] as String? ?? "暂时没有答复。",
       keyPoints: (json["keyPoints"] as List?)?.whereType<String>().toList() ??
           const [],
+      suggestedActions: (json["suggestedActions"] as List?)
+              ?.whereType<Map<String, dynamic>>()
+              .map(_actionFromJson)
+              .toList() ??
+          const [],
       disclaimer: disclaimer is Map<String, dynamic>
           ? disclaimer["zh"] as String? ?? "仅用于研究学习，不构成投资建议。"
           : "仅用于研究学习，不构成投资建议。",
+    );
+  }
+
+  static LooMinisterSuggestedAction _actionFromJson(Map<String, dynamic> json) {
+    final target = json["target"];
+    return LooMinisterSuggestedAction(
+      id: json["id"] as String? ?? "minister-action",
+      label: json["label"] as String? ?? "查看建议动作",
+      actionType: json["actionType"] as String? ?? "explain",
+      detail: json["detail"] as String?,
+      target:
+          target is Map<String, dynamic> ? target : const <String, dynamic>{},
+      requiresConfirmation: json["requiresConfirmation"] == true,
     );
   }
 }
@@ -511,6 +633,12 @@ class _MinisterAnswerView extends StatelessWidget {
               const SizedBox(height: 10),
               ...answer.keyPoints.take(4).map((point) => Text("• $point")),
             ],
+            if (answer.suggestedActions.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              ...answer.suggestedActions.take(3).map(
+                    (action) => _MinisterSuggestedActionChip(action: action),
+                  ),
+            ],
             const SizedBox(height: 10),
             Text(
               answer.disclaimer,
@@ -518,6 +646,53 @@ class _MinisterAnswerView extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _MinisterSuggestedActionChip extends StatelessWidget {
+  const _MinisterSuggestedActionChip({required this.action});
+
+  final LooMinisterSuggestedAction action;
+
+  @override
+  Widget build(BuildContext context) {
+    final isRunAnalysis = action.actionType == "run-analysis";
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: OutlinedButton.icon(
+        onPressed: () => _showActionDetail(context),
+        icon: Icon(
+          isRunAnalysis
+              ? Icons.analytics_outlined
+              : Icons.arrow_forward_outlined,
+        ),
+        label: Text(action.label),
+      ),
+    );
+  }
+
+  void _showActionDetail(BuildContext context) {
+    showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(action.label),
+        content: Text(
+          [
+            action.detail,
+            action.requiresConfirmation ? "此动作需要你在对应功能卡片中确认执行。" : null,
+            action.actionType == "run-analysis"
+                ? "当前版本大臣先完成安全 handoff；实际 AI 快扫请使用当前页面已有的 AI 快扫按钮执行。"
+                : null,
+          ].whereType<String>().join("\n\n"),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: const Text("知道了"),
+          ),
+        ],
       ),
     );
   }

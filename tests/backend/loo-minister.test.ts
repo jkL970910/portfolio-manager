@@ -194,10 +194,9 @@ test("Loo Minister answers product feature questions with project context", asyn
     },
   );
 
-  assert.match(response.data.answer, /项目内功能上下文/);
   assert.match(response.data.answer, /新手引导式问答/);
-  assert.match(response.data.answer, /手动编辑/);
-  assert.match(response.data.answer, /确认后才应用/);
+  assert.match(response.data.answer, /进阶用户直接手动编辑/);
+  assert.match(response.data.answer, /先展示给你确认/);
   assert.ok(
     response.data.sources.some((source) => source.sourceType === "manual"),
   );
@@ -435,9 +434,384 @@ test("Loo Minister hydrates comparison security context from a ticker mention", 
     },
   );
 
-  assert.match(response.data.answer, /对比标的 1: VFV · TSX · CAD/);
-  assert.match(response.data.answer, /大臣上下文补齐状态: hydrated/);
+  assert.match(response.data.answer, /对比标的 1：VFV · TSX · CAD/);
+  assert.match(response.data.answer, /Context 状态：hydrated/);
   assert.match(response.data.disclaimer.zh, /不构成投资建议/);
+});
+
+test("Loo Minister explains Health Score with portfolio and account lenses", async () => {
+  const response = await getLooMinisterAnswer(
+    "user_1",
+    {
+      pageContext: {
+        version: LOO_MINISTER_VERSION,
+        page: "portfolio-health",
+        locale: "zh",
+        title: "Loo国健康巡查",
+        asOf: now,
+        displayCurrency: "CAD",
+        subject: {},
+        dataFreshness: {
+          portfolioAsOf: now,
+          quotesAsOf: now,
+          fxAsOf: now,
+          chartFreshness: "fresh",
+          sourceMode: "local",
+        },
+        facts: [
+          {
+            id: "health-score",
+            label: "健康分",
+            value: "74",
+            detail: "US Equity 高于目标。",
+            source: "analysis-cache",
+          },
+          {
+            id: "asset-class-drift",
+            label: "资产配置偏离",
+            value: "US Equity 高于目标",
+            source: "analysis-cache",
+          },
+        ],
+        warnings: [],
+        allowedActions: [],
+      },
+      question: "健康分里最应该先修正什么？",
+      answerStyle: "beginner",
+      cacheStrategy: "prefer-cache",
+      includeExternalResearch: false,
+    },
+    {
+      settings: {
+        mode: "local",
+        provider: "official-openai",
+        model: "gpt-5.5",
+        reasoningEffort: "medium",
+        endpoint: "https://api.openai.com/v1/responses",
+        apiKey: null,
+        apiKeySource: "none",
+        providerEnabled: false,
+      },
+      persistUsage: false,
+    },
+  );
+
+  assert.match(response.data.answer, /Health Score/);
+  assert.match(response.data.answer, /全组合 Health/);
+  assert.match(response.data.answer, /账户级 Health/);
+  assert.match(response.data.answer, /配置偏离/);
+});
+
+test("Loo Minister explains recommendation constraints and V3 overlay boundaries", async () => {
+  const response = await getLooMinisterAnswer(
+    "user_1",
+    {
+      pageContext: {
+        version: LOO_MINISTER_VERSION,
+        page: "recommendations",
+        locale: "zh",
+        title: "Loo国推荐",
+        asOf: now,
+        displayCurrency: "CAD",
+        subject: {
+          recommendationRunId: "run_1",
+        },
+        dataFreshness: {
+          portfolioAsOf: now,
+          quotesAsOf: now,
+          fxAsOf: now,
+          chartFreshness: "fresh",
+          sourceMode: "cached-external",
+        },
+        facts: [
+          {
+            id: "recommendation-run",
+            label: "推荐批次",
+            value: "V2.1 Core + V3 Overlay",
+            source: "analysis-cache",
+          },
+          {
+            id: "recommendation-constraints",
+            label: "推荐约束",
+            value: "排除高波动单股，偏好 ETF",
+            source: "user-input",
+          },
+        ],
+        warnings: [],
+        allowedActions: [],
+      },
+      question: "为什么推荐这个，约束和 V3 overlay 有什么影响？",
+      answerStyle: "beginner",
+      cacheStrategy: "prefer-cache",
+      includeExternalResearch: false,
+    },
+    {
+      settings: {
+        mode: "local",
+        provider: "official-openai",
+        model: "gpt-5.5",
+        reasoningEffort: "medium",
+        endpoint: "https://api.openai.com/v1/responses",
+        apiKey: null,
+        apiKeySource: "none",
+        providerEnabled: false,
+      },
+      persistUsage: false,
+    },
+  );
+
+  assert.match(response.data.answer, /V2\.1 Core/);
+  assert.match(response.data.answer, /V3 cached-intelligence overlay/);
+  assert.match(response.data.answer, /排除规则优先于偏好规则/);
+  assert.match(response.data.answer, /不会在页面加载时实时抓新闻/);
+});
+
+test("Loo Minister treats V2 as deprecated and points users to V2.1 Core", async () => {
+  const response = await getLooMinisterAnswer(
+    "user_1",
+    {
+      pageContext: {
+        version: LOO_MINISTER_VERSION,
+        page: "recommendations",
+        locale: "zh",
+        title: "Loo国推荐",
+        asOf: now,
+        displayCurrency: "CAD",
+        subject: {},
+        dataFreshness: {
+          portfolioAsOf: now,
+          quotesAsOf: now,
+          fxAsOf: now,
+          chartFreshness: "fresh",
+          sourceMode: "local",
+        },
+        facts: [],
+        warnings: [],
+        allowedActions: [],
+      },
+      question: "V2 还需要继续用吗？",
+      answerStyle: "beginner",
+      cacheStrategy: "prefer-cache",
+      includeExternalResearch: false,
+    },
+    {
+      settings: {
+        mode: "local",
+        provider: "official-openai",
+        model: "gpt-5.5",
+        reasoningEffort: "medium",
+        endpoint: "https://api.openai.com/v1/responses",
+        apiKey: null,
+        apiKeySource: "none",
+        providerEnabled: false,
+      },
+      persistUsage: false,
+    },
+  );
+
+  assert.match(response.data.answer, /V2 已经是历史\/deprecated/);
+  assert.match(response.data.answer, /V2\.1 Core/);
+  assert.match(response.data.answer, /V3 Overlay/);
+});
+
+test("legacy empty recommendation run defaults to V2.1 engine version", async () => {
+  const { getRecommendationView } = await import(
+    "@/lib/backend/services"
+  );
+  const response = await getRecommendationView("user_demo");
+
+  assert.equal(response.data.engine.version, "V2.1 Core");
+});
+
+test("Loo Minister explains security detail without ticker-only merging", async () => {
+  const response = await getLooMinisterAnswer(
+    "user_1",
+    {
+      pageContext: {
+        version: LOO_MINISTER_VERSION,
+        page: "security-detail",
+        locale: "zh",
+        title: "VFV 标的详情",
+        asOf: now,
+        displayCurrency: "CAD",
+        subject: {
+          security: {
+            securityId: "security_vfv_cad",
+            symbol: "VFV",
+            exchange: "TSX",
+            currency: "CAD",
+            name: "Vanguard S&P 500 Index ETF",
+          },
+        },
+        dataFreshness: {
+          portfolioAsOf: now,
+          quotesAsOf: now,
+          fxAsOf: now,
+          chartFreshness: "fresh",
+          sourceMode: "cached-external",
+        },
+        facts: [
+          {
+            id: "security-identity",
+            label: "标的身份",
+            value: "VFV · TSX · CAD",
+            source: "portfolio-data",
+          },
+          {
+            id: "price-trend",
+            label: "价格走势",
+            value: "本地历史可用",
+            source: "quote-cache",
+          },
+        ],
+        warnings: [],
+        allowedActions: [],
+      },
+      question: "这个标的详情应该怎么看？",
+      answerStyle: "beginner",
+      cacheStrategy: "prefer-cache",
+      includeExternalResearch: false,
+    },
+    {
+      settings: {
+        mode: "local",
+        provider: "official-openai",
+        model: "gpt-5.5",
+        reasoningEffort: "medium",
+        endpoint: "https://api.openai.com/v1/responses",
+        apiKey: null,
+        apiKeySource: "none",
+        providerEnabled: false,
+      },
+      persistUsage: false,
+    },
+  );
+
+  assert.match(response.data.answer, /VFV · TSX · CAD/);
+  assert.match(response.data.answer, /不会只按 ticker 合并/);
+  assert.match(response.data.answer, /数据新鲜度/);
+  assert.match(response.data.answer, /Preference Factors/);
+});
+
+test("Loo Minister hands analysis requests off to confirmed run-analysis actions", async () => {
+  const response = await getLooMinisterAnswer(
+    "user_1",
+    {
+      pageContext: {
+        version: LOO_MINISTER_VERSION,
+        page: "security-detail",
+        locale: "zh",
+        title: "VFV 标的详情",
+        asOf: now,
+        displayCurrency: "CAD",
+        subject: {
+          security: {
+            securityId: "security_vfv_cad",
+            symbol: "VFV",
+            exchange: "TSX",
+            currency: "CAD",
+            name: "Vanguard S&P 500 Index ETF",
+          },
+        },
+        dataFreshness: {
+          portfolioAsOf: now,
+          quotesAsOf: now,
+          fxAsOf: now,
+          chartFreshness: "fresh",
+          sourceMode: "cached-external",
+        },
+        facts: [],
+        warnings: [],
+        allowedActions: [
+          {
+            id: "run-security-analysis",
+            label: "运行 AI 标的快扫",
+            actionType: "run-analysis",
+            target: {
+              page: "security-detail",
+              security: {
+                securityId: "security_vfv_cad",
+                symbol: "VFV",
+                exchange: "TSX",
+                currency: "CAD",
+              },
+            },
+            requiresConfirmation: true,
+          },
+        ],
+      },
+      question: "帮我分析一下这个标的",
+      answerStyle: "beginner",
+      cacheStrategy: "prefer-cache",
+      includeExternalResearch: false,
+    },
+    {
+      settings: {
+        mode: "local",
+        provider: "official-openai",
+        model: "gpt-5.5",
+        reasoningEffort: "medium",
+        endpoint: "https://api.openai.com/v1/responses",
+        apiKey: null,
+        apiKeySource: "none",
+        providerEnabled: false,
+      },
+      persistUsage: false,
+    },
+  );
+
+  assert.match(response.data.answer, /AI 快扫\/分析 handoff/);
+  assert.match(response.data.answer, /必须由你点击确认/);
+  assert.equal(response.data.suggestedActions.length, 1);
+  assert.equal(response.data.suggestedActions[0]?.actionType, "run-analysis");
+  assert.equal(response.data.suggestedActions[0]?.requiresConfirmation, true);
+});
+
+test("Loo Minister explains analysis handoff without actions when page cannot run analysis", async () => {
+  const response = await getLooMinisterAnswer(
+    "user_1",
+    {
+      pageContext: {
+        version: LOO_MINISTER_VERSION,
+        page: "settings",
+        locale: "zh",
+        title: "设置",
+        asOf: now,
+        displayCurrency: "CAD",
+        subject: {},
+        dataFreshness: {
+          portfolioAsOf: now,
+          quotesAsOf: now,
+          fxAsOf: now,
+          chartFreshness: "unknown",
+          sourceMode: "local",
+        },
+        facts: [],
+        warnings: [],
+        allowedActions: [],
+      },
+      question: "帮我运行一下 AI 快扫",
+      answerStyle: "beginner",
+      cacheStrategy: "prefer-cache",
+      includeExternalResearch: false,
+    },
+    {
+      settings: {
+        mode: "local",
+        provider: "official-openai",
+        model: "gpt-5.5",
+        reasoningEffort: "medium",
+        endpoint: "https://api.openai.com/v1/responses",
+        apiKey: null,
+        apiKeySource: "none",
+        providerEnabled: false,
+      },
+      persistUsage: false,
+    },
+  );
+
+  assert.match(response.data.answer, /当前页面没有提供可直接运行的 AI 快扫动作/);
+  assert.equal(response.data.suggestedActions.length, 0);
 });
 
 test("Loo Minister provider fallback redacts API keys in user-visible reason", async () => {
@@ -620,9 +994,17 @@ test("Loo Minister can call an OpenRouter-compatible Responses endpoint", async 
             },
           ],
           warnings: [],
-          allowedActions: [],
+          allowedActions: [
+            {
+              id: "run-portfolio-analysis",
+              label: "运行 AI 组合快扫",
+              actionType: "run-analysis",
+              target: { page: "portfolio-health" },
+              requiresConfirmation: true,
+            },
+          ],
         },
-        question: "当前页面重点是什么？",
+        question: "帮我分析当前组合",
         answerStyle: "beginner",
         cacheStrategy: "prefer-cache",
         includeExternalResearch: false,
@@ -662,6 +1044,8 @@ test("Loo Minister can call an OpenRouter-compatible Responses endpoint", async 
       /优先引用它/,
     );
     assert.equal(response.data.title, "总览大臣答复");
+    assert.equal(response.data.suggestedActions.length, 1);
+    assert.equal(response.data.suggestedActions[0]?.id, "run-portfolio-analysis");
     assert.doesNotMatch(response.data.answer, /本地 deterministic 回答/);
   } finally {
     globalThis.fetch = originalFetch;

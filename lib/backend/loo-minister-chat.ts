@@ -2,6 +2,11 @@ import { and, desc, eq, sql } from "drizzle-orm";
 import type { z } from "zod";
 import { apiSuccess } from "@/lib/backend/contracts";
 import { getLooMinisterAnswer } from "@/lib/backend/loo-minister";
+import {
+  chatSubjectPackKey,
+  getOrBuildContextPackSync,
+  LOO_MINISTER_CONTEXT_PACK_TTL_MS,
+} from "@/lib/backend/loo-minister-context-pack-cache";
 import { resolveLooMinisterContext } from "@/lib/backend/loo-minister-context-resolver";
 import {
   type LooMinisterFact,
@@ -205,9 +210,15 @@ export async function askLooMinisterChat(
     pageContextJson: input.pageContext,
   });
 
-  const sessionSubjectHistory = parseSubjectHistory(
-    activeSession.subjectHistoryJson,
-  );
+  const sessionSubjectHistory = getOrBuildContextPackSync({
+    key: chatSubjectPackKey(
+      activeSession.id,
+      String(activeSession.updatedAt ?? activeSession.createdAt ?? "new"),
+    ),
+    kind: "chat-subjects",
+    ttlMs: LOO_MINISTER_CONTEXT_PACK_TTL_MS.chatSubjects,
+    build: () => parseSubjectHistory(activeSession.subjectHistoryJson),
+  }).data;
   const resolvedContext = await resolveLooMinisterContext({
     userId,
     request: input,
@@ -230,6 +241,7 @@ export async function askLooMinisterChat(
   };
   const answerResponse = await getLooMinisterAnswer(userId, enrichedRequest, {
     skipContextResolver: true,
+    forceLocal: input.answerMode === "local",
   });
   const answer = answerResponse.data;
   const recentWithCurrent = [

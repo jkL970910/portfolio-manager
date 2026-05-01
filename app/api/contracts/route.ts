@@ -25,7 +25,7 @@ const contracts = {
     {
       path: "/api/recommendations",
       method: "GET",
-      description: "Recommendation view with transparent inputs, structured ranked items, V2 confidence metadata, and latest run rationale."
+      description: "Recommendation view with transparent inputs, structured ranked items, V2.1 Core confidence metadata, V3 Overlay evidence when available, and latest run rationale."
     },
     {
       path: "/api/spending",
@@ -137,7 +137,7 @@ const contracts = {
     {
       path: "/api/recommendations/runs",
       methods: ["POST"],
-      description: "Generate a new V2 recommendation run from current holdings and preferences, including structured rationale and placement metadata."
+      description: "Generate a new V2.1 Core recommendation run from current holdings and preferences, including structured rationale and placement metadata."
     },
     {
       path: "/api/recommendations/candidate-score",

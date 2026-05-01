@@ -4115,7 +4115,11 @@ export function buildRecommendationsData(args: {
       display,
     ),
     engine: {
-      version: latestRun?.engineVersion?.toUpperCase() ?? "V2",
+      version: latestRun?.engineVersion === "v2.1"
+        ? "V2.1 Core"
+        : latestRun?.engineVersion
+          ? `${latestRun.engineVersion.toUpperCase()} deprecated`
+          : "V2.1 Core",
       objective: latestRun?.objective
         ? pick(
             language,

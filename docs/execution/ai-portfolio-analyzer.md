@@ -296,11 +296,76 @@ Runtime context architecture:
    - comparison questions such as `和 VFV 比呢？` now try to resolve VFV from
      user holdings/recommendations/cache and inject it as a comparison subject
 4. Context pack cache:
-   - first pass is deterministic packaging rather than a separate cache table
+   - first pass is a process-local TTL cache in
+     `lib/backend/loo-minister-context-pack-cache.ts`, not a new DB table
+   - packs include `key`, `kind`, `asOf`, `source`, `freshness`, `builtAt`,
+     and `expiresAt`, so answers can distinguish backend-built data from a
+     reused memory-cache pack
+   - implemented pack families:
+     - `projectKnowledgePack:v1` for versioned product/domain knowledge
+     - `userPreferencePack:{userId}:{updatedAt/latest}` for Preference Factors
+     - `latestRecommendationPack:{userId}:{runId/latest}` for recommendation
+       context
+     - `securityContextPack:{userId}:{identity}:{quoteUpdatedAt}` for ticker
+       mention resolution and listing-level cached intelligence
+     - `chatSubjectPack:{sessionId}:{updatedAt}` for structured subject history
    - chat sessions now persist `subjectHistoryJson` so follow-up comparison
      questions can reuse recent structured subjects
-   - future cache keys should include project knowledge version, securityId,
-     preference updatedAt, recommendation run id, and freshness/asOf metadata
+   - current invalidation is conservative TTL-based; cloud deployment should
+     replace the backing store with Redis/DB and tighten preference/recommendation
+     keys to true `updatedAt` / latest run ids where the repository exposes them
+5. Response-speed policy:
+   - Flutter now shows staged status while 大臣 prepares context and waits for
+     GPT/Router
+   - after a slow response threshold, the user chooses whether to keep waiting
+     for GPT or switch to a local deterministic answer
+   - server-side `answerMode=local` exists for explicit user-selected local
+     fallback; this must not silently replace GPT without user choice
+   - local answer strategy now has separate branches for comparison,
+     recommendation, preference, data freshness, product-help, and candidate-fit
+     questions so fallback answers remain useful rather than generic
+6. Feature-specific knowledge depth:
+   - Health Score questions now explicitly separate whole-portfolio and
+     account-level lenses. Account Health should be explained as account-fit
+     plus portfolio-target reference, not as a requirement that one account
+     copies the whole portfolio.
+   - Recommendation questions now explain four layers: target-allocation gap,
+     account/tax/FX route, Preference Factors V2 / recommendation constraints,
+     and V3 cached-intelligence overlay.
+   - Preference questions now require the two-track setup model: beginner
+     guided Q&A and manual advanced editing. Guided AI drafts must cover the
+     full factor set and still require user confirmation.
+   - Security/Holding detail questions now use listing identity first, then
+     data freshness, then asset/sector exposure, preference fit, recommendation
+     path, account/tax/FX friction, and cached intelligence.
+7. Tool-triggered analysis handoff:
+   - If the user asks 大臣 to "帮我分析", "运行快扫", or generate an analysis
+     report, the answer should not stay as generic chat.
+   - 大臣 now promotes existing `run-analysis` allowed actions into
+     `suggestedActions`, with `requiresConfirmation=true`. These actions are
+     attached deterministically by the backend from page `allowedActions`; GPT
+     providers must return `suggestedActions=[]` and cannot invent product
+     actions.
+   - First mobile pass displays those suggested actions as confirmation-gated
+     handoff buttons. The actual AI 快扫 still runs through the existing page
+     feature card, so the assistant does not bypass page state, backend
+     validation, or provider quota policy.
+   - Next pass can wire suggested actions to navigate or trigger the same
+     page-owned analyzer flow directly after explicit user confirmation.
+8. Security quick-scan readability and exposure classification:
+   - AI 标的快扫 now separates listing identity from economic exposure.
+     Listing identity (`securityId`, `symbol`, `exchange`, `currency`) remains
+     the source of truth for quote/history/cache matching, while target-fit
+     scoring can classify CAD-listed ETFs such as ZQQ/QQC/VFV by their
+     underlying US equity exposure.
+   - Main mobile analysis copy must be reader-facing Chinese. Raw debug fields
+     such as `quoteStatus=fresh`, `historyAsOf=...`, and `historyPoints=...`
+     belong in backend logs or source metadata, not in the primary card body.
+   - The mobile section formerly labeled `下一步` is now `当前分析结论`.
+     Identity repair should appear only when symbol/exchange/currency is
+     incomplete or low-confidence; if identity is complete, conclusions should
+     focus on concentration, target fit, account/tax placement, and data
+     freshness.
 
 Backend tests:
 

@@ -70,6 +70,33 @@ export const looMinisterProjectKnowledgeItems: Array<{
       "AI 大臣可以辅助生成草稿，但草稿必须展示给用户确认后才应用。Preference Factors V2 会影响健康分解释和推荐排序，但不能绕过目标配置和风险约束。",
   },
   {
+    id: "project-feature-health",
+    label: "功能说明：健康巡查",
+    pages: ["portfolio-health", "overview", "portfolio", "account-detail"],
+    triggers: [/health|健康|评分|score|分数|风险护栏|雷达|再平衡|偏离|目标/i],
+    value: "Health Score 分全组合和账户两个层级：全组合看总体配置/风险，账户页看账户内适配并参考全组合目标。",
+    detail:
+      "账户评分不要求每个账户复制全组合目标。大臣解释健康分时应区分 portfolio lens 与 account lens，并说明配置偏离、集中度、现金/流动性、税务/账户位置和数据新鲜度。",
+  },
+  {
+    id: "project-feature-recommendation-constraints",
+    label: "功能说明：推荐约束",
+    pages: ["recommendations", "settings"],
+    triggers: [/约束|constraints|排除|preferred|excluded|偏好标的|账户规则|资产类别区间|security type/i],
+    value: "推荐约束是 V2.1 的硬边界/软偏好层：排除标的、偏好标的、账户规则、资产类别区间和 security type 规则会影响推荐排序。",
+    detail:
+      "排除规则优先级高于偏好规则；偏好标的不会无条件买入，仍要满足目标配置、账户/税务/FX、数据新鲜度和身份匹配。大臣必须解释规则影响，不应直接建议绕过约束。",
+  },
+  {
+    id: "project-feature-daily-intelligence",
+    label: "功能说明：Loo国今日秘闻",
+    pages: ["overview", "recommendations", "security-detail"],
+    triggers: [/秘闻|新闻|论坛|外部信息|external|research|情报|可信度|相关度/i],
+    value: "今日秘闻是缓存后的精选情报层，不是页面加载时实时爬新闻或论坛。",
+    detail:
+      "总览显示全局精选，推荐页显示折叠摘要，标的详情只显示同一 securityId 或完整 symbol/exchange/currency listing 的情报。缺失情报应显示边界，而不是 ticker-only 混入。",
+  },
+  {
     id: "project-feature-import",
     label: "功能说明：手动导入",
     pages: ["import"],

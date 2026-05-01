@@ -3,6 +3,12 @@
 > [!IMPORTANT]
 > As of 2026-04-25, this project is now Flutter-first, mobile-first, Chinese-only, and Loo皇-themed. When this document conflicts with `docs/execution/flutter-mobile-migration-plan.md`, follow the migration plan first.
 
+> [!IMPORTANT]
+> As of 2026-05-01, `Recommendation V2` is deprecated as a product-facing
+> version. This document is retained as historical design context. Current
+> implementation and UI should use `V2.1 Core`, with external evidence shown as
+> `V3 Overlay`.
+
 
 ## Objective
 

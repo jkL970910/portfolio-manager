@@ -206,28 +206,93 @@ class MobileAiAnalysisResult {
     final disclaimer = _readMap(json["disclaimer"]);
     return MobileAiAnalysisResult(
       title: summary["title"] as String? ?? "AI 快速分析",
-      thesis: summary["thesis"] as String? ?? "",
+      thesis: _friendlyAnalysisText(summary["thesis"] as String? ?? ""),
       confidence: summary["confidence"] as String? ?? "medium",
       scorecards: _readMapList(json["scorecards"])
           .map(MobileAiScorecard.fromJson)
           .toList(),
       risks: _readMapList(json["risks"]).map(MobileAiRisk.fromJson).toList(),
-      taxNotes: _readStringList(json["taxNotes"]),
-      portfolioFit: _readStringList(json["portfolioFit"]),
+      taxNotes: _readStringList(json["taxNotes"])
+          .map(_friendlyAnalysisText)
+          .toList(),
+      portfolioFit: _readStringList(json["portfolioFit"])
+          .map(_friendlyAnalysisText)
+          .toList(),
       actionItems: _readMapList(json["actionItems"])
           .map(MobileAiActionItem.fromJson)
           .toList(),
       sources: _readMapList(json["sources"])
-          .map((item) => item["title"] as String? ?? "")
+          .map((item) => _friendlyAnalysisText(item["title"] as String? ?? ""))
           .where((item) => item.isNotEmpty)
           .toList(),
       disclaimerZh: disclaimer["zh"] as String? ?? "仅用于研究学习，不构成投资建议。",
       sourceMode: dataFreshness["sourceMode"] as String? ?? "local",
       quotesAsOf: dataFreshness["quotesAsOf"] as String?,
-      quoteSourceSummary: dataFreshness["quoteSourceSummary"] as String?,
-      quoteFreshnessSummary: dataFreshness["quoteFreshnessSummary"] as String?,
+      quoteSourceSummary:
+          _friendlyNullableText(dataFreshness["quoteSourceSummary"] as String?),
+      quoteFreshnessSummary: _friendlyNullableText(
+          dataFreshness["quoteFreshnessSummary"] as String?),
     );
   }
+}
+
+String? _friendlyNullableText(String? value) {
+  if (value == null || value.trim().isEmpty) return null;
+  return _friendlyAnalysisText(value);
+}
+
+String _friendlyAnalysisText(String value) {
+  var text = value;
+  text = text.replaceAllMapped(
+    RegExp(r"quotes=([a-zA-Z0-9_-]+)"),
+    (match) => "报价来自 ${_providerLabel(match.group(1) ?? "")}",
+  );
+  text = text.replaceAllMapped(
+    RegExp(r"history=([a-zA-Z0-9_-]+)"),
+    (match) => "历史价格来自 ${_providerLabel(match.group(1) ?? "")}",
+  );
+  text = text.replaceAllMapped(
+    RegExp(r"quoteStatus=([a-zA-Z0-9_-]+)"),
+    (match) => _quoteStatusLabel(match.group(1) ?? ""),
+  );
+  text = text.replaceAllMapped(
+    RegExp(r"historyAsOf=([0-9]{4}-[0-9]{2}-[0-9]{2})"),
+    (match) => "历史价格截至 ${match.group(1)}",
+  );
+  text = text.replaceAllMapped(
+    RegExp(r"historyPoints=([0-9]+)"),
+    (match) => "历史样本 ${match.group(1)} 个交易日",
+  );
+  text = text
+      .replaceAll("Cached holding quotes", "缓存持仓报价")
+      .replaceAll("Cached price history", "缓存价格历史")
+      .replaceAll("Local holdings and account data", "本地持仓与账户数据")
+      .replaceAll("Cached holding quote fields", "缓存持仓报价字段")
+      .replaceAll("Local portfolio health summary", "本地组合健康摘要")
+      .replaceAll("Local account health summary", "本地账户健康摘要")
+      .replaceAll("Local account holdings", "本地账户持仓")
+      .replaceAll("Local recommendation run", "本地推荐运行记录");
+  return text.replaceAll(RegExp(r"\s*;\s*"), "；").trim();
+}
+
+String _providerLabel(String value) {
+  return value
+      .split(RegExp(r"[-_\s]+"))
+      .where((part) => part.isNotEmpty)
+      .map((part) => part.length <= 3
+          ? part.toUpperCase()
+          : "${part.substring(0, 1).toUpperCase()}${part.substring(1)}")
+      .join(" ");
+}
+
+String _quoteStatusLabel(String value) {
+  final normalized = value.toLowerCase();
+  if (normalized == "fresh" || normalized == "success") {
+    return "报价较新";
+  }
+  if (normalized == "stale") return "报价可能过期";
+  if (normalized == "failed" || normalized == "error") return "报价刷新失败";
+  return "报价状态待确认";
 }
 
 class MobileAiScorecard {
@@ -246,7 +311,7 @@ class MobileAiScorecard {
     return MobileAiScorecard(
       label: json["label"] as String? ?? "评分",
       score: score is num ? score.toDouble().clamp(0, 100) : 0,
-      rationale: json["rationale"] as String? ?? "",
+      rationale: _friendlyAnalysisText(json["rationale"] as String? ?? ""),
     );
   }
 }
@@ -266,7 +331,7 @@ class MobileAiRisk {
     return MobileAiRisk(
       severity: json["severity"] as String? ?? "info",
       title: json["title"] as String? ?? "风险提示",
-      detail: json["detail"] as String? ?? "",
+      detail: _friendlyAnalysisText(json["detail"] as String? ?? ""),
     );
   }
 }
@@ -285,8 +350,8 @@ class MobileAiActionItem {
   factory MobileAiActionItem.fromJson(Map<String, dynamic> json) {
     return MobileAiActionItem(
       priority: json["priority"] as String? ?? "P1",
-      title: json["title"] as String? ?? "下一步",
-      detail: json["detail"] as String? ?? "",
+      title: json["title"] as String? ?? "当前分析结论",
+      detail: _friendlyAnalysisText(json["detail"] as String? ?? ""),
     );
   }
 }
@@ -343,7 +408,7 @@ class _AnalysisResultView extends StatelessWidget {
         ],
         if (data.actionItems.isNotEmpty) ...[
           const SizedBox(height: 14),
-          Text("下一步", style: Theme.of(context).textTheme.titleSmall),
+          Text("当前分析结论", style: Theme.of(context).textTheme.titleSmall),
           ...data.actionItems.take(4).map(_ActionRow.new),
         ],
         const SizedBox(height: 14),
@@ -424,7 +489,7 @@ class _ActionRow extends StatelessWidget {
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.only(top: 8),
-      child: Text("${action.priority} · ${action.title}：${action.detail}"),
+      child: Text("${action.title}：${action.detail}"),
     );
   }
 }

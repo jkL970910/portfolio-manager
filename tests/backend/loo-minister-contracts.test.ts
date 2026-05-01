@@ -159,6 +159,7 @@ test("Loo Minister chat request keeps session id optional for multi-turn Q&A", (
   });
 
   assert.equal(firstTurn.sessionId, undefined);
+  assert.equal(firstTurn.answerMode, "auto");
   assert.equal(followUp.sessionId, "minister-session-1");
   assert.equal(followUp.includeExternalResearch, false);
 });

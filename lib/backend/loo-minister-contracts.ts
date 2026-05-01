@@ -203,6 +203,7 @@ export const looMinisterQuestionRequestSchema = z
   });
 
 export const looMinisterChatRequestSchema = looMinisterQuestionRequestSchema.extend({
+  answerMode: z.enum(["auto", "local"]).default("auto"),
   sessionId: z.string().trim().min(1).max(80).optional(),
 });
 

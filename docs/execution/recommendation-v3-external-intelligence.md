@@ -1,12 +1,23 @@
 # Recommendation V3 External Intelligence Plan
 
-Last updated: 2026-04-30
+Last updated: 2026-05-01
+
+## Version Naming Decision
+
+`Recommendation V2` is now deprecated as a product-facing version name.
+
+- `V2` remains a historical design document and some internal file/function names
+  still use `recommendation-v2` to avoid a broad rename.
+- Current recommendation execution should be described as `V2.1 Core`.
+- External evidence should be described as `V3 Overlay`.
+- UI, docs, and AI 大臣 answers should not present `V2` as the active engine.
 
 ## Decision
 
-Upgrade toward `Recommendation Engine V3` instead of stretching V2.
+Upgrade toward `Recommendation Engine V3` instead of stretching the deprecated
+V2 product version.
 
-V2 remains the deterministic core:
+V2.1 Core is the active deterministic core:
 
 - target allocation gap
 - account placement
@@ -28,17 +39,19 @@ The V3 engine must remain auditable. External information can adjust ranking and
 warnings, but it must not silently override the user's saved allocation,
 account rules, or explicit exclusions.
 
-## Why Not Just Patch V2
+## Why Not Just Patch Deprecated V2
 
-V2 is currently a rule engine. It is good for transparent, stable decisions.
+V2 was the original rule-engine design. V2.1 is now the active version because it
+adds Preference Factors V2, recommendation constraints, security identity,
+account/tax/FX handling, and data-freshness boundaries.
 
 Adding live news, forum sentiment, personal goals, sector tilts, and life-event
-planning directly inside V2 would make it harder to test and explain. The safer
+planning directly inside the core engine would make it harder to test and explain. The safer
 structure is:
 
-1. V2 produces baseline candidate recommendations.
+1. V2.1 Core produces baseline candidate recommendations.
 2. External-intelligence workers attach cached evidence to candidate identities.
-3. V3 reranks / annotates V2 candidates using that evidence and the expanded
+3. V3 reranks / annotates V2.1 candidates using that evidence and the expanded
    preference profile.
 4. Mobile shows both the baseline reason and the external-intelligence impact.
 
@@ -54,7 +67,7 @@ Goal:
 Required behavior:
 
 - Preserve `symbol + exchange + currency` on every candidate.
-- Keep V2 baseline score visible.
+- Keep V2.1 baseline score visible.
 - Add V3 overlays such as:
   - external information score
   - confidence level
@@ -69,7 +82,7 @@ Required behavior:
 Initial output model:
 
 - `engineVersion: "v3"`
-- `baselineV2Score`
+- `baselineScore` (V2.1 Core)
 - `externalInsightScore`
 - `preferenceFitScore`
 - `finalScore`
@@ -267,7 +280,7 @@ Use this pipeline:
 1. Provider adapters fetch structured external documents.
 2. Worker deduplicates, scores relevance, and writes cached records.
 3. Analyzer normalizes those records into `portfolio_analysis_runs`.
-4. Recommendation V3 reads V2 candidates plus cached external evidence.
+4. Recommendation V3 reads V2.1 Core candidates plus cached external evidence.
 5. Loo国大臣 answers using page context plus saved analysis references.
 
 Suggested tables:

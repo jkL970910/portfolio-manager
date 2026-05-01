@@ -645,7 +645,7 @@ function createEmptyRun(userId: string): RecommendationRun {
     userId,
     contributionAmountCad: 0,
     createdAt: new Date().toISOString(),
-    engineVersion: "v2",
+    engineVersion: "v2.1",
     objective: "target-tracking",
     confidenceScore: null,
     assumptions: [

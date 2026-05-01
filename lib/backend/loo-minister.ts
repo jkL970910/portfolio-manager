@@ -1,4 +1,13 @@
 import { apiSuccess } from "@/lib/backend/contracts";
+import {
+  getOrBuildContextPack,
+  getOrBuildContextPackSync,
+  latestRecommendationPackKey,
+  LOO_MINISTER_CONTEXT_PACK_TTL_MS,
+  projectKnowledgePackKey,
+  securityContextPackKey,
+  userPreferencePackKey,
+} from "@/lib/backend/loo-minister-context-pack-cache";
 import { resolveLooMinisterContext } from "@/lib/backend/loo-minister-context-resolver";
 import {
   LOO_MINISTER_VERSION,
@@ -91,6 +100,33 @@ const projectKnowledgeItems: Array<{
       "AI 大臣可以辅助生成草稿，但草稿必须展示给用户确认后才应用。Preference Factors V2 会影响健康分解释和推荐排序，但不能绕过目标配置和风险约束。",
   },
   {
+    id: "project-feature-health",
+    label: "功能说明：健康巡查",
+    pages: ["portfolio-health", "overview", "portfolio", "account-detail"],
+    triggers: [/health|健康|评分|score|分数|风险护栏|雷达|再平衡|偏离|目标/i],
+    value: "Health Score 分全组合和账户两个层级：全组合看总体配置/风险，账户页看账户内适配并参考全组合目标。",
+    detail:
+      "账户评分不要求每个账户复制全组合目标。大臣解释健康分时应区分 portfolio lens 与 account lens，并说明配置偏离、集中度、现金/流动性、税务/账户位置和数据新鲜度。",
+  },
+  {
+    id: "project-feature-recommendation-constraints",
+    label: "功能说明：推荐约束",
+    pages: ["recommendations", "settings"],
+    triggers: [/约束|constraints|排除|preferred|excluded|偏好标的|账户规则|资产类别区间|security type/i],
+    value: "推荐约束是 V2.1 的硬边界/软偏好层：排除标的、偏好标的、账户规则、资产类别区间和 security type 规则会影响推荐排序。",
+    detail:
+      "排除规则优先级高于偏好规则；偏好标的不会无条件买入，仍要满足目标配置、账户/税务/FX、数据新鲜度和身份匹配。大臣必须解释规则影响，不应直接建议绕过约束。",
+  },
+  {
+    id: "project-feature-daily-intelligence",
+    label: "功能说明：Loo国今日秘闻",
+    pages: ["overview", "recommendations", "security-detail"],
+    triggers: [/秘闻|新闻|论坛|外部信息|external|research|情报|可信度|相关度/i],
+    value: "今日秘闻是缓存后的精选情报层，不是页面加载时实时爬新闻或论坛。",
+    detail:
+      "总览显示全局精选，推荐页显示折叠摘要，标的详情只显示同一 securityId 或完整 symbol/exchange/currency listing 的情报。缺失情报应显示边界，而不是 ticker-only 混入。",
+  },
+  {
     id: "project-feature-import",
     label: "功能说明：手动导入",
     pages: ["import"],
@@ -171,8 +207,48 @@ function isCandidateFitQuestion(question: string) {
   );
 }
 
+function isAnalysisRequestQuestion(question: string) {
+  return /帮我.*分析|分析一下|做.*分析|跑.*快扫|运行.*快扫|生成.*快扫|quick.?scan|analy[sz]e|analysis/i.test(
+    question,
+  );
+}
+
+function isComparisonQuestion(question: string) {
+  return /对比|比较|相比|比呢|和.+比|versus| vs\.? |compare/i.test(question);
+}
+
 function isProductHelpQuestion(question: string) {
   return /是什么|怎么|如何|为什么|哪里|入口|功能|流程|页面|tab|使用|下一步|区别|解释|作用|meaning|how|what|why/i.test(
+    question,
+  );
+}
+
+function isPreferenceQuestion(question: string) {
+  return /偏好|preference|factor|风险|行业|科技|能源|买房|税务|现金|新手|进阶/i.test(
+    question,
+  );
+}
+
+function isRecommendationQuestion(question: string) {
+  return /推荐|recommend|v2|v3|overlay|候选|买什么|优先|为什么推荐|约束|排除|preferred|excluded/i.test(
+    question,
+  );
+}
+
+function isHealthQuestion(question: string) {
+  return /health|健康|评分|score|风险护栏|雷达|偏离|再平衡|目标|账户评分|组合评分/i.test(
+    question,
+  );
+}
+
+function isSecurityDetailQuestion(question: string) {
+  return /这个标的|这个持仓|走势|价格|秘闻|新闻|风险|作用|表现|详情|怎么看|需要注意/i.test(
+    question,
+  );
+}
+
+function isFreshnessQuestion(question: string) {
+  return /新鲜|stale|缓存|刷新|provider|行情|fx|汇率|真实数据|mock|fallback|过期|报价|走势/i.test(
     question,
   );
 }
@@ -181,28 +257,67 @@ function findFact(facts: LooMinisterFact[], id: string) {
   return facts.find((fact) => fact.id === id);
 }
 
+function getRunAnalysisActions(input: LooMinisterQuestionRequest) {
+  if (!isAnalysisRequestQuestion(input.question)) {
+    return [];
+  }
+  return input.pageContext.allowedActions
+    .filter((action) => action.actionType === "run-analysis")
+    .map((action) => ({
+      ...action,
+      requiresConfirmation: true,
+    }))
+    .slice(0, 3);
+}
+
+function attachDeterministicSuggestedActions(
+  input: LooMinisterQuestionRequest,
+  answer: LooMinisterAnswerResult,
+) {
+  const runAnalysisActions = getRunAnalysisActions(input);
+  if (runAnalysisActions.length === 0) {
+    return looMinisterAnswerResultSchema.parse(answer);
+  }
+
+  return looMinisterAnswerResultSchema.parse({
+    ...answer,
+    suggestedActions: runAnalysisActions,
+  });
+}
+
 function buildProjectKnowledgeFacts(
   input: LooMinisterQuestionRequest,
 ): LooMinisterFact[] {
-  const { pageContext, question } = input;
-  const selected = projectKnowledgeItems.filter(
-    (item) =>
-      item.pages.includes(pageContext.page) ||
-      item.triggers.some((trigger) => trigger.test(question)),
-  );
-  const unique = new Map<string, (typeof projectKnowledgeItems)[number]>();
-  for (const item of selected) {
-    unique.set(item.id, item);
-  }
+  return getOrBuildContextPackSync({
+    key: projectKnowledgePackKey({
+      version: LOO_MINISTER_VERSION,
+      page: input.pageContext.page,
+      question: input.question,
+    }),
+    kind: "project-knowledge",
+    ttlMs: LOO_MINISTER_CONTEXT_PACK_TTL_MS.projectKnowledge,
+    build: () => {
+      const { pageContext, question } = input;
+      const selected = projectKnowledgeItems.filter(
+        (item) =>
+          item.pages.includes(pageContext.page) ||
+          item.triggers.some((trigger) => trigger.test(question)),
+      );
+      const unique = new Map<string, (typeof projectKnowledgeItems)[number]>();
+      for (const item of selected) {
+        unique.set(item.id, item);
+      }
 
-  const items = Array.from(unique.values()).slice(0, 5);
-  return items.map((item) => ({
-    id: item.id,
-    label: item.label,
-    value: item.value.slice(0, 240),
-    detail: item.detail.slice(0, 600),
-    source: "system",
-  }));
+      const items = Array.from(unique.values()).slice(0, 5);
+      return items.map((item) => ({
+        id: item.id,
+        label: item.label,
+        value: item.value.slice(0, 240),
+        detail: item.detail.slice(0, 600),
+        source: "system" as const,
+      }));
+    },
+  }).data;
 }
 
 function hasProjectKnowledge(facts: LooMinisterFact[]) {
@@ -400,14 +515,257 @@ function buildProductHelpAnswer(input: LooMinisterQuestionRequest) {
   ].join("\n");
 }
 
+function buildComparisonAnswer(input: LooMinisterQuestionRequest) {
+  const current = getSecurityDisplayName(input.pageContext.subject.security);
+  const comparisonFacts = input.pageContext.facts.filter((fact) =>
+    fact.id.startsWith("comparison-subject-"),
+  );
+  const intelligenceFacts = input.pageContext.facts.filter((fact) =>
+    fact.id.startsWith("comparison-intelligence-"),
+  );
+  const status = input.pageContext.facts.find((fact) =>
+    fact.id.startsWith("context-resolver-status-"),
+  );
+  const freshness = input.pageContext.dataFreshness;
+
+  return [
+    `大臣会按对比问题处理：当前页面标的是「${current}」，对比对象是 ${comparisonFacts.map((fact) => fact.value).join("、")}。`,
+    "比较时不会只按 ticker 合并；每个标的都必须保留 securityId 或完整 symbol + exchange + currency。",
+    comparisonFacts
+      .map((fact) => `${fact.label}：${fact.value}${fact.detail ? `（${fact.detail}）` : ""}`)
+      .join("\n"),
+    intelligenceFacts.length > 0
+      ? `可用缓存情报：${intelligenceFacts.map((fact) => `${fact.label}：${fact.value}`).join("；")}。`
+      : "当前没有匹配到对比标的的缓存秘闻；这不是利好或利空，只是外部情报缓存不足。",
+    status
+      ? `Context 状态：${status.value}（${status.detail ?? "无补充说明"}）。`
+      : "Context 状态：已基于当前页面和本地缓存回答。",
+    `数据边界：报价 ${freshness.quotesAsOf ?? "未知"}；FX ${freshness.fxAsOf ?? "未知"}；图表 ${freshness.chartFreshness}；来源 ${freshness.sourceMode}。`,
+    "下一步判断应该看：资产类别是否重叠、费用/税务/账户位置、CAD/USD 或 hedged 差异、集中度、推荐路径，以及你自己的 Preference Factors。",
+  ].join("\n");
+}
+
+function buildRecommendationAnswer(input: LooMinisterQuestionRequest) {
+  const facts = input.pageContext.facts;
+  const recommendationFacts = facts.filter(
+    (fact) =>
+      fact.id.includes("recommendation") ||
+      fact.label.includes("推荐") ||
+      fact.value.includes("V2") ||
+      fact.value.includes("V3"),
+  );
+  const preferenceFacts = facts.filter(
+    (fact) =>
+      fact.id.includes("preference") ||
+      fact.label.includes("偏好") ||
+      fact.label.includes("投资偏好"),
+  );
+  const intelligenceFacts = facts.filter(
+    (fact) => fact.source === "external-intelligence",
+  );
+  const constraintFacts = facts.filter(
+    (fact) =>
+      fact.id.includes("constraint") ||
+      fact.label.includes("约束") ||
+      fact.label.includes("排除") ||
+      fact.label.includes("偏好标的") ||
+      fact.value.includes("排除") ||
+      fact.value.includes("偏好"),
+  );
+
+  return [
+    "推荐页的大臣回答会分四层：目标配置缺口、账户/税务/FX 路径、Preference Factors V2/约束、V3 cached-intelligence overlay。",
+    "V2 已经是历史/deprecated 口径；当前产品应称为 V2.1 Core，外部信息层称为 V3 Overlay。",
+    "V2.1 Core 是确定性规则，不会因为外部消息直接跳过目标配置；V3 Overlay 只读取已缓存情报，不会在页面加载时实时抓新闻或论坛。",
+    recommendationFacts.length > 0
+      ? `当前推荐上下文：${recommendationFacts.slice(0, 4).map((fact) => `${fact.label}：${fact.value}`).join("；")}。`
+      : "当前页面没有足够推荐 run 细节；如果你要问某个具体标的，最好先进入该标的详情或生成最新推荐。",
+    constraintFacts.length > 0
+      ? `约束影响：${constraintFacts.slice(0, 4).map((fact) => `${fact.label}：${fact.value}`).join("；")}。排除规则优先于偏好规则，偏好标的也必须通过配置/账户/税务/FX 检查。`
+      : "约束影响：如果设置了排除标的、偏好标的、账户规则、资产类别区间或 security type 限制，它们会改变候选排序或直接过滤候选。",
+    preferenceFacts.length > 0
+      ? `偏好影响：${preferenceFacts.slice(0, 3).map((fact) => `${fact.label}：${fact.value}`).join("；")}。`
+      : "偏好影响：Preference Factors V2 会影响排序和解释，但不会绕过目标配置。",
+    intelligenceFacts.length > 0
+      ? `缓存外部情报：${intelligenceFacts.slice(0, 2).map((fact) => `${fact.label}：${fact.value}`).join("；")}。`
+      : "当前没有可用 cached-intelligence；推荐仍以 V2.1 deterministic core 为主。",
+    "如果你问“为什么推荐/为什么不推荐”，大臣应该说明资产类别缺口、账户位置、税务/FX 摩擦、偏好因子、观察/排除规则和数据新鲜度。",
+  ].join("\n");
+}
+
+function buildHealthAnswer(input: LooMinisterQuestionRequest) {
+  const { pageContext } = input;
+  const healthFacts = pageContext.facts.filter(
+    (fact) =>
+      fact.id.includes("health") ||
+      fact.label.includes("健康") ||
+      fact.label.includes("评分") ||
+      fact.label.includes("风险") ||
+      fact.label.includes("偏离") ||
+      fact.label.includes("配置"),
+  );
+  const preferenceFacts = pageContext.facts.filter(
+    (fact) =>
+      fact.id.includes("preference") ||
+      fact.label.includes("偏好") ||
+      fact.label.includes("目标"),
+  );
+  const lens =
+    pageContext.page === "account-detail" || pageContext.subject.accountId
+      ? "账户级 Health：先看账户内适配，再参考全组合目标；单个账户不必复制全组合目标。"
+      : "全组合 Health：先看总体资产配置、集中度、现金/流动性、税务/账户位置和数据新鲜度。";
+  const freshness = pageContext.dataFreshness;
+
+  return [
+    `大臣会按 Health Score 问题处理。评分口径：${lens}`,
+    "层级边界：全组合 Health 用来判断总体风险和配置目标；账户级 Health 用来判断该账户内部是否适配，并把全组合目标作为参考而不是硬复制。",
+    healthFacts.length > 0
+      ? `当前健康相关事实：${healthFacts.slice(0, 5).map((fact) => `${fact.label}：${fact.value}${fact.detail ? `（${fact.detail}）` : ""}`).join("；")}。`
+      : "当前页面没有足够健康分细项；大臣只能解释评分框架，不能假设哪个维度一定最差。",
+    preferenceFacts.length > 0
+      ? `偏好/目标约束：${preferenceFacts.slice(0, 4).map((fact) => `${fact.label}：${fact.value}`).join("；")}。`
+      : "偏好/目标约束没有完整注入；如果 Health 结果与你主观目标不一致，应先检查 Preference Factors V2 和资产类别 bands。",
+    `数据边界：portfolio=${freshness.portfolioAsOf ?? "未知"}；quotes=${freshness.quotesAsOf ?? "未知"}；fx=${freshness.fxAsOf ?? "未知"}；chart=${freshness.chartFreshness}；source=${freshness.sourceMode}。`,
+    "优先修复顺序建议：先处理明显超出 band 的资产类别和集中度，再看账户位置/税务/FX，最后才是主题偏好或单个标的喜好。",
+  ].join("\n");
+}
+
+function buildPreferenceAnswer(input: LooMinisterQuestionRequest) {
+  const facts = input.pageContext.facts;
+  const preferenceFacts = facts.filter(
+    (fact) =>
+      fact.id.includes("preference") ||
+      fact.label.includes("偏好") ||
+      fact.label.includes("投资偏好") ||
+      fact.value.includes("新手引导") ||
+      fact.value.includes("手动"),
+  );
+
+  return [
+    "投资偏好现在应理解为两条线：新手引导式问答生成完整参数，进阶用户直接手动编辑所有参数。",
+    preferenceFacts.length > 0
+      ? `当前可见偏好上下文：${preferenceFacts.slice(0, 4).map((fact) => `${fact.label}：${fact.value}`).join("；")}。`
+      : "当前页面没有给出具体偏好值；大臣只能解释设置方式，不能假设你的风险/行业/税务目标。",
+    "新手流程应该覆盖完整 factors：风险容量、波动舒适度、投资期限、行业/风格/主题倾向、回避行业、现金缓冲、买房目标、税务敏感度、USD 路径、账户放置偏好、外部信息偏好和再平衡节奏。",
+    "AI 大臣可以根据问答生成结构化草稿，但必须先展示给你确认；应用前仍允许手动微调，不能自动写入真实偏好。",
+    "这些参数会进入 Health Score 解释和 Recommendation V2.1/V3：Health 用它解释目标偏离和风险护栏，Recommendation 用它调整候选排序和解释，但不能绕过目标配置、账户/税务/FX 和身份隔离规则。",
+  ].join("\n");
+}
+
+function buildSecurityDetailAnswer(input: LooMinisterQuestionRequest) {
+  const securityName = getSecurityDisplayName(input.pageContext.subject.security);
+  const facts = input.pageContext.facts;
+  const identityFacts = facts.filter(
+    (fact) =>
+      fact.id.includes("security") ||
+      fact.label.includes("身份") ||
+      fact.label.includes("资产类别") ||
+      fact.label.includes("行业"),
+  );
+  const marketFacts = facts.filter(
+    (fact) =>
+      fact.source === "quote-cache" ||
+      fact.source === "analysis-cache" ||
+      fact.label.includes("价格") ||
+      fact.label.includes("走势") ||
+      fact.label.includes("市场"),
+  );
+  const intelligenceFacts = facts.filter(
+    (fact) => fact.source === "external-intelligence",
+  );
+  const freshness = input.pageContext.dataFreshness;
+
+  return [
+    `大臣会按标的/持仓详情回答，并保留 listing 身份：「${securityName}」。不会只按 ticker 合并 CAD/US 或不同交易所版本。`,
+    identityFacts.length > 0
+      ? `身份与分类：${identityFacts.slice(0, 4).map((fact) => `${fact.label}：${fact.value}`).join("；")}。`
+      : "当前上下文没有完整身份/分类事实；如果缺少 exchange/currency，应先补齐 listing 身份。",
+    marketFacts.length > 0
+      ? `行情/分析：${marketFacts.slice(0, 4).map((fact) => `${fact.label}：${fact.value}${fact.detail ? `（${fact.detail}）` : ""}`).join("；")}。`
+      : "当前没有足够行情或分析事实；不能把缺失历史或参考曲线当成真实趋势。",
+    intelligenceFacts.length > 0
+      ? `秘闻/缓存外部信息：${intelligenceFacts.slice(0, 2).map((fact) => `${fact.label}：${fact.value}`).join("；")}。`
+      : "当前没有同一 listing 的缓存秘闻；这不是利好或利空，只表示外部情报缓存不足。",
+    `数据边界：quotes=${freshness.quotesAsOf ?? "未知"}；fx=${freshness.fxAsOf ?? "未知"}；chart=${freshness.chartFreshness}；source=${freshness.sourceMode}。`,
+    "判断顺序：先确认身份和数据新鲜度，再看资产类别/行业暴露、与 Preference Factors 的适配、推荐引擎路径、账户/税务/FX 摩擦，最后才看短期价格走势。",
+  ].join("\n");
+}
+
+function buildAnalysisHandoffAnswer(input: LooMinisterQuestionRequest) {
+  const actions = getRunAnalysisActions(input);
+  const scopeLine =
+    actions.length > 0
+      ? `当前页面可运行：${actions.map((action) => action.label).join("、")}。`
+      : "当前页面没有提供可直接运行的 AI 快扫动作；请进入标的详情、Health Score、账户 Health 或推荐页后再触发。";
+
+  return [
+    "这类问题不应该只靠聊天回答。大臣会把它当作 AI 快扫/分析 handoff：先解释可分析范围，再让你确认是否运行后端受控分析。",
+    scopeLine,
+    "安全边界：运行分析属于显式动作，必须由你点击确认；大臣不会在聊天里自动修改数据、自动刷新行情、自动抓新闻论坛或绕过 provider quota。",
+    "分析会复用现有 portfolio-analyzer 合约和缓存策略：标的分析保留 securityId / symbol + exchange + currency，组合/账户分析使用当前 Health 和持仓上下文，推荐分析使用当前 recommendation run。",
+    "如果你只是想先听解释，可以继续追问；如果要生成结构化报告，请点击下方建议动作。",
+  ].join("\n");
+}
+
+function buildFreshnessAnswer(input: LooMinisterQuestionRequest) {
+  const freshness = input.pageContext.dataFreshness;
+  const quoteFacts = input.pageContext.facts.filter(
+    (fact) => fact.source === "quote-cache" || fact.source === "fx-cache",
+  );
+  const statusFacts = input.pageContext.facts.filter(
+    (fact) =>
+      fact.id.startsWith("context-resolver-status-") ||
+      fact.label.includes("新鲜度") ||
+      fact.label.includes("行情") ||
+      fact.label.includes("报价"),
+  );
+
+  return [
+    "数据新鲜度要分开看：标的报价用 native trading currency，CAD 汇总只在显示/聚合时通过独立 FX cache 折算。",
+    `当前 freshness：portfolio=${freshness.portfolioAsOf ?? "未知"}；quotes=${freshness.quotesAsOf ?? "未知"}；fx=${freshness.fxAsOf ?? "未知"}；chart=${freshness.chartFreshness}；source=${freshness.sourceMode}。`,
+    quoteFacts.length > 0
+      ? `报价/FX 事实：${quoteFacts.slice(0, 4).map((fact) => `${fact.label}：${fact.value}`).join("；")}。`
+      : "当前页面没有足够报价/FX 事实；大臣不会把缺失数据说成实时行情。",
+    statusFacts.length > 0
+      ? `状态提示：${statusFacts.slice(0, 3).map((fact) => `${fact.label}：${fact.value}`).join("；")}。`
+      : "没有额外状态提示。",
+    "刷新失败不能清空旧价格；provider 限流时应沿用旧缓存并说明边界。真实历史不足时应显示 fallback/reference，不能画成真实线性走势。",
+  ].join("\n");
+}
+
 function buildAnswer(input: LooMinisterQuestionRequest) {
   const { pageContext, question } = input;
+  if (isAnalysisRequestQuestion(question)) {
+    return buildAnalysisHandoffAnswer(input);
+  }
   if (
     pageContext.page === "security-detail" &&
     pageContext.subject.security &&
     isCandidateFitQuestion(question)
   ) {
     return buildCandidateFitAnswer(input);
+  }
+  if (isComparisonQuestion(question) && findFact(pageContext.facts, "comparison-subject-1")) {
+    return buildComparisonAnswer(input);
+  }
+  if (isHealthQuestion(question) || pageContext.page === "portfolio-health") {
+    return buildHealthAnswer(input);
+  }
+  if (isRecommendationQuestion(question)) {
+    return buildRecommendationAnswer(input);
+  }
+  if (isPreferenceQuestion(question)) {
+    return buildPreferenceAnswer(input);
+  }
+  if (isFreshnessQuestion(question)) {
+    return buildFreshnessAnswer(input);
+  }
+  if (
+    (pageContext.page === "security-detail" ||
+      pageContext.page === "holding-detail") &&
+    isSecurityDetailQuestion(question)
+  ) {
+    return buildSecurityDetailAnswer(input);
   }
   if (isProductHelpQuestion(question) && hasProjectKnowledge(pageContext.facts)) {
     return buildProductHelpAnswer(input);
@@ -501,7 +859,7 @@ function buildLocalAnswer(
     disclaimer: PORTFOLIO_ANALYZER_DISCLAIMER,
   };
 
-  return looMinisterAnswerResultSchema.parse(answer);
+  return attachDeterministicSuggestedActions(input, answer);
 }
 
 function buildRouterCompatiblePrompt(input: LooMinisterQuestionRequest) {
@@ -531,11 +889,15 @@ function buildRouterCompatiblePrompt(input: LooMinisterQuestionRequest) {
   return [
     "你是 Loo国大臣。只使用下面的页面摘要回答中文问题。",
     "不要编造实时行情、新闻或论坛结论；投资相关回答必须包含不构成投资建议的免责声明。",
+    "如果用户要求帮忙分析、运行快扫或生成分析报告，不要只聊天回答；说明这会交给应用里的确认式 AI 快扫流程。suggestedActions 必须返回 []，后端会基于 allowedActions 附加确认动作。",
     "如果用户问某个标的是否适合买入/是否适配，不要因为当前组合占比是 0% 就停止分析；要按候选标的视角结合偏好、推荐引擎、资产类别、账户/税务/FX、缓存情报和数据新鲜度回答。",
+    "如果用户问 Health Score，要明确全组合评分和账户级评分是两个层级；账户级评分不是要求单个账户复制全组合目标。",
+    "如果用户问推荐或约束，要分清 V2.1 deterministic core、Preference Factors V2、推荐约束和 V3 cached-intelligence overlay。",
+    "如果用户问投资偏好，要说明新手引导和手动进阶两条线，并覆盖风险、行业/风格、现金、买房、税务、USD 路径、账户位置和外部信息偏好。",
     "如果关键事实里有 analysis-cache 或 external-intelligence 结果，优先引用它；没有时说明当前只能基于页面上下文和本地缓存回答。",
     "只返回合法 JSON object，不要 markdown，不要额外解释。",
     "JSON 字段必须是：version, generatedAt, role, page, title, answer, keyPoints, suggestedActions, sources, disclaimer。",
-    `固定字段：version=${LOO_MINISTER_VERSION}; role=loo-minister; page=${pageContext.page}; suggestedActions=[]。`,
+    `固定字段：version=${LOO_MINISTER_VERSION}; role=loo-minister; page=${pageContext.page}。suggestedActions 必须返回 []；产品动作由后端 deterministic 附加，不能由模型生成。`,
     "sources 至少包含一个 {title, sourceType, asOf}，sourceType 可用 page-context、portfolio-data、quote-cache、fx-cache、analysis-cache、external-intelligence、manual。",
     `disclaimer 必须是 {"zh":"仅用于研究学习，不构成投资建议。","en":"For research and education only. This is not investment advice."}`,
     "",
@@ -776,7 +1138,7 @@ function buildExternalInput(
     {
       role: "system",
       content:
-        "你是 Loo国大臣。只用提供的页面 context 回答中文问题；如果 context 里有 analysis-cache 或 external-intelligence 结果，优先引用它；没有时说明只能基于页面上下文和本地缓存回答。不要编造实时行情、新闻或论坛结论；保留 securityId 以及 symbol + exchange + currency 身份；所有投资相关回答必须包含不构成投资建议的免责声明。若用户问某标的是否适合买入/适配，不要因为当前持仓占比是 0% 就拒绝分析，要按候选标的视角结合偏好、推荐引擎、资产类别、账户/税务/FX、缓存情报和数据新鲜度回答。只返回合法 JSON object，不要 markdown。JSON 必须符合 LooMinisterAnswerResult：version、generatedAt、role、page、title、answer、keyPoints、suggestedActions、sources、disclaimer。role 必须是 loo-minister，suggestedActions 必须返回空数组，产品动作由本地应用控制。",
+        "你是 Loo国大臣。只用提供的页面 context 回答中文问题；如果 context 里有 analysis-cache 或 external-intelligence 结果，优先引用它；没有时说明只能基于页面上下文和本地缓存回答。不要编造实时行情、新闻或论坛结论；保留 securityId 以及 symbol + exchange + currency 身份；所有投资相关回答必须包含不构成投资建议的免责声明。若用户要求帮忙分析、运行快扫或生成分析报告，不要只聊天回答；说明这会交给应用里的确认式 AI 快扫流程。suggestedActions 必须返回 []，后端会基于 pageContext.allowedActions deterministic 附加确认动作。若用户问某标的是否适合买入/适配，不要因为当前持仓占比是 0% 就拒绝分析，要按候选标的视角结合偏好、推荐引擎、资产类别、账户/税务/FX、缓存情报和数据新鲜度回答。若用户问 Health Score，要区分全组合评分与账户级评分。若用户问推荐，要区分 V2.1 core、Preference Factors、推荐约束和 V3 cached-intelligence overlay。若用户问偏好，要说明新手引导与手动进阶两条线。只返回合法 JSON object，不要 markdown。JSON 必须符合 LooMinisterAnswerResult：version、generatedAt、role、page、title、answer、keyPoints、suggestedActions、sources、disclaimer。role 必须是 loo-minister，产品动作由本地应用控制。",
     },
     {
       role: "user",
@@ -841,7 +1203,26 @@ async function enrichMinisterInputWithDailyIntelligence(
   input: LooMinisterQuestionRequest,
 ): Promise<LooMinisterQuestionRequest> {
   try {
-    const items = await getDailyIntelligenceItemsForUser(userId, 5);
+    const items = (
+      await getOrBuildContextPack({
+        key: securityContextPackKey({
+          userId,
+          identity: [
+            "daily-intelligence",
+            input.pageContext.subject.security?.securityId,
+            input.pageContext.subject.security?.symbol,
+            input.pageContext.subject.security?.exchange,
+            input.pageContext.subject.security?.currency,
+          ]
+            .filter(Boolean)
+            .join("|"),
+          quoteUpdatedAt: "latest",
+        }),
+        kind: "external-intelligence",
+        ttlMs: LOO_MINISTER_CONTEXT_PACK_TTL_MS.externalIntelligence,
+        build: () => getDailyIntelligenceItemsForUser(userId, 5),
+      })
+    ).data;
     if (items.length === 0) {
       return input;
     }
@@ -916,13 +1297,26 @@ async function enrichMinisterInputWithCandidateFit(
 
   try {
     const repositories = getRepositories();
-    const [profile, holdings, recommendationRun] = await Promise.all([
-      repositories.preferences.getByUserId(userId),
+    const [profilePack, holdings, recommendationRunPack] = await Promise.all([
+      getOrBuildContextPack({
+        key: userPreferencePackKey(userId, "latest"),
+        kind: "preference",
+        ttlMs: LOO_MINISTER_CONTEXT_PACK_TTL_MS.preference,
+        build: () => repositories.preferences.getByUserId(userId),
+      }),
       repositories.holdings.listByUserId(userId),
-      repositories.recommendations
-        .getLatestByUserId(userId)
-        .catch(() => null),
+      getOrBuildContextPack({
+        key: latestRecommendationPackKey(userId, "latest"),
+        kind: "recommendation",
+        ttlMs: LOO_MINISTER_CONTEXT_PACK_TTL_MS.recommendation,
+        build: () =>
+          repositories.recommendations
+            .getLatestByUserId(userId)
+            .catch(() => null),
+      }),
     ]);
+    const profile = profilePack.data;
+    const recommendationRun = recommendationRunPack.data;
     const matchingHoldings = getMatchingHoldings(security, holdings);
     const totalMarketValueCad = matchingHoldings.reduce(
       (sum, holding) => sum + holding.marketValueCad,
@@ -1142,10 +1536,10 @@ async function callExternalMinisterOnce(
   const parsed = looMinisterAnswerResultSchema.parse(
     sanitizeExternalMinisterAnswerPayload(JSON.parse(outputText)),
   );
-  return {
-    answer: parsed,
-    usage: extractUsage(payload),
-  };
+    return {
+      answer: attachDeterministicSuggestedActions(input, parsed),
+      usage: extractUsage(payload),
+    };
 }
 
 export async function getLooMinisterAnswer(
@@ -1155,6 +1549,7 @@ export async function getLooMinisterAnswer(
     settings?: ResolvedLooMinisterSettings;
     persistUsage?: boolean;
     skipContextResolver?: boolean;
+    forceLocal?: boolean;
   } = {},
 ) {
   const resolvedContext = options.skipContextResolver
@@ -1172,6 +1567,20 @@ export async function getLooMinisterAnswer(
   const persistUsage = options.persistUsage ?? true;
   const localAnswer = (fallbackReason?: string) =>
     buildLocalAnswer(enrichedInput, fallbackReason);
+
+  if (options.forceLocal) {
+    const answer = localAnswer();
+    if (persistUsage) {
+      await recordLooMinisterUsage(userId, {
+        page: enrichedInput.pageContext.page,
+        mode: "local",
+        provider: "local",
+        model: settings.model,
+        status: "success",
+      });
+    }
+    return apiSuccess(answer, "service");
+  }
 
   if (
     settings.mode !== "gpt-5.5" ||

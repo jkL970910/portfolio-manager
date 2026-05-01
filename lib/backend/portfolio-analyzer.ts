@@ -66,6 +66,122 @@ function getHoldingAccount(holding: HoldingPosition | null | undefined, accounts
   return holding ? accounts.find((account) => account.id === holding.accountId) : undefined;
 }
 
+const US_EQUITY_EXPOSURE_SYMBOLS = new Set([
+  "VFV",
+  "XUS",
+  "XUU",
+  "ZSP",
+  "HXS",
+  "HULC",
+  "QQC",
+  "ZQQ",
+  "HXQ",
+  "XQQ",
+]);
+
+const INTERNATIONAL_EQUITY_EXPOSURE_SYMBOLS = new Set([
+  "XEF",
+  "VIU",
+  "XAW",
+  "XEQT",
+  "VEQT",
+]);
+
+const FIXED_INCOME_EXPOSURE_SYMBOLS = new Set([
+  "XBB",
+  "ZAG",
+  "VAB",
+  "XSB",
+  "ZFL",
+]);
+
+const CASH_EXPOSURE_SYMBOLS = new Set(["CASH", "PSA", "HSAV", "CSAV"]);
+
+function inferEconomicAssetClass(holding: HoldingPosition) {
+  const symbol = holding.symbol.trim().toUpperCase();
+  const name = holding.name.trim().toLowerCase();
+  const type = (holding.securityTypeOverride ?? "").trim().toLowerCase();
+  const isFundLike =
+    type.includes("etf") ||
+    type.includes("fund") ||
+    name.includes(" etf") ||
+    name.includes(" index ") ||
+    name.includes("nasdaq") ||
+    name.includes("s&p") ||
+    name.includes("msci");
+
+  if (
+    FIXED_INCOME_EXPOSURE_SYMBOLS.has(symbol) ||
+    name.includes("bond") ||
+    name.includes("aggregate")
+  ) {
+    return "Fixed Income";
+  }
+
+  if (
+    CASH_EXPOSURE_SYMBOLS.has(symbol) ||
+    name.includes("high interest savings") ||
+    name.includes("cash")
+  ) {
+    return "Cash";
+  }
+
+  if (
+    INTERNATIONAL_EQUITY_EXPOSURE_SYMBOLS.has(symbol) ||
+    name.includes("eafe") ||
+    name.includes("ex canada") ||
+    name.includes("developed all cap ex north america") ||
+    name.includes("international")
+  ) {
+    return "International Equity";
+  }
+
+  if (
+    US_EQUITY_EXPOSURE_SYMBOLS.has(symbol) ||
+    name.includes("nasdaq") ||
+    name.includes("s&p 500") ||
+    name.includes("s&p500") ||
+    name.includes("u.s.") ||
+    name.includes("us total market") ||
+    name.includes("united states")
+  ) {
+    return "US Equity";
+  }
+
+  if (isFundLike && name.includes("canadian")) {
+    return "Canadian Equity";
+  }
+
+  return holding.assetClass;
+}
+
+function buildEconomicExposureNote(args: {
+  holding: HoldingPosition;
+  economicAssetClass: string;
+  identity: AnalyzerSecurityIdentity;
+}) {
+  const listing = [
+    args.identity.symbol,
+    args.identity.exchange,
+    args.identity.currency,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+  if (args.economicAssetClass === args.holding.assetClass) {
+    return `经济暴露按 ${args.economicAssetClass} 评估，交易身份仍保留 ${listing}。`;
+  }
+
+  return `交易身份仍保留 ${listing}，但配置/目标适配按底层经济暴露 ${args.economicAssetClass} 评估，而不是按 ${args.holding.assetClass} 或交易币种简单归类。`;
+}
+
+function hasCompleteAnalyzerIdentity(identity: AnalyzerSecurityIdentity) {
+  return Boolean(
+    identity.symbol.trim() &&
+      identity.exchange?.trim() &&
+      identity.currency?.trim(),
+  );
+}
+
 function getTaxNotes(args: {
   holdings: HoldingPosition[];
   accounts: InvestmentAccount[];
@@ -193,27 +309,47 @@ function buildMarketDataSummary(args: {
     quoteProviders.length > 0 ||
     historyProviders.length > 0 ||
     snapshots.some((snapshot) => snapshot.sourceMode === "cached-external");
+  const formatProviders = (providers: string[]) =>
+    providers
+      .slice(0, 3)
+      .map((provider) =>
+        provider
+          .split(/[-_\s]+/)
+          .filter(Boolean)
+          .map((part) =>
+            part.length <= 3
+              ? part.toUpperCase()
+              : `${part.slice(0, 1).toUpperCase()}${part.slice(1)}`,
+          )
+          .join(" "),
+      )
+      .join("、");
+  const quoteStatusLabel = quoteStatuses.some((status) =>
+    ["success", "fresh"].includes(status),
+  )
+    ? "报价较新"
+    : quoteStatuses.length > 0
+      ? "报价需要确认"
+      : null;
   const quoteSourceSummary =
     quoteProviders.length > 0 || historyProviders.length > 0
       ? [
           quoteProviders.length > 0
-            ? `quotes=${quoteProviders.slice(0, 3).join("/")}`
+            ? `报价来自 ${formatProviders(quoteProviders)}`
             : null,
           historyProviders.length > 0
-            ? `history=${historyProviders.slice(0, 3).join("/")}`
+            ? `历史价格来自 ${formatProviders(historyProviders)}`
             : null,
         ]
           .filter(Boolean)
           .join("；")
       : null;
   const quoteFreshnessSummary = [
-    quoteStatuses.length > 0
-      ? `quoteStatus=${quoteStatuses.slice(0, 4).join("/")}`
-      : null,
-    latestHistoryAsOf ? `historyAsOf=${latestHistoryAsOf.slice(0, 10)}` : null,
-    priceHistory.length > 0 ? `historyPoints=${priceHistory.length}` : null,
-    fallbackPointCount > 0 ? `fallbackPoints=${fallbackPointCount}` : null,
-    stalePointCount > 0 ? `stalePoints=${stalePointCount}` : null,
+    quoteStatusLabel,
+    latestHistoryAsOf ? `历史价格截至 ${latestHistoryAsOf.slice(0, 10)}` : null,
+    priceHistory.length > 0 ? `历史样本 ${priceHistory.length} 个交易日` : null,
+    fallbackPointCount > 0 ? `其中 ${fallbackPointCount} 个为参考/兜底点` : null,
+    stalePointCount > 0 ? `其中 ${stalePointCount} 个可能过期` : null,
   ]
     .filter(Boolean)
     .join("；");
@@ -233,7 +369,7 @@ function buildMarketDataSummary(args: {
       ...(quoteProviders.length > 0
         ? [
             {
-              title: `Cached holding quotes: ${quoteProviders.slice(0, 3).join(" / ")}`,
+              title: `缓存持仓报价：${formatProviders(quoteProviders)}`,
               sourceType: "quote-cache" as const,
               date: latestHoldingQuoteAsOf?.slice(0, 10),
             },
@@ -242,7 +378,7 @@ function buildMarketDataSummary(args: {
       ...(historyProviders.length > 0
         ? [
             {
-              title: `Cached price history: ${historyProviders.slice(0, 3).join(" / ")}`,
+              title: `缓存价格历史：${formatProviders(historyProviders)}`,
               sourceType: "market-data" as const,
               date: latestHistoryAsOf?.slice(0, 10),
             },
@@ -251,7 +387,7 @@ function buildMarketDataSummary(args: {
       ...(latestSnapshot
         ? [
             {
-              title: `Portfolio snapshot: ${latestSnapshot.sourceMode ?? latestSnapshot.sourceVersion}`,
+              title: `组合快照：${latestSnapshot.sourceMode ?? latestSnapshot.sourceVersion}`,
               sourceType: "portfolio-data" as const,
               date: latestSnapshot.snapshotDate,
             },
@@ -317,8 +453,11 @@ export function buildSecurityAnalyzerQuickScan(args: {
   const heldValueCad = sum(matchingHoldings.map((holding) => holding.marketValueCad));
   const heldWeightPct = totalPortfolioCad > 0 ? (heldValueCad / totalPortfolioCad) * 100 : 0;
   const referenceHolding = matchingHoldings[0] ?? args.holdings.find((holding) => holding.symbol.trim().toUpperCase() === normalizedSymbol);
+  const economicAssetClass = referenceHolding
+    ? inferEconomicAssetClass(referenceHolding)
+    : null;
   const targetPct = referenceHolding
-    ? args.profile.targetAllocation.find((target) => target.assetClass === referenceHolding.assetClass)?.targetPct ?? 0
+    ? args.profile.targetAllocation.find((target) => target.assetClass === economicAssetClass)?.targetPct ?? 0
     : 0;
   const accountTypes = [...new Set(matchingHoldings
     .map((holding) => getHoldingAccount(holding, args.accounts)?.type)
@@ -384,7 +523,9 @@ export function buildSecurityAnalyzerQuickScan(args: {
         label: "目标配置适配",
         score: referenceHolding && targetPct > 0 ? 72 : 45,
         rationale: referenceHolding
-          ? `它归入 ${referenceHolding.assetClass}，该资产类别目标约 ${targetPct}%。`
+          ? economicAssetClass === referenceHolding.assetClass
+            ? `它按 ${economicAssetClass} 评估，该资产类别目标约 ${targetPct}%。`
+            : `它交易身份是 ${referenceHolding.exchangeOverride ?? "未知交易所"} / ${referenceHolding.currency ?? "未知币种"}，但底层经济暴露按 ${economicAssetClass} 评估；该资产类别目标约 ${targetPct}%。`
           : "还没有足够的本地持仓上下文判断目标配置。"
       }
     ],
@@ -410,6 +551,13 @@ export function buildSecurityAnalyzerQuickScan(args: {
     ],
     taxNotes,
     portfolioFit: [
+      referenceHolding && economicAssetClass
+        ? buildEconomicExposureNote({
+            holding: referenceHolding,
+            economicAssetClass,
+            identity,
+          })
+        : "当前没有足够持仓上下文判断底层经济暴露。",
       accountTypes.length > 0
         ? `当前匹配持仓分布在 ${accountTypes.join(" / ")}。`
         : "当前没有匹配到账户内真实持仓。",
@@ -419,15 +567,46 @@ export function buildSecurityAnalyzerQuickScan(args: {
       "分析身份保留 symbol、exchange、currency，避免 CAD 版本和美股正股混淆。"
     ],
     actionItems: [
-      {
-        priority: "P1",
-        title: "确认标的身份",
-        detail: `继续分析前确认 ${normalizedSymbol} 的交易所和币种是否与真实持仓一致。`
-      }
+      ...(hasCompleteAnalyzerIdentity(identity)
+        ? []
+        : [
+            {
+              priority: "P0" as const,
+              title: "补全交易身份",
+              detail: `当前缺少交易所或币种，继续分析前需要补全 ${normalizedSymbol} 的 symbol、exchange、currency，避免混用同 ticker 的 CAD/US 版本。`,
+            },
+          ]),
+      ...(heldWeightPct >= 15
+        ? [
+            {
+              priority: "P1" as const,
+              title: "评估集中度",
+              detail: `${normalizedSymbol} 当前约占组合 ${round(heldWeightPct, 1)}%，建议结合行业暴露、账户分布和风险偏好判断是否继续增持或降低集中度。`,
+            },
+          ]
+        : []),
+      ...(referenceHolding && economicAssetClass && targetPct > 0
+        ? [
+            {
+              priority: "P1" as const,
+              title: "核对目标配置",
+              detail: `${normalizedSymbol} 按 ${economicAssetClass} 暴露评估，该资产类别目标约 ${targetPct}%；后续判断应看组合整体是否仍需要补足这一类资产。`,
+            },
+          ]
+        : []),
+      ...(marketData.priceHistoryPointCount < 5
+        ? [
+            {
+              priority: "P2" as const,
+              title: "补充价格历史",
+              detail: "缓存价格历史不足时，快扫只能做低置信判断；后续可通过行情刷新或 worker 补齐历史样本。",
+            },
+          ]
+        : []),
     ],
     sources: [
-      { title: "Local holdings and account data", sourceType: "portfolio-data" },
-      { title: "Cached holding quote fields", sourceType: "quote-cache" },
+      { title: "本地持仓与账户数据", sourceType: "portfolio-data" },
+      { title: "缓存持仓报价字段", sourceType: "quote-cache" },
       ...marketData.sources
     ],
     disclaimer: PORTFOLIO_ANALYZER_DISCLAIMER
@@ -527,9 +706,9 @@ export function buildPortfolioAnalyzerQuickScan(args: {
       detail: item
     })),
     sources: [
-      { title: "Local portfolio health summary", sourceType: "portfolio-data" },
-      { title: "Local holdings and account data", sourceType: "portfolio-data" },
-      { title: "Cached holding quote fields", sourceType: "quote-cache" },
+      { title: "本地组合健康摘要", sourceType: "portfolio-data" },
+      { title: "本地持仓与账户数据", sourceType: "portfolio-data" },
+      { title: "缓存持仓报价字段", sourceType: "quote-cache" },
       ...marketData.sources
     ],
     disclaimer: PORTFOLIO_ANALYZER_DISCLAIMER
@@ -677,9 +856,9 @@ export function buildAccountAnalyzerQuickScan(args: {
       detail: item
     })),
     sources: [
-      { title: "Local account health summary", sourceType: "portfolio-data" },
-      { title: "Local account holdings", sourceType: "portfolio-data" },
-      { title: "Cached holding quote fields", sourceType: "quote-cache" },
+      { title: "本地账户健康摘要", sourceType: "portfolio-data" },
+      { title: "本地账户持仓", sourceType: "portfolio-data" },
+      { title: "缓存持仓报价字段", sourceType: "quote-cache" },
       ...marketData.sources
     ],
     disclaimer: PORTFOLIO_ANALYZER_DISCLAIMER
@@ -752,7 +931,7 @@ export function buildRecommendationRunAnalyzerQuickScan(args: {
       detail: item.explanation
     })),
     sources: [
-      { title: "Local recommendation run", sourceType: "portfolio-data" },
+      { title: "本地推荐运行记录", sourceType: "portfolio-data" },
       { title: "Stored recommendation constraints", sourceType: "manual" }
     ],
     disclaimer: PORTFOLIO_ANALYZER_DISCLAIMER

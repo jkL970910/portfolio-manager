@@ -212,10 +212,10 @@ test("security analyzer quick scan consumes cached market data by identity", () 
 
   assert.equal(result.dataFreshness.sourceMode, "cached-external");
   assert.equal(result.dataFreshness.priceHistoryPointCount, 1);
-  assert.match(result.dataFreshness.quoteSourceSummary ?? "", /yahoo-finance/);
+  assert.match(result.dataFreshness.quoteSourceSummary ?? "", /Yahoo Finance/);
   assert.ok(
     result.sources.some((source) =>
-      source.title.includes("Cached price history")
+      source.title.includes("缓存价格历史")
     )
   );
   assert.ok(
@@ -225,6 +225,134 @@ test("security analyzer quick scan consumes cached market data by identity", () 
     (result.scorecards.find((card) => card.id === "market-data-freshness")
       ?.score ?? 0) > 45
   );
+});
+
+test("security analyzer quick scan separates listing identity from economic exposure", () => {
+  const zqqHolding: HoldingPosition = {
+    id: "holding_zqq",
+    securityId: "security_zqq_cad",
+    userId: "user_test",
+    accountId: "acct_tfsa",
+    symbol: "ZQQ",
+    name: "BMO Nasdaq 100 Equity Hedged to CAD Index ETF",
+    assetClass: "Canadian Equity",
+    sector: "Technology",
+    currency: "CAD",
+    securityTypeOverride: "ETF",
+    exchangeOverride: "TSX",
+    marketValueCad: 17200,
+    quoteProvider: "yahoo-finance",
+    quoteSourceMode: "cached-external",
+    quoteStatus: "success",
+    lastQuoteSuccessAt: generatedAt,
+    weightPct: 17.2,
+    gainLossPct: 4,
+    updatedAt: generatedAt,
+  };
+  const result = buildSecurityAnalyzerQuickScan({
+    identity: {
+      securityId: "security_zqq_cad",
+      symbol: "ZQQ",
+      exchange: "TSX",
+      currency: "CAD",
+      name: "BMO Nasdaq 100 Equity Hedged to CAD Index ETF",
+    },
+    accounts,
+    holdings: [...holdings, zqqHolding],
+    profile: makeProfile(),
+    marketData: {
+      priceHistory: [
+        {
+          ...priceHistory[1]!,
+          id: "history_zqq_tsx",
+          securityId: "security_zqq_cad",
+          symbol: "ZQQ",
+          exchange: "TSX",
+          currency: "CAD",
+          provider: "yahoo-finance",
+          source: "quote-refresh-yahoo-finance",
+        },
+      ],
+    },
+    generatedAt,
+  });
+
+  const targetFit = result.scorecards.find((card) => card.id === "target-fit");
+  assert.match(targetFit?.rationale ?? "", /底层经济暴露按 US Equity/);
+  assert.match(targetFit?.rationale ?? "", /目标约 60%/);
+  assert.ok(
+    result.portfolioFit.some((item) =>
+      item.includes("交易身份仍保留 ZQQ · TSX · CAD"),
+    ),
+  );
+});
+
+test("security analyzer quick scan returns reader-friendly market data wording", () => {
+  const result = buildSecurityAnalyzerQuickScan({
+    identity: {
+      securityId: "security_amzn_cad",
+      symbol: "AMZN",
+      exchange: "NEO",
+      currency: "CAD",
+      name: "Amazon CDR",
+    },
+    accounts,
+    holdings,
+    profile: makeProfile(),
+    marketData: { priceHistory },
+    generatedAt,
+  });
+  const rendered = JSON.stringify(result);
+
+  assert.match(result.dataFreshness.quoteSourceSummary ?? "", /报价来自/);
+  assert.match(result.dataFreshness.quoteFreshnessSummary ?? "", /报价较新/);
+  assert.doesNotMatch(rendered, /quoteStatus=/);
+  assert.doesNotMatch(rendered, /historyAsOf=/);
+  assert.doesNotMatch(rendered, /historyPoints=/);
+  assert.doesNotMatch(rendered, /Cached holding quotes/);
+});
+
+test("security analyzer quick scan shows conclusions instead of identity check when identity is complete", () => {
+  const result = buildSecurityAnalyzerQuickScan({
+    identity: {
+      securityId: "security_amzn_cad",
+      symbol: "AMZN",
+      exchange: "NEO",
+      currency: "CAD",
+      name: "Amazon CDR",
+    },
+    accounts,
+    holdings,
+    profile: makeProfile(),
+    marketData: { priceHistory },
+    generatedAt,
+  });
+
+  assert.equal(
+    result.actionItems.some((item) => item.title === "确认标的身份"),
+    false,
+  );
+  assert.ok(
+    result.actionItems.some(
+      (item) => item.title === "核对目标配置" || item.title === "评估集中度",
+    ),
+  );
+});
+
+test("security analyzer quick scan asks for identity repair only when listing fields are missing", () => {
+  const result = buildSecurityAnalyzerQuickScan({
+    identity: {
+      symbol: "AMZN",
+      name: "Amazon",
+    },
+    accounts,
+    holdings,
+    profile: makeProfile(),
+    generatedAt,
+  });
+
+  assert.equal(result.actionItems[0]?.title, "补全交易身份");
+  assert.match(result.actionItems[0]?.detail ?? "", /symbol、exchange、currency/);
 });
 
 test("security analyzer quick scan uses security id when provider exchange labels differ", () => {
@@ -263,7 +391,7 @@ test("security analyzer quick scan uses security id when provider exchange label
     (card) => card.id === "market-data-freshness"
   );
   assert.equal(result.dataFreshness.priceHistoryPointCount, 1);
-  assert.match(result.dataFreshness.quoteSourceSummary ?? "", /yahoo-finance/);
+  assert.match(result.dataFreshness.quoteSourceSummary ?? "", /Yahoo Finance/);
   assert.ok((freshness?.score ?? 0) > 45);
 });
 
