@@ -38,11 +38,27 @@ function makeOverviewContext(overrides: Record<string, unknown> = {}) {
 }
 
 test("Loo Minister page context accepts overview facts for cross-page Q&A", () => {
-  const parsed = looMinisterPageContextSchema.parse(makeOverviewContext());
+  const parsed = looMinisterPageContextSchema.parse(makeOverviewContext({
+    facts: [
+      {
+        id: "net-worth",
+        label: "总资产",
+        value: "CAD 100,000",
+        source: "portfolio-data"
+      },
+      {
+        id: "daily-intelligence-1",
+        label: "今日秘闻：VFV listing 缓存行情快照",
+        value: "VFV TSX CAD 缓存行情可用。",
+        source: "external-intelligence"
+      }
+    ]
+  }));
 
   assert.equal(parsed.page, "overview");
   assert.equal(parsed.locale, "zh");
   assert.equal(parsed.facts[0].id, "net-worth");
+  assert.equal(parsed.facts[1].source, "external-intelligence");
 });
 
 test("Loo Minister security context preserves symbol, exchange, and currency identity", () => {
@@ -151,6 +167,11 @@ test("Loo Minister answer requires non-advice disclaimer", () => {
       {
         title: "Overview page context",
         sourceType: "page-context",
+        asOf: now
+      },
+      {
+        title: "Loo国今日秘闻",
+        sourceType: "external-intelligence",
         asOf: now
       }
     ],

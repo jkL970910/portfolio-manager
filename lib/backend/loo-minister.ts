@@ -11,6 +11,7 @@ import {
   resolveLooMinisterSettings,
   type ResolvedLooMinisterSettings,
 } from "@/lib/backend/loo-minister-settings";
+import { getDailyIntelligenceItemsForUser } from "@/lib/backend/mobile-daily-intelligence";
 import { PORTFOLIO_ANALYZER_DISCLAIMER } from "@/lib/backend/portfolio-analyzer-contracts";
 
 const pageLabels: Record<
@@ -65,7 +66,7 @@ function buildAnswer(input: LooMinisterQuestionRequest) {
     warnings.length > 0
       ? `页面已经提示的风险/备注包括：${warnings.join("；")}。`
       : "页面没有提供额外风险提示。",
-    "这是一版本地 deterministic 回答，用来先跑通 Loo国大臣的安全接口；后续接入 GPT-5.5 时会继续使用同一套上下文 DTO 和确认边界。",
+    "这是一版本地 deterministic 回答，用来先跑通 Loo国大臣的安全接口；GPT-5.5 模式会继续使用同一套页面 context、今日秘闻和确认边界。",
   ].join("\n");
 }
 
@@ -75,6 +76,7 @@ type LooMinisterAnswerSourceType =
   | "quote-cache"
   | "fx-cache"
   | "analysis-cache"
+  | "external-intelligence"
   | "manual";
 
 function toAnswerSourceType(
@@ -154,11 +156,11 @@ function buildRouterCompatiblePrompt(input: LooMinisterQuestionRequest) {
   return [
     "你是 Loo国大臣。只使用下面的页面摘要回答中文问题。",
     "不要编造实时行情、新闻或论坛结论；投资相关回答必须包含不构成投资建议的免责声明。",
-    "如果关键事实里有 analysis-cache 或 cached-external 结果，优先引用它；没有时说明当前只能基于页面上下文和本地缓存回答。",
+    "如果关键事实里有 analysis-cache 或 external-intelligence 结果，优先引用它；没有时说明当前只能基于页面上下文和本地缓存回答。",
     "只返回合法 JSON object，不要 markdown，不要额外解释。",
     "JSON 字段必须是：version, generatedAt, role, page, title, answer, keyPoints, suggestedActions, sources, disclaimer。",
     `固定字段：version=${LOO_MINISTER_VERSION}; role=loo-minister; page=${pageContext.page}; suggestedActions=[]。`,
-    "sources 至少包含一个 {title, sourceType, asOf}，sourceType 可用 page-context、portfolio-data、quote-cache、fx-cache、analysis-cache、manual。",
+    "sources 至少包含一个 {title, sourceType, asOf}，sourceType 可用 page-context、portfolio-data、quote-cache、fx-cache、analysis-cache、external-intelligence、manual。",
     `disclaimer 必须是 {"zh":"仅用于研究学习，不构成投资建议。","en":"For research and education only. This is not investment advice."}`,
     "",
     `页面：${pageContext.title}`,
@@ -232,6 +234,7 @@ const answerJsonSchema = {
               "quote-cache",
               "fx-cache",
               "analysis-cache",
+              "external-intelligence",
               "manual",
             ],
           },
@@ -363,7 +366,7 @@ function buildExternalInput(
     {
       role: "system",
       content:
-        "你是 Loo国大臣。只用提供的页面 context 回答中文问题；如果 context 里有 analysis-cache 或 cached-external 结果，优先引用它；没有时说明只能基于页面上下文和本地缓存回答。不要编造实时行情、新闻或论坛结论；保留 symbol + exchange + currency 身份；所有投资相关回答必须包含不构成投资建议的免责声明。只返回合法 JSON object，不要 markdown。JSON 必须符合 LooMinisterAnswerResult：version、generatedAt、role、page、title、answer、keyPoints、suggestedActions、sources、disclaimer。role 必须是 loo-minister，suggestedActions 必须返回空数组，产品动作由本地应用控制。",
+        "你是 Loo国大臣。只用提供的页面 context 回答中文问题；如果 context 里有 analysis-cache 或 external-intelligence 结果，优先引用它；没有时说明只能基于页面上下文和本地缓存回答。不要编造实时行情、新闻或论坛结论；保留 symbol + exchange + currency 身份；所有投资相关回答必须包含不构成投资建议的免责声明。只返回合法 JSON object，不要 markdown。JSON 必须符合 LooMinisterAnswerResult：version、generatedAt、role、page、title、answer、keyPoints、suggestedActions、sources、disclaimer。role 必须是 loo-minister，suggestedActions 必须返回空数组，产品动作由本地应用控制。",
     },
     {
       role: "user",
@@ -375,6 +378,97 @@ function buildExternalInput(
       }),
     },
   ];
+}
+
+function getMinisterSecurityListingKey(
+  security: LooMinisterQuestionRequest["pageContext"]["subject"]["security"],
+) {
+  if (!security?.symbol || !security.exchange || !security.currency) {
+    return null;
+  }
+  return [security.symbol, security.exchange, security.currency]
+    .map((item) => item.trim().toUpperCase())
+    .join("|");
+}
+
+function getDailyIntelligenceListingKey(
+  item: Awaited<ReturnType<typeof getDailyIntelligenceItemsForUser>>[number],
+) {
+  const identity = item.identity;
+  if (!identity.symbol || !identity.exchange || !identity.currency) {
+    return null;
+  }
+  return [identity.symbol, identity.exchange, identity.currency]
+    .map((value) => value.trim().toUpperCase())
+    .join("|");
+}
+
+function mapDailyIntelligenceFact(
+  item: Awaited<ReturnType<typeof getDailyIntelligenceItemsForUser>>[number],
+  index: number,
+): LooMinisterFact {
+  return {
+    id: `daily-intelligence-${index + 1}`,
+    label: `今日秘闻：${item.title}`.slice(0, 120),
+    value: item.summary.slice(0, 240),
+    detail: [
+      item.reason,
+      item.freshnessLabel,
+      item.confidenceLabel,
+      item.relevanceLabel,
+      ...item.keyPoints.slice(0, 2),
+      ...item.riskFlags.slice(0, 2).map((flag) => `风险：${flag}`),
+    ]
+      .filter(Boolean)
+      .join("；")
+      .slice(0, 600),
+    source: "external-intelligence",
+  };
+}
+
+async function enrichMinisterInputWithDailyIntelligence(
+  userId: string,
+  input: LooMinisterQuestionRequest,
+): Promise<LooMinisterQuestionRequest> {
+  try {
+    const items = await getDailyIntelligenceItemsForUser(userId, 5);
+    if (items.length === 0) {
+      return input;
+    }
+
+    const subjectListingKey = getMinisterSecurityListingKey(
+      input.pageContext.subject.security,
+    );
+    const matchedItems = subjectListingKey
+      ? items.filter(
+          (item) => getDailyIntelligenceListingKey(item) === subjectListingKey,
+        )
+      : [];
+    const selectedItems = (matchedItems.length > 0 ? matchedItems : items)
+      .slice(0, 3);
+
+    return {
+      ...input,
+      pageContext: {
+        ...input.pageContext,
+        facts: [
+          ...input.pageContext.facts,
+          ...selectedItems.map(mapDailyIntelligenceFact),
+        ].slice(0, 40),
+      },
+    };
+  } catch {
+    return {
+      ...input,
+      pageContext: {
+        ...input.pageContext,
+        warnings: [
+          ...input.pageContext.warnings,
+          "今日秘闻缓存读取失败；大臣本次只基于当前页面上下文回答。",
+        ].slice(0, 20),
+      },
+    };
+  }
 }
 
 async function callExternalMinister(
@@ -492,11 +586,15 @@ export async function getLooMinisterAnswer(
     persistUsage?: boolean;
   } = {},
 ) {
+  const enrichedInput = await enrichMinisterInputWithDailyIntelligence(
+    userId,
+    input,
+  );
   const settings =
     options.settings ?? (await resolveLooMinisterSettings(userId));
   const persistUsage = options.persistUsage ?? true;
   const localAnswer = (fallbackReason?: string) =>
-    buildLocalAnswer(input, fallbackReason);
+    buildLocalAnswer(enrichedInput, fallbackReason);
 
   if (
     settings.mode !== "gpt-5.5" ||
@@ -510,7 +608,7 @@ export async function getLooMinisterAnswer(
     const answer = localAnswer(fallbackReason);
     if (persistUsage) {
       await recordLooMinisterUsage(userId, {
-        page: input.pageContext.page,
+        page: enrichedInput.pageContext.page,
         mode: settings.mode,
         provider: settings.mode === "local" ? "local" : settings.provider,
         model: settings.model,
@@ -522,10 +620,10 @@ export async function getLooMinisterAnswer(
   }
 
   try {
-    const result = await callExternalMinister(input, settings);
+    const result = await callExternalMinister(enrichedInput, settings);
     if (persistUsage) {
       await recordLooMinisterUsage(userId, {
-        page: input.pageContext.page,
+        page: enrichedInput.pageContext.page,
         mode: settings.mode,
         provider: `${settings.provider}-${settings.apiKeySource}`,
         model: settings.model,
@@ -544,7 +642,7 @@ export async function getLooMinisterAnswer(
     const answer = localAnswer(errorMessage);
     if (persistUsage) {
       await recordLooMinisterUsage(userId, {
-        page: input.pageContext.page,
+        page: enrichedInput.pageContext.page,
         mode: settings.mode,
         provider: `${settings.provider}-${settings.apiKeySource}`,
         model: settings.model,

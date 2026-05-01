@@ -451,7 +451,8 @@ Next priority order:
    analyses instead of duplicating them.
    - Status: in progress.
    - 大臣 prompts now include fact source tags and prefer `analysis-cache` /
-     `cached-external` facts when present.
+     `external-intelligence` facts when present. Backend answer requests now
+     auto-enrich page context from the standalone `Loo国今日秘闻` feed.
 4. Normalize Flutter API contracts into typed DTOs and reduce page-level
    `Map<String, dynamic>` parsing.
    - Status: in progress.

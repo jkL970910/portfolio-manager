@@ -52,6 +52,7 @@ export const looMinisterFactSchema = z.object({
       "fx-cache",
       "user-input",
       "analysis-cache",
+      "external-intelligence",
       "system",
     ])
     .default("portfolio-data"),
@@ -223,6 +224,7 @@ export const looMinisterAnswerResultSchema = z
             "quote-cache",
             "fx-cache",
             "analysis-cache",
+            "external-intelligence",
             "manual",
           ]),
           asOf: z.string().datetime().nullable().default(null),

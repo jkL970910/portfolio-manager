@@ -308,6 +308,11 @@ Current structured document boundary:
   intelligence feed as a standalone mobile contract. Overview, Portfolio,
   Recommendations, and AI 大臣 can reuse it without duplicating document/run
   mapping logic.
+- AI 大臣 now automatically enriches every answer request with the same daily
+  intelligence feed on the backend. Flutter pages do not need to inject the
+  feed manually; the minister receives up to three `external-intelligence`
+  facts, preferring the current `symbol + exchange + currency` listing when the
+  page has a resolved security subject.
 - Recommendation V3 overlay now reads document evidence fields when available:
   `confidence`, `relevanceScore`, `sourceReliability`, and `riskFlags`. Saved
   analysis runs without those fields still use the conservative source/scope/
@@ -412,6 +417,9 @@ P0.5:
    currency`; ticker-only fallback is intentionally skipped.
 6. Complete: cached market-data provider results are persisted as structured
    external research documents and consumed by Recommendation V3 overlay.
+7. Complete: AI 大臣 backend prompt/context enrichment consumes the standalone
+   `今日秘闻` feed as `external-intelligence` facts without triggering live
+   research.
 
 P1:
 
@@ -419,8 +427,9 @@ P1:
 2. Deepen V3 scoring calibration with more source types, backtests, and
    source-specific stale-data rules. The first document-evidence scoring bridge
    is implemented for cached market-data documents.
-3. Add standalone `今日秘闻` API if Overview/Portfolio/大臣 need the same feed.
-4. Add deeper guided preference questions for sector/style/life/tax factors.
+3. Add deeper guided preference questions for sector/style/life/tax factors.
+4. Add UI surfaces outside Recommendations that display the standalone
+   `今日秘闻` feed directly when useful.
 
 P2:
 

@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { getLooMinisterAnswer } from "@/lib/backend/loo-minister";
 import { LOO_MINISTER_VERSION } from "@/lib/backend/loo-minister-contracts";
+import { mockRepositories } from "@/lib/backend/repositories/mock-repositories";
 
 const now = "2026-04-30T04:00:00.000Z";
 
@@ -141,6 +142,103 @@ test("Loo Minister GPT mode falls back safely when provider is not enabled", asy
   assert.match(response.data.answer, /本地 deterministic 回答/);
   assert.match(response.data.answer, /NVDA/);
   assert.match(response.data.disclaimer.zh, /不构成投资建议/);
+});
+
+test("Loo Minister enriches answers with cached daily intelligence", async () => {
+  await mockRepositories.externalResearchDocuments.create({
+    userId: "minister_daily_user",
+    providerDocumentId: "doc_vfv_minister_1",
+    sourceType: "market-data",
+    providerId: "market-data",
+    sourceName: "本地缓存行情",
+    title: "VFV listing 缓存行情快照",
+    summary: "VFV TSX CAD 缓存行情可用，但仍需要人工复核。",
+    url: null,
+    publishedAt: "2026-04-30T00:00:00.000Z",
+    capturedAt: now,
+    expiresAt: "2026-05-01T04:00:00.000Z",
+    language: "zh",
+    security: {
+      securityId: "sec_vfv_cad",
+      symbol: "VFV",
+      exchange: "TSX",
+      currency: "CAD",
+    },
+    underlyingId: null,
+    confidence: "high",
+    sentiment: "neutral",
+    relevanceScore: 78,
+    sourceReliability: 82,
+    keyPoints: ["最近缓存收盘价可用。"],
+    riskFlags: ["缓存行情仍需人工复核。"],
+    tags: ["market-data", "listing-identity"],
+    rawPayload: {},
+  });
+
+  const response = await getLooMinisterAnswer(
+    "minister_daily_user",
+    {
+      pageContext: {
+        version: LOO_MINISTER_VERSION,
+        page: "security-detail",
+        locale: "zh",
+        title: "VFV 标的详情",
+        asOf: now,
+        displayCurrency: "CAD",
+        subject: {
+          security: {
+            symbol: "VFV",
+            exchange: "TSX",
+            currency: "CAD",
+          },
+        },
+        dataFreshness: {
+          portfolioAsOf: now,
+          quotesAsOf: now,
+          fxAsOf: now,
+          chartFreshness: "fresh",
+          sourceMode: "cached-external",
+        },
+        facts: [
+          {
+            id: "security",
+            label: "标的身份",
+            value: "VFV · TSX · CAD",
+            source: "portfolio-data",
+          },
+        ],
+        warnings: [],
+        allowedActions: [],
+      },
+      question: "这个标的当前有什么需要注意？",
+      answerStyle: "beginner",
+      cacheStrategy: "prefer-cache",
+      includeExternalResearch: false,
+    },
+    {
+      settings: {
+        mode: "local",
+        provider: "official-openai",
+        model: "gpt-5.5",
+        reasoningEffort: "medium",
+        endpoint: "https://api.openai.com/v1/responses",
+        apiKey: null,
+        apiKeySource: "none",
+        providerEnabled: false,
+      },
+      persistUsage: false,
+    },
+  );
+
+  assert.match(response.data.answer, /VFV listing 缓存行情快照/);
+  assert.ok(
+    response.data.sources.some(
+      (source) => source.sourceType === "external-intelligence",
+    ),
+  );
+  assert.ok(
+    response.data.keyPoints.some((point) => point.includes("今日秘闻")),
+  );
 });
 
 test("Loo Minister provider fallback redacts API keys in user-visible reason", async () => {

@@ -461,9 +461,11 @@ Next analyzer work:
   A request such as `VFV + NASDAQ + USD` must not reuse CAD/TSX or exchange-less
   cached history.
 - Loo国大臣 prompt construction now includes fact source tags and instructs the
-  provider to prefer `analysis-cache` / `cached-external` facts when present.
-  This keeps 大臣 as a cross-page explainer over the same analysis layer rather
-  than a duplicate report generator.
+  provider to prefer `analysis-cache` / `external-intelligence` facts when
+  present. Backend answer requests automatically enrich page context with up to
+  three cached `Loo国今日秘闻` facts, matched by listing identity when the page
+  has a resolved security subject. This keeps 大臣 as a cross-page explainer
+  over the same analysis layer rather than a duplicate report generator.
 - Provider retry-after windows are now persisted in
   `market_data_provider_limits`; refresh ledgers can snapshot DB-backed limits
   for Settings QA and later cloud workers.
@@ -477,8 +479,8 @@ P1:
 - saved analysis history detail/drilldown
 - Recommendation V3 external-intelligence overlay. See
   `docs/execution/recommendation-v3-external-intelligence.md`.
-- Loo国今日秘闻 curated daily intelligence card, using cached source/freshness
-  records rather than raw live search.
+- Loo国今日秘闻 curated daily intelligence feed is now a backend API and 大臣
+  context source; next work is broader UI placement outside Recommendations.
 - Preference Factors V2 for sector/style/life/tax/cash preferences that can
   improve health score and recommendation scoring.
 - production-grade background scheduling and persisted provider-limit behavior

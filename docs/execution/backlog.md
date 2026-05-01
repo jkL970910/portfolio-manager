@@ -70,7 +70,7 @@ over simply adding more Flutter screens.
 | Watchlist and target constraints workflow | In Progress | Mobile can edit watchlist, strategy, tax-aware placement, and account priority constraints                                                                                                                                                                                                     |
 | Cloud-ready cache / worker boundaries     | In Progress | First-pass market-data refresh worker, persisted run ledger, mobile Settings run-status readout, and DB-backed provider retry-after guard exist; next is cron/cloud scheduling before heavier AI-agent jobs                                                                                |
 | Quote-provider status UX                  | In Progress | Refresh results, Settings, holding rows, price-history records, and persisted provider-limit snapshots now expose source/status lineage; remaining work is deeper per-provider dashboards                                                                                                  |
-| Loo国 AI Minister assistant               | In Progress | Backend and Flutter first-pass page-context DTOs exist; global floating 大臣 entry receives Overview/Portfolio/detail/Health context; Settings can switch Local/GPT-5.5, choose official OpenAI or OpenRouter-compatible provider, save encrypted BYOK API key, and surface usage/retry/failure observability |
+| Loo国 AI Minister assistant               | In Progress | Backend and Flutter first-pass page-context DTOs exist; global floating 大臣 entry receives Overview/Portfolio/detail/Health context; backend now auto-enriches answers with cached `今日秘闻` as `external-intelligence`; Settings can switch Local/GPT-5.5, choose official OpenAI or OpenRouter-compatible provider, save encrypted BYOK API key, and surface usage/retry/failure observability |
 | P0.5 external consultation skill pipeline | In Progress | The uploaded `portfolio-analyzer.skill` is productized as cached/guarded analysis work. Next priority is proving it on real cached market data before enabling live external research adapters or UI-heavy redesign.                                                                        |
 | Recommendation V2.1 preference fit        | In Progress | V2 now starts consuming Preference Factors V2 for light candidate ordering and explanation while preserving deterministic target-allocation/account-placement behavior.                                                                             |
 | Recommendation V3 external intelligence   | In Progress | See `docs/execution/recommendation-v3-external-intelligence.md`. Mobile now labels the cached-intelligence layer as `V3 Overlay / V2.1 Core` when saved external/local analysis or persisted external research documents are available. |
@@ -198,7 +198,11 @@ Guardrails:
   an intelligence overlay only: it does not automatically change deterministic
   V2.1 ordering, and it must not trigger live news/forum research on page load.
 - `GET /api/mobile/intelligence/daily` now provides the same curated feed as a
-  standalone mobile contract for future Overview/Portfolio/AI 大臣 reuse.
+  standalone mobile contract for future Overview/Portfolio reuse.
+- Loo国大臣 answer requests now auto-read that curated feed server-side and add
+  up to three `external-intelligence` facts. If the current page has a resolved
+  security subject, the enrichment first matches the same `symbol + exchange +
+  currency` listing.
 - Recommendation priority cards now attach cached intelligence references by
   canonical identity first. Exact `security_id` matches are `当前上市版本情报`;
   exact `symbol + exchange + currency` remains a strict fallback for older
@@ -227,7 +231,7 @@ Guardrails:
   Recommendations reads fresh records directly for V3 overlay matching. This is
   the closed-loop P0.5 path before live news/forum adapters are introduced.
 - Loo国大臣 prompts now carry fact source tags and explicitly prefer
-  `analysis-cache` / `cached-external` facts when present.
+  `analysis-cache` / `external-intelligence` facts when present.
 - `0016_preference_factors` adds the first Preference Factors V2 storage
   boundary. The current slice is backend-only: safe defaults, validation, and
   persistence for behavior, sector/style tilt, life goals, tax strategy,
