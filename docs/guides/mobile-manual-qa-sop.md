@@ -4,7 +4,7 @@
 
 ## 测试入口
 
-- 远程预览 URL：`https://stephen-automobiles-unto-smallest.trycloudflare.com`
+- 远程预览 URL：`https://advantages-citizens-idle-hebrew.trycloudflare.com`
 - 目标设备：Android 手机 Chrome 优先；iOS Safari/Chrome 作为兼容性补测。
 - 测试范围：Flutter Web 手机端当前已实现功能。
 - 非测试范围：旧 Next.js Web 页面完整回归、CSV 导入、生产部署稳定性。
