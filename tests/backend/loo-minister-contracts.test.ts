@@ -68,6 +68,7 @@ test("Loo Minister security context preserves symbol, exchange, and currency ide
     subject: {
       security: {
         symbol: "AMZN",
+        securityId: "security_amzn_us",
         exchange: "NASDAQ",
         currency: "USD",
         name: "Amazon.com"
@@ -88,6 +89,7 @@ test("Loo Minister security context preserves symbol, exchange, and currency ide
   }));
 
   assert.equal(usdCommon.subject.security?.symbol, cadListed.subject.security?.symbol);
+  assert.equal(usdCommon.subject.security?.securityId, "security_amzn_us");
   assert.notDeepEqual(usdCommon.subject.security, cadListed.subject.security);
 });
 

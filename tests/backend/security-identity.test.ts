@@ -10,7 +10,7 @@ import {
 test("canonicalizes equivalent exchange labels into one listing identity", async () => {
   const first = await resolveCanonicalSecurityIdentity({
     symbol: "XBB.TO",
-    exchange: "Toronto Stock Exchange",
+    exchange: "TOR",
     currency: "CAD",
     name: "iShares Core Canadian Universe Bond Index ETF",
     provider: "yahoo-finance",

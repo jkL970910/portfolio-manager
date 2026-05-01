@@ -25,6 +25,7 @@ const EXCHANGE_ALIASES: Record<
   { canonicalExchange: string; micCode?: string; country?: string }
 > = {
   TSX: { canonicalExchange: "TSX", micCode: "XTSE", country: "Canada" },
+  TOR: { canonicalExchange: "TSX", micCode: "XTSE", country: "Canada" },
   XTSE: { canonicalExchange: "TSX", micCode: "XTSE", country: "Canada" },
   "TORONTO STOCK EXCHANGE": {
     canonicalExchange: "TSX",
@@ -184,7 +185,9 @@ export async function resolveCanonicalSecurityIdentity(
   });
   const repositories = getRepositories();
 
-  for (const alias of aliasValuesForInput(input)) {
+  for (const alias of aliasValuesForInput(input).filter(
+    (item) => item.aliasType === "provider-symbol",
+  )) {
     const existing = await repositories.securities.findByAlias(alias);
     if (existing && existing.symbol === symbol && existing.currency === currency) {
       return existing;

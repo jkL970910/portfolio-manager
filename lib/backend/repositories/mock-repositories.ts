@@ -146,7 +146,7 @@ export const mockRepositories: BackendRepositories = {
         (item) =>
           item.aliasType === input.aliasType &&
           item.aliasValue === input.aliasValue &&
-          (!input.provider || item.provider === input.provider),
+          item.provider === (input.provider ?? null),
       );
       if (!alias) {
         return null;
@@ -181,9 +181,10 @@ export const mockRepositories: BackendRepositories = {
     async addAlias(input) {
       const existing = securityAliases.find(
         (alias) =>
+          alias.securityId === input.securityId &&
           alias.aliasType === input.aliasType &&
           alias.aliasValue === input.aliasValue &&
-          alias.provider === input.provider,
+          alias.provider === (input.provider ?? null),
       );
       if (existing) {
         return existing;

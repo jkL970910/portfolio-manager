@@ -40,14 +40,40 @@ cache/worker boundaries exist.
 
 The AI agent should behave as a product-owned assistant role:
 
+- It is the user's Loo国 steward / 管家, not a single-page helper. Its long-term
+  job is to explain the product, the user's portfolio data, and the current
+  decision context across all features.
 - It answers user questions in Chinese using the Loo国 / 大臣 theme.
 - It explains page-specific data in beginner-friendly language.
+- It should support follow-up questions like ChatGPT, with conversation memory
+  scoped to the user's explicit chat session and grounded in current backend
+  context rather than stale UI text.
 - It can propose drafts, next steps, and warnings, but must not silently mutate
   real user settings or portfolio data.
 - It must ground every answer in a structured page context DTO rather than
   scraping Flutter widgets or relying on free-form page text.
 - It must preserve the current product boundary: AI explains and drafts;
   backend validators and explicit user confirmation decide what is saved.
+
+Target mature behavior:
+
+- Explain project features and how to use them, including Import, Discover,
+  Recommendations, Health Score, Preferences, quote refresh, cached intelligence,
+  and future Spending.
+- Answer feature-specific questions using the active page context, for example
+  why a chart is stale, why a recommendation was selected, or why an account
+  score differs from total-portfolio health.
+- Answer candidate-investment questions using current exposure, target
+  allocation, Preference Factors V2, latest recommendation path, account/tax/FX
+  fit, cached intelligence, and data freshness. A 0% holding should be treated
+  as "not currently held", not as "cannot analyze".
+- Help users understand and refine Preference Factors V2 through guided Q&A,
+  then show a structured draft for confirmation before applying changes.
+- Reference saved AI 标的/组合/账户 analysis when available instead of
+  regenerating a full report inside every answer.
+- Maintain clear source boundaries: local cache, stale cache, external
+  intelligence, GPT answer, user input, and deterministic backend facts must be
+  distinguishable in the response and logs.
 
 Initial page-context examples:
 
@@ -466,6 +492,11 @@ Next analyzer work:
   three cached `Loo国今日秘闻` facts, matched by listing identity when the page
   has a resolved security subject. This keeps 大臣 as a cross-page explainer
   over the same analysis layer rather than a duplicate report generator.
+- Candidate-buy-fit questions now get a dedicated backend context enrichment:
+  current exposure, Preference Factors V2 summary, target allocation, latest
+  recommendation match, cached intelligence, and source freshness. This makes
+  questions such as "这个标的适合买入吗？" answerable even when the security is not
+  currently held.
 - Provider retry-after windows are now persisted in
   `market_data_provider_limits`; refresh ledgers can snapshot DB-backed limits
   for Settings QA and later cloud workers.
@@ -488,6 +519,8 @@ P1:
 - cached-external result detail visibility if mobile needs drilldown
 - standardized chart DTO migration, starting with Security Detail. See
   `docs/execution/mobile-chart-contracts.md`.
+- multi-turn AI 大臣 chat sessions with user-scoped conversation history,
+  bounded summarization, and project-level context injection
 - mobile UI / IA overhaul after P0.5 real-data AI/external-consultation flows
   pass QA
 

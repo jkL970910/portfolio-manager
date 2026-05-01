@@ -36,6 +36,7 @@
     "worker:market-data:once": "tsx ./scripts/market-data-refresh-worker-once.ts",
     "backfill:security-history-exchange": "tsx ./scripts/backfill-security-history-exchange.ts",
     "backfill:security-identity": "tsx ./scripts/backfill-security-identity.ts",
+    "repair:security-identity-duplicates": "tsx ./scripts/merge-duplicate-security-identities.ts",
     "audit:security-identity": "tsx ./scripts/audit-security-identity.ts"
   },
   "dependencies": {

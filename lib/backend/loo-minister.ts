@@ -11,8 +11,14 @@ import {
   resolveLooMinisterSettings,
   type ResolvedLooMinisterSettings,
 } from "@/lib/backend/loo-minister-settings";
+import type {
+  HoldingPosition,
+  PreferenceProfile,
+  RecommendationRun,
+} from "@/lib/backend/models";
 import { getDailyIntelligenceItemsForUser } from "@/lib/backend/mobile-daily-intelligence";
 import { PORTFOLIO_ANALYZER_DISCLAIMER } from "@/lib/backend/portfolio-analyzer-contracts";
+import { getRepositories } from "@/lib/backend/repositories/factory";
 
 const pageLabels: Record<
   LooMinisterQuestionRequest["pageContext"]["page"],
@@ -39,8 +45,171 @@ function summarizeFacts(facts: LooMinisterFact[]) {
     );
 }
 
+function normalizeKey(value: string | null | undefined) {
+  return value?.trim().toUpperCase() ?? "";
+}
+
+function isCandidateFitQuestion(question: string) {
+  return /适合|适配|买入|能买吗|值得|加仓|建仓|candidate|buy|fit/i.test(
+    question,
+  );
+}
+
+function findFact(facts: LooMinisterFact[], id: string) {
+  return facts.find((fact) => fact.id === id);
+}
+
+function getSecurityDisplayName(
+  security: LooMinisterQuestionRequest["pageContext"]["subject"]["security"],
+) {
+  if (!security) return "这个标的";
+  return [security.symbol, security.exchange, security.currency]
+    .filter(Boolean)
+    .join(" · ");
+}
+
+function matchesSecurityIdentity(
+  security: LooMinisterQuestionRequest["pageContext"]["subject"]["security"],
+  input: {
+    securityId?: string | null;
+    symbol?: string | null;
+    exchange?: string | null;
+    currency?: string | null;
+  },
+) {
+  if (!security) return false;
+  const securityId = normalizeKey(security.securityId);
+  if (securityId && normalizeKey(input.securityId) === securityId) {
+    return true;
+  }
+
+  const symbol = normalizeKey(security.symbol);
+  const exchange = normalizeKey(security.exchange);
+  const currency = normalizeKey(security.currency);
+  return Boolean(symbol && exchange && currency) &&
+    normalizeKey(input.symbol) === symbol &&
+    normalizeKey(input.exchange) === exchange &&
+    normalizeKey(input.currency) === currency;
+}
+
+function formatPct(value: number | null | undefined) {
+  return typeof value === "number" && Number.isFinite(value)
+    ? `${value.toFixed(1)}%`
+    : "未记录";
+}
+
+function summarizePreferenceProfile(profile: PreferenceProfile) {
+  const factors = profile.preferenceFactors;
+  const preferred = [
+    ...factors.sectorTilts.preferredSectors,
+    ...factors.sectorTilts.styleTilts,
+    ...factors.sectorTilts.thematicInterests,
+  ].slice(0, 5);
+  const avoided = factors.sectorTilts.avoidedSectors.slice(0, 4);
+  const homeGoal = factors.lifeGoals.homePurchase.enabled
+    ? `买房目标：${factors.lifeGoals.homePurchase.priority} 优先级，期限 ${factors.lifeGoals.homePurchase.horizonYears ?? "未填"} 年`
+    : "买房目标：未启用";
+
+  return [
+    `风险档位 ${profile.riskProfile}`,
+    `集中度容忍 ${factors.behavior.concentrationTolerance}`,
+    preferred.length > 0 ? `偏好 ${preferred.join(" / ")}` : "未设置行业/风格偏好",
+    avoided.length > 0 ? `回避 ${avoided.join(" / ")}` : "未设置回避行业",
+    homeGoal,
+    `USD 路径 ${factors.taxStrategy.usdFundingPath}`,
+  ].join("；");
+}
+
+function getTargetAllocationForAssetClass(
+  profile: PreferenceProfile,
+  assetClass: string,
+) {
+  return profile.targetAllocation.find(
+    (target) =>
+      normalizeKey(target.assetClass) === normalizeKey(assetClass),
+  )?.targetPct;
+}
+
+function findRecommendationMatch(
+  security: LooMinisterQuestionRequest["pageContext"]["subject"]["security"],
+  run: RecommendationRun,
+) {
+  return run.items.find((item) =>
+    matchesSecurityIdentity(security, {
+      securityId: item.securityId,
+      symbol: item.securitySymbol,
+      exchange: item.securityExchange,
+      currency: item.securityCurrency,
+    }),
+  );
+}
+
+function getMatchingHoldings(
+  security: LooMinisterQuestionRequest["pageContext"]["subject"]["security"],
+  holdings: HoldingPosition[],
+) {
+  return holdings.filter((holding) =>
+    matchesSecurityIdentity(security, {
+      securityId: holding.securityId,
+      symbol: holding.symbol,
+      exchange: holding.exchangeOverride,
+      currency: holding.currency,
+    }),
+  );
+}
+
+function buildCandidateFitAnswer(input: LooMinisterQuestionRequest) {
+  const security = input.pageContext.subject.security;
+  const securityName = getSecurityDisplayName(security);
+  const facts = input.pageContext.facts;
+  const recommendationFact = findFact(facts, "candidate-recommendation-fit");
+  const exposureFact = findFact(facts, "candidate-current-exposure");
+  const preferenceFact = findFact(facts, "candidate-preference-fit");
+  const targetFact = findFact(facts, "candidate-target-fit");
+  const intelligenceFacts = facts.filter(
+    (fact) => fact.source === "external-intelligence",
+  );
+  const freshness = input.pageContext.dataFreshness;
+  const freshnessNote = [
+    freshness.quotesAsOf ? `报价 ${freshness.quotesAsOf}` : null,
+    `图表 ${freshness.chartFreshness}`,
+    `来源 ${freshness.sourceMode}`,
+  ].filter(Boolean).join("；");
+
+  return [
+    `大臣会把「${securityName} 是否适合买入」当作候选标的适配问题，而不是只看当前持仓占比。`,
+    exposureFact
+      ? `当前暴露：${exposureFact.value}${exposureFact.detail ? `（${exposureFact.detail}）` : ""}。0% 只代表现在没持有，不代表不能分析。`
+      : "当前页面没有给出持仓暴露；如果是未持有标的，会按候选标的继续评估。",
+    targetFact
+      ? `配置目标：${targetFact.value}${targetFact.detail ? `（${targetFact.detail}）` : ""}。`
+      : "配置目标没有精确匹配到该资产类别，所以结论需要更保守。",
+    preferenceFact
+      ? `偏好适配：${preferenceFact.value}${preferenceFact.detail ? `（${preferenceFact.detail}）` : ""}。`
+      : "偏好适配资料不足，建议先确认风险、行业/风格倾向、买房/现金目标和 USD 路径。",
+    recommendationFact
+      ? `推荐引擎：${recommendationFact.value}${recommendationFact.detail ? `（${recommendationFact.detail}）` : ""}。`
+      : "最新推荐没有把这个 listing 明确列为首选；这不是否定买入，只表示它还没有成为当前资金路径的最高优先级。",
+    intelligenceFacts.length > 0
+      ? `缓存情报：${intelligenceFacts.slice(0, 2).map((fact) => `${fact.label}：${fact.value}`).join("；")}。`
+      : "当前没有匹配到该 listing 的缓存秘闻/外部研究；不要把这理解成利好或利空。",
+    freshnessNote
+      ? `数据边界：${freshnessNote}。如果报价或图表不是 fresh，只适合做方向判断，不适合下单前定价。`
+      : "数据边界不完整，实际交易前需要刷新报价和检查来源。",
+    "结论口径：如果它命中你的目标资产类别、偏好因子和推荐路径，可以进入观察/小额配置；如果只是因为价格涨跌或主题热度吸引你，应先看目标配置缺口、账户位置、税务/FX 摩擦和集中度。",
+  ].join("\n");
+}
+
 function buildAnswer(input: LooMinisterQuestionRequest) {
   const { pageContext, question } = input;
+  if (
+    pageContext.page === "security-detail" &&
+    pageContext.subject.security &&
+    isCandidateFitQuestion(question)
+  ) {
+    return buildCandidateFitAnswer(input);
+  }
+
   const facts = summarizeFacts(pageContext.facts);
   const freshness = pageContext.dataFreshness;
   const freshnessNotes = [
@@ -156,6 +325,7 @@ function buildRouterCompatiblePrompt(input: LooMinisterQuestionRequest) {
   return [
     "你是 Loo国大臣。只使用下面的页面摘要回答中文问题。",
     "不要编造实时行情、新闻或论坛结论；投资相关回答必须包含不构成投资建议的免责声明。",
+    "如果用户问某个标的是否适合买入/是否适配，不要因为当前组合占比是 0% 就停止分析；要按候选标的视角结合偏好、推荐引擎、资产类别、账户/税务/FX、缓存情报和数据新鲜度回答。",
     "如果关键事实里有 analysis-cache 或 external-intelligence 结果，优先引用它；没有时说明当前只能基于页面上下文和本地缓存回答。",
     "只返回合法 JSON object，不要 markdown，不要额外解释。",
     "JSON 字段必须是：version, generatedAt, role, page, title, answer, keyPoints, suggestedActions, sources, disclaimer。",
@@ -400,7 +570,7 @@ function buildExternalInput(
     {
       role: "system",
       content:
-        "你是 Loo国大臣。只用提供的页面 context 回答中文问题；如果 context 里有 analysis-cache 或 external-intelligence 结果，优先引用它；没有时说明只能基于页面上下文和本地缓存回答。不要编造实时行情、新闻或论坛结论；保留 symbol + exchange + currency 身份；所有投资相关回答必须包含不构成投资建议的免责声明。只返回合法 JSON object，不要 markdown。JSON 必须符合 LooMinisterAnswerResult：version、generatedAt、role、page、title、answer、keyPoints、suggestedActions、sources、disclaimer。role 必须是 loo-minister，suggestedActions 必须返回空数组，产品动作由本地应用控制。",
+        "你是 Loo国大臣。只用提供的页面 context 回答中文问题；如果 context 里有 analysis-cache 或 external-intelligence 结果，优先引用它；没有时说明只能基于页面上下文和本地缓存回答。不要编造实时行情、新闻或论坛结论；保留 securityId 以及 symbol + exchange + currency 身份；所有投资相关回答必须包含不构成投资建议的免责声明。若用户问某标的是否适合买入/适配，不要因为当前持仓占比是 0% 就拒绝分析，要按候选标的视角结合偏好、推荐引擎、资产类别、账户/税务/FX、缓存情报和数据新鲜度回答。只返回合法 JSON object，不要 markdown。JSON 必须符合 LooMinisterAnswerResult：version、generatedAt、role、page、title、answer、keyPoints、suggestedActions、sources、disclaimer。role 必须是 loo-minister，suggestedActions 必须返回空数组，产品动作由本地应用控制。",
     },
     {
       role: "user",
@@ -499,6 +669,144 @@ async function enrichMinisterInputWithDailyIntelligence(
         warnings: [
           ...input.pageContext.warnings,
           "今日秘闻缓存读取失败；大臣本次只基于当前页面上下文回答。",
+        ].slice(0, 20),
+      },
+    };
+  }
+}
+
+async function enrichMinisterInputWithCandidateFit(
+  userId: string,
+  input: LooMinisterQuestionRequest,
+): Promise<LooMinisterQuestionRequest> {
+  const security = input.pageContext.subject.security;
+  if (
+    input.pageContext.page !== "security-detail" ||
+    !security ||
+    !isCandidateFitQuestion(input.question)
+  ) {
+    return input;
+  }
+
+  try {
+    const repositories = getRepositories();
+    const [profile, holdings, recommendationRun] = await Promise.all([
+      repositories.preferences.getByUserId(userId),
+      repositories.holdings.listByUserId(userId),
+      repositories.recommendations
+        .getLatestByUserId(userId)
+        .catch(() => null),
+    ]);
+    const matchingHoldings = getMatchingHoldings(security, holdings);
+    const totalMarketValueCad = matchingHoldings.reduce(
+      (sum, holding) => sum + holding.marketValueCad,
+      0,
+    );
+    const totalWeightPct = matchingHoldings.reduce(
+      (sum, holding) => sum + (holding.weightPct ?? 0),
+      0,
+    );
+    const assetClass =
+      findFact(input.pageContext.facts, "asset-class")?.value ??
+      matchingHoldings[0]?.assetClass ??
+      null;
+    const targetPct = assetClass
+      ? getTargetAllocationForAssetClass(profile, assetClass)
+      : null;
+    const recommendationMatch = recommendationRun
+      ? findRecommendationMatch(security, recommendationRun)
+      : null;
+
+    const addedFacts: LooMinisterFact[] = [
+      {
+        id: "candidate-current-exposure",
+        label: "候选标的当前暴露",
+        value:
+          matchingHoldings.length > 0
+            ? `${formatPct(totalWeightPct)} · ${totalMarketValueCad.toLocaleString("en-CA", { style: "currency", currency: "CAD" })}`
+            : "0% · 当前未持有该 listing",
+        detail:
+          matchingHoldings.length > 0
+            ? `匹配 ${matchingHoldings.length} 笔持仓；使用 securityId 或完整 symbol/exchange/currency 匹配。`
+            : "0% 是当前暴露，不是候选分析结论；仍应继续看偏好、推荐路径和数据质量。",
+        source: "portfolio-data",
+      },
+      {
+        id: "candidate-preference-fit",
+        label: "候选标的偏好上下文",
+        value: summarizePreferenceProfile(profile),
+        detail:
+          "买入适配必须同时看风险容量、行业/风格倾向、现金/买房目标、税务和 USD 路径。",
+        source: "user-input",
+      },
+      {
+        id: "candidate-target-fit",
+        label: "候选标的资产类别目标",
+        value: assetClass
+          ? `${assetClass} 目标 ${formatPct(targetPct)}`
+          : "资产类别未确认",
+        detail:
+          assetClass && targetPct != null
+            ? "这表示该标的应先服务于资产类别缺口，而不是单独看价格走势。"
+            : "资产类别或目标缺失时，候选买入结论必须降级为观察。",
+        source: "analysis-cache",
+      },
+      recommendationMatch
+        ? {
+            id: "candidate-recommendation-fit",
+            label: "候选标的推荐引擎匹配",
+            value: `最新推荐包含该 listing：${recommendationMatch.amountCad.toLocaleString("en-CA", { style: "currency", currency: "CAD" })} → ${recommendationMatch.targetAccountType}`,
+            detail: [
+              recommendationMatch.securityScore != null
+                ? `标的分 ${recommendationMatch.securityScore.toFixed(1)}`
+                : null,
+              recommendationMatch.preferenceFitScore != null
+                ? `偏好契合 ${recommendationMatch.preferenceFitScore.toFixed(1)}`
+                : null,
+              recommendationMatch.accountFitScore != null
+                ? `账户契合 ${recommendationMatch.accountFitScore.toFixed(1)}`
+                : null,
+              recommendationMatch.taxFitScore != null
+                ? `税务契合 ${recommendationMatch.taxFitScore.toFixed(1)}`
+                : null,
+              recommendationMatch.fxFrictionPenaltyBps != null
+                ? `FX 摩擦 ${recommendationMatch.fxFrictionPenaltyBps} bps`
+                : null,
+              recommendationMatch.explanation,
+            ]
+              .filter(Boolean)
+              .join("；")
+              .slice(0, 600),
+            source: "analysis-cache",
+          }
+        : {
+            id: "candidate-recommendation-fit",
+            label: "候选标的推荐引擎匹配",
+            value: recommendationRun
+              ? "最新推荐未把该 listing 列为首选"
+              : "尚无最新推荐结果",
+            detail: recommendationRun
+              ? "这不是否定买入；只是说明当前推荐资金路径没有优先选择它。"
+              : "请先生成推荐，再让大臣结合推荐路径判断候选买入优先级。",
+            source: "analysis-cache",
+          },
+    ];
+
+    return {
+      ...input,
+      pageContext: {
+        ...input.pageContext,
+        facts: [...input.pageContext.facts, ...addedFacts].slice(0, 40),
+      },
+    };
+  } catch {
+    return {
+      ...input,
+      pageContext: {
+        ...input.pageContext,
+        warnings: [
+          ...input.pageContext.warnings,
+          "候选标的偏好/推荐上下文读取失败；大臣本次不会把 0% 持仓当作无法分析，但结论会更保守。",
         ].slice(0, 20),
       },
     };
@@ -624,7 +932,7 @@ export async function getLooMinisterAnswer(
 ) {
   const enrichedInput = await enrichMinisterInputWithDailyIntelligence(
     userId,
-    input,
+    await enrichMinisterInputWithCandidateFit(userId, input),
   );
   const settings =
     options.settings ?? (await resolveLooMinisterSettings(userId));

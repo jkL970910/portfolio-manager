@@ -139,7 +139,7 @@ test("Loo Minister GPT mode falls back safely when provider is not enabled", asy
   assert.equal(response.data.page, "security-detail");
   assert.match(response.data.title, /本地降级/);
   assert.match(response.data.answer, /GPT-5.5 provider 未启用/);
-  assert.match(response.data.answer, /本地 deterministic 回答/);
+  assert.match(response.data.answer, /候选标的适配问题/);
   assert.match(response.data.answer, /NVDA/);
   assert.match(response.data.disclaimer.zh, /不构成投资建议/);
 });
@@ -239,6 +239,83 @@ test("Loo Minister enriches answers with cached daily intelligence", async () =>
   assert.ok(
     response.data.keyPoints.some((point) => point.includes("今日秘闻")),
   );
+});
+
+test("Loo Minister answers candidate buy-fit questions without treating zero holding as no analysis", async () => {
+  const response = await getLooMinisterAnswer(
+    "user_casey",
+    {
+      pageContext: {
+        version: LOO_MINISTER_VERSION,
+        page: "security-detail",
+        locale: "zh",
+        title: "ZQQ 标的详情",
+        asOf: now,
+        displayCurrency: "CAD",
+        subject: {
+          security: {
+            securityId: "security_zqq_cad",
+            symbol: "ZQQ",
+            exchange: "TSX",
+            currency: "CAD",
+            name: "BMO Nasdaq 100 Equity Hedged to CAD Index ETF",
+          },
+        },
+        dataFreshness: {
+          portfolioAsOf: now,
+          quotesAsOf: now,
+          fxAsOf: now,
+          chartFreshness: "fresh",
+          sourceMode: "cached-external",
+        },
+        facts: [
+          {
+            id: "last-price",
+            label: "最新价格",
+            value: "CAD 187.76",
+            source: "quote-cache",
+          },
+          {
+            id: "asset-class",
+            label: "资产类别",
+            value: "US Equity",
+            source: "analysis-cache",
+          },
+          {
+            id: "sector",
+            label: "行业",
+            value: "Technology",
+            source: "portfolio-data",
+          },
+        ],
+        warnings: ["当前没有该标的持仓。"],
+        allowedActions: [],
+      },
+      question: "这个标的适合买入吗？",
+      answerStyle: "beginner",
+      cacheStrategy: "prefer-cache",
+      includeExternalResearch: false,
+    },
+    {
+      settings: {
+        mode: "local",
+        provider: "official-openai",
+        model: "gpt-5.5",
+        reasoningEffort: "medium",
+        endpoint: "https://api.openai.com/v1/responses",
+        apiKey: null,
+        apiKeySource: "none",
+        providerEnabled: false,
+      },
+      persistUsage: false,
+    },
+  );
+
+  assert.match(response.data.answer, /候选标的适配问题/);
+  assert.match(response.data.answer, /0% 只代表现在没持有/);
+  assert.match(response.data.answer, /偏好适配/);
+  assert.match(response.data.answer, /推荐引擎/);
+  assert.match(response.data.disclaimer.zh, /不构成投资建议/);
 });
 
 test("Loo Minister provider fallback redacts API keys in user-visible reason", async () => {

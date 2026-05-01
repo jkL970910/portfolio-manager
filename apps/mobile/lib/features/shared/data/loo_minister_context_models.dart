@@ -3,6 +3,7 @@ const looMinisterContextVersion = "0.1";
 class LooMinisterSecurityIdentity {
   const LooMinisterSecurityIdentity({
     required this.symbol,
+    this.securityId,
     this.exchange,
     this.currency,
     this.name,
@@ -11,6 +12,7 @@ class LooMinisterSecurityIdentity {
   });
 
   final String symbol;
+  final String? securityId;
   final String? exchange;
   final String? currency;
   final String? name;
@@ -25,6 +27,8 @@ class LooMinisterSecurityIdentity {
 
   Map<String, dynamic> toJson() {
     return {
+      if (securityId != null && securityId!.isNotEmpty)
+        "securityId": securityId,
       "symbol": symbol,
       if (exchange != null && exchange!.isNotEmpty) "exchange": exchange,
       if (currency != null && currency!.isNotEmpty) "currency": currency,

@@ -165,6 +165,7 @@ class _SecurityDetailPageState extends State<SecurityDetailPage> {
                 AiAnalysisCard(
                   apiClient: widget.apiClient,
                   title: "AI 标的快扫",
+                  onCompleted: _refreshDailyIntelligence,
                   refreshKey: [
                     data.quoteTimestamp,
                     data.priceHistoryChart?.freshness.latestDate,
@@ -270,6 +271,15 @@ class _SecurityDetailPageState extends State<SecurityDetailPage> {
     );
   }
 
+  void _refreshDailyIntelligence() {
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _dailyIntelligence = _loadDailyIntelligence();
+    });
+  }
+
   MobileDailyIntelligenceSnapshot _filterIntelligenceForSecurity(
     MobileDailyIntelligenceSnapshot snapshot,
     MobileSecurityDetailSnapshot security,
@@ -364,6 +374,7 @@ class MobileSecurityDetailSnapshot {
       displayCurrency: currency.isEmpty ? "CAD" : currency,
       subject: LooMinisterSubject(
         security: LooMinisterSecurityIdentity(
+          securityId: securityId.isNotEmpty ? securityId : null,
           symbol: symbol,
           exchange: listingExchange != null && listingCurrency != null
               ? listingExchange

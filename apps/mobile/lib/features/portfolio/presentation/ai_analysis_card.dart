@@ -9,6 +9,7 @@ class AiAnalysisCard extends StatefulWidget {
     this.title = "AI 分析",
     this.description = "基于当前组合、账户、偏好和本地报价缓存生成，不包含实时新闻或论坛情绪。",
     this.refreshKey,
+    this.onCompleted,
     super.key,
   });
 
@@ -17,6 +18,7 @@ class AiAnalysisCard extends StatefulWidget {
   final String title;
   final String description;
   final String? refreshKey;
+  final VoidCallback? onCompleted;
 
   @override
   State<AiAnalysisCard> createState() => _AiAnalysisCardState();
@@ -64,6 +66,7 @@ class _AiAnalysisCardState extends State<AiAnalysisCard> {
           _hasResult = true;
           _isLoading = false;
         });
+        widget.onCompleted?.call();
       }
       return result;
     } on Object {

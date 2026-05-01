@@ -3,7 +3,7 @@
 > [!IMPORTANT]
 > As of 2026-04-25, this project is now Flutter-first, mobile-first, Chinese-only, and Loo皇-themed. When this document conflicts with `docs/execution/flutter-mobile-migration-plan.md`, follow the migration plan first.
 
-Last updated: 2026-04-30
+Last updated: 2026-05-01
 
 ## Objective
 
@@ -70,7 +70,7 @@ over simply adding more Flutter screens.
 | Watchlist and target constraints workflow | In Progress | Mobile can edit watchlist, strategy, tax-aware placement, and account priority constraints                                                                                                                                                                                                     |
 | Cloud-ready cache / worker boundaries     | In Progress | First-pass market-data refresh worker, persisted run ledger, mobile Settings run-status readout, and DB-backed provider retry-after guard exist; next is cron/cloud scheduling before heavier AI-agent jobs                                                                                |
 | Quote-provider status UX                  | In Progress | Refresh results, Settings, holding rows, price-history records, and persisted provider-limit snapshots now expose source/status lineage; remaining work is deeper per-provider dashboards                                                                                                  |
-| Loo国 AI Minister assistant               | P0 In Progress | Backend and Flutter first-pass page-context DTOs exist; global floating 大臣 entry receives Overview/Portfolio/detail/Health context; backend now auto-enriches answers with cached `今日秘闻` as `external-intelligence`; Settings can switch Local/GPT-5.5, choose official OpenAI or OpenRouter-compatible provider, save encrypted BYOK API key, and surface usage/retry/failure observability. Next P0 is Chat Session + candidate-buy-fit reasoning: multi-turn cached chat, project-level context, and recommendation/preference-aware answers for “是否适合买入/是否适配” questions instead of treating 0% holding as “cannot analyze.” |
+| Loo国 AI Minister assistant               | P0 In Progress | Backend and Flutter first-pass page-context DTOs exist; global floating 大臣 entry receives Overview/Portfolio/detail/Health context; backend now auto-enriches answers with cached `今日秘闻` as `external-intelligence`; Settings can switch Local/GPT-5.5, choose official OpenAI or OpenRouter-compatible provider, save encrypted BYOK API key, and surface usage/retry/failure observability. Candidate-buy-fit reasoning now treats “是否适合买入/是否适配” as a candidate question, injects current exposure, Preference Factors V2, target allocation, latest recommendation match, and cached intelligence, and no longer treats 0% holding as “cannot analyze.” Next P0 is multi-turn Chat Session with cached conversation history and project-level context. |
 | P0.5 external consultation skill pipeline | In Progress | The uploaded `portfolio-analyzer.skill` is productized as cached/guarded analysis work. Next priority is proving it on real cached market data before enabling live external research adapters or UI-heavy redesign.                                                                        |
 | Recommendation V2.1 preference fit        | In Progress | V2 now starts consuming Preference Factors V2 for light candidate ordering and explanation while preserving deterministic target-allocation/account-placement behavior.                                                                             |
 | Recommendation V3 external intelligence   | In Progress | See `docs/execution/recommendation-v3-external-intelligence.md`. Mobile now labels the cached-intelligence layer as `V3 Overlay / V2.1 Core` when saved external/local analysis or persisted external research documents are available. |
@@ -90,7 +90,7 @@ over simply adding more Flutter screens.
 
 | Feature                                      | Priority | Note                                                                                                               |
 | -------------------------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------ |
-| Security Identity Registry                   | P0       | Canonical `security_id` registry with exchange aliases, provider symbols, underlying-vs-listing separation, and DB unique constraints. This replaces ticker/exchange string fallback as the final identity solution. |
+| Security Identity Registry                   | P0       | Canonical `security_id` registry with exchange aliases, provider symbols, underlying-vs-listing separation, and DB repair tooling. This replaces ticker/exchange string fallback as the final identity solution. |
 | Per-investment-account AI Minister opt-in    | P1       | Let users enable/disable GPT analysis per TFSA/RRSP/FHSA/Taxable/account instance after global BYOK flow is stable |
 | Persist draggable Minister button position   | P1       | Current drag position is session-local; persist later after UX settles                                             |
 | Minister usage/cost dashboard with estimates | P1       | Current logs store provider/model/status/token counts; cost estimates can be added after pricing policy is fixed   |
@@ -102,7 +102,7 @@ over simply adding more Flutter screens.
 2. Complete Security Identity Registry P0 before deeper Recommendation V3 scoring: canonical `security_id` must become the shared join key for holdings, price history, recommendations, AI analysis, and external intelligence.
 3. Run the external consultation / `portfolio-analyzer.skill` pipeline on cached real market data first; keep live external research disabled until worker/cache/provider quota policy is proven.
 4. Align AI 标的分析 and AI 大臣: AI 标的分析 produces structured saved analysis; 大臣 answers cross-page questions, explains current context, and references or triggers saved analysis instead of duplicating a full report.
-5. Upgrade AI 大臣 to Chat Session + candidate-fit reasoning before deeper UI polish: keep multi-turn chat context, inject project-level context, and make “这个标的是否适合买入/是否适配” use recommendation/preference/candidate logic instead of existing-position-only logic.
+5. Upgrade AI 大臣 to Chat Session before deeper UI polish: keep multi-turn chat context and inject project-level context across follow-up questions. Candidate-fit reasoning for “这个标的是否适合买入/是否适配” now has a first backend pass using recommendation/preference/candidate logic instead of existing-position-only logic.
 6. Define Recommendation V3 external-signal contracts before adding live news/forum adapters.
 7. Extend Preference Factors V2 with AI 大臣问答式参数生成, using the same payload as the manual Flutter editor.
 8. Add a local/cached `Loo国今日秘闻` API before live provider integration.
@@ -173,16 +173,25 @@ Implementation status:
 6. P0-F complete: `npm run audit:security-identity` reports missing registry
    ids, duplicate same-listing history rows, and listing-specific alias
    conflicts. It never auto-merges or deletes rows.
+7. P0-G complete: `npm run repair:security-identity-duplicates` safely merges
+   historical duplicate listing rows created by provider exchange-label drift
+   such as `TOR` vs `TSX/XTSE`, moves holdings/price history/recommendation
+   items/external research to the surviving canonical `security_id`, normalizes
+   price-history exchange fields, removes duplicate alias rows, and supports
+   `--dry-run` before applying.
 
 Guardrails:
 
 - CAD/USD listings must remain separate `security_id` values.
-- Provider aliases such as `TSX`, `XTSE`, `Toronto Stock Exchange`, and
+- Provider aliases such as `TSX`, `TOR`, `XTSE`, `Toronto Stock Exchange`, and
   `XBB.TO` must point to the same canonical listing.
 - Listing-level facts include price, history, quote provider, refresh status,
   FX, and chart freshness.
 - Underlying-level facts include company/fund news, broad thesis, industry
   context, and non-price external research.
+- Exchange-label aliases alone are not enough to resolve a security. Future
+  resolution should use canonical listing identity first, and only use provider
+  symbols as direct aliases when symbol/currency validation also matches.
 
 - `0015_market_data_provider_limits` persists provider retry-after windows so
   multi-process/cloud refresh jobs do not immediately forget `429` responses

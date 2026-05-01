@@ -1,4 +1,4 @@
-import { and, desc, eq, gt, lte, sql } from "drizzle-orm";
+import { and, desc, eq, gt, isNull, lte, sql } from "drizzle-orm";
 import { getDb } from "@/lib/db/client";
 import {
   allocationTargets,
@@ -655,7 +655,7 @@ export const postgresRepositories: BackendRepositories = {
           eq(securityAliases.aliasValue, input.aliasValue),
           input.provider
             ? eq(securityAliases.provider, input.provider)
-            : undefined,
+            : isNull(securityAliases.provider),
         ),
       });
       if (!alias) {
@@ -705,6 +705,19 @@ export const postgresRepositories: BackendRepositories = {
     },
     async addAlias(input) {
       const db = getDb();
+      const existing = await db.query.securityAliases.findFirst({
+        where: and(
+          eq(securityAliases.securityId, input.securityId),
+          eq(securityAliases.aliasType, input.aliasType),
+          eq(securityAliases.aliasValue, input.aliasValue),
+          input.provider
+            ? eq(securityAliases.provider, input.provider)
+            : isNull(securityAliases.provider),
+        ),
+      });
+      if (existing) {
+        return mapSecurityAlias(existing);
+      }
       const [row] = await db
         .insert(securityAliases)
         .values({
@@ -724,19 +737,19 @@ export const postgresRepositories: BackendRepositories = {
       if (row) {
         return mapSecurityAlias(row);
       }
-      const existing = await db.query.securityAliases.findFirst({
+      const insertedByRace = await db.query.securityAliases.findFirst({
         where: and(
           eq(securityAliases.aliasType, input.aliasType),
           eq(securityAliases.aliasValue, input.aliasValue),
           input.provider
             ? eq(securityAliases.provider, input.provider)
-            : undefined,
+            : isNull(securityAliases.provider),
         ),
       });
-      if (!existing) {
+      if (!insertedByRace) {
         throw new Error("Failed to add security alias.");
       }
-      return mapSecurityAlias(existing);
+      return mapSecurityAlias(insertedByRace);
     },
   },
   preferences: {

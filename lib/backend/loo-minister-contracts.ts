@@ -7,6 +7,7 @@ const ministerCurrencySchema = z.enum(["CAD", "USD"]);
 
 export const looMinisterSecurityIdentitySchema = z
   .object({
+    securityId: z.string().trim().min(1).max(80).nullable().optional(),
     symbol: z.string().trim().min(1).max(32),
     exchange: z.string().trim().min(1).max(64).nullable().optional(),
     currency: ministerCurrencySchema.nullable().optional(),
