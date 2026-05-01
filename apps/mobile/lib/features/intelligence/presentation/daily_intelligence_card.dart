@@ -76,6 +76,78 @@ class DailyIntelligenceCard extends StatelessWidget {
   }
 }
 
+class DailyIntelligenceSummaryCard extends StatelessWidget {
+  const DailyIntelligenceSummaryCard({
+    required this.snapshot,
+    required this.isLoading,
+    this.errorMessage,
+    this.onViewSecurity,
+    super.key,
+  });
+
+  final MobileDailyIntelligenceSnapshot? snapshot;
+  final bool isLoading;
+  final String? errorMessage;
+  final ValueChanged<MobileDailyIntelligenceItem>? onViewSecurity;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final items = snapshot?.items ?? const <MobileDailyIntelligenceItem>[];
+    final countLabel = items.isEmpty ? "暂无组合秘闻" : "${items.length} 条缓存秘闻";
+
+    return Card(
+      child: ExpansionTile(
+        leading: const Icon(Icons.auto_awesome_outlined),
+        title: Text("Loo国今日秘闻", style: theme.textTheme.titleLarge),
+        subtitle: Text(
+          errorMessage != null
+              ? "暂不可用"
+              : isLoading
+                  ? "正在整理缓存秘闻..."
+                  : "$countLabel · 只读缓存，不实时抓取外部源",
+        ),
+        trailing: isLoading
+            ? const SizedBox(
+                height: 18,
+                width: 18,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              )
+            : null,
+        childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+        children: [
+          Align(
+            alignment: Alignment.centerLeft,
+            child: Text(
+              snapshot?.disclaimer ?? "这里只展示已缓存的 AI/行情研究，不会在页面加载时实时抓新闻或论坛。",
+              style: theme.textTheme.bodySmall,
+            ),
+          ),
+          const SizedBox(height: 10),
+          if (errorMessage != null)
+            _DailyEmptyState(
+              title: "今日秘闻暂不可用",
+              detail: errorMessage!,
+            )
+          else if (items.isEmpty)
+            _DailyEmptyState(
+              title: snapshot?.emptyTitle ?? "暂时没有可用秘闻",
+              detail: snapshot?.emptyDetail ?? "先在标的详情运行 AI 快扫，或手动触发缓存外部研究。",
+            )
+          else
+            ...items.take(2).map(
+                  (item) => _DailyIntelligenceTile(
+                    item,
+                    onViewSecurity:
+                        item.canOpenSecurity ? onViewSecurity : null,
+                  ),
+                ),
+        ],
+      ),
+    );
+  }
+}
+
 class _DailyIntelligenceTile extends StatelessWidget {
   const _DailyIntelligenceTile(this.item, {required this.onViewSecurity});
 

@@ -147,7 +147,7 @@ class _PortfolioPageState extends State<PortfolioPage> {
                         FutureBuilder<MobileDailyIntelligenceSnapshot>(
                           future: _dailyIntelligence,
                           builder: (context, intelligenceSnapshot) {
-                            return DailyIntelligenceCard(
+                            return DailyIntelligenceSummaryCard(
                               snapshot: intelligenceSnapshot.data,
                               isLoading: intelligenceSnapshot.connectionState ==
                                   ConnectionState.waiting,
