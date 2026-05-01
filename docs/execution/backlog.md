@@ -74,7 +74,7 @@ over simply adding more Flutter screens.
 | P0.5 external consultation skill pipeline | In Progress | The uploaded `portfolio-analyzer.skill` is productized as cached/guarded analysis work. Next priority is proving it on real cached market data before enabling live external research adapters or UI-heavy redesign.                                                                        |
 | Recommendation V2.1 preference fit        | In Progress | V2 now starts consuming Preference Factors V2 for light candidate ordering and explanation while preserving deterministic target-allocation/account-placement behavior.                                                                             |
 | Recommendation V3 external intelligence   | In Progress | See `docs/execution/recommendation-v3-external-intelligence.md`. Mobile now labels the cached-intelligence layer as `V3 Overlay / V2.1 Core` when saved external/local analysis or persisted external research documents are available. |
-| Loo国今日秘闻                             | In Progress | Standalone mobile API now combines persisted external research documents and saved analysis runs into a curated feed. Flutter Overview keeps the full daily briefing card, full Portfolio uses a collapsed summary entry to avoid repetition, and identity-filtered Security Detail keeps the strict listing-level card; account/holding detail placements remain P1. It is source/freshness-aware and still must not become a raw news feed. |
+| Loo国今日秘闻                             | In Progress | Standalone mobile API now combines persisted external research documents and saved analysis runs into a curated feed. Flutter Overview keeps the full daily briefing card, Recommendations uses a collapsed summary entry, Portfolio no longer loads the feed to avoid repetition, and identity-filtered Security Detail keeps the strict listing-level card. It is source/freshness-aware and still must not become a raw news feed. |
 
 ## Deferred
 
@@ -200,10 +200,11 @@ Guardrails:
   V2.1 ordering, and it must not trigger live news/forum research on page load.
 - `GET /api/mobile/intelligence/daily` now provides the same curated feed as a
   standalone mobile contract. Flutter Overview displays the full daily briefing,
-  full Portfolio displays a collapsed summary entry to avoid duplicating the
-  overview card, and identity-filtered Security Detail displays a strict
-  listing-level card from that API; account/holding detail reuse remains a P1 UI
-  expansion, not a backend rewrite.
+  Recommendations displays a collapsed summary entry, Portfolio no longer loads
+  the feed to avoid duplicating the overview/recommendation surfaces, and
+  identity-filtered Security Detail displays a strict listing-level card from
+  that API; account/holding detail reuse remains a P1 UI expansion, not a
+  backend rewrite.
 - Loo国大臣 answer requests now auto-read that curated feed server-side and add
   up to three `external-intelligence` facts. If the current page has a resolved
   security subject, the enrichment first matches the same `symbol + exchange +

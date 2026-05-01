@@ -308,13 +308,14 @@ Current structured document boundary:
   intelligence feed as a standalone mobile contract. Overview, Portfolio,
   Recommendations, and AI 大臣 can reuse it without duplicating document/run
   mapping logic.
-- Flutter Overview, full Portfolio, and Security Detail now consume the
+- Flutter Overview, Recommendations, and Security Detail now consume the
   standalone feed through a shared mobile DTO/card. Overview keeps the full daily
-  briefing card; Portfolio uses a collapsed summary entry to avoid duplicating
-  the overview; Security Detail filters the feed by exact `securityId` or
-  complete `symbol + exchange + currency`; ticker-only matches are intentionally
-  excluded. This is still read-only cache display: loading any page must not
-  trigger live news, forum, or paid external API calls.
+  briefing card; Recommendations uses a collapsed summary entry for decision
+  context; Portfolio no longer loads the feed to avoid duplication; Security
+  Detail filters the feed by exact `securityId` or complete `symbol + exchange +
+  currency`; ticker-only matches are intentionally excluded. This is still
+  read-only cache display: loading any page must not trigger live news, forum,
+  or paid external API calls.
 - AI 大臣 now automatically enriches every answer request with the same daily
   intelligence feed on the backend. Flutter pages do not need to inject the
   feed manually; the minister receives up to three `external-intelligence`
@@ -418,9 +419,10 @@ P0.5:
    defaults.
 4. Complete for cached market-data: local-only `今日秘闻` surface from cached provider/portfolio
    signals before live news adapters. A standalone mobile API now backs the
-   curated feed, and Flutter Overview/full Portfolio/Security Detail have a
-   first-pass shared card consuming it. Portfolio uses a collapsed summary
-   surface; Security Detail uses strict listing-identity filtering.
+   curated feed, and Flutter Overview/Recommendations/Security Detail have a
+   first-pass shared card consuming it. Recommendations uses a collapsed summary
+   surface; Portfolio intentionally does not load it; Security Detail uses
+   strict listing-identity filtering.
 5. Complete for cached market-data: identity-safe external research provider. Cached market-data
    research now requires `security_id` or complete `symbol + exchange +
    currency`; ticker-only fallback is intentionally skipped.

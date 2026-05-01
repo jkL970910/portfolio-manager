@@ -3,6 +3,8 @@ import "package:flutter/material.dart";
 import "../../../core/api/loo_api_client.dart";
 import "../data/mobile_recommendation_models.dart";
 import "../../discover/presentation/discover_page.dart";
+import "../../intelligence/data/daily_intelligence_models.dart";
+import "../../intelligence/presentation/daily_intelligence_card.dart";
 import "../../portfolio/presentation/security_detail_page.dart";
 
 class RecommendationsPage extends StatefulWidget {
@@ -19,12 +21,14 @@ class RecommendationsPage extends StatefulWidget {
 
 class _RecommendationsPageState extends State<RecommendationsPage> {
   late Future<MobileRecommendationsSnapshot> _snapshot;
+  late Future<MobileDailyIntelligenceSnapshot> _dailyIntelligence;
   var _working = false;
 
   @override
   void initState() {
     super.initState();
     _snapshot = _loadSnapshot();
+    _dailyIntelligence = _loadDailyIntelligence();
   }
 
   Future<MobileRecommendationsSnapshot> _loadSnapshot() async {
@@ -37,9 +41,19 @@ class _RecommendationsPageState extends State<RecommendationsPage> {
     return MobileRecommendationsSnapshot.fromJson(data);
   }
 
+  Future<MobileDailyIntelligenceSnapshot> _loadDailyIntelligence() async {
+    final response = await widget.apiClient.getDailyIntelligence(limit: 8);
+    final data = response["data"];
+    if (data is! Map<String, dynamic>) {
+      throw const LooApiException("今日秘闻数据格式不正确。");
+    }
+    return MobileDailyIntelligenceSnapshot.fromJson(data);
+  }
+
   void _refresh() {
     setState(() {
       _snapshot = _loadSnapshot();
+      _dailyIntelligence = _loadDailyIntelligence();
     });
   }
 
@@ -176,8 +190,19 @@ class _RecommendationsPageState extends State<RecommendationsPage> {
                     children: [
                       _SummaryCard(snapshot.data!),
                       const SizedBox(height: 16),
-                      _IntelligenceBriefsCard(
-                        items: snapshot.data!.intelligenceBriefs,
+                      FutureBuilder<MobileDailyIntelligenceSnapshot>(
+                        future: _dailyIntelligence,
+                        builder: (context, intelligenceSnapshot) {
+                          return DailyIntelligenceSummaryCard(
+                            snapshot: intelligenceSnapshot.data,
+                            isLoading: intelligenceSnapshot.connectionState ==
+                                ConnectionState.waiting,
+                            errorMessage: intelligenceSnapshot.hasError
+                                ? intelligenceSnapshot.error.toString()
+                                : null,
+                            onViewSecurity: _openSecurityFromIntelligence,
+                          );
+                        },
                       ),
                       const SizedBox(height: 16),
                       _DiscoverEntryCard(onOpen: _openDiscover),
@@ -268,6 +293,25 @@ class _RecommendationsPageState extends State<RecommendationsPage> {
           currency: priority.securityCurrency.isNotEmpty
               ? priority.securityCurrency
               : null,
+        ),
+      ),
+    );
+  }
+
+  void _openSecurityFromIntelligence(MobileDailyIntelligenceItem item) {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => SecurityDetailPage(
+          apiClient: widget.apiClient,
+          symbol: item.identity.symbol,
+          fallbackTitle: item.identity.symbol,
+          securityId: item.identity.securityId.isEmpty
+              ? null
+              : item.identity.securityId,
+          exchange:
+              item.identity.exchange.isEmpty ? null : item.identity.exchange,
+          currency:
+              item.identity.currency.isEmpty ? null : item.identity.currency,
         ),
       ),
     );
@@ -388,94 +432,6 @@ class _DiscoverEntryCard extends StatelessWidget {
         subtitle: const Text("按代码或名称查找股票、ETF、CDR，再加入观察或打开标的详情。"),
         trailing: const Icon(Icons.chevron_right),
         onTap: onOpen,
-      ),
-    );
-  }
-}
-
-class _IntelligenceBriefsCard extends StatelessWidget {
-  const _IntelligenceBriefsCard({required this.items});
-
-  final List<MobileIntelligenceBrief> items;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                const Icon(Icons.newspaper_outlined),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text("Loo国今日秘闻", style: theme.textTheme.titleLarge),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            const Text("这里只展示已缓存的 AI/行情研究，不会在页面加载时实时抓新闻或论坛。"),
-            const SizedBox(height: 12),
-            if (items.isEmpty)
-              const Text("暂时没有可用秘闻。先在标的详情运行 AI 快扫，或手动触发缓存外部研究。")
-            else
-              ...items.take(3).map(_IntelligenceBriefTile.new),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _IntelligenceBriefTile extends StatelessWidget {
-  const _IntelligenceBriefTile(this.item);
-
-  final MobileIntelligenceBrief item;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Padding(
-      padding: const EdgeInsets.only(top: 12),
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          color:
-              theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.42),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: theme.colorScheme.outlineVariant),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.all(12),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(item.title, style: theme.textTheme.titleMedium),
-              const SizedBox(height: 6),
-              Text(item.detail),
-              const SizedBox(height: 8),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  _InfoPill(item.sourceLabel),
-                  _InfoPill(item.freshnessLabel),
-                  if (item.symbols.isNotEmpty)
-                    _InfoPill(item.symbols.join(" · ")),
-                ],
-              ),
-              if (item.sources.isNotEmpty) ...[
-                const SizedBox(height: 8),
-                Text(
-                  "来源：${item.sources.take(2).map((source) => source.value).join("；")}",
-                  style: theme.textTheme.bodySmall,
-                ),
-              ],
-            ],
-          ),
-        ),
       ),
     );
   }
@@ -739,7 +695,8 @@ class _PriorityIntelligenceSection extends StatelessWidget {
           children: [
             Text("相关秘闻", style: theme.textTheme.titleMedium),
             const SizedBox(height: 6),
-            const Text("这些只是缓存情报引用，用来解释背景；底层资产情报可跨 CAD/USD 版本参考，具体价格和刷新状态仍以当前 listing 为准。"),
+            const Text(
+                "这些只是缓存情报引用，用来解释背景；底层资产情报可跨 CAD/USD 版本参考，具体价格和刷新状态仍以当前 listing 为准。"),
             ...items.take(2).map((item) {
               return Padding(
                 padding: const EdgeInsets.only(top: 10),
