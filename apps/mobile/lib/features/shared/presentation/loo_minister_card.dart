@@ -10,12 +10,14 @@ class LooMinisterCard extends StatefulWidget {
     required this.apiClient,
     required this.pageContext,
     required this.suggestedQuestion,
+    required this.onSuggestedActionConfirmed,
     super.key,
   });
 
   final LooApiClient apiClient;
   final LooMinisterPageContext pageContext;
   final String suggestedQuestion;
+  final ValueChanged<LooMinisterSuggestedAction> onSuggestedActionConfirmed;
 
   @override
   State<LooMinisterCard> createState() => _LooMinisterCardState();
@@ -27,6 +29,7 @@ class LooMinisterFloatingButton extends StatelessWidget {
     required this.navigatorKey,
     required this.pageContext,
     required this.suggestedQuestion,
+    required this.onSuggestedActionConfirmed,
     super.key,
   });
 
@@ -34,6 +37,7 @@ class LooMinisterFloatingButton extends StatelessWidget {
   final GlobalKey<NavigatorState> navigatorKey;
   final LooMinisterPageContext pageContext;
   final String suggestedQuestion;
+  final ValueChanged<LooMinisterSuggestedAction> onSuggestedActionConfirmed;
 
   @override
   Widget build(BuildContext context) {
@@ -43,6 +47,7 @@ class LooMinisterFloatingButton extends StatelessWidget {
         navigatorKey: navigatorKey,
         pageContext: pageContext,
         suggestedQuestion: suggestedQuestion,
+        onSuggestedActionConfirmed: onSuggestedActionConfirmed,
       ),
     );
   }
@@ -54,12 +59,14 @@ class _DraggableMinisterButton extends StatefulWidget {
     required this.navigatorKey,
     required this.pageContext,
     required this.suggestedQuestion,
+    required this.onSuggestedActionConfirmed,
   });
 
   final LooApiClient apiClient;
   final GlobalKey<NavigatorState> navigatorKey;
   final LooMinisterPageContext pageContext;
   final String suggestedQuestion;
+  final ValueChanged<LooMinisterSuggestedAction> onSuggestedActionConfirmed;
 
   @override
   State<_DraggableMinisterButton> createState() =>
@@ -199,6 +206,7 @@ class _DraggableMinisterButtonState extends State<_DraggableMinisterButton> {
         apiClient: widget.apiClient,
         pageContext: widget.pageContext,
         suggestedQuestion: widget.suggestedQuestion,
+        onSuggestedActionConfirmed: widget.onSuggestedActionConfirmed,
       ),
     ).whenComplete(() {
       if (mounted) {
@@ -213,11 +221,13 @@ class _LooMinisterSheet extends StatelessWidget {
     required this.apiClient,
     required this.pageContext,
     required this.suggestedQuestion,
+    required this.onSuggestedActionConfirmed,
   });
 
   final LooApiClient apiClient;
   final LooMinisterPageContext pageContext;
   final String suggestedQuestion;
+  final ValueChanged<LooMinisterSuggestedAction> onSuggestedActionConfirmed;
 
   @override
   Widget build(BuildContext context) {
@@ -250,6 +260,7 @@ class _LooMinisterSheet extends StatelessWidget {
                 apiClient: apiClient,
                 pageContext: pageContext,
                 suggestedQuestion: suggestedQuestion,
+                onSuggestedActionConfirmed: onSuggestedActionConfirmed,
               ),
             ],
           ),
@@ -448,7 +459,13 @@ class _LooMinisterCardState extends State<LooMinisterCard> {
             ],
             if (_messages.isNotEmpty) ...[
               const SizedBox(height: 12),
-              ..._messages.map(_MinisterChatBubble.new),
+              ..._messages.map(
+                (message) => _MinisterChatBubble(
+                  message,
+                  onSuggestedActionConfirmed:
+                      widget.onSuggestedActionConfirmed,
+                ),
+              ),
             ],
             const SizedBox(height: 12),
             TextField(
@@ -521,9 +538,13 @@ class _MinisterChatMessage {
 }
 
 class _MinisterChatBubble extends StatelessWidget {
-  const _MinisterChatBubble(this.message);
+  const _MinisterChatBubble(
+    this.message, {
+    required this.onSuggestedActionConfirmed,
+  });
 
   final _MinisterChatMessage message;
+  final ValueChanged<LooMinisterSuggestedAction> onSuggestedActionConfirmed;
 
   @override
   Widget build(BuildContext context) {
@@ -549,7 +570,11 @@ class _MinisterChatBubble extends StatelessWidget {
                   ? Text(message.text)
                   : message.isError
                       ? _MinisterError(message: message.text)
-                      : _MinisterAnswerView(message.answer!),
+                      : _MinisterAnswerView(
+                          message.answer!,
+                          onSuggestedActionConfirmed:
+                              onSuggestedActionConfirmed,
+                        ),
             ),
           ),
         ),
@@ -606,9 +631,13 @@ class LooMinisterAnswer {
 }
 
 class _MinisterAnswerView extends StatelessWidget {
-  const _MinisterAnswerView(this.answer);
+  const _MinisterAnswerView(
+    this.answer, {
+    required this.onSuggestedActionConfirmed,
+  });
 
   final LooMinisterAnswer answer;
+  final ValueChanged<LooMinisterSuggestedAction> onSuggestedActionConfirmed;
 
   @override
   Widget build(BuildContext context) {
@@ -636,7 +665,10 @@ class _MinisterAnswerView extends StatelessWidget {
             if (answer.suggestedActions.isNotEmpty) ...[
               const SizedBox(height: 12),
               ...answer.suggestedActions.take(3).map(
-                    (action) => _MinisterSuggestedActionChip(action: action),
+                    (action) => _MinisterSuggestedActionChip(
+                      action: action,
+                      onConfirmed: onSuggestedActionConfirmed,
+                    ),
                   ),
             ],
             const SizedBox(height: 10),
@@ -652,9 +684,13 @@ class _MinisterAnswerView extends StatelessWidget {
 }
 
 class _MinisterSuggestedActionChip extends StatelessWidget {
-  const _MinisterSuggestedActionChip({required this.action});
+  const _MinisterSuggestedActionChip({
+    required this.action,
+    required this.onConfirmed,
+  });
 
   final LooMinisterSuggestedAction action;
+  final ValueChanged<LooMinisterSuggestedAction> onConfirmed;
 
   @override
   Widget build(BuildContext context) {
@@ -662,7 +698,7 @@ class _MinisterSuggestedActionChip extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
       child: OutlinedButton.icon(
-        onPressed: () => _showActionDetail(context),
+        onPressed: () => _confirmAction(context),
         icon: Icon(
           isRunAnalysis
               ? Icons.analytics_outlined
@@ -673,28 +709,41 @@ class _MinisterSuggestedActionChip extends StatelessWidget {
     );
   }
 
-  void _showActionDetail(BuildContext context) {
-    showDialog<void>(
+  Future<void> _confirmAction(BuildContext context) async {
+    final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: Text(action.label),
         content: Text(
           [
             action.detail,
-            action.requiresConfirmation ? "此动作需要你在对应功能卡片中确认执行。" : null,
+            action.requiresConfirmation ? "此动作会复用当前页面已有的 AI 快扫卡片执行。" : null,
             action.actionType == "run-analysis"
-                ? "当前版本大臣先完成安全 handoff；实际 AI 快扫请使用当前页面已有的 AI 快扫按钮执行。"
+                ? "确认后，大臣只发送触发信号；真实请求、缓存策略和 quota 仍由页面分析卡片负责。"
                 : null,
           ].whereType<String>().join("\n\n"),
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(),
-            child: const Text("知道了"),
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text("取消"),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text("确认执行"),
           ),
         ],
       ),
     );
+    if (confirmed != true) {
+      return;
+    }
+    onConfirmed(action);
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("已请求执行：${action.label}")),
+      );
+    }
   }
 }
 

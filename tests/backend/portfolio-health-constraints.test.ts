@@ -177,3 +177,35 @@ test("account health exposes account-fit and portfolio-target reference lenses",
   assert.ok(health.dimensions.some((item) => item.label === "全组合目标参考"));
   assert.ok(health.dimensions.find((item) => item.id === "allocation")?.drivers.some((driver) => driver.includes("不要求单个账户复制全组合目标")));
 });
+
+test("health score uses economic exposure for CAD-listed US ETFs", () => {
+  const zqqHoldings: HoldingPosition[] = [
+    {
+      id: "holding_zqq",
+      userId: "user_test",
+      accountId: "acct_tfsa",
+      symbol: "ZQQ",
+      name: "BMO Nasdaq 100 Equity Hedged to CAD Index ETF",
+      assetClass: "Canadian Equity",
+      sector: "Technology",
+      currency: "CAD",
+      securityTypeOverride: "ETF",
+      exchangeOverride: "TSX",
+      marketValueCad: 70000,
+      weightPct: 70,
+      gainLossPct: 0
+    }
+  ];
+  const summary = buildPortfolioHealthSummary({
+    accounts,
+    holdings: zqqHoldings,
+    profile: makeProfile(),
+    language: "zh"
+  });
+
+  assert.ok(
+    summary.holdingDrilldown.some((item) =>
+      item.drivers.some((driver) => driver.includes("美国股票")),
+    ),
+  );
+});

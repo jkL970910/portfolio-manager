@@ -9,6 +9,11 @@
 import { getAssetClassLabel, getAccountTypeLabel, getRiskProfileLabel } from "@/lib/i18n/finance";
 import type { DisplayLanguage } from "@/lib/i18n/ui";
 import { pick } from "@/lib/i18n/ui";
+import {
+  getHoldingEconomicAssetClass,
+  inferEconomicAssetClass,
+  isEconomicExposureDifferent
+} from "@/lib/backend/security-economic-exposure";
 
 const DEFAULT_TARGETS_BY_RISK = {
   Conservative: [
@@ -267,7 +272,8 @@ function getCurrentAllocationFromHoldings(holdings: HoldingPosition[]) {
   }
 
   for (const holding of holdings) {
-    allocation.set(holding.assetClass, (allocation.get(holding.assetClass) ?? 0) + holding.marketValueCad);
+    const assetClass = getHoldingEconomicAssetClass(holding);
+    allocation.set(assetClass, (allocation.get(assetClass) ?? 0) + holding.marketValueCad);
   }
 
   return {
@@ -499,7 +505,7 @@ export function buildRecommendationV2(args: {
   const fxPolicy = inferFxPolicy(accounts, holdings);
   const holdingRiskContributionRaw = holdings.map((holding) => ({
     holding,
-    weightedRisk: holding.weightPct * (ASSET_CLASS_RISK_WEIGHTS[holding.assetClass] ?? 1)
+    weightedRisk: holding.weightPct * (ASSET_CLASS_RISK_WEIGHTS[getHoldingEconomicAssetClass(holding)] ?? 1)
   }));
   const totalHoldingWeightedRisk = holdingRiskContributionRaw.reduce((sum, item) => sum + item.weightedRisk, 0) || 1;
   const holdingRiskContribution = new Map(
@@ -563,7 +569,7 @@ export function buildRecommendationV2(args: {
       ? round(priority.targetPct - (((currentAssetValue + rawAmount) / projectedValue) * 100), 2)
       : 0;
     const existingHolding = holdings
-      .filter((holding) => holding.assetClass === priority.assetClass)
+      .filter((holding) => getHoldingEconomicAssetClass(holding) === priority.assetClass)
       .sort((left, right) => right.weightPct - left.weightPct)[0];
     return {
       assetClass: priority.assetClass,
@@ -650,12 +656,28 @@ export function scoreCandidateSecurity(args: {
   const knownUniverse = buildKnownUniverseLookup();
   const existingHolding = holdings.find((holding) => holding.symbol.trim().toUpperCase() === normalizedSymbol);
   const knownCandidate = knownUniverse.get(normalizedSymbol);
-  const assetClass = candidate.assetClass
-    ?? existingHolding?.assetClass
-    ?? knownCandidate?.assetClass
-    ?? inferAssetClassFromSecurityType(candidate.securityType, candidate.currency ?? knownCandidate?.currency ?? existingHolding?.currency ?? "CAD");
+  const fallbackAssetClass =
+    candidate.assetClass ??
+    (existingHolding ? getHoldingEconomicAssetClass(existingHolding) : null) ??
+    knownCandidate?.assetClass ??
+    inferAssetClassFromSecurityType(candidate.securityType, candidate.currency ?? knownCandidate?.currency ?? existingHolding?.currency ?? "CAD");
+  const assetClass = inferEconomicAssetClass({
+    symbol: normalizedSymbol,
+    name: candidate.name ?? knownCandidate?.name ?? existingHolding?.name,
+    assetClass: fallbackAssetClass,
+    securityType: candidate.securityType ?? knownCandidate?.securityType ?? existingHolding?.securityTypeOverride,
+    currency: candidate.currency ?? knownCandidate?.currency ?? existingHolding?.currency ?? "CAD"
+  });
   const assetClassSource: CandidateSecurityScoreResult["assetClassSource"] = candidate.assetClass
-    ? "explicit"
+    ? isEconomicExposureDifferent({
+        symbol: normalizedSymbol,
+        name: candidate.name ?? knownCandidate?.name ?? existingHolding?.name,
+        assetClass: candidate.assetClass,
+        securityType: candidate.securityType ?? knownCandidate?.securityType ?? existingHolding?.securityTypeOverride,
+        currency: candidate.currency ?? knownCandidate?.currency ?? existingHolding?.currency ?? "CAD"
+      })
+      ? "known-universe"
+      : "explicit"
     : existingHolding
       ? "existing-holding"
       : knownCandidate

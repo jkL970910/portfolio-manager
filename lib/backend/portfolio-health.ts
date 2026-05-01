@@ -3,6 +3,7 @@ import { getAssetClassLabel, getAccountTypeLabel } from "@/lib/i18n/finance";
 import type { DisplayLanguage } from "@/lib/i18n/ui";
 import { pick } from "@/lib/i18n/ui";
 import { getAccountPlacementMatrix } from "@/lib/backend/recommendation-v2";
+import { getHoldingEconomicAssetClass } from "@/lib/backend/security-economic-exposure";
 
 function clamp(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max);
@@ -51,7 +52,8 @@ function getCurrentAllocation(holdings: HoldingPosition[]) {
   const total = sum(holdings.map((holding) => holding.marketValueCad));
   const byAssetClass = new Map<string, number>();
   for (const holding of holdings) {
-    byAssetClass.set(holding.assetClass, (byAssetClass.get(holding.assetClass) ?? 0) + holding.marketValueCad);
+    const assetClass = getHoldingEconomicAssetClass(holding);
+    byAssetClass.set(assetClass, (byAssetClass.get(assetClass) ?? 0) + holding.marketValueCad);
   }
 
   return {
@@ -165,7 +167,7 @@ export function buildPortfolioHealthSummary(args: {
 
   const significantSleeves = [...allocation.values()].filter((value) => value >= 5).length;
   const sleeveCountScore = 40 + significantSleeves * 9;
-  const sectors = new Set(holdings.map((holding) => holding.sector || holding.assetClass));
+  const sectors = new Set(holdings.map((holding) => holding.sector || getHoldingEconomicAssetClass(holding)));
   const diversification = clamp(sleeveCountScore + Math.min(sectors.size, 6) * 3, 28, 92);
 
   const placementMatrix = getAccountPlacementMatrix();
@@ -174,7 +176,8 @@ export function buildPortfolioHealthSummary(args: {
     if (!account || total <= 0) {
       return 0;
     }
-    const fit = placementMatrix[holding.assetClass]?.[account.type] ?? 0.45;
+    const assetClass = getHoldingEconomicAssetClass(holding);
+    const fit = placementMatrix[assetClass]?.[account.type] ?? 0.45;
     return fit * (holding.marketValueCad / total) * 100;
   });
   const accountEfficiency = clamp(sum(weightedFit), 24, 95);
@@ -196,7 +199,7 @@ export function buildPortfolioHealthSummary(args: {
   const cashCurrent = allocation.get("Cash") ?? 0;
   const holdingRiskContributionRaw = holdings.map((holding) => ({
     holding,
-    weightedRisk: holding.weightPct * (ASSET_CLASS_RISK_WEIGHTS[holding.assetClass] ?? 1)
+    weightedRisk: holding.weightPct * (ASSET_CLASS_RISK_WEIGHTS[getHoldingEconomicAssetClass(holding)] ?? 1)
   }));
   const totalHoldingWeightedRisk = sum(holdingRiskContributionRaw.map((item) => item.weightedRisk)) || 1;
   const holdingRiskContribution = holdingRiskContributionRaw
@@ -239,7 +242,7 @@ export function buildPortfolioHealthSummary(args: {
       const account = accounts.find((entry) => entry.id === holding.accountId);
       return {
         holding,
-        fit: account ? (placementMatrix[holding.assetClass]?.[account.type] ?? 0.45) : 0.45,
+        fit: account ? (placementMatrix[getHoldingEconomicAssetClass(holding)]?.[account.type] ?? 0.45) : 0.45,
         account
       };
     })
@@ -415,8 +418,8 @@ export function buildPortfolioHealthSummary(args: {
       leastEfficientHolding?.account
         ? pick(
           language,
-          `下一笔钱尽量放进更适合 ${getAssetClassLabel(leastEfficientHolding.holding.assetClass, language)} 的账户里，不要继续加在当前这个账户。`,
-          `Route new money into accounts with a better fit for ${leastEfficientHolding.holding.assetClass}.`
+          `下一笔钱尽量放进更适合 ${getAssetClassLabel(getHoldingEconomicAssetClass(leastEfficientHolding.holding), language)} 的账户里，不要继续加在当前这个账户。`,
+          `Route new money into accounts with a better fit for ${getHoldingEconomicAssetClass(leastEfficientHolding.holding)}.`
         )
         : pick(language, "继续保留现有的账户优先顺序即可。", "Keep the current funding order for now.")
     ]
@@ -494,8 +497,8 @@ export function buildPortfolioHealthSummary(args: {
       dominantHoldingRisk
         ? pick(
           language,
-          `${dominantHoldingRisk.holding.symbol} 所在的 ${getAssetClassLabel(dominantHoldingRisk.holding.assetClass, language)} 本来波动就更大，所以它对风险的影响会比你看到的市值占比更重。`,
-          `${dominantHoldingRisk.holding.symbol} sits in a higher-risk ${getAssetClassLabel(dominantHoldingRisk.holding.assetClass, language)} sleeve, so its risk contribution is about ${dominantHoldingRisk.contributionPct.toFixed(0)}% and may exceed its plain market-value weight.`
+          `${dominantHoldingRisk.holding.symbol} 所在的 ${getAssetClassLabel(getHoldingEconomicAssetClass(dominantHoldingRisk.holding), language)} 本来波动就更大，所以它对风险的影响会比你看到的市值占比更重。`,
+          `${dominantHoldingRisk.holding.symbol} sits in a higher-risk ${getAssetClassLabel(getHoldingEconomicAssetClass(dominantHoldingRisk.holding), language)} sleeve, so its risk contribution is about ${dominantHoldingRisk.contributionPct.toFixed(0)}% and may exceed its plain market-value weight.`
         )
         : pick(
           language,
@@ -559,7 +562,7 @@ export function buildPortfolioHealthSummary(args: {
       const sharePct = total > 0 ? (groupedValue / total) * 100 : 0;
       const weightedFit = groupedHoldings.length > 0 && groupedValue > 0
         ? sum(groupedHoldings.map((holding) => {
-          const fit = placementMatrix[holding.assetClass]?.[accountType] ?? 0.45;
+          const fit = placementMatrix[getHoldingEconomicAssetClass(holding)]?.[accountType] ?? 0.45;
           return fit * (holding.marketValueCad / groupedValue) * 100;
         }))
         : 45;
@@ -630,9 +633,10 @@ export function buildPortfolioHealthSummary(args: {
   const holdingDrilldown = [...holdings]
     .map((holding) => {
       const account = accounts.find((entry) => entry.id === holding.accountId);
-      const fit = account ? (placementMatrix[holding.assetClass]?.[account.type] ?? 0.45) : 0.45;
+      const assetClass = getHoldingEconomicAssetClass(holding);
+      const fit = account ? (placementMatrix[assetClass]?.[account.type] ?? 0.45) : 0.45;
       const holdingRisk = holdingRiskContribution.find((item) => item.holding.id === holding.id)?.contributionPct ?? 0;
-      const holdingScore = clamp((fit * 100) - Math.max(0, holding.weightPct - 12) * 2.2 + (holding.assetClass === "Cash" && holding.weightPct > 8 ? -8 : 0), 16, 95);
+      const holdingScore = clamp((fit * 100) - Math.max(0, holding.weightPct - 12) * 2.2 + (assetClass === "Cash" && holding.weightPct > 8 ? -8 : 0), 16, 95);
 
       return {
         id: holding.id,
@@ -668,8 +672,8 @@ export function buildPortfolioHealthSummary(args: {
         drivers: [
           pick(
             language,
-            `它属于 ${getAssetClassLabel(holding.assetClass, language)}，现在放在 ${getAccountTypeLabel(account?.type ?? "Taxable", language)} 里。`,
-            `Asset class: ${getAssetClassLabel(holding.assetClass, language)}; account: ${getAccountTypeLabel(account?.type ?? "Taxable", language)}.`
+            `它按底层经济暴露归入 ${getAssetClassLabel(assetClass, language)}，现在放在 ${getAccountTypeLabel(account?.type ?? "Taxable", language)} 里。`,
+            `Economic exposure: ${getAssetClassLabel(assetClass, language)}; account: ${getAccountTypeLabel(account?.type ?? "Taxable", language)}.`
           ),
           pick(
             language,

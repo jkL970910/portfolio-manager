@@ -346,12 +346,11 @@ Runtime context architecture:
      attached deterministically by the backend from page `allowedActions`; GPT
      providers must return `suggestedActions=[]` and cannot invent product
      actions.
-   - First mobile pass displays those suggested actions as confirmation-gated
-     handoff buttons. The actual AI 快扫 still runs through the existing page
-     feature card, so the assistant does not bypass page state, backend
-     validation, or provider quota policy.
-   - Next pass can wire suggested actions to navigate or trigger the same
-     page-owned analyzer flow directly after explicit user confirmation.
+   - Mobile now displays those suggested actions as confirmation-gated handoff
+     buttons. After confirmation, the handoff sends a trigger to the current
+     page-owned `AiAnalysisCard`; the actual AI 快扫 still runs through that
+     card, so 大臣 does not bypass page state, backend validation, cache
+     strategy, or provider quota policy.
 8. Security quick-scan readability and exposure classification:
    - AI 标的快扫 now separates listing identity from economic exposure.
      Listing identity (`securityId`, `symbol`, `exchange`, `currency`) remains
@@ -366,6 +365,14 @@ Runtime context architecture:
      incomplete or low-confidence; if identity is complete, conclusions should
      focus on concentration, target fit, account/tax placement, and data
      freshness.
+   - The current mobile layout order is `核心结论 / 当前分析结论 / 风险护栏 /
+     税务账户提醒 / 组合适配 / 数据依据 / 来源详情`. Dense provider/source
+     metadata should stay in `数据依据` or the collapsed `来源详情`, not the
+     opening thesis.
+   - `security-economic-exposure.ts` is the shared first-pass economic exposure
+     registry. AI 快扫, Recommendation V2.1, and Health Score now use it so
+     CAD-listed US ETFs can keep their listing identity while contributing to
+     the correct underlying exposure sleeve.
 
 Backend tests:
 

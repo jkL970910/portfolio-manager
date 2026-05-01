@@ -131,6 +131,25 @@ test("advanced preference factors improve matching sector and style candidates",
   assert.ok(tilted.preferenceFitScore > baseline.preferenceFitScore);
 });
 
+test("economic exposure registry overrides misleading CAD-listed ETF asset class", () => {
+  const result = scoreCandidateSecurity({
+    accounts,
+    holdings: [],
+    profile: makeProfile(),
+    language: "zh",
+    candidate: {
+      symbol: "ZQQ",
+      name: "BMO Nasdaq 100 Equity Hedged to CAD Index ETF",
+      currency: "CAD",
+      assetClass: "Canadian Equity",
+      securityType: "ETF"
+    }
+  });
+
+  assert.equal(result.assetClass, "US Equity");
+  assert.equal(result.assetClassSource, "known-universe");
+});
+
 test("advanced preference factors penalize avoided sector candidates", () => {
   const baseline = scoreCandidateSecurity({
     accounts,

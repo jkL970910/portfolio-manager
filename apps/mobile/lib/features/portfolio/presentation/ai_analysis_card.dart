@@ -1,6 +1,9 @@
 import "package:flutter/material.dart";
+import "package:flutter/foundation.dart";
 
 import "../../../core/api/loo_api_client.dart";
+import "../../shared/data/loo_minister_context_models.dart";
+import "../../shared/presentation/loo_minister_scope.dart";
 
 class AiAnalysisCard extends StatefulWidget {
   const AiAnalysisCard({
@@ -26,8 +29,28 @@ class AiAnalysisCard extends StatefulWidget {
 
 class _AiAnalysisCardState extends State<AiAnalysisCard> {
   Future<MobileAiAnalysisResult>? _analysis;
+  ValueListenable<LooMinisterSuggestedAction?>? _ministerActionListenable;
   bool _hasResult = false;
   bool _isLoading = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final listenable =
+        LooMinisterScope.maybeOf(context)?.analysisActionListenable;
+    if (listenable == _ministerActionListenable) {
+      return;
+    }
+    _ministerActionListenable?.removeListener(_handleMinisterAction);
+    _ministerActionListenable = listenable;
+    _ministerActionListenable?.addListener(_handleMinisterAction);
+  }
+
+  @override
+  void dispose() {
+    _ministerActionListenable?.removeListener(_handleMinisterAction);
+    super.dispose();
+  }
 
   @override
   void didUpdateWidget(covariant AiAnalysisCard oldWidget) {
@@ -47,6 +70,54 @@ class _AiAnalysisCardState extends State<AiAnalysisCard> {
       _isLoading = true;
       _analysis = _loadAnalysis(refresh: refresh);
     });
+  }
+
+  void _handleMinisterAction() {
+    final action = _ministerActionListenable?.value;
+    if (action == null || _isLoading || !_matchesMinisterAction(action)) {
+      return;
+    }
+    _runAnalysis(refresh: _hasResult);
+  }
+
+  bool _matchesMinisterAction(LooMinisterSuggestedAction action) {
+    if (action.actionType != "run-analysis") {
+      return false;
+    }
+    final payloadScope = widget.payload["scope"];
+    final targetScope = action.target["scope"];
+    if (targetScope is String) {
+      if (payloadScope != targetScope) {
+        return false;
+      }
+    } else if (action.id.contains("security")) {
+      if (payloadScope != "security") return false;
+    } else if (action.id.contains("account")) {
+      if (payloadScope != "account") return false;
+    } else if (action.id.contains("portfolio")) {
+      if (payloadScope != "portfolio") return false;
+    }
+
+    final targetAccountId = action.target["accountId"];
+    if (targetAccountId is String &&
+        targetAccountId.isNotEmpty &&
+        widget.payload["accountId"] != targetAccountId) {
+      return false;
+    }
+
+    final targetSecurity = action.target["security"];
+    final payloadSecurity = widget.payload["security"];
+    if (targetSecurity is Map<String, dynamic> &&
+        payloadSecurity is Map<String, dynamic>) {
+      final targetSecurityId = targetSecurity["securityId"];
+      if (targetSecurityId is String &&
+          targetSecurityId.isNotEmpty &&
+          payloadSecurity["securityId"] != targetSecurityId) {
+        return false;
+      }
+    }
+
+    return true;
   }
 
   Future<MobileAiAnalysisResult> _loadAnalysis({required bool refresh}) async {
@@ -366,57 +437,129 @@ class _AnalysisResultView extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(data.title, style: Theme.of(context).textTheme.titleMedium),
-        const SizedBox(height: 6),
-        Text(data.thesis),
-        const SizedBox(height: 8),
-        _MetaPill(
-            "置信度 ${_confidenceLabel(data.confidence)} · ${_sourceModeLabel(data.sourceMode)}"),
-        if (data.quoteSourceSummary != null ||
-            data.quoteFreshnessSummary != null ||
-            data.quotesAsOf != null) ...[
-          const SizedBox(height: 8),
-          Text(
-            [
-              if (data.quotesAsOf != null)
-                "行情截至 ${data.quotesAsOf!.substring(0, 10)}",
-              if (data.quoteSourceSummary != null) data.quoteSourceSummary!,
-              if (data.quoteFreshnessSummary != null)
-                data.quoteFreshnessSummary!,
-            ].join(" · "),
-            style: Theme.of(context).textTheme.bodySmall,
+        _AnalysisSection(
+          title: "核心结论",
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(data.title, style: Theme.of(context).textTheme.titleMedium),
+              const SizedBox(height: 6),
+              Text(data.thesis),
+              const SizedBox(height: 8),
+              _MetaPill(
+                  "置信度 ${_confidenceLabel(data.confidence)} · ${_sourceModeLabel(data.sourceMode)}"),
+            ],
+          ),
+        ),
+        if (data.actionItems.isNotEmpty)
+          _AnalysisSection(
+            title: "当前分析结论",
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: data.actionItems.take(4).map(_ActionRow.new).toList(),
+            ),
+          ),
+        if (data.risks.isNotEmpty)
+          _AnalysisSection(
+            title: "风险护栏",
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: data.risks.take(4).map(_RiskRow.new).toList(),
+            ),
+          ),
+        if (data.taxNotes.isNotEmpty) ...[
+          _AnalysisSection(
+            title: "税务/账户提醒",
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: data.taxNotes.take(3).map(_bullet).toList(),
+            ),
           ),
         ],
-        if (data.scorecards.isNotEmpty) ...[
-          const SizedBox(height: 14),
-          ...data.scorecards.take(4).map(_ScorecardRow.new),
-        ],
-        if (data.risks.isNotEmpty) ...[
-          const SizedBox(height: 14),
-          Text("风险护栏", style: Theme.of(context).textTheme.titleSmall),
-          ...data.risks.take(4).map(_RiskRow.new),
-        ],
-        if (data.taxNotes.isNotEmpty) ...[
-          const SizedBox(height: 14),
-          Text("税务/账户提醒", style: Theme.of(context).textTheme.titleSmall),
-          ...data.taxNotes.take(3).map(_bullet),
-        ],
-        if (data.portfolioFit.isNotEmpty) ...[
-          const SizedBox(height: 14),
-          Text("组合适配", style: Theme.of(context).textTheme.titleSmall),
-          ...data.portfolioFit.take(4).map(_bullet),
-        ],
-        if (data.actionItems.isNotEmpty) ...[
-          const SizedBox(height: 14),
-          Text("当前分析结论", style: Theme.of(context).textTheme.titleSmall),
-          ...data.actionItems.take(4).map(_ActionRow.new),
-        ],
-        const SizedBox(height: 14),
+        if (data.portfolioFit.isNotEmpty)
+          _AnalysisSection(
+            title: "组合适配",
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: data.portfolioFit.take(4).map(_bullet).toList(),
+            ),
+          ),
+        if (data.scorecards.isNotEmpty ||
+            data.quoteSourceSummary != null ||
+            data.quoteFreshnessSummary != null ||
+            data.quotesAsOf != null)
+          _AnalysisSection(
+            title: "数据依据",
+            child: _DataEvidenceView(data),
+          ),
+        if (data.sources.isNotEmpty)
+          ExpansionTile(
+            tilePadding: EdgeInsets.zero,
+            title:
+                Text("来源详情", style: Theme.of(context).textTheme.titleSmall),
+            childrenPadding: EdgeInsets.zero,
+            children: [
+              Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  data.sources.take(6).join("、"),
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+              ),
+            ],
+          ),
+        const SizedBox(height: 8),
         Text(data.disclaimerZh, style: Theme.of(context).textTheme.bodySmall),
-        if (data.sources.isNotEmpty) ...[
-          const SizedBox(height: 4),
-          Text("来源：${data.sources.take(3).join("、")}",
-              style: Theme.of(context).textTheme.bodySmall),
+      ],
+    );
+  }
+}
+
+class _AnalysisSection extends StatelessWidget {
+  const _AnalysisSection({required this.title, required this.child});
+
+  final String title;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(title, style: Theme.of(context).textTheme.titleSmall),
+          const SizedBox(height: 8),
+          child,
+        ],
+      ),
+    );
+  }
+}
+
+class _DataEvidenceView extends StatelessWidget {
+  const _DataEvidenceView(this.data);
+
+  final MobileAiAnalysisResult data;
+
+  @override
+  Widget build(BuildContext context) {
+    final freshnessLines = [
+      if (data.quotesAsOf != null) "行情截至 ${data.quotesAsOf!.substring(0, 10)}",
+      if (data.quoteSourceSummary != null) data.quoteSourceSummary!,
+      if (data.quoteFreshnessSummary != null) data.quoteFreshnessSummary!,
+    ];
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (freshnessLines.isNotEmpty)
+          Text(
+            freshnessLines.join(" · "),
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+        if (data.scorecards.isNotEmpty) ...[
+          const SizedBox(height: 10),
+          ...data.scorecards.take(4).map(_ScorecardRow.new),
         ],
       ],
     );

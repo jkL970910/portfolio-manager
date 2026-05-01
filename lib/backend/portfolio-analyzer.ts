@@ -15,6 +15,7 @@ import {
   PortfolioAnalyzerResult,
   portfolioAnalyzerResultSchema
 } from "@/lib/backend/portfolio-analyzer-contracts";
+import { getHoldingEconomicAssetClass } from "@/lib/backend/security-economic-exposure";
 
 function round(value: number, digits = 0) {
   const factor = 10 ** digits;
@@ -64,95 +65,6 @@ function getHoldingIdentity(holding: HoldingPosition): AnalyzerSecurityIdentity 
 
 function getHoldingAccount(holding: HoldingPosition | null | undefined, accounts: InvestmentAccount[]) {
   return holding ? accounts.find((account) => account.id === holding.accountId) : undefined;
-}
-
-const US_EQUITY_EXPOSURE_SYMBOLS = new Set([
-  "VFV",
-  "XUS",
-  "XUU",
-  "ZSP",
-  "HXS",
-  "HULC",
-  "QQC",
-  "ZQQ",
-  "HXQ",
-  "XQQ",
-]);
-
-const INTERNATIONAL_EQUITY_EXPOSURE_SYMBOLS = new Set([
-  "XEF",
-  "VIU",
-  "XAW",
-  "XEQT",
-  "VEQT",
-]);
-
-const FIXED_INCOME_EXPOSURE_SYMBOLS = new Set([
-  "XBB",
-  "ZAG",
-  "VAB",
-  "XSB",
-  "ZFL",
-]);
-
-const CASH_EXPOSURE_SYMBOLS = new Set(["CASH", "PSA", "HSAV", "CSAV"]);
-
-function inferEconomicAssetClass(holding: HoldingPosition) {
-  const symbol = holding.symbol.trim().toUpperCase();
-  const name = holding.name.trim().toLowerCase();
-  const type = (holding.securityTypeOverride ?? "").trim().toLowerCase();
-  const isFundLike =
-    type.includes("etf") ||
-    type.includes("fund") ||
-    name.includes(" etf") ||
-    name.includes(" index ") ||
-    name.includes("nasdaq") ||
-    name.includes("s&p") ||
-    name.includes("msci");
-
-  if (
-    FIXED_INCOME_EXPOSURE_SYMBOLS.has(symbol) ||
-    name.includes("bond") ||
-    name.includes("aggregate")
-  ) {
-    return "Fixed Income";
-  }
-
-  if (
-    CASH_EXPOSURE_SYMBOLS.has(symbol) ||
-    name.includes("high interest savings") ||
-    name.includes("cash")
-  ) {
-    return "Cash";
-  }
-
-  if (
-    INTERNATIONAL_EQUITY_EXPOSURE_SYMBOLS.has(symbol) ||
-    name.includes("eafe") ||
-    name.includes("ex canada") ||
-    name.includes("developed all cap ex north america") ||
-    name.includes("international")
-  ) {
-    return "International Equity";
-  }
-
-  if (
-    US_EQUITY_EXPOSURE_SYMBOLS.has(symbol) ||
-    name.includes("nasdaq") ||
-    name.includes("s&p 500") ||
-    name.includes("s&p500") ||
-    name.includes("u.s.") ||
-    name.includes("us total market") ||
-    name.includes("united states")
-  ) {
-    return "US Equity";
-  }
-
-  if (isFundLike && name.includes("canadian")) {
-    return "Canadian Equity";
-  }
-
-  return holding.assetClass;
 }
 
 function buildEconomicExposureNote(args: {
@@ -454,7 +366,7 @@ export function buildSecurityAnalyzerQuickScan(args: {
   const heldWeightPct = totalPortfolioCad > 0 ? (heldValueCad / totalPortfolioCad) * 100 : 0;
   const referenceHolding = matchingHoldings[0] ?? args.holdings.find((holding) => holding.symbol.trim().toUpperCase() === normalizedSymbol);
   const economicAssetClass = referenceHolding
-    ? inferEconomicAssetClass(referenceHolding)
+    ? getHoldingEconomicAssetClass(referenceHolding)
     : null;
   const targetPct = referenceHolding
     ? args.profile.targetAllocation.find((target) => target.assetClass === economicAssetClass)?.targetPct ?? 0

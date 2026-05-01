@@ -25,11 +25,18 @@ class LooWealthApp extends StatefulWidget {
 class _LooWealthAppState extends State<LooWealthApp> {
   late final MobileAuthStore _authStore;
   final _navigatorKey = GlobalKey<NavigatorState>();
+  final _ministerAnalysisAction = ValueNotifier<LooMinisterSuggestedAction?>(null);
 
   MobileAuthSession? _session;
   LooMinisterPageContext? _ministerContext;
   Future<String?>? _refreshInFlight;
   var _loading = true;
+
+  @override
+  void dispose() {
+    _ministerAnalysisAction.dispose();
+    super.dispose();
+  }
 
   @override
   void initState() {
@@ -137,6 +144,11 @@ class _LooWealthAppState extends State<LooWealthApp> {
     });
   }
 
+  void _requestMinisterAnalysisAction(LooMinisterSuggestedAction action) {
+    _ministerAnalysisAction.value = null;
+    _ministerAnalysisAction.value = action;
+  }
+
   Future<void> _logout() async {
     final session = _session;
     if (session != null) {
@@ -186,6 +198,7 @@ class _LooWealthAppState extends State<LooWealthApp> {
 
         return LooMinisterScope(
           onContextChanged: _setMinisterContext,
+          analysisActionListenable: _ministerAnalysisAction,
           child: Stack(
             children: [
               Positioned.fill(child: currentChild),
@@ -194,6 +207,7 @@ class _LooWealthAppState extends State<LooWealthApp> {
                 navigatorKey: _navigatorKey,
                 pageContext: _ministerContext ?? _fallbackMinisterContext,
                 suggestedQuestion: _suggestedMinisterQuestion,
+                onSuggestedActionConfirmed: _requestMinisterAnalysisAction,
               ),
             ],
           ),
