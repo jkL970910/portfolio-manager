@@ -304,6 +304,10 @@ Current structured document boundary:
   matching. This keeps the recommendation bridge usable even when the analysis
   run is only a compact report and the richer source document needs to remain
   queryable.
+- `GET /api/mobile/intelligence/daily` now exposes the same curated daily
+  intelligence feed as a standalone mobile contract. Overview, Portfolio,
+  Recommendations, and AI 大臣 can reuse it without duplicating document/run
+  mapping logic.
 - Recommendation V3 overlay now reads document evidence fields when available:
   `confidence`, `relevanceScore`, `sourceReliability`, and `riskFlags`. Saved
   analysis runs without those fields still use the conservative source/scope/
@@ -401,9 +405,8 @@ P0.5:
 3. Complete: Preference Factors V2 backend schema as optional fields with safe
    defaults.
 4. Complete for cached market-data: local-only `今日秘闻` surface from cached provider/portfolio
-   signals before live news adapters. Current implementation is embedded in the
-   mobile recommendations payload; a standalone API can be added when other
-   pages need the same curated feed.
+   signals before live news adapters. A standalone mobile API now backs the
+   curated feed so other pages can consume it without page-specific rewrites.
 5. Complete for cached market-data: identity-safe external research provider. Cached market-data
    research now requires `security_id` or complete `symbol + exchange +
    currency`; ticker-only fallback is intentionally skipped.

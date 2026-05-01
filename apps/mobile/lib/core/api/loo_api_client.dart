@@ -81,6 +81,10 @@ class LooApiClient {
     return _getJson("/api/mobile/recommendations");
   }
 
+  Future<Map<String, dynamic>> getDailyIntelligence({int limit = 8}) {
+    return _getJson("/api/mobile/intelligence/daily?limit=$limit");
+  }
+
   Future<Map<String, dynamic>> createRecommendationRun(
       double contributionAmountCad) {
     return _postJson(

@@ -734,6 +734,56 @@ export interface RecommendationsData {
   notes: string[];
 }
 
+export interface DailyIntelligenceData {
+  generatedAt: string;
+  policy: {
+    manualTriggerOnly: boolean;
+    sourceMode: "cached-external";
+    disclaimer: string;
+  };
+  items: {
+    id: string;
+    title: string;
+    summary: string;
+    sourceLabel: string;
+    sourceType: "market-data" | "news" | "forum" | "institutional" | "manual" | "analysis";
+    sourceMode: "local" | "cached-external" | "live-external";
+    confidenceLabel: string;
+    confidence?: "low" | "medium" | "high";
+    relevanceScore?: number;
+    sourceReliability?: number;
+    freshnessLabel: string;
+    relevanceLabel: string;
+    generatedAt: string;
+    expiresAt?: string;
+    identity: {
+      securityId?: string;
+      symbol?: string;
+      exchange?: string;
+      currency?: "CAD" | "USD";
+      underlyingId?: string;
+    };
+    reason: string;
+    keyPoints: string[];
+    riskFlags: string[];
+    actions: {
+      label: string;
+      type: "view-security" | "ask-minister" | "refresh-source" | "ignore";
+      payload?: Record<string, string>;
+    }[];
+    sources: {
+      title: string;
+      sourceType: string;
+      date?: string;
+      url?: string;
+    }[];
+  }[];
+  emptyState: {
+    title: string;
+    detail: string;
+  };
+}
+
 export interface SpendingData {
   displayContext: {
     currency: "CAD" | "USD";

@@ -18,10 +18,10 @@ import {
   getRecommendationView,
 } from "@/lib/backend/services";
 import { getRepositories } from "@/lib/backend/repositories/factory";
-import type {
-  ExternalResearchDocumentRecord,
-  PortfolioAnalysisRun,
-} from "@/lib/backend/models";
+import {
+  getDailyIntelligenceItemsForUser,
+  mapDailyIntelligenceItemToRecommendationBrief,
+} from "@/lib/backend/mobile-daily-intelligence";
 import type { Viewer } from "@/lib/auth/session";
 
 type MobileHomeData = {
@@ -716,176 +716,6 @@ function normalizeSymbolKey(value: string) {
   return value.trim().toUpperCase().replace(/[^A-Z0-9.:-]/g, "");
 }
 
-function readResultMap(run: PortfolioAnalysisRun) {
-  return run.result && typeof run.result === "object"
-    ? run.result
-    : {};
-}
-
-function readNestedMap(value: unknown) {
-  return value && typeof value === "object"
-    ? value as Record<string, unknown>
-    : {};
-}
-
-function mapRecommendationIntelligenceBriefs(
-  runs: PortfolioAnalysisRun[],
-): RecommendationsData["intelligenceBriefs"] {
-  return runs.slice(0, 5).map((run) => {
-    const result = readResultMap(run);
-    const summary = readNestedMap(result.summary);
-    const dataFreshness = readNestedMap(result.dataFreshness);
-    const identity = readNestedMap(result.identity);
-    const rawSources = Array.isArray(result.sources) ? result.sources : [];
-    const symbol =
-      typeof identity.symbol === "string" && identity.symbol.trim()
-        ? identity.symbol.trim().toUpperCase()
-        : "UNKNOWN";
-    const securityId =
-      typeof identity.securityId === "string" && identity.securityId.trim()
-        ? identity.securityId.trim()
-        : undefined;
-    const exchange =
-      typeof identity.exchange === "string" && identity.exchange.trim()
-        ? identity.exchange.trim().toUpperCase()
-        : undefined;
-    const currency =
-      typeof identity.currency === "string" && identity.currency.trim()
-        ? identity.currency.trim().toUpperCase()
-        : undefined;
-    const symbols = [
-      symbol,
-      exchange,
-      currency,
-    ].filter((value): value is string => Boolean(value));
-    const sourceMode =
-      run.sourceMode === "cached-external" || run.sourceMode === "live-external"
-        ? run.sourceMode
-        : "local";
-    const sourceLabel = sourceMode === "cached-external"
-      ? "缓存外部情报"
-      : sourceMode === "live-external"
-        ? "实时外部情报"
-        : "本地快扫";
-    const quotesAsOf =
-      typeof dataFreshness.quotesAsOf === "string"
-        ? dataFreshness.quotesAsOf
-        : null;
-    const quoteSource =
-      typeof dataFreshness.quoteSourceSummary === "string"
-        ? dataFreshness.quoteSourceSummary
-        : null;
-    const freshnessLabel = [
-      quotesAsOf ? `行情 ${quotesAsOf.slice(0, 10)}` : null,
-      quoteSource,
-    ].filter(Boolean).join(" · ") || "暂无行情新鲜度";
-
-    return {
-      id: run.id,
-      title:
-        typeof summary.title === "string" && summary.title.trim()
-          ? summary.title
-          : "Loo国秘闻",
-      detail:
-        typeof summary.thesis === "string" && summary.thesis.trim()
-          ? summary.thesis
-          : "这条情报来自已缓存的分析记录。",
-      sourceLabel,
-      sourceMode,
-      freshnessLabel,
-      generatedAt: run.generatedAt,
-      symbols,
-      identity: {
-        securityId,
-        symbol,
-        exchange,
-        currency,
-      },
-      sources: rawSources.slice(0, 4).map((source) => {
-        const value = readNestedMap(source);
-        return {
-          title:
-            typeof value.title === "string" && value.title.trim()
-              ? value.title
-              : "来源",
-          sourceType:
-            typeof value.sourceType === "string"
-              ? value.sourceType
-              : "portfolio-data",
-          date: typeof value.date === "string" ? value.date : undefined,
-        };
-      }),
-      confidence: undefined,
-      relevanceScore: undefined,
-      sourceReliability: undefined,
-      riskFlags: [],
-    };
-  });
-}
-
-function mapExternalResearchDocumentBriefs(
-  documents: ExternalResearchDocumentRecord[],
-): RecommendationsData["intelligenceBriefs"] {
-  return documents.slice(0, 8).map((document) => {
-    const security = document.security;
-    const symbol = security?.symbol?.trim().toUpperCase() || "UNKNOWN";
-    const exchange = security?.exchange?.trim().toUpperCase() || undefined;
-    const currency =
-      security?.currency === "CAD" || security?.currency === "USD"
-        ? security.currency
-        : undefined;
-    const sourceLabelMap: Record<
-      ExternalResearchDocumentRecord["sourceType"],
-      string
-    > = {
-      "market-data": "缓存行情情报",
-      news: "缓存新闻/公告",
-      forum: "社区情绪（低权重）",
-      institutional: "缓存机构资料",
-      manual: "手动研究记录",
-    };
-    const freshnessLabel = [
-      document.publishedAt
-        ? `来源 ${document.publishedAt.slice(0, 10)}`
-        : `捕获 ${document.capturedAt.slice(0, 10)}`,
-      `过期 ${document.expiresAt.slice(0, 10)}`,
-      `可信度 ${document.confidence}`,
-    ].join(" · ");
-
-    return {
-      id: `doc:${document.id}`,
-      title: document.title,
-      detail: document.summary,
-      sourceLabel: sourceLabelMap[document.sourceType],
-      sourceMode: "cached-external",
-      freshnessLabel,
-      generatedAt: document.capturedAt,
-      symbols: [symbol, exchange, currency].filter(
-        (value): value is string => Boolean(value),
-      ),
-      identity: {
-        securityId: security?.securityId ?? undefined,
-        symbol,
-        exchange,
-        currency,
-      },
-      sources: [
-        {
-          title: document.sourceName,
-          sourceType: document.sourceType,
-          date:
-            document.publishedAt?.slice(0, 10) ??
-            document.capturedAt.slice(0, 10),
-        },
-      ],
-      confidence: document.confidence,
-      relevanceScore: document.relevanceScore,
-      sourceReliability: document.sourceReliability,
-      riskFlags: document.riskFlags,
-    };
-  });
-}
-
 function mapMobileImportData(data: ImportData): MobileImportData {
   return {
     manualSteps: [
@@ -1013,20 +843,14 @@ export async function getMobilePortfolioSecurityDetailView(
 }
 
 export async function getMobileRecommendationsView(userId: string) {
-  const now = new Date();
-  const [payload, profile, analysisRuns, externalDocuments] = await Promise.all([
+  const [payload, profile, dailyIntelligenceItems] = await Promise.all([
     getRecommendationView(userId),
     getRepositories().preferences.getByUserId(userId),
-    getRepositories().analysisRuns.listRecentByUserId(userId, 5),
-    getRepositories().externalResearchDocuments.listFreshByUserId(userId, {
-      now,
-      limit: 8,
-    }),
+    getDailyIntelligenceItemsForUser(userId, 8),
   ]);
-  const intelligenceBriefs = [
-    ...mapExternalResearchDocumentBriefs(externalDocuments),
-    ...mapRecommendationIntelligenceBriefs(analysisRuns),
-  ];
+  const intelligenceBriefs = dailyIntelligenceItems.map(
+    mapDailyIntelligenceItemToRecommendationBrief,
+  );
   return {
     data: mapMobileRecommendationsData(payload.data, {
       riskProfile: profile.riskProfile,
