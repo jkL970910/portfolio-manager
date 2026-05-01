@@ -308,6 +308,10 @@ Current structured document boundary:
   intelligence feed as a standalone mobile contract. Overview, Portfolio,
   Recommendations, and AI 大臣 can reuse it without duplicating document/run
   mapping logic.
+- Flutter Overview now consumes the standalone feed through a shared mobile
+  DTO/card and displays the first visible cross-page `Loo国今日秘闻` surface.
+  This is still read-only cache display: loading the page must not trigger live
+  news, forum, or paid external API calls.
 - AI 大臣 now automatically enriches every answer request with the same daily
   intelligence feed on the backend. Flutter pages do not need to inject the
   feed manually; the minister receives up to three `external-intelligence`
@@ -411,7 +415,7 @@ P0.5:
    defaults.
 4. Complete for cached market-data: local-only `今日秘闻` surface from cached provider/portfolio
    signals before live news adapters. A standalone mobile API now backs the
-   curated feed so other pages can consume it without page-specific rewrites.
+   curated feed, and Flutter Overview has a first-pass shared card consuming it.
 5. Complete for cached market-data: identity-safe external research provider. Cached market-data
    research now requires `security_id` or complete `symbol + exchange +
    currency`; ticker-only fallback is intentionally skipped.
@@ -428,8 +432,8 @@ P1:
    source-specific stale-data rules. The first document-evidence scoring bridge
    is implemented for cached market-data documents.
 3. Add deeper guided preference questions for sector/style/life/tax factors.
-4. Add UI surfaces outside Recommendations that display the standalone
-   `今日秘闻` feed directly when useful.
+4. Expand the shared `今日秘闻` card from Overview to Portfolio and detail pages
+   where it improves decision context without cluttering the primary workflow.
 
 P2:
 

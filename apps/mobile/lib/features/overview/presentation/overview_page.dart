@@ -1,10 +1,13 @@
 import "package:flutter/material.dart";
 
 import "../../../core/api/loo_api_client.dart";
+import "../../intelligence/data/daily_intelligence_models.dart";
+import "../../intelligence/presentation/daily_intelligence_card.dart";
 import "../data/mobile_home_models.dart";
 import "../../portfolio/presentation/account_detail_page.dart";
 import "../../portfolio/presentation/health_score_page.dart";
 import "../../portfolio/presentation/holding_detail_page.dart";
+import "../../portfolio/presentation/security_detail_page.dart";
 import "../../shared/data/mobile_chart_models.dart";
 import "../../shared/data/mobile_models.dart";
 import "../../shared/presentation/loo_charts.dart";
@@ -24,11 +27,13 @@ class OverviewPage extends StatefulWidget {
 
 class _OverviewPageState extends State<OverviewPage> {
   late Future<MobileHomeSnapshot> _snapshot;
+  late Future<MobileDailyIntelligenceSnapshot> _dailyIntelligence;
 
   @override
   void initState() {
     super.initState();
     _snapshot = _loadSnapshot();
+    _dailyIntelligence = _loadDailyIntelligence();
   }
 
   Future<MobileHomeSnapshot> _loadSnapshot() async {
@@ -49,9 +54,19 @@ class _OverviewPageState extends State<OverviewPage> {
     return snapshot;
   }
 
+  Future<MobileDailyIntelligenceSnapshot> _loadDailyIntelligence() async {
+    final response = await widget.apiClient.getDailyIntelligence(limit: 8);
+    final data = response["data"];
+    if (data is! Map<String, dynamic>) {
+      throw const LooApiException("今日秘闻数据格式不正确。");
+    }
+    return MobileDailyIntelligenceSnapshot.fromJson(data);
+  }
+
   void _refresh() {
     setState(() {
       _snapshot = _loadSnapshot();
+      _dailyIntelligence = _loadDailyIntelligence();
     });
   }
 
@@ -99,6 +114,22 @@ class _OverviewPageState extends State<OverviewPage> {
                           fallbackPoints: snapshot.data!.netWorthTrend,
                         ),
                       ],
+                      const SizedBox(height: 18),
+                      FutureBuilder<MobileDailyIntelligenceSnapshot>(
+                        future: _dailyIntelligence,
+                        builder: (context, intelligenceSnapshot) {
+                          return DailyIntelligenceCard(
+                            snapshot: intelligenceSnapshot.data,
+                            isLoading: intelligenceSnapshot.connectionState ==
+                                ConnectionState.waiting,
+                            errorMessage: intelligenceSnapshot.hasError
+                                ? intelligenceSnapshot.error.toString()
+                                : null,
+                            onViewSecurity: _openSecurityFromIntelligence,
+                          );
+                        },
+                      ),
+                      const SizedBox(height: 18),
                       _HealthCard(
                         snapshot.data!.health,
                         onTap: _openHealthScore,
@@ -158,6 +189,25 @@ class _OverviewPageState extends State<OverviewPage> {
           apiClient: widget.apiClient,
           holdingId: holding.id,
           fallbackTitle: holding.symbol,
+        ),
+      ),
+    );
+  }
+
+  void _openSecurityFromIntelligence(MobileDailyIntelligenceItem item) {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => SecurityDetailPage(
+          apiClient: widget.apiClient,
+          symbol: item.identity.symbol,
+          fallbackTitle: item.identity.symbol,
+          securityId: item.identity.securityId.isEmpty
+              ? null
+              : item.identity.securityId,
+          exchange:
+              item.identity.exchange.isEmpty ? null : item.identity.exchange,
+          currency:
+              item.identity.currency.isEmpty ? null : item.identity.currency,
         ),
       ),
     );
