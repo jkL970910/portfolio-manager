@@ -141,6 +141,20 @@
       "when": 1777586400000,
       "tag": "0019_external_research_documents",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1777590000000,
+      "tag": "0020_loo_minister_chat_sessions",
+      "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1777593600000,
+      "tag": "0021_loo_minister_subject_history",
+      "breakpoints": true
     }
   ]
 }

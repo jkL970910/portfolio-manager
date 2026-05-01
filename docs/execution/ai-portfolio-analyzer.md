@@ -202,11 +202,27 @@ Current status:
   It is bearer/session protected, validates `LooMinisterQuestionRequest`, keeps
   live external research disabled, and currently returns a deterministic local
   `LooMinisterAnswerResult`.
+- First-pass multi-turn chat API exists at `POST /api/mobile/minister/chat`.
+  It creates a user-scoped chat session, persists user/assistant messages,
+  injects recent conversation history plus project-level 大臣 capability context,
+  and returns the same validated answer contract under `data.answer`. This is
+  the preferred mobile path for the floating 大臣 entry.
+- First-pass product-help knowledge now exists inside the backend answer engine.
+  大臣 can answer "这个功能是什么 / 怎么用 / 下一步做什么" style questions
+  with product boundaries for Overview, Portfolio, Security/Holding,
+  Recommendations, Preferences, Import, data freshness, and the Minister itself.
+- First-pass Context Resolver / Tool Registry now exists behind the answer
+  engine. It extracts ticker mentions, checks chat subject history, resolves
+  known holdings/recommendation identities, attempts bounded market-data
+  resolver lookup when local context is missing, injects comparison subjects,
+  and refuses ticker-only CAD/USD guesses when listing identity is ambiguous.
 - Flutter API client exposes `askLooMinister(...)`.
+- Flutter API client also exposes `askLooMinisterChat(...)`.
 - Mobile shell now owns a persistent floating `问大臣` entry. Overview and
   Portfolio report their page-context DTOs into the shell, so the same floating
   entry can answer with current page context without injecting a separate card
-  into every page.
+  into every page. The floating entry now keeps visible messages in the panel
+  and reuses the backend `sessionId` for follow-up questions.
 - Account Detail, Holding Detail, Security Detail, and Health pages now report
   first-pass page-context DTOs into the global minister scope. The floating
   entry remains above pushed detail routes instead of being limited to the
@@ -231,25 +247,60 @@ API integration plan:
 2. `/api/mobile/settings/ai-minister` exposes Local/GPT-5.5 mode, provider
    selection, model slug, reasoning effort, base URL, BYOK key status, provider
    availability, and recent usage logs to Flutter Settings.
-3. `/api/mobile/minister/ask` remains the only Flutter-facing answer endpoint.
-   It routes to the selected Responses-compatible endpoint only when the user
-   setting, provider env flag, and API key are all present; otherwise it falls
-   back to the deterministic local answer.
-4. GPT output is parsed back into `LooMinisterAnswerResult` and validated before
+3. `/api/mobile/minister/ask` remains the single-turn answer endpoint. It routes
+   to the selected Responses-compatible endpoint only when the user setting,
+   provider env flag, and API key are all present; otherwise it falls back to the
+   deterministic local answer.
+4. `/api/mobile/minister/chat` is the preferred floating 大臣 endpoint. It wraps
+   the same answer engine with persisted session history and must keep external
+   research disabled unless worker/cache policy explicitly enables it.
+5. GPT output is parsed back into `LooMinisterAnswerResult` and validated before
    being returned to mobile. Official OpenAI calls can use strict JSON Schema.
    OpenRouter-compatible calls use a single-message plain-text context summary
    with JSON object mode plus the same backend validator, because the current
    router proxy can return 5xx for multi-message Responses input or raw JSON
    context payloads.
-5. `loo_minister_usage_logs` records page, mode, provider, model, status, token
+6. `loo_minister_usage_logs` records page, mode, provider, model, status, token
    counts when available, retry count, failure kind, and fallback/error
    messages. Flutter Settings surfaces these fields in recent-call rows so QA
    can distinguish provider 5xx, empty output, invalid JSON, and contract
    validation failures without querying the database.
-6. Live external research stays disabled until worker/cache/provider quota
+7. Live external research stays disabled until worker/cache/provider quota
    boundaries are production-ready.
-7. Per-investment-account AI opt-in is intentionally P1, after the global
+8. Per-investment-account AI opt-in is intentionally P1, after the global
    BYOK/user-setting flow is stable.
+
+Runtime context architecture:
+
+1. Domain knowledge:
+   - implemented as versioned backend knowledge in
+     `lib/backend/loo-minister-domain-knowledge.ts`
+   - covers project features, page boundaries, identity rules, data freshness,
+     recommendation layers, import, preferences, and 大臣 behavior
+   - can later migrate to a DB/embedding store without changing Flutter
+2. Tool registry:
+   - implemented as allowlisted backend functions in
+     `lib/backend/loo-minister-tools.ts`
+   - tools include project-knowledge search, ticker mention extraction,
+     security mention resolution, cached external intelligence lookup, and
+     subject-to-fact packing
+   - GPT/MCP is not allowed to call arbitrary tools directly; the backend
+     decides which tools run before the model call
+3. Context resolver:
+   - implemented in `lib/backend/loo-minister-context-resolver.ts`
+   - status semantics:
+     - `hydrated`: the resolver found useful extra context and injected it
+     - `partial`: it detected a mention but could not prove one listing
+     - ambiguous facts: user must choose exchange/currency
+     - unavailable facts: provider/cache could not resolve enough context
+   - comparison questions such as `和 VFV 比呢？` now try to resolve VFV from
+     user holdings/recommendations/cache and inject it as a comparison subject
+4. Context pack cache:
+   - first pass is deterministic packaging rather than a separate cache table
+   - chat sessions now persist `subjectHistoryJson` so follow-up comparison
+     questions can reuse recent structured subjects
+   - future cache keys should include project knowledge version, securityId,
+     preference updatedAt, recommendation run id, and freshness/asOf metadata
 
 Backend tests:
 

@@ -202,6 +202,10 @@ export const looMinisterQuestionRequestSchema = z
     }
   });
 
+export const looMinisterChatRequestSchema = looMinisterQuestionRequestSchema.extend({
+  sessionId: z.string().trim().min(1).max(80).optional(),
+});
+
 export const looMinisterAnswerResultSchema = z
   .object({
     version: z.literal(LOO_MINISTER_VERSION),

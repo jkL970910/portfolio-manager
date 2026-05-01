@@ -1,4 +1,5 @@
 import { apiSuccess } from "@/lib/backend/contracts";
+import { resolveLooMinisterContext } from "@/lib/backend/loo-minister-context-resolver";
 import {
   LOO_MINISTER_VERSION,
   type LooMinisterAnswerResult,
@@ -36,8 +37,123 @@ const pageLabels: Record<
   spending: "收支",
 };
 
+const projectKnowledgeItems: Array<{
+  id: string;
+  label: string;
+  pages: Array<LooMinisterQuestionRequest["pageContext"]["page"]>;
+  triggers: RegExp[];
+  value: string;
+  detail: string;
+}> = [
+  {
+    id: "project-feature-overview",
+    label: "功能说明：总览",
+    pages: ["overview"],
+    triggers: [/总览|首页|净资产|total asset|走势|曲线/i],
+    value: "总览负责展示 Loo国当前全局状态：总资产、走势图、健康巡查、重点账户、头部持仓和今日秘闻。",
+    detail:
+      "总览是最高层摘要，不负责深度编辑；如果用户追问具体账户/持仓/标的，应引导进入对应详情页。走势图必须说明真实历史、本地缓存、参考曲线或 stale 状态。",
+  },
+  {
+    id: "project-feature-portfolio",
+    label: "功能说明：组合",
+    pages: ["portfolio"],
+    triggers: [/组合|portfolio|账户|持仓|资产类别|allocation|配置/i],
+    value: "组合页负责解释账户、持仓、资产类别分布、FX 折算、报价新鲜度和组合级健康状态。",
+    detail:
+      "组合页不重复完整今日秘闻，避免每个页面都加载相同情报；它应优先帮助用户定位配置偏离、持仓状态和账户层面的下一步操作。",
+  },
+  {
+    id: "project-feature-security",
+    label: "功能说明：标的详情",
+    pages: ["security-detail", "holding-detail"],
+    triggers: [/标的|security|ticker|listing|买入|适合|适配|价格|报价|刷新/i],
+    value: "标的/持仓详情必须按 securityId 或完整 symbol + exchange + currency 回答，不能只按 ticker 合并。",
+    detail:
+      "价格、走势图、AI 快扫、今日秘闻和推荐解释都要保留 listing 身份。US 正股与 CAD listed/CDR/hedged 版本可以共享 underlying 研究背景，但不能共享 listing 价格、FX 和持仓事实。",
+  },
+  {
+    id: "project-feature-recommendations",
+    label: "功能说明：推荐",
+    pages: ["recommendations"],
+    triggers: [/推荐|recommend|v2|v3|候选|买什么|优先/i],
+    value: "推荐页当前是 V2.1 deterministic core + V3 cached-intelligence overlay。",
+    detail:
+      "V2.1 负责目标配置、账户/税务/FX/约束和偏好因子；V3 overlay 读取缓存外部情报，不应在页面加载时实时抓新闻或论坛。大臣可解释推荐原因，但保存/执行仍需用户确认。",
+  },
+  {
+    id: "project-feature-preferences",
+    label: "功能说明：投资偏好",
+    pages: ["settings", "recommendations", "portfolio-health"],
+    triggers: [/偏好|preference|factor|风险|行业|科技|能源|买房|税务|现金/i],
+    value: "投资偏好保留两条线：新手引导式问答生成完整参数，进阶用户手动编辑所有参数。",
+    detail:
+      "AI 大臣可以辅助生成草稿，但草稿必须展示给用户确认后才应用。Preference Factors V2 会影响健康分解释和推荐排序，但不能绕过目标配置和风险约束。",
+  },
+  {
+    id: "project-feature-import",
+    label: "功能说明：手动导入",
+    pages: ["import"],
+    triggers: [/导入|import|csv|新增账户|新增持仓|搜索标的|验证/i],
+    value: "移动端导入保留手动/引导式账户和持仓导入，不做 CSV MVP。",
+    detail:
+      "导入时标的搜索/验证必须显示 symbol、exchange/listing market、currency，避免 US common share 和 CAD listing/CDR 混淆。",
+  },
+  {
+    id: "project-feature-data-freshness",
+    label: "功能说明：数据新鲜度",
+    pages: [
+      "overview",
+      "portfolio",
+      "account-detail",
+      "holding-detail",
+      "security-detail",
+      "settings",
+    ],
+    triggers: [/新鲜|stale|缓存|刷新|provider|行情|fx|汇率|真实数据|mock|fallback/i],
+    value: "行情、历史价格、FX 和外部情报都必须显示来源、新鲜度和 fallback 边界。",
+    detail:
+      "报价使用 native trading currency 存储，CAD 汇总只在显示/聚合时通过独立 FX cache 折算。刷新失败不能清空旧价格，也不能把参考曲线说成真实走势。",
+  },
+  {
+    id: "project-feature-minister",
+    label: "功能说明：AI 大臣",
+    pages: [
+      "overview",
+      "portfolio",
+      "account-detail",
+      "holding-detail",
+      "security-detail",
+      "portfolio-health",
+      "recommendations",
+      "import",
+      "settings",
+      "spending",
+    ],
+    triggers: [/大臣|ai|gpt|chatgpt|问答|助手|管家|解释|怎么用|下一步/i],
+    value: "AI 大臣是跨页面 Loo国管家，用当前页面 DTO、用户偏好、推荐、缓存分析和对话上下文回答问题。",
+    detail:
+      "大臣可以解释功能、数据、推荐、偏好和下一步；它不能自动修改真实数据，不能在未启用 worker/cache 策略时实时抓新闻/论坛，投资相关回答必须保留免责声明。",
+  },
+];
+
+function factDisplayPriority(fact: LooMinisterFact) {
+  if (fact.source === "external-intelligence") return 0;
+  if (fact.source === "analysis-cache") return 1;
+  if (fact.source === "quote-cache") return 2;
+  if (fact.source === "portfolio-data") return 3;
+  if (fact.source === "fx-cache") return 4;
+  if (fact.source === "user-input") return 5;
+  if (fact.id.startsWith("context-resolver-status-")) return 6;
+  if (fact.id.startsWith("project-feature-")) return 8;
+  return 7;
+}
+
 function summarizeFacts(facts: LooMinisterFact[]) {
-  return facts
+  const sorted = [...facts].sort((a, b) => {
+    return factDisplayPriority(a) - factDisplayPriority(b);
+  });
+  return sorted
     .slice(0, 5)
     .map(
       (fact) =>
@@ -55,8 +171,42 @@ function isCandidateFitQuestion(question: string) {
   );
 }
 
+function isProductHelpQuestion(question: string) {
+  return /是什么|怎么|如何|为什么|哪里|入口|功能|流程|页面|tab|使用|下一步|区别|解释|作用|meaning|how|what|why/i.test(
+    question,
+  );
+}
+
 function findFact(facts: LooMinisterFact[], id: string) {
   return facts.find((fact) => fact.id === id);
+}
+
+function buildProjectKnowledgeFacts(
+  input: LooMinisterQuestionRequest,
+): LooMinisterFact[] {
+  const { pageContext, question } = input;
+  const selected = projectKnowledgeItems.filter(
+    (item) =>
+      item.pages.includes(pageContext.page) ||
+      item.triggers.some((trigger) => trigger.test(question)),
+  );
+  const unique = new Map<string, (typeof projectKnowledgeItems)[number]>();
+  for (const item of selected) {
+    unique.set(item.id, item);
+  }
+
+  const items = Array.from(unique.values()).slice(0, 5);
+  return items.map((item) => ({
+    id: item.id,
+    label: item.label,
+    value: item.value.slice(0, 240),
+    detail: item.detail.slice(0, 600),
+    source: "system",
+  }));
+}
+
+function hasProjectKnowledge(facts: LooMinisterFact[]) {
+  return facts.some((fact) => fact.id.startsWith("project-feature-"));
 }
 
 function getSecurityDisplayName(
@@ -200,6 +350,56 @@ function buildCandidateFitAnswer(input: LooMinisterQuestionRequest) {
   ].join("\n");
 }
 
+function buildProductHelpAnswer(input: LooMinisterQuestionRequest) {
+  const { pageContext, question } = input;
+  const knowledgeFacts = pageContext.facts.filter((fact) =>
+    fact.id.startsWith("project-feature-"),
+  );
+  const currentPageKnowledge =
+    knowledgeFacts.find((fact) =>
+      projectKnowledgeItems
+        .find((item) => item.id === fact.id)
+        ?.pages.includes(pageContext.page),
+    ) ?? knowledgeFacts[0];
+  const related = knowledgeFacts
+    .filter((fact) => fact.id !== currentPageKnowledge?.id)
+    .slice(0, 3);
+  const dataFreshness = pageContext.dataFreshness;
+  const freshnessLine = [
+    dataFreshness.portfolioAsOf ? `组合 ${dataFreshness.portfolioAsOf}` : null,
+    dataFreshness.quotesAsOf ? `报价 ${dataFreshness.quotesAsOf}` : null,
+    dataFreshness.fxAsOf ? `FX ${dataFreshness.fxAsOf}` : null,
+    `图表 ${dataFreshness.chartFreshness}`,
+    `来源 ${dataFreshness.sourceMode}`,
+  ]
+    .filter(Boolean)
+    .join("；");
+  const actionLine =
+    pageContext.allowedActions.length > 0
+      ? `如果你要继续操作，当前页面允许的安全动作包括：${pageContext.allowedActions
+          .slice(0, 3)
+          .map((action) => action.label)
+          .join("、")}。需要刷新、运行分析或修改设置时，仍必须由你确认。`
+      : "当前页面没有提供可直接执行的安全动作；大臣只能解释、建议路径或告诉你应去哪个页面操作。";
+
+  return [
+    `你问的是「${question}」，大臣按项目内功能上下文回答，而不是只复述页面数值。`,
+    currentPageKnowledge
+      ? `当前页面定位：${currentPageKnowledge.value}${currentPageKnowledge.detail ? `（${currentPageKnowledge.detail}）` : ""}`
+      : `当前页面是「${pageLabels[pageContext.page]}」，但还没有注入更细的产品说明。`,
+    related.length > 0
+      ? `相关功能边界：${related
+          .map((fact) => `${fact.label.replace("功能说明：", "")}：${fact.value}`)
+          .join("；")}`
+      : "相关功能边界暂时较少；后续会继续补充产品知识库。",
+    freshnessLine
+      ? `数据口径：${freshnessLine}。如果页面显示 stale、fallback、reference 或 cached-external，大臣必须把它当作边界说明，不能说成实时事实。`
+      : "数据口径：当前上下文没有完整新鲜度标记，所以回答只能作为功能解释。",
+    actionLine,
+    "产品原则：AI 大臣负责解释和草拟，真实保存、刷新、导入、推荐生成和偏好应用都必须走后端校验与用户确认。",
+  ].join("\n");
+}
+
 function buildAnswer(input: LooMinisterQuestionRequest) {
   const { pageContext, question } = input;
   if (
@@ -208,6 +408,9 @@ function buildAnswer(input: LooMinisterQuestionRequest) {
     isCandidateFitQuestion(question)
   ) {
     return buildCandidateFitAnswer(input);
+  }
+  if (isProductHelpQuestion(question) && hasProjectKnowledge(pageContext.facts)) {
+    return buildProductHelpAnswer(input);
   }
 
   const facts = summarizeFacts(pageContext.facts);
@@ -261,6 +464,9 @@ function buildLocalAnswer(
   fallbackReason?: string,
 ) {
   const pageContext = input.pageContext;
+  const prioritizedFacts = [...pageContext.facts].sort((a, b) => {
+    return factDisplayPriority(a) - factDisplayPriority(b);
+  });
   const fallbackNote = fallbackReason
     ? `GPT-5.5 调用未成功，已降级为本地大臣答复。原因：${fallbackReason}\n`
     : "";
@@ -274,7 +480,7 @@ function buildLocalAnswer(
       : `${pageLabels[pageContext.page]}大臣答复`,
     answer: `${fallbackNote}${buildAnswer(input)}`,
     keyPoints: [
-      ...pageContext.facts
+      ...prioritizedFacts
         .slice(0, 4)
         .map((fact) => `${fact.label}: ${fact.value}`),
       ...pageContext.warnings.slice(0, 2),
@@ -286,7 +492,7 @@ function buildLocalAnswer(
         sourceType: "page-context",
         asOf: pageContext.asOf,
       },
-      ...pageContext.facts.slice(0, 5).map((fact) => ({
+      ...prioritizedFacts.slice(0, 5).map((fact) => ({
         title: fact.label,
         sourceType: toAnswerSourceType(fact.source),
         asOf: pageContext.asOf,
@@ -675,6 +881,26 @@ async function enrichMinisterInputWithDailyIntelligence(
   }
 }
 
+function enrichMinisterInputWithProjectKnowledge(
+  input: LooMinisterQuestionRequest,
+): LooMinisterQuestionRequest {
+  const knowledgeFacts = buildProjectKnowledgeFacts(input);
+  if (knowledgeFacts.length === 0) {
+    return input;
+  }
+
+  const existingIds = new Set(input.pageContext.facts.map((fact) => fact.id));
+  const newFacts = knowledgeFacts.filter((fact) => !existingIds.has(fact.id));
+
+  return {
+    ...input,
+    pageContext: {
+      ...input.pageContext,
+      facts: [...newFacts, ...input.pageContext.facts].slice(0, 40),
+    },
+  };
+}
+
 async function enrichMinisterInputWithCandidateFit(
   userId: string,
   input: LooMinisterQuestionRequest,
@@ -928,11 +1154,18 @@ export async function getLooMinisterAnswer(
   options: {
     settings?: ResolvedLooMinisterSettings;
     persistUsage?: boolean;
+    skipContextResolver?: boolean;
   } = {},
 ) {
+  const resolvedContext = options.skipContextResolver
+    ? { request: input }
+    : await resolveLooMinisterContext({ userId, request: input });
   const enrichedInput = await enrichMinisterInputWithDailyIntelligence(
     userId,
-    await enrichMinisterInputWithCandidateFit(userId, input),
+    await enrichMinisterInputWithCandidateFit(
+      userId,
+      enrichMinisterInputWithProjectKnowledge(resolvedContext.request),
+    ),
   );
   const settings =
     options.settings ?? (await resolveLooMinisterSettings(userId));

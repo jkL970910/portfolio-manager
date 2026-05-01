@@ -144,6 +144,65 @@ test("Loo Minister GPT mode falls back safely when provider is not enabled", asy
   assert.match(response.data.disclaimer.zh, /不构成投资建议/);
 });
 
+test("Loo Minister answers product feature questions with project context", async () => {
+  const response = await getLooMinisterAnswer(
+    "user_1",
+    {
+      pageContext: {
+        version: LOO_MINISTER_VERSION,
+        page: "settings",
+        locale: "zh",
+        title: "Loo国设置",
+        asOf: now,
+        displayCurrency: "CAD",
+        subject: {},
+        dataFreshness: {
+          portfolioAsOf: now,
+          quotesAsOf: now,
+          fxAsOf: now,
+          chartFreshness: "unknown",
+          sourceMode: "local",
+        },
+        facts: [
+          {
+            id: "preference-mode",
+            label: "偏好设置模式",
+            value: "新手引导 + 手动进阶",
+            source: "user-input",
+          },
+        ],
+        warnings: [],
+        allowedActions: [],
+      },
+      question: "新手应该如何设置投资偏好？",
+      answerStyle: "beginner",
+      cacheStrategy: "prefer-cache",
+      includeExternalResearch: false,
+    },
+    {
+      settings: {
+        mode: "local",
+        provider: "official-openai",
+        model: "gpt-5.5",
+        reasoningEffort: "medium",
+        endpoint: "https://api.openai.com/v1/responses",
+        apiKey: null,
+        apiKeySource: "none",
+        providerEnabled: false,
+      },
+      persistUsage: false,
+    },
+  );
+
+  assert.match(response.data.answer, /项目内功能上下文/);
+  assert.match(response.data.answer, /新手引导式问答/);
+  assert.match(response.data.answer, /手动编辑/);
+  assert.match(response.data.answer, /确认后才应用/);
+  assert.ok(
+    response.data.sources.some((source) => source.sourceType === "manual"),
+  );
+});
+
 test("Loo Minister enriches answers with cached daily intelligence", async () => {
   await mockRepositories.externalResearchDocuments.create({
     userId: "minister_daily_user",
@@ -315,6 +374,69 @@ test("Loo Minister answers candidate buy-fit questions without treating zero hol
   assert.match(response.data.answer, /0% 只代表现在没持有/);
   assert.match(response.data.answer, /偏好适配/);
   assert.match(response.data.answer, /推荐引擎/);
+  assert.match(response.data.disclaimer.zh, /不构成投资建议/);
+});
+
+test("Loo Minister hydrates comparison security context from a ticker mention", async () => {
+  const response = await getLooMinisterAnswer(
+    "user_casey",
+    {
+      pageContext: {
+        version: LOO_MINISTER_VERSION,
+        page: "security-detail",
+        locale: "zh",
+        title: "ZQQ 标的详情",
+        asOf: now,
+        displayCurrency: "CAD",
+        subject: {
+          security: {
+            securityId: "security_zqq_cad",
+            symbol: "ZQQ",
+            exchange: "TSX",
+            currency: "CAD",
+            name: "BMO Nasdaq 100 Equity Hedged to CAD Index ETF",
+          },
+        },
+        dataFreshness: {
+          portfolioAsOf: now,
+          quotesAsOf: now,
+          fxAsOf: now,
+          chartFreshness: "fresh",
+          sourceMode: "cached-external",
+        },
+        facts: [
+          {
+            id: "asset-class",
+            label: "资产类别",
+            value: "US Equity",
+            source: "analysis-cache",
+          },
+        ],
+        warnings: [],
+        allowedActions: [],
+      },
+      question: "和 VFV 比呢？",
+      answerStyle: "beginner",
+      cacheStrategy: "prefer-cache",
+      includeExternalResearch: false,
+    },
+    {
+      settings: {
+        mode: "local",
+        provider: "official-openai",
+        model: "gpt-5.5",
+        reasoningEffort: "medium",
+        endpoint: "https://api.openai.com/v1/responses",
+        apiKey: null,
+        apiKeySource: "none",
+        providerEnabled: false,
+      },
+      persistUsage: false,
+    },
+  );
+
+  assert.match(response.data.answer, /对比标的 1: VFV · TSX · CAD/);
+  assert.match(response.data.answer, /大臣上下文补齐状态: hydrated/);
   assert.match(response.data.disclaimer.zh, /不构成投资建议/);
 });
 

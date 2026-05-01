@@ -812,6 +812,64 @@ export const looMinisterUsageLogs = pgTable(
   }),
 );
 
+export const looMinisterChatSessions = pgTable(
+  "loo_minister_chat_sessions",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id),
+    title: varchar("title", { length: 160 }).notNull(),
+    page: varchar("page", { length: 40 }).notNull(),
+    pageContextJson: jsonb("page_context_json").notNull(),
+    subjectHistoryJson: jsonb("subject_history_json").notNull().default([]),
+    summary: text("summary"),
+    messageCount: integer("message_count").notNull().default(0),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => ({
+    userUpdatedIdx: index("loo_minister_chat_sessions_user_updated_idx").on(
+      table.userId,
+      table.updatedAt,
+    ),
+  }),
+);
+
+export const looMinisterChatMessages = pgTable(
+  "loo_minister_chat_messages",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    sessionId: uuid("session_id")
+      .notNull()
+      .references(() => looMinisterChatSessions.id),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id),
+    role: varchar("role", { length: 16 }).notNull(),
+    content: text("content").notNull(),
+    pageContextJson: jsonb("page_context_json"),
+    answerJson: jsonb("answer_json"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => ({
+    sessionCreatedIdx: index("loo_minister_chat_messages_session_created_idx").on(
+      table.sessionId,
+      table.createdAt,
+    ),
+    userCreatedIdx: index("loo_minister_chat_messages_user_created_idx").on(
+      table.userId,
+      table.createdAt,
+    ),
+  }),
+);
+
 export const marketDataRefreshRuns = pgTable(
   "market_data_refresh_runs",
   {

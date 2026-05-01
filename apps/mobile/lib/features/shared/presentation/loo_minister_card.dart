@@ -260,8 +260,9 @@ class _LooMinisterSheet extends StatelessWidget {
 class _LooMinisterCardState extends State<LooMinisterCard> {
   late final TextEditingController _questionController =
       TextEditingController(text: widget.suggestedQuestion);
-  Future<LooMinisterAnswer>? _answer;
+  final List<_MinisterChatMessage> _messages = [];
   var _loading = false;
+  String? _sessionId;
 
   @override
   void dispose() {
@@ -269,7 +270,7 @@ class _LooMinisterCardState extends State<LooMinisterCard> {
     super.dispose();
   }
 
-  Future<LooMinisterAnswer> _askMinister() async {
+  Future<void> _askMinister() async {
     final question = _questionController.text.trim();
     if (question.length < 2) {
       throw const LooApiException("请先输入至少 2 个字的问题。");
@@ -278,23 +279,50 @@ class _LooMinisterCardState extends State<LooMinisterCard> {
     final request = LooMinisterQuestionRequest(
       pageContext: widget.pageContext,
       question: question,
-    );
-    final response = await widget.apiClient.askLooMinister(request.toJson());
+    ).toJson();
+    final response = await widget.apiClient.askLooMinisterChat({
+      ...request,
+      if (_sessionId != null) "sessionId": _sessionId,
+    });
     final data = response["data"];
     if (data is! Map<String, dynamic>) {
       throw const LooApiException("Loo国大臣答复格式不正确。");
     }
-    return LooMinisterAnswer.fromJson(data);
+    final answerData = data["answer"];
+    if (answerData is! Map<String, dynamic>) {
+      throw const LooApiException("Loo国大臣答复格式不正确。");
+    }
+    final answer = LooMinisterAnswer.fromJson(answerData);
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _sessionId = data["sessionId"] as String? ?? _sessionId;
+      _messages.add(_MinisterChatMessage.assistant(answer));
+      _questionController.clear();
+    });
   }
 
   void _submit() {
+    final question = _questionController.text.trim();
+    if (question.length < 2 || _loading) {
+      return;
+    }
+
     setState(() {
       _loading = true;
-      _answer = _askMinister().whenComplete(() {
-        if (mounted) {
-          setState(() => _loading = false);
-        }
-      });
+      _messages.add(_MinisterChatMessage.user(question));
+    });
+    _askMinister().catchError((Object error) {
+      if (mounted) {
+        setState(() {
+          _messages.add(_MinisterChatMessage.error(error.toString()));
+        });
+      }
+    }).whenComplete(() {
+      if (mounted) {
+        setState(() => _loading = false);
+      }
     });
   }
 
@@ -319,7 +347,18 @@ class _LooMinisterCardState extends State<LooMinisterCard> {
               ],
             ),
             const SizedBox(height: 8),
-            const Text("基于当前页面数据回答；暂不调用实时新闻、论坛或外部研究。"),
+            const Text("基于当前页面和本轮对话回答；暂不在聊天里实时抓新闻、论坛或外部研究。"),
+            if (_sessionId != null) ...[
+              const SizedBox(height: 6),
+              Text(
+                "本轮对话已开启，可继续追问。",
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+            ],
+            if (_messages.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              ..._messages.map(_MinisterChatBubble.new),
+            ],
             const SizedBox(height: 12),
             TextField(
               controller: _questionController,
@@ -338,29 +377,79 @@ class _LooMinisterCardState extends State<LooMinisterCard> {
               child: FilledButton.icon(
                 onPressed: _loading ? null : _submit,
                 icon: const Icon(Icons.auto_awesome),
-                label: Text(_loading ? "大臣思考中..." : "请大臣解释"),
+                label: Text(_loading ? "大臣思考中..." : "发送给大臣"),
               ),
             ),
-            if (_answer != null) ...[
-              const SizedBox(height: 14),
-              FutureBuilder<LooMinisterAnswer>(
-                future: _answer,
-                builder: (context, snapshot) {
-                  if (snapshot.connectionState == ConnectionState.waiting) {
-                    return const LinearProgressIndicator();
-                  }
-                  if (snapshot.hasError) {
-                    return _MinisterError(message: snapshot.error.toString());
-                  }
-                  final answer = snapshot.data;
-                  if (answer == null) {
-                    return const _MinisterError(message: "没有收到大臣答复。");
-                  }
-                  return _MinisterAnswerView(answer);
-                },
-              ),
+            if (_loading) ...[
+              const SizedBox(height: 12),
+              const LinearProgressIndicator(),
             ],
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _MinisterChatMessage {
+  const _MinisterChatMessage._({
+    required this.role,
+    required this.text,
+    this.answer,
+    this.isError = false,
+  });
+
+  factory _MinisterChatMessage.user(String text) =>
+      _MinisterChatMessage._(role: "user", text: text);
+
+  factory _MinisterChatMessage.assistant(LooMinisterAnswer answer) =>
+      _MinisterChatMessage._(
+        role: "assistant",
+        text: answer.answer,
+        answer: answer,
+      );
+
+  factory _MinisterChatMessage.error(String text) =>
+      _MinisterChatMessage._(role: "assistant", text: text, isError: true);
+
+  final String role;
+  final String text;
+  final LooMinisterAnswer? answer;
+  final bool isError;
+}
+
+class _MinisterChatBubble extends StatelessWidget {
+  const _MinisterChatBubble(this.message);
+
+  final _MinisterChatMessage message;
+
+  @override
+  Widget build(BuildContext context) {
+    final isUser = message.role == "user";
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Align(
+        alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 520),
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              color: isUser
+                  ? theme.colorScheme.secondaryContainer
+                  : theme.colorScheme.primaryContainer.withValues(alpha: 0.32),
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(color: theme.colorScheme.outlineVariant),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: isUser
+                  ? Text(message.text)
+                  : message.isError
+                      ? _MinisterError(message: message.text)
+                      : _MinisterAnswerView(message.answer!),
+            ),
+          ),
         ),
       ),
     );

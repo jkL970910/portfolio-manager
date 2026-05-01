@@ -3,6 +3,7 @@ import test from "node:test";
 import {
   LOO_MINISTER_VERSION,
   looMinisterAnswerResultSchema,
+  looMinisterChatRequestSchema,
   looMinisterPageContextSchema,
   looMinisterQuestionRequestSchema,
   looMinisterSuggestedActionSchema
@@ -144,6 +145,22 @@ test("Loo Minister question request keeps external research disabled by default"
 
   assert.equal(parsed.answerStyle, "beginner");
   assert.equal(parsed.includeExternalResearch, false);
+});
+
+test("Loo Minister chat request keeps session id optional for multi-turn Q&A", () => {
+  const firstTurn = looMinisterChatRequestSchema.parse({
+    pageContext: makeOverviewContext(),
+    question: "大臣先解释一下总资产。"
+  });
+  const followUp = looMinisterChatRequestSchema.parse({
+    pageContext: makeOverviewContext(),
+    question: "那这个和组合页有什么不同？",
+    sessionId: "minister-session-1"
+  });
+
+  assert.equal(firstTurn.sessionId, undefined);
+  assert.equal(followUp.sessionId, "minister-session-1");
+  assert.equal(followUp.includeExternalResearch, false);
 });
 
 test("Loo Minister question request rejects live external research for now", () => {
