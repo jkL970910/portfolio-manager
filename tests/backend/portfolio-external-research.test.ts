@@ -104,6 +104,10 @@ test("cached market-data provider reads local cache only when explicitly enabled
   assert.equal(result.security?.symbol, "VFV");
   assert.ok(result.summaryPoints.some((point) => point.includes("缓存行情")));
   assert.equal(result.sources[0]?.sourceType, "market-data");
+  assert.equal(result.documents?.[0]?.sourceType, "market-data");
+  assert.equal(result.documents?.[0]?.security?.symbol, "VFV");
+  assert.equal(result.documents?.[0]?.security?.exchange, "TSX");
+  assert.equal(result.documents?.[0]?.security?.currency, "CAD");
 
   clearExternalResearchEnv();
 });

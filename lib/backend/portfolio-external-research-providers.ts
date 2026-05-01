@@ -7,6 +7,7 @@ import {
   ExternalResearchSource,
   getExternalResearchPolicy,
 } from "@/lib/backend/portfolio-external-research";
+import type { ExternalResearchDocument } from "@/lib/backend/external-research-documents";
 import { getRepositories } from "@/lib/backend/repositories/factory";
 
 export type ExternalResearchProviderId = ExternalResearchSource["id"];
@@ -35,6 +36,7 @@ export interface ExternalResearchProviderResult {
   summaryPoints: string[];
   risks: string[];
   sources: ExternalResearchProviderSource[];
+  documents?: ExternalResearchDocument[];
 }
 
 export interface ExternalResearchProvider {
@@ -81,6 +83,96 @@ function isSourceAllowed(
   return input.allowedSources.some(
     (source) => source.id === sourceId && source.enabled,
   );
+}
+
+function addSeconds(date: Date, seconds: number) {
+  return new Date(date.getTime() + seconds * 1000);
+}
+
+function buildCachedMarketDataDocument(args: {
+  input: ExternalResearchProviderInput;
+  symbol: string;
+  expectedCurrency: string | null;
+  expectedExchange: string | null;
+  expectedSecurityId: string | null;
+  summaryPoints: string[];
+  risks: string[];
+  matchingHistoryCount: number;
+  latestPoint:
+    | {
+        priceDate: string;
+        close: number;
+        currency: string;
+        source: string;
+        provider?: string | null;
+        freshness?: string | null;
+      }
+    | null;
+  staleOrFallbackPoints: number;
+}): ExternalResearchDocument {
+  const requestSecurity = args.input.request.security;
+  const ttlSeconds = Math.max(
+    args.input.request.maxCacheAgeSeconds ?? getExternalResearchPolicy().defaultTtlSeconds,
+    getExternalResearchPolicy().minTtlSeconds,
+  );
+  const publishedAt = args.latestPoint?.priceDate
+    ? `${args.latestPoint.priceDate}T00:00:00.000Z`
+    : args.input.now.toISOString();
+  const confidence = args.matchingHistoryCount > 0
+    ? args.staleOrFallbackPoints > 0
+      ? "medium"
+      : "high"
+    : "low";
+  const relevanceScore = args.matchingHistoryCount > 0
+    ? args.staleOrFallbackPoints > 0
+      ? 65
+      : 78
+    : 35;
+
+  return {
+    id: [
+      "market-data",
+      args.expectedSecurityId ?? args.symbol,
+      args.expectedExchange ?? "unknown-exchange",
+      args.expectedCurrency ?? "unknown-currency",
+      args.latestPoint?.priceDate ?? args.input.now.toISOString().slice(0, 10),
+    ].join(":"),
+    userId: args.input.userId,
+    sourceType: "market-data",
+    providerId: "market-data",
+    sourceName: "本地缓存行情",
+    title: `${args.symbol} listing 缓存行情快照`,
+    summary: args.summaryPoints.slice(0, 4).join(" "),
+    url: null,
+    publishedAt,
+    capturedAt: args.input.now.toISOString(),
+    expiresAt: addSeconds(args.input.now, ttlSeconds).toISOString(),
+    language: "zh",
+    security: {
+      securityId: args.expectedSecurityId,
+      symbol: args.symbol,
+      exchange: args.expectedExchange,
+      currency: args.expectedCurrency === "CAD" || args.expectedCurrency === "USD"
+        ? args.expectedCurrency
+        : null,
+      name: requestSecurity?.name ?? null,
+      provider: args.latestPoint?.provider ?? args.latestPoint?.source ?? "local-cache",
+      securityType: null,
+    },
+    underlyingId: null,
+    confidence,
+    sentiment: "neutral",
+    relevanceScore,
+    sourceReliability: 82,
+    keyPoints: args.summaryPoints.slice(0, 6),
+    riskFlags: args.risks.slice(0, 6),
+    tags: [
+      "market-data",
+      "quote-cache",
+      "listing-identity",
+      confidence === "high" ? "fresh-cache" : "limited-cache",
+    ],
+  };
 }
 
 export const cachedMarketDataResearchProvider: ExternalResearchProvider = {
@@ -156,38 +248,41 @@ export const cachedMarketDataResearchProvider: ExternalResearchProvider = {
       0,
     );
 
+    const summaryPoints = [
+      `缓存行情覆盖 ${matchingHistory.length} 条 ${symbol} 价格历史。`,
+      latestPoint
+        ? `最近缓存收盘价：${latestPoint.currency} ${latestPoint.close.toFixed(2)}，日期 ${latestPoint.priceDate}。`
+        : "没有找到匹配币种的缓存价格历史。",
+      latestPoint
+        ? `缓存来源：${latestPoint.source}；provider=${latestPoint.provider ?? "未知"}；freshness=${latestPoint.freshness ?? "未知"}。`
+        : "缓存来源：无可用价格历史。",
+      `组合内匹配持仓 ${matchingHoldings.length} 笔，CAD 市值约 ${Math.round(totalMarketValueCad).toLocaleString("en-CA")}。`,
+      `身份匹配使用 securityId=${expectedSecurityId ?? "未指定"}, symbol=${symbol}, exchange=${expectedExchange ?? "未指定"}, currency=${expectedCurrency ?? "未指定"}。`,
+    ];
+    const risks = [
+      ...(!expectedSecurityId && (!expectedExchange || !expectedCurrency)
+        ? ["缺少 securityId 或完整 listing 身份；已跳过 ticker-only 行情关联，避免 CAD/USD 混淆。"]
+        : []),
+      ...(matchingHistory.length === 0
+        ? ["缓存行情为空；不能把该结果当成实时市场研究。"]
+        : []),
+      ...(staleOrFallbackPoints > 0
+        ? [
+            `缓存价格历史中有 ${staleOrFallbackPoints} 条 stale/fallback 点；AI 只能把它当成参考数据。`,
+          ]
+        : []),
+      ...(matchingHoldings.length === 0
+        ? ["组合内没有找到完全匹配的持仓；请确认交易所和币种是否正确。"]
+        : []),
+    ];
+
     return {
       sourceMode: "cached-external",
       externalResearchAsOf: input.now.toISOString(),
       targetKey: input.targetKey,
       security,
-      summaryPoints: [
-        `缓存行情覆盖 ${matchingHistory.length} 条 ${symbol} 价格历史。`,
-        latestPoint
-          ? `最近缓存收盘价：${latestPoint.currency} ${latestPoint.close.toFixed(2)}，日期 ${latestPoint.priceDate}。`
-          : "没有找到匹配币种的缓存价格历史。",
-        latestPoint
-          ? `缓存来源：${latestPoint.source}；provider=${latestPoint.provider ?? "未知"}；freshness=${latestPoint.freshness ?? "未知"}。`
-          : "缓存来源：无可用价格历史。",
-        `组合内匹配持仓 ${matchingHoldings.length} 笔，CAD 市值约 ${Math.round(totalMarketValueCad).toLocaleString("en-CA")}。`,
-        `身份匹配使用 securityId=${expectedSecurityId ?? "未指定"}, symbol=${symbol}, exchange=${expectedExchange ?? "未指定"}, currency=${expectedCurrency ?? "未指定"}。`,
-      ],
-      risks: [
-        ...(!expectedSecurityId && (!expectedExchange || !expectedCurrency)
-          ? ["缺少 securityId 或完整 listing 身份；已跳过 ticker-only 行情关联，避免 CAD/USD 混淆。"]
-          : []),
-        ...(matchingHistory.length === 0
-          ? ["缓存行情为空；不能把该结果当成实时市场研究。"]
-          : []),
-        ...(staleOrFallbackPoints > 0
-          ? [
-              `缓存价格历史中有 ${staleOrFallbackPoints} 条 stale/fallback 点；AI 只能把它当成参考数据。`,
-            ]
-          : []),
-        ...(matchingHoldings.length === 0
-          ? ["组合内没有找到完全匹配的持仓；请确认交易所和币种是否正确。"]
-          : []),
-      ],
+      summaryPoints,
+      risks,
       sources: [
         {
           title: "Local cached security price history",
@@ -195,6 +290,20 @@ export const cachedMarketDataResearchProvider: ExternalResearchProvider = {
           sourceType: "market-data",
           providerId: "market-data",
         },
+      ],
+      documents: [
+        buildCachedMarketDataDocument({
+          input,
+          symbol,
+          expectedCurrency,
+          expectedExchange,
+          expectedSecurityId,
+          summaryPoints,
+          risks,
+          matchingHistoryCount: matchingHistory.length,
+          latestPoint,
+          staleOrFallbackPoints,
+        }),
       ],
     };
   },

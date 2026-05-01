@@ -17,6 +17,7 @@ import {
   ExternalResearchProviderResult,
   fetchCachedExternalResearch,
 } from "@/lib/backend/portfolio-external-research-providers";
+import type { ExternalResearchDocument } from "@/lib/backend/external-research-documents";
 import {
   ExternalResearchJob,
   ExternalResearchUsageCounter,
@@ -278,6 +279,55 @@ export function buildAnalyzerResultFromExternalResearch(args: {
   };
 }
 
+function mapExternalResearchDocumentForPersistence(
+  userId: string,
+  document: ExternalResearchDocument,
+) {
+  return {
+    userId,
+    providerDocumentId: document.id,
+    sourceType: document.sourceType,
+    providerId: document.providerId,
+    sourceName: document.sourceName,
+    title: document.title,
+    summary: document.summary,
+    url: document.url ?? null,
+    publishedAt: document.publishedAt ?? null,
+    capturedAt: document.capturedAt,
+    expiresAt: document.expiresAt,
+    language: document.language,
+    security: document.security ?? null,
+    underlyingId: document.underlyingId ?? null,
+    confidence: document.confidence,
+    sentiment: document.sentiment,
+    relevanceScore: document.relevanceScore,
+    sourceReliability: document.sourceReliability,
+    keyPoints: document.keyPoints,
+    riskFlags: document.riskFlags,
+    tags: document.tags,
+    rawPayload: document,
+  };
+}
+
+async function persistExternalResearchDocuments(args: {
+  userId: string;
+  providerResult: ExternalResearchProviderResult;
+}) {
+  const documents = args.providerResult.documents ?? [];
+  if (documents.length === 0) {
+    return [];
+  }
+
+  const repositories = getRepositories();
+  return Promise.all(
+    documents.map((document) =>
+      repositories.externalResearchDocuments.create(
+        mapExternalResearchDocumentForPersistence(args.userId, document),
+      )
+    ),
+  );
+}
+
 export async function claimNextExternalResearchJob(
   workerId: string,
   now = new Date(),
@@ -351,6 +401,10 @@ export async function runExternalResearchWorkerOnce(args: {
       job,
       providerResult,
       now,
+    });
+    await persistExternalResearchDocuments({
+      userId: job.userId,
+      providerResult,
     });
     const expiresAt = new Date(
       now.getTime() + getExternalResearchPolicy().defaultTtlSeconds * 1000,

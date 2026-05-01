@@ -18,7 +18,10 @@ import {
   getRecommendationView,
 } from "@/lib/backend/services";
 import { getRepositories } from "@/lib/backend/repositories/factory";
-import type { PortfolioAnalysisRun } from "@/lib/backend/models";
+import type {
+  ExternalResearchDocumentRecord,
+  PortfolioAnalysisRun,
+} from "@/lib/backend/models";
 import type { Viewer } from "@/lib/auth/session";
 
 type MobileHomeData = {
@@ -774,6 +777,65 @@ function mapRecommendationIntelligenceBriefs(
   });
 }
 
+function mapExternalResearchDocumentBriefs(
+  documents: ExternalResearchDocumentRecord[],
+): RecommendationsData["intelligenceBriefs"] {
+  return documents.slice(0, 8).map((document) => {
+    const security = document.security;
+    const symbol = security?.symbol?.trim().toUpperCase() || "UNKNOWN";
+    const exchange = security?.exchange?.trim().toUpperCase() || undefined;
+    const currency =
+      security?.currency === "CAD" || security?.currency === "USD"
+        ? security.currency
+        : undefined;
+    const sourceLabelMap: Record<
+      ExternalResearchDocumentRecord["sourceType"],
+      string
+    > = {
+      "market-data": "缓存行情情报",
+      news: "缓存新闻/公告",
+      forum: "社区情绪（低权重）",
+      institutional: "缓存机构资料",
+      manual: "手动研究记录",
+    };
+    const freshnessLabel = [
+      document.publishedAt
+        ? `来源 ${document.publishedAt.slice(0, 10)}`
+        : `捕获 ${document.capturedAt.slice(0, 10)}`,
+      `过期 ${document.expiresAt.slice(0, 10)}`,
+      `可信度 ${document.confidence}`,
+    ].join(" · ");
+
+    return {
+      id: `doc:${document.id}`,
+      title: document.title,
+      detail: document.summary,
+      sourceLabel: sourceLabelMap[document.sourceType],
+      sourceMode: "cached-external",
+      freshnessLabel,
+      generatedAt: document.capturedAt,
+      symbols: [symbol, exchange, currency].filter(
+        (value): value is string => Boolean(value),
+      ),
+      identity: {
+        securityId: security?.securityId ?? undefined,
+        symbol,
+        exchange,
+        currency,
+      },
+      sources: [
+        {
+          title: document.sourceName,
+          sourceType: document.sourceType,
+          date:
+            document.publishedAt?.slice(0, 10) ??
+            document.capturedAt.slice(0, 10),
+        },
+      ],
+    };
+  });
+}
+
 function mapMobileImportData(data: ImportData): MobileImportData {
   return {
     manualSteps: [
@@ -901,11 +963,20 @@ export async function getMobilePortfolioSecurityDetailView(
 }
 
 export async function getMobileRecommendationsView(userId: string) {
-  const [payload, profile, analysisRuns] = await Promise.all([
+  const now = new Date();
+  const [payload, profile, analysisRuns, externalDocuments] = await Promise.all([
     getRecommendationView(userId),
     getRepositories().preferences.getByUserId(userId),
     getRepositories().analysisRuns.listRecentByUserId(userId, 5),
+    getRepositories().externalResearchDocuments.listFreshByUserId(userId, {
+      now,
+      limit: 8,
+    }),
   ]);
+  const intelligenceBriefs = [
+    ...mapExternalResearchDocumentBriefs(externalDocuments),
+    ...mapRecommendationIntelligenceBriefs(analysisRuns),
+  ];
   return {
     data: mapMobileRecommendationsData(payload.data, {
       riskProfile: profile.riskProfile,
@@ -917,7 +988,7 @@ export async function getMobileRecommendationsView(userId: string) {
       watchlistSymbols: profile.watchlistSymbols,
       recommendationConstraints: profile.recommendationConstraints,
       preferenceFactors: profile.preferenceFactors,
-    }, mapRecommendationIntelligenceBriefs(analysisRuns)),
+    }, intelligenceBriefs),
     meta: payload.meta,
   };
 }

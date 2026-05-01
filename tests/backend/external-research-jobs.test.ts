@@ -317,6 +317,31 @@ test("external research worker can persist cached market-data results when expli
   assert.ok(result.job?.resultRunId);
   assert.match(result.message, /cached market-data provider/);
 
+  const documents =
+    await mockRepositories.externalResearchDocuments.listFreshByUserId(
+      "user_casey",
+      {
+        now,
+        limit: 20,
+        symbol: "VFV",
+        exchange: "TSX",
+        currency: "CAD",
+      },
+    );
+  const marketDataDocument = documents.find(
+    (document) => document.providerId === "market-data",
+  );
+  assert.ok(marketDataDocument);
+  assert.equal(marketDataDocument.sourceType, "market-data");
+  assert.equal(marketDataDocument.security?.symbol, "VFV");
+  assert.equal(marketDataDocument.security?.exchange, "TSX");
+  assert.equal(marketDataDocument.security?.currency, "CAD");
+  assert.ok(
+    marketDataDocument.keyPoints.some((point) =>
+      point.includes("缓存行情覆盖"),
+    ),
+  );
+
   clearExternalResearchEnv();
 });
 

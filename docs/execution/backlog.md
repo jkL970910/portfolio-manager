@@ -73,7 +73,7 @@ over simply adding more Flutter screens.
 | Loo国 AI Minister assistant               | In Progress | Backend and Flutter first-pass page-context DTOs exist; global floating 大臣 entry receives Overview/Portfolio/detail/Health context; Settings can switch Local/GPT-5.5, choose official OpenAI or OpenRouter-compatible provider, save encrypted BYOK API key, and surface usage/retry/failure observability |
 | P0.5 external consultation skill pipeline | In Progress | The uploaded `portfolio-analyzer.skill` is productized as cached/guarded analysis work. Next priority is proving it on real cached market data before enabling live external research adapters or UI-heavy redesign.                                                                        |
 | Recommendation V2.1 preference fit        | In Progress | V2 now starts consuming Preference Factors V2 for light candidate ordering and explanation while preserving deterministic target-allocation/account-placement behavior.                                                                             |
-| Recommendation V3 external intelligence   | In Progress | See `docs/execution/recommendation-v3-external-intelligence.md`. Mobile now labels the cached-intelligence layer as `V3 Overlay / V2.1 Core` when saved external/local analysis is available. |
+| Recommendation V3 external intelligence   | In Progress | See `docs/execution/recommendation-v3-external-intelligence.md`. Mobile now labels the cached-intelligence layer as `V3 Overlay / V2.1 Core` when saved external/local analysis or persisted external research documents are available. |
 | Loo国今日秘闻                             | In Progress | Curated cached-intelligence card exists for holdings/watchlist/recommendation candidates. It is source/freshness-aware and still must not become a raw news feed.                                                                            |
 
 ## Deferred
@@ -194,9 +194,9 @@ Guardrails:
   counts, fallback counts, and market-data sources so stale/reference data is
   visible instead of hidden inside the AI explanation.
 - Mobile Recommendations now includes a first-pass `Loo国今日秘闻` card sourced
-  from cached analysis runs. This is an intelligence overlay only: it does not
-  automatically change deterministic V2.1 ordering, and it must not trigger
-  live news/forum research on page load.
+  from persisted external research documents and cached analysis runs. This is
+  an intelligence overlay only: it does not automatically change deterministic
+  V2.1 ordering, and it must not trigger live news/forum research on page load.
 - Recommendation priority cards now attach cached intelligence references by
   canonical identity first. Exact `security_id` matches are `当前上市版本情报`;
   exact `symbol + exchange + currency` remains a strict fallback for older
@@ -216,6 +216,10 @@ Guardrails:
   type, identity scope, TTL, confidence, sentiment, relevance, reliability, key
   points, and risk flags. Ticker-only documents are unresolved and cannot be
   used as listing-level evidence.
+- Cached market-data external research now writes a structured
+  `external_research_documents` record through the worker and mobile
+  Recommendations reads fresh records directly for V3 overlay matching. This is
+  the closed-loop P0.5 path before live news/forum adapters are introduced.
 - Loo国大臣 prompts now carry fact source tags and explicitly prefer
   `analysis-cache` / `cached-external` facts when present.
 - `0016_preference_factors` adds the first Preference Factors V2 storage

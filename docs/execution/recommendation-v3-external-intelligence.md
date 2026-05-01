@@ -282,6 +282,9 @@ Current structured document boundary:
 
 - `lib/backend/external-research-documents.ts` defines the first source-agnostic
   external research document contract.
+- `external_research_documents` is now backed by DB persistence. Successful
+  external research worker runs can upsert provider documents by
+  `user_id + provider_id + provider_document_id`.
 - Every future adapter must normalize into this shape before Recommendation V3
   reads it:
   - source type: market-data / news / forum / institutional / manual
@@ -293,9 +296,14 @@ Current structured document boundary:
 - The ranking layer intentionally separates `listing`, `underlying`, `macro`,
   and `unresolved` scopes. Ticker-only documents are unresolved and cannot be
   used as listing-level evidence.
-- The current implementation is contract/test level plus provider-result
-  builder. DB persistence for `external_research_documents` remains the next
-  step before live news/announcement adapters are enabled.
+- The current cached market-data provider emits a structured market-data
+  document for the exact listing request. The worker persists that document
+  alongside the saved analysis run.
+- Mobile Recommendations now reads fresh `external_research_documents` directly
+  and merges them with saved analysis runs for `Loo国今日秘闻` / V3 overlay
+  matching. This keeps the recommendation bridge usable even when the analysis
+  run is only a compact report and the richer source document needs to remain
+  queryable.
 
 ## Source Strategy
 
@@ -388,13 +396,15 @@ P0.5:
 2. Complete: docs and contract for Recommendation V3 external signals.
 3. Complete: Preference Factors V2 backend schema as optional fields with safe
    defaults.
-4. In progress: local-only `今日秘闻` surface from cached provider/portfolio
+4. Complete for cached market-data: local-only `今日秘闻` surface from cached provider/portfolio
    signals before live news adapters. Current implementation is embedded in the
    mobile recommendations payload; a standalone API can be added when other
    pages need the same curated feed.
-5. In progress: identity-safe external research provider. Cached market-data
+5. Complete for cached market-data: identity-safe external research provider. Cached market-data
    research now requires `security_id` or complete `symbol + exchange +
    currency`; ticker-only fallback is intentionally skipped.
+6. Complete: cached market-data provider results are persisted as structured
+   external research documents and consumed by Recommendation V3 overlay.
 
 P1:
 
