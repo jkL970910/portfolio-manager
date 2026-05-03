@@ -1,0 +1,9 @@
+.local/
+.db-backups/
+node_modules/
+apps/mobile/build/
+apps/mobile/.dart_tool/
+**/.flutter-plugins
+**/.flutter-plugins-dependencies
+**/.packages
+*.log

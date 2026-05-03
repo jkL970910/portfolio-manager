@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { AlertTriangle, CheckCircle2, Eye, FileText, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { extractCsvHeaders, previewCsvContent } from "@/lib/backend/csv-import";
+import { extractCsvHeaders, previewCsvContent } from "@/lib/import/csv-client";
 import { assertApiData, getApiErrorMessage, safeJson } from "@/lib/client/api";
 import { getImportFieldMeta, getImportMappingGroupTitle } from "@/lib/i18n/import";
 import { DisplayLanguage, pick } from "@/lib/i18n/ui";

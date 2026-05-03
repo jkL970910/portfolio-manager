@@ -23,7 +23,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { InfoRow } from "@/components/ui/info-row";
-import { extractCsvHeaders, previewCsvContent, type ImportFieldMapping } from "@/lib/backend/csv-import";
+import { extractCsvHeaders, previewCsvContent, type ImportFieldMapping } from "@/lib/import/csv-client";
 import { assertApiData, getApiErrorMessage, safeJson } from "@/lib/client/api";
 import { getAccountTypeLabel, getAssetClassLabel } from "@/lib/i18n/finance";
 import { getImportFieldMeta, getImportMappingGroupTitle, getImportPresetLabel } from "@/lib/i18n/import";
@@ -2193,5 +2193,4 @@ function StepCompleteSetup({
     </div>
   );
 }
-
 

@@ -1,0 +1,21 @@
+name = "portfolio-manager-cron"
+main = "portfolio-cron-worker.js"
+compatibility_date = "2026-05-03"
+
+[triggers]
+crons = [
+  "15 11 * * *"
+]
+
+[vars]
+APP_BASE_URL = "https://<your-vercel-domain>"
+ENABLE_SECURITY_METADATA_WORKER = "true"
+ENABLE_MARKET_DATA_WORKER = "true"
+ENABLE_EXTERNAL_RESEARCH_WORKER = "false"
+SECURITY_METADATA_REFRESH_MAX_SECURITIES = "50"
+SECURITY_METADATA_REFRESH_MAX_AGE_DAYS = "30"
+MARKET_DATA_REFRESH_MAX_USERS = "1"
+MARKET_DATA_REFRESH_MAX_SYMBOLS = "20"
+
+# Add as a secret, never as plaintext:
+# wrangler secret put PORTFOLIO_WORKER_SECRET

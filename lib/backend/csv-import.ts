@@ -1,4 +1,18 @@
-import { AccountType, CurrencyCode } from "@/lib/backend/models";
+import type { AccountType, CurrencyCode } from "@/lib/backend/models";
+import {
+  ImportCanonicalField,
+  ImportFieldMapping,
+  normalizeCsvHeader,
+  splitCsvLine,
+} from "@/lib/import/csv-client";
+
+export {
+  extractCsvHeaders,
+  previewCsvContent,
+  type CsvPreview,
+  type ImportCanonicalField,
+  type ImportFieldMapping,
+} from "@/lib/import/csv-client";
 
 export interface ParsedAccountSeed {
   accountKey: string;
@@ -55,100 +69,6 @@ export interface ParsedCsvImport {
   detectedHeaders: string[];
 }
 
-export interface CsvPreview {
-  headers: string[];
-  rows: string[][];
-}
-
-export type ImportFieldMapping = Partial<Record<ImportCanonicalField, string>>;
-
-export type ImportCanonicalField =
-  | "record_type"
-  | "account_key"
-  | "account_type"
-  | "institution"
-  | "account_nickname"
-  | "account_currency"
-  | "market_value"
-  | "market_value_cad"
-  | "contribution_room_cad"
-  | "symbol"
-  | "name"
-  | "exchange"
-  | "asset_class"
-  | "sector"
-  | "holding_currency"
-  | "quantity"
-  | "avg_cost_per_share"
-  | "avg_cost_per_share_cad"
-  | "cost_basis"
-  | "cost_basis_cad"
-  | "last_price"
-  | "last_price_cad"
-  | "weight_pct"
-  | "gain_loss_pct"
-  | "booked_at"
-  | "merchant"
-  | "category"
-  | "amount_cad"
-  | "direction";
-
-function splitCsvLine(line: string) {
-  const values: string[] = [];
-  let current = "";
-  let inQuotes = false;
-
-  for (let index = 0; index < line.length; index += 1) {
-    const character = line[index];
-    const nextCharacter = line[index + 1];
-
-    if (character === "\"") {
-      if (inQuotes && nextCharacter === "\"") {
-        current += "\"";
-        index += 1;
-      } else {
-        inQuotes = !inQuotes;
-      }
-      continue;
-    }
-
-    if (character === "," && !inQuotes) {
-      values.push(current.trim());
-      current = "";
-      continue;
-    }
-
-    current += character;
-  }
-
-  values.push(current.trim());
-  return values;
-}
-
-function normalizeHeader(value: string) {
-  return value.trim().toLowerCase().replace(/\s+/g, "_");
-}
-
-export function extractCsvHeaders(csvContent: string) {
-  const firstLine = csvContent.replace(/^\uFEFF/, "").split(/\r?\n/).find((line) => line.trim());
-  return firstLine ? splitCsvLine(firstLine).map((header) => header.trim()).filter(Boolean) : [];
-}
-
-export function previewCsvContent(csvContent: string, limit = 20): CsvPreview {
-  const lines = csvContent
-    .replace(/^\uFEFF/, "")
-    .split(/\r?\n/)
-    .filter((line) => line.trim());
-
-  if (lines.length === 0) {
-    return { headers: [], rows: [] };
-  }
-
-  const headers = splitCsvLine(lines[0]).map((header) => header.trim());
-  const rows = lines.slice(1, limit + 1).map((line) => splitCsvLine(line));
-  return { headers, rows };
-}
-
 function parseNumber(value: string) {
   const normalized = value.replace(/[$,\s]/g, "");
   if (!normalized) {
@@ -196,7 +116,7 @@ function round(value: number, digits = 2) {
 }
 
 function resolveMappedHeader(canonicalField: ImportCanonicalField, fieldMapping: ImportFieldMapping) {
-  return normalizeHeader(fieldMapping[canonicalField] ?? canonicalField);
+  return normalizeCsvHeader(fieldMapping[canonicalField] ?? canonicalField);
 }
 
 function getMappedValue(
@@ -230,7 +150,7 @@ export async function parseImportCsv(csvContent: string, fieldMapping: ImportFie
   }
 
   const rawHeaders = splitCsvLine(lines[0]).map((header) => header.trim());
-  const normalizedHeaders = rawHeaders.map(normalizeHeader);
+  const normalizedHeaders = rawHeaders.map(normalizeCsvHeader);
   const rows = lines.slice(1).map((line, index) => {
     const values = splitCsvLine(line);
     const record: Record<string, string> = {};
@@ -241,7 +161,7 @@ export async function parseImportCsv(csvContent: string, fieldMapping: ImportFie
   });
 
   const missingMappedHeaders = Object.entries(fieldMapping)
-    .filter(([, selectedHeader]) => selectedHeader && !normalizedHeaders.includes(normalizeHeader(selectedHeader)))
+    .filter(([, selectedHeader]) => selectedHeader && !normalizedHeaders.includes(normalizeCsvHeader(selectedHeader)))
     .map(([canonicalField, selectedHeader]) => `${canonicalField} -> ${selectedHeader}`);
 
   const validationErrors: ImportValidationError[] = missingMappedHeaders.map((message) => ({

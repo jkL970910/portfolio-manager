@@ -49,3 +49,5 @@ Thumbs.db
 # Local database runtime
 .local/
 .db-backups/
+.vercel
+infra/cloudflare/wrangler.toml
