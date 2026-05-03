@@ -133,6 +133,23 @@ export const mockRepositories: BackendRepositories = {
     async getById(securityId) {
       return securities.find((security) => security.id === securityId) ?? null;
     },
+    async listNeedingMetadataRefresh(input) {
+      const staleBeforeTime = Date.parse(input.staleBefore);
+      return securities
+        .filter((security) => {
+          if (security.metadataSource === "manual" || security.metadataConfirmedAt) {
+            return false;
+          }
+          if (!security.metadataAsOf) {
+            return true;
+          }
+          const asOfTime = Date.parse(security.metadataAsOf);
+          return Number.isFinite(staleBeforeTime) &&
+            Number.isFinite(asOfTime) &&
+            asOfTime <= staleBeforeTime;
+        })
+        .slice(0, input.limit);
+    },
     async findByCanonicalIdentity(input) {
       return securities.find(
         (security) =>
@@ -179,6 +196,17 @@ export const mockRepositories: BackendRepositories = {
       };
       securities.push(security);
       return security;
+    },
+    async updateMetadata(securityId, input) {
+      const existing = securities.find((security) => security.id === securityId);
+      if (!existing) {
+        throw new Error(`Security ${securityId} not found.`);
+      }
+      Object.assign(existing, {
+        ...input,
+        updatedAt: new Date().toISOString(),
+      });
+      return existing;
     },
     async addAlias(input) {
       const existing = securityAliases.find(

@@ -17,6 +17,25 @@ export type InferredSecurityMetadata = SecurityMetadata & {
   assetClassSource: SecurityMetadataSource;
 };
 
+export function normalizeSecurityMetadataForWrite(
+  metadata: SecurityMetadata,
+): SecurityMetadata {
+  const confidence = Number.isFinite(metadata.confidence)
+    ? Math.min(100, Math.max(0, Math.round(metadata.confidence)))
+    : 45;
+
+  return {
+    economicAssetClass: metadata.economicAssetClass?.trim() || null,
+    economicSector: metadata.economicSector?.trim() || null,
+    exposureRegion: metadata.exposureRegion?.trim() || null,
+    source: metadata.source,
+    confidence,
+    asOf: metadata.asOf,
+    confirmedAt: metadata.confirmedAt,
+    notes: metadata.notes?.trim() || null,
+  };
+}
+
 const US_EQUITY_EXPOSURE_SYMBOLS = new Set([
   "VFV",
   "XUS",

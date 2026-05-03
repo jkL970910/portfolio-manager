@@ -3945,11 +3945,27 @@ function buildBaseRecommendationV3Overlay(
     signals: item.rationale?.preferenceSignals?.length
       ? formatPreferenceSignalLabels(item.rationale.preferenceSignals, language)
       : [],
-    riskFlags: [],
+    riskFlags:
+      item.rationale?.metadataSource === "heuristic" ||
+      (item.rationale?.metadataConfidence ?? 100) < 70
+        ? [
+            pick(
+              language,
+              "标的属性仍是低置信推断，真实 ETF/company metadata 接入后需要复核。",
+              "Security metadata is still low-confidence and should be reviewed after a real metadata provider is connected.",
+            ),
+          ]
+        : [],
     explanation: pick(
       language,
-      "当前分数由配置缺口、账户放置、税务友好度和进阶偏好组成；外部情报尚未参与加权。",
-      "Current score combines allocation gap, account placement, tax fit, and advanced preferences; external intelligence is not weighted yet.",
+      item.rationale?.metadataSource === "provider" &&
+        (item.rationale?.metadataConfidence ?? 0) >= 70
+        ? "当前分数由配置缺口、账户放置、税务友好度、进阶偏好和高置信标的属性组成；新闻/论坛情报尚未参与加权。"
+        : "当前分数由配置缺口、账户放置、税务友好度和进阶偏好组成；外部情报尚未参与加权。",
+      item.rationale?.metadataSource === "provider" &&
+        (item.rationale?.metadataConfidence ?? 0) >= 70
+        ? "Current score combines allocation gap, account placement, tax fit, advanced preferences, and high-confidence security metadata; news/forum intelligence is not weighted yet."
+        : "Current score combines allocation gap, account placement, tax fit, and advanced preferences; external intelligence is not weighted yet.",
     ),
   };
 }

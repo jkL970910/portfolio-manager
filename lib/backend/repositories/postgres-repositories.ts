@@ -687,6 +687,20 @@ export const postgresRepositories: BackendRepositories = {
       });
       return row ? mapSecurity(row) : null;
     },
+    async listNeedingMetadataRefresh(input) {
+      const db = getDb();
+      const staleBefore = new Date(input.staleBefore);
+      const rows = await db.query.securities.findMany({
+        where: and(
+          sql`${securities.metadataSource} <> 'manual'`,
+          isNull(securities.metadataConfirmedAt),
+          sql`(${securities.metadataAsOf} IS NULL OR ${securities.metadataAsOf} <= ${staleBefore})`,
+        ),
+        orderBy: [desc(securities.updatedAt)],
+        limit: input.limit,
+      });
+      return rows.map(mapSecurity);
+    },
     async findByCanonicalIdentity(input) {
       const db = getDb();
       const row = await db.query.securities.findFirst({
@@ -771,6 +785,30 @@ export const postgresRepositories: BackendRepositories = {
         .returning();
       if (!row) {
         throw new Error("Failed to upsert security identity.");
+      }
+      return mapSecurity(row);
+    },
+    async updateMetadata(securityId, input) {
+      const db = getDb();
+      const [row] = await db
+        .update(securities)
+        .set({
+          economicAssetClass: input.economicAssetClass,
+          economicSector: input.economicSector,
+          exposureRegion: input.exposureRegion,
+          metadataSource: input.metadataSource,
+          metadataConfidence: input.metadataConfidence,
+          metadataAsOf: input.metadataAsOf ? new Date(input.metadataAsOf) : null,
+          metadataConfirmedAt: input.metadataConfirmedAt
+            ? new Date(input.metadataConfirmedAt)
+            : null,
+          metadataNotes: input.metadataNotes,
+          updatedAt: new Date(),
+        })
+        .where(eq(securities.id, securityId))
+        .returning();
+      if (!row) {
+        throw new Error(`Security ${securityId} not found.`);
       }
       return mapSecurity(row);
     },

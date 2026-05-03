@@ -441,6 +441,9 @@ export interface RecommendationItem {
     existingHoldingSymbol?: string;
     existingHoldingWeightPct?: number;
     existingHoldingRiskContributionPct?: number;
+    metadataSource?: SecurityMetadataSource;
+    metadataConfidence?: number;
+    economicAssetClass?: string | null;
   };
 }
 

@@ -242,3 +242,32 @@ test("asset-class bands constrain effective recommendation target percentages", 
   assert.ok(usEquityItem?.rationale);
   assert.equal(usEquityItem.rationale.targetPct, 35);
 });
+
+test("candidate scoring uses high-confidence security metadata for asset class", () => {
+  const result = scoreCandidateSecurity({
+    accounts,
+    holdings: [],
+    profile: makeProfile(),
+    language: "zh",
+    candidate: {
+      symbol: "CGL.C",
+      name: "iShares Gold Bullion ETF",
+      currency: "CAD",
+      assetClass: "Canadian Equity",
+      securityType: "ETF",
+      metadata: {
+        economicAssetClass: "Commodity",
+        economicSector: "Precious Metals",
+        exposureRegion: null,
+        source: "provider",
+        confidence: 92,
+        asOf: "2026-05-03T00:00:00.000Z",
+        confirmedAt: null,
+        notes: "ETF metadata provider classified gold exposure.",
+      },
+    },
+  });
+
+  assert.equal(result.assetClass, "Commodity");
+  assert.equal(result.assetClassSource, "metadata");
+});

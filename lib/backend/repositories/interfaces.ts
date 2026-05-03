@@ -78,6 +78,10 @@ export interface SecurityPriceHistoryRepository {
 
 export interface SecurityRepository {
   getById(securityId: EntityId): Promise<SecurityRecord | null>;
+  listNeedingMetadataRefresh(params: {
+    limit: number;
+    staleBefore: string;
+  }): Promise<SecurityRecord[]>;
   findByCanonicalIdentity(input: {
     symbol: string;
     canonicalExchange: string;
@@ -90,6 +94,20 @@ export interface SecurityRepository {
   }): Promise<SecurityRecord | null>;
   upsertCanonical(
     input: Omit<SecurityRecord, "id" | "createdAt" | "updatedAt">,
+  ): Promise<SecurityRecord>;
+  updateMetadata(
+    securityId: EntityId,
+    input: Pick<
+      SecurityRecord,
+      | "economicAssetClass"
+      | "economicSector"
+      | "exposureRegion"
+      | "metadataSource"
+      | "metadataConfidence"
+      | "metadataAsOf"
+      | "metadataConfirmedAt"
+      | "metadataNotes"
+    >,
   ): Promise<SecurityRecord>;
   addAlias(
     input: Omit<SecurityAliasRecord, "id" | "createdAt">,

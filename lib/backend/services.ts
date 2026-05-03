@@ -5210,6 +5210,14 @@ export async function createRecommendationRun(
           securityExchange: security.canonicalExchange,
           securityMicCode: security.micCode,
           securityCurrency: security.currency,
+          rationale: item.rationale
+            ? {
+                ...item.rationale,
+                metadataSource: security.metadataSource,
+                metadataConfidence: security.metadataConfidence,
+                economicAssetClass: security.economicAssetClass,
+              }
+            : item.rationale,
         };
       }),
     );

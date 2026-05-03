@@ -4,7 +4,8 @@
   HoldingPosition,
   InvestmentAccount,
   PreferenceProfile,
-  RecommendationRun
+  RecommendationRun,
+  SecurityMetadata
 } from "@/lib/backend/models";
 import { getAssetClassLabel, getAccountTypeLabel, getRiskProfileLabel } from "@/lib/i18n/finance";
 import type { DisplayLanguage } from "@/lib/i18n/ui";
@@ -63,13 +64,14 @@ export type CandidateSecurityScoreInput = {
   currency?: CurrencyCode;
   assetClass?: string;
   securityType?: string | null;
+  metadata?: SecurityMetadata | null;
 };
 
 export type CandidateSecurityScoreResult = {
   symbol: string;
   name: string;
   assetClass: string;
-  assetClassSource: "explicit" | "existing-holding" | "known-universe" | "heuristic";
+  assetClassSource: "metadata" | "explicit" | "existing-holding" | "known-universe" | "heuristic";
   currency: CurrencyCode;
   score: number;
   verdict: "strong" | "watch" | "weak";
@@ -673,15 +675,20 @@ export function scoreCandidateSecurity(args: {
     name: candidate.name ?? knownCandidate?.name ?? existingHolding?.name,
     assetClass: fallbackAssetClass,
     securityType: candidate.securityType ?? knownCandidate?.securityType ?? existingHolding?.securityTypeOverride,
-    currency: candidate.currency ?? knownCandidate?.currency ?? existingHolding?.currency ?? "CAD"
+    currency: candidate.currency ?? knownCandidate?.currency ?? existingHolding?.currency ?? "CAD",
+    metadata: candidate.metadata ?? existingHolding?.securityMetadata
   });
-  const assetClassSource: CandidateSecurityScoreResult["assetClassSource"] = candidate.assetClass
+  const assetClassSource: CandidateSecurityScoreResult["assetClassSource"] =
+    candidate.metadata?.economicAssetClass && candidate.metadata.confidence >= 70
+    ? "metadata"
+    : candidate.assetClass
     ? isEconomicExposureDifferent({
         symbol: normalizedSymbol,
         name: candidate.name ?? knownCandidate?.name ?? existingHolding?.name,
         assetClass: candidate.assetClass,
         securityType: candidate.securityType ?? knownCandidate?.securityType ?? existingHolding?.securityTypeOverride,
-        currency: candidate.currency ?? knownCandidate?.currency ?? existingHolding?.currency ?? "CAD"
+        currency: candidate.currency ?? knownCandidate?.currency ?? existingHolding?.currency ?? "CAD",
+        metadata: candidate.metadata ?? existingHolding?.securityMetadata
       })
       ? "known-universe"
       : "explicit"

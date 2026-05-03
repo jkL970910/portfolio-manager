@@ -181,3 +181,26 @@ test("recommendation V3 overlay uses persisted document evidence scores", () => 
     overlay.riskFlags.some((flag) => flag.includes("缓存行情仍需要人工复核")),
   );
 });
+
+test("recommendation V3 overlay keeps metadata uncertainty visible before live intelligence", () => {
+  const candidate = priority({
+    v3Overlay: {
+      baselineScore: 66,
+      externalInsightScore: null,
+      preferenceFitScore: 70,
+      finalScore: 67,
+      confidenceLabel: "V2.1 规则评分，等待缓存外部情报校准",
+      sourceMode: "local",
+      signals: [],
+      riskFlags: ["标的属性仍是低置信推断，真实 ETF/company metadata 接入后需要复核。"],
+      explanation: "base",
+    },
+  });
+  const overlay = buildRecommendationV3Overlay(candidate, [], []);
+
+  assert.ok(overlay);
+  assert.ok(
+    overlay.riskFlags.some((flag) => flag.includes("低置信推断")),
+  );
+  assert.equal(overlay.sourceMode, "local");
+});
