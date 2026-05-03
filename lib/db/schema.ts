@@ -948,6 +948,74 @@ export const marketDataProviderLimits = pgTable(
   }),
 );
 
+export const providerUsageLedger = pgTable(
+  "provider_usage_ledger",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    provider: varchar("provider", { length: 64 }).notNull(),
+    endpoint: varchar("endpoint", { length: 120 }).notNull(),
+    usageDate: date("usage_date").notNull(),
+    requestCount: integer("request_count").notNull().default(0),
+    successCount: integer("success_count").notNull().default(0),
+    failureCount: integer("failure_count").notNull().default(0),
+    skippedCount: integer("skipped_count").notNull().default(0),
+    estimatedCostMicros: integer("estimated_cost_micros").notNull().default(0),
+    quotaLimit: integer("quota_limit"),
+    metadataJson: jsonb("metadata_json").notNull().default({}),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => ({
+    providerEndpointDateIdx: uniqueIndex(
+      "provider_usage_ledger_provider_endpoint_date_idx",
+    ).on(table.provider, table.endpoint, table.usageDate),
+    providerDateIdx: index("provider_usage_ledger_provider_date_idx").on(
+      table.provider,
+      table.usageDate,
+    ),
+  }),
+);
+
+export const securityMetadataRefreshRuns = pgTable(
+  "security_metadata_refresh_runs",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    status: varchar("status", { length: 24 }).notNull(),
+    triggeredBy: varchar("triggered_by", { length: 32 })
+      .notNull()
+      .default("worker"),
+    workerId: varchar("worker_id", { length: 120 }),
+    sampledSecurityCount: integer("sampled_security_count")
+      .notNull()
+      .default(0),
+    updatedCount: integer("updated_count").notNull().default(0),
+    skippedCount: integer("skipped_count").notNull().default(0),
+    failedCount: integer("failed_count").notNull().default(0),
+    providerIdsJson: jsonb("provider_ids_json").notNull().default([]),
+    providerUsageJson: jsonb("provider_usage_json").notNull().default([]),
+    statusNote: text("status_note"),
+    startedAt: timestamp("started_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    finishedAt: timestamp("finished_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => ({
+    statusCreatedIdx: index(
+      "security_metadata_refresh_runs_status_created_idx",
+    ).on(table.status, table.createdAt),
+    workerCreatedIdx: index(
+      "security_metadata_refresh_runs_worker_created_idx",
+    ).on(table.workerId, table.createdAt),
+  }),
+);
+
 export const importJobs = pgTable("import_jobs", {
   id: uuid("id").defaultRandom().primaryKey(),
   userId: uuid("user_id")

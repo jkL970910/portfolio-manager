@@ -27,6 +27,7 @@ LOO_MINISTER_ENCRYPTION_SECRET=<32+ char secret>
 LOO_MINISTER_PROVIDER_ENABLED=false
 LOO_MINISTER_ALLOW_SERVER_KEY=false
 SECURITY_METADATA_PROVIDER_ENABLED=false
+OPENFIGI_DAILY_QUOTA_LIMIT=25
 MARKET_DATA_REFRESH_MAX_USERS=1
 MARKET_DATA_REFRESH_MAX_SYMBOLS=20
 MARKET_DATA_REFRESH_BATCH_SIZE=20
@@ -159,15 +160,40 @@ Expected:
   next run” status, not a full skip.
 - `external-research` stays disabled unless explicitly enabled.
 
+Mobile visibility:
+
+- Settings now has a `云端后台任务中心` card backed by
+  `/api/mobile/workers/status`.
+- The card summarizes the latest market-data run, security metadata run, and
+  external-research queue state.
+- It also shows recent provider usage from `provider_usage_ledger`, including
+  request/success/failure/skipped counts and any configured daily quota.
+- This is the user-facing place to confirm worker freshness after Cloudflare
+  Cron runs.
+
 ## Phase 4: First Real Provider
 
 Only after Phases 1-3 pass:
 
-1. Add a structured metadata provider adapter.
+1. Add or enable a structured metadata provider adapter.
 2. Keep it behind `SECURITY_METADATA_PROVIDER_ENABLED=true`.
 3. Ingest only by `security_id` or full `symbol + exchange + currency`.
 4. Persist metadata source, confidence, as-of, and notes.
 5. Never call it from Flutter page load.
+
+Current first provider boundary:
+
+- `openfigi-profile` is implemented as a structured metadata provider.
+- It is disabled by default and only runs when both
+  `SECURITY_METADATA_PROVIDER_ENABLED=true` and `OPENFIGI_API_KEY` are present.
+- It only applies results when ticker and listing identity match. Equivalent MIC
+  labels such as `XTSE -> TSX`, `XNAS -> NASDAQ`, and `XNYS -> NYSE` are
+  normalized before comparison.
+- It updates economic exposure metadata through the same confidence/manual
+  override guard as the project registry.
+- Provider calls are counted in `provider_usage_ledger`; use
+  `OPENFIGI_DAILY_QUOTA_LIMIT` to show a conservative daily quota in mobile
+  Settings.
 
 Preferred first provider data:
 

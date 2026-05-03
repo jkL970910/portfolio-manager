@@ -163,6 +163,8 @@ class _SettingsPageState extends State<SettingsPage> {
             ),
           ),
           const SizedBox(height: 16),
+          _WorkerStatusCenterCard(apiClient: widget.apiClient),
+          const SizedBox(height: 16),
           _MarketDataStatusCard(apiClient: widget.apiClient),
           const SizedBox(height: 16),
           _RecentAnalysisCard(apiClient: widget.apiClient),
@@ -447,6 +449,135 @@ class _AiMinisterSettingsCardState extends State<_AiMinisterSettingsCard> {
                         style: Theme.of(context).textTheme.titleMedium),
                     const SizedBox(height: 6),
                     ...settings.recentUsage.map(_AiMinisterUsageTile.new),
+                  ],
+                ],
+              ],
+            );
+          },
+        ),
+      ),
+    );
+  }
+}
+
+class _WorkerStatusCenterCard extends StatefulWidget {
+  const _WorkerStatusCenterCard({required this.apiClient});
+
+  final LooApiClient apiClient;
+
+  @override
+  State<_WorkerStatusCenterCard> createState() =>
+      _WorkerStatusCenterCardState();
+}
+
+class _WorkerStatusCenterCardState extends State<_WorkerStatusCenterCard> {
+  late Future<WorkerStatusCenter> _status = _loadStatus();
+
+  Future<WorkerStatusCenter> _loadStatus() async {
+    final response = await widget.apiClient.getWorkerStatusCenter();
+    return WorkerStatusCenter.fromApiResponse(response);
+  }
+
+  void _refresh() {
+    setState(() {
+      _status = _loadStatus();
+    });
+  }
+
+  IconData _iconForStatus(String status) {
+    return switch (status) {
+      "success" => Icons.check_circle_outline,
+      "partial" => Icons.warning_amber_outlined,
+      "failed" => Icons.error_outline,
+      "running" => Icons.sync,
+      "skipped" || "disabled" || "empty" => Icons.info_outline,
+      _ => Icons.pending_outlined,
+    };
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: FutureBuilder<WorkerStatusCenter>(
+          future: _status,
+          builder: (context, snapshot) {
+            final status = snapshot.data;
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    const Icon(Icons.cloud_sync_outlined),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        status?.title ?? "云端后台任务中心",
+                        style: Theme.of(context).textTheme.titleLarge,
+                      ),
+                    ),
+                    IconButton(
+                      onPressed:
+                          snapshot.connectionState == ConnectionState.waiting
+                              ? null
+                              : _refresh,
+                      icon: const Icon(Icons.refresh),
+                      tooltip: "刷新后台任务状态",
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                if (snapshot.connectionState == ConnectionState.waiting) ...[
+                  const LinearProgressIndicator(),
+                ] else if (snapshot.hasError) ...[
+                  Text(
+                    "后台任务状态暂时读取失败：${snapshot.error}",
+                    style:
+                        TextStyle(color: Theme.of(context).colorScheme.error),
+                  ),
+                ] else if (status == null) ...[
+                  const Text("后台任务状态暂时不可用。"),
+                ] else ...[
+                  Text(status.statusLabel),
+                  const SizedBox(height: 6),
+                  Text(
+                    status.nextRunLabel,
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                  const SizedBox(height: 12),
+                  ...status.tasks.map(
+                    (task) => ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      dense: true,
+                      leading: Icon(_iconForStatus(task.status)),
+                      title: Text("${task.title} · ${task.statusLabel}"),
+                      subtitle: Text(
+                        [
+                          task.metricsLabel,
+                          task.lastFinishedAtLabel,
+                          task.note,
+                        ].join("\n"),
+                      ),
+                      isThreeLine: true,
+                    ),
+                  ),
+                  if (status.providerUsage.isNotEmpty) ...[
+                    const Divider(),
+                    Text(
+                      "最近外部接口用量",
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
+                    const SizedBox(height: 6),
+                    ...status.providerUsage.map(
+                      (item) => ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        dense: true,
+                        leading: const Icon(Icons.speed_outlined),
+                        title: Text("${item.provider} · ${item.usageDate}"),
+                        subtitle: Text(item.compactLabel),
+                      ),
+                    ),
                   ],
                 ],
               ],

@@ -182,8 +182,7 @@ class LooApiClient {
     String? currency,
   }) {
     final query = {
-      if (securityId != null && securityId.isNotEmpty)
-        "securityId": securityId,
+      if (securityId != null && securityId.isNotEmpty) "securityId": securityId,
       if (exchange != null && exchange.isNotEmpty) "exchange": exchange,
       if (currency != null && currency.isNotEmpty) "currency": currency,
     };
@@ -199,8 +198,7 @@ class LooApiClient {
     String? currency,
   }) {
     final query = {
-      if (securityId != null && securityId.isNotEmpty)
-        "securityId": securityId,
+      if (securityId != null && securityId.isNotEmpty) "securityId": securityId,
       if (exchange != null && exchange.isNotEmpty) "exchange": exchange,
       if (currency != null && currency.isNotEmpty) "currency": currency,
     };
@@ -325,6 +323,10 @@ class LooApiClient {
 
   Future<Map<String, dynamic>> getMarketDataRefreshRuns({int limit = 5}) {
     return _getJson("/api/mobile/market-data/refresh-runs/recent?limit=$limit");
+  }
+
+  Future<Map<String, dynamic>> getWorkerStatusCenter() {
+    return _getJson("/api/mobile/workers/status");
   }
 
   Future<Map<String, dynamic>> login({

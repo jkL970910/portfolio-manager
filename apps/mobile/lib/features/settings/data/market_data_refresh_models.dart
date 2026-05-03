@@ -271,3 +271,141 @@ class MarketDataRefreshRunItem {
     );
   }
 }
+
+class WorkerStatusCenter {
+  const WorkerStatusCenter({
+    required this.title,
+    required this.statusLabel,
+    required this.nextRunLabel,
+    required this.tasks,
+    required this.providerUsage,
+  });
+
+  final String title;
+  final String statusLabel;
+  final String nextRunLabel;
+  final List<WorkerTaskStatus> tasks;
+  final List<ProviderUsageItem> providerUsage;
+
+  factory WorkerStatusCenter.fromApiResponse(Map<String, dynamic> json) {
+    final data = json["data"];
+    final payload =
+        data is Map<String, dynamic> ? data : const <String, dynamic>{};
+    return WorkerStatusCenter.fromJson(payload);
+  }
+
+  factory WorkerStatusCenter.fromJson(Map<String, dynamic> json) {
+    final summary = json["summary"] is Map<String, dynamic>
+        ? json["summary"] as Map<String, dynamic>
+        : const <String, dynamic>{};
+    final rawTasks = json["tasks"];
+    final rawProviderUsage = json["providerUsage"];
+    return WorkerStatusCenter(
+      title: summary["title"] as String? ?? "云端后台任务中心",
+      statusLabel:
+          summary["statusLabel"] as String? ?? "行情、标的资料和外部研究由后台任务统一管理。",
+      nextRunLabel: summary["nextRunLabel"] as String? ?? "下一次运行时间待确认。",
+      tasks: rawTasks is List
+          ? rawTasks
+              .whereType<Map<String, dynamic>>()
+              .map(WorkerTaskStatus.fromJson)
+              .toList()
+          : const [],
+      providerUsage: rawProviderUsage is List
+          ? rawProviderUsage
+              .whereType<Map<String, dynamic>>()
+              .map(ProviderUsageItem.fromJson)
+              .toList()
+          : const [],
+    );
+  }
+}
+
+class WorkerTaskStatus {
+  const WorkerTaskStatus({
+    required this.id,
+    required this.title,
+    required this.status,
+    required this.statusLabel,
+    required this.note,
+    required this.metricsLabel,
+    required this.lastFinishedAt,
+  });
+
+  final String id;
+  final String title;
+  final String status;
+  final String statusLabel;
+  final String note;
+  final String metricsLabel;
+  final DateTime? lastFinishedAt;
+
+  String get lastFinishedAtLabel {
+    final value = lastFinishedAt;
+    if (value == null) {
+      return "最近运行时间未知";
+    }
+    final local = value.toLocal();
+    String two(int number) => number.toString().padLeft(2, "0");
+    return "${local.month}/${local.day} ${two(local.hour)}:${two(local.minute)}";
+  }
+
+  factory WorkerTaskStatus.fromJson(Map<String, dynamic> json) {
+    final rawLastFinishedAt = json["lastFinishedAt"];
+    return WorkerTaskStatus(
+      id: json["id"] as String? ?? "unknown",
+      title: json["title"] as String? ?? "后台任务",
+      status: json["status"] as String? ?? "unknown",
+      statusLabel: json["statusLabel"] as String? ?? "状态未知",
+      note: json["note"] as String? ?? "暂无说明。",
+      metricsLabel: json["metricsLabel"] as String? ?? "指标待确认",
+      lastFinishedAt: rawLastFinishedAt is String
+          ? DateTime.tryParse(rawLastFinishedAt)
+          : null,
+    );
+  }
+}
+
+class ProviderUsageItem {
+  const ProviderUsageItem({
+    required this.provider,
+    required this.endpoint,
+    required this.usageDate,
+    required this.requestCount,
+    required this.successCount,
+    required this.failureCount,
+    required this.skippedCount,
+    required this.quotaLimit,
+    required this.label,
+  });
+
+  final String provider;
+  final String endpoint;
+  final String usageDate;
+  final int requestCount;
+  final int successCount;
+  final int failureCount;
+  final int skippedCount;
+  final int? quotaLimit;
+  final String label;
+
+  String get compactLabel {
+    final quota =
+        quotaLimit != null && quotaLimit! > 0 ? " / 上限 $quotaLimit" : "";
+    return "$provider：请求 $requestCount$quota，成功 $successCount，失败 $failureCount，跳过 $skippedCount";
+  }
+
+  factory ProviderUsageItem.fromJson(Map<String, dynamic> json) {
+    return ProviderUsageItem(
+      provider: json["provider"] as String? ?? "provider",
+      endpoint: json["endpoint"] as String? ?? "unknown",
+      usageDate: json["usageDate"] as String? ?? "",
+      requestCount: json["requestCount"] as int? ?? 0,
+      successCount: json["successCount"] as int? ?? 0,
+      failureCount: json["failureCount"] as int? ?? 0,
+      skippedCount: json["skippedCount"] as int? ?? 0,
+      quotaLimit: json["quotaLimit"] as int?,
+      label: json["label"] as String? ?? "暂无用量记录。",
+    );
+  }
+}

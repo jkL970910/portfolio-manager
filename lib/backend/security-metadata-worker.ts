@@ -6,6 +6,13 @@ import {
 import {
   normalizeSecurityMetadataForWrite,
 } from "@/lib/backend/security-economic-exposure";
+import { incrementProviderUsage } from "@/lib/backend/provider-usage-ledger";
+import { getDb } from "@/lib/db/client";
+import { securityMetadataRefreshRuns } from "@/lib/db/schema";
+import { eq } from "drizzle-orm";
+
+type SecurityMetadataRefreshRunRow =
+  typeof securityMetadataRefreshRuns.$inferSelect;
 
 function normalizePositiveInteger(
   value: number | undefined,
@@ -32,6 +39,24 @@ export async function runSecurityMetadataRefreshWorkerOnce(input?: {
   const maxAgeDays = normalizePositiveInteger(input?.maxAgeDays, 30);
   const repositories = getRepositories();
   const providers = getEnabledSecurityMetadataProviders();
+  let run: SecurityMetadataRefreshRunRow | null = null;
+  try {
+    if (process.env.DATABASE_URL) {
+      const db = getDb();
+      const runRows = await db
+        .insert(securityMetadataRefreshRuns)
+        .values({
+          status: "running",
+          workerId,
+          startedAt: now,
+          providerIdsJson: providers.map((provider) => provider.id),
+        })
+        .returning();
+      run = runRows[0] ?? null;
+    }
+  } catch {
+    run = null;
+  }
   const securities = await repositories.securities.listNeedingMetadataRefresh({
     limit: maxSecurities,
     staleBefore: readMetadataStaleBefore(now, maxAgeDays),
@@ -56,7 +81,49 @@ export async function runSecurityMetadataRefreshWorkerOnce(input?: {
     try {
       let applied = false;
       for (const provider of providers) {
-        const result = await provider.fetch(security);
+        let result = null;
+        try {
+          result = await provider.fetch(security);
+          if (process.env.DATABASE_URL) {
+            await incrementProviderUsage({
+              provider: provider.id,
+              endpoint: "security-metadata",
+              requestCount: provider.id === "project-registry" ? 0 : 1,
+              successCount: result ? 1 : 0,
+              skippedCount: result ? 0 : 1,
+              quotaLimit:
+                provider.id === "openfigi-profile"
+                  ? Number(process.env.OPENFIGI_DAILY_QUOTA_LIMIT ?? 25)
+                  : null,
+              metadata: {
+                workerId,
+                securityId: security.id,
+                source: "security-metadata-worker",
+              },
+              now,
+            });
+          }
+        } catch (error) {
+          if (process.env.DATABASE_URL) {
+            await incrementProviderUsage({
+              provider: provider.id,
+              endpoint: "security-metadata",
+              requestCount: provider.id === "project-registry" ? 0 : 1,
+              failureCount: 1,
+              quotaLimit:
+                provider.id === "openfigi-profile"
+                  ? Number(process.env.OPENFIGI_DAILY_QUOTA_LIMIT ?? 25)
+                  : null,
+              metadata: {
+                workerId,
+                securityId: security.id,
+                error: error instanceof Error ? error.message : "unknown",
+              },
+              now,
+            });
+          }
+          throw error;
+        }
         if (!result) {
           continue;
         }
@@ -116,7 +183,32 @@ export async function runSecurityMetadataRefreshWorkerOnce(input?: {
     }
   }
 
+  const status =
+    failedCount > 0 ? "partial" : updatedCount > 0 ? "success" : "skipped";
+  if (run) {
+    const db = getDb();
+    await db
+      .update(securityMetadataRefreshRuns)
+      .set({
+        status,
+        sampledSecurityCount: securities.length,
+        updatedCount,
+        skippedCount,
+        failedCount,
+        providerIdsJson: providers.map((provider) => provider.id),
+        statusNote:
+          status === "skipped"
+            ? "本次没有找到更高可信度的标的资料。"
+            : status === "partial"
+              ? "部分标的资料刷新失败，已保留原有资料。"
+              : "标的资料刷新完成。",
+        finishedAt: new Date(),
+      })
+      .where(eq(securityMetadataRefreshRuns.id, run.id));
+  }
+
   return {
+    runId: run?.id ?? null,
     workerId,
     startedAt: now.toISOString(),
     finishedAt: new Date().toISOString(),
