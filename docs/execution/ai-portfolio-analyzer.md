@@ -415,9 +415,12 @@ Runtime context architecture:
      metadata should stay in `数据依据` or the collapsed `来源详情`, not the
      opening thesis.
    - `security-economic-exposure.ts` is the shared first-pass economic exposure
-     registry. AI 快扫, Recommendation V2.1, and Health Score now use it so
-     CAD-listed US ETFs can keep their listing identity while contributing to
-     the correct underlying exposure sleeve.
+     registry. AI 快扫, Recommendation V2.1, Health Score, and 大臣 context now
+     use it so CAD-listed US ETFs can keep their listing identity while
+     contributing to the correct underlying exposure sleeve. Gold /
+     precious-metals instruments such as CGL.C are treated as Commodity /
+     商品贵金属 exposure rather than Canadian Equity solely because they are
+     CAD/TSX-listed.
 
 Backend tests:
 

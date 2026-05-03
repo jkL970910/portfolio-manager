@@ -131,6 +131,11 @@ const SECURITY_UNIVERSE: Record<string, SecurityCandidate[]> = {
     { symbol: "ZAG", name: "BMO Aggregate Bond Index ETF", assetClass: "Fixed Income", currency: "CAD", expenseBps: 9, liquidityScore: 92, tags: ["core-bonds"] },
     { symbol: "VAB", name: "Vanguard Canadian Aggregate Bond Index ETF", assetClass: "Fixed Income", currency: "CAD", expenseBps: 8, liquidityScore: 89, tags: ["core-bonds"] }
   ],
+  Commodity: [
+    { symbol: "CGL.C", name: "iShares Gold Bullion ETF", assetClass: "Commodity", currency: "CAD", expenseBps: 55, liquidityScore: 78, tags: ["gold", "precious-metals", "commodity", "defensive"] },
+    { symbol: "PHYS", name: "Sprott Physical Gold Trust", assetClass: "Commodity", currency: "USD", expenseBps: 41, liquidityScore: 82, tags: ["gold", "precious-metals", "commodity"] },
+    { symbol: "GLD", name: "SPDR Gold Shares", assetClass: "Commodity", currency: "USD", expenseBps: 40, liquidityScore: 95, tags: ["gold", "precious-metals", "commodity"] }
+  ],
   Cash: [
     { symbol: "CASH", name: "Global X High Interest Savings ETF", assetClass: "Cash", currency: "CAD", expenseBps: 11, liquidityScore: 96, tags: ["cash-parking"] },
     { symbol: "PSA", name: "Purpose High Interest Savings ETF", assetClass: "Cash", currency: "CAD", expenseBps: 15, liquidityScore: 92, tags: ["cash-parking"] },
@@ -143,6 +148,7 @@ const ACCOUNT_FIT_MATRIX: Record<string, Record<AccountType, number>> = {
   "US Equity": { TFSA: 0.74, RRSP: 0.95, FHSA: 0.78, Taxable: 0.68 },
   "International Equity": { TFSA: 0.72, RRSP: 0.86, FHSA: 0.74, Taxable: 0.5 },
   "Fixed Income": { TFSA: 0.66, RRSP: 0.95, FHSA: 0.78, Taxable: 0.24 },
+  Commodity: { TFSA: 0.76, RRSP: 0.7, FHSA: 0.56, Taxable: 0.62 },
   Cash: { TFSA: 0.78, RRSP: 0.56, FHSA: 0.9, Taxable: 0.72 }
 };
 
@@ -289,6 +295,7 @@ const ASSET_CLASS_RISK_WEIGHTS: Record<string, number> = {
   "US Equity": 1.12,
   "International Equity": 1.08,
   "Fixed Income": 0.42,
+  Commodity: 1.05,
   Cash: 0.08
 };
 
@@ -443,7 +450,7 @@ function inferAssetClassFromSecurityType(securityType: string | null | undefined
     return "Fixed Income";
   }
   if (normalizedType.includes("commodity")) {
-    return "Cash";
+    return "Commodity";
   }
   if (normalizedType.includes("crypto")) {
     return currency === "USD" ? "US Equity" : "Canadian Equity";

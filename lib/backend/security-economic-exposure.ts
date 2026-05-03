@@ -39,6 +39,62 @@ const FIXED_INCOME_EXPOSURE_SYMBOLS = new Set([
 
 const CASH_EXPOSURE_SYMBOLS = new Set(["CASH", "PSA", "HSAV", "CSAV"]);
 
+const PRECIOUS_METALS_EXPOSURE_SYMBOLS = new Set([
+  "CGL",
+  "CGL.C",
+  "CGL-C",
+  "GLD",
+  "IAU",
+  "PHYS",
+  "MNT",
+  "MNT.U",
+  "KILO",
+  "XGD",
+  "GDX",
+  "GDXJ",
+  "HUG",
+  "HGY",
+]);
+
+function getSymbolVariants(symbol: string) {
+  const upper = symbol.trim().toUpperCase();
+  const withoutProviderSuffix = upper.replace(/\.(TO|TSX|NEO|NYSE|NASDAQ|NDAQ|AMEX|ARCA)$/u, "");
+  return new Set([
+    upper,
+    withoutProviderSuffix,
+    withoutProviderSuffix.replace(/-/gu, "."),
+    withoutProviderSuffix.replace(/\./gu, "-"),
+    withoutProviderSuffix.split(/[.-]/u)[0] ?? withoutProviderSuffix,
+  ]);
+}
+
+function symbolMatches(symbols: Set<string>, symbol: string) {
+  return [...getSymbolVariants(symbol)].some((variant) => symbols.has(variant));
+}
+
+function isPreciousMetalsExposure(input: {
+  symbol: string;
+  name: string;
+  type: string;
+  fallbackAssetClass: string | null;
+}) {
+  const fallback = (input.fallbackAssetClass ?? "").trim().toLowerCase();
+  return (
+    symbolMatches(PRECIOUS_METALS_EXPOSURE_SYMBOLS, input.symbol) ||
+    input.type.includes("commodity") ||
+    fallback.includes("commodity") ||
+    fallback.includes("precious") ||
+    input.name.includes("gold bullion") ||
+    input.name.includes("silver bullion") ||
+    input.name.includes("precious metal") ||
+    input.name.includes("precious metals") ||
+    input.name.includes("gold miner") ||
+    input.name.includes("gold miners") ||
+    input.name.includes("gold mining") ||
+    input.name.includes("gold producers")
+  );
+}
+
 export function inferEconomicAssetClass(input: EconomicExposureInput) {
   const symbol = input.symbol.trim().toUpperCase();
   const name = (input.name ?? "").trim().toLowerCase();
@@ -67,6 +123,10 @@ export function inferEconomicAssetClass(input: EconomicExposureInput) {
     name.includes("cash")
   ) {
     return "Cash";
+  }
+
+  if (isPreciousMetalsExposure({ symbol, name, type, fallbackAssetClass })) {
+    return "Commodity";
   }
 
   if (

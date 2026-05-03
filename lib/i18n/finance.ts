@@ -12,6 +12,7 @@ export function getAssetClassLabel(assetClass: string, language: DisplayLanguage
     "US Equity": { zh: "美国股票", en: "US Equity" },
     "International Equity": { zh: "国际股票", en: "International Equity" },
     "Fixed Income": { zh: "固定收益", en: "Fixed Income" },
+    Commodity: { zh: "商品/贵金属", en: "Commodity / Precious Metals" },
     Cash: { zh: "现金", en: "Cash" },
     "Multi-sector": { zh: "多行业", en: "Multi-sector" },
     Other: { zh: "其他", en: "Other" }

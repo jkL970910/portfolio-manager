@@ -209,3 +209,38 @@ test("health score uses economic exposure for CAD-listed US ETFs", () => {
     ),
   );
 });
+
+test("health score treats CGL.C as precious metals exposure, not Canadian equity", () => {
+  const cglHoldings: HoldingPosition[] = [
+    {
+      id: "holding_cgl",
+      userId: "user_test",
+      accountId: "acct_tfsa",
+      symbol: "CGL.C",
+      name: "iShares Gold Bullion ETF",
+      assetClass: "Canadian Equity",
+      sector: "Materials",
+      currency: "CAD",
+      securityTypeOverride: "Commodity ETF",
+      exchangeOverride: "TSX",
+      marketValueCad: 1600,
+      weightPct: 1.6,
+      gainLossPct: 0
+    }
+  ];
+  const summary = buildPortfolioHealthSummary({
+    accounts,
+    holdings: cglHoldings,
+    profile: makeProfile(),
+    language: "zh"
+  });
+
+  const cgl = summary.holdingDrilldown.find((item) => item.id === "holding_cgl");
+  assert.ok(cgl);
+  assert.ok(
+    cgl.drivers.some((driver) => driver.includes("商品/贵金属")),
+  );
+  assert.ok(
+    !cgl.drivers.some((driver) => driver.includes("加拿大股票")),
+  );
+});

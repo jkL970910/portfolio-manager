@@ -66,6 +66,7 @@ const ASSET_CLASS_RISK_WEIGHTS: Record<string, number> = {
   "Canadian Equity": 1,
   "US Equity": 1.12,
   "International Equity": 1.08,
+  Commodity: 1.05,
   "Fixed Income": 0.42,
   Cash: 0.08
 };

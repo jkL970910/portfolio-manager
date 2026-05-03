@@ -150,6 +150,28 @@ test("economic exposure registry overrides misleading CAD-listed ETF asset class
   assert.equal(result.assetClassSource, "known-universe");
 });
 
+test("economic exposure registry treats CGL.C as precious metals, not Canadian equity", () => {
+  const result = scoreCandidateSecurity({
+    accounts,
+    holdings: [],
+    profile: makeProfile(),
+    language: "zh",
+    candidate: {
+      symbol: "CGL.C",
+      name: "iShares Gold Bullion ETF",
+      currency: "CAD",
+      assetClass: "Canadian Equity",
+      securityType: "Commodity ETF"
+    }
+  });
+
+  assert.equal(result.assetClass, "Commodity");
+  assert.equal(result.assetClassSource, "known-universe");
+  assert.ok(
+    result.drivers.some((driver) => driver.includes("账户落点")),
+  );
+});
+
 test("advanced preference factors penalize avoided sector candidates", () => {
   const baseline = scoreCandidateSecurity({
     accounts,

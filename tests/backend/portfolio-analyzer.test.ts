@@ -287,6 +287,67 @@ test("security analyzer quick scan separates listing identity from economic expo
   );
 });
 
+test("security analyzer quick scan treats CGL.C as precious metals exposure", () => {
+  const cglHolding: HoldingPosition = {
+    id: "holding_cgl",
+    securityId: "security_cgl_cad",
+    userId: "user_test",
+    accountId: "acct_tfsa",
+    symbol: "CGL.C",
+    name: "iShares Gold Bullion ETF",
+    assetClass: "Canadian Equity",
+    sector: "Materials",
+    currency: "CAD",
+    securityTypeOverride: "Commodity ETF",
+    exchangeOverride: "TSX",
+    marketValueCad: 1600,
+    quoteProvider: "yahoo-finance",
+    quoteSourceMode: "cached-external",
+    quoteStatus: "success",
+    lastQuoteSuccessAt: generatedAt,
+    weightPct: 1.6,
+    gainLossPct: 0,
+    updatedAt: generatedAt,
+  };
+  const result = buildSecurityAnalyzerQuickScan({
+    identity: {
+      securityId: "security_cgl_cad",
+      symbol: "CGL.C",
+      exchange: "TSX",
+      currency: "CAD",
+      name: "iShares Gold Bullion ETF",
+      securityType: "Commodity ETF",
+    },
+    accounts,
+    holdings: [...holdings, cglHolding],
+    profile: makeProfile(),
+    marketData: {
+      priceHistory: [
+        {
+          ...priceHistory[1]!,
+          id: "history_cgl_tsx",
+          securityId: "security_cgl_cad",
+          symbol: "CGL.C",
+          exchange: "TSX",
+          currency: "CAD",
+          provider: "yahoo-finance",
+          source: "quote-refresh-yahoo-finance",
+        },
+      ],
+    },
+    generatedAt,
+  });
+
+  const targetFit = result.scorecards.find((card) => card.id === "target-fit");
+  assert.match(targetFit?.rationale ?? "", /底层经济暴露按 Commodity/);
+  assert.doesNotMatch(targetFit?.rationale ?? "", /加拿大股票整体配置|Canadian Equity/);
+  assert.ok(
+    result.portfolioFit.some((item) =>
+      item.includes("不是按 Canadian Equity 或交易币种简单归类"),
+    ),
+  );
+});
+
 test("security analyzer quick scan returns reader-friendly market data wording", () => {
   const result = buildSecurityAnalyzerQuickScan({
     identity: {

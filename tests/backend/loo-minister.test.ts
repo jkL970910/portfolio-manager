@@ -447,6 +447,77 @@ test("Loo Minister infers candidate economic exposure when page asset class is u
   assert.doesNotMatch(response.data.answer, /不能.*判断.*适配/);
 });
 
+test("Loo Minister treats CGL.C as precious metals exposure, not Canadian equity", async () => {
+  const response = await getLooMinisterAnswer(
+    "user_casey",
+    {
+      pageContext: {
+        version: LOO_MINISTER_VERSION,
+        page: "security-detail",
+        locale: "zh",
+        title: "CGL.C 标的详情",
+        asOf: now,
+        displayCurrency: "CAD",
+        subject: {
+          security: {
+            securityId: "security_cgl_cad",
+            symbol: "CGL.C",
+            exchange: "TSX",
+            currency: "CAD",
+            name: "iShares Gold Bullion ETF",
+            securityType: "Commodity ETF",
+          },
+        },
+        dataFreshness: {
+          portfolioAsOf: now,
+          quotesAsOf: now,
+          fxAsOf: now,
+          chartFreshness: "fresh",
+          sourceMode: "cached-external",
+        },
+        facts: [
+          {
+            id: "asset-class",
+            label: "资产类别",
+            value: "Canadian Equity",
+            source: "analysis-cache",
+          },
+          {
+            id: "holding-weight",
+            label: "组合占比",
+            value: "1.6%",
+            source: "portfolio-data",
+          },
+        ],
+        warnings: [],
+        allowedActions: [],
+      },
+      question: "CGL.C 是否适合继续加仓？",
+      answerStyle: "beginner",
+      cacheStrategy: "prefer-cache",
+      includeExternalResearch: false,
+    },
+    {
+      settings: {
+        mode: "local",
+        provider: "official-openai",
+        model: "gpt-5.5",
+        reasoningEffort: "medium",
+        endpoint: "https://api.openai.com/v1/responses",
+        apiKey: null,
+        apiKeySource: "none",
+        providerEnabled: false,
+      },
+      persistUsage: false,
+    },
+  );
+
+  assert.match(response.data.answer, /底层经济暴露：Commodity/);
+  assert.match(response.data.answer, /候选新增标的|持仓复盘|继续加仓/);
+  assert.doesNotMatch(response.data.answer, /加拿大股票整体配置|Canadian Equity 高于目标/);
+  assert.doesNotMatch(response.data.answer, /目标 22\.0%|目标约 22/);
+});
+
 test("Loo Minister hydrates comparison security context from a ticker mention", async () => {
   const response = await getLooMinisterAnswer(
     "user_casey",
