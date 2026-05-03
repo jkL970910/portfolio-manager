@@ -27,6 +27,18 @@ export async function POST(request: NextRequest) {
         request.nextUrl.searchParams.get("maxSymbols"),
         "MARKET_DATA_REFRESH_MAX_SYMBOLS",
       ),
+      batchSize: readPositiveWorkerLimit(
+        request.nextUrl.searchParams.get("batchSize"),
+        "MARKET_DATA_REFRESH_BATCH_SIZE",
+      ),
+      maxBatchesPerRun: readPositiveWorkerLimit(
+        request.nextUrl.searchParams.get("maxBatchesPerRun"),
+        "MARKET_DATA_REFRESH_MAX_BATCHES_PER_RUN",
+      ),
+      maxRuntimeSeconds: readPositiveWorkerLimit(
+        request.nextUrl.searchParams.get("maxRuntimeSeconds"),
+        "MARKET_DATA_REFRESH_MAX_RUNTIME_SECONDS",
+      ),
     });
 
     return NextResponse.json(

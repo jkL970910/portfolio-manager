@@ -4637,10 +4637,13 @@ export async function createGuidedImportAccount(
 
 export async function refreshPortfolioQuotes(
   userId: string,
-  options: { refreshRunId?: string | null } = {},
+  options: { refreshRunId?: string | null; securityIds?: string[] } = {},
 ): Promise<RefreshPortfolioQuotesResult> {
   const db = getDb();
   const repositories = getRepositories();
+  const allowedSecurityIds = options.securityIds
+    ? new Set(options.securityIds.filter(Boolean))
+    : null;
   const holdings = await repositories.holdings.listByUserId(userId);
   const resolvedHoldings = await Promise.all(
     holdings.map(async (holding) => ({
@@ -4661,6 +4664,9 @@ export async function refreshPortfolioQuotes(
           currency: security.currency,
         }))
         .filter((holding) => holding.symbol)
+        .filter((holding) =>
+          allowedSecurityIds ? allowedSecurityIds.has(holding.securityId) : true,
+        )
         .map((holding) => [
           holding.securityId,
           holding,
@@ -4742,6 +4748,12 @@ export async function refreshPortfolioQuotes(
         (holding.currency as string) || "CAD",
       );
       const security = resolvedHoldingById.get(holding.id);
+      if (
+        allowedSecurityIds &&
+        (!security?.id || !allowedSecurityIds.has(security.id))
+      ) {
+        continue;
+      }
       const quoteKey = security?.id ?? "";
       const quote = quoteMap.get(quoteKey);
       if (!quote) {

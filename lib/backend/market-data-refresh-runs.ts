@@ -91,7 +91,33 @@ function formatProviderStatus(args: {
   missingQuoteCount: number;
   errorMessage: string | null;
   providerLimits?: unknown;
+  batching?: unknown;
 }) {
+  const batching =
+    args.batching && typeof args.batching === "object"
+      ? (args.batching as {
+          completedBatchCount?: number;
+          plannedBatchCount?: number;
+          processedSymbolCount?: number;
+          deferredSymbolCount?: number;
+          stoppedByRuntime?: boolean;
+        })
+      : null;
+  if (batching) {
+    const completedBatchCount = batching.completedBatchCount ?? 0;
+    const processedSymbolCount = batching.processedSymbolCount ?? 0;
+    const deferredSymbolCount = batching.deferredSymbolCount ?? 0;
+    if (deferredSymbolCount > 0) {
+      const reason = batching.stoppedByRuntime
+        ? "运行时间到达上限"
+        : "达到本次后台额度";
+      return `本次分 ${completedBatchCount} 批刷新 ${processedSymbolCount} 个，剩余 ${deferredSymbolCount} 个因${reason}会在下次自动刷新。`;
+    }
+    if (completedBatchCount > 1) {
+      return `本次分 ${completedBatchCount} 批完成 ${processedSymbolCount} 个标的刷新。`;
+    }
+  }
+
   const activeLimits = Array.isArray(args.providerLimits)
     ? args.providerLimits.filter(
         (item): item is { provider?: string; retryAfterSeconds?: number } =>
@@ -139,6 +165,12 @@ export function mapMarketDataRefreshRunForMobile(
     Array.isArray(run.providerStatusJson.providerLimits)
       ? run.providerStatusJson.providerLimits
       : [];
+  const batching =
+    run.providerStatusJson &&
+    typeof run.providerStatusJson === "object" &&
+    "batching" in run.providerStatusJson
+      ? run.providerStatusJson.batching
+      : null;
   const durationMs =
     run.finishedAt && run.startedAt
       ? Math.max(run.finishedAt.getTime() - run.startedAt.getTime(), 0)
@@ -169,6 +201,7 @@ export function mapMarketDataRefreshRunForMobile(
       missingQuoteCount: run.missingQuoteCount,
       errorMessage: run.errorMessage,
       providerLimits,
+      batching,
     }),
     errorMessage: run.errorMessage,
     durationMs,

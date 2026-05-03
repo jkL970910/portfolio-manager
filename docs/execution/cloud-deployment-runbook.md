@@ -29,6 +29,9 @@ LOO_MINISTER_ALLOW_SERVER_KEY=false
 SECURITY_METADATA_PROVIDER_ENABLED=false
 MARKET_DATA_REFRESH_MAX_USERS=1
 MARKET_DATA_REFRESH_MAX_SYMBOLS=20
+MARKET_DATA_REFRESH_BATCH_SIZE=20
+MARKET_DATA_REFRESH_MAX_BATCHES_PER_RUN=3
+MARKET_DATA_REFRESH_MAX_RUNTIME_SECONDS=45
 SECURITY_METADATA_REFRESH_MAX_SECURITIES=50
 SECURITY_METADATA_REFRESH_MAX_AGE_DAYS=30
 ```
@@ -149,6 +152,11 @@ Expected:
 
 - `security-metadata` returns success or safe skipped rows.
 - `market-data` writes a run ledger row.
+- `market-data` refreshes in bounded batches. Keep `MARKET_DATA_REFRESH_BATCH_SIZE=20`
+  and use `MARKET_DATA_REFRESH_MAX_BATCHES_PER_RUN` / runtime limits to avoid
+  unbounded provider calls. If the list grows beyond the current run budget, the
+  run should be `partial` with a mobile-readable “remaining symbols will refresh
+  next run” status, not a full skip.
 - `external-research` stays disabled unless explicitly enabled.
 
 ## Phase 4: First Real Provider

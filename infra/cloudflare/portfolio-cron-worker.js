@@ -62,7 +62,11 @@ function scheduledJobs(env) {
       path: "/api/workers/market-data/run",
       query: {
         maxUsers: env.MARKET_DATA_REFRESH_MAX_USERS || "1",
-        maxSymbols: env.MARKET_DATA_REFRESH_MAX_SYMBOLS || "20"
+        maxSymbols: env.MARKET_DATA_REFRESH_MAX_SYMBOLS || "20",
+        batchSize: env.MARKET_DATA_REFRESH_BATCH_SIZE || "20",
+        maxBatchesPerRun:
+          env.MARKET_DATA_REFRESH_MAX_BATCHES_PER_RUN || "3",
+        maxRuntimeSeconds: env.MARKET_DATA_REFRESH_MAX_RUNTIME_SECONDS || "45"
       }
     },
     envFlag(env.ENABLE_EXTERNAL_RESEARCH_WORKER, false) && {

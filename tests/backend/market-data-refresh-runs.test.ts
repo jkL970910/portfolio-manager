@@ -84,4 +84,29 @@ describe("market data refresh run mobile mapping", () => {
       "twelve-data 已限流，约 600 秒后重试",
     );
   });
+
+  it("explains batched worker refresh progress", () => {
+    const item = mapMarketDataRefreshRunForMobile({
+      ...baseRun,
+      status: "partial",
+      triggeredBy: "worker",
+      sampledSymbolCount: 45,
+      refreshedHoldingCount: 20,
+      providerStatusJson: {
+        batching: {
+          batchSize: 20,
+          completedBatchCount: 1,
+          plannedBatchCount: 3,
+          processedSymbolCount: 20,
+          deferredSymbolCount: 25,
+          stoppedByRuntime: false,
+        },
+      },
+    });
+
+    assert.equal(
+      item.providerStatusLabel,
+      "本次分 1 批刷新 20 个，剩余 25 个因达到本次后台额度会在下次自动刷新。",
+    );
+  });
 });

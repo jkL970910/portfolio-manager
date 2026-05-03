@@ -31,6 +31,13 @@ async function main() {
       workerId,
       maxUsers: readPositiveIntEnv("MARKET_DATA_REFRESH_MAX_USERS"),
       maxSymbols: readPositiveIntEnv("MARKET_DATA_REFRESH_MAX_SYMBOLS"),
+      batchSize: readPositiveIntEnv("MARKET_DATA_REFRESH_BATCH_SIZE"),
+      maxBatchesPerRun: readPositiveIntEnv(
+        "MARKET_DATA_REFRESH_MAX_BATCHES_PER_RUN",
+      ),
+      maxRuntimeSeconds: readPositiveIntEnv(
+        "MARKET_DATA_REFRESH_MAX_RUNTIME_SECONDS",
+      ),
     });
     console.log(JSON.stringify(result, null, 2));
   } catch (error) {
