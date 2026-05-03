@@ -11,7 +11,6 @@ import { getProviderLimitSnapshotPersisted } from "@/lib/market-data/provider-li
 const DEFAULT_MAX_USERS = 25;
 const DEFAULT_BATCH_SIZE = 20;
 const DEFAULT_MAX_BATCHES_PER_RUN = 3;
-const DEFAULT_MAX_PROVIDER_CALLS_PER_RUN = 60;
 const DEFAULT_MAX_RUNTIME_SECONDS = 45;
 
 function normalizePositiveInteger(
