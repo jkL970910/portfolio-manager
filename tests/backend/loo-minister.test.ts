@@ -137,9 +137,9 @@ test("Loo Minister GPT mode falls back safely when provider is not enabled", asy
 
   assert.equal(response.meta.source, "service");
   assert.equal(response.data.page, "security-detail");
-  assert.match(response.data.title, /本地降级/);
+  assert.match(response.data.title, /本地答复/);
   assert.match(response.data.answer, /GPT-5.5 provider 未启用/);
-  assert.match(response.data.answer, /candidate-fit DTO/);
+  assert.match(response.data.answer, /候选适配资料/);
   assert.match(response.data.answer, /NVDA/);
   assert.match(response.data.disclaimer.zh, /不构成投资建议/);
 });
@@ -369,7 +369,7 @@ test("Loo Minister answers candidate buy-fit questions without treating zero hol
     },
   );
 
-  assert.match(response.data.answer, /candidate-new-buy DTO/);
+  assert.match(response.data.answer, /候选新增标的/);
   assert.match(response.data.answer, /0% 只代表当前未持有/);
   assert.match(response.data.answer, /偏好适配/);
   assert.match(response.data.answer, /推荐引擎/);
@@ -440,7 +440,7 @@ test("Loo Minister infers candidate economic exposure when page asset class is u
     },
   );
 
-  assert.match(response.data.answer, /candidate-new-buy DTO/);
+  assert.match(response.data.answer, /候选新增标的/);
   assert.match(response.data.answer, /底层经济暴露：Fixed Income/);
   assert.match(response.data.answer, /目标 10\.0%/);
   assert.doesNotMatch(response.data.answer, /资产类别未确认/);
@@ -506,7 +506,112 @@ test("Loo Minister hydrates comparison security context from a ticker mention", 
   );
 
   assert.match(response.data.answer, /对比标的 1：VFV · TSX · CAD/);
-  assert.match(response.data.answer, /Context 状态：hydrated/);
+  assert.match(response.data.answer, /资料补齐状态：hydrated/);
+  assert.match(response.data.disclaimer.zh, /不构成投资建议/);
+});
+
+test("Loo Minister resolves multiple ticker mentions in one round", async () => {
+  const response = await getLooMinisterAnswer(
+    "user_casey",
+    {
+      pageContext: {
+        version: LOO_MINISTER_VERSION,
+        page: "portfolio",
+        locale: "zh",
+        title: "Loo国组合",
+        asOf: now,
+        displayCurrency: "CAD",
+        subject: {},
+        dataFreshness: {
+          portfolioAsOf: now,
+          quotesAsOf: now,
+          fxAsOf: now,
+          chartFreshness: "fresh",
+          sourceMode: "cached-external",
+        },
+        facts: [
+          {
+            id: "portfolio-context",
+            label: "组合上下文",
+            value: "CAD 100,000",
+            detail: JSON.stringify({
+              version: "portfolio-context.v1",
+              page: "portfolio",
+              summary: {
+                totalNetWorthCad: 100000,
+                totalMarketValueCad: 80000,
+                cashBalanceCad: 20000,
+                accountCount: 2,
+                holdingCount: 4,
+                topHolding: "VFV 12.5%",
+              },
+              accounts: [],
+              assetAllocation: [],
+              concentration: {
+                topHoldings: [],
+                topFiveWeightPct: 0,
+                largestHoldingWeightPct: 0,
+              },
+              health: {
+                score: 72,
+                status: "ok",
+                weakestDimension: null,
+                strongestDimension: null,
+                actionQueue: [],
+              },
+              preference: {
+                summary: "test",
+                riskProfile: "balanced",
+                cashBufferTargetCad: 0,
+                source: null,
+              },
+              recommendation: {
+                runId: null,
+                engineVersion: null,
+                topItems: [],
+                assumptions: [],
+              },
+              dataFreshness: {
+                portfolioAsOf: now,
+                quotesAsOf: now,
+                fxAsOf: now,
+                chartFreshness: "fresh",
+                sourceMode: "cached-external",
+              },
+              cachedIntelligence: { count: 0, summaries: [] },
+              analysisCache: { count: 0, summaries: [] },
+              contextCompleteness: { score: 100, missing: [], blocking: [] },
+              rules: [],
+            }),
+            source: "analysis-cache",
+          },
+        ],
+        warnings: [],
+        allowedActions: [],
+      },
+      question: "VFV 和 XEQT 比呢？",
+      answerStyle: "beginner",
+      cacheStrategy: "prefer-cache",
+      includeExternalResearch: false,
+    },
+    {
+      settings: {
+        mode: "local",
+        provider: "official-openai",
+        model: "gpt-5.5",
+        reasoningEffort: "medium",
+        endpoint: "https://api.openai.com/v1/responses",
+        apiKey: null,
+        apiKeySource: "none",
+        providerEnabled: false,
+      },
+      persistUsage: false,
+    },
+  );
+
+  assert.match(response.data.answer, /对比标的 1/);
+  assert.match(response.data.answer, /VFV/);
+  assert.match(response.data.answer, /XEQT/);
   assert.match(response.data.disclaimer.zh, /不构成投资建议/);
 });
 
@@ -623,12 +728,62 @@ test("Loo Minister uses portfolio context DTO for whole-portfolio holding questi
     },
   );
 
-  assert.match(response.data.answer, /portfolio-context\.v1/);
+  assert.match(response.data.answer, /组合上下文/);
   assert.match(response.data.answer, /投资资产/);
   assert.match(response.data.answer, /前五大持仓/);
   assert.match(response.data.answer, /Health/);
   assert.match(response.data.answer, /偏好/);
   assert.doesNotMatch(response.data.answer, /投资偏好现在应理解/);
+});
+
+test("Loo Minister hydrates mentioned ticker context on portfolio pages", async () => {
+  const response = await getLooMinisterAnswer(
+    "user_demo",
+    {
+      pageContext: {
+        version: LOO_MINISTER_VERSION,
+        page: "portfolio",
+        locale: "zh",
+        title: "Loo国组合",
+        asOf: now,
+        displayCurrency: "CAD",
+        subject: {},
+        dataFreshness: {
+          portfolioAsOf: now,
+          quotesAsOf: now,
+          fxAsOf: now,
+          chartFreshness: "fresh",
+          sourceMode: "cached-external",
+        },
+        facts: [],
+        warnings: [],
+        allowedActions: [],
+      },
+      question: "XBB 现在是否适合买入？",
+      answerStyle: "beginner",
+      cacheStrategy: "prefer-cache",
+      includeExternalResearch: false,
+    },
+    {
+      settings: {
+        mode: "local",
+        provider: "official-openai",
+        model: "gpt-5.5",
+        reasoningEffort: "medium",
+        endpoint: "https://api.openai.com/v1/responses",
+        apiKey: null,
+        apiKeySource: "none",
+        providerEnabled: false,
+      },
+      persistUsage: false,
+    },
+  );
+
+  assert.match(response.data.answer, /候选买入\/适配/);
+  assert.match(response.data.answer, /已识别标的/);
+  assert.match(response.data.answer, /XBB/);
+  assert.match(response.data.answer, /当前未持有不代表不能分析/);
+  assert.doesNotMatch(response.data.answer, /当前页面没有足够.*context/);
 });
 
 test("Loo Minister explains recommendation constraints and V3 overlay boundaries", async () => {
@@ -690,7 +845,7 @@ test("Loo Minister explains recommendation constraints and V3 overlay boundaries
   );
 
   assert.match(response.data.answer, /V2\.1 Core/);
-  assert.match(response.data.answer, /V3 cached-intelligence overlay/);
+  assert.match(response.data.answer, /V3 Overlay/);
   assert.match(response.data.answer, /排除规则优先于偏好规则/);
   assert.match(response.data.answer, /不会在页面加载时实时抓新闻/);
 });
@@ -819,7 +974,7 @@ test("Loo Minister explains security detail without ticker-only merging", async 
   assert.match(response.data.answer, /VFV · TSX · CAD/);
   assert.match(response.data.answer, /不会只按 ticker 合并/);
   assert.match(response.data.answer, /数据新鲜度/);
-  assert.match(response.data.answer, /Preference Factors/);
+  assert.match(response.data.answer, /偏好和数据新鲜度/);
 });
 
 test("Loo Minister uses security context DTO for non-buy security questions", async () => {
@@ -886,12 +1041,12 @@ test("Loo Minister uses security context DTO for non-buy security questions", as
     },
   );
 
-  assert.match(response.data.answer, /security-context\.v1/);
+  assert.match(response.data.answer, /标的上下文/);
   assert.match(response.data.answer, /VFV · TSX · CAD/);
   assert.match(response.data.answer, /底层经济暴露 US Equity/);
   assert.match(response.data.answer, /持仓上下文/);
   assert.match(response.data.answer, /15\.8%/);
-  assert.doesNotMatch(response.data.answer, /candidate-new-buy DTO/);
+  assert.doesNotMatch(response.data.answer, /候选新增标的/);
 });
 
 test("Loo Minister builds security context from holding detail without explicit security subject", async () => {
@@ -939,7 +1094,7 @@ test("Loo Minister builds security context from holding detail without explicit 
     },
   );
 
-  assert.match(response.data.answer, /security-context\.v1/);
+  assert.match(response.data.answer, /标的上下文/);
   assert.match(response.data.answer, /VFV · TSX · CAD/);
   assert.match(response.data.answer, /已持有 listing/);
   assert.match(response.data.answer, /US Equity/);
@@ -1139,7 +1294,7 @@ test("Loo Minister provider fallback redacts API keys in user-visible reason", a
       },
     );
 
-    assert.match(response.data.title, /本地降级/);
+  assert.match(response.data.title, /本地答复/);
     assert.match(response.data.answer, /sk-\.\.\.cdef/);
     assert.doesNotMatch(response.data.answer, /sk-test-secret/);
   } finally {
@@ -1411,7 +1566,7 @@ test("Loo Minister OpenRouter prompt prioritizes candidate fit context", async (
       },
     );
 
-    assert.match(requestedPrompt, /候选适配 DTO/);
+    assert.match(requestedPrompt, /候选适配/);
     assert.match(requestedPrompt, /"analysisMode":"candidate-new-buy"/);
     assert.match(requestedPrompt, /"assetClass":"Fixed Income"/);
     assert.match(requestedPrompt, /currentExposurePct=0 never blocks/);
@@ -1506,9 +1661,97 @@ test("Loo Minister replaces misleading candidate fit provider answers", async ()
       },
     );
 
-    assert.match(response.data.answer, /未通过候选适配校验/);
+    assert.match(response.data.answer, /没有正确使用候选适配资料/);
     assert.match(response.data.answer, /0% 只代表当前未持有/);
     assert.doesNotMatch(response.data.answer, /就不能继续分析/);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("Loo Minister sanitizes provider answers that promise unavailable quick scan confirmation", async () => {
+  const originalFetch = globalThis.fetch;
+
+  globalThis.fetch = async () =>
+    new Response(
+      JSON.stringify({
+        output_text: JSON.stringify({
+          version: LOO_MINISTER_VERSION,
+          generatedAt: now,
+          role: "loo-minister",
+          page: "portfolio",
+          title: "组合大臣答复",
+          answer:
+            "如果要真正比较 RKLB 和 NASA 是否适合买入，会交给应用里的确认式 AI 快扫流程，由你确认后再运行。",
+          keyPoints: ["需要快扫"],
+          suggestedActions: [],
+          sources: [
+            {
+              title: "组合页面上下文",
+              sourceType: "page-context",
+              asOf: now,
+            },
+          ],
+          disclaimer: {
+            zh: "仅用于研究学习，不构成投资建议。",
+            en: "For research and education only. This is not investment advice.",
+          },
+        }),
+      }),
+      {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      },
+    );
+
+  try {
+    const response = await getLooMinisterAnswer(
+      "user_demo",
+      {
+        pageContext: {
+          version: LOO_MINISTER_VERSION,
+          page: "portfolio",
+          locale: "zh",
+          title: "Loo国组合",
+          asOf: now,
+          displayCurrency: "CAD",
+          subject: {},
+          dataFreshness: {
+            portfolioAsOf: now,
+            quotesAsOf: now,
+            fxAsOf: now,
+            chartFreshness: "fresh",
+            sourceMode: "cached-external",
+          },
+          facts: [],
+          warnings: [],
+          allowedActions: [],
+        },
+        question: "RKLB 或 NASA 现在是否适合买入？",
+        answerStyle: "beginner",
+        cacheStrategy: "prefer-cache",
+        includeExternalResearch: false,
+      },
+      {
+        settings: {
+          mode: "gpt-5.5",
+          provider: "openrouter-compatible",
+          model: "gpt-5.5",
+          reasoningEffort: "medium",
+          endpoint: "https://openrouter.icu/v1/responses",
+          apiKey: "sk-router-test",
+          apiKeySource: "user",
+          providerEnabled: true,
+        },
+        persistUsage: false,
+      },
+    );
+
+    assert.match(response.data.answer, /动作边界修正/);
+    assert.match(response.data.answer, /没有可确认的 AI 快扫按钮/);
+    assert.match(response.data.keyPoints[0] ?? "", /保留 GPT 主回答并修正动作边界/);
+    assert.doesNotMatch(response.data.answer, /由你确认后再运行/);
+    assert.equal(response.data.suggestedActions.length, 0);
   } finally {
     globalThis.fetch = originalFetch;
   }

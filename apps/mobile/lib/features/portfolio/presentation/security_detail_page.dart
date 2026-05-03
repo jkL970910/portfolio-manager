@@ -290,13 +290,20 @@ class _SecurityDetailPageState extends State<SecurityDetailPage> {
     final currency = security.currency.trim().toUpperCase();
     final items = snapshot.items.where((item) {
       final identity = item.identity;
-      if (securityId.isNotEmpty && identity.securityId == securityId) {
-        return true;
-      }
-
       final itemSymbol = identity.symbol.trim().toUpperCase();
       final itemExchange = identity.exchange.trim().toUpperCase();
       final itemCurrency = identity.currency.trim().toUpperCase();
+      final conflictsWithVisibleIdentity =
+          (itemExchange.isNotEmpty &&
+                  exchange.isNotEmpty &&
+                  itemExchange != exchange) ||
+              (itemCurrency.isNotEmpty &&
+                  currency.isNotEmpty &&
+                  itemCurrency != currency);
+      if (securityId.isNotEmpty && identity.securityId == securityId) {
+        return !conflictsWithVisibleIdentity;
+      }
+
       return symbol.isNotEmpty &&
           exchange.isNotEmpty &&
           currency.isNotEmpty &&
@@ -312,7 +319,7 @@ class _SecurityDetailPageState extends State<SecurityDetailPage> {
       items: items,
       emptyTitle: "暂时没有该标的秘闻",
       emptyDetail:
-          "当前只显示同一 securityId，或完整 symbol/exchange/currency 匹配的缓存情报；不会用 ticker-only 情报混入这个 listing。",
+          "当前只显示同一标的，或完整 symbol/exchange/currency 匹配的缓存情报；不会把其他版本的资料混入当前标的。",
     );
   }
 }

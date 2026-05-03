@@ -885,7 +885,10 @@ export const postgresRepositories: BackendRepositories = {
     async listRecentByUserId(userId, limit) {
       const db = getDb();
       const rows = await db.query.portfolioAnalysisRuns.findMany({
-        where: eq(portfolioAnalysisRuns.userId, userId),
+        where: and(
+          eq(portfolioAnalysisRuns.userId, userId),
+          gt(portfolioAnalysisRuns.expiresAt, new Date()),
+        ),
         orderBy: desc(portfolioAnalysisRuns.createdAt),
         limit,
       });

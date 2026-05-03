@@ -107,11 +107,24 @@ export async function resolveLooMinisterContext(input: {
   const mentions = extractSecurityMentions(input.request.question);
   const sessionSubjects = input.sessionSubjects ?? [];
 
-  for (const mention of mentions) {
-    if (currentSubject && normalizeKey(currentSubject.symbol) === normalizeKey(mention.replace(/\.TO$/u, ""))) {
-      continue;
-    }
-    const resolved = await resolveSecurityMentionTool(input.userId, mention);
+  const resolvedMentions = await Promise.all(
+    mentions.map(async (mention) => {
+      if (
+        currentSubject &&
+        normalizeKey(currentSubject.symbol) === normalizeKey(mention.replace(/\.TO$/u, ""))
+      ) {
+        return null;
+      }
+      return {
+        mention,
+        resolved: await resolveSecurityMentionTool(input.userId, mention),
+      };
+    }),
+  );
+
+  for (const item of resolvedMentions) {
+    if (!item) continue;
+    const { resolved } = item;
     if (resolved.status === "resolved" && resolved.subject) {
       if (!isSameSubject(currentSubject, resolved.subject)) {
         comparisonSubjects.push(resolved.subject);

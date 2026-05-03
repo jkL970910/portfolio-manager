@@ -443,7 +443,7 @@ class _AiMinisterSettingsCardState extends State<_AiMinisterSettingsCard> {
                   ],
                   if (settings.recentUsage.isNotEmpty) ...[
                     const SizedBox(height: 14),
-                    Text("最近调用",
+                    Text("最近使用记录",
                         style: Theme.of(context).textTheme.titleMedium),
                     const SizedBox(height: 6),
                     ...settings.recentUsage.map(_AiMinisterUsageTile.new),
@@ -508,7 +508,7 @@ class _AiMinisterSettings {
   }
 
   String get providerEnabledLabel {
-    return providerEnabled ? "Provider 已启用" : "Provider 未启用";
+    return providerEnabled ? "外部 AI 已启用" : "外部 AI 未启用";
   }
 
   String get reasoningEffortLabel {
@@ -590,6 +590,32 @@ class _AiMinisterUsageTile extends StatelessWidget {
 
   final _AiMinisterUsage item;
 
+  String get _statusLabel {
+    switch (item.status) {
+      case "success":
+        return "成功";
+      case "fallback":
+        return "已用本地答复";
+      case "failed":
+        return "失败";
+      default:
+        return item.status;
+    }
+  }
+
+  String get _providerLabel {
+    switch (item.provider) {
+      case "local":
+        return "本地大臣";
+      case "official-openai":
+        return "OpenAI";
+      case "openrouter-compatible":
+        return "自定义 AI";
+      default:
+        return item.provider;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return ListTile(
@@ -600,7 +626,7 @@ class _AiMinisterUsageTile extends StatelessWidget {
             ? Icons.check_circle_outline
             : Icons.info_outline,
       ),
-      title: Text("${item.page} · ${item.provider} · ${item.status}"),
+      title: Text("${item.page} · $_providerLabel · $_statusLabel"),
       subtitle: Text(
         [
           item.model,
@@ -707,7 +733,7 @@ class _MarketDataStatusCardState extends State<_MarketDataStatusCard> {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    "最近任意任务：${status.latestStatusLabel} · ${status.latestProviderStatusLabel}",
+                    "最近刷新：${status.latestStatusLabel} · ${status.latestProviderStatusLabel}",
                     style: Theme.of(context).textTheme.bodySmall,
                   ),
                   const Divider(),

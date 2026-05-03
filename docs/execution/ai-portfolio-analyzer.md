@@ -321,6 +321,18 @@ Runtime context architecture:
      for GPT or switch to a local deterministic answer
    - server-side `answerMode=local` exists for explicit user-selected local
      fallback; this must not silently replace GPT without user choice
+   - backend context enrichment now prepares daily intelligence, portfolio
+     context, security context, and settings in parallel where dependencies
+     allow, then merges deduplicated facts before answering
+   - ticker mention resolution now hydrates multiple mentioned securities in
+     parallel, so "VFV 和 XEQT 比呢" style questions no longer pay a serial
+     lookup cost for every symbol
+   - OpenRouter-compatible prompt construction now sends compact Chinese
+     summaries for portfolio/security/candidate-fit context instead of dumping
+     full page JSON, reducing token volume and latency risk
+   - user-facing 大臣 copy should say `组合上下文`, `标的上下文`,
+     `候选适配资料`, `外部资料`, and `本地答复`; avoid leaking engineering
+     words such as DTO, sourceMode, deterministic, fallback, or provider internals
    - local answer strategy now has separate branches for comparison,
      recommendation, preference, data freshness, product-help, and candidate-fit
      questions so fallback answers remain useful rather than generic

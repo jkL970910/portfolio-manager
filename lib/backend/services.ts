@@ -91,11 +91,13 @@ import {
   resolveSecurity,
 } from "@/lib/market-data/service";
 import { resolveCanonicalSecurityIdentity } from "@/lib/market-data/security-identity";
+import { inferEconomicAssetClass } from "@/lib/backend/security-economic-exposure";
 import type {
   SecurityQuote,
   SecurityResolution,
 } from "@/lib/market-data/types";
 import { getProviderLimitSnapshot } from "@/lib/market-data/provider-limits";
+import { getAssetClassLabel } from "@/lib/i18n/finance";
 import { pick } from "@/lib/i18n/ui";
 
 type DbTransaction = Parameters<
@@ -2146,9 +2148,32 @@ export async function getPortfolioSecurityDetailView(
 
   const resolution = resolutionResponse.result;
   const quote = quoteResponse.result;
+  const resolvedAssetClass = inferEconomicAssetClass({
+    symbol: canonicalSecurity.symbol,
+    name: resolution.name ?? canonicalSecurity.name,
+    assetClass: referenceHolding?.assetClass ?? null,
+    securityType: resolution.securityType ?? canonicalSecurity.securityType,
+    currency: canonicalSecurity.currency,
+  });
 
   data.security.securityId = canonicalSecurity.id;
   data.security.name = resolution.name ?? data.security.name;
+  data.security.currency = canonicalSecurity.currency;
+  if (!referenceHolding) {
+    data.security.assetClass = getAssetClassLabel(
+      resolvedAssetClass,
+      user.displayLanguage,
+    );
+    data.analysis.assetClassLabel = getAssetClassLabel(
+      resolvedAssetClass,
+      user.displayLanguage,
+    );
+    data.analysis.summary = pick(
+      user.displayLanguage,
+      `${normalizedSymbol} 当前不是实际持仓，系统按 ${getAssetClassLabel(resolvedAssetClass, user.displayLanguage)} 的候选标的口径展示；行业分类仍需要更完整的外部 profile 数据补齐。`,
+      `${normalizedSymbol} is not currently held, so it is shown as a ${getAssetClassLabel(resolvedAssetClass, user.displayLanguage)} candidate; industry classification still needs richer external profile data.`,
+    );
+  }
   data.security.securityType = formatSecurityTypeLabel(resolution.securityType);
   data.security.exchange =
     resolution.exchange ??

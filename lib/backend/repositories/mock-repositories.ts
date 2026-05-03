@@ -242,6 +242,7 @@ export const mockRepositories: BackendRepositories = {
     async listRecentByUserId(userId, limit) {
       return portfolioAnalysisRuns
         .filter((run) => run.userId === userId)
+        .filter((run) => new Date(run.expiresAt).getTime() > Date.now())
         .sort(
           (left, right) =>
             new Date(right.createdAt).getTime() -
