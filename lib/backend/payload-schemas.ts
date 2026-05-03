@@ -235,6 +235,17 @@ export const watchlistSymbolInputSchema = z.object({
   symbol: z.string().trim().min(1).max(32),
 });
 
+export const securityMetadataManualUpdateSchema = z.object({
+  economicAssetClass: z.string().trim().min(2).max(64),
+  economicSector: z.string().trim().max(80).nullable().optional(),
+  exposureRegion: z.string().trim().max(80).nullable().optional(),
+  notes: z.string().trim().max(240).nullable().optional(),
+});
+
+export const securityMetadataRefreshInputSchema = z.object({
+  maxSecurities: z.number().int().min(1).max(50).optional(),
+});
+
 export const registerUserInputSchema = z
   .object({
     displayName: z.string().trim().min(2).max(160),

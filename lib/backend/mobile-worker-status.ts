@@ -1,11 +1,17 @@
-import { desc } from "drizzle-orm";
+import { desc, eq, inArray } from "drizzle-orm";
 import { apiSuccess } from "@/lib/backend/contracts";
 import { getMobileExternalResearchJobs } from "@/lib/backend/external-research-jobs";
 import { mapMarketDataRefreshRunForMobile } from "@/lib/backend/market-data-refresh-runs";
+import type { SecurityRecord } from "@/lib/backend/models";
 import { listRecentProviderUsage } from "@/lib/backend/provider-usage-ledger";
+import { getRepositories } from "@/lib/backend/repositories/factory";
+import { normalizeSecurityMetadataForWrite } from "@/lib/backend/security-economic-exposure";
+import { runSecurityMetadataRefreshWorkerOnce } from "@/lib/backend/security-metadata-worker";
 import { getDb } from "@/lib/db/client";
 import {
+  holdingPositions,
   marketDataRefreshRuns,
+  securities,
   securityMetadataRefreshRuns,
 } from "@/lib/db/schema";
 
@@ -70,6 +76,243 @@ function mapSecurityMetadataRun(
       ? row.providerIdsJson
       : [],
   };
+}
+
+function metadataSourceLabel(source: string) {
+  switch (source) {
+    case "manual":
+      return "人工确认";
+    case "provider":
+      return "外部资料";
+    case "project-registry":
+      return "项目规则";
+    case "heuristic":
+      return "系统推断";
+    default:
+      return "来源未知";
+  }
+}
+
+function metadataConfidenceLabel(confidence: number) {
+  if (confidence >= 90) return "高可信";
+  if (confidence >= 70) return "可用";
+  if (confidence >= 50) return "待复核";
+  return "低可信";
+}
+
+function formatMetadataDate(value: Date | string | null | undefined) {
+  const iso = formatDateTime(value);
+  if (!iso) return "时间未知";
+  return iso.slice(0, 10);
+}
+
+function mapSecurityMetadataForMobile(
+  security: Pick<
+    SecurityRecord,
+    | "id"
+    | "symbol"
+    | "name"
+    | "canonicalExchange"
+    | "currency"
+    | "securityType"
+    | "economicAssetClass"
+    | "economicSector"
+    | "exposureRegion"
+    | "metadataSource"
+    | "metadataConfidence"
+    | "metadataAsOf"
+    | "metadataConfirmedAt"
+    | "metadataNotes"
+  >,
+  holdingCount: number,
+) {
+  const source = security.metadataSource ?? "heuristic";
+  const confidence = security.metadataConfidence ?? 45;
+  const confirmed = source === "manual" || Boolean(security.metadataConfirmedAt);
+  return {
+    securityId: security.id,
+    symbol: security.symbol,
+    name: security.name,
+    exchange: security.canonicalExchange,
+    currency: security.currency,
+    securityType: security.securityType,
+    economicAssetClass: security.economicAssetClass ?? "待确认",
+    economicSector: security.economicSector ?? "",
+    exposureRegion: security.exposureRegion ?? "",
+    metadataSource: source,
+    metadataSourceLabel: metadataSourceLabel(source),
+    metadataConfidence: confidence,
+    metadataConfidenceLabel: metadataConfidenceLabel(confidence),
+    metadataAsOfLabel: formatMetadataDate(security.metadataAsOf),
+    metadataConfirmedAtLabel: security.metadataConfirmedAt
+      ? formatMetadataDate(security.metadataConfirmedAt)
+      : null,
+    metadataNotes: security.metadataNotes ?? "",
+    holdingCount,
+    locked: confirmed,
+    statusLabel: confirmed
+      ? "已人工确认，后台不会覆盖"
+      : `${metadataSourceLabel(source)} · ${metadataConfidenceLabel(confidence)}`,
+  };
+}
+
+export class SecurityMetadataAccessError extends Error {
+  constructor(message = "只能修正当前组合内的标的资料。") {
+    super(message);
+    this.name = "SecurityMetadataAccessError";
+  }
+}
+
+export async function getMobileSecurityMetadataReview(userId: string) {
+  const db = getDb();
+  const holdingRows = await db
+    .select({
+      securityId: holdingPositions.securityId,
+    })
+    .from(holdingPositions)
+    .where(eq(holdingPositions.userId, userId));
+  const securityIds = [
+    ...new Set(
+      holdingRows
+        .map((row) => row.securityId)
+        .filter((value): value is string => Boolean(value)),
+    ),
+  ];
+
+  if (securityIds.length === 0) {
+    return apiSuccess(
+      {
+        summary: {
+          title: "标的资料修正",
+          statusLabel: "当前没有可复核的持仓标的资料。",
+          actionLabel: "导入持仓后再复核",
+        },
+        items: [],
+      },
+      "database",
+    );
+  }
+
+  const rows = await db
+    .select()
+    .from(securities)
+    .where(inArray(securities.id, securityIds));
+  const holdingCounts = new Map<string, number>();
+  for (const row of holdingRows) {
+    if (!row.securityId) continue;
+    holdingCounts.set(row.securityId, (holdingCounts.get(row.securityId) ?? 0) + 1);
+  }
+  const items = rows
+    .map((row) =>
+      mapSecurityMetadataForMobile(
+        {
+          id: row.id,
+          symbol: row.symbol,
+          name: row.name,
+          canonicalExchange: row.canonicalExchange,
+          currency: row.currency as SecurityRecord["currency"],
+          securityType: row.securityType,
+          economicAssetClass: row.economicAssetClass,
+          economicSector: row.economicSector,
+          exposureRegion: row.exposureRegion,
+          metadataSource:
+            (row.metadataSource as SecurityRecord["metadataSource"]) ??
+            "heuristic",
+          metadataConfidence: row.metadataConfidence,
+          metadataAsOf: row.metadataAsOf?.toISOString() ?? null,
+          metadataConfirmedAt: row.metadataConfirmedAt?.toISOString() ?? null,
+          metadataNotes: row.metadataNotes,
+        },
+        holdingCounts.get(row.id) ?? 0,
+      ),
+    )
+    .sort((left, right) => {
+      if (left.locked !== right.locked) return left.locked ? 1 : -1;
+      return left.metadataConfidence - right.metadataConfidence;
+    });
+  const lowConfidenceCount = items.filter(
+    (item) => !item.locked && item.metadataConfidence < 70,
+  ).length;
+  const manualCount = items.filter((item) => item.locked).length;
+
+  return apiSuccess(
+    {
+      summary: {
+        title: "标的资料修正",
+        statusLabel:
+          lowConfidenceCount > 0
+            ? `${lowConfidenceCount} 个标的资料仍建议复核。`
+            : "当前持仓标的资料没有明显低可信项。",
+        actionLabel:
+          "可小批量刷新外部资料；人工确认后会锁定，不再被后台覆盖。",
+        totalCount: items.length,
+        manualCount,
+        lowConfidenceCount,
+      },
+      items,
+    },
+    "database",
+  );
+}
+
+export async function updateMobileSecurityMetadata(
+  userId: string,
+  securityId: string,
+  input: {
+    economicAssetClass: string;
+    economicSector?: string | null;
+    exposureRegion?: string | null;
+    notes?: string | null;
+  },
+) {
+  const repositories = getRepositories();
+  const holdings = await repositories.holdings.listByUserId(userId);
+  if (!holdings.some((holding) => holding.securityId === securityId)) {
+    throw new SecurityMetadataAccessError();
+  }
+
+  const now = new Date().toISOString();
+  const metadata = normalizeSecurityMetadataForWrite({
+    economicAssetClass: input.economicAssetClass,
+    economicSector: input.economicSector ?? null,
+    exposureRegion: input.exposureRegion ?? null,
+    source: "manual",
+    confidence: 100,
+    asOf: now,
+    confirmedAt: now,
+    notes: input.notes ?? "用户在移动端人工确认。",
+  });
+  const security = await repositories.securities.updateMetadata(securityId, {
+    economicAssetClass: metadata.economicAssetClass,
+    economicSector: metadata.economicSector,
+    exposureRegion: metadata.exposureRegion,
+    metadataSource: metadata.source,
+    metadataConfidence: metadata.confidence,
+    metadataAsOf: metadata.asOf,
+    metadataConfirmedAt: metadata.confirmedAt,
+    metadataNotes: metadata.notes,
+  });
+
+  return apiSuccess(
+    {
+      item: mapSecurityMetadataForMobile(
+        security,
+        holdings.filter((holding) => holding.securityId === securityId).length,
+      ),
+    },
+    "database",
+  );
+}
+
+export async function refreshMobileSecurityMetadata(input?: {
+  maxSecurities?: number;
+}) {
+  const result = await runSecurityMetadataRefreshWorkerOnce({
+    workerId: "mobile-security-metadata-refresh",
+    maxSecurities: input?.maxSecurities ?? 12,
+    maxAgeDays: 0,
+  });
+  return apiSuccess(result, "database");
 }
 
 export async function getMobileWorkerStatusCenter(userId: string) {

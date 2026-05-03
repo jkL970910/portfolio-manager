@@ -165,6 +165,8 @@ class _SettingsPageState extends State<SettingsPage> {
           const SizedBox(height: 16),
           _WorkerStatusCenterCard(apiClient: widget.apiClient),
           const SizedBox(height: 16),
+          _SecurityMetadataReviewCard(apiClient: widget.apiClient),
+          const SizedBox(height: 16),
           _MarketDataStatusCard(apiClient: widget.apiClient),
           const SizedBox(height: 16),
           _RecentAnalysisCard(apiClient: widget.apiClient),
@@ -583,6 +585,380 @@ class _WorkerStatusCenterCardState extends State<_WorkerStatusCenterCard> {
               ],
             );
           },
+        ),
+      ),
+    );
+  }
+}
+
+class _SecurityMetadataReviewCard extends StatefulWidget {
+  const _SecurityMetadataReviewCard({required this.apiClient});
+
+  final LooApiClient apiClient;
+
+  @override
+  State<_SecurityMetadataReviewCard> createState() =>
+      _SecurityMetadataReviewCardState();
+}
+
+class _SecurityMetadataReviewCardState
+    extends State<_SecurityMetadataReviewCard> {
+  late Future<SecurityMetadataReviewSnapshot> _snapshot = _loadSnapshot();
+  var _refreshingProvider = false;
+  String? _message;
+
+  Future<SecurityMetadataReviewSnapshot> _loadSnapshot() async {
+    final response = await widget.apiClient.getSecurityMetadataReview();
+    return SecurityMetadataReviewSnapshot.fromApiResponse(response);
+  }
+
+  void _refresh() {
+    setState(() {
+      _snapshot = _loadSnapshot();
+    });
+  }
+
+  Future<void> _refreshProvider() async {
+    if (_refreshingProvider) return;
+    setState(() {
+      _refreshingProvider = true;
+      _message = null;
+    });
+
+    try {
+      final response =
+          await widget.apiClient.refreshSecurityMetadata(maxSecurities: 12);
+      final data = response["data"];
+      final payload =
+          data is Map<String, dynamic> ? data : const <String, dynamic>{};
+      final sampled = payload["sampledSecurityCount"] as int? ?? 0;
+      final updated = payload["updatedCount"] as int? ?? 0;
+      final skipped = payload["skippedCount"] as int? ?? 0;
+      final failed = payload["failedCount"] as int? ?? 0;
+      if (!mounted) return;
+      setState(() {
+        _message = "已检查 $sampled 个标的；更新 $updated，跳过 $skipped，失败 $failed。";
+        _refreshingProvider = false;
+        _snapshot = _loadSnapshot();
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _message = error.toString();
+        _refreshingProvider = false;
+      });
+    }
+  }
+
+  Future<void> _openManualEditor(SecurityMetadataItem item) async {
+    final updated = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) => _SecurityMetadataEditorSheet(
+        apiClient: widget.apiClient,
+        item: item,
+      ),
+    );
+    if (updated == true && mounted) {
+      setState(() {
+        _message = "${item.symbol} 已人工确认并锁定。";
+        _snapshot = _loadSnapshot();
+      });
+    }
+  }
+
+  Color _confidenceColor(BuildContext context, SecurityMetadataItem item) {
+    if (item.locked) return Theme.of(context).colorScheme.primary;
+    if (item.metadataConfidence >= 70) return Colors.teal;
+    if (item.metadataConfidence >= 50) return Colors.orange;
+    return Theme.of(context).colorScheme.error;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: FutureBuilder<SecurityMetadataReviewSnapshot>(
+          future: _snapshot,
+          builder: (context, snapshot) {
+            final data = snapshot.data;
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    const Icon(Icons.verified_outlined),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        data?.title ?? "标的资料修正",
+                        style: Theme.of(context).textTheme.titleLarge,
+                      ),
+                    ),
+                    IconButton(
+                      onPressed:
+                          snapshot.connectionState == ConnectionState.waiting
+                              ? null
+                              : _refresh,
+                      icon: const Icon(Icons.refresh),
+                      tooltip: "刷新资料列表",
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                if (snapshot.connectionState == ConnectionState.waiting) ...[
+                  const LinearProgressIndicator(),
+                ] else if (snapshot.hasError) ...[
+                  Text(
+                    "标的资料暂时读取失败：${snapshot.error}",
+                    style:
+                        TextStyle(color: Theme.of(context).colorScheme.error),
+                  ),
+                ] else if (data != null) ...[
+                  Text(data.statusLabel),
+                  const SizedBox(height: 6),
+                  Text(
+                    data.actionLabel,
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                  const SizedBox(height: 10),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      Chip(label: Text("共 ${data.totalCount} 个")),
+                      Chip(label: Text("已锁定 ${data.manualCount} 个")),
+                      Chip(label: Text("待复核 ${data.lowConfidenceCount} 个")),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  FilledButton.tonalIcon(
+                    onPressed: _refreshingProvider ? null : _refreshProvider,
+                    icon: _refreshingProvider
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.manage_search_outlined),
+                    label: Text(_refreshingProvider ? "刷新资料中" : "小批量刷新标的资料"),
+                  ),
+                  if (_message != null) ...[
+                    const SizedBox(height: 8),
+                    Text(
+                      _message!,
+                      style: TextStyle(
+                        color: _message!.contains("失败") ||
+                                _message!.contains("Exception")
+                            ? Theme.of(context).colorScheme.error
+                            : Theme.of(context).colorScheme.primary,
+                      ),
+                    ),
+                  ],
+                  const Divider(),
+                  if (data.items.isEmpty)
+                    const Text("当前没有可复核的持仓标的。")
+                  else
+                    ...data.items.take(12).map(
+                          (item) => ListTile(
+                            contentPadding: EdgeInsets.zero,
+                            dense: true,
+                            leading: CircleAvatar(
+                              backgroundColor: _confidenceColor(context, item),
+                              child: Text(
+                                item.metadataConfidence.toString(),
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ),
+                            title: Text(item.identityLabel),
+                            subtitle: Text(
+                              [
+                                item.name,
+                                item.detailLabel,
+                                item.statusLabel,
+                              ].join("\n"),
+                            ),
+                            isThreeLine: true,
+                            trailing: const Icon(Icons.edit_outlined),
+                            onTap: () => _openManualEditor(item),
+                          ),
+                        ),
+                ],
+              ],
+            );
+          },
+        ),
+      ),
+    );
+  }
+}
+
+class _SecurityMetadataEditorSheet extends StatefulWidget {
+  const _SecurityMetadataEditorSheet({
+    required this.apiClient,
+    required this.item,
+  });
+
+  final LooApiClient apiClient;
+  final SecurityMetadataItem item;
+
+  @override
+  State<_SecurityMetadataEditorSheet> createState() =>
+      _SecurityMetadataEditorSheetState();
+}
+
+class _SecurityMetadataEditorSheetState
+    extends State<_SecurityMetadataEditorSheet> {
+  late var _assetClass = _assetClassOptions.contains(
+    widget.item.economicAssetClass,
+  )
+      ? widget.item.economicAssetClass
+      : _assetClassOptions.first;
+  late final _sectorController =
+      TextEditingController(text: widget.item.economicSector);
+  late final _regionController =
+      TextEditingController(text: widget.item.exposureRegion);
+  late final _notesController = TextEditingController(
+    text: widget.item.metadataNotes.isNotEmpty
+        ? widget.item.metadataNotes
+        : "移动端人工确认。",
+  );
+  var _saving = false;
+  String? _error;
+
+  static const _assetClassOptions = [
+    "US Equity",
+    "Canadian Equity",
+    "International Equity",
+    "Fixed Income",
+    "Commodity",
+    "Cash",
+  ];
+
+  @override
+  void dispose() {
+    _sectorController.dispose();
+    _regionController.dispose();
+    _notesController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    if (_saving) return;
+    setState(() {
+      _saving = true;
+      _error = null;
+    });
+
+    try {
+      await widget.apiClient.updateSecurityMetadata(
+        securityId: widget.item.securityId,
+        economicAssetClass: _assetClass,
+        economicSector: _sectorController.text.trim().isEmpty
+            ? null
+            : _sectorController.text.trim(),
+        exposureRegion: _regionController.text.trim().isEmpty
+            ? null
+            : _regionController.text.trim(),
+        notes: _notesController.text.trim().isEmpty
+            ? null
+            : _notesController.text.trim(),
+      );
+      if (mounted) Navigator.of(context).pop(true);
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _error = error.toString();
+        _saving = false;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bottom = MediaQuery.of(context).viewInsets.bottom;
+    return Padding(
+      padding: EdgeInsets.fromLTRB(20, 20, 20, bottom + 20),
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              "修正 ${widget.item.identityLabel}",
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
+            const SizedBox(height: 6),
+            Text(
+              "保存后会标记为人工确认，后台 provider 不会自动覆盖。",
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+            const SizedBox(height: 16),
+            DropdownButtonFormField<String>(
+              initialValue: _assetClass,
+              decoration: const InputDecoration(labelText: "经济资产类别"),
+              items: _assetClassOptions
+                  .map(
+                    (value) =>
+                        DropdownMenuItem(value: value, child: Text(value)),
+                  )
+                  .toList(),
+              onChanged: _saving
+                  ? null
+                  : (value) => setState(() => _assetClass = value!),
+            ),
+            const SizedBox(height: 10),
+            TextField(
+              controller: _sectorController,
+              decoration: const InputDecoration(
+                labelText: "行业/主题",
+                hintText: "例如 Precious Metals、Technology",
+              ),
+            ),
+            const SizedBox(height: 10),
+            TextField(
+              controller: _regionController,
+              decoration: const InputDecoration(
+                labelText: "暴露地区",
+                hintText: "例如 United States、Canada、International",
+              ),
+            ),
+            const SizedBox(height: 10),
+            TextField(
+              controller: _notesController,
+              maxLines: 2,
+              decoration: const InputDecoration(labelText: "备注"),
+            ),
+            if (_error != null) ...[
+              const SizedBox(height: 8),
+              Text(
+                _error!,
+                style: TextStyle(color: Theme.of(context).colorScheme.error),
+              ),
+            ],
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Expanded(
+                  child: FilledButton.icon(
+                    onPressed: _saving ? null : _save,
+                    icon: _saving
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.lock_outline),
+                    label: Text(_saving ? "保存中" : "确认并锁定"),
+                  ),
+                ),
+              ],
+            ),
+          ],
         ),
       ),
     );

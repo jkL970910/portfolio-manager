@@ -409,3 +409,132 @@ class ProviderUsageItem {
     );
   }
 }
+
+class SecurityMetadataReviewSnapshot {
+  const SecurityMetadataReviewSnapshot({
+    required this.title,
+    required this.statusLabel,
+    required this.actionLabel,
+    required this.totalCount,
+    required this.manualCount,
+    required this.lowConfidenceCount,
+    required this.items,
+  });
+
+  final String title;
+  final String statusLabel;
+  final String actionLabel;
+  final int totalCount;
+  final int manualCount;
+  final int lowConfidenceCount;
+  final List<SecurityMetadataItem> items;
+
+  factory SecurityMetadataReviewSnapshot.fromApiResponse(
+      Map<String, dynamic> json) {
+    final data = json["data"];
+    final payload =
+        data is Map<String, dynamic> ? data : const <String, dynamic>{};
+    return SecurityMetadataReviewSnapshot.fromJson(payload);
+  }
+
+  factory SecurityMetadataReviewSnapshot.fromJson(Map<String, dynamic> json) {
+    final summary = json["summary"] is Map<String, dynamic>
+        ? json["summary"] as Map<String, dynamic>
+        : const <String, dynamic>{};
+    final rawItems = json["items"];
+    return SecurityMetadataReviewSnapshot(
+      title: summary["title"] as String? ?? "标的资料修正",
+      statusLabel: summary["statusLabel"] as String? ?? "标的资料状态待确认。",
+      actionLabel: summary["actionLabel"] as String? ?? "可人工确认，避免后台覆盖。",
+      totalCount: summary["totalCount"] as int? ?? 0,
+      manualCount: summary["manualCount"] as int? ?? 0,
+      lowConfidenceCount: summary["lowConfidenceCount"] as int? ?? 0,
+      items: rawItems is List
+          ? rawItems
+              .whereType<Map<String, dynamic>>()
+              .map(SecurityMetadataItem.fromJson)
+              .toList()
+          : const [],
+    );
+  }
+}
+
+class SecurityMetadataItem {
+  const SecurityMetadataItem({
+    required this.securityId,
+    required this.symbol,
+    required this.name,
+    required this.exchange,
+    required this.currency,
+    required this.securityType,
+    required this.economicAssetClass,
+    required this.economicSector,
+    required this.exposureRegion,
+    required this.metadataSource,
+    required this.metadataSourceLabel,
+    required this.metadataConfidence,
+    required this.metadataConfidenceLabel,
+    required this.metadataAsOfLabel,
+    required this.metadataConfirmedAtLabel,
+    required this.metadataNotes,
+    required this.holdingCount,
+    required this.locked,
+    required this.statusLabel,
+  });
+
+  final String securityId;
+  final String symbol;
+  final String name;
+  final String exchange;
+  final String currency;
+  final String? securityType;
+  final String economicAssetClass;
+  final String economicSector;
+  final String exposureRegion;
+  final String metadataSource;
+  final String metadataSourceLabel;
+  final int metadataConfidence;
+  final String metadataConfidenceLabel;
+  final String metadataAsOfLabel;
+  final String? metadataConfirmedAtLabel;
+  final String metadataNotes;
+  final int holdingCount;
+  final bool locked;
+  final String statusLabel;
+
+  String get identityLabel => "$symbol · $exchange · $currency";
+
+  String get detailLabel {
+    return [
+      economicAssetClass,
+      if (economicSector.isNotEmpty) economicSector,
+      if (exposureRegion.isNotEmpty) exposureRegion,
+      "$metadataSourceLabel $metadataConfidence 分",
+    ].join(" · ");
+  }
+
+  factory SecurityMetadataItem.fromJson(Map<String, dynamic> json) {
+    return SecurityMetadataItem(
+      securityId: json["securityId"] as String? ?? "",
+      symbol: json["symbol"] as String? ?? "--",
+      name: json["name"] as String? ?? "未知标的",
+      exchange: json["exchange"] as String? ?? "",
+      currency: json["currency"] as String? ?? "",
+      securityType: json["securityType"] as String?,
+      economicAssetClass: json["economicAssetClass"] as String? ?? "待确认",
+      economicSector: json["economicSector"] as String? ?? "",
+      exposureRegion: json["exposureRegion"] as String? ?? "",
+      metadataSource: json["metadataSource"] as String? ?? "heuristic",
+      metadataSourceLabel: json["metadataSourceLabel"] as String? ?? "系统推断",
+      metadataConfidence: json["metadataConfidence"] as int? ?? 45,
+      metadataConfidenceLabel:
+          json["metadataConfidenceLabel"] as String? ?? "待复核",
+      metadataAsOfLabel: json["metadataAsOfLabel"] as String? ?? "时间未知",
+      metadataConfirmedAtLabel: json["metadataConfirmedAtLabel"] as String?,
+      metadataNotes: json["metadataNotes"] as String? ?? "",
+      holdingCount: json["holdingCount"] as int? ?? 0,
+      locked: json["locked"] == true,
+      statusLabel: json["statusLabel"] as String? ?? "状态待确认",
+    );
+  }
+}

@@ -329,6 +329,36 @@ class LooApiClient {
     return _getJson("/api/mobile/workers/status");
   }
 
+  Future<Map<String, dynamic>> getSecurityMetadataReview() {
+    return _getJson("/api/mobile/settings/security-metadata");
+  }
+
+  Future<Map<String, dynamic>> refreshSecurityMetadata(
+      {int maxSecurities = 12}) {
+    return _postJson(
+      "/api/mobile/settings/security-metadata",
+      body: {"maxSecurities": maxSecurities},
+    );
+  }
+
+  Future<Map<String, dynamic>> updateSecurityMetadata({
+    required String securityId,
+    required String economicAssetClass,
+    String? economicSector,
+    String? exposureRegion,
+    String? notes,
+  }) {
+    return _patchJson(
+      "/api/mobile/settings/security-metadata/${Uri.encodeComponent(securityId)}",
+      body: {
+        "economicAssetClass": economicAssetClass,
+        "economicSector": economicSector,
+        "exposureRegion": exposureRegion,
+        "notes": notes,
+      },
+    );
+  }
+
   Future<Map<String, dynamic>> login({
     required String email,
     required String password,

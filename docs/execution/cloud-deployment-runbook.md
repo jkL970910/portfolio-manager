@@ -170,6 +170,13 @@ Mobile visibility:
   request/success/failure/skipped counts and any configured daily quota.
 - This is the user-facing place to confirm worker freshness after Cloudflare
   Cron runs.
+- Settings also has a `标的资料修正` card backed by
+  `/api/mobile/settings/security-metadata`.
+- That card is the user-facing QA path for provider metadata: review low
+  confidence items, run a bounded small-batch refresh, and manually confirm
+  asset class / sector / region when provider data is wrong or incomplete.
+- Manual confirmations are locked as source `manual` with confidence `100`, so
+  project-registry/OpenFIGI refreshes must not overwrite them.
 
 ## Phase 4: First Real Provider
 
@@ -210,7 +217,10 @@ Do not start with raw news/forum/search feeds.
 - Portfolio loads.
 - Security detail loads.
 - AI 大臣 opens in local mode.
-- Settings shows market-data/external-research status.
+- Settings shows `云端后台任务中心` with market-data, security-metadata,
+  external-research, and provider usage status.
+- Settings shows `标的资料修正`; low-confidence items are visible, small-batch
+  refresh is bounded, and manual corrections persist after page refresh.
 - Worker endpoint rejects wrong secret.
 - Worker endpoint succeeds with correct secret.
 - `CGL.C` remains `商品/贵金属`.
