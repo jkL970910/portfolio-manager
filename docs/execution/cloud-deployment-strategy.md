@@ -337,7 +337,7 @@ Future enhancements:
 ## Current Recommended Priority
 
 1. Commit/push current P0.1/P0.2 worker and freshness work.
-2. Prepare Neon migration checklist and environment variable map.
+2. Follow `docs/execution/neon-migration-checklist.md` for database migration.
 3. Deploy Next.js API to Vercel against Neon.
 4. Add Cloudflare Workers Cron to call protected worker endpoints.
 5. QA mobile URL against the cloud backend.
