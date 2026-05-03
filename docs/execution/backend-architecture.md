@@ -52,6 +52,16 @@ Tracks CSV import state from creation to validation and completion.
 
 ## Current runtime shape
 
+### Backend language boundary
+
+The current backend remains Next.js / TypeScript. Do not introduce a Java,
+Python, or separate quantitative service for the current phase.
+
+The product's near-term complexity is data identity, source freshness, worker
+scheduling, provider limits, and AI/external API cost control. Those are already
+implemented in TypeScript service/repository boundaries and should be deepened
+there before a microservice split is considered.
+
 ### Auth and user scope
 - Auth.js credentials flow
 - local registration endpoint

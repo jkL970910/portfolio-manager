@@ -1,5 +1,6 @@
 import { desc, eq } from "drizzle-orm";
 import { apiSuccess } from "@/lib/backend/contracts";
+import { getMobileDataFreshnessPolicy } from "@/lib/backend/data-freshness-policy";
 import { refreshPortfolioQuotes } from "@/lib/backend/services";
 import { getDb } from "@/lib/db/client";
 import { marketDataRefreshRuns } from "@/lib/db/schema";
@@ -283,6 +284,7 @@ export async function getMobileMarketDataRefreshRuns(
         latestManualFxLabel: latestManual?.fxRateLabel ?? null,
         latestManualFxFreshnessLabel: latestManual?.fxFreshnessLabel ?? null,
       },
+      freshnessPolicy: getMobileDataFreshnessPolicy(),
       items,
     },
     "database",

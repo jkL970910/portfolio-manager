@@ -168,4 +168,6 @@ Note: if `npm run lint` fails because ESLint 9 expects flat config, do not treat
 2. Decide whether Holding Detail needs a dedicated account-specific chart beyond Security Detail. If yes, migrate it to `MobileChartSeries`; if not, document it as intentionally covered by Security Detail + Account Detail.
 3. Start preview stack stability hardening so API/DB/tunnel failures are detected before sending a phone QA URL.
 4. Keep external research guarded off by default. The DB-backed job/usage ledger, local worker command, mobile job status visibility, cached market-data provider, and admin-only smoke enqueue tooling are in place. The provider reads only local cached data and requires explicit env flags.
-5. Evaluate QStash/Cloudflare Queues and real external data sources only after cached-external detail visibility and chart contracts are stable.
+5. Follow the current cloud plan before real external APIs: Neon Postgres, Vercel Next.js/API, Cloudflare Workers Cron calling protected worker endpoints, queue deferred until cron + DB ledger is insufficient.
+6. Keep financial logic in the existing Next.js / TypeScript backend for the current phase. Do not introduce Java/Python financial microservices unless explicitly requested.
+7. First real external API should be structured and cacheable, such as ETF metadata or company fundamentals. Do not start with raw news/forum/search feeds.

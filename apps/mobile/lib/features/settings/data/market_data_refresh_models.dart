@@ -8,6 +8,7 @@ class MarketDataRefreshStatus {
     required this.latestManualProviderStatusLabel,
     required this.latestManualFxLabel,
     required this.latestManualFxFreshnessLabel,
+    required this.freshnessPolicy,
     required this.items,
   });
 
@@ -19,6 +20,7 @@ class MarketDataRefreshStatus {
   final String latestManualProviderStatusLabel;
   final String? latestManualFxLabel;
   final String? latestManualFxFreshnessLabel;
+  final MobileFreshnessPolicy freshnessPolicy;
   final List<MarketDataRefreshRunItem> items;
 
   factory MarketDataRefreshStatus.fromApiResponse(Map<String, dynamic> json) {
@@ -44,26 +46,112 @@ class MarketDataRefreshStatus {
           readSummaryString("latestProviderStatusLabel") ?? "尚未执行过行情刷新。",
       latestFxLabel: readSummaryString("latestFxLabel"),
       latestFxFreshnessLabel: readSummaryString("latestFxFreshnessLabel"),
-      latestManualStatusLabel:
-          readSummaryString("latestManualStatusLabel") ??
-              readSummaryString("latestStatusLabel") ??
-              "还没有手动刷新记录",
+      latestManualStatusLabel: readSummaryString("latestManualStatusLabel") ??
+          readSummaryString("latestStatusLabel") ??
+          "还没有手动刷新记录",
       latestManualProviderStatusLabel:
           readSummaryString("latestManualProviderStatusLabel") ??
               readSummaryString("latestProviderStatusLabel") ??
               "尚未执行过手动行情刷新。",
-      latestManualFxLabel:
-          readSummaryString("latestManualFxLabel") ??
-              readSummaryString("latestFxLabel"),
+      latestManualFxLabel: readSummaryString("latestManualFxLabel") ??
+          readSummaryString("latestFxLabel"),
       latestManualFxFreshnessLabel:
           readSummaryString("latestManualFxFreshnessLabel") ??
               readSummaryString("latestFxFreshnessLabel"),
+      freshnessPolicy: MobileFreshnessPolicy.fromJson(
+        json["freshnessPolicy"] is Map<String, dynamic>
+            ? json["freshnessPolicy"] as Map<String, dynamic>
+            : const <String, dynamic>{},
+      ),
       items: rawItems is List
           ? rawItems
               .whereType<Map<String, dynamic>>()
               .map(MarketDataRefreshRunItem.fromJson)
               .toList()
           : const [],
+    );
+  }
+}
+
+class MobileFreshnessPolicy {
+  const MobileFreshnessPolicy({
+    required this.quoteTtlLabel,
+    required this.fxTtlLabel,
+    required this.historyTtlLabel,
+    required this.externalIntelligenceTtlLabel,
+    required this.workerBoundaryLabel,
+    required this.items,
+  });
+
+  final String quoteTtlLabel;
+  final String fxTtlLabel;
+  final String historyTtlLabel;
+  final String externalIntelligenceTtlLabel;
+  final String workerBoundaryLabel;
+  final List<MobileFreshnessPolicyItem> items;
+
+  factory MobileFreshnessPolicy.fromJson(Map<String, dynamic> json) {
+    final summary = json["summary"] is Map<String, dynamic>
+        ? json["summary"] as Map<String, dynamic>
+        : const <String, dynamic>{};
+    final rawItems = json["items"];
+    String readSummary(String key, String fallback) {
+      final value = summary[key];
+      return value is String && value.isNotEmpty ? value : fallback;
+    }
+
+    return MobileFreshnessPolicy(
+      quoteTtlLabel: readSummary("quoteTtlLabel", "30 分钟"),
+      fxTtlLabel: readSummary("fxTtlLabel", "12 小时"),
+      historyTtlLabel: readSummary("historyTtlLabel", "30 分钟"),
+      externalIntelligenceTtlLabel:
+          readSummary("externalIntelligenceTtlLabel", "6 小时"),
+      workerBoundaryLabel: readSummary(
+        "workerBoundaryLabel",
+        "行情、FX、历史和外部情报都应走 worker/cache；手机页面只读状态或手动确认触发。",
+      ),
+      items: rawItems is List
+          ? rawItems
+              .whereType<Map<String, dynamic>>()
+              .map(MobileFreshnessPolicyItem.fromJson)
+              .toList()
+          : const [],
+    );
+  }
+}
+
+class MobileFreshnessPolicyItem {
+  const MobileFreshnessPolicyItem({
+    required this.id,
+    required this.label,
+    required this.ttlLabel,
+    required this.sourceLabel,
+    required this.usageLabel,
+    required this.staleBehaviorLabel,
+    required this.workerTarget,
+    required this.userActionLabel,
+  });
+
+  final String id;
+  final String label;
+  final String ttlLabel;
+  final String sourceLabel;
+  final String usageLabel;
+  final String staleBehaviorLabel;
+  final bool workerTarget;
+  final String userActionLabel;
+
+  factory MobileFreshnessPolicyItem.fromJson(Map<String, dynamic> json) {
+    return MobileFreshnessPolicyItem(
+      id: json["id"] as String? ?? "unknown",
+      label: json["label"] as String? ?? "数据策略",
+      ttlLabel: json["ttlLabel"] as String? ?? "TTL 未知",
+      sourceLabel: json["sourceLabel"] as String? ?? "来源待确认",
+      usageLabel: json["usageLabel"] as String? ?? "用途待确认",
+      staleBehaviorLabel:
+          json["staleBehaviorLabel"] as String? ?? "过期后会显示边界说明。",
+      workerTarget: json["workerTarget"] == true,
+      userActionLabel: json["userActionLabel"] as String? ?? "请在对应页面手动确认。",
     );
   }
 }
@@ -129,8 +217,7 @@ class MarketDataRefreshRunItem {
   String get subtitle {
     return [
       "$triggerLabel · $createdAtLabel · $durationLabel",
-      if (isSkippedWorker)
-        "这是后台 worker 的预算保护跳过，不代表手动行情刷新失败。",
+      if (isSkippedWorker) "这是后台 worker 的预算保护跳过，不代表手动行情刷新失败。",
       "检查 $sampledSymbolCount 个标的；刷新 $refreshedHoldingCount 笔持仓；缺失 $missingQuoteCount；历史 $historyPointCount 条；${snapshotRecorded ? "已记录快照" : "未记录快照"}",
       if (fxRateLabel != null && fxRateLabel!.isNotEmpty) fxRateLabel!,
       if (fxFreshnessLabel != null && fxFreshnessLabel!.isNotEmpty)

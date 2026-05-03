@@ -1,4 +1,5 @@
 import { apiSuccess } from "@/lib/backend/contracts";
+import { getMobileDataFreshnessPolicy } from "@/lib/backend/data-freshness-policy";
 import {
   PORTFOLIO_ANALYZER_DISCLAIMER,
   PORTFOLIO_ANALYZER_VERSION,
@@ -58,6 +59,100 @@ export function summarizeExternalResearchUsage(
   };
 }
 
+function formatExternalResearchDateTime(value: string | null) {
+  if (!value) {
+    return null;
+  }
+  const date = new Date(value);
+  if (!Number.isFinite(date.getTime())) {
+    return null;
+  }
+  return date.toISOString().slice(0, 16).replace("T", " ");
+}
+
+function formatTtlSeconds(seconds: number | undefined) {
+  const safeSeconds =
+    typeof seconds === "number" && Number.isFinite(seconds) && seconds > 0
+      ? Math.trunc(seconds)
+      : getExternalResearchPolicy().defaultTtlSeconds;
+  if (safeSeconds < 3600) {
+    return `${Math.round(safeSeconds / 60)} 分钟`;
+  }
+  if (safeSeconds < 86400) {
+    return `${Math.round(safeSeconds / 3600)} 小时`;
+  }
+  return `${Math.round(safeSeconds / 86400)} 天`;
+}
+
+function mapExternalResearchStatusNote(job: ExternalResearchJob) {
+  if (job.status === "queued") {
+    const runAfter = formatExternalResearchDateTime(job.runAfter);
+    return runAfter ? `排队中，计划 ${runAfter} 后运行。` : "排队中，等待 worker。";
+  }
+  if (job.status === "running") {
+    return job.lockedBy
+      ? `worker ${job.lockedBy} 正在处理。`
+      : "worker 正在处理。";
+  }
+  if (job.status === "succeeded") {
+    return job.finishedAt
+      ? `已在 ${formatExternalResearchDateTime(job.finishedAt)} 完成。`
+      : "已完成。";
+  }
+  if (job.status === "failed") {
+    if (job.attemptCount < job.maxAttempts) {
+      const runAfter = formatExternalResearchDateTime(job.runAfter);
+      return runAfter
+        ? `失败后可重试；下次最早 ${runAfter}。`
+        : "失败后可重试，等待下一次 worker。";
+    }
+    return "已达到最大尝试次数，需要检查配置或来源。";
+  }
+  if (job.status === "cancelled") {
+    return "任务已取消。";
+  }
+  return "状态待确认。";
+}
+
+function mapExternalResearchNextRetryLabel(job: ExternalResearchJob) {
+  if (job.status === "queued" || job.status === "failed") {
+    if (job.attemptCount >= job.maxAttempts) {
+      return null;
+    }
+    const runAfter = formatExternalResearchDateTime(job.runAfter);
+    return runAfter ? `下次可运行：${runAfter}` : "等待下一次 worker";
+  }
+  return null;
+}
+
+function mapExternalResearchFreshness(job: ExternalResearchJob) {
+  const request = job.request as Partial<PortfolioAnalyzerRequest>;
+  const ttlSeconds =
+    typeof request.maxCacheAgeSeconds === "number"
+      ? request.maxCacheAgeSeconds
+      : getExternalResearchPolicy().defaultTtlSeconds;
+  const ttlLabel = formatTtlSeconds(ttlSeconds);
+  const resultExpiresAt = job.finishedAt
+    ? new Date(new Date(job.finishedAt).getTime() + ttlSeconds * 1000)
+    : null;
+  const resultExpiresAtLabel =
+    resultExpiresAt && Number.isFinite(resultExpiresAt.getTime())
+      ? formatExternalResearchDateTime(resultExpiresAt.toISOString())
+      : null;
+
+  return {
+    requestedCacheMaxAgeSeconds: ttlSeconds,
+    ttlLabel,
+    freshnessLabel:
+      job.status === "succeeded"
+        ? `缓存有效期约 ${ttlLabel}`
+        : `请求缓存窗口 ${ttlLabel}`,
+    resultExpiresAt: resultExpiresAt?.toISOString() ?? null,
+    resultExpiresAtLabel,
+    sourceModeLabel: "缓存外部研究",
+  };
+}
+
 export function mapExternalResearchJobForMobile(job: ExternalResearchJob) {
   const statusLabels: Record<ExternalResearchJob["status"], string> = {
     queued: "排队中",
@@ -89,6 +184,7 @@ export function mapExternalResearchJobForMobile(job: ExternalResearchJob) {
         .filter((item): item is string => Boolean(item))
         .join(" · ")
     : job.targetKey;
+  const freshness = mapExternalResearchFreshness(job);
 
   return {
     id: job.id,
@@ -102,6 +198,9 @@ export function mapExternalResearchJobForMobile(job: ExternalResearchJob) {
     attemptCount: job.attemptCount,
     maxAttempts: job.maxAttempts,
     runAfter: job.runAfter,
+    nextRetryLabel: mapExternalResearchNextRetryLabel(job),
+    statusNote: mapExternalResearchStatusNote(job),
+    freshness,
     startedAt: job.startedAt,
     finishedAt: job.finishedAt,
     errorMessage: job.errorMessage,
@@ -147,6 +246,7 @@ export async function getMobileExternalResearchUsage(
       counterDate,
       policy: mapExternalResearchPolicyForMobile(policy),
       usage: summarizeExternalResearchUsage(counters, policy),
+      freshnessPolicy: getMobileDataFreshnessPolicy(),
     },
     "database",
   );
@@ -160,9 +260,26 @@ export async function getMobileExternalResearchJobs(userId: string, limit = 5) {
     safeLimit,
   );
 
+  const items = jobs.map(mapExternalResearchJobForMobile);
+  const latest = items[0] ?? null;
+  const runningCount = items.filter((item) => item.status === "running").length;
+  const queuedCount = items.filter((item) => item.status === "queued").length;
+  const failedCount = items.filter((item) => item.status === "failed").length;
+
   return apiSuccess(
     {
-      items: jobs.map(mapExternalResearchJobForMobile),
+      summary: {
+        latestStatusLabel: latest?.statusLabel ?? "还没有外部研究任务",
+        latestStatusNote:
+          latest?.statusNote ?? "最近没有外部研究任务；页面不会自动抓新闻或论坛。",
+        latestTargetLabel: latest?.targetLabel ?? null,
+        runningCount,
+        queuedCount,
+        failedCount,
+        workerBoundaryLabel:
+          "外部研究只能由手动入队或后台 worker 执行，页面加载不得自动触发实时来源。",
+      },
+      items,
     },
     "database",
   );

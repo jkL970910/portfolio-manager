@@ -69,6 +69,23 @@ Do not use OpenBB as the primary runtime data provider for the product UI.
 
 OpenBB is better treated as a future research and agent-facing aggregation layer, not the first external dependency for core product runtime features.
 
+### First real external API after cloud scheduling
+
+Do not start with raw news, Reddit/forum, Google-like search, or high-frequency
+realtime quote APIs.
+
+After Neon/Vercel/Cloudflare scheduler is proven, the first real external
+adapter should prefer structured, low-frequency, cacheable data:
+
+- ETF metadata
+- company/security profile
+- company fundamentals
+- dividend / distribution profile
+
+These sources are more useful for Recommendation V3 and AI 大臣 context, cheaper
+to cache, and easier to validate than raw news. Raw news/forum/search adapters
+should wait until queue/concurrency limits and quality scoring are mature.
+
 ## Current implementation
 
 The project now includes:

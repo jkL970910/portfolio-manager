@@ -321,7 +321,20 @@ Runtime context architecture:
    - current invalidation is conservative TTL-based; cloud deployment should
      tighten preference/recommendation keys to true `updatedAt` / latest run ids
      where the repository exposes them
-5. Response-speed policy:
+5. Data freshness policy:
+   - implemented as `lib/backend/data-freshness-policy.ts`
+   - exposes one mobile-readable policy for quote, FX, price history, security
+     identity, and external intelligence TTLs
+   - Settings now receives the same policy through both market-data refresh
+     status and external-research usage endpoints, so user-facing freshness
+     copy does not drift between cards
+   - quote, FX, history, and external intelligence are marked as worker/cache
+     targets; mobile pages should either read cached state or require explicit
+     user confirmation before triggering quota-consuming work
+   - identity resolution is not treated as a scheduled worker target yet; it
+     remains tied to import/discover validation and the Security Identity
+     Registry repair path
+6. Response-speed policy:
    - Flutter now shows staged status while 大臣 prepares context and waits for
      GPT/Router
    - after a slow response threshold, the user chooses whether to keep waiting
@@ -343,7 +356,7 @@ Runtime context architecture:
    - local answer strategy now has separate branches for comparison,
      recommendation, preference, data freshness, product-help, and candidate-fit
      questions so fallback answers remain useful rather than generic
-6. Feature-specific knowledge depth:
+7. Feature-specific knowledge depth:
    - Health Score questions now explicitly separate whole-portfolio and
      account-level lenses. Account Health should be explained as account-fit
      plus portfolio-target reference, not as a requirement that one account
@@ -357,7 +370,7 @@ Runtime context architecture:
    - Security/Holding detail questions now use listing identity first, then
      data freshness, then asset/sector exposure, preference fit, recommendation
      path, account/tax/FX friction, and cached intelligence.
-7. Tool-triggered analysis handoff:
+8. Tool-triggered analysis handoff:
    - If the user asks 大臣 to "帮我分析", "运行快扫", or generate an analysis
      report, the answer should not stay as generic chat.
    - 大臣 now promotes existing `run-analysis` allowed actions into
@@ -370,7 +383,7 @@ Runtime context architecture:
      page-owned `AiAnalysisCard`; the actual AI 快扫 still runs through that
      card, so 大臣 does not bypass page state, backend validation, cache
      strategy, or provider quota policy.
-8. Direct-action routing boundary:
+9. Direct-action routing boundary:
    - Mobile now has an app-level dispatcher for 大臣 suggested actions.
    - Read-only navigation actions can open existing mobile destinations:
      Overview, Portfolio, Recommendations, Discover, Import, Settings,
@@ -383,7 +396,7 @@ Runtime context architecture:
    - 大臣 must not directly mutate portfolio data, save preferences, import
      holdings, or refresh quota-consuming providers without an explicit
      product UI confirmation.
-9. Security quick-scan readability and exposure classification:
+10. Security quick-scan readability and exposure classification:
    - AI 标的快扫 now separates listing identity from economic exposure.
      Listing identity (`securityId`, `symbol`, `exchange`, `currency`) remains
      the source of truth for quote/history/cache matching, while target-fit
@@ -632,6 +645,10 @@ Next analyzer work:
 - Mobile recent external-research jobs expose a readable target label such as
   `VFV · TSX · CAD` in addition to the internal cache key, so QA can verify
   identity separation from the Settings page.
+- Mobile recent external-research jobs now expose a summary block, retry/next
+  run labels, requested cache TTL, and estimated result expiry, so Settings can
+  explain whether a skipped/failed/pending external consultation is a worker
+  scheduling state rather than a page-load problem.
 - Mobile Settings QA passed for recent external-research job visibility after
   the local smoke run.
 - `AI 最近分析` now exposes compact result details on mobile, including
@@ -665,6 +682,13 @@ Next analyzer work:
 - Provider retry-after windows are now persisted in
   `market_data_provider_limits`; refresh ledgers can snapshot DB-backed limits
   for Settings QA and later cloud workers.
+- Protected worker API endpoints now exist for cloud scheduling:
+  `POST /api/workers/market-data/run` and
+  `POST /api/workers/external-research/run`. They require
+  `PORTFOLIO_WORKER_SECRET` through `Authorization: Bearer <secret>` or
+  `x-worker-secret`, return `503` when the secret is not configured, and reuse
+  the same worker functions as the local npm scripts. This keeps cloud cron or
+  queue delivery as infrastructure wiring rather than a new product code path.
 
 ## Deferred Work
 

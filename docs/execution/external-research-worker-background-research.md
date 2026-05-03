@@ -57,6 +57,14 @@ It does not enable live news, forum, institutional, or paid external research.
   - mobile recent-job rows include a readable `targetLabel`, for example
     `VFV · TSX · CAD`, so Settings QA does not have to inspect internal cache
     keys.
+  - mobile recent-job rows now also expose summary, retry/next-run labels,
+    requested cache TTL, and estimated result expiry for Settings QA.
+  - protected worker API endpoints now exist for cloud scheduling:
+    `POST /api/workers/market-data/run` and
+    `POST /api/workers/external-research/run`. Both require
+    `PORTFOLIO_WORKER_SECRET` through `Authorization: Bearer <secret>` or
+    `x-worker-secret`, return `503` if the secret is missing, and reuse the same
+    execution functions as the local npm scripts.
   - mobile Settings QA passed after the smoke job; the recent task row is
     visible to the matching logged-in user and shows the readable identity
     target.

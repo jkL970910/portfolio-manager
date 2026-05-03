@@ -736,12 +736,75 @@ class _MarketDataStatusCardState extends State<_MarketDataStatusCard> {
                     "最近刷新：${status.latestStatusLabel} · ${status.latestProviderStatusLabel}",
                     style: Theme.of(context).textTheme.bodySmall,
                   ),
+                  const SizedBox(height: 10),
+                  _FreshnessPolicySummary(status.freshnessPolicy),
                   const Divider(),
                   ...status.items.map(_MarketDataRefreshRunTile.new),
                 ],
               ],
             );
           },
+        ),
+      ),
+    );
+  }
+}
+
+class _FreshnessPolicySummary extends StatelessWidget {
+  const _FreshnessPolicySummary(this.policy);
+
+  final MobileFreshnessPolicy policy;
+
+  @override
+  Widget build(BuildContext context) {
+    final importantItems = policy.items
+        .where((item) =>
+            item.id == "quote" ||
+            item.id == "fx" ||
+            item.id == "history" ||
+            item.id == "external-intelligence")
+        .toList();
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: Theme.of(context)
+            .colorScheme
+            .surfaceContainerHighest
+            .withValues(alpha: 0.55),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text("数据新鲜度策略", style: Theme.of(context).textTheme.titleSmall),
+            const SizedBox(height: 6),
+            Text(policy.workerBoundaryLabel),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                Chip(label: Text("报价 ${policy.quoteTtlLabel}")),
+                Chip(label: Text("FX ${policy.fxTtlLabel}")),
+                Chip(label: Text("历史 ${policy.historyTtlLabel}")),
+                Chip(label: Text("秘闻 ${policy.externalIntelligenceTtlLabel}")),
+              ],
+            ),
+            if (importantItems.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              ...importantItems.take(4).map(
+                    (item) => Padding(
+                      padding: const EdgeInsets.only(top: 6),
+                      child: Text(
+                        "${item.label}：${item.sourceLabel}；${item.staleBehaviorLabel}",
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                    ),
+                  ),
+            ],
+          ],
         ),
       ),
     );
@@ -888,7 +951,7 @@ class _ExternalResearchPolicyCard extends StatefulWidget {
 class _ExternalResearchPolicyCardState
     extends State<_ExternalResearchPolicyCard> {
   late Future<_ExternalResearchPolicy> _policy = _loadPolicy();
-  late Future<List<_ExternalResearchJobItem>> _jobs = _loadJobs();
+  late Future<_ExternalResearchJobsStatus> _jobs = _loadJobs();
 
   Future<_ExternalResearchPolicy> _loadPolicy() async {
     final response = await widget.apiClient.getExternalResearchUsage();
@@ -898,18 +961,12 @@ class _ExternalResearchPolicyCardState
     return _ExternalResearchPolicy.fromUsageJson(payload);
   }
 
-  Future<List<_ExternalResearchJobItem>> _loadJobs() async {
+  Future<_ExternalResearchJobsStatus> _loadJobs() async {
     final response = await widget.apiClient.getExternalResearchJobs(limit: 5);
     final data = response["data"];
     final payload =
         data is Map<String, dynamic> ? data : const <String, dynamic>{};
-    final rawItems = payload["items"];
-    return rawItems is List
-        ? rawItems
-            .whereType<Map<String, dynamic>>()
-            .map(_ExternalResearchJobItem.fromJson)
-            .toList()
-        : const [];
+    return _ExternalResearchJobsStatus.fromJson(payload);
   }
 
   void _refresh() {
@@ -991,6 +1048,8 @@ class _ExternalResearchPolicyCardState
                     style: Theme.of(context).textTheme.bodySmall,
                   ),
                   const SizedBox(height: 10),
+                  _ExternalIntelligenceFreshnessNote(policy.freshnessPolicy),
+                  const SizedBox(height: 10),
                   ...policy.sources.map(
                     (source) => ListTile(
                       contentPadding: EdgeInsets.zero,
@@ -1005,7 +1064,7 @@ class _ExternalResearchPolicyCardState
                     ),
                   ),
                   const Divider(),
-                  FutureBuilder<List<_ExternalResearchJobItem>>(
+                  FutureBuilder<_ExternalResearchJobsStatus>(
                     future: _jobs,
                     builder: (context, jobsSnapshot) {
                       if (jobsSnapshot.connectionState ==
@@ -1022,7 +1081,8 @@ class _ExternalResearchPolicyCardState
                               color: Theme.of(context).colorScheme.error),
                         );
                       }
-                      final jobs = jobsSnapshot.data ??
+                      final jobStatus = jobsSnapshot.data;
+                      final jobs = jobStatus?.items ??
                           const <_ExternalResearchJobItem>[];
                       if (jobs.isEmpty) {
                         return const Text("最近没有外部研究任务。");
@@ -1035,6 +1095,13 @@ class _ExternalResearchPolicyCardState
                             style: Theme.of(context).textTheme.titleMedium,
                           ),
                           const SizedBox(height: 6),
+                          if (jobStatus != null) ...[
+                            Text(
+                              jobStatus.summaryLine,
+                              style: Theme.of(context).textTheme.bodySmall,
+                            ),
+                            const SizedBox(height: 6),
+                          ],
                           ...jobs.map(_ExternalResearchJobTile.new),
                         ],
                       );
@@ -1044,6 +1111,42 @@ class _ExternalResearchPolicyCardState
               ],
             );
           },
+        ),
+      ),
+    );
+  }
+}
+
+class _ExternalIntelligenceFreshnessNote extends StatelessWidget {
+  const _ExternalIntelligenceFreshnessNote(this.policy);
+
+  final MobileFreshnessPolicy policy;
+
+  @override
+  Widget build(BuildContext context) {
+    MobileFreshnessPolicyItem? externalItem;
+    for (final item in policy.items) {
+      if (item.id == "external-intelligence") {
+        externalItem = item;
+        break;
+      }
+    }
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: Theme.of(context)
+            .colorScheme
+            .surfaceContainerHighest
+            .withValues(alpha: 0.55),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Text(
+          externalItem == null
+              ? "外部情报 TTL：${policy.externalIntelligenceTtlLabel}。${policy.workerBoundaryLabel}"
+              : "外部情报 TTL：${externalItem.ttlLabel}。${externalItem.staleBehaviorLabel} ${externalItem.userActionLabel}",
+          style: Theme.of(context).textTheme.bodySmall,
         ),
       ),
     );
@@ -1063,6 +1166,59 @@ class _ExternalResearchJobTile extends StatelessWidget {
       leading: Icon(item.statusIcon),
       title: Text("${item.scopeLabel} · ${item.statusLabel}"),
       subtitle: Text(item.subtitle),
+      isThreeLine: true,
+    );
+  }
+}
+
+class _ExternalResearchJobsStatus {
+  const _ExternalResearchJobsStatus({
+    required this.latestStatusLabel,
+    required this.latestStatusNote,
+    required this.workerBoundaryLabel,
+    required this.runningCount,
+    required this.queuedCount,
+    required this.failedCount,
+    required this.items,
+  });
+
+  final String latestStatusLabel;
+  final String latestStatusNote;
+  final String workerBoundaryLabel;
+  final int runningCount;
+  final int queuedCount;
+  final int failedCount;
+  final List<_ExternalResearchJobItem> items;
+
+  String get summaryLine {
+    return [
+      latestStatusLabel,
+      latestStatusNote,
+      "运行 $runningCount / 排队 $queuedCount / 失败 $failedCount",
+      workerBoundaryLabel,
+    ].where((item) => item.isNotEmpty).join("\n");
+  }
+
+  factory _ExternalResearchJobsStatus.fromJson(Map<String, dynamic> json) {
+    final summary = json["summary"] is Map<String, dynamic>
+        ? json["summary"] as Map<String, dynamic>
+        : const <String, dynamic>{};
+    final rawItems = json["items"];
+    return _ExternalResearchJobsStatus(
+      latestStatusLabel: summary["latestStatusLabel"] as String? ?? "还没有外部研究任务",
+      latestStatusNote:
+          summary["latestStatusNote"] as String? ?? "最近没有外部研究任务；页面不会自动抓新闻或论坛。",
+      workerBoundaryLabel: summary["workerBoundaryLabel"] as String? ??
+          "外部研究只能由手动入队或后台 worker 执行。",
+      runningCount: summary["runningCount"] as int? ?? 0,
+      queuedCount: summary["queuedCount"] as int? ?? 0,
+      failedCount: summary["failedCount"] as int? ?? 0,
+      items: rawItems is List
+          ? rawItems
+              .whereType<Map<String, dynamic>>()
+              .map(_ExternalResearchJobItem.fromJson)
+              .toList()
+          : const [],
     );
   }
 }
@@ -1076,6 +1232,10 @@ class _ExternalResearchJobItem {
     required this.targetLabel,
     required this.attemptCount,
     required this.maxAttempts,
+    required this.statusNote,
+    required this.nextRetryLabel,
+    required this.freshnessLabel,
+    required this.resultExpiresAtLabel,
     required this.createdAt,
     required this.errorMessage,
   });
@@ -1087,6 +1247,10 @@ class _ExternalResearchJobItem {
   final String targetLabel;
   final int attemptCount;
   final int maxAttempts;
+  final String statusNote;
+  final String? nextRetryLabel;
+  final String freshnessLabel;
+  final String? resultExpiresAtLabel;
   final DateTime? createdAt;
   final String? errorMessage;
 
@@ -1119,6 +1283,11 @@ class _ExternalResearchJobItem {
     final details = [
       targetLabel,
       "$createdAtLabel · 尝试 $attemptCount/$maxAttempts",
+      statusNote,
+      freshnessLabel,
+      if (nextRetryLabel != null && nextRetryLabel!.isNotEmpty) nextRetryLabel!,
+      if (resultExpiresAtLabel != null && resultExpiresAtLabel!.isNotEmpty)
+        "有效至 $resultExpiresAtLabel",
       if (errorMessage != null && errorMessage!.isNotEmpty) errorMessage!,
     ];
     return details.join("\n");
@@ -1126,6 +1295,9 @@ class _ExternalResearchJobItem {
 
   factory _ExternalResearchJobItem.fromJson(Map<String, dynamic> json) {
     final rawCreatedAt = json["createdAt"];
+    final freshness = json["freshness"] is Map<String, dynamic>
+        ? json["freshness"] as Map<String, dynamic>
+        : const <String, dynamic>{};
     return _ExternalResearchJobItem(
       scopeLabel: json["scopeLabel"] as String? ?? "外部研究",
       status: json["status"] as String? ?? "unknown",
@@ -1136,6 +1308,10 @@ class _ExternalResearchJobItem {
           "目标未知",
       attemptCount: json["attemptCount"] as int? ?? 0,
       maxAttempts: json["maxAttempts"] as int? ?? 3,
+      statusNote: json["statusNote"] as String? ?? "状态待确认。",
+      nextRetryLabel: json["nextRetryLabel"] as String?,
+      freshnessLabel: freshness["freshnessLabel"] as String? ?? "缓存状态未知",
+      resultExpiresAtLabel: freshness["resultExpiresAtLabel"] as String?,
       createdAt:
           rawCreatedAt is String ? DateTime.tryParse(rawCreatedAt) : null,
       errorMessage: json["errorMessage"] as String?,
@@ -1153,6 +1329,7 @@ class _ExternalResearchPolicy {
     required this.maxSymbolsPerRun,
     required this.usedRuns,
     required this.remainingRuns,
+    required this.freshnessPolicy,
     required this.sources,
   });
 
@@ -1164,6 +1341,7 @@ class _ExternalResearchPolicy {
   final int maxSymbolsPerRun;
   final int usedRuns;
   final int remainingRuns;
+  final MobileFreshnessPolicy freshnessPolicy;
   final List<_ExternalResearchSource> sources;
 
   int get ttlHours => (minTtlSeconds / 3600).ceil();
@@ -1175,12 +1353,20 @@ class _ExternalResearchPolicy {
     final usageJson = json["usage"] is Map<String, dynamic>
         ? json["usage"] as Map<String, dynamic>
         : const <String, dynamic>{};
-    return _ExternalResearchPolicy.fromJson(policyJson, usageJson: usageJson);
+    final freshnessPolicyJson = json["freshnessPolicy"] is Map<String, dynamic>
+        ? json["freshnessPolicy"] as Map<String, dynamic>
+        : const <String, dynamic>{};
+    return _ExternalResearchPolicy.fromJson(
+      policyJson,
+      usageJson: usageJson,
+      freshnessPolicyJson: freshnessPolicyJson,
+    );
   }
 
   factory _ExternalResearchPolicy.fromJson(
     Map<String, dynamic> json, {
     Map<String, dynamic> usageJson = const <String, dynamic>{},
+    Map<String, dynamic> freshnessPolicyJson = const <String, dynamic>{},
   }) {
     final rawSources = json["sources"];
     return _ExternalResearchPolicy(
@@ -1198,6 +1384,7 @@ class _ExternalResearchPolicy {
       remainingRuns: usageJson["remainingRuns"] as int? ??
           json["dailyRunLimit"] as int? ??
           20,
+      freshnessPolicy: MobileFreshnessPolicy.fromJson(freshnessPolicyJson),
       sources: rawSources is List
           ? rawSources
               .whereType<Map<String, dynamic>>()

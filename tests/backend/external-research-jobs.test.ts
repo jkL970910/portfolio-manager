@@ -4,6 +4,7 @@ import {
   assertExternalResearchQuota,
   estimateExternalResearchSymbolCount,
   getExternalResearchCounterDate,
+  getMobileExternalResearchJobs,
   mapExternalResearchJobForMobile,
   runExternalResearchWorkerOnce,
   summarizeExternalResearchUsage,
@@ -190,6 +191,10 @@ test("external research job maps to mobile-safe status labels", async () => {
   assert.equal(mapped.scopeLabel, "组合研究");
   assert.equal(mapped.statusLabel, "已失败");
   assert.equal(mapped.errorMessage, "provider disabled");
+  assert.equal(mapped.nextRetryLabel, "下次可运行：2026-04-28 12:30");
+  assert.match(mapped.statusNote, /失败后可重试/);
+  assert.equal(mapped.freshness.ttlLabel, "6 小时");
+  assert.equal(mapped.freshness.freshnessLabel, "请求缓存窗口 6 小时");
 });
 
 test("external research job mobile mapping exposes readable security identity", async () => {
@@ -230,6 +235,51 @@ test("external research job mobile mapping exposes readable security identity", 
     currency: "CAD",
     name: null,
   });
+  assert.equal(mapped.freshness.requestedCacheMaxAgeSeconds, 21600);
+  assert.equal(mapped.freshness.ttlLabel, "6 小时");
+  assert.equal(mapped.freshness.freshnessLabel, "缓存有效期约 6 小时");
+  assert.match(mapped.freshness.resultExpiresAtLabel ?? "", /2026-04-28 18:45/);
+});
+
+test("external research mobile jobs expose summary and retry labels", async () => {
+  const now = new Date("2026-04-28T16:00:00.000Z");
+  await mockRepositories.externalResearchJobs.create({
+    userId: "user_mobile_summary_job_test",
+    scope: "security",
+    targetKey: "security:ZQQ:TSX:CAD",
+    request: {
+      scope: "security",
+      mode: "quick",
+      security: { symbol: "ZQQ", exchange: "TSX", currency: "CAD" },
+      cacheStrategy: "prefer-cache",
+      maxCacheAgeSeconds: 10800,
+      includeExternalResearch: true,
+    },
+    status: "queued",
+    sourceMode: "cached-external",
+    sourceAllowlist: [],
+    priority: 10,
+    attemptCount: 1,
+    maxAttempts: 3,
+    runAfter: now.toISOString(),
+    lockedAt: null,
+    lockedBy: null,
+    startedAt: null,
+    finishedAt: null,
+    errorMessage: null,
+    resultRunId: null,
+  });
+
+  const response = await getMobileExternalResearchJobs(
+    "user_mobile_summary_job_test",
+    5,
+  );
+
+  assert.equal(response.data.summary.latestStatusLabel, "排队中");
+  assert.equal(response.data.summary.queuedCount, 1);
+  assert.match(response.data.summary.workerBoundaryLabel, /worker/);
+  assert.equal(response.data.items[0]?.nextRetryLabel, "下次可运行：2026-04-28 16:00");
+  assert.equal(response.data.items[0]?.freshness.ttlLabel, "3 小时");
 });
 
 test("external research worker fails claimed jobs safely while providers are disabled", async () => {
