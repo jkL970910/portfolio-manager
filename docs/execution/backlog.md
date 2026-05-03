@@ -100,7 +100,7 @@ over simply adding more Flutter screens.
 
 ## Recommended Build Order From Here
 
-1. Stabilize P0.5 real-data foundations: scheduled quote/history/FX refresh, security metadata refresh, provider retry-after persistence, and source/freshness lineage that AI can trust. P0.1 now exposes a unified mobile freshness policy for quote, FX, history, identity, and external intelligence plus external-research retry/TTL status. P0.2 now has protected worker API endpoints for market-data, security-metadata, and external-research execution. P0.3 now has Neon/Vercel/Cloudflare deployment scaffolding, batched market-data worker refresh, security-metadata run ledger, provider usage ledger, mobile `云端后台任务中心`, and mobile `标的资料修正` review flow for manual metadata locks. Current cloud decision: Neon Free for Postgres, Vercel Hobby for Next.js API/BFF, Cloudflare Workers Cron for scheduler, queue deferred until cron + DB ledger is insufficient.
+1. Stabilize P0.5 real-data foundations: scheduled quote/history/FX refresh, security metadata refresh, provider retry-after persistence, and source/freshness lineage that AI can trust. P0.1 now exposes a unified mobile freshness policy for quote, FX, history, identity, and external intelligence plus external-research retry/TTL status. P0.2 now has protected worker API endpoints for market-data, security-metadata, and external-research execution. P0.3 now has Neon/Vercel/Cloudflare deployment scaffolding, batched market-data worker refresh, security-metadata run ledger, provider usage ledger, mobile `云端后台任务中心`, and advanced mobile `标的资料可信度` fallback flow for low-confidence metadata locks. Current cloud decision: Neon Free for Postgres, Vercel Hobby for Next.js API/BFF, Cloudflare Workers Cron for scheduler, queue deferred until cron + DB ledger is insufficient.
 2. Complete Security Identity Registry P0 before deeper Recommendation V3 scoring: canonical `security_id` must become the shared join key for holdings, price history, recommendations, AI analysis, and external intelligence.
 3. Run the external consultation / `portfolio-analyzer.skill` pipeline on cached real market data first; keep live external research disabled until worker/cache/provider quota policy is proven.
 4. Align AI 标的分析 and AI 大臣: AI 标的分析 produces structured saved analysis; 大臣 answers cross-page questions, explains current context, and references or triggers saved analysis instead of duplicating a full report.
@@ -198,12 +198,13 @@ Guardrails:
 - `0015_market_data_provider_limits` persists provider retry-after windows so
   multi-process/cloud refresh jobs do not immediately forget `429` responses
   after restart.
-- Mobile Settings now exposes a `标的资料修正` card. It reviews current user's
-  held securities, highlights low-confidence/unconfirmed metadata, supports
-  bounded metadata refresh, and lets the user manually confirm asset class,
-  sector, region, and notes. Manual confirmation writes source `manual`,
-  confidence `100`, and `confirmed_at`, so later registry/provider refreshes do
-  not overwrite user-confirmed classification.
+- Mobile Settings now exposes an advanced `标的资料可信度` card. It is a
+  data-quality fallback, not a normal user maintenance workflow: default view
+  only shows held securities with low confidence or missing economic metadata;
+  high-confidence holdings stay hidden unless the user taps `查看全部`. Manual
+  confirmation writes source `manual`, confidence `100`, and `confirmed_at`, so
+  later registry/provider refreshes do not overwrite user-confirmed
+  classification.
 - External consultation cached market-data now filters price history by
   `symbol + exchange + currency`, not ticker alone.
 - AI 标的/组合/账户快扫 now consumes cached quote lineage, security price

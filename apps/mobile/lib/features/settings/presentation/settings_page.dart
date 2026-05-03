@@ -605,6 +605,7 @@ class _SecurityMetadataReviewCardState
     extends State<_SecurityMetadataReviewCard> {
   late Future<SecurityMetadataReviewSnapshot> _snapshot = _loadSnapshot();
   var _refreshingProvider = false;
+  var _showAllItems = false;
   String? _message;
 
   Future<SecurityMetadataReviewSnapshot> _loadSnapshot() async {
@@ -661,7 +662,7 @@ class _SecurityMetadataReviewCardState
     );
     if (updated == true && mounted) {
       setState(() {
-        _message = "${item.symbol} 已人工确认并锁定。";
+        _message = "${item.symbol} 已确认分类口径。";
         _snapshot = _loadSnapshot();
       });
     }
@@ -683,6 +684,11 @@ class _SecurityMetadataReviewCardState
           future: _snapshot,
           builder: (context, snapshot) {
             final data = snapshot.data;
+            final visibleItems = data == null
+                ? const <SecurityMetadataItem>[]
+                : _showAllItems
+                    ? data.allItems
+                    : data.items;
             return Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -692,7 +698,7 @@ class _SecurityMetadataReviewCardState
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                        data?.title ?? "标的资料修正",
+                        data?.title ?? "高级：标的资料可信度",
                         style: Theme.of(context).textTheme.titleLarge,
                       ),
                     ),
@@ -728,21 +734,40 @@ class _SecurityMetadataReviewCardState
                     runSpacing: 8,
                     children: [
                       Chip(label: Text("共 ${data.totalCount} 个")),
-                      Chip(label: Text("已锁定 ${data.manualCount} 个")),
-                      Chip(label: Text("待复核 ${data.lowConfidenceCount} 个")),
+                      Chip(label: Text("已确认 ${data.manualCount} 个")),
+                      Chip(label: Text("建议复核 ${data.reviewCount} 个")),
                     ],
                   ),
                   const SizedBox(height: 10),
-                  FilledButton.tonalIcon(
-                    onPressed: _refreshingProvider ? null : _refreshProvider,
-                    icon: _refreshingProvider
-                        ? const SizedBox(
-                            width: 16,
-                            height: 16,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : const Icon(Icons.manage_search_outlined),
-                    label: Text(_refreshingProvider ? "刷新资料中" : "小批量刷新标的资料"),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      FilledButton.tonalIcon(
+                        onPressed:
+                            _refreshingProvider ? null : _refreshProvider,
+                        icon: _refreshingProvider
+                            ? const SizedBox(
+                                width: 16,
+                                height: 16,
+                                child:
+                                    CircularProgressIndicator(strokeWidth: 2),
+                              )
+                            : const Icon(Icons.manage_search_outlined),
+                        label: Text(_refreshingProvider ? "刷新中" : "复核低可信资料"),
+                      ),
+                      if (data.allItems.length > data.items.length)
+                        TextButton.icon(
+                          onPressed: () =>
+                              setState(() => _showAllItems = !_showAllItems),
+                          icon: Icon(
+                            _showAllItems
+                                ? Icons.visibility_off_outlined
+                                : Icons.visibility_outlined,
+                          ),
+                          label: Text(_showAllItems ? "只看需复核" : "查看全部"),
+                        ),
+                    ],
                   ),
                   if (_message != null) ...[
                     const SizedBox(height: 8),
@@ -757,10 +782,10 @@ class _SecurityMetadataReviewCardState
                     ),
                   ],
                   const Divider(),
-                  if (data.items.isEmpty)
-                    const Text("当前没有可复核的持仓标的。")
+                  if (visibleItems.isEmpty)
+                    const Text("当前资料可信，无需手动维护。")
                   else
-                    ...data.items.take(12).map(
+                    ...visibleItems.take(12).map(
                           (item) => ListTile(
                             contentPadding: EdgeInsets.zero,
                             dense: true,
@@ -825,7 +850,7 @@ class _SecurityMetadataEditorSheetState
   late final _notesController = TextEditingController(
     text: widget.item.metadataNotes.isNotEmpty
         ? widget.item.metadataNotes
-        : "移动端人工确认。",
+        : "用户确认分类口径。",
   );
   var _saving = false;
   String? _error;
@@ -889,12 +914,12 @@ class _SecurityMetadataEditorSheetState
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              "修正 ${widget.item.identityLabel}",
+              "确认 ${widget.item.identityLabel}",
               style: Theme.of(context).textTheme.titleLarge,
             ),
             const SizedBox(height: 6),
             Text(
-              "保存后会标记为人工确认，后台 provider 不会自动覆盖。",
+              "仅在分类明显异常时使用。保存后会锁定这条标的的资产类别、行业和地区口径。",
               style: Theme.of(context).textTheme.bodySmall,
             ),
             const SizedBox(height: 16),

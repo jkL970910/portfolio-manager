@@ -418,7 +418,9 @@ class SecurityMetadataReviewSnapshot {
     required this.totalCount,
     required this.manualCount,
     required this.lowConfidenceCount,
+    required this.reviewCount,
     required this.items,
+    required this.allItems,
   });
 
   final String title;
@@ -427,7 +429,9 @@ class SecurityMetadataReviewSnapshot {
   final int totalCount;
   final int manualCount;
   final int lowConfidenceCount;
+  final int reviewCount;
   final List<SecurityMetadataItem> items;
+  final List<SecurityMetadataItem> allItems;
 
   factory SecurityMetadataReviewSnapshot.fromApiResponse(
       Map<String, dynamic> json) {
@@ -443,14 +447,21 @@ class SecurityMetadataReviewSnapshot {
         : const <String, dynamic>{};
     final rawItems = json["items"];
     return SecurityMetadataReviewSnapshot(
-      title: summary["title"] as String? ?? "标的资料修正",
+      title: summary["title"] as String? ?? "高级：标的资料可信度",
       statusLabel: summary["statusLabel"] as String? ?? "标的资料状态待确认。",
-      actionLabel: summary["actionLabel"] as String? ?? "可人工确认，避免后台覆盖。",
+      actionLabel: summary["actionLabel"] as String? ?? "发现分类异常时可人工锁定。",
       totalCount: summary["totalCount"] as int? ?? 0,
       manualCount: summary["manualCount"] as int? ?? 0,
       lowConfidenceCount: summary["lowConfidenceCount"] as int? ?? 0,
+      reviewCount: summary["reviewCount"] as int? ?? 0,
       items: rawItems is List
           ? rawItems
+              .whereType<Map<String, dynamic>>()
+              .map(SecurityMetadataItem.fromJson)
+              .toList()
+          : const [],
+      allItems: json["allItems"] is List
+          ? (json["allItems"] as List)
               .whereType<Map<String, dynamic>>()
               .map(SecurityMetadataItem.fromJson)
               .toList()

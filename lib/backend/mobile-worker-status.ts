@@ -55,10 +55,10 @@ function mapSecurityMetadataRun(
   if (!row) {
     return {
       id: null,
-      title: "标的资料修正",
+      title: "标的资料可信度",
       status: "empty",
       statusLabel: "还没有运行记录",
-      note: "后台还没有修正过标的资料。",
+      note: "后台还没有复核过标的资料。",
       lastFinishedAt: null,
       metricsLabel: "更新 0 / 跳过 0 / 失败 0",
     };
@@ -66,7 +66,7 @@ function mapSecurityMetadataRun(
 
   return {
     id: row.id,
-    title: "标的资料修正",
+    title: "标的资料可信度",
     status: row.status,
     statusLabel: statusLabel(row.status),
     note: row.statusNote ?? "标的资料 worker 已记录运行状态。",
@@ -98,6 +98,16 @@ function metadataConfidenceLabel(confidence: number) {
   if (confidence >= 70) return "可用";
   if (confidence >= 50) return "待复核";
   return "低可信";
+}
+
+function needsMetadataReview(item: ReturnType<typeof mapSecurityMetadataForMobile>) {
+  return (
+    !item.locked &&
+    (item.metadataConfidence < 70 ||
+      item.economicAssetClass === "待确认" ||
+      item.economicSector.length === 0 ||
+      item.exposureRegion.length === 0)
+  );
 }
 
 function formatMetadataDate(value: Date | string | null | undefined) {
@@ -151,13 +161,13 @@ function mapSecurityMetadataForMobile(
     holdingCount,
     locked: confirmed,
     statusLabel: confirmed
-      ? "已人工确认，后台不会覆盖"
+      ? "已确认分类口径"
       : `${metadataSourceLabel(source)} · ${metadataConfidenceLabel(confidence)}`,
   };
 }
 
 export class SecurityMetadataAccessError extends Error {
-  constructor(message = "只能修正当前组合内的标的资料。") {
+  constructor(message = "只能确认当前组合内的标的资料。") {
     super(message);
     this.name = "SecurityMetadataAccessError";
   }
@@ -183,11 +193,13 @@ export async function getMobileSecurityMetadataReview(userId: string) {
     return apiSuccess(
       {
         summary: {
-          title: "标的资料修正",
-          statusLabel: "当前没有可复核的持仓标的资料。",
-          actionLabel: "导入持仓后再复核",
+          title: "高级：标的资料可信度",
+          statusLabel: "当前没有需要复核的持仓标的资料。",
+          actionLabel: "导入持仓后，系统会自动识别资产类别、行业和地区。",
         },
         items: [],
+        reviewItems: [],
+        allItems: [],
       },
       "database",
     );
@@ -233,23 +245,27 @@ export async function getMobileSecurityMetadataReview(userId: string) {
   const lowConfidenceCount = items.filter(
     (item) => !item.locked && item.metadataConfidence < 70,
   ).length;
+  const reviewItems = items.filter(needsMetadataReview);
   const manualCount = items.filter((item) => item.locked).length;
 
   return apiSuccess(
     {
       summary: {
-        title: "标的资料修正",
+        title: "高级：标的资料可信度",
         statusLabel:
-          lowConfidenceCount > 0
-            ? `${lowConfidenceCount} 个标的资料仍建议复核。`
-            : "当前持仓标的资料没有明显低可信项。",
+          reviewItems.length > 0
+            ? `${reviewItems.length} 个标的资料建议复核；普通页面仍会使用当前最佳分类。`
+            : "当前持仓标的资料可信，无需手动处理。",
         actionLabel:
-          "可小批量刷新外部资料；人工确认后会锁定，不再被后台覆盖。",
+          "这是数据质量兜底工具；只有发现分类异常时才需要人工锁定。",
         totalCount: items.length,
         manualCount,
         lowConfidenceCount,
+        reviewCount: reviewItems.length,
       },
-      items,
+      items: reviewItems,
+      reviewItems,
+      allItems: items,
     },
     "database",
   );
@@ -280,7 +296,7 @@ export async function updateMobileSecurityMetadata(
     confidence: 100,
     asOf: now,
     confirmedAt: now,
-    notes: input.notes ?? "用户在移动端人工确认。",
+    notes: input.notes ?? "用户确认分类口径。",
   });
   const security = await repositories.securities.updateMetadata(securityId, {
     economicAssetClass: metadata.economicAssetClass,
