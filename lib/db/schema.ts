@@ -302,6 +302,18 @@ export const securities = pgTable(
     marketSector: varchar("market_sector", { length: 64 }),
     country: varchar("country", { length: 64 }),
     underlyingId: varchar("underlying_id", { length: 120 }),
+    economicAssetClass: varchar("economic_asset_class", { length: 64 }),
+    economicSector: varchar("economic_sector", { length: 64 }),
+    exposureRegion: varchar("exposure_region", { length: 64 }),
+    metadataSource: varchar("metadata_source", { length: 64 })
+      .notNull()
+      .default("heuristic"),
+    metadataConfidence: integer("metadata_confidence").notNull().default(45),
+    metadataAsOf: timestamp("metadata_as_of", { withTimezone: true }),
+    metadataConfirmedAt: timestamp("metadata_confirmed_at", {
+      withTimezone: true,
+    }),
+    metadataNotes: text("metadata_notes"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),

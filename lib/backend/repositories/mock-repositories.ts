@@ -172,6 +172,8 @@ export const mockRepositories: BackendRepositories = {
         ...input,
         id: `security_${securities.length + 1}`,
         symbol: input.symbol.trim().toUpperCase(),
+        metadataSource: input.metadataSource ?? "heuristic",
+        metadataConfidence: input.metadataConfidence ?? 45,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };

@@ -51,6 +51,21 @@ test("keeps same ticker in different currencies as separate listing identities",
   assert.equal(usd.canonicalExchange, "NASDAQ");
 });
 
+test("persists project-registry metadata on resolved security identity", async () => {
+  const security = await resolveCanonicalSecurityIdentity({
+    symbol: "CGL.C",
+    exchange: "TSX",
+    currency: "CAD",
+    name: "iShares Gold Bullion ETF",
+    securityType: "Commodity ETF",
+  });
+
+  assert.equal(security.economicAssetClass, "Commodity");
+  assert.equal(security.economicSector, "Precious Metals");
+  assert.equal(security.metadataSource, "project-registry");
+  assert.ok(security.metadataConfidence >= 80);
+});
+
 test("normalization helpers preserve canonical lookup keys", () => {
   assert.equal(normalizeSecuritySymbol("XBB.TO"), "XBB");
   assert.equal(normalizeSecuritySymbol("BRK-B"), "BRK.B");

@@ -113,8 +113,35 @@ function mapSecurity(row: typeof securities.$inferSelect): SecurityRecord {
     marketSector: row.marketSector ?? null,
     country: row.country ?? null,
     underlyingId: row.underlyingId ?? null,
+    economicAssetClass: row.economicAssetClass ?? null,
+    economicSector: row.economicSector ?? null,
+    exposureRegion: row.exposureRegion ?? null,
+    metadataSource:
+      (row.metadataSource as SecurityRecord["metadataSource"]) ?? "heuristic",
+    metadataConfidence: row.metadataConfidence ?? 45,
+    metadataAsOf: row.metadataAsOf?.toISOString() ?? null,
+    metadataConfirmedAt: row.metadataConfirmedAt?.toISOString() ?? null,
+    metadataNotes: row.metadataNotes ?? null,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
+  };
+}
+
+function mapSecurityMetadata(
+  security: SecurityRecord | null | undefined,
+): HoldingPosition["securityMetadata"] {
+  if (!security) {
+    return null;
+  }
+  return {
+    economicAssetClass: security.economicAssetClass,
+    economicSector: security.economicSector,
+    exposureRegion: security.exposureRegion,
+    source: security.metadataSource,
+    confidence: security.metadataConfidence,
+    asOf: security.metadataAsOf,
+    confirmedAt: security.metadataConfirmedAt,
+    notes: security.metadataNotes,
   };
 }
 
@@ -451,6 +478,27 @@ export const postgresRepositories: BackendRepositories = {
       const rows = await db.query.holdingPositions.findMany({
         where: eq(holdingPositions.userId, userId),
       });
+      const securityIds = [
+        ...new Set(
+          rows
+            .map((row) => row.securityId)
+            .filter((id): id is string => Boolean(id)),
+        ),
+      ];
+      const securityById = new Map(
+        (
+          await Promise.all(
+            securityIds.map(async (securityId) => {
+              const security = await db.query.securities.findFirst({
+                where: eq(securities.id, securityId),
+              });
+              return security ? mapSecurity(security) : null;
+            }),
+          )
+        )
+          .filter((security): security is SecurityRecord => Boolean(security))
+          .map((security) => [security.id, security]),
+      );
       return rows.map((row) => ({
         ...(() => {
           const currency =
@@ -482,6 +530,9 @@ export const postgresRepositories: BackendRepositories = {
             securityTypeOverride: row.securityTypeOverride ?? null,
             exchangeOverride: row.exchangeOverride ?? null,
             marketSectorOverride: row.marketSectorOverride ?? null,
+            securityMetadata: mapSecurityMetadata(
+              row.securityId ? securityById.get(row.securityId) : null,
+            ),
             quantity: row.quantity == null ? null : toNumber(row.quantity),
             avgCostPerShareAmount:
               row.avgCostPerShareAmount == null
@@ -680,6 +731,16 @@ export const postgresRepositories: BackendRepositories = {
           marketSector: input.marketSector,
           country: input.country,
           underlyingId: input.underlyingId,
+          economicAssetClass: input.economicAssetClass,
+          economicSector: input.economicSector,
+          exposureRegion: input.exposureRegion,
+          metadataSource: input.metadataSource,
+          metadataConfidence: input.metadataConfidence,
+          metadataAsOf: input.metadataAsOf ? new Date(input.metadataAsOf) : null,
+          metadataConfirmedAt: input.metadataConfirmedAt
+            ? new Date(input.metadataConfirmedAt)
+            : null,
+          metadataNotes: input.metadataNotes,
         })
         .onConflictDoUpdate({
           target: [
@@ -694,6 +755,16 @@ export const postgresRepositories: BackendRepositories = {
             marketSector: input.marketSector,
             country: input.country,
             underlyingId: input.underlyingId,
+            economicAssetClass: input.economicAssetClass,
+            economicSector: input.economicSector,
+            exposureRegion: input.exposureRegion,
+            metadataSource: input.metadataSource,
+            metadataConfidence: input.metadataConfidence,
+            metadataAsOf: input.metadataAsOf ? new Date(input.metadataAsOf) : null,
+            metadataConfirmedAt: input.metadataConfirmedAt
+              ? new Date(input.metadataConfirmedAt)
+              : null,
+            metadataNotes: input.metadataNotes,
             updatedAt: new Date(),
           },
         })

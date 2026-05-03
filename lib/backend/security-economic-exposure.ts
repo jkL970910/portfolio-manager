@@ -1,4 +1,8 @@
-import type { HoldingPosition } from "@/lib/backend/models";
+import type {
+  HoldingPosition,
+  SecurityMetadata,
+  SecurityMetadataSource,
+} from "@/lib/backend/models";
 
 export type EconomicExposureInput = {
   symbol: string;
@@ -6,6 +10,11 @@ export type EconomicExposureInput = {
   assetClass?: string | null;
   securityType?: string | null;
   currency?: string | null;
+  metadata?: SecurityMetadata | null;
+};
+
+export type InferredSecurityMetadata = SecurityMetadata & {
+  assetClassSource: SecurityMetadataSource;
 };
 
 const US_EQUITY_EXPOSURE_SYMBOLS = new Set([
@@ -96,6 +105,13 @@ function isPreciousMetalsExposure(input: {
 }
 
 export function inferEconomicAssetClass(input: EconomicExposureInput) {
+  if (
+    input.metadata?.economicAssetClass &&
+    input.metadata.confidence >= 70
+  ) {
+    return input.metadata.economicAssetClass;
+  }
+
   const symbol = input.symbol.trim().toUpperCase();
   const name = (input.name ?? "").trim().toLowerCase();
   const type = (input.securityType ?? "").trim().toLowerCase();
@@ -163,6 +179,52 @@ export function inferEconomicAssetClass(input: EconomicExposureInput) {
   );
 }
 
+export function inferSecurityMetadata(
+  input: Omit<EconomicExposureInput, "metadata">,
+): InferredSecurityMetadata {
+  const economicAssetClass = inferEconomicAssetClass(input);
+  const symbol = input.symbol.trim().toUpperCase();
+  const name = (input.name ?? "").trim().toLowerCase();
+  const type = (input.securityType ?? "").trim().toLowerCase();
+  const fallbackAssetClass = input.assetClass?.trim() || null;
+  const isRegistryKnown =
+    symbolMatches(US_EQUITY_EXPOSURE_SYMBOLS, symbol) ||
+    symbolMatches(INTERNATIONAL_EQUITY_EXPOSURE_SYMBOLS, symbol) ||
+    symbolMatches(FIXED_INCOME_EXPOSURE_SYMBOLS, symbol) ||
+    symbolMatches(CASH_EXPOSURE_SYMBOLS, symbol) ||
+    isPreciousMetalsExposure({ symbol, name, type, fallbackAssetClass });
+  const isAssetClassOverride = Boolean(
+    fallbackAssetClass && fallbackAssetClass !== economicAssetClass,
+  );
+  const source: SecurityMetadataSource =
+    isRegistryKnown || isAssetClassOverride ? "project-registry" : "heuristic";
+
+  return {
+    economicAssetClass,
+    economicSector:
+      economicAssetClass === "Commodity"
+        ? "Precious Metals"
+        : null,
+    exposureRegion:
+      economicAssetClass === "US Equity"
+        ? "United States"
+        : economicAssetClass === "Canadian Equity"
+          ? "Canada"
+          : economicAssetClass === "International Equity"
+            ? "International"
+            : null,
+    source,
+    assetClassSource: source,
+    confidence: source === "project-registry" ? 82 : 45,
+    asOf: null,
+    confirmedAt: null,
+    notes:
+      source === "project-registry"
+        ? "Matched by project economic exposure registry."
+        : "Inferred from available listing, type, currency, and name fields.",
+  };
+}
+
 export function getHoldingEconomicAssetClass(holding: HoldingPosition) {
   return inferEconomicAssetClass({
     symbol: holding.symbol,
@@ -170,6 +232,7 @@ export function getHoldingEconomicAssetClass(holding: HoldingPosition) {
     assetClass: holding.assetClass,
     securityType: holding.securityTypeOverride,
     currency: holding.currency,
+    metadata: holding.securityMetadata,
   });
 }
 

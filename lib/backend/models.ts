@@ -94,6 +94,7 @@ export interface HoldingPosition {
   securityTypeOverride?: string | null;
   exchangeOverride?: string | null;
   marketSectorOverride?: string | null;
+  securityMetadata?: SecurityMetadata | null;
   quantity?: number | null;
   avgCostPerShareAmount?: number | null;
   costBasisAmount?: number | null;
@@ -139,8 +140,33 @@ export interface SecurityRecord {
   marketSector: string | null;
   country: string | null;
   underlyingId: string | null;
+  economicAssetClass: string | null;
+  economicSector: string | null;
+  exposureRegion: string | null;
+  metadataSource: SecurityMetadataSource;
+  metadataConfidence: number;
+  metadataAsOf: string | null;
+  metadataConfirmedAt: string | null;
+  metadataNotes: string | null;
   createdAt: string;
   updatedAt: string;
+}
+
+export type SecurityMetadataSource =
+  | "manual"
+  | "provider"
+  | "project-registry"
+  | "heuristic";
+
+export interface SecurityMetadata {
+  economicAssetClass: string | null;
+  economicSector: string | null;
+  exposureRegion: string | null;
+  source: SecurityMetadataSource;
+  confidence: number;
+  asOf: string | null;
+  confirmedAt: string | null;
+  notes: string | null;
 }
 
 export interface SecurityAliasRecord {

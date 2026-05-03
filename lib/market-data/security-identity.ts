@@ -4,6 +4,7 @@ import type {
   SecurityRecord,
 } from "@/lib/backend/models";
 import { getRepositories } from "@/lib/backend/repositories/factory";
+import { inferSecurityMetadata } from "@/lib/backend/security-economic-exposure";
 
 export type CanonicalSecurityIdentityInput = {
   symbol: string;
@@ -184,6 +185,13 @@ export async function resolveCanonicalSecurityIdentity(
     currency,
   });
   const repositories = getRepositories();
+  const inferredMetadata = inferSecurityMetadata({
+    symbol,
+    name: input.name,
+    assetClass: null,
+    securityType: input.securityType,
+    currency,
+  });
 
   for (const alias of aliasValuesForInput(input).filter(
     (item) => item.aliasType === "provider-symbol",
@@ -213,6 +221,14 @@ export async function resolveCanonicalSecurityIdentity(
     marketSector: normalizeText(input.marketSector) || null,
     country: normalizeText(input.country) || (exchange.country ?? null),
     underlyingId: buildUnderlyingId({ symbol, name: input.name }),
+    economicAssetClass: inferredMetadata.economicAssetClass,
+    economicSector: inferredMetadata.economicSector,
+    exposureRegion: inferredMetadata.exposureRegion,
+    metadataSource: inferredMetadata.source,
+    metadataConfidence: inferredMetadata.confidence,
+    metadataAsOf: null,
+    metadataConfirmedAt: null,
+    metadataNotes: null,
   });
 
   const aliases = [
