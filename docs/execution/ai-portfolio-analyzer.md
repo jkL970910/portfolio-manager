@@ -296,8 +296,15 @@ Runtime context architecture:
    - comparison questions such as `和 VFV 比呢？` now try to resolve VFV from
      user holdings/recommendations/cache and inject it as a comparison subject
 4. Context pack cache:
-   - first pass is a process-local TTL cache in
-     `lib/backend/loo-minister-context-pack-cache.ts`, not a new DB table
+   - first pass uses a process-local TTL store, but the cache is now behind the
+     `LooMinisterContextPackStore` interface in
+     `lib/backend/loo-minister-context-pack-cache.ts`
+   - cloud deployment should provide a Redis/DB-backed async store through
+     `setLooMinisterContextPackStore(...)`; the 大臣 enrichment code should not
+     change when replacing the backing cache
+   - sync call sites remain supported only when the installed store exposes
+     sync methods; async cloud stores are supported by `getOrBuildContextPack`
+     and the async cache management APIs
    - packs include `key`, `kind`, `asOf`, `source`, `freshness`, `builtAt`,
      and `expiresAt`, so answers can distinguish backend-built data from a
      reused memory-cache pack
@@ -312,8 +319,8 @@ Runtime context architecture:
    - chat sessions now persist `subjectHistoryJson` so follow-up comparison
      questions can reuse recent structured subjects
    - current invalidation is conservative TTL-based; cloud deployment should
-     replace the backing store with Redis/DB and tighten preference/recommendation
-     keys to true `updatedAt` / latest run ids where the repository exposes them
+     tighten preference/recommendation keys to true `updatedAt` / latest run ids
+     where the repository exposes them
 5. Response-speed policy:
    - Flutter now shows staged status while 大臣 prepares context and waits for
      GPT/Router
@@ -363,7 +370,20 @@ Runtime context architecture:
      page-owned `AiAnalysisCard`; the actual AI 快扫 still runs through that
      card, so 大臣 does not bypass page state, backend validation, cache
      strategy, or provider quota policy.
-8. Security quick-scan readability and exposure classification:
+8. Direct-action routing boundary:
+   - Mobile now has an app-level dispatcher for 大臣 suggested actions.
+   - Read-only navigation actions can open existing mobile destinations:
+     Overview, Portfolio, Recommendations, Discover, Import, Settings,
+     Health Score, Account Detail, Holding Detail, and Security Detail.
+   - `run-analysis` actions remain routed to the current page-owned
+     `AiAnalysisCard`; 大臣 does not run a separate hidden analysis path.
+   - `open-form`, `update-preferences`, and `refresh-data` actions only route
+     the user to the relevant page and explain that saving/refreshing still
+     requires page-level confirmation.
+   - 大臣 must not directly mutate portfolio data, save preferences, import
+     holdings, or refresh quota-consuming providers without an explicit
+     product UI confirmation.
+9. Security quick-scan readability and exposure classification:
    - AI 标的快扫 now separates listing identity from economic exposure.
      Listing identity (`securityId`, `symbol`, `exchange`, `currency`) remains
      the source of truth for quote/history/cache matching, while target-fit

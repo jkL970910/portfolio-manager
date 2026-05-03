@@ -343,8 +343,8 @@ class _LooMinisterCardState extends State<LooMinisterCard> {
             child: const Text("继续等 GPT"),
           ),
           FilledButton(
-            onPressed: () =>
-                Navigator.of(dialogContext).pop(_MinisterTimeoutChoice.useLocal),
+            onPressed: () => Navigator.of(dialogContext)
+                .pop(_MinisterTimeoutChoice.useLocal),
             child: const Text("改用本地大臣"),
           ),
         ],
@@ -392,7 +392,8 @@ class _LooMinisterCardState extends State<LooMinisterCard> {
     final choice = await _showTimeoutChoice();
     if (choice == _MinisterTimeoutChoice.useLocal) {
       _setPhase("切换本地大臣答复...");
-      final localResponse = await _requestMinister(question, answerMode: "local");
+      final localResponse =
+          await _requestMinister(question, answerMode: "local");
       await _applyMinisterResponse(localResponse);
       return;
     }
@@ -462,8 +463,7 @@ class _LooMinisterCardState extends State<LooMinisterCard> {
               ..._messages.map(
                 (message) => _MinisterChatBubble(
                   message,
-                  onSuggestedActionConfirmed:
-                      widget.onSuggestedActionConfirmed,
+                  onSuggestedActionConfirmed: widget.onSuggestedActionConfirmed,
                 ),
               ),
             ],
@@ -710,19 +710,15 @@ class _MinisterSuggestedActionChip extends StatelessWidget {
   }
 
   Future<void> _confirmAction(BuildContext context) async {
+    final confirmationDetail = _confirmationDetail;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: Text(action.label),
-        content: Text(
-          [
-            action.detail,
-            action.requiresConfirmation ? "此动作会复用当前页面已有的 AI 快扫卡片执行。" : null,
-            action.actionType == "run-analysis"
-                ? "确认后，大臣只发送触发信号；真实请求、缓存策略和 quota 仍由页面分析卡片负责。"
-                : null,
-          ].whereType<String>().join("\n\n"),
-        ),
+        content: Text([action.detail, confirmationDetail]
+            .whereType<String>()
+            .where((item) => item.isNotEmpty)
+            .join("\n\n")),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(dialogContext).pop(false),
@@ -739,11 +735,17 @@ class _MinisterSuggestedActionChip extends StatelessWidget {
       return;
     }
     onConfirmed(action);
-    if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("已请求执行：${action.label}")),
-      );
-    }
+  }
+
+  String get _confirmationDetail {
+    return switch (action.actionType) {
+      "run-analysis" => "确认后，大臣会触发当前页面已有的 AI 快扫。真实请求、缓存策略和额度仍由页面分析卡片控制。",
+      "navigate" => "确认后会打开对应页面，不会修改任何数据。",
+      "open-form" => "确认后会打开对应入口。保存前仍需要你在页面内再次确认。",
+      "update-preferences" => "确认后会打开偏好设置。大臣不会直接替你保存配置。",
+      "refresh-data" => "确认后会打开对应页面。实际刷新仍需要你使用页面内按钮确认执行。",
+      _ => "确认后会把这个建议交给当前应用处理。",
+    };
   }
 }
 

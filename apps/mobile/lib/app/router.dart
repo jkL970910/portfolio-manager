@@ -7,6 +7,20 @@ import "../features/portfolio/presentation/portfolio_page.dart";
 import "../features/recommendations/presentation/recommendations_page.dart";
 import "../features/settings/presentation/settings_page.dart";
 
+class MobileRootShellController extends ChangeNotifier {
+  int _index = 0;
+
+  int get index => _index;
+
+  void openTab(int index) {
+    if (index == _index) {
+      return;
+    }
+    _index = index;
+    notifyListeners();
+  }
+}
+
 class MobileRootShell extends StatefulWidget {
   const MobileRootShell({
     required this.apiClient,
@@ -14,6 +28,7 @@ class MobileRootShell extends StatefulWidget {
     required this.baseCurrency,
     required this.onDisplayCurrencyChanged,
     required this.onLogout,
+    this.controller,
     super.key,
   });
 
@@ -22,6 +37,7 @@ class MobileRootShell extends StatefulWidget {
   final String baseCurrency;
   final Future<void> Function(String currency) onDisplayCurrencyChanged;
   final VoidCallback onLogout;
+  final MobileRootShellController? controller;
 
   @override
   State<MobileRootShell> createState() => _MobileRootShellState();
@@ -29,6 +45,45 @@ class MobileRootShell extends StatefulWidget {
 
 class _MobileRootShellState extends State<MobileRootShell> {
   int _index = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _index = widget.controller?.index ?? _index;
+    widget.controller?.addListener(_handleControllerChanged);
+  }
+
+  @override
+  void didUpdateWidget(covariant MobileRootShell oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.controller == widget.controller) {
+      return;
+    }
+    oldWidget.controller?.removeListener(_handleControllerChanged);
+    _index = widget.controller?.index ?? _index;
+    widget.controller?.addListener(_handleControllerChanged);
+  }
+
+  @override
+  void dispose() {
+    widget.controller?.removeListener(_handleControllerChanged);
+    super.dispose();
+  }
+
+  void _handleControllerChanged() {
+    final nextIndex = widget.controller?.index ?? _index;
+    if (nextIndex == _index || !mounted) {
+      return;
+    }
+    setState(() => _index = nextIndex);
+  }
+
+  void _selectTab(int index) {
+    widget.controller?.openTab(index);
+    if (widget.controller == null) {
+      setState(() => _index = index);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -50,7 +105,7 @@ class _MobileRootShellState extends State<MobileRootShell> {
       body: SafeArea(child: pages[_index]),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _index,
-        onDestinationSelected: (value) => setState(() => _index = value),
+        onDestinationSelected: _selectTab,
         destinations: const [
           NavigationDestination(
               icon: Icon(Icons.dashboard_outlined), label: "总览"),

@@ -3,12 +3,19 @@ import test from "node:test";
 import {
   chatSubjectPackKey,
   clearLooMinisterContextPackCache,
+  clearLooMinisterContextPackCacheAsync,
+  createMemoryLooMinisterContextPackStore,
   getOrBuildContextPack,
   getOrBuildContextPackSync,
   getLooMinisterContextPackCacheStats,
+  getLooMinisterContextPackCacheStatsAsync,
   latestRecommendationPackKey,
   projectKnowledgePackKey,
+  resetLooMinisterContextPackStore,
   securityContextPackKey,
+  setLooMinisterContextPackStore,
+  type LooMinisterContextPackStore,
+  type LooMinisterStoredContextPack,
   userPreferencePackKey,
 } from "@/lib/backend/loo-minister-context-pack-cache";
 
@@ -106,6 +113,104 @@ test("Loo Minister context pack cache supports sync project knowledge packs and 
   assert.deepEqual(second.data, ["overview"]);
   assert.equal(stats.total, 1);
   assert.equal(stats.fresh, 1);
+});
+
+test("Loo Minister context pack cache supports a cloud-ready async store boundary", async () => {
+  const packs = new Map<string, LooMinisterStoredContextPack>();
+  const asyncOnlyStore: LooMinisterContextPackStore = {
+    async get(key) {
+      return packs.get(key) ?? null;
+    },
+    async set(pack) {
+      packs.set(pack.key, pack);
+    },
+    async clear() {
+      packs.clear();
+    },
+    async deletePrefix(prefix) {
+      for (const key of packs.keys()) {
+        if (key.startsWith(prefix)) packs.delete(key);
+      }
+    },
+    async stats(nowMs = Date.now()) {
+      let fresh = 0;
+      let stale = 0;
+      for (const pack of packs.values()) {
+        const expiresAt = Date.parse(pack.expiresAt);
+        if (Number.isFinite(expiresAt) && expiresAt > nowMs) {
+          fresh += 1;
+        } else {
+          stale += 1;
+        }
+      }
+      return { total: packs.size, fresh, stale };
+    },
+  };
+
+  setLooMinisterContextPackStore(asyncOnlyStore);
+  try {
+    let buildCount = 0;
+    const first = await getOrBuildContextPack({
+      key: "cloud:security:vfv",
+      kind: "security",
+      ttlMs: 1_000,
+      build: async () => {
+        buildCount += 1;
+        return { symbol: "VFV" };
+      },
+    });
+    const second = await getOrBuildContextPack({
+      key: "cloud:security:vfv",
+      kind: "security",
+      ttlMs: 1_000,
+      build: async () => {
+        buildCount += 1;
+        return { symbol: "XEQT" };
+      },
+    });
+    const stats = await getLooMinisterContextPackCacheStatsAsync();
+
+    assert.equal(buildCount, 1);
+    assert.equal(first.source, "backend");
+    assert.equal(second.source, "memory-cache");
+    assert.deepEqual(second.data, { symbol: "VFV" });
+    assert.equal(stats.total, 1);
+
+    await clearLooMinisterContextPackCacheAsync("cloud:");
+    assert.equal((await getLooMinisterContextPackCacheStatsAsync()).total, 0);
+  } finally {
+    resetLooMinisterContextPackStore();
+  }
+});
+
+test("Loo Minister sync cache API requires a sync-capable store", () => {
+  const asyncOnlyStore: LooMinisterContextPackStore = {
+    async get() {
+      return null;
+    },
+    async set() {},
+    async clear() {},
+    async deletePrefix() {},
+    async stats() {
+      return { total: 0, fresh: 0, stale: 0 };
+    },
+  };
+
+  setLooMinisterContextPackStore(asyncOnlyStore);
+  try {
+    assert.throws(
+      () =>
+        getOrBuildContextPackSync({
+          key: "sync:unsupported",
+          kind: "project-knowledge",
+          ttlMs: 1_000,
+          build: () => [],
+        }),
+      /does not support getSync/,
+    );
+  } finally {
+    setLooMinisterContextPackStore(createMemoryLooMinisterContextPackStore());
+  }
 });
 
 test("Loo Minister context pack keys carry explicit invalidation dimensions", () => {

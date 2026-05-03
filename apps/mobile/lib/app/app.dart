@@ -5,6 +5,11 @@ import "../core/auth/mobile_auth_session.dart";
 import "../core/auth/mobile_auth_store.dart";
 import "../core/theme/loo_theme.dart";
 import "../features/auth/presentation/login_page.dart";
+import "../features/discover/presentation/discover_page.dart";
+import "../features/portfolio/presentation/account_detail_page.dart";
+import "../features/portfolio/presentation/health_score_page.dart";
+import "../features/portfolio/presentation/holding_detail_page.dart";
+import "../features/portfolio/presentation/security_detail_page.dart";
 import "../features/shared/data/loo_minister_context_models.dart";
 import "../features/shared/presentation/loo_minister_card.dart";
 import "../features/shared/presentation/loo_minister_scope.dart";
@@ -25,7 +30,9 @@ class LooWealthApp extends StatefulWidget {
 class _LooWealthAppState extends State<LooWealthApp> {
   late final MobileAuthStore _authStore;
   final _navigatorKey = GlobalKey<NavigatorState>();
-  final _ministerAnalysisAction = ValueNotifier<LooMinisterSuggestedAction?>(null);
+  final _rootShellController = MobileRootShellController();
+  final _ministerAnalysisAction =
+      ValueNotifier<LooMinisterSuggestedAction?>(null);
 
   MobileAuthSession? _session;
   LooMinisterPageContext? _ministerContext;
@@ -35,6 +42,7 @@ class _LooWealthAppState extends State<LooWealthApp> {
   @override
   void dispose() {
     _ministerAnalysisAction.dispose();
+    _rootShellController.dispose();
     super.dispose();
   }
 
@@ -145,8 +153,214 @@ class _LooWealthAppState extends State<LooWealthApp> {
   }
 
   void _requestMinisterAnalysisAction(LooMinisterSuggestedAction action) {
+    _handleMinisterAction(action);
+  }
+
+  void _triggerMinisterAnalysisAction(LooMinisterSuggestedAction action) {
     _ministerAnalysisAction.value = null;
     _ministerAnalysisAction.value = action;
+  }
+
+  void _handleMinisterAction(LooMinisterSuggestedAction action) {
+    switch (action.actionType) {
+      case "run-analysis":
+        _triggerMinisterAnalysisAction(action);
+        _showMinisterActionMessage("已发送给当前页面的 AI 快扫。");
+      case "navigate":
+      case "open-form":
+      case "update-preferences":
+      case "refresh-data":
+        _routeMinisterAction(action);
+      default:
+        _showMinisterActionMessage("大臣已给出建议，请按页面提示继续操作。");
+    }
+  }
+
+  void _routeMinisterAction(LooMinisterSuggestedAction action) {
+    final page = _targetString(action, "page");
+    final scope = _targetString(action, "scope");
+    final handled = _openMinisterTargetPage(
+      page: page,
+      scope: scope,
+      action: action,
+    );
+
+    if (!handled) {
+      _showMinisterActionMessage("这个建议需要在当前页面手动确认。");
+      return;
+    }
+
+    if (action.actionType == "refresh-data") {
+      _showMinisterActionMessage("已打开对应页面，请使用页面内刷新按钮确认执行。");
+    } else if (action.actionType == "update-preferences" ||
+        action.actionType == "open-form") {
+      _showMinisterActionMessage("已打开对应页面，请在页面内检查并保存。");
+    } else {
+      _showMinisterActionMessage("已打开：${action.label}");
+    }
+  }
+
+  bool _openMinisterTargetPage({
+    required String? page,
+    required String? scope,
+    required LooMinisterSuggestedAction action,
+  }) {
+    final effectivePage = page ?? _pageForScope(scope);
+    switch (effectivePage) {
+      case "overview":
+        _rootShellController.openTab(0);
+        return true;
+      case "portfolio":
+        _rootShellController.openTab(1);
+        return true;
+      case "recommendations":
+        _rootShellController.openTab(2);
+        return true;
+      case "discover":
+      case "security-discover":
+        return _pushMinisterPage(
+          DiscoverPage(apiClient: _currentApiClient),
+        );
+      case "import":
+        _rootShellController.openTab(3);
+        return true;
+      case "settings":
+      case "preferences":
+      case "investment-preferences":
+        _rootShellController.openTab(4);
+        return true;
+      case "portfolio-health":
+      case "health-score":
+        return _pushMinisterPage(
+          HealthScorePage(
+            apiClient: _currentApiClient,
+            accountId: _targetString(action, "accountId") ??
+                _ministerContext?.subject.accountId,
+            fallbackTitle: "健康巡查",
+          ),
+        );
+      case "account-detail":
+        final accountId = _targetString(action, "accountId") ??
+            _ministerContext?.subject.accountId;
+        if (accountId == null || accountId.isEmpty) {
+          return false;
+        }
+        return _pushMinisterPage(
+          AccountDetailPage(
+            apiClient: _currentApiClient,
+            accountId: accountId,
+            fallbackTitle: "账户详情",
+          ),
+        );
+      case "holding-detail":
+        final holdingId = _targetString(action, "holdingId") ??
+            _ministerContext?.subject.holdingId;
+        if (holdingId == null || holdingId.isEmpty) {
+          return false;
+        }
+        return _pushMinisterPage(
+          HoldingDetailPage(
+            apiClient: _currentApiClient,
+            holdingId: holdingId,
+            fallbackTitle: "持仓详情",
+          ),
+        );
+      case "security-detail":
+        final security =
+            _targetSecurity(action) ?? _ministerContext?.subject.security;
+        if (security == null || security.symbol.isEmpty) {
+          return false;
+        }
+        return _pushMinisterPage(
+          SecurityDetailPage(
+            apiClient: _currentApiClient,
+            symbol: security.symbol,
+            fallbackTitle: security.name?.isNotEmpty == true
+                ? security.name!
+                : security.symbol,
+            securityId: security.securityId,
+            exchange: security.exchange,
+            currency: security.currency,
+          ),
+        );
+      default:
+        return false;
+    }
+  }
+
+  LooApiClient get _currentApiClient {
+    final session = _session;
+    return LooApiClient(
+      accessToken: session?.accessToken ?? "",
+      refreshAccessToken: _refreshAccessToken,
+      onUnauthorized: _clearSession,
+    );
+  }
+
+  bool _pushMinisterPage(Widget page) {
+    final navigator = _navigatorKey.currentState;
+    if (navigator == null) {
+      return false;
+    }
+    navigator.push(MaterialPageRoute<void>(builder: (_) => page));
+    return true;
+  }
+
+  String? _pageForScope(String? scope) {
+    return switch (scope) {
+      "portfolio" => "portfolio-health",
+      "account" => "portfolio-health",
+      "security" => "security-detail",
+      "holding" => "holding-detail",
+      _ => null,
+    };
+  }
+
+  String? _targetString(LooMinisterSuggestedAction action, String key) {
+    final value = action.target[key];
+    return value is String && value.trim().isNotEmpty ? value.trim() : null;
+  }
+
+  LooMinisterSecurityIdentity? _targetSecurity(
+    LooMinisterSuggestedAction action,
+  ) {
+    final targetSecurity = action.target["security"];
+    if (targetSecurity is Map<String, dynamic>) {
+      final symbol = targetSecurity["symbol"];
+      if (symbol is String && symbol.trim().isNotEmpty) {
+        return LooMinisterSecurityIdentity(
+          symbol: symbol.trim().toUpperCase(),
+          securityId: targetSecurity["securityId"] as String?,
+          exchange: targetSecurity["exchange"] as String?,
+          currency: targetSecurity["currency"] as String?,
+          name: targetSecurity["name"] as String?,
+          provider: targetSecurity["provider"] as String?,
+          securityType: targetSecurity["securityType"] as String?,
+        );
+      }
+    }
+
+    final symbol = _targetString(action, "symbol");
+    if (symbol == null) {
+      return null;
+    }
+    return LooMinisterSecurityIdentity(
+      symbol: symbol.toUpperCase(),
+      securityId: _targetString(action, "securityId"),
+      exchange: _targetString(action, "exchange"),
+      currency: _targetString(action, "currency"),
+      name: _targetString(action, "name"),
+    );
+  }
+
+  void _showMinisterActionMessage(String message) {
+    final context = _navigatorKey.currentContext;
+    if (context == null) {
+      return;
+    }
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message)),
+    );
   }
 
   Future<void> _logout() async {
@@ -219,6 +433,7 @@ class _LooWealthAppState extends State<LooWealthApp> {
               ? LoginPage(onAuthenticated: _setSession)
               : MobileRootShell(
                   apiClient: apiClient!,
+                  controller: _rootShellController,
                   viewerName: session.viewerName,
                   baseCurrency: session.baseCurrency,
                   onDisplayCurrencyChanged: _setDisplayCurrency,

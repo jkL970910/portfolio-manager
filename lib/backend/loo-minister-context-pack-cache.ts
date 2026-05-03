@@ -21,10 +21,29 @@ export type LooMinisterContextPack<T> = {
   expiresAt: string;
 };
 
-type StoredContextPack = Omit<
+export type LooMinisterStoredContextPack = Omit<
   LooMinisterContextPack<unknown>,
   "source" | "freshness"
 >;
+
+export type LooMinisterContextPackCacheStats = {
+  total: number;
+  fresh: number;
+  stale: number;
+};
+
+export type LooMinisterContextPackStore = {
+  get(key: string): Promise<LooMinisterStoredContextPack | null>;
+  set(pack: LooMinisterStoredContextPack): Promise<void>;
+  clear(): Promise<void>;
+  deletePrefix(prefix: string): Promise<void>;
+  stats(nowMs?: number): Promise<LooMinisterContextPackCacheStats>;
+  getSync?: (key: string) => LooMinisterStoredContextPack | null;
+  setSync?: (pack: LooMinisterStoredContextPack) => void;
+  clearSync?: () => void;
+  deletePrefixSync?: (prefix: string) => void;
+  statsSync?: (nowMs?: number) => LooMinisterContextPackCacheStats;
+};
 
 export const LOO_MINISTER_CONTEXT_PACK_TTL_MS = {
   projectKnowledge: 60 * 60 * 1000,
@@ -36,14 +55,93 @@ export const LOO_MINISTER_CONTEXT_PACK_TTL_MS = {
   chatSubjects: 60 * 1000,
 } as const;
 
-const contextPackCache = new Map<string, StoredContextPack>();
+class MemoryLooMinisterContextPackStore
+  implements LooMinisterContextPackStore
+{
+  private readonly packs = new Map<string, LooMinisterStoredContextPack>();
+
+  async get(key: string) {
+    return this.getSync(key);
+  }
+
+  getSync(key: string) {
+    return this.packs.get(key) ?? null;
+  }
+
+  async set(pack: LooMinisterStoredContextPack) {
+    this.setSync(pack);
+  }
+
+  setSync(pack: LooMinisterStoredContextPack) {
+    this.packs.set(pack.key, pack);
+  }
+
+  async clear() {
+    this.clearSync();
+  }
+
+  clearSync() {
+    this.packs.clear();
+  }
+
+  async deletePrefix(prefix: string) {
+    this.deletePrefixSync(prefix);
+  }
+
+  deletePrefixSync(prefix: string) {
+    for (const key of this.packs.keys()) {
+      if (key.startsWith(prefix)) {
+        this.packs.delete(key);
+      }
+    }
+  }
+
+  async stats(nowMs = Date.now()) {
+    return this.statsSync(nowMs);
+  }
+
+  statsSync(nowMs = Date.now()) {
+    let fresh = 0;
+    let stale = 0;
+    for (const pack of this.packs.values()) {
+      const expiresAt = Date.parse(pack.expiresAt);
+      if (Number.isFinite(expiresAt) && expiresAt > nowMs) {
+        fresh += 1;
+      } else {
+        stale += 1;
+      }
+    }
+    return {
+      total: this.packs.size,
+      fresh,
+      stale,
+    };
+  }
+}
+
+export function createMemoryLooMinisterContextPackStore() {
+  return new MemoryLooMinisterContextPackStore();
+}
+
+let contextPackStore: LooMinisterContextPackStore =
+  createMemoryLooMinisterContextPackStore();
+
+export function setLooMinisterContextPackStore(
+  store: LooMinisterContextPackStore,
+) {
+  contextPackStore = store;
+}
+
+export function resetLooMinisterContextPackStore() {
+  contextPackStore = createMemoryLooMinisterContextPackStore();
+}
 
 function nowIso(nowMs = Date.now()) {
   return new Date(nowMs).toISOString();
 }
 
 function packFromStored<T>(
-  stored: StoredContextPack,
+  stored: LooMinisterStoredContextPack,
   freshness: LooMinisterContextPackFreshness,
 ): LooMinisterContextPack<T> {
   return {
@@ -54,7 +152,24 @@ function packFromStored<T>(
   };
 }
 
-function storePack<T>(args: {
+function getSyncStoreMethod<TMethod extends keyof LooMinisterContextPackStore>(
+  method: TMethod,
+): NonNullable<LooMinisterContextPackStore[TMethod]> {
+  const handler = contextPackStore[method];
+  if (!handler) {
+    throw new Error(
+      `Loo Minister context pack store does not support ${String(method)}. Use the async cache API for cloud-backed stores.`,
+    );
+  }
+  if (typeof handler === "function") {
+    return handler.bind(contextPackStore) as NonNullable<
+      LooMinisterContextPackStore[TMethod]
+    >;
+  }
+  return handler as NonNullable<LooMinisterContextPackStore[TMethod]>;
+}
+
+function buildStoredPack<T>(args: {
   key: string;
   kind: LooMinisterContextPackKind;
   data: T;
@@ -64,7 +179,7 @@ function storePack<T>(args: {
 }): LooMinisterContextPack<T> {
   const nowMs = args.nowMs ?? Date.now();
   const builtAt = nowIso(nowMs);
-  const stored: StoredContextPack = {
+  const stored: LooMinisterStoredContextPack = {
     key: args.key,
     kind: args.kind,
     data: args.data,
@@ -72,7 +187,6 @@ function storePack<T>(args: {
     builtAt,
     expiresAt: nowIso(nowMs + args.ttlMs),
   };
-  contextPackCache.set(args.key, stored);
   return {
     ...stored,
     data: stored.data as T,
@@ -81,14 +195,50 @@ function storePack<T>(args: {
   };
 }
 
-function cachedPack<T>(key: string, nowMs = Date.now()) {
-  const stored = contextPackCache.get(key);
-  if (!stored) return null;
+async function storePack<T>(args: {
+  key: string;
+  kind: LooMinisterContextPackKind;
+  data: T;
+  ttlMs: number;
+  asOf?: string;
+  nowMs?: number;
+}) {
+  const pack = buildStoredPack(args);
+  await contextPackStore.set(pack);
+  return pack;
+}
+
+function storePackSync<T>(args: {
+  key: string;
+  kind: LooMinisterContextPackKind;
+  data: T;
+  ttlMs: number;
+  asOf?: string;
+  nowMs?: number;
+}) {
+  const pack = buildStoredPack(args);
+  getSyncStoreMethod("setSync")(pack);
+  return pack;
+}
+
+function packFreshness(
+  stored: LooMinisterStoredContextPack,
+  nowMs = Date.now(),
+) {
   const expiresAt = Date.parse(stored.expiresAt);
-  if (Number.isFinite(expiresAt) && expiresAt > nowMs) {
-    return packFromStored<T>(stored, "fresh");
-  }
-  return packFromStored<T>(stored, "stale");
+  return Number.isFinite(expiresAt) && expiresAt > nowMs ? "fresh" : "stale";
+}
+
+async function cachedPack<T>(key: string, nowMs = Date.now()) {
+  const stored = await contextPackStore.get(key);
+  if (!stored) return null;
+  return packFromStored<T>(stored, packFreshness(stored, nowMs));
+}
+
+function cachedPackSync<T>(key: string, nowMs = Date.now()) {
+  const stored = getSyncStoreMethod("getSync")(key);
+  if (!stored) return null;
+  return packFromStored<T>(stored, packFreshness(stored, nowMs));
 }
 
 export function getOrBuildContextPackSync<T>(args: {
@@ -98,13 +248,13 @@ export function getOrBuildContextPackSync<T>(args: {
   asOf?: string;
   build: () => T;
 }): LooMinisterContextPack<T> {
-  const cached = cachedPack<T>(args.key);
+  const cached = cachedPackSync<T>(args.key);
   if (cached?.freshness === "fresh") {
     return cached;
   }
 
   try {
-    return storePack({
+    return storePackSync({
       key: args.key,
       kind: args.kind,
       data: args.build(),
@@ -124,13 +274,13 @@ export async function getOrBuildContextPack<T>(args: {
   asOf?: string;
   build: () => Promise<T> | T;
 }): Promise<LooMinisterContextPack<T>> {
-  const cached = cachedPack<T>(args.key);
+  const cached = await cachedPack<T>(args.key);
   if (cached?.freshness === "fresh") {
     return cached;
   }
 
   try {
-    return storePack({
+    return await storePack({
       key: args.key,
       kind: args.kind,
       data: await args.build(),
@@ -194,31 +344,24 @@ export function chatSubjectPackKey(sessionId: string, updatedAt: string) {
 
 export function clearLooMinisterContextPackCache(prefix?: string) {
   if (!prefix) {
-    contextPackCache.clear();
+    getSyncStoreMethod("clearSync")();
     return;
   }
-  for (const key of contextPackCache.keys()) {
-    if (key.startsWith(prefix)) {
-      contextPackCache.delete(key);
-    }
+  getSyncStoreMethod("deletePrefixSync")(prefix);
+}
+
+export async function clearLooMinisterContextPackCacheAsync(prefix?: string) {
+  if (!prefix) {
+    await contextPackStore.clear();
+    return;
   }
+  await contextPackStore.deletePrefix(prefix);
 }
 
 export function getLooMinisterContextPackCacheStats() {
-  const nowMs = Date.now();
-  let fresh = 0;
-  let stale = 0;
-  for (const pack of contextPackCache.values()) {
-    const expiresAt = Date.parse(pack.expiresAt);
-    if (Number.isFinite(expiresAt) && expiresAt > nowMs) {
-      fresh += 1;
-    } else {
-      stale += 1;
-    }
-  }
-  return {
-    total: contextPackCache.size,
-    fresh,
-    stale,
-  };
+  return getSyncStoreMethod("statsSync")();
+}
+
+export async function getLooMinisterContextPackCacheStatsAsync() {
+  return contextPackStore.stats();
 }
