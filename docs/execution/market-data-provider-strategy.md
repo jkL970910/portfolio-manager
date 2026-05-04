@@ -59,9 +59,24 @@ This is an unofficial provider and has no SLA. The app must cache aggressively, 
 
 ### Alpha Vantage
 
-Keep as an optional fallback path for future autocomplete or lightweight lookup work.
+Use for low-frequency profile metadata only:
 
-It is not the primary recommendation for the app's main runtime data plane.
+- company `OVERVIEW`
+- ETF/fund `ETF_PROFILE`
+- sector / industry / country / asset-type support for security metadata
+
+Do not use it as the primary realtime quote plane. It has strict free-tier
+limits, so profile calls must run through the security-metadata worker with
+allowlists, quota tracking, and cached persistence.
+
+Current behavior:
+
+- common-stock/company-like securities query `OVERVIEW` first
+- ETF/fund-like securities query `ETF_PROFILE` first
+- both paths fall back to the other endpoint if the preferred endpoint has no
+  useful payload
+- provider results can improve low-confidence heuristic metadata, but cannot
+  overwrite manual locks or lower-confidence curated project-registry metadata
 
 ### OpenBB
 
@@ -69,18 +84,18 @@ Do not use OpenBB as the primary runtime data provider for the product UI.
 
 OpenBB is better treated as a future research and agent-facing aggregation layer, not the first external dependency for core product runtime features.
 
-### First real external API after cloud scheduling
+### First live external-information API after cloud scheduling
 
 Do not start with raw news, Reddit/forum, Google-like search, or high-frequency
 realtime quote APIs.
 
 After Neon/Vercel/Cloudflare scheduler is proven, the first real external
-adapter should prefer structured, low-frequency, cacheable data:
+information adapter should prefer structured, low-frequency, cacheable data:
 
-- ETF metadata
-- company/security profile
+- company announcements / filings / earnings-calendar events
 - company fundamentals
 - dividend / distribution profile
+- ETF holdings / distribution profile
 
 These sources are more useful for Recommendation V3 and AI 大臣 context, cheaper
 to cache, and easier to validate than raw news. Raw news/forum/search adapters

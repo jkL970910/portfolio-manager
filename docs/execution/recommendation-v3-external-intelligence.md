@@ -1,6 +1,26 @@
 # Recommendation V3 External Intelligence Plan
 
-Last updated: 2026-05-01
+Last updated: 2026-05-04
+
+## Current Implementation Status
+
+The V3 shape exists, but live external information is not enabled yet.
+
+- Completed: V2.1 Core remains the deterministic baseline; V3 Overlay can read
+  persisted `external_research_documents` and saved analysis runs.
+- Completed: `Loo国今日秘闻` reads cached/persisted intelligence and saved
+  analysis, not live news on page load.
+- Completed: security identity is listing-aware through `security_id`,
+  `symbol + exchange + currency`, and external documents cannot use ticker-only
+  evidence as confirmed listing-level data.
+- Completed: security metadata has provider boundaries, including OpenFIGI for
+  identity/alias support and Alpha Vantage profile for company/ETF metadata.
+- Partial: `portfolio-analyzer.skill` has been productized as a guarded/cached
+  analysis path, but needs more end-to-end QA on real cached data.
+- Not completed: live news/forum/announcement provider adapters remain disabled.
+  The next P0 task is to add one bounded, cache-first, structured provider that
+  writes `external_research_documents` through the worker, not from Flutter
+  page load.
 
 ## Version Naming Decision
 
@@ -78,6 +98,8 @@ Required behavior:
 - Never recommend a security if the user explicitly excluded that exact
   identity.
 - Never treat community sentiment as high-confidence fact.
+- Never use live external data directly in the mobile request path. V3 must
+  consume persisted/cached documents produced by workers.
 
 Initial output model:
 
@@ -106,6 +128,15 @@ Recommended sources:
 - P1: selected financial news API summaries
 - P2: institutional / ETF holding / fundamentals data
 - P2/P3: Reddit/forum/community sentiment as low-confidence color only
+
+Current source policy:
+
+- Active now: persisted external research documents and saved analysis runs.
+- Next P0: one structured external-information adapter, preferably
+  announcements / filings / earnings-calendar / fundamental-event style data.
+- Later: curated financial news APIs.
+- Last: forum/community sentiment, always low-confidence and never treated as
+  fact.
 
 Card behavior:
 
