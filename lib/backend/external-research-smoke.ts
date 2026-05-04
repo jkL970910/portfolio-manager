@@ -9,8 +9,9 @@ export const EXTERNAL_RESEARCH_SMOKE_REQUIRED_FLAGS = [
   "PORTFOLIO_ANALYZER_EXTERNAL_WORKER",
   "PORTFOLIO_ANALYZER_EXTERNAL_PROVIDERS",
   "PORTFOLIO_ANALYZER_EXTERNAL_ADAPTERS",
-  "PORTFOLIO_ANALYZER_EXTERNAL_SOURCE_MARKET_DATA",
 ] as const;
+
+export type ExternalResearchSmokeSource = "market-data" | "profile";
 
 type ExternalResearchSmokeEnv = Record<string, string | undefined>;
 
@@ -20,25 +21,55 @@ export interface ExternalResearchSmokeArgs {
   currency: "CAD" | "USD";
   exchange?: string;
   name?: string;
+  securityId?: string;
+  securityType?: string;
   maxCacheAgeSeconds: number;
+  source?: ExternalResearchSmokeSource;
+}
+
+function getRequiredSourceFlag(source: ExternalResearchSmokeSource) {
+  return source === "profile"
+    ? "PORTFOLIO_ANALYZER_EXTERNAL_SOURCE_PROFILE"
+    : "PORTFOLIO_ANALYZER_EXTERNAL_SOURCE_MARKET_DATA";
+}
+
+function getRequiredSourceSecrets(source: ExternalResearchSmokeSource) {
+  return source === "profile" ? (["ALPHA_VANTAGE_API_KEY"] as const) : [];
 }
 
 export function getMissingExternalResearchSmokeFlags(
   env: ExternalResearchSmokeEnv = process.env,
+  source: ExternalResearchSmokeSource = "market-data",
 ) {
-  return EXTERNAL_RESEARCH_SMOKE_REQUIRED_FLAGS.filter(
-    (flag) => env[flag] !== "enabled",
-  );
+  return [
+    ...EXTERNAL_RESEARCH_SMOKE_REQUIRED_FLAGS,
+    getRequiredSourceFlag(source),
+  ].filter((flag) => env[flag] !== "enabled");
+}
+
+export function getMissingExternalResearchSmokeSecrets(
+  env: ExternalResearchSmokeEnv = process.env,
+  source: ExternalResearchSmokeSource = "market-data",
+) {
+  return getRequiredSourceSecrets(source).filter((secret) => !env[secret]);
 }
 
 export function assertExternalResearchSmokeEnvironment(
   env: ExternalResearchSmokeEnv = process.env,
+  source: ExternalResearchSmokeSource = "market-data",
 ) {
-  const missingFlags = getMissingExternalResearchSmokeFlags(env);
+  const missingFlags = getMissingExternalResearchSmokeFlags(env, source);
+  const missingSecrets = getMissingExternalResearchSmokeSecrets(env, source);
 
   if (missingFlags.length > 0) {
     throw new Error(
       `External research smoke enqueue requires these env flags to be set to "enabled": ${missingFlags.join(", ")}.`,
+    );
+  }
+
+  if (missingSecrets.length > 0) {
+    throw new Error(
+      `External research smoke enqueue requires these secrets to be configured: ${missingSecrets.join(", ")}.`,
     );
   }
 }
@@ -60,6 +91,12 @@ export function buildExternalResearchSmokeRequest(
   if (name) {
     security.name = name;
   }
+  if (args.securityId?.trim()) {
+    security.securityId = args.securityId.trim();
+  }
+  if (args.securityType?.trim()) {
+    security.securityType = args.securityType.trim();
+  }
 
   return {
     scope: "security",
@@ -75,7 +112,10 @@ export async function enqueueExternalResearchSmokeJob(
   args: ExternalResearchSmokeArgs,
   now = new Date(),
 ) {
-  assertExternalResearchSmokeEnvironment();
+  assertExternalResearchSmokeEnvironment(
+    process.env,
+    args.source ?? "market-data",
+  );
 
   return enqueueExternalResearchJob(
     args.userId,

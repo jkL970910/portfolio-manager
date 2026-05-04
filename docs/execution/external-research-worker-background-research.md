@@ -77,6 +77,15 @@ Required env flags for the cached market-data provider:
 - `PORTFOLIO_ANALYZER_EXTERNAL_ADAPTERS=enabled`
 - `PORTFOLIO_ANALYZER_EXTERNAL_SOURCE_MARKET_DATA=enabled`
 
+Required env flags for the Alpha Vantage profile provider:
+
+- `PORTFOLIO_ANALYZER_EXTERNAL_RESEARCH=enabled`
+- `PORTFOLIO_ANALYZER_EXTERNAL_WORKER=enabled`
+- `PORTFOLIO_ANALYZER_EXTERNAL_PROVIDERS=enabled`
+- `PORTFOLIO_ANALYZER_EXTERNAL_ADAPTERS=enabled`
+- `PORTFOLIO_ANALYZER_EXTERNAL_SOURCE_PROFILE=enabled`
+- `ALPHA_VANTAGE_API_KEY=<secret>`
+
 Local smoke flow:
 
 ```bash
@@ -97,6 +106,32 @@ npm run worker:external-research:once
 The smoke job preserves `symbol + exchange + currency` in the analyzer request
 so CAD-listed/hedged variants and US common shares are not tested through
 ticker-only matching.
+
+Profile smoke flow:
+
+```bash
+PORTFOLIO_ANALYZER_EXTERNAL_RESEARCH=enabled \
+PORTFOLIO_ANALYZER_EXTERNAL_WORKER=enabled \
+PORTFOLIO_ANALYZER_EXTERNAL_PROVIDERS=enabled \
+PORTFOLIO_ANALYZER_EXTERNAL_ADAPTERS=enabled \
+PORTFOLIO_ANALYZER_EXTERNAL_SOURCE_PROFILE=enabled \
+npm run worker:external-research:enqueue-smoke -- \
+  --user-id <local-user-id> \
+  --source profile \
+  --symbol RKLB \
+  --exchange NASDAQ \
+  --currency USD \
+  --security-id <security-id> \
+  --security-type "Common Stock"
+
+npm run worker:external-research:once
+```
+
+The smoke helper validates the source-specific allowlist before enqueueing.
+For `--source profile`, it also requires `ALPHA_VANTAGE_API_KEY` so a queued
+job is not created when the profile worker is guaranteed to fail. The helper
+does not call Alpha Vantage directly; the provider call still happens only in
+`npm run worker:external-research:once`.
 
 ## External Option Notes
 
@@ -249,8 +284,11 @@ After the DB ledger exists:
 
 P0 next:
 
-1. Decide whether mobile needs cached-external result detail visibility beyond
+1. QA profile documents end to end with `--source profile`, then confirm
+   `Loo国今日秘闻`, Recommendation V3 overlay, and 大臣 consume the persisted
+   document without page-load live calls.
+2. Decide whether mobile needs cached-external result detail visibility beyond
    the Settings recent-task row.
-2. Add provider result detail visibility if cached-external runs need UI
+3. Add provider result detail visibility if cached-external runs need UI
    drilldown.
-3. Only then evaluate QStash or Cloudflare Queues as the hosted delivery layer.
+4. Only then evaluate QStash or Cloudflare Queues as the hosted delivery layer.

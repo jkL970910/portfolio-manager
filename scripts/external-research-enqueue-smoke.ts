@@ -16,6 +16,9 @@ interface ParsedArgs {
   currency: "CAD" | "USD";
   exchange?: string;
   name?: string;
+  securityId?: string;
+  securityType?: string;
+  source: "market-data" | "profile";
   maxCacheAgeSeconds: number;
 }
 
@@ -29,6 +32,9 @@ Options:
   --currency <CAD|USD>             Trading currency. Default: CAD
   --exchange <exchange>            Listing exchange, for identity separation. Example: TSX
   --name <name>                    Optional display name.
+  --security-id <uuid>             Optional canonical security_id for strict identity matching.
+  --security-type <type>           Optional security type. Example: Common Stock, ETF
+  --source <market-data|profile>   External research source. Default: market-data
   --max-cache-age-seconds <int>    Cache TTL. Default: 21600
   --help                           Show this help.
 
@@ -37,9 +43,10 @@ Required env flags:
   PORTFOLIO_ANALYZER_EXTERNAL_WORKER=enabled
   PORTFOLIO_ANALYZER_EXTERNAL_PROVIDERS=enabled
   PORTFOLIO_ANALYZER_EXTERNAL_ADAPTERS=enabled
-  PORTFOLIO_ANALYZER_EXTERNAL_SOURCE_MARKET_DATA=enabled
+  PORTFOLIO_ANALYZER_EXTERNAL_SOURCE_MARKET_DATA=enabled for --source market-data
+  PORTFOLIO_ANALYZER_EXTERNAL_SOURCE_PROFILE=enabled and ALPHA_VANTAGE_API_KEY for --source profile
 
-This only enqueues a cached market-data job. It does not call external APIs.`);
+This only enqueues a job. External provider calls happen later when you run npm run worker:external-research:once.`);
 }
 
 function readOption(argv: string[], flag: string) {
@@ -78,6 +85,14 @@ function parsePositiveInteger(value: string | undefined, fallback: number) {
   return parsed;
 }
 
+function parseSource(value: string | undefined): "market-data" | "profile" {
+  const normalized = (value ?? "market-data").trim().toLowerCase();
+  if (normalized !== "market-data" && normalized !== "profile") {
+    throw new Error("--source must be market-data or profile.");
+  }
+  return normalized;
+}
+
 function parseArgs(argv: string[]): ParsedArgs {
   const help = argv.includes("--help") || argv.includes("-h");
   return {
@@ -89,6 +104,9 @@ function parseArgs(argv: string[]): ParsedArgs {
     currency: parseCurrency(readOption(argv, "--currency")),
     exchange: readOption(argv, "--exchange"),
     name: readOption(argv, "--name"),
+    securityId: readOption(argv, "--security-id"),
+    securityType: readOption(argv, "--security-type"),
+    source: parseSource(readOption(argv, "--source")),
     maxCacheAgeSeconds: parsePositiveInteger(
       readOption(argv, "--max-cache-age-seconds"),
       21600,
@@ -120,6 +138,9 @@ async function main() {
     currency: parsed.currency,
     exchange: parsed.exchange,
     name: parsed.name,
+    securityId: parsed.securityId,
+    securityType: parsed.securityType,
+    source: parsed.source,
     maxCacheAgeSeconds: parsed.maxCacheAgeSeconds,
   });
 
@@ -127,6 +148,7 @@ async function main() {
     JSON.stringify(
       {
         status: "queued",
+        source: parsed.source,
         job: result.data.job,
         nextCommand: "npm run worker:external-research:once",
       },

@@ -639,9 +639,14 @@ Next analyzer work:
   `portfolio_analysis_runs` and marks the job succeeded.
 - Admin-only smoke enqueue command exists:
   `npm run worker:external-research:enqueue-smoke -- --user-id <uuid>`.
-  It creates a queued cached market-data job for local worker validation, keeps
-  `symbol + exchange + currency` in the request, and does not call external
-  APIs.
+  It creates a queued cached-external job for local worker validation, keeps
+  `security_id + symbol + exchange + currency + security_type` in the request,
+  and does not call external APIs. Use `--source market-data` for local cached
+  market-data evidence and `--source profile` for Alpha Vantage profile
+  evidence.
+- Profile smoke enqueue validates `PORTFOLIO_ANALYZER_EXTERNAL_SOURCE_PROFILE`
+  and `ALPHA_VANTAGE_API_KEY` before creating a job, so local QA does not queue
+  a job that is guaranteed to fail before the worker reaches the provider.
 - Local Postgres smoke validation passed for `VFV + TSX + CAD`: worker created
   a `cached-external` analysis run and did not mix in ticker-only/USD cached
   data when CAD price history was absent.

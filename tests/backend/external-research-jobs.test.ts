@@ -13,6 +13,7 @@ import {
   buildExternalResearchSmokeRequest,
   enqueueExternalResearchSmokeJob,
   getMissingExternalResearchSmokeFlags,
+  getMissingExternalResearchSmokeSecrets,
 } from "@/lib/backend/external-research-smoke";
 import { DEFAULT_EXTERNAL_RESEARCH_POLICY } from "@/lib/backend/portfolio-external-research";
 import { ExternalResearchUsageCounter } from "@/lib/backend/models";
@@ -26,12 +27,23 @@ function enableCachedMarketDataProvider() {
   process.env.PORTFOLIO_ANALYZER_EXTERNAL_SOURCE_MARKET_DATA = "enabled";
 }
 
+function enableProfileProvider() {
+  process.env.PORTFOLIO_ANALYZER_EXTERNAL_RESEARCH = "enabled";
+  process.env.PORTFOLIO_ANALYZER_EXTERNAL_WORKER = "enabled";
+  process.env.PORTFOLIO_ANALYZER_EXTERNAL_PROVIDERS = "enabled";
+  process.env.PORTFOLIO_ANALYZER_EXTERNAL_ADAPTERS = "enabled";
+  process.env.PORTFOLIO_ANALYZER_EXTERNAL_SOURCE_PROFILE = "enabled";
+  process.env.ALPHA_VANTAGE_API_KEY = "test-alpha-vantage-key";
+}
+
 function clearExternalResearchEnv() {
   delete process.env.PORTFOLIO_ANALYZER_EXTERNAL_RESEARCH;
   delete process.env.PORTFOLIO_ANALYZER_EXTERNAL_WORKER;
   delete process.env.PORTFOLIO_ANALYZER_EXTERNAL_PROVIDERS;
   delete process.env.PORTFOLIO_ANALYZER_EXTERNAL_ADAPTERS;
   delete process.env.PORTFOLIO_ANALYZER_EXTERNAL_SOURCE_MARKET_DATA;
+  delete process.env.PORTFOLIO_ANALYZER_EXTERNAL_SOURCE_PROFILE;
+  delete process.env.ALPHA_VANTAGE_API_KEY;
 }
 
 function makeCounter(
@@ -408,6 +420,44 @@ test("external research smoke helper reports missing explicit env flags", () => 
   ]);
 });
 
+test("external research smoke helper supports profile source flags", () => {
+  clearExternalResearchEnv();
+  enableProfileProvider();
+
+  assert.deepEqual(
+    getMissingExternalResearchSmokeFlags(process.env, "profile"),
+    [],
+  );
+  assert.deepEqual(
+    getMissingExternalResearchSmokeSecrets(process.env, "profile"),
+    [],
+  );
+  assert.ok(
+    getMissingExternalResearchSmokeFlags(process.env, "market-data").includes(
+      "PORTFOLIO_ANALYZER_EXTERNAL_SOURCE_MARKET_DATA",
+    ),
+  );
+
+  clearExternalResearchEnv();
+});
+
+test("external research smoke helper requires profile provider secret", () => {
+  clearExternalResearchEnv();
+  enableProfileProvider();
+  delete process.env.ALPHA_VANTAGE_API_KEY;
+
+  assert.deepEqual(
+    getMissingExternalResearchSmokeFlags(process.env, "profile"),
+    [],
+  );
+  assert.deepEqual(
+    getMissingExternalResearchSmokeSecrets(process.env, "profile"),
+    ["ALPHA_VANTAGE_API_KEY"],
+  );
+
+  clearExternalResearchEnv();
+});
+
 test("external research smoke request preserves security identity", () => {
   const request = buildExternalResearchSmokeRequest({
     userId: "user_casey",
@@ -415,6 +465,8 @@ test("external research smoke request preserves security identity", () => {
     currency: "CAD",
     exchange: "tsx",
     name: "Vanguard S&P 500 Index ETF",
+    securityId: "security_vfv_tsx_cad",
+    securityType: "ETF",
     maxCacheAgeSeconds: 21600,
   });
 
@@ -424,6 +476,8 @@ test("external research smoke request preserves security identity", () => {
   assert.equal(request.security?.exchange, "TSX");
   assert.equal(request.security?.currency, "CAD");
   assert.equal(request.security?.name, "Vanguard S&P 500 Index ETF");
+  assert.equal(request.security?.securityId, "security_vfv_tsx_cad");
+  assert.equal(request.security?.securityType, "ETF");
 });
 
 test("external research smoke enqueue creates a queued cached market-data job", async () => {
@@ -452,6 +506,54 @@ test("external research smoke enqueue creates a queued cached market-data job", 
       (source) => source.id === "market-data" && source.enabled === true,
     ),
     true,
+  );
+
+  clearExternalResearchEnv();
+});
+
+test("external research smoke enqueue creates a queued profile job", async () => {
+  enableProfileProvider();
+
+  const result = await enqueueExternalResearchSmokeJob(
+    {
+      userId: "user_casey",
+      symbol: "RKLB",
+      currency: "USD",
+      exchange: "NASDAQ",
+      name: "Rocket Lab USA Inc.",
+      securityId: "security_rklb_nasdaq_usd",
+      securityType: "Common Stock",
+      source: "profile",
+      maxCacheAgeSeconds: 21600,
+    },
+    new Date("2026-04-28T15:00:00.000Z"),
+  );
+
+  const security = result.data.job.request.security as {
+    securityId?: string;
+    securityType?: string;
+    exchange?: string;
+    currency?: string;
+  };
+
+  assert.equal(result.data.job.status, "queued");
+  assert.equal(result.data.job.scope, "security");
+  assert.equal(result.data.job.sourceMode, "cached-external");
+  assert.equal(security.securityId, "security_rklb_nasdaq_usd");
+  assert.equal(security.securityType, "Common Stock");
+  assert.equal(security.exchange, "NASDAQ");
+  assert.equal(security.currency, "USD");
+  assert.equal(
+    result.data.job.sourceAllowlist.some(
+      (source) => source.id === "profile" && source.enabled === true,
+    ),
+    true,
+  );
+  assert.equal(
+    result.data.job.sourceAllowlist.some(
+      (source) => source.id === "market-data" && source.enabled === true,
+    ),
+    false,
   );
 
   clearExternalResearchEnv();
