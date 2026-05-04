@@ -27,6 +27,9 @@ export async function POST(request: NextRequest) {
         request.nextUrl.searchParams.get("maxAgeDays"),
         "SECURITY_METADATA_REFRESH_MAX_AGE_DAYS",
       ),
+      symbols:
+        request.nextUrl.searchParams.get("symbols")?.trim() ||
+        process.env.SECURITY_METADATA_REFRESH_SYMBOLS,
     });
 
     return NextResponse.json(

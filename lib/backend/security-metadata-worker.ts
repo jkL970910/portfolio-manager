@@ -27,10 +27,23 @@ function readMetadataStaleBefore(now: Date, maxAgeDays: number) {
   return new Date(now.getTime() - maxAgeDays * 86_400_000).toISOString();
 }
 
+function normalizeSymbolList(symbols: string[] | string | undefined) {
+  const values = Array.isArray(symbols)
+    ? symbols
+    : symbols
+      ? symbols.split(",")
+      : [];
+  const normalized = values
+    .map((value) => value.trim().toUpperCase())
+    .filter(Boolean);
+  return new Set(normalized);
+}
+
 export async function runSecurityMetadataRefreshWorkerOnce(input?: {
   workerId?: string;
   maxSecurities?: number;
   maxAgeDays?: number;
+  symbols?: string[] | string;
   now?: Date;
 }) {
   const now = input?.now ?? new Date();
@@ -39,6 +52,9 @@ export async function runSecurityMetadataRefreshWorkerOnce(input?: {
   const maxAgeDays = normalizePositiveInteger(input?.maxAgeDays, 30);
   const repositories = getRepositories();
   const providers = getEnabledSecurityMetadataProviders();
+  const symbolAllowlist = normalizeSymbolList(
+    input?.symbols ?? process.env.SECURITY_METADATA_REFRESH_SYMBOLS,
+  );
   let run: SecurityMetadataRefreshRunRow | null = null;
   try {
     if (process.env.DATABASE_URL) {
@@ -57,10 +73,18 @@ export async function runSecurityMetadataRefreshWorkerOnce(input?: {
   } catch {
     run = null;
   }
-  const securities = await repositories.securities.listNeedingMetadataRefresh({
-    limit: maxSecurities,
-    staleBefore: readMetadataStaleBefore(now, maxAgeDays),
-  });
+  const securities = (
+    await repositories.securities.listNeedingMetadataRefresh({
+      limit: symbolAllowlist.size > 0 ? Math.max(maxSecurities, 200) : maxSecurities,
+      staleBefore: readMetadataStaleBefore(now, maxAgeDays),
+    })
+  )
+    .filter(
+      (security) =>
+        symbolAllowlist.size === 0 ||
+        symbolAllowlist.has(security.symbol.trim().toUpperCase()),
+    )
+    .slice(0, maxSecurities);
 
   let updatedCount = 0;
   let skippedCount = 0;
@@ -214,6 +238,7 @@ export async function runSecurityMetadataRefreshWorkerOnce(input?: {
     finishedAt: new Date().toISOString(),
     maxSecurities,
     maxAgeDays,
+    symbols: [...symbolAllowlist],
     sampledSecurityCount: securities.length,
     updatedCount,
     skippedCount,

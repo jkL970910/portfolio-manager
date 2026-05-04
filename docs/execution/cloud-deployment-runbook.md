@@ -197,6 +197,12 @@ Current first provider boundary:
 - It only applies results when ticker and listing identity match. Equivalent MIC
   labels such as `XTSE -> TSX`, `XNAS -> NASDAQ`, and `XNYS -> NYSE` are
   normalized before comparison.
+- The OpenFIGI lookup is listing-aware: the query/cache key includes the current
+  symbol, exchange, and currency instead of ticker alone.
+- For provider QA, restrict the first run with
+  `SECURITY_METADATA_REFRESH_SYMBOLS=CGL.C,ZQQ,XBB,RKLB,VFV` or the worker API
+  query `?symbols=CGL.C,ZQQ,XBB,RKLB,VFV&maxSecurities=5`. Do not enable broad
+  provider refresh until those representative listings pass.
 - It updates economic exposure metadata through the same confidence/manual
   override guard as the project registry.
 - Provider calls are counted in `provider_usage_ledger`; use

@@ -23,6 +23,11 @@ const workerId =
   process.env.SECURITY_METADATA_WORKER_ID ??
   `security-metadata-worker-${process.pid}`;
 
+function readSymbolListEnv(name: string) {
+  const value = process.env[name]?.trim();
+  return value || undefined;
+}
+
 async function main() {
   try {
     const { runSecurityMetadataRefreshWorkerOnce } = await import(
@@ -34,6 +39,7 @@ async function main() {
         "SECURITY_METADATA_REFRESH_MAX_SECURITIES",
       ),
       maxAgeDays: readPositiveIntEnv("SECURITY_METADATA_REFRESH_MAX_AGE_DAYS"),
+      symbols: readSymbolListEnv("SECURITY_METADATA_REFRESH_SYMBOLS"),
     });
     console.log(JSON.stringify(result, null, 2));
   } catch (error) {

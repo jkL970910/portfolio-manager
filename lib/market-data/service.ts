@@ -134,23 +134,35 @@ export async function searchSecurities(
 
 export async function resolveSecurity(
   symbol: string,
+  options?: SecurityQuoteOptions,
 ): Promise<{
   result: SecurityResolution;
   providerHealth: ReturnType<typeof getProviderHealth>;
 }> {
   const trimmed = symbol.trim().toUpperCase();
+  const normalizedExchange = options?.exchange?.trim().toUpperCase() || null;
+  const normalizedCurrency = options?.currency?.trim().toUpperCase() || null;
   if (!trimmed) {
     throw new Error("Security symbol is required.");
   }
 
   const { resolveCacheTtlSeconds } = getMarketDataConfig();
   const openFigiResult = await getOrSetCached(
-    `market-data:resolve:${trimmed}`,
+    [
+      "market-data:resolve",
+      trimmed,
+      normalizedExchange ?? "any-exchange",
+      normalizedCurrency ?? "any-currency",
+    ].join(":"),
     {
       ttlMs: resolveCacheTtlSeconds * 1000,
       staleOnErrorMs: resolveCacheTtlSeconds * 1000,
     },
-    async () => resolveSecurityWithOpenFigi(trimmed),
+    async () =>
+      resolveSecurityWithOpenFigi(trimmed, {
+        exchange: normalizedExchange,
+        currency: normalizedCurrency,
+      }),
   );
 
   if (openFigiResult) {

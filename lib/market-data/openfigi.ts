@@ -12,11 +12,20 @@ interface OpenFigiSearchItem {
   marketSector?: string;
 }
 
-export async function resolveSecurityWithOpenFigi(symbol: string): Promise<SecurityResolution | null> {
+export async function resolveSecurityWithOpenFigi(
+  symbol: string,
+  options?: {
+    exchange?: string | null;
+    currency?: string | null;
+  },
+): Promise<SecurityResolution | null> {
   const { openFigiApiKey } = getMarketDataConfig();
   if (!openFigiApiKey) {
     return null;
   }
+  const normalizedSymbol = symbol.trim().toUpperCase();
+  const normalizedExchange = options?.exchange?.trim().toUpperCase() || null;
+  const normalizedCurrency = options?.currency?.trim().toUpperCase() || null;
 
   const response = await fetch("https://api.openfigi.com/v3/search", {
     method: "POST",
@@ -24,7 +33,14 @@ export async function resolveSecurityWithOpenFigi(symbol: string): Promise<Secur
       "Content-Type": "application/json",
       "X-OPENFIGI-APIKEY": openFigiApiKey
     },
-    body: JSON.stringify({ query: symbol, limit: 5 }),
+    body: JSON.stringify({
+      query: [
+        normalizedSymbol,
+        normalizedExchange,
+        normalizedCurrency,
+      ].filter(Boolean).join(" "),
+      limit: 10
+    }),
     cache: "no-store"
   });
 
@@ -33,7 +49,21 @@ export async function resolveSecurityWithOpenFigi(symbol: string): Promise<Secur
   }
 
   const payload = (await response.json()) as { data?: OpenFigiSearchItem[] };
-  const match = payload.data?.find((item) => item.ticker?.toUpperCase() === symbol.toUpperCase()) ?? payload.data?.[0];
+  const exactTickerMatches = payload.data?.filter(
+    (item) => item.ticker?.toUpperCase() === normalizedSymbol,
+  ) ?? [];
+  const match =
+    exactTickerMatches.find((item) => {
+      const exchange = item.exchCode?.trim().toUpperCase() || "";
+      const micCode = item.micCode?.trim().toUpperCase() || "";
+      return (
+        !normalizedExchange ||
+        exchange === normalizedExchange ||
+        micCode === normalizedExchange
+      );
+    }) ??
+    exactTickerMatches[0] ??
+    payload.data?.[0];
 
   if (!match?.ticker) {
     return null;

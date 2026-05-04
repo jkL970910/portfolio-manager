@@ -102,7 +102,10 @@ export const openFigiProfileSecurityMetadataProvider: SecurityMetadataProvider =
   },
   async fetch(security) {
     const { resolveSecurity } = await import("@/lib/market-data/service");
-    const resolved = await resolveSecurity(security.symbol);
+    const resolved = await resolveSecurity(security.symbol, {
+      exchange: security.canonicalExchange,
+      currency: security.currency,
+    });
     if (!providerResultMatchesListing(security, resolved.result)) {
       return null;
     }

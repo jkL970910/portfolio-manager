@@ -254,7 +254,11 @@ Guardrails:
   boundary. `npm run worker:security-metadata:once` refreshes known securities
   through enabled providers; `/api/workers/security-metadata/run` exposes the
   same cloud-protected endpoint using `PORTFOLIO_WORKER_SECRET`. The only
-  enabled provider by default is the project registry; future FMP/Twelve
+  enabled provider by default is the project registry. The OpenFIGI profile
+  provider is listing-aware and cache-keyed by symbol, exchange, and currency;
+  P0.1 provider QA should run through
+  `SECURITY_METADATA_REFRESH_SYMBOLS=CGL.C,ZQQ,XBB,RKLB,VFV` or the equivalent
+  worker API `symbols` query before broad enablement. Future FMP/Twelve
   Data/ETF-profile adapters must use the same contract and must not run on page
   load.
 - Cached market-data external research now writes a structured
