@@ -199,15 +199,25 @@ Current first provider boundary:
   normalized before comparison.
 - The OpenFIGI lookup is listing-aware: the query/cache key includes the current
   symbol, exchange, and currency instead of ticker alone.
+- `alpha-vantage-profile` is implemented as the first economic profile provider.
+  It is disabled by default and only runs when
+  `SECURITY_METADATA_PROVIDER_ENABLED=true`,
+  `ALPHA_VANTAGE_PROFILE_PROVIDER_ENABLED=true`, and `ALPHA_VANTAGE_API_KEY`
+  are present. It reads Alpha Vantage `ETF_PROFILE` / `OVERVIEW` for asset
+  class, sector, and region metadata; it is not used for page-load calls.
 - For provider QA, restrict the first run with
-  `SECURITY_METADATA_REFRESH_SYMBOLS=CGL.C,ZQQ,XBB,RKLB,VFV` or the worker API
-  query `?symbols=CGL.C,ZQQ,XBB,RKLB,VFV&maxSecurities=5`. Do not enable broad
-  provider refresh until those representative listings pass.
+  exact listing identities such as
+  `SECURITY_METADATA_REFRESH_SYMBOLS=CGL.C:TSX:CAD,ZQQ:TSX:CAD,XBB:TSX:CAD,RKLB:NASDAQ:USD,VFV:TSX:CAD`
+  or the worker API query
+  `?symbols=CGL.C:TSX:CAD,ZQQ:TSX:CAD,XBB:TSX:CAD,RKLB:NASDAQ:USD,VFV:TSX:CAD&maxSecurities=5&force=true`.
+  Do not enable broad provider refresh until those representative listings pass.
 - It updates economic exposure metadata through the same confidence/manual
-  override guard as the project registry.
+  override guard as the project registry. Manual locks are never overwritten,
+  and lower-confidence provider results do not replace curated project-registry
+  classifications.
 - Provider calls are counted in `provider_usage_ledger`; use
-  `OPENFIGI_DAILY_QUOTA_LIMIT` to show a conservative daily quota in mobile
-  Settings.
+  `OPENFIGI_DAILY_QUOTA_LIMIT` and `ALPHA_VANTAGE_DAILY_QUOTA_LIMIT` to show
+  conservative daily quotas in mobile Settings.
 
 Preferred first provider data:
 

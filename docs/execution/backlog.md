@@ -255,10 +255,14 @@ Guardrails:
   through enabled providers; `/api/workers/security-metadata/run` exposes the
   same cloud-protected endpoint using `PORTFOLIO_WORKER_SECRET`. The only
   enabled provider by default is the project registry. The OpenFIGI profile
-  provider is listing-aware and cache-keyed by symbol, exchange, and currency;
-  P0.1 provider QA should run through
-  `SECURITY_METADATA_REFRESH_SYMBOLS=CGL.C,ZQQ,XBB,RKLB,VFV` or the equivalent
-  worker API `symbols` query before broad enablement. Future FMP/Twelve
+  provider is listing-aware and cache-keyed by symbol, exchange, and currency.
+  The Alpha Vantage profile provider is now the first economic metadata adapter
+  for `ETF_PROFILE` / `OVERVIEW`, behind
+  `ALPHA_VANTAGE_PROFILE_PROVIDER_ENABLED=true`. P0 provider QA should run
+  through exact identities such as
+  `SECURITY_METADATA_REFRESH_SYMBOLS=RKLB:NASDAQ:USD,CGL.C:TSX:CAD` with
+  `SECURITY_METADATA_REFRESH_FORCE=true` or the equivalent worker API
+  `symbols` + `force=true` query before broad enablement. Future FMP/Twelve
   Data/ETF-profile adapters must use the same contract and must not run on page
   load.
 - Cached market-data external research now writes a structured

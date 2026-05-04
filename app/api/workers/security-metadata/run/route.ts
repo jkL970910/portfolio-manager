@@ -30,6 +30,9 @@ export async function POST(request: NextRequest) {
       symbols:
         request.nextUrl.searchParams.get("symbols")?.trim() ||
         process.env.SECURITY_METADATA_REFRESH_SYMBOLS,
+      force:
+        request.nextUrl.searchParams.get("force")?.trim().toLowerCase() ===
+        "true",
     });
 
     return NextResponse.json(

@@ -28,6 +28,10 @@ function readSymbolListEnv(name: string) {
   return value || undefined;
 }
 
+function readBooleanEnv(name: string) {
+  return process.env[name]?.trim().toLowerCase() === "true";
+}
+
 async function main() {
   try {
     const { runSecurityMetadataRefreshWorkerOnce } = await import(
@@ -40,6 +44,7 @@ async function main() {
       ),
       maxAgeDays: readPositiveIntEnv("SECURITY_METADATA_REFRESH_MAX_AGE_DAYS"),
       symbols: readSymbolListEnv("SECURITY_METADATA_REFRESH_SYMBOLS"),
+      force: readBooleanEnv("SECURITY_METADATA_REFRESH_FORCE"),
     });
     console.log(JSON.stringify(result, null, 2));
   } catch (error) {

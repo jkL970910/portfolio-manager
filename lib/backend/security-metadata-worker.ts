@@ -27,16 +27,89 @@ function readMetadataStaleBefore(now: Date, maxAgeDays: number) {
   return new Date(now.getTime() - maxAgeDays * 86_400_000).toISOString();
 }
 
-function normalizeSymbolList(symbols: string[] | string | undefined) {
+type SecurityMetadataRefreshFilter = {
+  symbol: string;
+  exchange: string | null;
+  currency: string | null;
+};
+
+function normalizeIdentityValue(value: string): SecurityMetadataRefreshFilter | null {
+  const parts = value
+    .trim()
+    .split(":")
+    .map((part) => part.trim().toUpperCase())
+    .filter(Boolean);
+  if (parts.length === 0) {
+    return null;
+  }
+  return {
+    symbol: parts[0],
+    exchange: parts[1] ?? null,
+    currency: parts[2] ?? null,
+  };
+}
+
+function normalizeIdentityList(symbols: string[] | string | undefined) {
   const values = Array.isArray(symbols)
     ? symbols
     : symbols
       ? symbols.split(",")
       : [];
-  const normalized = values
-    .map((value) => value.trim().toUpperCase())
-    .filter(Boolean);
-  return new Set(normalized);
+  return values
+    .map(normalizeIdentityValue)
+    .filter((item): item is SecurityMetadataRefreshFilter => Boolean(item));
+}
+
+function normalizeIdentityPart(value: string | null | undefined) {
+  return value?.trim().toUpperCase() ?? "";
+}
+
+function matchesRefreshFilter(
+  security: {
+    symbol: string;
+    canonicalExchange: string;
+    micCode?: string | null;
+    currency: string;
+  },
+  filter: SecurityMetadataRefreshFilter,
+) {
+  if (normalizeIdentityPart(security.symbol) !== filter.symbol) {
+    return false;
+  }
+  if (filter.currency && normalizeIdentityPart(security.currency) !== filter.currency) {
+    return false;
+  }
+  if (!filter.exchange) {
+    return true;
+  }
+  return (
+    normalizeIdentityPart(security.canonicalExchange) === filter.exchange ||
+    normalizeIdentityPart(security.micCode) === filter.exchange
+  );
+}
+
+function matchesAnyRefreshFilter(
+  security: Parameters<typeof matchesRefreshFilter>[0],
+  filters: SecurityMetadataRefreshFilter[],
+) {
+  return (
+    filters.length === 0 ||
+    filters.some((filter) => matchesRefreshFilter(security, filter))
+  );
+}
+
+function providerRequestQuotaLimit(providerId: string) {
+  if (providerId === "openfigi-profile") {
+    return Number(process.env.OPENFIGI_DAILY_QUOTA_LIMIT ?? 25);
+  }
+  if (providerId === "alpha-vantage-profile") {
+    return Number(process.env.ALPHA_VANTAGE_DAILY_QUOTA_LIMIT ?? 25);
+  }
+  return null;
+}
+
+function providerRequestCount(providerId: string) {
+  return providerId === "project-registry" ? 0 : 1;
 }
 
 export async function runSecurityMetadataRefreshWorkerOnce(input?: {
@@ -44,15 +117,17 @@ export async function runSecurityMetadataRefreshWorkerOnce(input?: {
   maxSecurities?: number;
   maxAgeDays?: number;
   symbols?: string[] | string;
+  force?: boolean;
   now?: Date;
 }) {
   const now = input?.now ?? new Date();
   const workerId = input?.workerId ?? `security-metadata-worker-${process.pid}`;
   const maxSecurities = normalizePositiveInteger(input?.maxSecurities, 100);
   const maxAgeDays = normalizePositiveInteger(input?.maxAgeDays, 30);
+  const force = input?.force ?? false;
   const repositories = getRepositories();
   const providers = getEnabledSecurityMetadataProviders();
-  const symbolAllowlist = normalizeSymbolList(
+  const refreshFilters = normalizeIdentityList(
     input?.symbols ?? process.env.SECURITY_METADATA_REFRESH_SYMBOLS,
   );
   let run: SecurityMetadataRefreshRunRow | null = null;
@@ -75,14 +150,15 @@ export async function runSecurityMetadataRefreshWorkerOnce(input?: {
   }
   const securities = (
     await repositories.securities.listNeedingMetadataRefresh({
-      limit: symbolAllowlist.size > 0 ? Math.max(maxSecurities, 200) : maxSecurities,
-      staleBefore: readMetadataStaleBefore(now, maxAgeDays),
+      limit: refreshFilters.length > 0 ? Math.max(maxSecurities, 500) : maxSecurities,
+      staleBefore: force
+        ? new Date(now.getTime() + 86_400_000).toISOString()
+        : readMetadataStaleBefore(now, maxAgeDays),
     })
   )
     .filter(
       (security) =>
-        symbolAllowlist.size === 0 ||
-        symbolAllowlist.has(security.symbol.trim().toUpperCase()),
+        matchesAnyRefreshFilter(security, refreshFilters),
     )
     .slice(0, maxSecurities);
 
@@ -112,13 +188,10 @@ export async function runSecurityMetadataRefreshWorkerOnce(input?: {
             await incrementProviderUsage({
               provider: provider.id,
               endpoint: "security-metadata",
-              requestCount: provider.id === "project-registry" ? 0 : 1,
+              requestCount: providerRequestCount(provider.id),
               successCount: result ? 1 : 0,
               skippedCount: result ? 0 : 1,
-              quotaLimit:
-                provider.id === "openfigi-profile"
-                  ? Number(process.env.OPENFIGI_DAILY_QUOTA_LIMIT ?? 25)
-                  : null,
+              quotaLimit: providerRequestQuotaLimit(provider.id),
               metadata: {
                 workerId,
                 securityId: security.id,
@@ -132,12 +205,9 @@ export async function runSecurityMetadataRefreshWorkerOnce(input?: {
             await incrementProviderUsage({
               provider: provider.id,
               endpoint: "security-metadata",
-              requestCount: provider.id === "project-registry" ? 0 : 1,
+              requestCount: providerRequestCount(provider.id),
               failureCount: 1,
-              quotaLimit:
-                provider.id === "openfigi-profile"
-                  ? Number(process.env.OPENFIGI_DAILY_QUOTA_LIMIT ?? 25)
-                  : null,
+              quotaLimit: providerRequestQuotaLimit(provider.id),
               metadata: {
                 workerId,
                 securityId: security.id,
@@ -238,7 +308,10 @@ export async function runSecurityMetadataRefreshWorkerOnce(input?: {
     finishedAt: new Date().toISOString(),
     maxSecurities,
     maxAgeDays,
-    symbols: [...symbolAllowlist],
+    force,
+    symbols: refreshFilters.map((filter) =>
+      [filter.symbol, filter.exchange, filter.currency].filter(Boolean).join(":"),
+    ),
     sampledSecurityCount: securities.length,
     updatedCount,
     skippedCount,

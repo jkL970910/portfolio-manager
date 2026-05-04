@@ -1,7 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { mockRepositories } from "@/lib/backend/repositories/mock-repositories";
-import { shouldApplySecurityMetadata } from "@/lib/backend/security-metadata-providers";
+import {
+  buildAlphaVantageProfileMetadata,
+  shouldApplySecurityMetadata,
+} from "@/lib/backend/security-metadata-providers";
 import { runSecurityMetadataRefreshWorkerOnce } from "@/lib/backend/security-metadata-worker";
 import { resolveCanonicalSecurityIdentity } from "@/lib/market-data/security-identity";
 
@@ -100,6 +103,71 @@ test("security metadata worker can restrict QA refresh to an explicit symbol lis
   assert.equal(updated?.metadataSource, "project-registry");
 });
 
+test("security metadata worker can restrict QA refresh to an exact listing identity", async () => {
+  const symbol = `QAID${Date.now()}`;
+  const cadSecurity = await resolveCanonicalSecurityIdentity({
+    symbol,
+    exchange: "TSX",
+    currency: "CAD",
+    name: "QA Identity CAD Gold ETF",
+    securityType: "Commodity ETF",
+  });
+  const usdSecurity = await resolveCanonicalSecurityIdentity({
+    symbol,
+    exchange: "NASDAQ",
+    currency: "USD",
+    name: "QA Identity USD Gold ETF",
+    securityType: "Commodity ETF",
+  });
+
+  const result = await runSecurityMetadataRefreshWorkerOnce({
+    workerId: "test-security-metadata-worker",
+    maxSecurities: 50,
+    maxAgeDays: 1,
+    symbols: [`${symbol}:TSX:CAD`],
+    now: new Date("2026-05-03T12:00:00.000Z"),
+  });
+
+  assert.equal(result.sampledSecurityCount, 1);
+  assert.ok(
+    result.items.some((item) => item.securityId === cadSecurity.id),
+    "exact CAD listing should be sampled",
+  );
+  assert.ok(
+    result.items.every((item) => item.securityId !== usdSecurity.id),
+    "same ticker on a different listing should not be sampled",
+  );
+});
+
+test("alpha vantage overview maps company sector and region metadata", () => {
+  const metadata = buildAlphaVantageProfileMetadata({
+    security: {
+      symbol: "RKLB",
+      name: "Rocket Lab USA Inc",
+      currency: "USD",
+      securityType: "Common Stock",
+      economicAssetClass: null,
+    },
+    kind: "company-overview",
+    candidateSymbol: "RKLB",
+    payload: {
+      Symbol: "RKLB",
+      Name: "Rocket Lab USA Inc",
+      AssetType: "Common Stock",
+      Country: "USA",
+      Currency: "USD",
+      Sector: "Industrials",
+      Industry: "Aerospace & Defense",
+    },
+  });
+
+  assert.equal(metadata.source, "provider");
+  assert.equal(metadata.economicAssetClass, "US Equity");
+  assert.equal(metadata.economicSector, "Industrials");
+  assert.equal(metadata.exposureRegion, "United States");
+  assert.ok(metadata.confidence >= 70);
+});
+
 test("metadata application guard preserves manual confirmation", () => {
   assert.equal(
     shouldApplySecurityMetadata(
@@ -114,6 +182,29 @@ test("metadata application guard preserves manual confirmation", () => {
         exposureRegion: "United States",
         source: "provider",
         confidence: 95,
+        asOf: "2026-05-03T00:00:00.000Z",
+        confirmedAt: null,
+        notes: "Provider profile.",
+      },
+    ),
+    false,
+  );
+});
+
+test("metadata application guard preserves project registry against lower-confidence provider", () => {
+  assert.equal(
+    shouldApplySecurityMetadata(
+      {
+        metadataSource: "project-registry",
+        metadataConfidence: 82,
+        metadataConfirmedAt: null,
+      },
+      {
+        economicAssetClass: "Canadian Equity",
+        economicSector: null,
+        exposureRegion: "Canada",
+        source: "provider",
+        confidence: 76,
         asOf: "2026-05-03T00:00:00.000Z",
         confirmedAt: null,
         notes: "Provider profile.",
