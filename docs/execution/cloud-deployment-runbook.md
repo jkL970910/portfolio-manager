@@ -254,6 +254,15 @@ Keep `PORTFOLIO_ANALYZER_EXTERNAL_SOURCE_NEWS` and
 `PORTFOLIO_ANALYZER_EXTERNAL_SOURCE_COMMUNITY` disabled until queue, quality
 scoring, and cost controls are mature.
 
+Local smoke result:
+
+- `RKLB:NASDAQ:USD` profile smoke passed locally on 2026-05-03 and persisted
+  an `alpha-vantage-profile` institutional document plus a cached-external
+  analysis run.
+- `XBB:TSX:CAD` profile smoke failed safely because Alpha Vantage did not return
+  a usable ETF profile payload. Treat this as provider coverage evidence before
+  relying on Alpha Vantage for Canadian ETF profile data.
+
 ## QA Checklist
 
 - Login from mobile URL.

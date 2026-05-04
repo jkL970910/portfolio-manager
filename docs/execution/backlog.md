@@ -284,6 +284,14 @@ Guardrails:
   `PORTFOLIO_ANALYZER_EXTERNAL_SOURCE_PROFILE=enabled` and the external
   research worker/provider guards are enabled. It is a structured profile
   source, not a raw news source, and must not run from Flutter page load.
+- Real local profile smoke passed for `RKLB:NASDAQ:USD` on 2026-05-03:
+  the worker wrote an `alpha-vantage-profile` institutional document and a
+  cached-external analysis run, both keyed by
+  `a9e31252-abfb-47b8-bee4-a641197cfe9e`. `Loo国今日秘闻` can read the document
+  and shows RKLB as `INDUSTRIALS / AEROSPACE & DEFENSE`, not Canadian equity.
+  Real local profile smoke for `XBB:TSX:CAD` failed safely because Alpha
+  Vantage did not return a usable ETF profile payload; this is a provider
+  coverage gap, not a ticker identity fallback.
 - Loo国大臣 prompts now carry fact source tags and explicitly prefer
   `analysis-cache` / `external-intelligence` facts when present.
 - `0016_preference_factors` adds the first Preference Factors V2 storage
