@@ -175,6 +175,122 @@ function buildCachedMarketDataDocument(args: {
   };
 }
 
+function stringField(payload: Record<string, unknown>, key: string) {
+  const value = payload[key];
+  return typeof value === "string" && value.trim() ? value.trim() : null;
+}
+
+function getSecurityName(input: ExternalResearchProviderInput) {
+  return input.request.security?.name?.trim() || input.request.security?.symbol || "标的";
+}
+
+function normalizeIsoDate(value: string | null, fallback: string) {
+  if (!value) {
+    return fallback;
+  }
+  const parsed = Date.parse(value);
+  if (!Number.isFinite(parsed)) {
+    return fallback;
+  }
+  return new Date(parsed).toISOString();
+}
+
+function buildAlphaVantageProfileDocument(args: {
+  input: ExternalResearchProviderInput;
+  candidateSymbol: string;
+  kind: "company-overview" | "etf-profile";
+  payload: Record<string, unknown>;
+}): ExternalResearchDocument {
+  const requestSecurity = args.input.request.security;
+  const ttlSeconds = Math.max(
+    args.input.request.maxCacheAgeSeconds ??
+      getExternalResearchPolicy().defaultTtlSeconds,
+    getExternalResearchPolicy().minTtlSeconds,
+  );
+  const symbol = normalizeNullable(requestSecurity?.symbol) ?? args.candidateSymbol;
+  const name =
+    stringField(args.payload, "Name") ??
+    stringField(args.payload, "name") ??
+    getSecurityName(args.input);
+  const sector = stringField(args.payload, "Sector");
+  const industry = stringField(args.payload, "Industry");
+  const country = stringField(args.payload, "Country");
+  const assetType = stringField(args.payload, "AssetType");
+  const description = stringField(args.payload, "Description");
+  const expenseRatio = stringField(args.payload, "net_expense_ratio");
+  const dividendYield =
+    stringField(args.payload, "DividendYield") ??
+    stringField(args.payload, "dividend_yield");
+  const keyPoints = [
+    assetType ? `资产类型：${assetType}` : null,
+    sector ? `行业板块：${sector}` : null,
+    industry ? `细分行业：${industry}` : null,
+    country ? `地区：${country}` : null,
+    expenseRatio ? `费用率：${expenseRatio}` : null,
+    dividendYield ? `分红/收益率：${dividendYield}` : null,
+    description ? `资料摘要：${description.slice(0, 160)}` : null,
+  ].filter((item): item is string => Boolean(item));
+  const riskFlags = [
+    args.kind === "etf-profile"
+      ? "ETF_PROFILE 只提供基金资料快照，不代表实时买卖建议。"
+      : "OVERVIEW 只提供公司基本资料快照，不代表实时买卖建议。",
+    "该资料需要结合持仓、目标配置、估值和风险偏好一起判断。",
+  ];
+  const publishedAt = normalizeIsoDate(
+    stringField(args.payload, "LatestQuarter"),
+    args.input.now.toISOString(),
+  );
+
+  return {
+    id: [
+      "alpha-vantage-profile",
+      requestSecurity?.securityId ?? symbol,
+      requestSecurity?.exchange ?? "unknown-exchange",
+      requestSecurity?.currency ?? "unknown-currency",
+      args.kind,
+      args.input.now.toISOString().slice(0, 10),
+    ].join(":"),
+    userId: args.input.userId,
+    sourceType: "institutional",
+    providerId: "alpha-vantage-profile",
+    sourceName: "Alpha Vantage 标的资料",
+    title: `${name} 基本资料快照`,
+    summary:
+      keyPoints.slice(0, 4).join("；") ||
+      `${symbol} 的结构化标的资料已缓存。`,
+    url: null,
+    publishedAt,
+    capturedAt: args.input.now.toISOString(),
+    expiresAt: addSeconds(args.input.now, ttlSeconds).toISOString(),
+    language: "zh",
+    security: {
+      securityId: requestSecurity?.securityId ?? null,
+      symbol,
+      exchange: normalizeNullable(requestSecurity?.exchange),
+      currency:
+        requestSecurity?.currency === "CAD" || requestSecurity?.currency === "USD"
+          ? requestSecurity.currency
+          : null,
+      name,
+      provider: "alpha-vantage-profile",
+      securityType: assetType,
+    },
+    underlyingId: null,
+    confidence: keyPoints.length >= 3 ? "high" : "medium",
+    sentiment: "neutral",
+    relevanceScore: keyPoints.length >= 3 ? 78 : 62,
+    sourceReliability: 76,
+    keyPoints: keyPoints.slice(0, 8),
+    riskFlags,
+    tags: [
+      "profile",
+      "alpha-vantage",
+      args.kind,
+      requestSecurity?.exchange ? "listing-identity" : "partial-identity",
+    ],
+  };
+}
+
 export const cachedMarketDataResearchProvider: ExternalResearchProvider = {
   id: "market-data",
   sourceType: "market-data",
@@ -309,6 +425,83 @@ export const cachedMarketDataResearchProvider: ExternalResearchProvider = {
   },
 };
 
+export const alphaVantageProfileResearchProvider: ExternalResearchProvider = {
+  id: "profile",
+  sourceType: "institutional",
+  enabled(policy) {
+    return (
+      policy.liveProvidersEnabled &&
+      policy.adaptersImplemented &&
+      Boolean(process.env.ALPHA_VANTAGE_API_KEY?.trim()) &&
+      process.env.PORTFOLIO_ANALYZER_EXTERNAL_SOURCE_PROFILE === "enabled" &&
+      policy.allowedSources.some(
+        (source) => source.id === "profile" && source.enabled,
+      )
+    );
+  },
+  async fetch(input) {
+    if (!isSourceAllowed(input, "profile")) {
+      throw new ExternalResearchProviderDisabledError(
+        "Profile external research source is not allowed for this job.",
+      );
+    }
+
+    const security = input.request.security;
+    const symbol = normalizeNullable(security?.symbol);
+    if (!symbol) {
+      throw new ExternalResearchProviderDisabledError(
+        "Profile external research requires a security symbol.",
+      );
+    }
+
+    const { getAlphaVantageProfile } = await import(
+      "@/lib/market-data/alpha-vantage"
+    );
+    const profile = await getAlphaVantageProfile(
+      symbol,
+      security?.exchange,
+      security?.currency,
+      {
+        preferredKind:
+          security?.securityType?.toLowerCase().includes("etf") ||
+          security?.securityType?.toLowerCase().includes("fund")
+            ? "etf-profile"
+            : "company-overview",
+      },
+    );
+    if (!profile) {
+      throw new ExternalResearchProviderDisabledError(
+        "No Alpha Vantage profile payload was available for this security.",
+      );
+    }
+
+    const document = buildAlphaVantageProfileDocument({
+      input,
+      candidateSymbol: profile.candidateSymbol,
+      kind: profile.kind,
+      payload: profile.payload,
+    });
+
+    return {
+      sourceMode: "cached-external",
+      externalResearchAsOf: input.now.toISOString(),
+      targetKey: input.targetKey,
+      security,
+      summaryPoints: document.keyPoints.slice(0, 6),
+      risks: document.riskFlags.slice(0, 6),
+      sources: [
+        {
+          title: document.title,
+          date: document.publishedAt?.slice(0, 10),
+          sourceType: "institutional",
+          providerId: "profile",
+        },
+      ],
+      documents: [document],
+    };
+  },
+};
+
 export const disabledMarketDataResearchProvider: ExternalResearchProvider = {
   id: "market-data",
   sourceType: "market-data",
@@ -323,7 +516,7 @@ export const disabledMarketDataResearchProvider: ExternalResearchProvider = {
 };
 
 export function getExternalResearchProviders() {
-  return [cachedMarketDataResearchProvider];
+  return [alphaVantageProfileResearchProvider, cachedMarketDataResearchProvider];
 }
 
 export function getEnabledExternalResearchProviders(

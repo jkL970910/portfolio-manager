@@ -547,7 +547,7 @@ export async function runExternalResearchWorkerOnce(args: {
       workerId: args.workerId,
       job: succeededJob,
       message:
-        "External research job completed from cached market-data provider.",
+        "External research job completed from an enabled cached provider.",
     };
   } catch (error) {
     if (error instanceof ExternalResearchProviderDisabledError) {

@@ -17,7 +17,7 @@ export interface ExternalResearchPolicy {
 }
 
 export interface ExternalResearchSource {
-  id: "market-data" | "institutional" | "news" | "community";
+  id: "market-data" | "profile" | "institutional" | "news" | "community";
   label: string;
   enabled: boolean;
   reason: string;
@@ -59,6 +59,12 @@ export const DEFAULT_EXTERNAL_RESEARCH_POLICY: ExternalResearchPolicy = {
       reason: "等待 worker 缓存层接入，避免手机端直接触发实时请求。",
     },
     {
+      id: "profile",
+      label: "标的基本资料",
+      enabled: false,
+      reason: "等待结构化 profile provider、TTL 和额度策略确认。",
+    },
+    {
       id: "institutional",
       label: "机构资料",
       enabled: false,
@@ -82,6 +88,7 @@ export const DEFAULT_EXTERNAL_RESEARCH_POLICY: ExternalResearchPolicy = {
 export function getExternalResearchPolicy(): ExternalResearchPolicy {
   const sourceEnv: Record<ExternalResearchSource["id"], string | undefined> = {
     "market-data": process.env.PORTFOLIO_ANALYZER_EXTERNAL_SOURCE_MARKET_DATA,
+    profile: process.env.PORTFOLIO_ANALYZER_EXTERNAL_SOURCE_PROFILE,
     institutional: process.env.PORTFOLIO_ANALYZER_EXTERNAL_SOURCE_INSTITUTIONAL,
     news: process.env.PORTFOLIO_ANALYZER_EXTERNAL_SOURCE_NEWS,
     community: process.env.PORTFOLIO_ANALYZER_EXTERNAL_SOURCE_COMMUNITY,

@@ -365,7 +365,7 @@ test("external research worker can persist cached market-data results when expli
   assert.equal(result.job?.id, job.id);
   assert.equal(result.job?.status, "succeeded");
   assert.ok(result.job?.resultRunId);
-  assert.match(result.message, /cached market-data provider/);
+  assert.match(result.message, /enabled cached provider/);
 
   const documents =
     await mockRepositories.externalResearchDocuments.listFreshByUserId(

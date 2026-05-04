@@ -19,6 +19,8 @@ function clearExternalResearchEnv() {
   delete process.env.PORTFOLIO_ANALYZER_EXTERNAL_PROVIDERS;
   delete process.env.PORTFOLIO_ANALYZER_EXTERNAL_ADAPTERS;
   delete process.env.PORTFOLIO_ANALYZER_EXTERNAL_SOURCE_MARKET_DATA;
+  delete process.env.PORTFOLIO_ANALYZER_EXTERNAL_SOURCE_PROFILE;
+  delete process.env.ALPHA_VANTAGE_API_KEY;
 }
 
 test("external research is disabled unless explicitly enabled", () => {
@@ -152,6 +154,26 @@ test("cached market-data provider keeps exchange and currency identity separate"
       point.includes("securityId=未指定, symbol=VFV, exchange=NASDAQ, currency=USD"),
     ),
   );
+
+  clearExternalResearchEnv();
+});
+
+test("profile provider is disabled unless source and api key are configured", () => {
+  process.env.PORTFOLIO_ANALYZER_EXTERNAL_RESEARCH = "enabled";
+  process.env.PORTFOLIO_ANALYZER_EXTERNAL_WORKER = "enabled";
+  process.env.PORTFOLIO_ANALYZER_EXTERNAL_PROVIDERS = "enabled";
+  process.env.PORTFOLIO_ANALYZER_EXTERNAL_ADAPTERS = "enabled";
+  process.env.PORTFOLIO_ANALYZER_EXTERNAL_SOURCE_PROFILE = "enabled";
+  delete process.env.ALPHA_VANTAGE_API_KEY;
+
+  const policy = getExternalResearchPolicy();
+  assert.equal(
+    getEnabledExternalResearchSources(policy).some(
+      (source) => source.id === "profile",
+    ),
+    true,
+  );
+  assert.equal(getEnabledExternalResearchProviders(policy).length, 0);
 
   clearExternalResearchEnv();
 });

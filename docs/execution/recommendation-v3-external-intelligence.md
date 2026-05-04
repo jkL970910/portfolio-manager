@@ -15,12 +15,15 @@ The V3 shape exists, but live external information is not enabled yet.
   evidence as confirmed listing-level data.
 - Completed: security metadata has provider boundaries, including OpenFIGI for
   identity/alias support and Alpha Vantage profile for company/ETF metadata.
+- Completed: the external-research worker can persist Alpha Vantage company/ETF
+  profile snapshots into `external_research_documents` when the `profile`
+  source is explicitly enabled.
 - Partial: `portfolio-analyzer.skill` has been productized as a guarded/cached
   analysis path, but needs more end-to-end QA on real cached data.
 - Not completed: live news/forum/announcement provider adapters remain disabled.
-  The next P0 task is to add one bounded, cache-first, structured provider that
-  writes `external_research_documents` through the worker, not from Flutter
-  page load.
+  The next P0 task is to QA the profile adapter end-to-end, then add one
+  bounded announcement/filing/earnings-calendar style provider. Both must write
+  `external_research_documents` through the worker, not from Flutter page load.
 
 ## Version Naming Decision
 
@@ -131,9 +134,10 @@ Recommended sources:
 
 Current source policy:
 
-- Active now: persisted external research documents and saved analysis runs.
-- Next P0: one structured external-information adapter, preferably
-  announcements / filings / earnings-calendar / fundamental-event style data.
+- Active now: persisted external research documents, saved analysis runs, cached
+  market-data documents, and opt-in Alpha Vantage profile documents.
+- Next P0: one structured announcement / filing / earnings-calendar /
+  fundamental-event style adapter.
 - Later: curated financial news APIs.
 - Last: forum/community sentiment, always low-confidence and never treated as
   fact.

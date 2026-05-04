@@ -227,6 +227,33 @@ Preferred first provider data:
 
 Do not start with raw news/forum/search feeds.
 
+### External Research Profile Adapter
+
+The first live external-information adapter is intentionally still structured
+and low-frequency:
+
+- Source id: `profile`
+- Provider: Alpha Vantage profile data
+- Endpoints used: `OVERVIEW` for company/common-stock style securities and
+  `ETF_PROFILE` for ETF/fund-like securities
+- Output: persisted `external_research_documents`
+- Runtime boundary: external-research worker only; never Flutter page load
+
+Required env for profile research QA:
+
+```env
+PORTFOLIO_ANALYZER_EXTERNAL_RESEARCH=enabled
+PORTFOLIO_ANALYZER_EXTERNAL_WORKER=enabled
+PORTFOLIO_ANALYZER_EXTERNAL_PROVIDERS=enabled
+PORTFOLIO_ANALYZER_EXTERNAL_ADAPTERS=enabled
+PORTFOLIO_ANALYZER_EXTERNAL_SOURCE_PROFILE=enabled
+ALPHA_VANTAGE_API_KEY=...
+```
+
+Keep `PORTFOLIO_ANALYZER_EXTERNAL_SOURCE_NEWS` and
+`PORTFOLIO_ANALYZER_EXTERNAL_SOURCE_COMMUNITY` disabled until queue, quality
+scoring, and cost controls are mature.
+
 ## QA Checklist
 
 - Login from mobile URL.
