@@ -182,6 +182,71 @@ test("recommendation V3 overlay uses persisted document evidence scores", () => 
   );
 });
 
+test("recommendation V3 overlay consumes profile document evidence", () => {
+  const profileBrief: RecommendationsData["intelligenceBriefs"][number] = {
+    ...brief("doc_rklb_profile", "RKLB", "NASDAQ", "USD", "sec_rklb_us"),
+    title: "Rocket Lab USA Inc. 基本资料快照",
+    detail: "资产类型：Common Stock；行业板块：Technology；地区：USA。",
+    sourceLabel: "缓存机构资料",
+    sourceMode: "cached-external",
+    freshnessLabel: "来源 2026-03-31 · 可信度高 · 高相关",
+    generatedAt: new Date().toISOString(),
+    symbols: ["RKLB", "NASDAQ", "USD"],
+    identity: {
+      securityId: "sec_rklb_us",
+      symbol: "RKLB",
+      exchange: "NASDAQ",
+      currency: "USD",
+    },
+    sources: [
+      {
+        title: "Alpha Vantage 标的资料",
+        sourceType: "institutional",
+        date: "2026-03-31",
+      },
+    ],
+    confidence: "high",
+    relevanceScore: 78,
+    sourceReliability: 76,
+    riskFlags: ["OVERVIEW 只提供公司基本资料快照，不代表实时买卖建议。"],
+  };
+  const candidate = priority({
+    security: "RKLB - Rocket Lab USA Inc.",
+    securityId: "sec_rklb_us",
+    securitySymbol: "RKLB",
+    securityExchange: "NASDAQ",
+    securityCurrency: "USD",
+    tickers: "RKLB",
+    v3Overlay: {
+      baselineScore: 70,
+      externalInsightScore: null,
+      preferenceFitScore: 84,
+      finalScore: 72,
+      confidenceLabel: "V2.1 规则评分，等待缓存外部情报校准",
+      sourceMode: "local",
+      signals: ["偏好科技成长暴露"],
+      riskFlags: [],
+      explanation: "base",
+    },
+  });
+
+  const refs = mapRecommendationIntelligenceRefs(candidate, [profileBrief]);
+  const overlay = buildRecommendationV3Overlay(candidate, refs, [profileBrief]);
+
+  assert.equal(refs.length, 1);
+  assert.equal(refs[0]?.id, "doc_rklb_profile");
+  assert.equal(refs[0]?.scope, "listing");
+  assert.ok(overlay);
+  assert.equal(overlay.sourceMode, "cached-external");
+  assert.ok(overlay.externalInsightScore !== null);
+  assert.ok(
+    overlay.signals.some((signal) => signal.includes("当前 listing")),
+  );
+  assert.ok(
+    overlay.riskFlags.some((flag) => flag.includes("不代表实时买卖建议")),
+  );
+});
+
 test("recommendation V3 overlay keeps metadata uncertainty visible before live intelligence", () => {
   const candidate = priority({
     v3Overlay: {

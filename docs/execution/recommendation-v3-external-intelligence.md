@@ -4,7 +4,7 @@ Last updated: 2026-05-04
 
 ## Current Implementation Status
 
-The V3 shape exists, but live external information is not enabled yet.
+The V3 shape exists, but raw live news/forum information is not enabled yet.
 
 - Completed: V2.1 Core remains the deterministic baseline; V3 Overlay can read
   persisted `external_research_documents` and saved analysis runs.
@@ -18,12 +18,17 @@ The V3 shape exists, but live external information is not enabled yet.
 - Completed: the external-research worker can persist Alpha Vantage company/ETF
   profile snapshots into `external_research_documents` when the `profile`
   source is explicitly enabled.
+- Completed: automated tests cover the profile document consumption chain:
+  `external_research_documents` -> `Loo国今日秘闻` -> Recommendation V3 overlay
+  -> AI 大臣 `external-intelligence` facts. The chain remains cache-backed and
+  does not call providers from Flutter page load.
 - Partial: `portfolio-analyzer.skill` has been productized as a guarded/cached
-  analysis path, but needs more end-to-end QA on real cached data.
+  analysis path, but still needs real local/cloud smoke on profile documents.
 - Not completed: live news/forum/announcement provider adapters remain disabled.
-  The next P0 task is to QA the profile adapter end-to-end, then add one
-  bounded announcement/filing/earnings-calendar style provider. Both must write
-  `external_research_documents` through the worker, not from Flutter page load.
+  The next P0 task is to run profile smoke on representative real candidates,
+  then add one bounded announcement/filing/earnings-calendar style provider.
+  Both must write `external_research_documents` through the worker, not from
+  Flutter page load.
 
 ## Version Naming Decision
 
@@ -479,6 +484,10 @@ P0.5:
 7. Complete: AI 大臣 backend prompt/context enrichment consumes the standalone
    `今日秘闻` feed as `external-intelligence` facts without triggering live
    research.
+8. Complete for profile document consumption: Alpha Vantage profile documents
+   map to institutional `今日秘闻` cards, Recommendation V3 can score them as
+   cached external evidence, and 大臣 can cite matching profile intelligence by
+   complete `security_id` / `symbol + exchange + currency`.
 
 P1:
 

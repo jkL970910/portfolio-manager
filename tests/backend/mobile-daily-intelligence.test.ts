@@ -58,6 +58,66 @@ test("daily intelligence maps persisted research documents into mobile-safe card
   assert.equal(brief.sourceReliability, 82);
 });
 
+test("daily intelligence maps profile documents into institutional cards", async () => {
+  const now = new Date("2026-05-03T18:00:00.000Z");
+  const document = await mockRepositories.externalResearchDocuments.create({
+    userId: "daily_intel_profile_user",
+    providerDocumentId: "alpha-vantage-profile:RKLB:NASDAQ:USD",
+    sourceType: "institutional",
+    providerId: "alpha-vantage-profile",
+    sourceName: "Alpha Vantage 标的资料",
+    title: "Rocket Lab USA Inc. 基本资料快照",
+    summary: "资产类型：Common Stock；行业板块：Technology；地区：USA。",
+    url: null,
+    publishedAt: "2026-03-31T00:00:00.000Z",
+    capturedAt: now.toISOString(),
+    expiresAt: "2099-05-04T18:00:00.000Z",
+    language: "zh",
+    security: {
+      securityId: "sec_rklb_us",
+      symbol: "RKLB",
+      exchange: "NASDAQ",
+      currency: "USD",
+      name: "Rocket Lab USA Inc.",
+      provider: "alpha-vantage-profile",
+      securityType: "Common Stock",
+    },
+    underlyingId: null,
+    confidence: "high",
+    sentiment: "neutral",
+    relevanceScore: 78,
+    sourceReliability: 76,
+    keyPoints: [
+      "资产类型：Common Stock",
+      "行业板块：Technology",
+      "地区：USA",
+    ],
+    riskFlags: ["OVERVIEW 只提供公司基本资料快照，不代表实时买卖建议。"],
+    tags: ["profile", "alpha-vantage", "company-overview"],
+    rawPayload: {},
+  });
+
+  const item = mapExternalResearchDocumentForDailyIntelligence(document);
+
+  assert.equal(item.sourceLabel, "缓存机构资料");
+  assert.equal(item.identity.securityId, "sec_rklb_us");
+  assert.equal(item.identity.symbol, "RKLB");
+  assert.equal(item.identity.exchange, "NASDAQ");
+  assert.equal(item.identity.currency, "USD");
+  assert.ok(item.reason.includes("RKLB · NASDAQ · USD"));
+  assert.equal(item.sources[0]?.title, "Alpha Vantage 标的资料");
+  assert.equal(item.sources[0]?.sourceType, "institutional");
+
+  const brief = mapDailyIntelligenceItemToRecommendationBrief(item);
+  assert.equal(brief.identity.securityId, "sec_rklb_us");
+  assert.equal(brief.sourceLabel, "缓存机构资料");
+  assert.equal(brief.confidence, "high");
+  assert.equal(brief.sourceReliability, 76);
+  assert.ok(
+    brief.sources.some((source) => source.sourceType === "institutional"),
+  );
+});
+
 test("daily intelligence endpoint combines documents and saved analysis without live fetch", async () => {
   const now = new Date("2026-04-30T16:00:00.000Z");
   await mockRepositories.externalResearchDocuments.create({

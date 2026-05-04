@@ -299,6 +299,112 @@ test("Loo Minister enriches answers with cached daily intelligence", async () =>
   );
 });
 
+test("Loo Minister enriches answers with cached profile intelligence", async () => {
+  await mockRepositories.externalResearchDocuments.create({
+    userId: "minister_profile_user",
+    providerDocumentId: "alpha-vantage-profile:rklb",
+    sourceType: "institutional",
+    providerId: "alpha-vantage-profile",
+    sourceName: "Alpha Vantage 标的资料",
+    title: "Rocket Lab USA Inc. 基本资料快照",
+    summary: "资产类型：Common Stock；行业板块：Technology；地区：USA。",
+    url: null,
+    publishedAt: "2026-03-31T00:00:00.000Z",
+    capturedAt: now,
+    expiresAt: "2099-05-01T04:00:00.000Z",
+    language: "zh",
+    security: {
+      securityId: "sec_rklb_us",
+      symbol: "RKLB",
+      exchange: "NASDAQ",
+      currency: "USD",
+      name: "Rocket Lab USA Inc.",
+      provider: "alpha-vantage-profile",
+      securityType: "Common Stock",
+    },
+    underlyingId: null,
+    confidence: "high",
+    sentiment: "neutral",
+    relevanceScore: 78,
+    sourceReliability: 76,
+    keyPoints: [
+      "资产类型：Common Stock",
+      "行业板块：Technology",
+      "地区：USA",
+    ],
+    riskFlags: ["OVERVIEW 只提供公司基本资料快照，不代表实时买卖建议。"],
+    tags: ["profile", "alpha-vantage", "company-overview"],
+    rawPayload: {},
+  });
+
+  const response = await getLooMinisterAnswer(
+    "minister_profile_user",
+    {
+      pageContext: {
+        version: LOO_MINISTER_VERSION,
+        page: "security-detail",
+        locale: "zh",
+        title: "RKLB 标的详情",
+        asOf: now,
+        displayCurrency: "CAD",
+        subject: {
+          security: {
+            securityId: "sec_rklb_us",
+            symbol: "RKLB",
+            exchange: "NASDAQ",
+            currency: "USD",
+          },
+        },
+        dataFreshness: {
+          portfolioAsOf: now,
+          quotesAsOf: now,
+          fxAsOf: now,
+          chartFreshness: "fresh",
+          sourceMode: "cached-external",
+        },
+        facts: [
+          {
+            id: "security",
+            label: "标的身份",
+            value: "RKLB · NASDAQ · USD",
+            source: "portfolio-data",
+          },
+        ],
+        warnings: [],
+        allowedActions: [],
+      },
+      question: "这个标的是什么类型，风险是什么？",
+      answerStyle: "beginner",
+      cacheStrategy: "prefer-cache",
+      includeExternalResearch: false,
+    },
+    {
+      settings: {
+        mode: "local",
+        provider: "official-openai",
+        model: "gpt-5.5",
+        reasoningEffort: "medium",
+        endpoint: "https://api.openai.com/v1/responses",
+        apiKey: null,
+        apiKeySource: "none",
+        providerEnabled: false,
+      },
+      persistUsage: false,
+    },
+  );
+
+  assert.match(response.data.answer, /Rocket Lab USA Inc\. 基本资料快照/);
+  assert.match(response.data.answer, /Technology/);
+  assert.ok(
+    response.data.sources.some(
+      (source) => source.sourceType === "external-intelligence",
+    ),
+  );
+  assert.ok(
+    response.data.keyPoints.some((point) => point.includes("今日秘闻")),
+  );
+});
+
 test("Loo Minister answers candidate buy-fit questions without treating zero holding as no analysis", async () => {
   const response = await getLooMinisterAnswer(
     "user_casey",
