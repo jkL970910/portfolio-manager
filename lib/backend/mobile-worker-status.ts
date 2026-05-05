@@ -78,26 +78,54 @@ function mapSecurityMetadataRun(
   };
 }
 
-function metadataSourceLabel(source: string) {
+export function metadataSourceLabel(source: string) {
   switch (source) {
     case "manual":
-      return "人工确认";
+      return "已人工确认";
     case "provider":
-      return "外部资料";
+      return "机构资料";
     case "project-registry":
-      return "项目规则";
+      return "系统识别";
     case "heuristic":
-      return "系统推断";
+      return "资料待确认";
     default:
-      return "来源未知";
+      return "资料待确认";
   }
 }
 
-function metadataConfidenceLabel(confidence: number) {
+export function metadataConfidenceLabel(confidence: number) {
   if (confidence >= 90) return "高可信";
-  if (confidence >= 70) return "可用";
-  if (confidence >= 50) return "待复核";
-  return "低可信";
+  if (confidence >= 70) return "较可信";
+  if (confidence >= 50) return "资料需复核";
+  return "资料待确认";
+}
+
+function metadataStatusLabel(input: {
+  source: string;
+  confidence: number;
+  confirmed: boolean;
+}) {
+  if (input.confirmed) return "已人工确认";
+  if (input.confidence >= 70) {
+    return `${metadataSourceLabel(input.source)} · ${metadataConfidenceLabel(input.confidence)}`;
+  }
+  if (input.confidence >= 50) return "资料需复核";
+  return "资料待确认";
+}
+
+function sanitizeMetadataNotes(notes: string | null | undefined) {
+  const value = notes?.trim() ?? "";
+  if (!value) return "";
+  if (
+    value.includes("unsupported exchange/currency identity") ||
+    value.includes("Data quality cleanup")
+  ) {
+    return "这条标的记录当前不在支持范围内，系统不会把它当作已确认资料。";
+  }
+  if (value === "Heuristic fallback.") {
+    return "系统暂时只能识别基础资料，建议等待机构资料补全或人工确认。";
+  }
+  return value;
 }
 
 function needsMetadataReview(item: ReturnType<typeof mapSecurityMetadataForMobile>) {
@@ -157,12 +185,10 @@ function mapSecurityMetadataForMobile(
     metadataConfirmedAtLabel: security.metadataConfirmedAt
       ? formatMetadataDate(security.metadataConfirmedAt)
       : null,
-    metadataNotes: security.metadataNotes ?? "",
+    metadataNotes: sanitizeMetadataNotes(security.metadataNotes),
     holdingCount,
     locked: confirmed,
-    statusLabel: confirmed
-      ? "已确认分类口径"
-      : `${metadataSourceLabel(source)} · ${metadataConfidenceLabel(confidence)}`,
+    statusLabel: metadataStatusLabel({ source, confidence, confirmed }),
   };
 }
 
@@ -254,10 +280,10 @@ export async function getMobileSecurityMetadataReview(userId: string) {
         title: "高级：标的资料可信度",
         statusLabel:
           reviewItems.length > 0
-            ? `${reviewItems.length} 个标的资料建议复核；普通页面仍会使用当前最佳分类。`
+            ? `${reviewItems.length} 个标的资料建议复核；普通页面仍会使用当前最佳资料。`
             : "当前持仓标的资料可信，无需手动处理。",
         actionLabel:
-          "这是数据质量兜底工具；只有发现分类异常时才需要人工锁定。",
+          "只有发现资产类别、行业或地区明显异常时，才需要手动确认。",
         totalCount: items.length,
         manualCount,
         lowConfidenceCount,

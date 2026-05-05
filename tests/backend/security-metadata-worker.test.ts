@@ -2,6 +2,10 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { mockRepositories } from "@/lib/backend/repositories/mock-repositories";
 import {
+  metadataConfidenceLabel,
+  metadataSourceLabel,
+} from "@/lib/backend/mobile-worker-status";
+import {
   buildAlphaVantageProfileMetadata,
   shouldApplySecurityMetadata,
 } from "@/lib/backend/security-metadata-providers";
@@ -163,6 +167,17 @@ test("security metadata worker skips unsupported exchange identities", async () 
   assert.equal(result.updatedCount, 0);
   assert.equal(updated?.metadataSource, "heuristic");
   assert.equal(updated?.metadataConfidence, 45);
+});
+
+test("mobile metadata labels avoid provider/debug terminology", () => {
+  assert.equal(metadataSourceLabel("heuristic"), "资料待确认");
+  assert.equal(metadataSourceLabel("project-registry"), "系统识别");
+  assert.equal(metadataSourceLabel("provider"), "机构资料");
+  assert.equal(metadataSourceLabel("manual"), "已人工确认");
+  assert.equal(metadataConfidenceLabel(45), "资料待确认");
+  assert.equal(metadataConfidenceLabel(55), "资料需复核");
+  assert.equal(metadataConfidenceLabel(75), "较可信");
+  assert.equal(metadataConfidenceLabel(95), "高可信");
 });
 
 test("alpha vantage overview maps company sector and region metadata", () => {

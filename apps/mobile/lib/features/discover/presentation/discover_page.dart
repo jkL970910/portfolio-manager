@@ -513,16 +513,16 @@ String? _formatProviderStatus(Object? providerHealth) {
     return null;
   }
 
-  final twelve = providerHealth["twelveDataConfigured"] == true;
-  final openFigi = providerHealth["openFigiConfigured"] == true;
-  final active = [
-    if (twelve) "Twelve Data",
-    if (openFigi) "OpenFIGI",
-  ];
+  final searchReady = providerHealth["twelveDataConfigured"] == true;
+  final identityReady = providerHealth["openFigiConfigured"] == true;
 
-  return active.isEmpty
-      ? "当前没有配置标的搜索来源。"
-      : "搜索来源：${active.join("、")}；报价和走势图会使用独立行情来源。";
+  if (!searchReady && !identityReady) {
+    return "搜索服务暂未完全启用；可以稍后再试。";
+  }
+  if (!searchReady) {
+    return "当前可识别部分已知标的；完整搜索服务暂未启用。";
+  }
+  return "搜索范围：当前只展示加拿大/美国 CAD/USD 标的；系统会隐藏暂不支持的交易所。";
 }
 
 String _formatSearchStatus(int supportedCount, Object? metadata) {

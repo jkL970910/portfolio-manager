@@ -520,7 +520,7 @@ class SecurityMetadataItem {
       economicAssetClass,
       if (economicSector.isNotEmpty) economicSector,
       if (exposureRegion.isNotEmpty) exposureRegion,
-      "$metadataSourceLabel $metadataConfidence 分",
+      statusLabel,
     ].join(" · ");
   }
 
@@ -536,7 +536,7 @@ class SecurityMetadataItem {
       economicSector: json["economicSector"] as String? ?? "",
       exposureRegion: json["exposureRegion"] as String? ?? "",
       metadataSource: json["metadataSource"] as String? ?? "heuristic",
-      metadataSourceLabel: json["metadataSourceLabel"] as String? ?? "系统推断",
+      metadataSourceLabel: json["metadataSourceLabel"] as String? ?? "资料待确认",
       metadataConfidence: json["metadataConfidence"] as int? ?? 45,
       metadataConfidenceLabel:
           json["metadataConfidenceLabel"] as String? ?? "待复核",

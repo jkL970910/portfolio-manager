@@ -215,7 +215,9 @@ Guardrails:
   high-confidence holdings stay hidden unless the user taps `查看全部`. Manual
   confirmation writes source `manual`, confidence `100`, and `confirmed_at`, so
   later registry/provider refreshes do not overwrite user-confirmed
-  classification.
+  classification. The mobile surface must use user-facing labels such as
+  `资料待确认`, `资料需复核`, `系统识别`, `机构资料`, and `已人工确认`; raw source names
+  (`heuristic`, `provider`) and naked confidence scores should stay internal.
 - External consultation cached market-data now filters price history by
   `symbol + exchange + currency`, not ticker alone.
 - AI 标的/组合/账户快扫 now consumes cached quote lineage, security price

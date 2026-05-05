@@ -791,12 +791,14 @@ class _SecurityMetadataReviewCardState
                             dense: true,
                             leading: CircleAvatar(
                               backgroundColor: _confidenceColor(context, item),
-                              child: Text(
-                                item.metadataConfidence.toString(),
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 12,
-                                ),
+                              child: Icon(
+                                item.locked
+                                    ? Icons.verified_outlined
+                                    : item.metadataConfidence >= 70
+                                        ? Icons.check_outlined
+                                        : Icons.priority_high_outlined,
+                                color: Colors.white,
+                                size: 18,
                               ),
                             ),
                             title: Text(item.identityLabel),
@@ -804,7 +806,8 @@ class _SecurityMetadataReviewCardState
                               [
                                 item.name,
                                 item.detailLabel,
-                                item.statusLabel,
+                                if (item.metadataNotes.isNotEmpty)
+                                  item.metadataNotes,
                               ].join("\n"),
                             ),
                             isThreeLine: true,
