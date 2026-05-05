@@ -400,6 +400,61 @@ test("security analyzer quick scan shows conclusions instead of identity check w
   );
 });
 
+test("security analyzer quick scan evaluates unheld candidates with portfolio target context", () => {
+  const result = buildSecurityAnalyzerQuickScan({
+    identity: {
+      securityId: "security_tsm_us",
+      symbol: "TSM",
+      exchange: "NYSE",
+      currency: "USD",
+      name: "Taiwan Semiconductor Manufacturing Company",
+      securityType: "Common Stock",
+    },
+    accounts,
+    holdings,
+    profile: makeProfile(),
+    marketData: {
+      priceHistory: [
+        {
+          id: "history_tsm_us",
+          securityId: "security_tsm_us",
+          symbol: "TSM",
+          exchange: "NYSE",
+          priceDate: "2026-04-27",
+          close: 180,
+          adjustedClose: 180,
+          currency: "USD",
+          source: "provider",
+          provider: "twelve-data",
+          sourceMode: "cached-external",
+          freshness: "fresh",
+          refreshRunId: "run_tsm",
+          isReference: false,
+          fallbackReason: null,
+          createdAt: generatedAt,
+        },
+      ],
+    },
+    generatedAt,
+  });
+
+  const targetFit = result.scorecards.find((card) => card.id === "target-fit");
+  assert.equal(targetFit?.score, 72);
+  assert.match(targetFit?.rationale ?? "", /未持有候选标的/);
+  assert.match(targetFit?.rationale ?? "", /US Equity/);
+  assert.match(targetFit?.rationale ?? "", /目标约 60%/);
+  assert.doesNotMatch(targetFit?.rationale ?? "", /没有足够.*持仓上下文/);
+  assert.match(result.summary.thesis, /候选买入标的/);
+  assert.ok(
+    result.portfolioFit.some((item) =>
+      item.includes("当前 0% 只代表尚未持有，不代表无法分析"),
+    ),
+  );
+  assert.ok(
+    result.actionItems.some((item) => item.title === "核对目标配置"),
+  );
+});
+
 test("security analyzer quick scan asks for identity repair only when listing fields are missing", () => {
   const result = buildSecurityAnalyzerQuickScan({
     identity: {

@@ -15,7 +15,10 @@ import {
   PortfolioAnalyzerResult,
   portfolioAnalyzerResultSchema
 } from "@/lib/backend/portfolio-analyzer-contracts";
-import { getHoldingEconomicAssetClass } from "@/lib/backend/security-economic-exposure";
+import {
+  getHoldingEconomicAssetClass,
+  inferEconomicAssetClass,
+} from "@/lib/backend/security-economic-exposure";
 
 function round(value: number, digits = 0) {
   const factor = 10 ** digits;
@@ -84,6 +87,20 @@ function buildEconomicExposureNote(args: {
   }
 
   return `交易身份仍保留 ${listing}，但配置/目标适配按底层经济暴露 ${args.economicAssetClass} 评估，而不是按 ${args.holding.assetClass} 或交易币种简单归类。`;
+}
+
+function buildCandidateEconomicExposureNote(args: {
+  identity: AnalyzerSecurityIdentity;
+  economicAssetClass: string;
+}) {
+  const listing = [
+    args.identity.symbol,
+    args.identity.exchange,
+    args.identity.currency,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+  return `这是候选标的口径：交易身份保留 ${listing}，组合适配按底层经济暴露 ${args.economicAssetClass} 评估；当前 0% 只代表尚未持有，不代表无法分析。`;
 }
 
 function hasCompleteAnalyzerIdentity(identity: AnalyzerSecurityIdentity) {
@@ -367,10 +384,15 @@ export function buildSecurityAnalyzerQuickScan(args: {
   const referenceHolding = matchingHoldings[0] ?? args.holdings.find((holding) => holding.symbol.trim().toUpperCase() === normalizedSymbol);
   const economicAssetClass = referenceHolding
     ? getHoldingEconomicAssetClass(referenceHolding)
-    : null;
-  const targetPct = referenceHolding
-    ? args.profile.targetAllocation.find((target) => target.assetClass === economicAssetClass)?.targetPct ?? 0
-    : 0;
+    : inferEconomicAssetClass({
+        symbol: normalizedSymbol,
+        name: args.identity.name,
+        securityType: args.identity.securityType,
+        currency: args.identity.currency,
+        exchange: args.identity.exchange,
+      });
+  const targetPct =
+    args.profile.targetAllocation.find((target) => target.assetClass === economicAssetClass)?.targetPct ?? 0;
   const accountTypes = [...new Set(matchingHoldings
     .map((holding) => getHoldingAccount(holding, args.accounts)?.type)
     .filter((type): type is AccountType => Boolean(type)))];
@@ -409,9 +431,9 @@ export function buildSecurityAnalyzerQuickScan(args: {
       title: `${normalizedSymbol} AI 快速分析`,
       thesis: matchingHoldings.length > 0
         ? `${normalizedSymbol} 当前在组合中约占 ${round(heldWeightPct, 1)}%，本轮基于本地组合、账户、偏好、缓存报价和价格历史分析。`
-        : `${normalizedSymbol} 当前没有匹配到真实持仓，本轮只保留标的身份并等待后续接入候选/外部研究。`,
+        : `${normalizedSymbol} 当前还未持有，本轮按候选买入标的处理：结合完整交易身份、用户偏好目标、组合现有暴露、缓存行情和价格历史分析。`,
       confidence:
-        matchingHoldings.length > 0 && marketData.priceHistoryPointCount > 0
+        marketData.priceHistoryPointCount > 0
           ? "medium"
           : "low"
     },
@@ -433,12 +455,14 @@ export function buildSecurityAnalyzerQuickScan(args: {
       {
         id: "target-fit",
         label: "目标配置适配",
-        score: referenceHolding && targetPct > 0 ? 72 : 45,
+        score: targetPct > 0 ? 72 : 45,
         rationale: referenceHolding
           ? economicAssetClass === referenceHolding.assetClass
             ? `它按 ${economicAssetClass} 评估，该资产类别目标约 ${targetPct}%。`
             : `它交易身份是 ${referenceHolding.exchangeOverride ?? "未知交易所"} / ${referenceHolding.currency ?? "未知币种"}，但底层经济暴露按 ${economicAssetClass} 评估；该资产类别目标约 ${targetPct}%。`
-          : "还没有足够的本地持仓上下文判断目标配置。"
+          : targetPct > 0
+            ? `这是未持有候选标的，当前组合权重为 0%；按 ${economicAssetClass} 暴露评估，该资产类别目标约 ${targetPct}%。`
+            : `这是未持有候选标的，当前组合权重为 0%；暂未找到 ${economicAssetClass} 的目标配置，需要先补齐偏好设置。`
       }
     ],
     risks: [
@@ -469,10 +493,13 @@ export function buildSecurityAnalyzerQuickScan(args: {
             economicAssetClass,
             identity,
           })
-        : "当前没有足够持仓上下文判断底层经济暴露。",
+        : buildCandidateEconomicExposureNote({
+            identity,
+            economicAssetClass,
+          }),
       accountTypes.length > 0
         ? `当前匹配持仓分布在 ${accountTypes.join(" / ")}。`
-        : "当前没有匹配到账户内真实持仓。",
+        : "当前没有匹配到账户内真实持仓；如要买入，应结合账户属性、税务口径和现金安排选择落点。",
       marketData.quoteSourceSummary
         ? `行情来源：${marketData.quoteSourceSummary}。`
         : "行情来源：当前没有可审计 provider，只能低置信使用本地字段。",
@@ -497,7 +524,7 @@ export function buildSecurityAnalyzerQuickScan(args: {
             },
           ]
         : []),
-      ...(referenceHolding && economicAssetClass && targetPct > 0
+      ...(economicAssetClass && targetPct > 0
         ? [
             {
               priority: "P1" as const,
