@@ -83,3 +83,25 @@ test("market data search infers CAD/USD for identity providers without currency"
     ["AAPL:NASDAQ:USD", "AAPL:NEO:CAD"],
   );
 });
+
+test("market data search rejects explicit unsupported exchange identities", () => {
+  const results = filterSupportedSearchResults([
+    candidate("RKLB", {
+      currency: "CAD",
+      exchange: "BCBA",
+      micCode: "XBUE",
+      provider: "openfigi",
+    }),
+    candidate("DEV", {
+      currency: "USD",
+      exchange: "NASDAQ",
+      micCode: "XNAS",
+      provider: "openfigi",
+    }),
+  ]);
+
+  assert.deepEqual(
+    results.map((result) => `${result.symbol}:${result.exchange}:${result.currency}`),
+    ["DEV:NASDAQ:USD"],
+  );
+});

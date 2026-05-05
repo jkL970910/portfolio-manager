@@ -191,6 +191,9 @@ export async function resolveCanonicalSecurityIdentity(
     assetClass: null,
     securityType: input.securityType,
     currency,
+    exchange: exchange.canonicalExchange,
+    micCode: input.micCode?.trim().toUpperCase() || (exchange.micCode ?? null),
+    country: input.country ?? exchange.country ?? null,
   });
 
   for (const alias of aliasValuesForInput(input).filter(

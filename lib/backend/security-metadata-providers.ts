@@ -2,6 +2,7 @@ import type { SecurityMetadata, SecurityRecord } from "@/lib/backend/models";
 import type { SecurityResolution } from "@/lib/market-data/types";
 import {
   inferSecurityMetadata,
+  isSupportedNorthAmericanListing,
   normalizeSecurityMetadataForWrite,
 } from "@/lib/backend/security-economic-exposure";
 
@@ -292,12 +293,24 @@ export const projectRegistrySecurityMetadataProvider: SecurityMetadataProvider =
     return true;
   },
   async fetch(security) {
+    if (!isSupportedNorthAmericanListing({
+      exchange: security.canonicalExchange,
+      micCode: security.micCode,
+      currency: security.currency,
+      country: security.country,
+    })) {
+      return null;
+    }
+
     const inferred = inferSecurityMetadata({
       symbol: security.symbol,
       name: security.name,
       assetClass: security.economicAssetClass,
       securityType: security.securityType,
       currency: security.currency,
+      exchange: security.canonicalExchange,
+      micCode: security.micCode,
+      country: security.country,
     });
 
     return {
@@ -335,6 +348,9 @@ export const openFigiProfileSecurityMetadataProvider: SecurityMetadataProvider =
       assetClass: security.economicAssetClass,
       securityType: resolved.result.securityType ?? security.securityType,
       currency: security.currency,
+      exchange: security.canonicalExchange,
+      micCode: security.micCode,
+      country: security.country,
     });
 
     return {

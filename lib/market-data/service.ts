@@ -104,11 +104,15 @@ export function filterSupportedSearchResults(
     const exchange = normalizeIdentityPart(result.exchange);
     const micCode = normalizeIdentityPart(result.micCode);
     const country = normalizeIdentityPart(result.country);
+    const hasExchangeIdentity = Boolean(exchange || micCode);
     const supportedExchange =
       (exchange && EXCHANGE_CURRENCY_HINTS.has(exchange)) ||
       (micCode && EXCHANGE_CURRENCY_HINTS.has(micCode));
     const supportedCountry =
       !country || SUPPORTED_SEARCH_COUNTRIES.has(country);
+    if (hasExchangeIdentity && !supportedExchange) {
+      return [];
+    }
     if (!supportedExchange && !supportedCountry) {
       return [];
     }

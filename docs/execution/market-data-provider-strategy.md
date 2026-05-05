@@ -183,6 +183,11 @@ Current provider routing:
 - search -> Twelve Data, with OpenFIGI fallback for identity discovery
 - search results are product-scoped to CAD/USD listings only; complete listing
   identity is still preserved as `symbol + exchange + currency`
+- search and metadata provider results must also pass the supported North
+  American listing guard. If a provider returns an explicit unsupported
+  exchange/MIC, for example `BCBA` or another non-US/Canada venue, the row is
+  filtered or kept low-confidence instead of being upgraded by ticker-only
+  registry logic.
 - normalization -> OpenFIGI
 - USD quote -> Twelve Data first, with Yahoo Finance as a lightweight fallback
 - CAD quote with `NEO` / Cboe Canada -> Yahoo Finance using `.NE`

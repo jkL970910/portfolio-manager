@@ -139,6 +139,32 @@ test("security metadata worker can restrict QA refresh to an exact listing ident
   );
 });
 
+test("security metadata worker skips unsupported exchange identities", async () => {
+  const security = await resolveCanonicalSecurityIdentity({
+    symbol: `RKLB${Date.now()}`,
+    exchange: "BCBA",
+    micCode: "XBUE",
+    currency: "CAD",
+    name: "Rocket Lab USA Inc.",
+    securityType: "Common Stock",
+    country: "Argentina",
+  });
+
+  const result = await runSecurityMetadataRefreshWorkerOnce({
+    workerId: "test-security-metadata-worker",
+    maxSecurities: 50,
+    maxAgeDays: 1,
+    symbols: [`${security.symbol}:BCBA:CAD`],
+    now: new Date("2026-05-03T12:00:00.000Z"),
+  });
+  const updated = await mockRepositories.securities.getById(security.id);
+
+  assert.equal(result.sampledSecurityCount, 1);
+  assert.equal(result.updatedCount, 0);
+  assert.equal(updated?.metadataSource, "heuristic");
+  assert.equal(updated?.metadataConfidence, 45);
+});
+
 test("alpha vantage overview maps company sector and region metadata", () => {
   const metadata = buildAlphaVantageProfileMetadata({
     security: {

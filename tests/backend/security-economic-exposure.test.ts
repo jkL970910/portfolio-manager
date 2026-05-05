@@ -3,6 +3,7 @@ import test from "node:test";
 import {
   inferEconomicAssetClass,
   inferSecurityMetadata,
+  isSupportedNorthAmericanListing,
 } from "@/lib/backend/security-economic-exposure";
 
 test("verified security metadata overrides currency and heuristic classification", () => {
@@ -71,9 +72,36 @@ test("CAD listed US company wrappers do not become Canadian Equity by currency",
     assetClass: null,
     securityType: "Common Stock",
     currency: "CAD",
+    exchange: "NEO",
+    micCode: "NEOE",
   });
 
   assert.equal(metadata.economicAssetClass, "US Equity");
   assert.equal(metadata.exposureRegion, "United States");
   assert.equal(metadata.source, "project-registry");
+});
+
+test("unsupported exchange identities do not receive project-registry confidence", () => {
+  const metadata = inferSecurityMetadata({
+    symbol: "RKLB",
+    name: "Rocket Lab USA Inc.",
+    assetClass: null,
+    securityType: "Common Stock",
+    currency: "CAD",
+    exchange: "BCBA",
+    micCode: "XBUE",
+    country: "Argentina",
+  });
+
+  assert.equal(
+    isSupportedNorthAmericanListing({
+      exchange: "BCBA",
+      micCode: "XBUE",
+      currency: "CAD",
+      country: "Argentina",
+    }),
+    false,
+  );
+  assert.equal(metadata.source, "heuristic");
+  assert.equal(metadata.confidence, 45);
 });

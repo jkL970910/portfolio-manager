@@ -10,6 +10,9 @@ export type EconomicExposureInput = {
   assetClass?: string | null;
   securityType?: string | null;
   currency?: string | null;
+  exchange?: string | null;
+  micCode?: string | null;
+  country?: string | null;
   metadata?: SecurityMetadata | null;
 };
 
@@ -101,6 +104,79 @@ const US_COMPANY_CAD_LISTING_SYMBOLS = new Set([
   "TSLA",
 ]);
 
+const CANADIAN_LISTING_EXCHANGES = new Set([
+  "CBOE",
+  "CBOE CANADA",
+  "CSE",
+  "NEO",
+  "NEOE",
+  "TSX",
+  "TSXV",
+  "TOR",
+  "XTSE",
+  "XTSX",
+  "XCNQ",
+]);
+
+const US_LISTING_EXCHANGES = new Set([
+  "AMEX",
+  "ARCA",
+  "ARCX",
+  "BATS",
+  "NASDAQ",
+  "NAS",
+  "NYSE",
+  "NYSE AMERICAN",
+  "NYSE ARCA",
+  "NYSEARCA",
+  "OTC",
+  "PINX",
+  "XASE",
+  "XNAS",
+  "XNYS",
+]);
+
+function normalizeListingPart(value?: string | null) {
+  return value?.trim().toUpperCase() || "";
+}
+
+export function isSupportedNorthAmericanListing(input: {
+  exchange?: string | null;
+  micCode?: string | null;
+  currency?: string | null;
+  country?: string | null;
+}) {
+  const currency = normalizeListingPart(input.currency);
+  const exchange = normalizeListingPart(input.exchange);
+  const micCode = normalizeListingPart(input.micCode);
+  const country = normalizeListingPart(input.country);
+
+  if (exchange === "OTHER / MANUAL") {
+    return true;
+  }
+  if (currency !== "CAD" && currency !== "USD") {
+    return false;
+  }
+
+  const hasKnownCanadianExchange =
+    CANADIAN_LISTING_EXCHANGES.has(exchange) ||
+    CANADIAN_LISTING_EXCHANGES.has(micCode);
+  const hasKnownUsExchange =
+    US_LISTING_EXCHANGES.has(exchange) || US_LISTING_EXCHANGES.has(micCode);
+
+  if (currency === "CAD") {
+    return hasKnownCanadianExchange || country === "CANADA";
+  }
+
+  return (
+    hasKnownUsExchange ||
+    country === "UNITED STATES" ||
+    country === "UNITED STATES OF AMERICA" ||
+    country === "USA" ||
+    country === "US"
+  );
+}
+
 function getSymbolVariants(symbol: string) {
   const upper = symbol.trim().toUpperCase();
   const withoutProviderSuffix = upper.replace(/\.(TO|TSX|NEO|NYSE|NASDAQ|NDAQ|AMEX|ARCA)$/u, "");
@@ -122,10 +198,14 @@ function isCadListedWrapper(input: {
   name: string;
   type: string;
   currency: string | null | undefined;
+  exchange?: string | null;
+  micCode?: string | null;
+  country?: string | null;
 }) {
   const currency = input.currency?.trim().toUpperCase();
   return (
     currency === "CAD" &&
+    isSupportedNorthAmericanListing(input) &&
     (input.type.includes("cdr") ||
       input.name.includes(" cdr") ||
       input.name.includes("canadian depositary receipt") ||
@@ -213,7 +293,15 @@ export function inferEconomicAssetClass(input: EconomicExposureInput) {
 
   if (
     US_EQUITY_EXPOSURE_SYMBOLS.has(symbol) ||
-    isCadListedWrapper({ symbol, name, type, currency: input.currency }) ||
+    isCadListedWrapper({
+      symbol,
+      name,
+      type,
+      currency: input.currency,
+      exchange: input.exchange,
+      micCode: input.micCode,
+      country: input.country,
+    }) ||
     name.includes("nasdaq") ||
     name.includes("s&p 500") ||
     name.includes("s&p500") ||
@@ -255,12 +343,18 @@ export function inferSecurityMetadata(
       name,
       type,
       currency: input.currency,
+      exchange: input.exchange,
+      micCode: input.micCode,
+      country: input.country,
     });
+  const supportedListing = isSupportedNorthAmericanListing(input);
   const isAssetClassOverride = Boolean(
     fallbackAssetClass && fallbackAssetClass !== economicAssetClass,
   );
   const source: SecurityMetadataSource =
-    isRegistryKnown || isAssetClassOverride ? "project-registry" : "heuristic";
+    (supportedListing && isRegistryKnown) || isAssetClassOverride
+      ? "project-registry"
+      : "heuristic";
 
   return {
     economicAssetClass,
