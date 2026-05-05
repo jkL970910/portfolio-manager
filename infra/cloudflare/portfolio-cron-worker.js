@@ -71,7 +71,16 @@ function scheduledJobs(env) {
     },
     envFlag(env.ENABLE_EXTERNAL_RESEARCH_WORKER, false) && {
       name: "external-research",
-      path: "/api/workers/external-research/run"
+      path: "/api/workers/external-research/run",
+      query: {
+        mode: env.EXTERNAL_RESEARCH_WORKER_MODE || "daily-overview",
+        source: env.EXTERNAL_RESEARCH_DAILY_SOURCE || "profile",
+        maxUsers: env.EXTERNAL_RESEARCH_DAILY_MAX_USERS || "1",
+        maxSymbolsPerUser:
+          env.EXTERNAL_RESEARCH_DAILY_MAX_SYMBOLS_PER_USER || "3",
+        maxJobs: env.EXTERNAL_RESEARCH_WORKER_MAX_JOBS || "3",
+        maxRuntimeMs: env.EXTERNAL_RESEARCH_WORKER_MAX_RUNTIME_MS || "20000"
+      }
     }
   ].filter(Boolean);
 }

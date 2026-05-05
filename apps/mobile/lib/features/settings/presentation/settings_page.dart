@@ -1563,13 +1563,17 @@ class _ExternalResearchPolicyCardState
                         ),
                         label: Text(policy.statusLabel),
                       ),
-                      if (policy.manualTriggerOnly)
-                        const Chip(label: Text("仅手动触发")),
+                      if (policy.scheduledOverviewEnabled)
+                        const Chip(label: Text("每日总览缓存"))
+                      else
+                        const Chip(label: Text("总览自动缓存未启用")),
+                      if (policy.securityManualRefreshEnabled)
+                        const Chip(label: Text("单标的限额刷新")),
                       Chip(label: Text("TTL >= ${policy.ttlHours} 小时")),
                     ],
                   ),
                   const SizedBox(height: 10),
-                  const Text("当前不会自动调用新闻、论坛或付费外部研究。后续必须先接入 worker、缓存和来源白名单。"),
+                  const Text("总览秘闻只由后台 worker 每日缓存；单个标的可显式刷新且受次数和 TTL 限制。页面加载不会抓取新闻、论坛或付费外部 API。"),
                   const SizedBox(height: 10),
                   Text(
                     "今日用量：${policy.usedRuns}/${policy.dailyRunLimit} 次；剩余 ${policy.remainingRuns} 次。",
@@ -1711,6 +1715,7 @@ class _ExternalResearchJobsStatus {
     required this.runningCount,
     required this.queuedCount,
     required this.failedCount,
+    required this.skippedCount,
     required this.items,
   });
 
@@ -1720,13 +1725,14 @@ class _ExternalResearchJobsStatus {
   final int runningCount;
   final int queuedCount;
   final int failedCount;
+  final int skippedCount;
   final List<_ExternalResearchJobItem> items;
 
   String get summaryLine {
     return [
       latestStatusLabel,
       latestStatusNote,
-      "运行 $runningCount / 排队 $queuedCount / 失败 $failedCount",
+      "运行 $runningCount / 排队 $queuedCount / 跳过 $skippedCount / 失败 $failedCount",
       workerBoundaryLabel,
     ].where((item) => item.isNotEmpty).join("\n");
   }
@@ -1745,6 +1751,7 @@ class _ExternalResearchJobsStatus {
       runningCount: summary["runningCount"] as int? ?? 0,
       queuedCount: summary["queuedCount"] as int? ?? 0,
       failedCount: summary["failedCount"] as int? ?? 0,
+      skippedCount: summary["skippedCount"] as int? ?? 0,
       items: rawItems is List
           ? rawItems
               .whereType<Map<String, dynamic>>()
@@ -1794,6 +1801,8 @@ class _ExternalResearchJobItem {
         return Icons.sync;
       case "succeeded":
         return Icons.check_circle_outline;
+      case "skipped":
+        return Icons.info_outline;
       case "failed":
         return Icons.error_outline;
       default:
@@ -1855,7 +1864,8 @@ class _ExternalResearchPolicy {
   const _ExternalResearchPolicy({
     required this.statusLabel,
     required this.canRunLiveResearch,
-    required this.manualTriggerOnly,
+    required this.scheduledOverviewEnabled,
+    required this.securityManualRefreshEnabled,
     required this.minTtlSeconds,
     required this.dailyRunLimit,
     required this.maxSymbolsPerRun,
@@ -1867,7 +1877,8 @@ class _ExternalResearchPolicy {
 
   final String statusLabel;
   final bool canRunLiveResearch;
-  final bool manualTriggerOnly;
+  final bool scheduledOverviewEnabled;
+  final bool securityManualRefreshEnabled;
   final int minTtlSeconds;
   final int dailyRunLimit;
   final int maxSymbolsPerRun;
@@ -1904,7 +1915,9 @@ class _ExternalResearchPolicy {
     return _ExternalResearchPolicy(
       statusLabel: json["statusLabel"] as String? ?? "未启用",
       canRunLiveResearch: json["canRunLiveResearch"] == true,
-      manualTriggerOnly: json["manualTriggerOnly"] != false,
+      scheduledOverviewEnabled: json["scheduledOverviewEnabled"] == true,
+      securityManualRefreshEnabled:
+          json["securityManualRefreshEnabled"] != false,
       minTtlSeconds: json["minTtlSeconds"] as int? ?? 21600,
       dailyRunLimit: usageJson["dailyRunLimit"] as int? ??
           json["dailyRunLimit"] as int? ??

@@ -756,6 +756,48 @@ export const externalResearchDocuments = pgTable(
   }),
 );
 
+export const marketSentimentSnapshots = pgTable(
+  "market_sentiment_snapshots",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    provider: varchar("provider", { length: 64 }).notNull(),
+    indexName: varchar("index_name", { length: 120 }).notNull(),
+    score: integer("score").notNull(),
+    rating: varchar("rating", { length: 32 }).notNull(),
+    fgiScore: integer("fgi_score").notNull().default(50),
+    fgiLevel: varchar("fgi_level", { length: 24 }).notNull().default("neutral"),
+    vixValue: numeric("vix_value", { precision: 8, scale: 2 }),
+    vixLevel: varchar("vix_level", { length: 24 }),
+    quadrant: varchar("quadrant", { length: 4 }),
+    quadrantLabel: varchar("quadrant_label", { length: 120 }),
+    strategyLabel: varchar("strategy_label", { length: 120 })
+      .notNull()
+      .default("中性定投"),
+    strategyDetail: text("strategy_detail").notNull().default("按计划执行，市场情绪只作为节奏参考。"),
+    asOf: timestamp("as_of", { withTimezone: true }).notNull(),
+    sourceMode: varchar("source_mode", { length: 32 }).notNull(),
+    sourceUrl: text("source_url"),
+    components: jsonb("components").notNull().default([]),
+    summary: text("summary").notNull(),
+    buySignal: varchar("buy_signal", { length: 32 }).notNull(),
+    riskNote: text("risk_note").notNull(),
+    rawPayload: jsonb("raw_payload").notNull().default({}),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => ({
+    providerIndexAsOfIdx: index(
+      "market_sentiment_provider_index_asof_idx",
+    ).on(table.provider, table.indexName, table.asOf),
+    expiresIdx: index("market_sentiment_expires_idx").on(table.expiresAt),
+  }),
+);
+
 export const looMinisterSettings = pgTable(
   "loo_minister_settings",
   {

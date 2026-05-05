@@ -28,7 +28,8 @@ test("external research is disabled unless explicitly enabled", () => {
 
   assert.equal(getExternalResearchPolicy().enabled, false);
   assert.equal(DEFAULT_EXTERNAL_RESEARCH_POLICY.requiresWorker, true);
-  assert.equal(DEFAULT_EXTERNAL_RESEARCH_POLICY.manualTriggerOnly, true);
+  assert.equal(DEFAULT_EXTERNAL_RESEARCH_POLICY.scheduledOverviewEnabled, false);
+  assert.equal(DEFAULT_EXTERNAL_RESEARCH_POLICY.securityManualRefreshEnabled, true);
   assert.equal(
     DEFAULT_EXTERNAL_RESEARCH_POLICY.allowedSources.every(
       (source) => !source.enabled,
@@ -42,8 +43,9 @@ test("external research policy summary is safe for mobile display", () => {
 
   assert.equal(summary.statusLabel, "未启用");
   assert.equal(summary.canRunLiveResearch, false);
-  assert.equal(summary.manualTriggerOnly, true);
-  assert.ok(summary.guardrails.some((item) => item.includes("手动触发")));
+  assert.equal(summary.scheduledOverviewEnabled, false);
+  assert.equal(summary.securityManualRefreshEnabled, true);
+  assert.ok(summary.guardrails.some((item) => item.includes("每日缓存")));
   assert.ok(summary.sources.some((source) => source.id === "market-data"));
 });
 

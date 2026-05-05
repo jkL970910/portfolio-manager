@@ -48,6 +48,8 @@ void main() {
               generatedAt: "2026-04-30T12:00:00.000Z",
               disclaimer: "只展示缓存资料，不实时抓取外部 API。",
               manualTriggerOnly: true,
+              scheduledOverviewEnabled: false,
+              securityManualRefreshEnabled: true,
               items: [item],
               emptyTitle: "暂时没有可用秘闻",
               emptyDetail: "先运行 AI 快扫。",

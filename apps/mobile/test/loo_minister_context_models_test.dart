@@ -150,6 +150,7 @@ void main() {
       ),
       recommendationTheme: "补足固定收益",
       recommendationReason: "当前组合波动略高。",
+      marketSentiment: null,
     );
 
     final context = snapshot.toMinisterContext(asOf: now);

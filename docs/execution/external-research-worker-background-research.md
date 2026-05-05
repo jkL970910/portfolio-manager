@@ -19,7 +19,8 @@ It does not enable live news, forum, institutional, or paid external research.
 - `portfolio_analysis_runs` persists cached AI quick-scan results and worker
   generated cached-external results.
 - `lib/backend/portfolio-external-research.ts` now exposes product-owned policy:
-  - manual trigger only
+  - daily overview worker cache boundary
+  - explicit single-security manual refresh boundary
   - minimum TTL of 21,600 seconds
   - daily run limit
   - per-run symbol cap
@@ -268,6 +269,18 @@ Settings should show:
 
 Do not add a user-facing "run external research" button until the worker and at
 least one source adapter are actually enabled.
+
+Current approved product split:
+
+- Overview owns the full `Loo国今日秘闻` card.
+- Cloudflare Cron may call the protected external-research endpoint in
+  `mode=daily-overview`, which enqueues a small bounded set of complete-identity
+  holdings missing fresh cached documents, then drains the same queue.
+- Recommendations do not render a duplicate daily intelligence card; they only
+  show whether cached external material was incorporated and keep item-level
+  evidence snippets.
+- Future user-triggered refresh is only for a single security on Security
+  Detail, with daily quota and TTL reuse.
 
 ## Deferred Adapter Decision
 

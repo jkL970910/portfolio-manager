@@ -17,6 +17,7 @@ import {
 } from "@/lib/backend/mock-store";
 import {
   ExternalResearchDocumentRecord,
+  MarketSentimentSnapshot,
   PortfolioAnalysisRun,
 } from "@/lib/backend/models";
 import {
@@ -31,6 +32,7 @@ const portfolioAnalysisRuns: PortfolioAnalysisRun[] = [];
 const externalResearchJobs: ExternalResearchJob[] = [];
 const externalResearchUsageCounters: ExternalResearchUsageCounter[] = [];
 const externalResearchDocuments: ExternalResearchDocumentRecord[] = [];
+const marketSentimentSnapshots: MarketSentimentSnapshot[] = [];
 
 export const mockRepositories: BackendRepositories = {
   users: {
@@ -348,6 +350,17 @@ export const mockRepositories: BackendRepositories = {
       job.updatedAt = now.toISOString();
       return job;
     },
+    async markSkipped(jobId, message, now) {
+      const job = externalResearchJobs.find((item) => item.id === jobId);
+      if (!job) {
+        throw new Error(`External research job not found for id ${jobId}.`);
+      }
+      job.status = "skipped";
+      job.finishedAt = now.toISOString();
+      job.errorMessage = message;
+      job.updatedAt = now.toISOString();
+      return job;
+    },
     async markFailed(jobId, errorMessage, now) {
       const job = externalResearchJobs.find((item) => item.id === jobId);
       if (!job) {
@@ -451,6 +464,33 @@ export const mockRepositories: BackendRepositories = {
         )
         .sort((left, right) => right.relevanceScore - left.relevanceScore)
         .slice(0, Math.min(Math.max(Math.trunc(params.limit), 1), 50));
+    },
+  },
+  marketSentimentSnapshots: {
+    async create(input) {
+      const now = new Date().toISOString();
+      const snapshot: MarketSentimentSnapshot = {
+        id: `market_sentiment_${marketSentimentSnapshots.length + 1}`,
+        createdAt: now,
+        updatedAt: now,
+        ...input,
+      };
+      marketSentimentSnapshots.unshift(snapshot);
+      return snapshot;
+    },
+    async getLatest(params) {
+      return marketSentimentSnapshots
+        .filter((snapshot) =>
+          Date.parse(snapshot.expiresAt) > params.now.getTime()
+        )
+        .filter((snapshot) =>
+          params.provider ? snapshot.provider === params.provider : true
+        )
+        .filter((snapshot) =>
+          params.indexName ? snapshot.indexName === params.indexName : true
+        )
+        .sort((left, right) => Date.parse(right.asOf) - Date.parse(left.asOf))[0] ??
+        null;
     },
   },
   importJobs: {

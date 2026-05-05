@@ -170,7 +170,7 @@ export const preferenceProfileInputSchema = z
     recommendationStrategy: z.enum(["tax-aware", "target-first", "balanced"]),
     source: z.enum(["manual", "guided"]).optional(),
     rebalancingTolerancePct: z.number().int().min(0).max(50),
-    watchlistSymbols: z.array(z.string().trim().min(1).max(32)).max(20),
+    watchlistSymbols: z.array(z.string().trim().min(1).max(128)).max(20),
     recommendationConstraints: recommendationConstraintsSchema.optional(),
     preferenceFactors: preferenceFactorsSchema.optional(),
   })
@@ -232,7 +232,7 @@ export const displayLanguageInputSchema = z.object({
 });
 
 export const watchlistSymbolInputSchema = z.object({
-  symbol: z.string().trim().min(1).max(32),
+  symbol: z.string().trim().min(1).max(128),
 });
 
 export const securityMetadataManualUpdateSchema = z.object({
@@ -604,6 +604,13 @@ export const guidedAllocationDraftSchema = z.object({
     volatility: z.enum(["low", "medium", "high"]),
     priority: z.enum(["tax-efficiency", "balanced", "stay-close"]),
     cashNeed: z.enum(["low", "medium", "high"]),
+    sectorTilt: z
+      .enum(["broad", "tech-energy", "dividend-quality", "canada-home"])
+      .optional(),
+    homePlan: z.enum(["none", "possible", "active"]).optional(),
+    taxFocus: z.enum(["low", "medium", "high"]).optional(),
+    usdFundingPath: z.enum(["unknown", "available", "avoid"]).optional(),
+    allowExternalSignals: z.string().optional(),
   }),
   suggestedProfile: z
     .object({

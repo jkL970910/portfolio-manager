@@ -670,6 +670,87 @@ class MobileGuidedDraft {
       ],
     );
   }
+
+  factory MobileGuidedDraft.fromProfile(MobilePreferenceProfile profile) {
+    final factors = profile.preferenceFactors;
+    final equityPct = profile.targetAllocation
+        .where((target) =>
+            target.assetClass != "Fixed Income" && target.assetClass != "Cash")
+        .fold<int>(0, (sum, target) => sum + target.targetPct);
+    final cashPct = profile.allocationPct("Cash");
+    final fixedIncomePct = profile.allocationPct("Fixed Income");
+    final goal = factors.homePurchaseEnabled
+        ? "home"
+        : profile.riskProfile == "Conservative"
+            ? "capital-preservation"
+            : "retirement";
+    final horizon = (factors.homePurchaseHorizonYears ?? 0) > 0 &&
+            (factors.homePurchaseHorizonYears ?? 0) <= 3
+        ? "short"
+        : equityPct >= 80
+            ? "long"
+            : "medium";
+    final volatility = factors.volatilityComfort;
+    final priority = profile.recommendationStrategy == "tax-aware"
+        ? "tax-efficiency"
+        : profile.transitionPreference == "stay-close"
+            ? "stay-close"
+            : "balanced";
+    final cashNeed = factors.liquidityNeed;
+    final preferredSectors =
+        factors.preferredSectors.map((item) => item.toLowerCase()).toSet();
+    final styleTilts =
+        factors.styleTilts.map((item) => item.toLowerCase()).toSet();
+    final sectorTilt = preferredSectors.contains("technology") ||
+            preferredSectors.contains("energy") ||
+            styleTilts.contains("growth")
+        ? "tech-energy"
+        : styleTilts.contains("dividend") || styleTilts.contains("quality")
+            ? "dividend-quality"
+            : preferredSectors.contains("canadian equity")
+                ? "canada-home"
+                : "broad";
+    final homePlan = !factors.homePurchaseEnabled
+        ? "none"
+        : (factors.homePurchasePriority == "high" ? "active" : "possible");
+    final taxFocus = factors.taxableTaxSensitivity;
+
+    return MobileGuidedDraft(
+      answers: {
+        "goal": goal,
+        "horizon": horizon,
+        "volatility": volatility,
+        "priority": priority,
+        "cashNeed": cashNeed,
+        "sectorTilt": sectorTilt,
+        "homePlan": homePlan,
+        "taxFocus": taxFocus,
+        "usdFundingPath": factors.usdFundingPath,
+        "allowExternalSignals": (factors.allowNewsSignals ||
+                factors.allowInstitutionalSignals ||
+                factors.allowCommunitySignals)
+            .toString(),
+      },
+      riskProfile: profile.riskProfile,
+      targetAllocation: profile.targetAllocation,
+      accountFundingPriority: profile.accountFundingPriority,
+      taxAwarePlacement: profile.taxAwarePlacement,
+      cashBufferTargetCad: profile.cashBufferTargetCad,
+      transitionPreference: profile.transitionPreference,
+      recommendationStrategy: profile.recommendationStrategy,
+      rebalancingTolerancePct: profile.rebalancingTolerancePct,
+      preferenceFactors: factors,
+      assumptions: [
+        "已从当前保存的投资偏好恢复表单。",
+        "当前目标股/债/现金约为 $equityPct/$fixedIncomePct/$cashPct。",
+        "行业/风格偏好：${factors.summary}",
+      ],
+      rationale: [
+        "再次打开新手引导时会读取已应用 profile，而不是回到预设默认值。",
+        "行业倾向当前作为 Preference Factors 影响推荐和健康解释，不等同于独立资金占比目标。",
+      ],
+    );
+  }
 }
 
 class MobileTargetAllocation {

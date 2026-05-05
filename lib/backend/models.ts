@@ -479,6 +479,7 @@ export type ExternalResearchJobStatus =
   | "queued"
   | "running"
   | "succeeded"
+  | "skipped"
   | "failed"
   | "cancelled";
 
@@ -548,6 +549,57 @@ export interface ExternalResearchDocumentRecord {
   riskFlags: string[];
   tags: string[];
   rawPayload: Record<string, unknown>;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type MarketSentimentRating =
+  | "extreme-fear"
+  | "fear"
+  | "neutral"
+  | "greed"
+  | "extreme-greed";
+export type MarketPulseVixLevel = "low" | "normal" | "high";
+export type MarketPulseFgiLevel = "fear" | "neutral" | "greed";
+export type MarketPulseQuadrant =
+  | "A"
+  | "B"
+  | "C"
+  | "D"
+  | "E"
+  | "F"
+  | "G"
+  | "H"
+  | "I";
+
+export interface MarketSentimentSnapshot {
+  id: EntityId;
+  provider: string;
+  indexName: string;
+  score: number;
+  rating: MarketSentimentRating;
+  fgiScore: number;
+  fgiLevel: MarketPulseFgiLevel;
+  vixValue: number | null;
+  vixLevel: MarketPulseVixLevel | null;
+  quadrant: MarketPulseQuadrant | null;
+  quadrantLabel: string | null;
+  strategyLabel: string;
+  strategyDetail: string;
+  asOf: string;
+  sourceMode: "cached-external" | "derived" | "manual";
+  sourceUrl: string | null;
+  components: {
+    id: string;
+    label: string;
+    score: number;
+    detail: string;
+  }[];
+  summary: string;
+  buySignal: "accumulate" | "neutral" | "caution";
+  riskNote: string;
+  rawPayload: Record<string, unknown>;
+  expiresAt: string;
   createdAt: string;
   updatedAt: string;
 }

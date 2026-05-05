@@ -18,7 +18,7 @@ class DiscoverPage extends StatefulWidget {
 class _DiscoverPageState extends State<DiscoverPage> {
   final _queryController = TextEditingController();
   var _searching = false;
-  var _workingSymbol = "";
+  var _workingWatchlistKey = "";
   var _searched = false;
   String? _error;
   String? _status;
@@ -88,6 +88,8 @@ class _DiscoverPageState extends State<DiscoverPage> {
       final results = data is Map<String, dynamic> ? data["results"] : null;
       final providerHealth =
           data is Map<String, dynamic> ? data["providerHealth"] : null;
+      final metadata =
+          data is Map<String, dynamic> ? data["metadata"] : null;
       final candidates = results is List
           ? results
               .whereType<Map<String, dynamic>>()
@@ -100,9 +102,7 @@ class _DiscoverPageState extends State<DiscoverPage> {
         setState(() {
           _results = candidates;
           _searching = false;
-          _status = candidates.isEmpty
-              ? "没有找到匹配标的。可以换一个代码或公司名。"
-              : "找到 ${candidates.length} 个候选结果。";
+          _status = _formatSearchStatus(candidates.length, metadata);
           _providerStatus = _formatProviderStatus(providerHealth);
         });
       }
@@ -118,21 +118,21 @@ class _DiscoverPageState extends State<DiscoverPage> {
 
   Future<void> _toggleWatchlist(
       MobileDiscoverSecurityCandidate candidate) async {
-    final symbol = candidate.normalizedSymbol;
-    if (symbol.isEmpty || _workingSymbol.isNotEmpty) {
+    final watchlistKey = candidate.watchlistKey;
+    if (watchlistKey.isEmpty || _workingWatchlistKey.isNotEmpty) {
       return;
     }
 
-    final tracked = _watchlistSymbols.contains(symbol);
+    final tracked = _watchlistSymbols.contains(watchlistKey);
     setState(() {
-      _workingSymbol = symbol;
+      _workingWatchlistKey = watchlistKey;
       _error = null;
     });
 
     try {
       final response = tracked
-          ? await widget.apiClient.removeWatchlistSymbol(symbol)
-          : await widget.apiClient.addWatchlistSymbol(symbol);
+          ? await widget.apiClient.removeWatchlistSymbol(watchlistKey)
+          : await widget.apiClient.addWatchlistSymbol(watchlistKey);
       final data = response["data"];
       final symbols = data is Map<String, dynamic>
           ? data["watchlistSymbols"] as List?
@@ -147,15 +147,17 @@ class _DiscoverPageState extends State<DiscoverPage> {
                 .where((entry) => entry.isNotEmpty)
                 .toSet();
           } else if (tracked) {
-            _watchlistSymbols = {..._watchlistSymbols}..remove(symbol);
+            _watchlistSymbols = {..._watchlistSymbols}..remove(watchlistKey);
           } else {
-            _watchlistSymbols = {..._watchlistSymbols, symbol};
+            _watchlistSymbols = {..._watchlistSymbols, watchlistKey};
           }
-          _workingSymbol = "";
+          _workingWatchlistKey = "";
         });
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(tracked ? "$symbol 已移出观察列表。" : "$symbol 已加入观察列表。"),
+            content: Text(tracked
+                ? "$watchlistKey 已移出观察列表。"
+                : "$watchlistKey 已加入观察列表。"),
           ),
         );
       }
@@ -163,7 +165,7 @@ class _DiscoverPageState extends State<DiscoverPage> {
       if (mounted) {
         setState(() {
           _error = error.toString();
-          _workingSymbol = "";
+          _workingWatchlistKey = "";
         });
       }
     }
@@ -226,8 +228,8 @@ class _DiscoverPageState extends State<DiscoverPage> {
             ..._results.map(
               (candidate) => _SecurityResultCard(
                 candidate: candidate,
-                tracked: _watchlistSymbols.contains(candidate.normalizedSymbol),
-                working: _workingSymbol == candidate.normalizedSymbol,
+                tracked: _watchlistSymbols.contains(candidate.watchlistKey),
+                working: _workingWatchlistKey == candidate.watchlistKey,
                 onToggleWatchlist: () => _toggleWatchlist(candidate),
                 onOpenDetail: () => _openSecurityDetail(candidate),
               ),
@@ -258,6 +260,16 @@ class MobileDiscoverSecurityCandidate {
   final String? country;
 
   String get normalizedSymbol => symbol.trim().toUpperCase();
+
+  String get normalizedExchange => exchange?.trim().toUpperCase() ?? "";
+
+  String get normalizedCurrency => currency?.trim().toUpperCase() ?? "";
+
+  String get watchlistKey => [
+        normalizedSymbol,
+        if (normalizedExchange.isNotEmpty) normalizedExchange,
+        if (normalizedCurrency.isNotEmpty) normalizedCurrency,
+      ].join(":");
 
   String get identityLine => [
         if (exchange != null && exchange!.isNotEmpty) exchange!,
@@ -361,7 +373,7 @@ class _WatchlistPreview extends StatelessWidget {
               runSpacing: 8,
               children: symbols
                   .take(20)
-                  .map((symbol) => Chip(label: Text(symbol)))
+                  .map((symbol) => Chip(label: Text(_formatWatchlistLabel(symbol))))
                   .toList(),
             ),
           ],
@@ -369,6 +381,10 @@ class _WatchlistPreview extends StatelessWidget {
       ),
     );
   }
+}
+
+String _formatWatchlistLabel(String symbol) {
+  return symbol.split(":").where((part) => part.isNotEmpty).join(" · ");
 }
 
 class _SecurityResultCard extends StatelessWidget {
@@ -498,15 +514,34 @@ String? _formatProviderStatus(Object? providerHealth) {
   }
 
   final twelve = providerHealth["twelveDataConfigured"] == true;
-  final yahoo = providerHealth["yahooFinanceConfigured"] == true;
   final openFigi = providerHealth["openFigiConfigured"] == true;
   final active = [
     if (twelve) "Twelve Data",
-    if (yahoo) "Yahoo Finance",
     if (openFigi) "OpenFIGI",
   ];
 
   return active.isEmpty
-      ? "当前没有配置实时搜索 provider，可能只返回 fallback 结果。"
-      : "搜索来源：${active.join("、")}。";
+      ? "当前没有配置标的搜索来源。"
+      : "搜索来源：${active.join("、")}；报价和走势图会使用独立行情来源。";
+}
+
+String _formatSearchStatus(int supportedCount, Object? metadata) {
+  if (metadata is! Map<String, dynamic>) {
+    return supportedCount == 0
+        ? "没有找到匹配标的。可以换一个代码或公司名。"
+        : "找到 $supportedCount 个候选结果。";
+  }
+
+  final filteredOutCount = metadata["filteredOutCount"] as int? ?? 0;
+  final scope =
+      metadata["supportedScopeLabel"] as String? ?? "北美 CAD/USD 市场";
+  if (supportedCount > 0) {
+    return filteredOutCount > 0
+        ? "找到 $supportedCount 个候选结果；已隐藏 $filteredOutCount 个不在$scope范围内的结果。"
+        : "找到 $supportedCount 个候选结果。";
+  }
+  if (filteredOutCount > 0) {
+    return "没有找到当前支持范围内的标的；已隐藏 $filteredOutCount 个不在$scope范围内的结果。";
+  }
+  return "没有找到匹配标的。可以换一个代码或公司名。";
 }

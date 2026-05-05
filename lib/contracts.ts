@@ -107,6 +107,37 @@ export interface DashboardData {
     reason: string;
     signals: string[];
   };
+  marketSentiment?: {
+    id: string;
+    title: string;
+    score: number;
+    rating: "extreme-fear" | "fear" | "neutral" | "greed" | "extreme-greed";
+    ratingLabel: string;
+    fgiScore: number;
+    fgiLevel: "fear" | "neutral" | "greed";
+    fgiLevelLabel: string;
+    vixValue: number | null;
+    vixLevel: "low" | "normal" | "high" | null;
+    vixLevelLabel: string;
+    quadrant: "A" | "B" | "C" | "D" | "E" | "F" | "G" | "H" | "I" | null;
+    quadrantLabel: string;
+    strategyLabel: string;
+    strategyDetail: string;
+    buySignal: "accumulate" | "neutral" | "caution";
+    buySignalLabel: string;
+    summary: string;
+    riskNote: string;
+    asOf: string;
+    freshnessLabel: string;
+    sourceLabel: string;
+    sourceMode: "cached-external" | "derived" | "manual";
+    components: {
+      id: string;
+      label: string;
+      score: number;
+      detail: string;
+    }[];
+  };
 }
 
 export interface PortfolioData {
@@ -640,7 +671,7 @@ export interface RecommendationsData {
     title: string;
     detail: string;
     sourceLabel: string;
-    sourceMode: "local" | "cached-external" | "live-external";
+    sourceMode: "local" | "cached-external" | "live-external" | "derived" | "manual";
     freshnessLabel: string;
     generatedAt: string;
     symbols: string[];
@@ -698,7 +729,7 @@ export interface RecommendationsData {
       preferenceFitScore: number | null;
       finalScore: number;
       confidenceLabel: string;
-      sourceMode: "local" | "cached-external" | "live-external";
+      sourceMode: "local" | "cached-external" | "live-external" | "derived";
       signals: string[];
       riskFlags: string[];
       explanation: string;
@@ -738,6 +769,8 @@ export interface DailyIntelligenceData {
   generatedAt: string;
   policy: {
     manualTriggerOnly: boolean;
+    scheduledOverviewEnabled?: boolean;
+    securityManualRefreshEnabled?: boolean;
     sourceMode: "cached-external";
     disclaimer: string;
   };
@@ -746,8 +779,8 @@ export interface DailyIntelligenceData {
     title: string;
     summary: string;
     sourceLabel: string;
-    sourceType: "market-data" | "news" | "forum" | "institutional" | "manual" | "analysis";
-    sourceMode: "local" | "cached-external" | "live-external";
+    sourceType: "market-data" | "news" | "forum" | "institutional" | "manual" | "analysis" | "market-sentiment";
+    sourceMode: "local" | "cached-external" | "live-external" | "derived";
     confidenceLabel: string;
     confidence?: "low" | "medium" | "high";
     relevanceScore?: number;

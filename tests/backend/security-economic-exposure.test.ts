@@ -63,3 +63,17 @@ test("project metadata inference separates listing market from economic exposure
   assert.equal(metadata.source, "project-registry");
   assert.ok(metadata.confidence >= 80);
 });
+
+test("CAD listed US company wrappers do not become Canadian Equity by currency", () => {
+  const metadata = inferSecurityMetadata({
+    symbol: "GEV",
+    name: "GE Vernova Inc. CDR",
+    assetClass: null,
+    securityType: "Common Stock",
+    currency: "CAD",
+  });
+
+  assert.equal(metadata.economicAssetClass, "US Equity");
+  assert.equal(metadata.exposureRegion, "United States");
+  assert.equal(metadata.source, "project-registry");
+});

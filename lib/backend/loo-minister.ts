@@ -383,6 +383,19 @@ function summarizeFacts(facts: LooMinisterFact[]) {
     );
 }
 
+function isUserFacingFact(fact: LooMinisterFact) {
+  if (
+    [
+      "candidate-fit-context",
+      "portfolio-context",
+      "security-context",
+    ].includes(fact.id)
+  ) {
+    return false;
+  }
+  return !fact.detail?.trim().startsWith("{");
+}
+
 function formatSourceModeForUser(sourceMode: string | null | undefined) {
   switch (sourceMode) {
     case "local":
@@ -412,6 +425,34 @@ function formatChartFreshnessForUser(chartFreshness: string | null | undefined) 
       return "未知";
     default:
       return chartFreshness ?? "未知";
+  }
+}
+
+function formatTargetStatusForUser(
+  status: CandidateFitContext["target"]["status"],
+) {
+  switch (status) {
+    case "under-target":
+      return "同类资产低于目标";
+    case "over-target":
+      return "同类资产高于目标";
+    case "near-target":
+      return "同类资产接近目标";
+    default:
+      return "目标暂未完全匹配";
+  }
+}
+
+function formatCandidateMissingItemForUser(item: string) {
+  switch (item) {
+    case "asset-class target":
+      return "这类资产的目标比例";
+    case "latest recommendation run":
+      return "最新推荐结果";
+    case "quote timestamp":
+      return "报价时间";
+    default:
+      return item;
   }
 }
 
@@ -1507,7 +1548,7 @@ function mapCandidateFitContextFacts(
     },
     {
       id: "candidate-recommendation-fit",
-      label: "候选标的推荐引擎匹配",
+      label: "候选标的当前推荐匹配",
       value: context.recommendation.summary,
       detail: context.recommendation.detail ?? undefined,
       source: "analysis-cache",
@@ -1529,38 +1570,52 @@ function buildCandidateFitAnswer(input: LooMinisterQuestionRequest) {
     `图表 ${formatChartFreshnessForUser(freshness.chartFreshness)}`,
     `来源 ${formatSourceModeForUser(freshness.sourceMode)}`,
   ].filter(Boolean).join("；");
+  const recommendationLine = context
+    ? context.recommendation.status === "matched-latest-run"
+      ? `当前资金路径已经把它列入候选。${context.recommendation.detail ? `参考因素：${context.recommendation.detail}` : ""}`
+      : context.recommendation.status === "not-selected-latest-run"
+        ? "当前资金路径没有优先选它。这不是否定买入，只代表在现有现金、目标配置和账户路径下，它不是最优先的新增选择。"
+        : "当前还没有最新推荐结果，所以只能先按组合目标、用户偏好和已缓存资料做初步判断。"
+    : "当前还没有足够推荐资料，所以只能先做方向判断。";
+  const intelligenceLine =
+    intelligenceFacts.length > 0
+      ? `可参考的近期信息：${intelligenceFacts.slice(0, 2).map((fact) => `${fact.label}：${fact.value}`).join("；")}。`
+      : "目前没有匹配到这支标的的近期秘闻或外部研究；这不代表利好或利空，只代表本轮不能把新闻因素作为主要依据。";
+  const dataBoundaryLine = context
+    ? context.contextCompleteness.missing.length > 0
+      ? `参考范围：还缺少 ${context.contextCompleteness.missing.map(formatCandidateMissingItemForUser).join("、")}，所以适合做方向判断，不适合作为下单前价格依据。`
+      : "参考范围：当前已有持仓、偏好、推荐和行情时间信息，适合做初步适配判断；真正下单前仍要看最新价格。"
+    : "参考范围：候选资料不完整，只能做方向判断，不能作为下单前价格依据。";
+  const conclusionLine =
+    context?.analysisMode === "candidate-new-buy"
+      ? "结论：可以把它当作新增候选继续观察，但不应只因为当前持仓是 0% 就直接买入或直接排除。更合理的做法是先确认它是否补足目标缺口、是否符合你的行业/风格偏好，再决定是否小额试探或等待更好的价格。"
+      : "结论：它已经在组合中时，重点不是“能不能买”，而是继续加仓是否会让同类资产更偏离目标，以及账户、税务、汇率路径是否仍然合适。";
 
   return [
     context
-      ? `大臣会把「${securityName} 是否适合买入」按候选适配资料解释。${context.isHeld ? "它已在组合中，可同时看持仓复盘。" : "它当前未持有，所以这是候选新增标的分析，不是持仓复盘。"}`
-      : `大臣会把「${securityName} 是否适合买入」当作候选新增/持仓复盘问题；本次没有生成完整候选适配资料，所以只做保守分析。`,
+      ? `先说结论：我会把「${securityName} 是否适合买入」当作一支候选标的来判断。${context.isHeld ? "它已在组合中，所以还要看继续加仓是否合适。" : "它当前未持有，0% 只代表还没买入，不代表不能分析。"}`
+      : `先说结论：我会把「${securityName} 是否适合买入」当作候选标的问题处理；本轮资料不完整，所以只给方向判断。`,
     context
-      ? `当前暴露：${formatPct(context.currentExposure.holdingWeightPct)}，市值 ${formatCad(context.currentExposure.marketValueCad)}。${context.currentExposure.interpretation}`
+      ? context.isHeld
+        ? `你现在持有：组合占比 ${formatPct(context.currentExposure.holdingWeightPct)}，市值 ${formatCad(context.currentExposure.marketValueCad)}。`
+        : "你现在还没有持有它；下面按“如果新增买入”来判断。"
       : "当前页面没有给出持仓暴露；如果是未持有标的，会按候选标的继续评估。",
     context
-      ? `底层经济暴露：${context.economicExposure.assetClass}（来源 ${context.economicExposure.source}${context.economicExposure.rawAssetClass ? `，页面/持仓原始分类 ${context.economicExposure.rawAssetClass}` : ""}）。`
-      : "底层经济暴露暂时未结构化，结论需要更保守。",
+      ? `它主要会增加你的 ${context.economicExposure.assetClass} 暴露。这里看的是标的实际资产属性，不是只看交易币种或上市地点。`
+      : "底层经济暴露暂时不完整，不能只靠交易币种判断。",
     context
-      ? `配置目标：目标 ${formatPct(context.target.targetPct)}，当前同类资产约 ${formatPct(context.target.currentSleevePct)}，缺口 ${formatPct(context.target.gapPct)}，状态 ${context.target.status}。`
-      : "配置目标没有精确匹配到该资产类别，所以结论需要更保守。",
+      ? `和组合目标的关系：${formatTargetStatusForUser(context.target.status)}。你的目标是 ${formatPct(context.target.targetPct)}，当前同类资产约 ${formatPct(context.target.currentSleevePct)}，差距 ${formatPct(context.target.gapPct)}。`
+      : "组合适配：暂时没有精确匹配到这类资产的目标比例，所以不能给出强结论。",
     context
-      ? `偏好适配：${context.preference.summary}。`
+      ? `和你偏好的关系：${context.preference.summary}。`
       : "偏好适配资料不足，建议先确认风险、行业/风格倾向、买房/现金目标和 USD 路径。",
-    context
-      ? `推荐引擎：${context.recommendation.summary}${context.recommendation.detail ? `（${context.recommendation.detail}）` : ""}`
-      : "最新推荐没有把这个 listing 明确列为首选；这不是否定买入，只表示它还没有成为当前资金路径的最高优先级。",
-    context
-      ? `资料完整度：${context.contextCompleteness.score}/100；缺口：${context.contextCompleteness.missing.length > 0 ? context.contextCompleteness.missing.join("、") : "无阻塞缺口"}。阻塞项：${context.contextCompleteness.blocking.length > 0 ? context.contextCompleteness.blocking.join("、") : "无"}。`
-      : "资料完整度未结构化；大臣只能保守解释。",
-    intelligenceFacts.length > 0
-      ? `缓存情报：${intelligenceFacts.slice(0, 2).map((fact) => `${fact.label}：${fact.value}`).join("；")}。`
-      : "当前没有匹配到该 listing 的缓存秘闻/外部研究；不要把这理解成利好或利空。",
+    recommendationLine,
+    intelligenceLine,
+    dataBoundaryLine,
     freshnessNote
-      ? `数据边界：${freshnessNote}。如果报价或图表不是 fresh，只适合做方向判断，不适合下单前定价。`
+      ? `数据时间：${freshnessNote}。如果报价或图表不是最新，只适合做方向判断，不适合下单前定价。`
       : "数据边界不完整，实际交易前需要刷新报价和检查来源。",
-    context?.analysisMode === "candidate-new-buy"
-      ? "结论口径：先把它当作新增候选。只有当它能补目标缺口、符合偏好因素，且账户/税务/FX 与数据新鲜度可接受时，才值得进入观察或小额候选；0% 本身不构成否定。"
-      : "结论口径：既要看它作为现有持仓是否过重，也要看新增资金继续加它是否会改善目标配置、偏好和账户/税务/FX 路径。",
+    conclusionLine,
   ].join("\n");
 }
 
@@ -2023,7 +2078,7 @@ function buildAnswer(input: LooMinisterQuestionRequest) {
     warnings.length > 0
       ? `页面已经提示的风险/备注包括：${warnings.join("；")}。`
       : "页面没有提供额外风险提示。",
-    "这是本地大臣的保守回答；外部 AI 模式会继续使用同一套页面资料、今日秘闻和确认边界。",
+    "这是基于当前页面资料的保守回答；如果需要更完整结论，应先补齐报价、图表或外部情报缓存。",
   ].join("\n");
 }
 
@@ -2049,23 +2104,23 @@ function buildLocalAnswer(
   fallbackReason?: string,
 ) {
   const pageContext = input.pageContext;
-  const prioritizedFacts = [...pageContext.facts].sort((a, b) => {
-    return factDisplayPriority(a) - factDisplayPriority(b);
-  });
+  const prioritizedFacts = [...pageContext.facts]
+    .filter(isUserFacingFact)
+    .sort((a, b) => {
+      return factDisplayPriority(a) - factDisplayPriority(b);
+    });
   const qualityGuardPrefix = "quality_guard:";
   const fallbackNote = fallbackReason?.startsWith(qualityGuardPrefix)
-    ? `外部 AI 答复没有正确使用候选适配资料，已改用本地大臣答复。原因：${fallbackReason.slice(qualityGuardPrefix.length)}\n`
+    ? "我会按当前页面、持仓和缓存资料重新整理，避免把未持有或资料不足误读成不能分析。\n"
     : fallbackReason
-      ? `外部 AI 暂时不可用，已改用本地大臣答复。原因：${fallbackReason}\n`
+      ? "这轮先基于当前页面、持仓和缓存资料回答。\n"
       : "";
   const answer: LooMinisterAnswerResult = {
     version: LOO_MINISTER_VERSION,
     generatedAt: new Date().toISOString(),
     role: "loo-minister",
     page: pageContext.page,
-    title: fallbackReason
-      ? `${pageLabels[pageContext.page]}大臣本地答复`
-      : `${pageLabels[pageContext.page]}大臣答复`,
+    title: `${pageLabels[pageContext.page]}大臣答复`,
     answer: `${fallbackNote}${buildAnswer(input)}`,
     keyPoints: [
       ...prioritizedFacts
@@ -2256,6 +2311,19 @@ function sanitizeProviderError(message: string) {
       return `sk-...${last4}`;
     })
     .slice(0, 500);
+}
+
+function providerUnavailableUserMessage(settings: ResolvedLooMinisterSettings) {
+  if (settings.mode === "local") {
+    return "当前设置为本地大臣。";
+  }
+  if (!settings.providerEnabled) {
+    return "外部 AI 未启用，请先在设置中开启 AI 大臣外部模型。";
+  }
+  if (!settings.apiKey) {
+    return "AI 大臣缺少可用 API Key，请先在设置中保存 OpenAI 或兼容 Provider 的 API Key。";
+  }
+  return "外部 AI 暂时不可用。";
 }
 
 const answerJsonSchema = {
@@ -2948,6 +3016,7 @@ export async function getLooMinisterAnswer(
     persistUsage?: boolean;
     skipContextResolver?: boolean;
     forceLocal?: boolean;
+    allowProviderFallback?: boolean;
   } = {},
 ) {
   const settingsPromise =
@@ -2979,6 +3048,7 @@ export async function getLooMinisterAnswer(
     candidateFitInput,
   );
   const persistUsage = options.persistUsage ?? true;
+  const allowProviderFallback = options.allowProviderFallback ?? true;
   const localAnswer = (fallbackReason?: string) =>
     buildLocalAnswer(enrichedInput, fallbackReason);
 
@@ -3001,10 +3071,20 @@ export async function getLooMinisterAnswer(
     !settings.providerEnabled ||
     !settings.apiKey
   ) {
-    const fallbackReason =
-      settings.mode === "local"
-        ? undefined
-        : "GPT-5.5 provider 未启用或 API Key 未配置。";
+    const fallbackReason = providerUnavailableUserMessage(settings);
+    if (!allowProviderFallback) {
+      if (persistUsage) {
+        await recordLooMinisterUsage(userId, {
+          page: enrichedInput.pageContext.page,
+          mode: settings.mode,
+          provider: settings.mode === "local" ? "local" : settings.provider,
+          model: settings.model,
+          status: "failed",
+          errorMessage: fallbackReason,
+        });
+      }
+      throw new Error(fallbackReason);
+    }
     const answer = localAnswer(fallbackReason);
     if (persistUsage) {
       await recordLooMinisterUsage(userId, {
@@ -3028,6 +3108,26 @@ export async function getLooMinisterAnswer(
       ? "候选适配回答没有正确使用页面上下文。"
       : null;
     const replacedByQualityGuard = Boolean(qualityGuardReason);
+    if (replacedByQualityGuard && !allowProviderFallback) {
+      if (persistUsage) {
+        await recordLooMinisterUsage(userId, {
+          page: enrichedInput.pageContext.page,
+          mode: settings.mode,
+          provider: `${settings.provider}-${settings.apiKeySource}`,
+          model: settings.model,
+          status: "failed",
+          inputTokens: result.usage.inputTokens,
+          outputTokens: result.usage.outputTokens,
+          totalTokens: result.usage.totalTokens,
+          retryCount: result.retryCount,
+          failureKind: "candidate_fit_quality_guard",
+          errorMessage: qualityGuardReason,
+        });
+      }
+      throw new Error(
+        "外部 GPT 回答没有正确使用当前页面上下文。请重试，或在超时/失败时手动选择本地大臣。",
+      );
+    }
     const answer = replacedByQualityGuard
       ? localAnswer(`quality_guard:${qualityGuardReason}`)
       : sanitizeUnavailableRunAnalysisPromise(enrichedInput, result.answer);
@@ -3053,7 +3153,24 @@ export async function getLooMinisterAnswer(
     const errorMessage = sanitizeProviderError(
       error instanceof Error ? error.message : "OpenAI provider failed.",
     );
-    const answer = localAnswer(errorMessage);
+    if (!allowProviderFallback) {
+      if (persistUsage) {
+        await recordLooMinisterUsage(userId, {
+          page: enrichedInput.pageContext.page,
+          mode: settings.mode,
+          provider: `${settings.provider}-${settings.apiKeySource}`,
+          model: settings.model,
+          status: "failed",
+          retryCount: getRetryCount(error),
+          failureKind: getFailureKind(error),
+          errorMessage,
+        });
+      }
+      throw new Error(
+        `外部 GPT 暂时不可用：${errorMessage}。你可以重试，或在等待超时时手动选择本地大臣。`,
+      );
+    }
+    const answer = localAnswer("external_model_unavailable");
     if (persistUsage) {
       await recordLooMinisterUsage(userId, {
         page: enrichedInput.pageContext.page,

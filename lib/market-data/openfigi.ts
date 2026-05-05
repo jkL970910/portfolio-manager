@@ -1,5 +1,9 @@
 import { getMarketDataConfig } from "@/lib/market-data/config";
-import type { SecurityResolution } from "@/lib/market-data/types";
+import type {
+  SecurityResolution,
+  SecuritySearchResult,
+  SupportedAssetType,
+} from "@/lib/market-data/types";
 
 interface OpenFigiSearchItem {
   ticker?: string;
@@ -80,4 +84,65 @@ export async function resolveSecurityWithOpenFigi(
     marketSector: match.marketSector ?? null,
     provider: "openfigi"
   };
+}
+
+function mapOpenFigiAssetType(value?: string): SupportedAssetType {
+  const normalized = value?.trim().toLowerCase() ?? "";
+  if (normalized.includes("common") || normalized === "equity") {
+    return "Common Stock";
+  }
+  if (normalized.includes("etf") || normalized.includes("fund")) {
+    return "ETF";
+  }
+  if (normalized.includes("adr")) {
+    return "ADR";
+  }
+  if (normalized.includes("reit")) {
+    return "REIT";
+  }
+  if (normalized.includes("preferred")) {
+    return "Preferred Share";
+  }
+  return "Unknown";
+}
+
+export async function searchSecuritiesWithOpenFigi(
+  query: string,
+): Promise<SecuritySearchResult[]> {
+  const { openFigiApiKey } = getMarketDataConfig();
+  if (!openFigiApiKey) {
+    return [];
+  }
+
+  const response = await fetch("https://api.openfigi.com/v3/search", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-OPENFIGI-APIKEY": openFigiApiKey,
+    },
+    body: JSON.stringify({
+      query: query.trim(),
+      limit: 10,
+    }),
+    cache: "no-store",
+  });
+
+  if (!response.ok) {
+    throw new Error(`OpenFIGI search failed with status ${response.status}.`);
+  }
+
+  const payload = (await response.json()) as { data?: OpenFigiSearchItem[] };
+  return (payload.data ?? [])
+    .filter((item) => item.ticker && item.name)
+    .slice(0, 10)
+    .map((item) => ({
+      symbol: item.ticker!,
+      name: item.name!,
+      exchange: item.exchCode ?? null,
+      micCode: item.micCode ?? null,
+      country: null,
+      currency: null,
+      type: mapOpenFigiAssetType(item.securityType),
+      provider: "openfigi",
+    }));
 }

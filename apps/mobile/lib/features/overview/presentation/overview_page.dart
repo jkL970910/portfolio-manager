@@ -114,6 +114,12 @@ class _OverviewPageState extends State<OverviewPage> {
                           fallbackPoints: snapshot.data!.netWorthTrend,
                         ),
                       ],
+                      if (snapshot.data!.marketSentiment != null) ...[
+                        const SizedBox(height: 18),
+                        _MarketSentimentCard(
+                          snapshot.data!.marketSentiment!,
+                        ),
+                      ],
                       const SizedBox(height: 18),
                       FutureBuilder<MobileDailyIntelligenceSnapshot>(
                         future: _dailyIntelligence,
@@ -512,6 +518,128 @@ class _OverviewTrendCard extends StatelessWidget {
             ],
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _MarketSentimentCard extends StatelessWidget {
+  const _MarketSentimentCard(this.sentiment);
+
+  final MobileMarketSentiment sentiment;
+
+  @override
+  Widget build(BuildContext context) {
+    return _LooCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  "今日市场脉搏",
+                  style: Theme.of(context).textTheme.titleLarge,
+                ),
+              ),
+              Chip(label: Text("象限 ${sentiment.quadrant.isEmpty ? "-" : sentiment.quadrant}")),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            children: [
+              _PulseMetricTile(
+                label: "VIX",
+                value: sentiment.vixDisplay,
+                detail: sentiment.vixLevelLabel,
+              ),
+              _PulseMetricTile(
+                label: "FGI",
+                value: "${sentiment.fgiScore}",
+                detail: sentiment.fgiLevelLabel,
+              ),
+              _PulseMetricTile(
+                label: "策略",
+                value: sentiment.strategyLabel,
+                detail: sentiment.buySignalLabel,
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Text(
+            sentiment.quadrantLabel,
+            style: Theme.of(context).textTheme.titleMedium,
+          ),
+          const SizedBox(height: 6),
+          Text(sentiment.strategyDetail),
+          if (sentiment.summary.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Text(
+              sentiment.summary,
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+          ],
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              Chip(label: Text(sentiment.sourceLabel)),
+              if (sentiment.freshnessLabel.isNotEmpty)
+                Chip(label: Text(sentiment.freshnessLabel)),
+            ],
+          ),
+          if (sentiment.components.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            ...sentiment.components.take(4).map(
+                  (component) => Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Row(
+                      children: [
+                        Expanded(child: Text(component.label)),
+                        Text("${component.score}/100"),
+                      ],
+                    ),
+                  ),
+                ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _PulseMetricTile extends StatelessWidget {
+  const _PulseMetricTile({
+    required this.label,
+    required this.value,
+    required this.detail,
+  });
+
+  final String label;
+  final String value;
+  final String detail;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 120,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(16),
+        color: Theme.of(context).colorScheme.surfaceContainerHighest,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(label, style: Theme.of(context).textTheme.labelMedium),
+          const SizedBox(height: 6),
+          Text(value, style: Theme.of(context).textTheme.titleLarge),
+          const SizedBox(height: 4),
+          Text(detail, style: Theme.of(context).textTheme.bodySmall),
+        ],
       ),
     );
   }

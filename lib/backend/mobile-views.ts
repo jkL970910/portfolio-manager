@@ -22,6 +22,10 @@ import {
   getDailyIntelligenceItemsForUser,
   mapDailyIntelligenceItemToRecommendationBrief,
 } from "@/lib/backend/mobile-daily-intelligence";
+import {
+  getOrCreateLatestMarketSentiment,
+  mapMarketSentimentForMobile,
+} from "@/lib/backend/market-sentiment";
 import type { Viewer } from "@/lib/auth/session";
 
 type MobileHomeData = {
@@ -56,6 +60,7 @@ type MobileHomeData = {
   chartSeries?: DashboardData["chartSeries"];
   healthScore: DashboardData["healthScore"];
   recommendation: DashboardData["recommendation"];
+  marketSentiment?: NonNullable<DashboardData["marketSentiment"]>;
   context?: {
     userId: string;
     accountCount: number;
@@ -198,10 +203,11 @@ type MobileImportData = {
   notes: string[];
 };
 
-function mapMobileHomeData(
+async function mapMobileHomeData(
   viewer: Viewer,
   payload: ApiSuccess<DashboardData & { context?: MobileHomeData["context"] }>,
-): MobileHomeData {
+): Promise<MobileHomeData> {
+  const marketSentiment = await getOrCreateLatestMarketSentiment();
   return {
     viewer,
     displayContext: payload.data.displayContext,
@@ -234,6 +240,7 @@ function mapMobileHomeData(
     chartSeries: payload.data.chartSeries,
     healthScore: payload.data.healthScore,
     recommendation: payload.data.recommendation,
+    marketSentiment: mapMarketSentimentForMobile(marketSentiment),
     context: payload.data.context,
   };
 }
@@ -498,21 +505,36 @@ export function mapRecommendationIntelligenceRefs(
         briefMatchesPriorityListing(brief, priority)
       );
   if (exactListingRefs.length > 0) {
-    return exactListingRefs.slice(0, 2).map((brief) =>
+    return [
+      ...exactListingRefs.slice(0, 2).map((brief) =>
       mapIntelligenceBriefRef(brief, "listing")
-    );
+      ),
+      ...getMarketSentimentBriefRefs(intelligenceBriefs),
+    ].slice(0, 3);
   }
 
   const symbols = getRecommendationPrioritySymbols(priority);
   if (symbols.size === 0) {
-    return [];
+    return getMarketSentimentBriefRefs(intelligenceBriefs);
   }
 
-  return intelligenceBriefs
+  return [
+    ...intelligenceBriefs
     .filter((brief) =>
       symbols.has(normalizeSymbolKey(brief.identity.symbol)),
     )
     .slice(0, 2)
+    .map((brief) => mapIntelligenceBriefRef(brief, "underlying")),
+    ...getMarketSentimentBriefRefs(intelligenceBriefs),
+  ].slice(0, 3);
+}
+
+function getMarketSentimentBriefRefs(
+  intelligenceBriefs: RecommendationsData["intelligenceBriefs"],
+) {
+  return intelligenceBriefs
+    .filter((brief) => brief.id.startsWith("sentiment:"))
+    .slice(0, 1)
     .map((brief) => mapIntelligenceBriefRef(brief, "underlying"));
 }
 
@@ -554,8 +576,11 @@ export function buildRecommendationV3Overlay(
       Boolean(brief)
     );
   const hasListingRef = intelligenceRefs.some((ref) => ref.scope === "listing");
+  const hasMarketSentimentRef = matchedBriefs.some((brief) =>
+    brief.id.startsWith("sentiment:"),
+  );
   const hasExternalRef = matchedBriefs.some((brief) =>
-    brief.sourceMode !== "local"
+    brief.sourceMode !== "local" && brief.sourceMode !== "derived"
   );
   const newestGeneratedAt = matchedBriefs
     .map((brief) => Date.parse(brief.generatedAt))
@@ -594,6 +619,13 @@ export function buildRecommendationV3Overlay(
       preferenceFitScore * 0.15 +
       externalInsightScore * 0.15,
   );
+  const marketSentimentSignals = matchedBriefs
+    .filter((brief) => brief.id.startsWith("sentiment:"))
+    .flatMap((brief) => [
+      `市场脉搏：${brief.title.replace(/^今日市场脉搏：/, "")}`,
+      brief.detail,
+    ])
+    .slice(0, 2);
   const riskFlags = [
     ...base.riskFlags,
     ...matchedBriefs.flatMap((brief) => brief.riskFlags ?? []).slice(0, 3),
@@ -613,6 +645,7 @@ export function buildRecommendationV3Overlay(
       ...base.signals,
       hasListingRef ? "当前 listing 情报命中" : "底层资产情报命中",
       hasExternalRef ? "缓存外部研究可用" : "本地 AI 快扫可用",
+      ...(hasMarketSentimentRef ? marketSentimentSignals : []),
     ],
     riskFlags,
     explanation:
@@ -778,7 +811,7 @@ function mapMobileImportData(data: ImportData): MobileImportData {
 export async function getMobileHomeView(userId: string, viewer: Viewer) {
   const payload = await getDashboardView(userId);
   return {
-    data: mapMobileHomeData(viewer, payload),
+    data: await mapMobileHomeData(viewer, payload),
     meta: payload.meta,
   };
 }

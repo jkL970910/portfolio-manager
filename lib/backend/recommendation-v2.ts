@@ -45,6 +45,7 @@ type SecurityCandidate = {
   name: string;
   assetClass: string;
   currency: CurrencyCode;
+  exchange?: string | null;
   securityType?: string;
   expenseBps: number;
   liquidityScore: number;
@@ -58,9 +59,35 @@ type FxPolicy = {
   preferredTradingCurrency: "CAD" | "USD" | "mixed";
 };
 
+function watchlistKeysForCandidate(input: {
+  symbol: string;
+  exchange?: string | null;
+  currency?: string | null;
+}) {
+  const symbol = input.symbol.trim().toUpperCase();
+  const exchange = input.exchange?.trim().toUpperCase();
+  const currency = input.currency?.trim().toUpperCase();
+  return [
+    symbol,
+    exchange && currency ? `${symbol}:${exchange}:${currency}` : null,
+    currency ? `${symbol}:${currency}` : null,
+  ].filter((item): item is string => Boolean(item));
+}
+
+function isWatchlisted(
+  profile: PreferenceProfile,
+  input: { symbol: string; exchange?: string | null; currency?: string | null },
+) {
+  const watchlist = new Set(
+    profile.watchlistSymbols.map((entry) => entry.trim().toUpperCase()),
+  );
+  return watchlistKeysForCandidate(input).some((key) => watchlist.has(key));
+}
+
 export type CandidateSecurityScoreInput = {
   symbol: string;
   name?: string;
+  exchange?: string | null;
   currency?: CurrencyCode;
   assetClass?: string;
   securityType?: string | null;
@@ -367,7 +394,7 @@ function scoreSecurityCandidate(
   profile: PreferenceProfile,
   fxPolicy: FxPolicy
 ) {
-  const watchlistBoost = profile.watchlistSymbols.includes(candidate.symbol) ? 0.14 : 0;
+  const watchlistBoost = isWatchlisted(profile, candidate) ? 0.14 : 0;
   const preferredBoost = getPreferredSymbolBoost(profile, candidate.symbol);
   const securityTypePenalty = isSecurityTypeAllowed(profile, candidate.securityType ?? "ETF") ? 0 : 0.24;
   const expensePenalty = clamp(candidate.expenseBps / 200, 0, 0.18);
@@ -617,7 +644,7 @@ export function buildRecommendationV2(args: {
         fxPolicy: fxPolicy.hasUsdFundingPath ? "usd-funded" : "retail-fx",
         fxPenaltyBps: best.security.fxPenaltyBps,
         minTradeApplied: rawAmount < 500,
-        watchlistMatched: profile.watchlistSymbols.includes(best.security.candidate.symbol),
+        watchlistMatched: isWatchlisted(profile, best.security.candidate),
         preferredSymbolMatched: profile.recommendationConstraints.preferredSymbols.includes(best.security.candidate.symbol),
         existingHoldingId: existingHolding?.id,
         existingHoldingAccountId: existingHolding?.accountId,
@@ -702,6 +729,7 @@ export function scoreCandidateSecurity(args: {
     name: candidate.name?.trim() || knownCandidate?.name || existingHolding?.name || normalizedSymbol,
     assetClass,
     currency: candidate.currency ?? knownCandidate?.currency ?? existingHolding?.currency ?? "CAD",
+    exchange: candidate.exchange ?? null,
     securityType: candidate.securityType ?? knownCandidate?.securityType ?? existingHolding?.securityTypeOverride ?? "ETF",
     expenseBps: knownCandidate?.expenseBps ?? 18,
     liquidityScore: knownCandidate?.liquidityScore ?? 72,
@@ -721,7 +749,7 @@ export function scoreCandidateSecurity(args: {
     currency: securityCandidate.currency,
     score,
     verdict,
-    watchlistMatched: profile.watchlistSymbols.includes(normalizedSymbol),
+    watchlistMatched: isWatchlisted(profile, securityCandidate),
     preferredSymbolMatched: profile.recommendationConstraints.preferredSymbols.includes(normalizedSymbol),
     selectedAccountType: placement.account.type,
     selectedAccountName: placement.account.nickname || placement.account.institution || placement.account.type,
@@ -759,7 +787,7 @@ export function scoreCandidateSecurity(args: {
         `它与当前进阶偏好的贴合度约 ${security.preferenceFitScore.toFixed(0)}/100。`,
         `Its fit with the current advanced preferences is about ${security.preferenceFitScore.toFixed(0)}/100.`
       ),
-      profile.watchlistSymbols.includes(normalizedSymbol)
+      isWatchlisted(profile, securityCandidate)
         ? pick(language, "它已经在你的观察列表里，所以引擎会给它一点额外加分。", "It is already on your watchlist, so the engine gives it a small watchlist bonus.")
         : pick(language, "它现在还不在你的观察列表里，所以没有拿到观察列表加分。", "It is not currently on your watchlist, so it gets no watchlist bonus.")
     ],

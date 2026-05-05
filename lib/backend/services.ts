@@ -3631,11 +3631,22 @@ export async function updatePreferenceProfile(
   });
 }
 
+function normalizeWatchlistSymbol(value: string) {
+  return value
+    .trim()
+    .toUpperCase()
+    .split(":")
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .slice(0, 3)
+    .join(":");
+}
+
 export async function addWatchlistSymbol(
   userId: string,
   symbol: string,
 ): Promise<PreferenceProfile> {
-  const normalizedSymbol = symbol.trim().toUpperCase();
+  const normalizedSymbol = normalizeWatchlistSymbol(symbol);
   if (!normalizedSymbol) {
     throw new Error("Watchlist symbol is required.");
   }
@@ -3668,7 +3679,7 @@ export async function removeWatchlistSymbol(
   userId: string,
   symbol: string,
 ): Promise<PreferenceProfile> {
-  const normalizedSymbol = symbol.trim().toUpperCase();
+  const normalizedSymbol = normalizeWatchlistSymbol(symbol);
   if (!normalizedSymbol) {
     throw new Error("Watchlist symbol is required.");
   }

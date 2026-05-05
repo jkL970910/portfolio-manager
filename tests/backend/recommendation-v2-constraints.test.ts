@@ -98,6 +98,44 @@ test("preferred symbols improve candidate scoring without pinning absolute score
   assert.equal(preferred.preferredSymbolMatched, true);
 });
 
+test("watchlist identity keys match exact listing before ticker fallback", () => {
+  const usListing = scoreCandidateSecurity({
+    accounts,
+    holdings: [],
+    profile: makeProfile({
+      watchlistSymbols: ["AAPL:NASDAQ:USD"]
+    }),
+    language: "zh",
+    candidate: {
+      symbol: "AAPL",
+      exchange: "NASDAQ",
+      name: "Apple Inc.",
+      currency: "USD",
+      assetClass: "US Equity",
+      securityType: "Common Stock"
+    }
+  });
+  const cadListing = scoreCandidateSecurity({
+    accounts,
+    holdings: [],
+    profile: makeProfile({
+      watchlistSymbols: ["AAPL:NASDAQ:USD"]
+    }),
+    language: "zh",
+    candidate: {
+      symbol: "AAPL",
+      exchange: "NEO",
+      name: "Apple Inc. CDR",
+      currency: "CAD",
+      assetClass: "US Equity",
+      securityType: "Common Stock"
+    }
+  });
+
+  assert.equal(usListing.watchlistMatched, true);
+  assert.equal(cadListing.watchlistMatched, false);
+});
+
 test("advanced preference factors improve matching sector and style candidates", () => {
   const baseline = scoreCandidateSecurity({
     accounts,

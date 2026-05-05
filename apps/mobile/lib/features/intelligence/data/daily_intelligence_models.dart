@@ -5,6 +5,8 @@ class MobileDailyIntelligenceSnapshot {
     required this.generatedAt,
     required this.disclaimer,
     required this.manualTriggerOnly,
+    required this.scheduledOverviewEnabled,
+    required this.securityManualRefreshEnabled,
     required this.items,
     required this.emptyTitle,
     required this.emptyDetail,
@@ -13,6 +15,8 @@ class MobileDailyIntelligenceSnapshot {
   final String generatedAt;
   final String disclaimer;
   final bool manualTriggerOnly;
+  final bool scheduledOverviewEnabled;
+  final bool securityManualRefreshEnabled;
   final List<MobileDailyIntelligenceItem> items;
   final String emptyTitle;
   final String emptyDetail;
@@ -30,6 +34,10 @@ class MobileDailyIntelligenceSnapshot {
       disclaimer: policy["disclaimer"] as String? ??
           "Loo国今日秘闻只展示已缓存资料；页面加载不会触发实时外部 API。",
       manualTriggerOnly: policy["manualTriggerOnly"] as bool? ?? true,
+      scheduledOverviewEnabled:
+          policy["scheduledOverviewEnabled"] as bool? ?? false,
+      securityManualRefreshEnabled:
+          policy["securityManualRefreshEnabled"] as bool? ?? true,
       items: readJsonList(json, "items")
           .map(MobileDailyIntelligenceItem.fromJson)
           .toList(),

@@ -177,8 +177,11 @@ test("daily intelligence endpoint combines documents and saved analysis without 
   );
 
   assert.equal(response.data.policy.manualTriggerOnly, true);
+  assert.equal(response.data.policy.scheduledOverviewEnabled, false);
+  assert.equal(response.data.policy.securityManualRefreshEnabled, true);
   assert.match(response.data.policy.disclaimer, /不会触发实时新闻/);
-  assert.equal(response.data.items.length, 2);
+  assert.equal(response.data.items.length, 3);
+  assert.ok(response.data.items.some((item) => item.id.startsWith("sentiment:")));
   assert.ok(response.data.items.some((item) => item.title.includes("XBB")));
   assert.ok(response.data.items.some((item) => item.title.includes("AMZN")));
 });

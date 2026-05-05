@@ -84,6 +84,23 @@ const PRECIOUS_METALS_EXPOSURE_SYMBOLS = new Set([
   "HGY",
 ]);
 
+const US_COMPANY_CAD_LISTING_SYMBOLS = new Set([
+  "AAPL",
+  "AMZN",
+  "AMD",
+  "BRK",
+  "BRK.B",
+  "GEV",
+  "GOOG",
+  "GOOGL",
+  "META",
+  "MSFT",
+  "NFLX",
+  "NVDA",
+  "RKLB",
+  "TSLA",
+]);
+
 function getSymbolVariants(symbol: string) {
   const upper = symbol.trim().toUpperCase();
   const withoutProviderSuffix = upper.replace(/\.(TO|TSX|NEO|NYSE|NASDAQ|NDAQ|AMEX|ARCA)$/u, "");
@@ -98,6 +115,26 @@ function getSymbolVariants(symbol: string) {
 
 function symbolMatches(symbols: Set<string>, symbol: string) {
   return [...getSymbolVariants(symbol)].some((variant) => symbols.has(variant));
+}
+
+function isCadListedWrapper(input: {
+  symbol: string;
+  name: string;
+  type: string;
+  currency: string | null | undefined;
+}) {
+  const currency = input.currency?.trim().toUpperCase();
+  return (
+    currency === "CAD" &&
+    (input.type.includes("cdr") ||
+      input.name.includes(" cdr") ||
+      input.name.includes("canadian depositary receipt") ||
+      input.name.includes("cad hedged") ||
+      input.name.includes("hedged to cad") ||
+      input.name.includes("neo") ||
+      input.name.includes("cboe") ||
+      symbolMatches(US_COMPANY_CAD_LISTING_SYMBOLS, input.symbol))
+  );
 }
 
 function isPreciousMetalsExposure(input: {
@@ -176,6 +213,7 @@ export function inferEconomicAssetClass(input: EconomicExposureInput) {
 
   if (
     US_EQUITY_EXPOSURE_SYMBOLS.has(symbol) ||
+    isCadListedWrapper({ symbol, name, type, currency: input.currency }) ||
     name.includes("nasdaq") ||
     name.includes("s&p 500") ||
     name.includes("s&p500") ||
@@ -211,7 +249,13 @@ export function inferSecurityMetadata(
     symbolMatches(INTERNATIONAL_EQUITY_EXPOSURE_SYMBOLS, symbol) ||
     symbolMatches(FIXED_INCOME_EXPOSURE_SYMBOLS, symbol) ||
     symbolMatches(CASH_EXPOSURE_SYMBOLS, symbol) ||
-    isPreciousMetalsExposure({ symbol, name, type, fallbackAssetClass });
+    isPreciousMetalsExposure({ symbol, name, type, fallbackAssetClass }) ||
+    isCadListedWrapper({
+      symbol,
+      name,
+      type,
+      currency: input.currency,
+    });
   const isAssetClassOverride = Boolean(
     fallbackAssetClass && fallbackAssetClass !== economicAssetClass,
   );

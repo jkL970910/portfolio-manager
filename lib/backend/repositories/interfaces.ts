@@ -15,6 +15,7 @@ import {
   SecurityAliasRecord,
   SecurityPriceHistoryPoint,
   SecurityRecord,
+  MarketSentimentSnapshot,
   PreferenceProfile,
   RecommendationRun,
   UserProfile,
@@ -155,6 +156,11 @@ export interface ExternalResearchJobRepository {
     resultRunId: EntityId,
     now: Date,
   ): Promise<ExternalResearchJob>;
+  markSkipped(
+    jobId: EntityId,
+    message: string,
+    now: Date,
+  ): Promise<ExternalResearchJob>;
   markFailed(
     jobId: EntityId,
     errorMessage: string,
@@ -194,6 +200,17 @@ export interface ExternalResearchDocumentRepository {
   ): Promise<ExternalResearchDocumentRecord[]>;
 }
 
+export interface MarketSentimentSnapshotRepository {
+  create(
+    input: Omit<MarketSentimentSnapshot, "id" | "createdAt" | "updatedAt">,
+  ): Promise<MarketSentimentSnapshot>;
+  getLatest(params: {
+    now: Date;
+    provider?: string;
+    indexName?: string;
+  }): Promise<MarketSentimentSnapshot | null>;
+}
+
 export interface ImportJobRepository {
   getLatestByUserId(userId: EntityId): Promise<ImportJob>;
 }
@@ -215,5 +232,6 @@ export interface BackendRepositories {
   externalResearchJobs: ExternalResearchJobRepository;
   externalResearchUsageCounters: ExternalResearchUsageCounterRepository;
   externalResearchDocuments: ExternalResearchDocumentRepository;
+  marketSentimentSnapshots: MarketSentimentSnapshotRepository;
   importJobs: ImportJobRepository;
 }

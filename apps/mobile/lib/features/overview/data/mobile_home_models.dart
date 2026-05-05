@@ -14,6 +14,7 @@ class MobileHomeSnapshot {
     required this.fxContext,
     required this.recommendationTheme,
     required this.recommendationReason,
+    required this.marketSentiment,
   });
 
   final String viewerName;
@@ -26,6 +27,7 @@ class MobileHomeSnapshot {
   final MobileFxContext fxContext;
   final String recommendationTheme;
   final String recommendationReason;
+  final MobileMarketSentiment? marketSentiment;
 
   LooMinisterPageContext toMinisterContext({required String asOf}) {
     final chart = netWorthChart;
@@ -79,6 +81,16 @@ class MobileHomeSnapshot {
             label: "推荐主题",
             value: recommendationTheme,
             detail: recommendationReason,
+            source: "analysis-cache",
+          ),
+        if (marketSentiment != null)
+          LooMinisterFact(
+            id: "market-sentiment",
+            label: "今日市场脉搏",
+            value:
+                "VIX ${marketSentiment!.vixDisplay} · FGI ${marketSentiment!.fgiScore}/100 · 象限 ${marketSentiment!.quadrantLabel}",
+            detail:
+                "${marketSentiment!.strategyLabel}：${marketSentiment!.strategyDetail}",
             source: "analysis-cache",
           ),
       ],
@@ -136,6 +148,101 @@ class MobileHomeSnapshot {
       recommendationReason: recommendation is Map<String, dynamic>
           ? recommendation["reason"] as String? ?? "完成数据导入后，Loo国会生成组合建议。"
           : "完成数据导入后，Loo国会生成组合建议。",
+      marketSentiment: MobileMarketSentiment.tryParse(json["marketSentiment"]),
+    );
+  }
+}
+
+class MobileMarketSentiment {
+  const MobileMarketSentiment({
+    required this.title,
+    required this.score,
+    required this.ratingLabel,
+    required this.fgiScore,
+    required this.fgiLevelLabel,
+    required this.vixValue,
+    required this.vixLevelLabel,
+    required this.quadrant,
+    required this.quadrantLabel,
+    required this.strategyLabel,
+    required this.strategyDetail,
+    required this.buySignalLabel,
+    required this.summary,
+    required this.riskNote,
+    required this.freshnessLabel,
+    required this.sourceLabel,
+    required this.components,
+  });
+
+  final String title;
+  final int score;
+  final String ratingLabel;
+  final int fgiScore;
+  final String fgiLevelLabel;
+  final double? vixValue;
+  final String vixLevelLabel;
+  final String quadrant;
+  final String quadrantLabel;
+  final String strategyLabel;
+  final String strategyDetail;
+  final String buySignalLabel;
+  final String summary;
+  final String riskNote;
+  final String freshnessLabel;
+  final String sourceLabel;
+  final List<MobileMarketSentimentComponent> components;
+
+  bool get hasContent => title.isNotEmpty;
+  String get vixDisplay =>
+      vixValue == null ? "--" : vixValue!.toStringAsFixed(2);
+
+  static MobileMarketSentiment? tryParse(Object? value) {
+    if (value is! Map<String, dynamic>) {
+      return null;
+    }
+    return MobileMarketSentiment(
+      title: value["title"] as String? ?? "美股恐惧贪婪",
+      score: (value["score"] as num?)?.round() ?? 50,
+      ratingLabel: value["ratingLabel"] as String? ?? "中性",
+      fgiScore: (value["fgiScore"] as num?)?.round() ??
+          (value["score"] as num?)?.round() ??
+          50,
+      fgiLevelLabel: value["fgiLevelLabel"] as String? ?? "中性",
+      vixValue: (value["vixValue"] as num?)?.toDouble(),
+      vixLevelLabel: value["vixLevelLabel"] as String? ?? "波动待确认",
+      quadrant: value["quadrant"] as String? ?? "",
+      quadrantLabel: value["quadrantLabel"] as String? ?? "矩阵待确认",
+      strategyLabel: value["strategyLabel"] as String? ?? "中性定投",
+      strategyDetail:
+          value["strategyDetail"] as String? ?? "按计划执行，市场脉搏只作为节奏参考。",
+      buySignalLabel: value["buySignalLabel"] as String? ?? "按计划执行",
+      summary: value["summary"] as String? ?? "",
+      riskNote: value["riskNote"] as String? ?? "",
+      freshnessLabel: value["freshnessLabel"] as String? ?? "",
+      sourceLabel: value["sourceLabel"] as String? ?? "",
+      components: readJsonList(value, "components")
+          .map(MobileMarketSentimentComponent.fromJson)
+          .toList(),
+    );
+  }
+}
+
+class MobileMarketSentimentComponent {
+  const MobileMarketSentimentComponent({
+    required this.label,
+    required this.score,
+    required this.detail,
+  });
+
+  final String label;
+  final int score;
+  final String detail;
+
+  factory MobileMarketSentimentComponent.fromJson(Map<String, dynamic> json) {
+    return MobileMarketSentimentComponent(
+      label: json["label"] as String? ?? "情绪因子",
+      score: (json["score"] as num?)?.round() ?? 50,
+      detail: json["detail"] as String? ?? "",
     );
   }
 }

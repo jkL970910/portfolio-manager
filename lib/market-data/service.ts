@@ -3,7 +3,10 @@ import { getOrSetCached } from "@/lib/market-data/cache";
 import { getMarketDataConfig } from "@/lib/market-data/config";
 import { getHistoricalSeriesFromAlphaVantage } from "@/lib/market-data/alpha-vantage";
 import { isProviderLimited } from "@/lib/market-data/provider-limits";
-import { resolveSecurityWithOpenFigi } from "@/lib/market-data/openfigi";
+import {
+  resolveSecurityWithOpenFigi,
+  searchSecuritiesWithOpenFigi,
+} from "@/lib/market-data/openfigi";
 import {
   getHistoricalSeriesFromTwelveData,
   getQuoteFromTwelveData,
@@ -25,12 +28,101 @@ type SecurityQuoteOptions = {
   currency?: string | null;
 };
 
+const SUPPORTED_SEARCH_CURRENCIES = new Set(["CAD", "USD"]);
+
+const EXCHANGE_CURRENCY_HINTS = new Map<string, "CAD" | "USD">([
+  ["AMEX", "USD"],
+  ["ARCX", "USD"],
+  ["ARCA", "USD"],
+  ["BATS", "USD"],
+  ["NASDAQ", "USD"],
+  ["NAS", "USD"],
+  ["NYSE", "USD"],
+  ["NYS", "USD"],
+  ["NYSE AMERICAN", "USD"],
+  ["NYSE ARCA", "USD"],
+  ["OTC", "USD"],
+  ["PINX", "USD"],
+  ["XASE", "USD"],
+  ["XNAS", "USD"],
+  ["XNYS", "USD"],
+  ["CBOE", "CAD"],
+  ["CBOE CANADA", "CAD"],
+  ["CSE", "CAD"],
+  ["NEO", "CAD"],
+  ["NEOE", "CAD"],
+  ["TSX", "CAD"],
+  ["TSXV", "CAD"],
+  ["XTSE", "CAD"],
+  ["XTSX", "CAD"],
+  ["XCNQ", "CAD"],
+]);
+
+const SUPPORTED_SEARCH_COUNTRIES = new Set([
+  "CANADA",
+  "UNITED STATES",
+  "UNITED STATES OF AMERICA",
+  "USA",
+  "US",
+]);
+
+function normalizeIdentityPart(value?: string | null) {
+  return value?.trim().toUpperCase() || null;
+}
+
+function inferSupportedSearchCurrency(result: SecuritySearchResult) {
+  const currency = normalizeIdentityPart(result.currency);
+  if (currency && SUPPORTED_SEARCH_CURRENCIES.has(currency)) {
+    return currency as "CAD" | "USD";
+  }
+  if (currency) {
+    return null;
+  }
+
+  const exchange = normalizeIdentityPart(result.exchange);
+  if (exchange && EXCHANGE_CURRENCY_HINTS.has(exchange)) {
+    return EXCHANGE_CURRENCY_HINTS.get(exchange) ?? null;
+  }
+
+  const micCode = normalizeIdentityPart(result.micCode);
+  if (micCode && EXCHANGE_CURRENCY_HINTS.has(micCode)) {
+    return EXCHANGE_CURRENCY_HINTS.get(micCode) ?? null;
+  }
+
+  return null;
+}
+
+export function filterSupportedSearchResults(
+  results: SecuritySearchResult[],
+) {
+  return results.flatMap((result) => {
+    const currency = inferSupportedSearchCurrency(result);
+    if (!currency) {
+      return [];
+    }
+
+    const exchange = normalizeIdentityPart(result.exchange);
+    const micCode = normalizeIdentityPart(result.micCode);
+    const country = normalizeIdentityPart(result.country);
+    const supportedExchange =
+      (exchange && EXCHANGE_CURRENCY_HINTS.has(exchange)) ||
+      (micCode && EXCHANGE_CURRENCY_HINTS.has(micCode));
+    const supportedCountry =
+      !country || SUPPORTED_SEARCH_COUNTRIES.has(country);
+    if (!supportedExchange && !supportedCountry) {
+      return [];
+    }
+
+    return [{ ...result, currency }];
+  });
+}
+
 function isCanadianQuoteRequest(
   exchange?: string | null,
   currency?: string | null,
 ) {
-  const normalizedCurrency = currency?.trim().toUpperCase() || null;
-  const normalizedExchange = exchange?.trim().toUpperCase() || null;
+  const normalizedCurrency = normalizeIdentityPart(currency);
+  const normalizedExchange = normalizeIdentityPart(exchange);
   return (
     normalizedCurrency === "CAD" ||
     normalizedExchange === "TSX" ||
@@ -113,10 +205,25 @@ export async function searchSecurities(
 ): Promise<{
   results: SecuritySearchResult[];
   providerHealth: ReturnType<typeof getProviderHealth>;
+  metadata: {
+    rawResultCount: number;
+    supportedResultCount: number;
+    filteredOutCount: number;
+    supportedScopeLabel: string;
+  };
 }> {
   const trimmed = query.trim();
   if (trimmed.length < 1) {
-    return { results: [], providerHealth: getProviderHealth() };
+    return {
+      results: [],
+      providerHealth: getProviderHealth(),
+      metadata: {
+        rawResultCount: 0,
+        supportedResultCount: 0,
+        filteredOutCount: 0,
+        supportedScopeLabel: "北美 CAD/USD 市场",
+      },
+    };
   }
 
   const { searchCacheTtlSeconds } = getMarketDataConfig();
@@ -129,7 +236,46 @@ export async function searchSecurities(
     async () => searchSecuritiesWithTwelveData(trimmed),
   );
 
-  return { results, providerHealth: getProviderHealth() };
+  const supportedResults = filterSupportedSearchResults(results);
+
+  if (supportedResults.length > 0) {
+    return {
+      results: supportedResults,
+      providerHealth: getProviderHealth(),
+      metadata: {
+        rawResultCount: results.length,
+        supportedResultCount: supportedResults.length,
+        filteredOutCount: Math.max(results.length - supportedResults.length, 0),
+        supportedScopeLabel: "北美 CAD/USD 市场",
+      },
+    };
+  }
+
+  const openFigiResults = await getOrSetCached(
+    `market-data:search-openfigi:${trimmed.toLowerCase()}`,
+    {
+      ttlMs: searchCacheTtlSeconds * 1000,
+      staleOnErrorMs: searchCacheTtlSeconds * 1000,
+    },
+    async () => searchSecuritiesWithOpenFigi(trimmed),
+  ).catch(() => []);
+  const supportedOpenFigiResults = filterSupportedSearchResults(openFigiResults);
+
+  return {
+    results: supportedOpenFigiResults,
+    providerHealth: getProviderHealth(),
+    metadata: {
+      rawResultCount: results.length + openFigiResults.length,
+      supportedResultCount: supportedOpenFigiResults.length,
+      filteredOutCount: Math.max(
+        results.length +
+          openFigiResults.length -
+          supportedOpenFigiResults.length,
+        0,
+      ),
+      supportedScopeLabel: "北美 CAD/USD 市场",
+    },
+  };
 }
 
 export async function resolveSecurity(

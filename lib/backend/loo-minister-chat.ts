@@ -242,6 +242,7 @@ export async function askLooMinisterChat(
   const answerResponse = await getLooMinisterAnswer(userId, enrichedRequest, {
     skipContextResolver: true,
     forceLocal: input.answerMode === "local",
+    allowProviderFallback: input.answerMode === "local",
   });
   const answer = answerResponse.data;
   const recentWithCurrent = [

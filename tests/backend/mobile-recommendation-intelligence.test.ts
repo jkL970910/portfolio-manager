@@ -269,3 +269,38 @@ test("recommendation V3 overlay keeps metadata uncertainty visible before live i
   );
   assert.equal(overlay.sourceMode, "local");
 });
+
+test("recommendation V3 overlay can consume market pulse as portfolio-level timing context", () => {
+  const sentimentBrief: RecommendationsData["intelligenceBriefs"][number] = {
+    id: "sentiment:us-fear-greed",
+    title: "今日市场脉搏：象限 F · 控制仓位",
+    detail: "VIX 19.31（中性波动），FGI 66/100（中性），新增买入需要更注意价格和仓位。",
+    sourceLabel: "派生市场脉搏",
+    sourceMode: "derived",
+    freshnessLabel: "更新 2026-05-05 · 过期 2026-05-06",
+    generatedAt: "2026-05-05T12:00:00.000Z",
+    symbols: [],
+    identity: {
+      symbol: "US-MARKET",
+    },
+    sources: [
+      {
+        title: "derived-us-market-sentiment",
+        sourceType: "market-sentiment",
+        date: "2026-05-05",
+      },
+    ],
+    confidence: "medium",
+    relevanceScore: 65,
+    sourceReliability: 58,
+    riskFlags: ["贪婪指数不是自动卖出信号；它主要提醒新增买入不要追高。"],
+  };
+
+  const refs = mapRecommendationIntelligenceRefs(priority(), [sentimentBrief]);
+  const overlay = buildRecommendationV3Overlay(priority(), refs, [sentimentBrief]);
+
+  assert.ok(refs.some((ref) => ref.id === "sentiment:us-fear-greed"));
+  assert.ok(overlay);
+  assert.ok(overlay.signals.some((signal) => signal.includes("市场脉搏")));
+  assert.ok(overlay.riskFlags.some((flag) => flag.includes("不要追高")));
+});

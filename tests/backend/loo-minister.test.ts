@@ -137,11 +137,68 @@ test("Loo Minister GPT mode falls back safely when provider is not enabled", asy
 
   assert.equal(response.meta.source, "service");
   assert.equal(response.data.page, "security-detail");
-  assert.match(response.data.title, /本地答复/);
-  assert.match(response.data.answer, /GPT-5.5 provider 未启用/);
-  assert.match(response.data.answer, /候选适配资料/);
+  assert.equal(response.data.title, "标的大臣答复");
+  assert.match(response.data.answer, /当前页面、持仓和缓存资料/);
+  assert.doesNotMatch(response.data.answer, /provider|API Key|GPT-5\.5 provider/i);
+  assert.doesNotMatch(response.data.answer, /context \d+\/100|资料完整度/);
   assert.match(response.data.answer, /NVDA/);
   assert.match(response.data.disclaimer.zh, /不构成投资建议/);
+});
+
+test("Loo Minister strict GPT mode fails instead of silently using local fallback", async () => {
+  await assert.rejects(
+    getLooMinisterAnswer(
+      "user_1",
+      {
+        pageContext: {
+          version: LOO_MINISTER_VERSION,
+          page: "security-detail",
+          locale: "zh",
+          title: "NVDA 标的详情",
+          asOf: now,
+          displayCurrency: "CAD",
+          subject: {
+            security: {
+              securityId: "security_nvda_usd",
+              symbol: "NVDA",
+              exchange: "NASDAQ",
+              currency: "USD",
+              name: "NVIDIA Corp.",
+            },
+          },
+          dataFreshness: {
+            portfolioAsOf: now,
+            quotesAsOf: now,
+            fxAsOf: now,
+            chartFreshness: "fresh",
+            sourceMode: "cached-external",
+          },
+          facts: [],
+          warnings: [],
+          allowedActions: [],
+        },
+        question: "这个标的适合买入吗？",
+        answerStyle: "beginner",
+        cacheStrategy: "prefer-cache",
+        includeExternalResearch: false,
+      },
+      {
+        settings: {
+          mode: "gpt-5.5",
+          provider: "official-openai",
+          model: "gpt-5.5",
+          reasoningEffort: "medium",
+          endpoint: "https://api.openai.com/v1/responses",
+          apiKey: null,
+          apiKeySource: "none",
+          providerEnabled: false,
+        },
+        persistUsage: false,
+        allowProviderFallback: false,
+      },
+    ),
+    /外部 AI 未启用|API Key/,
+  );
 });
 
 test("Loo Minister answers product feature questions with project context", async () => {
@@ -475,10 +532,15 @@ test("Loo Minister answers candidate buy-fit questions without treating zero hol
     },
   );
 
-  assert.match(response.data.answer, /候选新增标的/);
-  assert.match(response.data.answer, /0% 只代表当前未持有/);
-  assert.match(response.data.answer, /偏好适配/);
-  assert.match(response.data.answer, /推荐引擎/);
+  assert.match(response.data.answer, /新增候选/);
+  assert.match(response.data.answer, /0% 只代表还没买入/);
+  assert.match(response.data.answer, /和你偏好的关系/);
+  assert.match(response.data.answer, /当前资金路径/);
+  assert.match(response.data.answer, /不代表不能分析/);
+  assert.doesNotMatch(
+    response.data.answer,
+    /推荐引擎|资料边界|结论口径|缓存情报|外部模型没有参与|应用内资料|资料完整度|asset-class target|阻塞项/,
+  );
   assert.match(response.data.disclaimer.zh, /不构成投资建议/);
 });
 
@@ -546,9 +608,9 @@ test("Loo Minister infers candidate economic exposure when page asset class is u
     },
   );
 
-  assert.match(response.data.answer, /候选新增标的/);
-  assert.match(response.data.answer, /底层经济暴露：Fixed Income/);
-  assert.match(response.data.answer, /目标 10\.0%/);
+  assert.match(response.data.answer, /新增候选/);
+  assert.match(response.data.answer, /Fixed Income 暴露/);
+  assert.match(response.data.answer, /目标是 10\.0%/);
   assert.doesNotMatch(response.data.answer, /资产类别未确认/);
   assert.doesNotMatch(response.data.answer, /不能.*判断.*适配/);
 });
@@ -618,8 +680,8 @@ test("Loo Minister treats CGL.C as precious metals exposure, not Canadian equity
     },
   );
 
-  assert.match(response.data.answer, /底层经济暴露：Commodity/);
-  assert.match(response.data.answer, /候选新增标的|持仓复盘|继续加仓/);
+  assert.match(response.data.answer, /Commodity 暴露/);
+  assert.match(response.data.answer, /新增候选|继续加仓/);
   assert.doesNotMatch(response.data.answer, /加拿大股票整体配置|Canadian Equity 高于目标/);
   assert.doesNotMatch(response.data.answer, /目标 22\.0%|目标约 22/);
 });
@@ -1471,9 +1533,9 @@ test("Loo Minister provider fallback redacts API keys in user-visible reason", a
       },
     );
 
-  assert.match(response.data.title, /本地答复/);
-    assert.match(response.data.answer, /sk-\.\.\.cdef/);
-    assert.doesNotMatch(response.data.answer, /sk-test-secret/);
+  assert.equal(response.data.title, "总览大臣答复");
+  assert.match(response.data.answer, /当前页面、持仓和缓存资料/);
+  assert.doesNotMatch(response.data.answer, /sk-\.\.\.cdef|sk-test-secret|API key|provider|外部模型没有参与/i);
   } finally {
     globalThis.fetch = originalFetch;
   }
@@ -1838,9 +1900,104 @@ test("Loo Minister replaces misleading candidate fit provider answers", async ()
       },
     );
 
-    assert.match(response.data.answer, /没有正确使用候选适配资料/);
-    assert.match(response.data.answer, /0% 只代表当前未持有/);
+    assert.match(response.data.answer, /当前页面、持仓和缓存资料/);
+    assert.match(response.data.answer, /0% 只代表还没买入/);
     assert.doesNotMatch(response.data.answer, /就不能继续分析/);
+    assert.doesNotMatch(response.data.answer, /质量守卫|quality_guard|provider|外部模型没有参与/i);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("Loo Minister strict GPT mode rejects misleading candidate fit provider answers", async () => {
+  const originalFetch = globalThis.fetch;
+
+  globalThis.fetch = async () =>
+    new Response(
+      JSON.stringify({
+        output_text: JSON.stringify({
+          version: LOO_MINISTER_VERSION,
+          generatedAt: now,
+          role: "loo-minister",
+          page: "security-detail",
+          title: "标的大臣答复",
+          answer:
+            "当前页面没有足够组合上下文判断这个标的是否适配，因此 XBB 当前组合占比 0% 就不能继续分析。",
+          keyPoints: ["上下文不足"],
+          suggestedActions: [],
+          sources: [
+            {
+              title: "XBB 标的详情 页面上下文",
+              sourceType: "page-context",
+              asOf: now,
+            },
+          ],
+          disclaimer: {
+            zh: "仅用于研究学习，不构成投资建议。",
+            en: "For research and education only. This is not investment advice.",
+          },
+        }),
+      }),
+      {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      },
+    );
+
+  try {
+    await assert.rejects(
+      getLooMinisterAnswer(
+        "user_casey",
+        {
+          pageContext: {
+            version: LOO_MINISTER_VERSION,
+            page: "security-detail",
+            locale: "zh",
+            title: "XBB 标的详情",
+            asOf: now,
+            displayCurrency: "CAD",
+            subject: {
+              security: {
+                securityId: "security_xbb_tsx_cad",
+                symbol: "XBB",
+                exchange: "TSX",
+                currency: "CAD",
+                name: "iShares Core Canadian Universe Bond Index ETF",
+              },
+            },
+            dataFreshness: {
+              portfolioAsOf: now,
+              quotesAsOf: now,
+              fxAsOf: now,
+              chartFreshness: "stale",
+              sourceMode: "cached-external",
+            },
+            facts: [],
+            warnings: [],
+            allowedActions: [],
+          },
+          question: "这个标的适合买入吗？",
+          answerStyle: "beginner",
+          cacheStrategy: "prefer-cache",
+          includeExternalResearch: false,
+        },
+        {
+          settings: {
+            mode: "gpt-5.5",
+            provider: "openrouter-compatible",
+            model: "gpt-5.5",
+            reasoningEffort: "medium",
+            endpoint: "https://openrouter.icu/v1/responses",
+            apiKey: "sk-router-test",
+            apiKeySource: "user",
+            providerEnabled: true,
+          },
+          persistUsage: false,
+          allowProviderFallback: false,
+        },
+      ),
+      /外部 GPT 回答没有正确使用当前页面上下文/,
+    );
   } finally {
     globalThis.fetch = originalFetch;
   }

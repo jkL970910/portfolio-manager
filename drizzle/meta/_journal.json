@@ -169,6 +169,20 @@
       "when": 1777856400000,
       "tag": "0023_provider_usage_and_worker_status",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1778029200000,
+      "tag": "0024_market_sentiment_snapshots",
+      "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1778032800000,
+      "tag": "0025_market_pulse_vix_fgi_matrix",
+      "breakpoints": true
     }
   ]
 }

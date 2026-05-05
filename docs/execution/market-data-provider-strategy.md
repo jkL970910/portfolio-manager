@@ -180,7 +180,9 @@ Provider limits must not break the product flow:
 
 Current provider routing:
 
-- search -> Twelve Data
+- search -> Twelve Data, with OpenFIGI fallback for identity discovery
+- search results are product-scoped to CAD/USD listings only; complete listing
+  identity is still preserved as `symbol + exchange + currency`
 - normalization -> OpenFIGI
 - USD quote -> Twelve Data first, with Yahoo Finance as a lightweight fallback
 - CAD quote with `NEO` / Cboe Canada -> Yahoo Finance using `.NE`

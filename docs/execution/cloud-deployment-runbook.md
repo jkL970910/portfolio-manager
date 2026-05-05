@@ -55,7 +55,13 @@ Cloudflare Worker:
 APP_BASE_URL=https://<your-vercel-domain>
 ENABLE_SECURITY_METADATA_WORKER=true
 ENABLE_MARKET_DATA_WORKER=true
-ENABLE_EXTERNAL_RESEARCH_WORKER=false
+ENABLE_EXTERNAL_RESEARCH_WORKER=true
+EXTERNAL_RESEARCH_WORKER_MODE=daily-overview
+EXTERNAL_RESEARCH_DAILY_SOURCE=profile
+EXTERNAL_RESEARCH_DAILY_MAX_USERS=1
+EXTERNAL_RESEARCH_DAILY_MAX_SYMBOLS_PER_USER=3
+EXTERNAL_RESEARCH_WORKER_MAX_JOBS=3
+EXTERNAL_RESEARCH_WORKER_MAX_RUNTIME_MS=20000
 ```
 
 Secret:
@@ -83,6 +89,9 @@ curl -i -X POST "$APP/api/workers/security-metadata/run?maxSecurities=1" \
 
 curl -i -X POST "$APP/api/workers/market-data/run?maxUsers=1&maxSymbols=1" \
   -H "Authorization: Bearer <PORTFOLIO_WORKER_SECRET>"
+
+curl -i -X POST "$APP/api/workers/external-research/run?mode=daily-overview&source=profile&maxUsers=1&maxSymbolsPerUser=1&maxJobs=1" \
+  -H "Authorization: Bearer <PORTFOLIO_WORKER_SECRET>"
 ```
 
 Expected:
@@ -90,6 +99,8 @@ Expected:
 - `/api/mobile/home` returns `401` without login token.
 - worker endpoints return `200` only with the correct secret.
 - wrong/missing worker secret returns `401` or `503`.
+- external-research returns `enqueue` plus `worker`; if daily overview is not
+  enabled on the API host, it skips safely instead of calling external providers.
 
 ## Phase 2: Flutter Web URL
 
@@ -158,7 +169,10 @@ Expected:
   unbounded provider calls. If the list grows beyond the current run budget, the
   run should be `partial` with a mobile-readable “remaining symbols will refresh
   next run” status, not a full skip.
-- `external-research` stays disabled unless explicitly enabled.
+- `external-research` may run in `daily-overview` mode with tight limits. It
+  only enqueues a small set of complete-identity holdings, skips fresh cached
+  documents, then drains the same external-research queue. Keep raw news/forum
+  sources disabled until provider/cost policy is explicitly approved.
 
 Mobile visibility:
 
@@ -237,7 +251,15 @@ and low-frequency:
 - Endpoints used: `OVERVIEW` for company/common-stock style securities and
   `ETF_PROFILE` for ETF/fund-like securities
 - Output: persisted `external_research_documents`
-- Runtime boundary: external-research worker only; never Flutter page load
+- Daily overview mode: Cloudflare Cron calls
+  `/api/workers/external-research/run?mode=daily-overview&source=profile`
+  with bounded `maxUsers`, `maxSymbolsPerUser`, and `maxJobs`; the endpoint
+  first enqueues only stale/missing complete-identity holdings, then drains the
+  queue.
+- Runtime boundary: external-research worker only; never Flutter page load.
+  Overview can display the full cached daily briefing. Recommendations should
+  only display lightweight “external material incorporated” status and
+  item-level evidence already present in the recommendation DTO.
 
 Required env for profile research QA:
 
@@ -247,6 +269,13 @@ PORTFOLIO_ANALYZER_EXTERNAL_WORKER=enabled
 PORTFOLIO_ANALYZER_EXTERNAL_PROVIDERS=enabled
 PORTFOLIO_ANALYZER_EXTERNAL_ADAPTERS=enabled
 PORTFOLIO_ANALYZER_EXTERNAL_SOURCE_PROFILE=enabled
+PORTFOLIO_ANALYZER_EXTERNAL_DAILY_OVERVIEW=enabled
+PORTFOLIO_ANALYZER_EXTERNAL_SECURITY_MANUAL_REFRESH=enabled
+EXTERNAL_RESEARCH_DAILY_SOURCE=profile
+EXTERNAL_RESEARCH_DAILY_MAX_USERS=1
+EXTERNAL_RESEARCH_DAILY_MAX_SYMBOLS_PER_USER=3
+EXTERNAL_RESEARCH_WORKER_MAX_JOBS=3
+EXTERNAL_RESEARCH_WORKER_MAX_RUNTIME_MS=20000
 ALPHA_VANTAGE_API_KEY=...
 ```
 

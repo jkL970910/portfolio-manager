@@ -99,6 +99,9 @@ function mapExternalResearchStatusNote(job: ExternalResearchJob) {
       ? `已在 ${formatExternalResearchDateTime(job.finishedAt)} 完成。`
       : "已完成。";
   }
+  if (job.status === "skipped") {
+    return job.errorMessage || "来源暂无可用资料，本次已安全跳过。";
+  }
   if (job.status === "failed") {
     if (job.attemptCount < job.maxAttempts) {
       const runAfter = formatExternalResearchDateTime(job.runAfter);
@@ -158,6 +161,7 @@ export function mapExternalResearchJobForMobile(job: ExternalResearchJob) {
     queued: "排队中",
     running: "运行中",
     succeeded: "已完成",
+    skipped: "已跳过",
     failed: "已失败",
     cancelled: "已取消",
   };
@@ -265,6 +269,7 @@ export async function getMobileExternalResearchJobs(userId: string, limit = 5) {
   const runningCount = items.filter((item) => item.status === "running").length;
   const queuedCount = items.filter((item) => item.status === "queued").length;
   const failedCount = items.filter((item) => item.status === "failed").length;
+  const skippedCount = items.filter((item) => item.status === "skipped").length;
 
   return apiSuccess(
     {
@@ -276,6 +281,7 @@ export async function getMobileExternalResearchJobs(userId: string, limit = 5) {
         runningCount,
         queuedCount,
         failedCount,
+        skippedCount,
         workerBoundaryLabel:
           "外部研究只能由手动入队或后台 worker 执行，页面加载不得自动触发实时来源。",
       },
@@ -289,6 +295,10 @@ export async function enqueueExternalResearchJob(
   userId: string,
   input: PortfolioAnalyzerRequest,
   now = new Date(),
+  options: {
+    sourceIds?: ExternalResearchPolicy["allowedSources"][number]["id"][];
+    priority?: number;
+  } = {},
 ) {
   assertExternalResearchAllowed(input);
 
@@ -304,6 +314,19 @@ export async function enqueueExternalResearchJob(
 
   assertExternalResearchQuota({ counters, policy, requestedSymbolCount });
 
+  const sourceAllowlist = policy.allowedSources
+    .filter((source) => source.enabled)
+    .filter(
+      (source) => !options.sourceIds || options.sourceIds.includes(source.id),
+    )
+    .map((source) => ({ ...source }));
+
+  if (sourceAllowlist.length === 0) {
+    throw new Error(
+      "External research source is not enabled for this request.",
+    );
+  }
+
   const job = await repositories.externalResearchJobs.create({
     userId,
     scope: input.scope,
@@ -311,10 +334,8 @@ export async function enqueueExternalResearchJob(
     request: input,
     status: "queued",
     sourceMode: "cached-external",
-    sourceAllowlist: policy.allowedSources
-      .filter((source) => source.enabled)
-      .map((source) => ({ ...source })),
-    priority: input.scope === "security" ? 10 : 0,
+    sourceAllowlist,
+    priority: options.priority ?? (input.scope === "security" ? 10 : 0),
     attemptCount: 0,
     maxAttempts: 3,
     runAfter: now.toISOString(),
@@ -335,6 +356,178 @@ export async function enqueueExternalResearchJob(
   });
 
   return apiSuccess({ job }, "database");
+}
+
+function parseDailyInteger(value: number | undefined, fallback: number) {
+  if (!Number.isFinite(value) || !value) {
+    return fallback;
+  }
+  return Math.max(Math.trunc(value), 1);
+}
+
+function normalizeDailySource(
+  source?: string | null,
+): ExternalResearchPolicy["allowedSources"][number]["id"] {
+  const normalized = source?.trim().toLowerCase();
+  if (
+    normalized === "market-data" ||
+    normalized === "profile" ||
+    normalized === "institutional" ||
+    normalized === "news" ||
+    normalized === "community"
+  ) {
+    return normalized;
+  }
+  return "profile";
+}
+
+export interface DailyOverviewExternalResearchEnqueueResult {
+  status: "queued" | "skipped" | "partial";
+  sourceId: ExternalResearchPolicy["allowedSources"][number]["id"];
+  usersChecked: number;
+  candidatesChecked: number;
+  queuedJobs: number;
+  skippedFresh: number;
+  skippedInvalidIdentity: number;
+  errors: string[];
+}
+
+export async function enqueueDailyOverviewExternalResearchJobs(args: {
+  now?: Date;
+  maxUsers?: number;
+  maxSymbolsPerUser?: number;
+  sourceId?: string | null;
+  maxCacheAgeSeconds?: number;
+} = {}): Promise<DailyOverviewExternalResearchEnqueueResult> {
+  const now = args.now ?? new Date();
+  const sourceId = normalizeDailySource(args.sourceId);
+  const policy = getExternalResearchPolicy();
+  const maxUsers = Math.min(parseDailyInteger(args.maxUsers, 1), 10);
+  const maxSymbolsPerUser = Math.min(
+    parseDailyInteger(args.maxSymbolsPerUser, 3),
+    12,
+  );
+  const maxCacheAgeSeconds =
+    args.maxCacheAgeSeconds ?? getExternalResearchPolicy().defaultTtlSeconds;
+  const repositories = getRepositories();
+  const result: DailyOverviewExternalResearchEnqueueResult = {
+    status: "skipped",
+    sourceId,
+    usersChecked: 0,
+    candidatesChecked: 0,
+    queuedJobs: 0,
+    skippedFresh: 0,
+    skippedInvalidIdentity: 0,
+    errors: [],
+  };
+
+  if (!policy.scheduledOverviewEnabled) {
+    result.errors.push(
+      "Daily overview external research is not enabled on the API host.",
+    );
+    return result;
+  }
+
+  const { getDb } = await import("@/lib/db/client");
+  const { holdingPositions, users } = await import("@/lib/db/schema");
+  const { desc, eq } = await import("drizzle-orm");
+  const db = getDb();
+  const userRows = await db
+    .select({ id: users.id })
+    .from(users)
+    .orderBy(desc(users.createdAt))
+    .limit(maxUsers);
+  result.usersChecked = userRows.length;
+
+  for (const user of userRows) {
+    const holdings = await db
+      .select({
+        securityId: holdingPositions.securityId,
+        symbol: holdingPositions.symbol,
+        name: holdingPositions.name,
+        exchange: holdingPositions.exchangeOverride,
+        currency: holdingPositions.currency,
+        securityType: holdingPositions.securityTypeOverride,
+        marketValueCad: holdingPositions.marketValueCad,
+      })
+      .from(holdingPositions)
+      .where(eq(holdingPositions.userId, user.id))
+      .orderBy(desc(holdingPositions.marketValueCad))
+      .limit(maxSymbolsPerUser * 3);
+
+    let queuedForUser = 0;
+    for (const holding of holdings) {
+      if (queuedForUser >= maxSymbolsPerUser) {
+        break;
+      }
+      result.candidatesChecked += 1;
+
+      const symbol = holding.symbol?.trim().toUpperCase();
+      const currency = holding.currency?.trim().toUpperCase();
+      const exchange = holding.exchange?.trim().toUpperCase();
+      const securityId = holding.securityId?.trim();
+      if (!symbol || !securityId || !currency || (currency !== "CAD" && currency !== "USD")) {
+        result.skippedInvalidIdentity += 1;
+        continue;
+      }
+
+      const freshDocuments =
+        await repositories.externalResearchDocuments.listFreshByUserId(
+          user.id,
+          {
+            now,
+            limit: 1,
+            securityId,
+          },
+        );
+      if (freshDocuments.length > 0) {
+        result.skippedFresh += 1;
+        continue;
+      }
+
+      try {
+        await enqueueExternalResearchJob(
+          user.id,
+          {
+            scope: "security",
+            mode: "quick",
+            security: {
+              securityId,
+              symbol,
+              exchange: exchange || undefined,
+              currency,
+              name: holding.name?.trim() || undefined,
+              securityType: holding.securityType?.trim() || undefined,
+            },
+            cacheStrategy: "prefer-cache",
+            maxCacheAgeSeconds,
+            includeExternalResearch: true,
+          },
+          now,
+          { sourceIds: [sourceId], priority: 5 },
+        );
+        queuedForUser += 1;
+        result.queuedJobs += 1;
+      } catch (error) {
+        const message =
+          error instanceof Error
+            ? error.message
+            : "Failed to enqueue daily overview external research.";
+        result.errors.push(`${symbol}: ${message}`);
+        if (/daily limit/i.test(message)) {
+          break;
+        }
+      }
+    }
+  }
+
+  result.status =
+    result.errors.length > 0 && result.queuedJobs > 0
+      ? "partial"
+      : result.queuedJobs > 0
+      ? "queued"
+      : "skipped";
+  return result;
 }
 
 export function buildAnalyzerResultFromExternalResearch(args: {
@@ -475,10 +668,27 @@ export async function markExternalResearchJobFailed(
   return repositories.externalResearchJobs.markFailed(jobId, errorMessage, now);
 }
 
+export async function markExternalResearchJobSkipped(
+  jobId: string,
+  message: string,
+  now = new Date(),
+) {
+  const repositories = getRepositories();
+  return repositories.externalResearchJobs.markSkipped(jobId, message, now);
+}
+
 export interface ExternalResearchWorkerResult {
-  status: "idle" | "succeeded" | "failed-safe";
+  status: "idle" | "succeeded" | "skipped" | "failed-safe";
   workerId: string;
   job: ExternalResearchJob | null;
+  message: string;
+}
+
+export interface ExternalResearchWorkerBatchResult {
+  status: "idle" | "succeeded" | "partial" | "failed-safe";
+  workerId: string;
+  results: ExternalResearchWorkerResult[];
+  processedJobs: number;
   message: string;
 }
 
@@ -506,7 +716,12 @@ export async function runExternalResearchWorkerOnce(args: {
       request: job.request as PortfolioAnalyzerRequest,
       targetKey: job.targetKey,
       allowedSources: job.sourceAllowlist.map((source) => ({
-        id: source.id as "market-data" | "institutional" | "news" | "community",
+        id: source.id as
+          | "market-data"
+          | "profile"
+          | "institutional"
+          | "news"
+          | "community",
         label: String(source.label ?? source.id ?? "External source"),
         enabled: source.enabled === true,
         reason: String(source.reason ?? ""),
@@ -551,7 +766,19 @@ export async function runExternalResearchWorkerOnce(args: {
     };
   } catch (error) {
     if (error instanceof ExternalResearchProviderDisabledError) {
-      message = `${error.message} Job failed safely without external API calls.`;
+      message = `${error.message} 本次已安全跳过，没有写入外部资料。`;
+      const skippedJob = await markExternalResearchJobSkipped(
+        job.id,
+        message,
+        now,
+      );
+
+      return {
+        status: "skipped",
+        workerId: args.workerId,
+        job: skippedJob,
+        message,
+      };
     } else {
       message =
         error instanceof Error
@@ -566,5 +793,58 @@ export async function runExternalResearchWorkerOnce(args: {
     workerId: args.workerId,
     job: failedJob,
     message,
+  };
+}
+
+export async function runExternalResearchWorkerBatch(args: {
+  workerId: string;
+  maxJobs?: number;
+  maxRuntimeMs?: number;
+  now?: Date;
+}): Promise<ExternalResearchWorkerBatchResult> {
+  const maxJobs = Math.min(parseDailyInteger(args.maxJobs, 3), 12);
+  const maxRuntimeMs = Math.min(parseDailyInteger(args.maxRuntimeMs, 20_000), 55_000);
+  const startedAt = Date.now();
+  const results: ExternalResearchWorkerResult[] = [];
+
+  for (let index = 0; index < maxJobs; index += 1) {
+    if (Date.now() - startedAt >= maxRuntimeMs) {
+      break;
+    }
+    const result = await runExternalResearchWorkerOnce({
+      workerId: args.workerId,
+      now: args.now ?? new Date(),
+    });
+    if (result.status === "idle") {
+      if (results.length === 0) {
+        results.push(result);
+      }
+      break;
+    }
+    results.push(result);
+  }
+
+  const processedJobs = results.filter((result) => result.job).length;
+  const succeeded = results.filter((result) => result.status === "succeeded").length;
+  const skipped = results.filter((result) => result.status === "skipped").length;
+  const failed = results.filter((result) => result.status === "failed-safe").length;
+  const status =
+    processedJobs === 0
+      ? "idle"
+      : failed > 0 && (succeeded > 0 || skipped > 0)
+      ? "partial"
+      : failed > 0
+      ? "failed-safe"
+      : "succeeded";
+
+  return {
+    status,
+    workerId: args.workerId,
+    results,
+    processedJobs,
+    message:
+      processedJobs === 0
+        ? "No queued external research job is ready."
+        : `Processed ${processedJobs} external research job(s): ${succeeded} succeeded, ${skipped} skipped, ${failed} failed-safe.`,
   };
 }

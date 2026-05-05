@@ -111,6 +111,7 @@ test("preference schema rejects invalid preference factor bounds", () => {
 
 test("preference schema accepts resolved recommendation security identities", () => {
   const parsed = preferenceProfileInputSchema.safeParse(makePreferencePayload({
+    watchlistSymbols: ["DEV:ASX:AUD", "AAPL:NASDAQ:USD"],
     recommendationConstraints: {
       excludedSymbols: ["AMZN"],
       preferredSymbols: ["VFV"],
@@ -129,6 +130,7 @@ test("preference schema accepts resolved recommendation security identities", ()
 
   assert.equal(parsed.success, true);
   if (parsed.success) {
+    assert.equal(parsed.data.watchlistSymbols[0], "DEV:ASX:AUD");
     assert.equal(parsed.data.recommendationConstraints?.excludedSecurities[0]?.currency, "USD");
     assert.equal(parsed.data.recommendationConstraints?.preferredSecurities[0]?.exchange, "TSX");
   }

@@ -3,8 +3,6 @@ import "package:flutter/material.dart";
 import "../../../core/api/loo_api_client.dart";
 import "../data/mobile_recommendation_models.dart";
 import "../../discover/presentation/discover_page.dart";
-import "../../intelligence/data/daily_intelligence_models.dart";
-import "../../intelligence/presentation/daily_intelligence_card.dart";
 import "../../portfolio/presentation/security_detail_page.dart";
 
 class RecommendationsPage extends StatefulWidget {
@@ -21,14 +19,12 @@ class RecommendationsPage extends StatefulWidget {
 
 class _RecommendationsPageState extends State<RecommendationsPage> {
   late Future<MobileRecommendationsSnapshot> _snapshot;
-  late Future<MobileDailyIntelligenceSnapshot> _dailyIntelligence;
   var _working = false;
 
   @override
   void initState() {
     super.initState();
     _snapshot = _loadSnapshot();
-    _dailyIntelligence = _loadDailyIntelligence();
   }
 
   Future<MobileRecommendationsSnapshot> _loadSnapshot() async {
@@ -41,19 +37,9 @@ class _RecommendationsPageState extends State<RecommendationsPage> {
     return MobileRecommendationsSnapshot.fromJson(data);
   }
 
-  Future<MobileDailyIntelligenceSnapshot> _loadDailyIntelligence() async {
-    final response = await widget.apiClient.getDailyIntelligence(limit: 8);
-    final data = response["data"];
-    if (data is! Map<String, dynamic>) {
-      throw const LooApiException("今日秘闻数据格式不正确。");
-    }
-    return MobileDailyIntelligenceSnapshot.fromJson(data);
-  }
-
   void _refresh() {
     setState(() {
       _snapshot = _loadSnapshot();
-      _dailyIntelligence = _loadDailyIntelligence();
     });
   }
 
@@ -190,20 +176,7 @@ class _RecommendationsPageState extends State<RecommendationsPage> {
                     children: [
                       _SummaryCard(snapshot.data!),
                       const SizedBox(height: 16),
-                      FutureBuilder<MobileDailyIntelligenceSnapshot>(
-                        future: _dailyIntelligence,
-                        builder: (context, intelligenceSnapshot) {
-                          return DailyIntelligenceSummaryCard(
-                            snapshot: intelligenceSnapshot.data,
-                            isLoading: intelligenceSnapshot.connectionState ==
-                                ConnectionState.waiting,
-                            errorMessage: intelligenceSnapshot.hasError
-                                ? intelligenceSnapshot.error.toString()
-                                : null,
-                            onViewSecurity: _openSecurityFromIntelligence,
-                          );
-                        },
-                      ),
+                      _RecommendationIntelligenceStatusCard(snapshot.data!),
                       const SizedBox(height: 16),
                       _DiscoverEntryCard(onOpen: _openDiscover),
                       const SizedBox(height: 16),
@@ -298,24 +271,6 @@ class _RecommendationsPageState extends State<RecommendationsPage> {
     );
   }
 
-  void _openSecurityFromIntelligence(MobileDailyIntelligenceItem item) {
-    Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (_) => SecurityDetailPage(
-          apiClient: widget.apiClient,
-          symbol: item.identity.symbol,
-          fallbackTitle: item.identity.symbol,
-          securityId: item.identity.securityId.isEmpty
-              ? null
-              : item.identity.securityId,
-          exchange:
-              item.identity.exchange.isEmpty ? null : item.identity.exchange,
-          currency:
-              item.identity.currency.isEmpty ? null : item.identity.currency,
-        ),
-      ),
-    );
-  }
 }
 
 class _PageHeader extends StatelessWidget {
@@ -383,6 +338,39 @@ class _SummaryCard extends StatelessWidget {
               ],
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _RecommendationIntelligenceStatusCard extends StatelessWidget {
+  const _RecommendationIntelligenceStatusCard(this.data);
+
+  final MobileRecommendationsSnapshot data;
+
+  @override
+  Widget build(BuildContext context) {
+    final refs = data.priorities
+        .expand((priority) => priority.intelligenceRefs)
+        .toList();
+    final hasRefs = refs.isNotEmpty;
+    final theme = Theme.of(context);
+
+    return Card(
+      child: ListTile(
+        leading: const Icon(Icons.auto_awesome_outlined),
+        title: const Text("外部资料纳入推荐"),
+        subtitle: Text(
+          hasRefs
+              ? "本轮推荐已引用 ${refs.length} 条缓存资料。完整 Loo国今日秘闻请在总览页查看。"
+              : "本轮推荐暂未命中缓存外部资料；排序仍按当前持仓和投资偏好计算。",
+        ),
+        trailing: Chip(
+          label: Text(hasRefs ? "已纳入" : "无缓存"),
+          backgroundColor: hasRefs
+              ? theme.colorScheme.tertiaryContainer
+              : theme.colorScheme.surfaceContainerHighest,
         ),
       ),
     );

@@ -11,6 +11,7 @@ import {
   holdingPositions,
   importJobs,
   investmentAccounts,
+  marketSentimentSnapshots,
   portfolioEvents,
   portfolioAnalysisRuns,
   portfolioSnapshots,
@@ -31,6 +32,7 @@ import {
   ExternalResearchDocumentRecord,
   ExternalResearchJob,
   ExternalResearchUsageCounter,
+  MarketSentimentSnapshot,
   PortfolioEvent,
   PortfolioAnalysisRun,
   PortfolioSnapshot,
@@ -402,6 +404,37 @@ function mapExternalResearchDocument(
     riskFlags: row.riskFlags as string[],
     tags: row.tags as string[],
     rawPayload: row.rawPayload as Record<string, unknown>,
+    createdAt: row.createdAt.toISOString(),
+    updatedAt: row.updatedAt.toISOString(),
+  };
+}
+
+function mapMarketSentimentSnapshot(
+  row: typeof marketSentimentSnapshots.$inferSelect,
+): MarketSentimentSnapshot {
+  return {
+    id: row.id,
+    provider: row.provider,
+    indexName: row.indexName,
+    score: row.score,
+    rating: row.rating as MarketSentimentSnapshot["rating"],
+    fgiScore: row.fgiScore,
+    fgiLevel: row.fgiLevel as MarketSentimentSnapshot["fgiLevel"],
+    vixValue: row.vixValue == null ? null : Number(row.vixValue),
+    vixLevel: row.vixLevel as MarketSentimentSnapshot["vixLevel"],
+    quadrant: row.quadrant as MarketSentimentSnapshot["quadrant"],
+    quadrantLabel: row.quadrantLabel ?? null,
+    strategyLabel: row.strategyLabel,
+    strategyDetail: row.strategyDetail,
+    asOf: row.asOf.toISOString(),
+    sourceMode: row.sourceMode as MarketSentimentSnapshot["sourceMode"],
+    sourceUrl: row.sourceUrl ?? null,
+    components: row.components as MarketSentimentSnapshot["components"],
+    summary: row.summary,
+    buySignal: row.buySignal as MarketSentimentSnapshot["buySignal"],
+    riskNote: row.riskNote,
+    rawPayload: row.rawPayload as Record<string, unknown>,
+    expiresAt: row.expiresAt.toISOString(),
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   };
@@ -1117,6 +1150,23 @@ export const postgresRepositories: BackendRepositories = {
       }
       return mapExternalResearchJob(row);
     },
+    async markSkipped(jobId, message, now) {
+      const db = getDb();
+      const [row] = await db
+        .update(externalResearchJobs)
+        .set({
+          status: "skipped",
+          finishedAt: now,
+          errorMessage: message,
+          updatedAt: now,
+        })
+        .where(eq(externalResearchJobs.id, jobId))
+        .returning();
+      if (!row) {
+        throw new Error(`External research job not found for id ${jobId}.`);
+      }
+      return mapExternalResearchJob(row);
+    },
     async markFailed(jobId, errorMessage, now) {
       const db = getDb();
       const [row] = await db
@@ -1277,6 +1327,57 @@ export const postgresRepositories: BackendRepositories = {
         limit: Math.min(Math.max(Math.trunc(params.limit), 1), 50),
       });
       return rows.map(mapExternalResearchDocument);
+    },
+  },
+  marketSentimentSnapshots: {
+    async create(input) {
+      const db = getDb();
+      const [row] = await db
+        .insert(marketSentimentSnapshots)
+        .values({
+          provider: input.provider,
+          indexName: input.indexName,
+          score: input.score,
+          rating: input.rating,
+          fgiScore: input.fgiScore,
+          fgiLevel: input.fgiLevel,
+          vixValue: input.vixValue?.toFixed(2) ?? null,
+          vixLevel: input.vixLevel,
+          quadrant: input.quadrant,
+          quadrantLabel: input.quadrantLabel,
+          strategyLabel: input.strategyLabel,
+          strategyDetail: input.strategyDetail,
+          asOf: new Date(input.asOf),
+          sourceMode: input.sourceMode,
+          sourceUrl: input.sourceUrl,
+          components: input.components,
+          summary: input.summary,
+          buySignal: input.buySignal,
+          riskNote: input.riskNote,
+          rawPayload: input.rawPayload,
+          expiresAt: new Date(input.expiresAt),
+        })
+        .returning();
+      if (!row) {
+        throw new Error("Failed to persist market sentiment snapshot.");
+      }
+      return mapMarketSentimentSnapshot(row);
+    },
+    async getLatest(params) {
+      const db = getDb();
+      const row = await db.query.marketSentimentSnapshots.findFirst({
+        where: and(
+          gt(marketSentimentSnapshots.expiresAt, params.now),
+          params.provider
+            ? eq(marketSentimentSnapshots.provider, params.provider)
+            : undefined,
+          params.indexName
+            ? eq(marketSentimentSnapshots.indexName, params.indexName)
+            : undefined,
+        ),
+        orderBy: desc(marketSentimentSnapshots.asOf),
+      });
+      return row ? mapMarketSentimentSnapshot(row) : null;
     },
   },
   importJobs: {

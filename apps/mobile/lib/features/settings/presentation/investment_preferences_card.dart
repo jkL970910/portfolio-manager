@@ -251,6 +251,23 @@ class _InvestmentPreferencesCardState extends State<InvestmentPreferencesCard> {
                 ),
                 const SizedBox(height: 10),
                 Text("进阶偏好：${profile.preferenceFactors.summary}"),
+                if (profile.preferenceFactors.preferredSectors.isNotEmpty ||
+                    profile.preferenceFactors.styleTilts.isNotEmpty ||
+                    profile.preferenceFactors.thematicInterests.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  Text(
+                    [
+                      if (profile.preferenceFactors.preferredSectors.isNotEmpty)
+                        "偏好行业：${profile.preferenceFactors.preferredSectors.join("、")}",
+                      if (profile.preferenceFactors.styleTilts.isNotEmpty)
+                        "风格：${profile.preferenceFactors.styleTilts.join("、")}",
+                      if (profile
+                          .preferenceFactors.thematicInterests.isNotEmpty)
+                        "主题：${profile.preferenceFactors.thematicInterests.join("、")}",
+                    ].join("；"),
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                ],
                 const SizedBox(height: 12),
                 Text("目标配置", style: Theme.of(context).textTheme.titleMedium),
                 const SizedBox(height: 6),
@@ -1597,16 +1614,17 @@ class _GuidedPreferenceSheet extends StatefulWidget {
 }
 
 class _GuidedPreferenceSheetState extends State<_GuidedPreferenceSheet> {
-  var _goal = "retirement";
-  var _horizon = "medium";
-  var _volatility = "medium";
-  var _priority = "balanced";
-  var _cashNeed = "medium";
-  var _sectorTilt = "broad";
-  var _homePlan = "none";
-  var _taxFocus = "medium";
-  var _usdFundingPath = "unknown";
-  var _allowExternalSignals = false;
+  late var _goal = _initialAnswers["goal"] ?? "retirement";
+  late var _horizon = _initialAnswers["horizon"] ?? "medium";
+  late var _volatility = _initialAnswers["volatility"] ?? "medium";
+  late var _priority = _initialAnswers["priority"] ?? "balanced";
+  late var _cashNeed = _initialAnswers["cashNeed"] ?? "medium";
+  late var _sectorTilt = _initialAnswers["sectorTilt"] ?? "broad";
+  late var _homePlan = _initialAnswers["homePlan"] ?? "none";
+  late var _taxFocus = _initialAnswers["taxFocus"] ?? "medium";
+  late var _usdFundingPath = _initialAnswers["usdFundingPath"] ?? "unknown";
+  late var _allowExternalSignals =
+      _initialAnswers["allowExternalSignals"] == "true";
   final _narrativeController = TextEditingController();
   MobilePreferenceFactors? _ministerFactors;
   String? _ministerSummary;
@@ -1614,6 +1632,10 @@ class _GuidedPreferenceSheetState extends State<_GuidedPreferenceSheet> {
   var _saving = false;
   var _drafting = false;
   String? _error;
+
+  late final MobileGuidedDraft _initialDraft =
+      MobileGuidedDraft.fromProfile(widget.profile);
+  late final Map<String, String> _initialAnswers = _initialDraft.answers;
 
   MobileGuidedDraft get _draft => MobileGuidedDraft.fromAnswers(
         goal: _goal,

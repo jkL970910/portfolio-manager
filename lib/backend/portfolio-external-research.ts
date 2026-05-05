@@ -7,7 +7,8 @@ export interface ExternalResearchPolicy {
   defaultTtlSeconds: number;
   requiresWorker: boolean;
   workerEnabled: boolean;
-  manualTriggerOnly: boolean;
+  scheduledOverviewEnabled: boolean;
+  securityManualRefreshEnabled: boolean;
   dailyRunLimit: number;
   maxSymbolsPerRun: number;
   liveProvidersEnabled: boolean;
@@ -27,7 +28,8 @@ export interface MobileExternalResearchPolicy {
   statusLabel: string;
   enabled: boolean;
   canRunLiveResearch: boolean;
-  manualTriggerOnly: boolean;
+  scheduledOverviewEnabled: boolean;
+  securityManualRefreshEnabled: boolean;
   sourceMode: ExternalResearchPolicy["sourceMode"];
   minTtlSeconds: number;
   defaultTtlSeconds: number;
@@ -45,7 +47,8 @@ export const DEFAULT_EXTERNAL_RESEARCH_POLICY: ExternalResearchPolicy = {
   defaultTtlSeconds: 21600,
   requiresWorker: true,
   workerEnabled: false,
-  manualTriggerOnly: true,
+  scheduledOverviewEnabled: false,
+  securityManualRefreshEnabled: true,
   dailyRunLimit: 20,
   maxSymbolsPerRun: 12,
   liveProvidersEnabled: false,
@@ -98,6 +101,11 @@ export function getExternalResearchPolicy(): ExternalResearchPolicy {
     ...DEFAULT_EXTERNAL_RESEARCH_POLICY,
     enabled: process.env.PORTFOLIO_ANALYZER_EXTERNAL_RESEARCH === "enabled",
     workerEnabled: process.env.PORTFOLIO_ANALYZER_EXTERNAL_WORKER === "enabled",
+    scheduledOverviewEnabled:
+      process.env.PORTFOLIO_ANALYZER_EXTERNAL_DAILY_OVERVIEW === "enabled",
+    securityManualRefreshEnabled:
+      process.env.PORTFOLIO_ANALYZER_EXTERNAL_SECURITY_MANUAL_REFRESH !==
+      "disabled",
     liveProvidersEnabled:
       process.env.PORTFOLIO_ANALYZER_EXTERNAL_PROVIDERS === "enabled",
     adaptersImplemented:
@@ -125,7 +133,8 @@ export function mapExternalResearchPolicyForMobile(
     statusLabel: canRunLiveResearch ? "已启用" : "未启用",
     enabled: policy.enabled,
     canRunLiveResearch,
-    manualTriggerOnly: policy.manualTriggerOnly,
+    scheduledOverviewEnabled: policy.scheduledOverviewEnabled,
+    securityManualRefreshEnabled: policy.securityManualRefreshEnabled,
     sourceMode: policy.sourceMode,
     minTtlSeconds: policy.minTtlSeconds,
     defaultTtlSeconds: policy.defaultTtlSeconds,
@@ -133,7 +142,8 @@ export function mapExternalResearchPolicyForMobile(
     maxSymbolsPerRun: policy.maxSymbolsPerRun,
     allowedScopes: policy.allowedScopes,
     guardrails: [
-      "外部研究只允许用户手动触发，不能在页面加载时自动运行。",
+      "总览级秘闻只允许后台 worker 每日缓存；Flutter 页面加载不能自动运行外部来源。",
+      "单个标的允许用户显式触发刷新，但必须受每日次数、TTL 和 worker 队列限制。",
       `缓存 TTL 不得低于 ${policy.minTtlSeconds} 秒，避免重复付费或重复抓取。`,
       `单次最多分析 ${policy.maxSymbolsPerRun} 个标的；每日默认最多 ${policy.dailyRunLimit} 次。`,
       "未接入 worker、provider 和来源白名单前，移动端不得展示 live research 已启用。",

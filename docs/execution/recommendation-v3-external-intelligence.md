@@ -18,6 +18,13 @@ The V3 shape exists, but raw live news/forum information is not enabled yet.
 - Completed: the external-research worker can persist Alpha Vantage company/ETF
   profile snapshots into `external_research_documents` when the `profile`
   source is explicitly enabled.
+- Completed: first-pass US market pulse context is cached in
+  `market_sentiment_snapshots`, shown on Overview as `今日市场脉搏`, included in
+  `Loo国今日秘闻`, and consumed by Recommendation V3 Overlay as a low-weight
+  timing/risk signal. The current snapshot stores FGI score/level, VIX
+  value/level, and an A-I 3x3 matrix quadrant with a user-facing buy-tempo
+  strategy. The current provider is explicitly labeled as
+  `derived-us-market-sentiment`; it is not presented as live CNN/VIX data.
 - Completed: automated tests cover the profile document consumption chain:
   `external_research_documents` -> `Loo国今日秘闻` -> Recommendation V3 overlay
   -> AI 大臣 `external-intelligence` facts. The chain remains cache-backed and
@@ -58,6 +65,7 @@ V2.1 Core is the active deterministic core:
 V3 adds an external-intelligence overlay:
 
 - cached market-data freshness and trend context
+- cached market pulse / VIX + FGI timing context
 - curated news / announcement / institutional sources
 - optional low-confidence community sentiment
 - richer investor preference factors
@@ -106,6 +114,9 @@ Required behavior:
 - Never recommend a security if the user explicitly excluded that exact
   identity.
 - Never treat community sentiment as high-confidence fact.
+- Never let market pulse directly override target allocation, explicit
+  exclusions, account/tax/FX constraints, or identity rules. It can only adjust
+  timing language, risk warnings, and small overlay score calibration.
 - Never use live external data directly in the mobile request path. V3 must
   consume persisted/cached documents produced by workers.
 
@@ -128,9 +139,16 @@ Initial output model:
 Goal:
 
 - Give the user a compact, curated daily intelligence card, not a raw news feed.
+- The full card belongs on Overview only. Recommendation should consume the same
+  cached intelligence for scoring/explanation, but should only show lightweight
+  `外部资料纳入推荐` status plus item-level evidence snippets.
+- Daily overview intelligence is refreshed by worker/cache/quota boundaries, not
+  by Flutter page load. Single-security refresh is allowed later only as an
+  explicit, quota-limited Security Detail action.
 
 Recommended sources:
 
+- P0.5: cached/derived US market pulse using a VIX + FGI 3x3 decision matrix
 - P1: cached market-data anomalies and quote/provider events
 - P1: company announcements / filings / earnings-calendar style records
 - P1: selected financial news API summaries
@@ -140,9 +158,15 @@ Recommended sources:
 Current source policy:
 
 - Active now: persisted external research documents, saved analysis runs, cached
-  market-data documents, and opt-in Alpha Vantage profile documents.
+  market-data documents, opt-in Alpha Vantage profile documents, and
+  `derived-us-market-sentiment` market pulse snapshots.
 - Next P0: one structured announcement / filing / earnings-calendar /
   fundamental-event style adapter.
+- Next P0.5/P1 provider upgrade: replace or supplement the derived FGI/VIX
+  inputs with bounded provider-backed sources such as CNN Fear & Greed and a
+  stable VIX quote/history source if legal/stable endpoints are selected. If
+  the provider fails, keep using the last cached snapshot or the derived
+  fallback; do not call live sentiment APIs from Flutter page load.
 - Later: curated financial news APIs.
 - Last: forum/community sentiment, always low-confidence and never treated as
   fact.
@@ -358,17 +382,18 @@ Current structured document boundary:
   run is only a compact report and the richer source document needs to remain
   queryable.
 - `GET /api/mobile/intelligence/daily` now exposes the same curated daily
-  intelligence feed as a standalone mobile contract. Overview, Portfolio,
-  Recommendations, and AI 大臣 can reuse it without duplicating document/run
-  mapping logic.
-- Flutter Overview, Recommendations, and Security Detail now consume the
-  standalone feed through a shared mobile DTO/card. Overview keeps the full daily
-  briefing card; Recommendations uses a collapsed summary entry for decision
-  context; Portfolio no longer loads the feed to avoid duplication; Security
-  Detail filters the feed by exact `securityId` or complete `symbol + exchange +
-  currency`; ticker-only matches are intentionally excluded. This is still
-  read-only cache display: loading any page must not trigger live news, forum,
-  or paid external API calls.
+  intelligence feed as a standalone mobile contract. Overview, Security Detail,
+  and AI 大臣 can reuse it without duplicating document/run mapping logic.
+- Flutter Overview and Security Detail consume the standalone feed through a
+  shared mobile DTO/card. Overview keeps the full daily briefing card.
+  Recommendations no longer loads this feed or displays a duplicate card; it
+  only shows whether cached external materials are already reflected in the
+  recommendation DTO and keeps `相关秘闻` evidence on priority cards. Portfolio
+  no longer loads the feed to avoid duplication. Security Detail filters the
+  feed by exact `securityId` or complete `symbol + exchange + currency`;
+  ticker-only matches are intentionally excluded. This is still read-only cache
+  display: loading any page must not trigger live news, forum, or paid external
+  API calls.
 - AI 大臣 now automatically enriches every answer request with the same daily
   intelligence feed on the backend. Flutter pages do not need to inject the
   feed manually; the minister receives up to three `external-intelligence`

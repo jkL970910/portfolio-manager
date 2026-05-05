@@ -4,6 +4,10 @@ import type {
   PortfolioAnalysisRun,
 } from "@/lib/backend/models";
 import { getExternalResearchPolicy } from "@/lib/backend/portfolio-external-research";
+import {
+  getOrCreateLatestMarketSentiment,
+  mapMarketSentimentForMobile,
+} from "@/lib/backend/market-sentiment";
 import { getRepositories } from "@/lib/backend/repositories/factory";
 import type {
   DailyIntelligenceData,
@@ -297,6 +301,58 @@ export function mapAnalysisRunForDailyIntelligence(
   };
 }
 
+export function mapMarketSentimentForDailyIntelligence(
+  sentiment: Awaited<ReturnType<typeof getOrCreateLatestMarketSentiment>>,
+): DailyIntelligenceItem {
+  const view = mapMarketSentimentForMobile(sentiment);
+  const sourceMode = view.sourceMode === "manual" ? "local" : view.sourceMode;
+  return {
+    id: `sentiment:${sentiment.id}`,
+    title: `今日市场脉搏：象限 ${view.quadrant ?? "-"} · ${view.strategyLabel}`,
+    summary: `${view.quadrantLabel}。VIX ${view.vixValue?.toFixed(2) ?? "--"}（${view.vixLevelLabel}），FGI ${view.fgiScore}/100（${view.fgiLevelLabel}）。${view.strategyDetail}`,
+    sourceLabel: view.sourceLabel,
+    sourceType: "market-sentiment",
+    sourceMode,
+    confidenceLabel:
+      view.sourceMode === "derived" ? "派生指标" : "缓存外部指数",
+    confidence: view.sourceMode === "derived" ? "medium" : "high",
+    relevanceScore: 65,
+    sourceReliability: view.sourceMode === "derived" ? 58 : 82,
+    freshnessLabel: view.freshnessLabel,
+    relevanceLabel: "组合级市场脉搏",
+    generatedAt: sentiment.asOf,
+    expiresAt: sentiment.expiresAt,
+    identity: {},
+    reason:
+      "市场脉搏用于辅助判断今日买入节奏，只影响分批/谨慎提示，不直接覆盖目标配置。",
+    keyPoints: [
+      `VIX ${view.vixValue?.toFixed(2) ?? "--"} · ${view.vixLevelLabel}`,
+      `FGI ${view.fgiScore}/100 · ${view.fgiLevelLabel}`,
+      `象限 ${view.quadrant ?? "-"} · ${view.strategyLabel}`,
+      view.buySignalLabel,
+      view.riskNote,
+    ],
+    riskFlags: [view.riskNote],
+    actions: [
+      {
+        label: "问大臣",
+        type: "ask-minister",
+        payload: {
+          intelligenceId: `sentiment:${sentiment.id}`,
+        },
+      },
+    ],
+    sources: [
+      {
+        title: sentiment.provider,
+        sourceType: "market-sentiment",
+        date: sentiment.asOf.slice(0, 10),
+        url: sentiment.sourceUrl ?? undefined,
+      },
+    ],
+  };
+}
+
 function dedupeItems(items: DailyIntelligenceItem[]) {
   const seen = new Set<string>();
   return items.filter((item) => {
@@ -369,15 +425,17 @@ export async function getDailyIntelligenceItemsForUser(
 ) {
   const repositories = getRepositories();
   const safeLimit = Math.min(Math.max(Math.trunc(limit), 1), 20);
-  const [documents, analysisRuns] = await Promise.all([
+  const [documents, analysisRuns, marketSentiment] = await Promise.all([
     repositories.externalResearchDocuments.listFreshByUserId(userId, {
       now,
       limit: safeLimit,
     }),
     repositories.analysisRuns.listRecentByUserId(userId, safeLimit),
+    getOrCreateLatestMarketSentiment(now),
   ]);
 
   return dedupeItems([
+    mapMarketSentimentForDailyIntelligence(marketSentiment),
     ...documents.map(mapExternalResearchDocumentForDailyIntelligence),
     ...analysisRuns.map(mapAnalysisRunForDailyIntelligence),
   ])
@@ -397,16 +455,18 @@ export async function getMobileDailyIntelligenceView(
   return apiSuccess<DailyIntelligenceData>({
     generatedAt: new Date().toISOString(),
     policy: {
-      manualTriggerOnly: policy.manualTriggerOnly,
+      manualTriggerOnly: !policy.scheduledOverviewEnabled,
+      scheduledOverviewEnabled: policy.scheduledOverviewEnabled,
+      securityManualRefreshEnabled: policy.securityManualRefreshEnabled,
       sourceMode: policy.sourceMode,
       disclaimer:
-        "Loo国今日秘闻只展示已缓存资料和已保存分析；页面加载不会触发实时新闻、论坛或付费外部 API。",
+        "Loo国今日秘闻只展示后台每日缓存资料和已保存分析；页面加载不会触发实时新闻、论坛或付费外部 API。",
     },
     items,
     emptyState: {
       title: "暂时没有可用秘闻",
       detail:
-        "先在标的详情运行 AI 快扫，或手动触发缓存外部研究任务。系统不会自动抓取新闻或论坛。",
+        "等待每日 worker 缓存组合秘闻，或在标的详情手动刷新单个标的资料；系统不会在页面加载时抓取新闻或论坛。",
     },
   }, "database");
 }

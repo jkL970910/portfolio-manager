@@ -316,6 +316,8 @@ class _SecurityDetailPageState extends State<SecurityDetailPage> {
       generatedAt: snapshot.generatedAt,
       disclaimer: snapshot.disclaimer,
       manualTriggerOnly: snapshot.manualTriggerOnly,
+      scheduledOverviewEnabled: snapshot.scheduledOverviewEnabled,
+      securityManualRefreshEnabled: snapshot.securityManualRefreshEnabled,
       items: items,
       emptyTitle: "暂时没有该标的秘闻",
       emptyDetail:
