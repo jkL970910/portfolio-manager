@@ -117,6 +117,72 @@ function extractUsage(response: Record<string, unknown>) {
   };
 }
 
+function isIsoDateTime(value: unknown) {
+  return typeof value === "string" &&
+    /^\d{4}-\d{2}-\d{2}T/.test(value) &&
+    !Number.isNaN(Date.parse(value));
+}
+
+function readStringArray(value: unknown) {
+  if (Array.isArray(value)) {
+    return value
+      .filter((item): item is string => typeof item === "string")
+      .map((item) => item.trim())
+      .filter(Boolean);
+  }
+
+  if (typeof value === "string" && value.trim()) {
+    return value
+      .split(/\n+|[；;]\s*|(?<=。)\s*/u)
+      .map((item) => item.replace(/^[-•\d.、\s]+/, "").trim())
+      .filter(Boolean);
+  }
+
+  return [];
+}
+
+function readNullableString(value: unknown) {
+  return typeof value === "string" && value.trim() ? value.trim() : null;
+}
+
+function sanitizeGptEnhancementPayload(value: unknown) {
+  if (!value || typeof value !== "object") {
+    return {};
+  }
+
+  const data = value as Record<string, unknown>;
+  const disclaimer =
+    data.disclaimer && typeof data.disclaimer === "object"
+      ? (data.disclaimer as Record<string, unknown>)
+      : {};
+
+  return {
+    ...data,
+    generatedAt: isIsoDateTime(data.generatedAt)
+      ? data.generatedAt
+      : new Date().toISOString(),
+    title: readNullableString(data.title) ?? "GPT 增强解读",
+    directAnswer:
+      readNullableString(data.directAnswer) ??
+      readNullableString(data.answer) ??
+      "已根据智能快扫结果生成增强解读。",
+    reasoning: readStringArray(data.reasoning),
+    decisionGates: readStringArray(data.decisionGates),
+    boundary: readNullableString(data.boundary),
+    nextStep: readNullableString(data.nextStep),
+    sourceLabel:
+      readNullableString(data.sourceLabel) ?? "GPT 增强解读 · 基于智能快扫",
+    disclaimer: {
+      zh:
+        readNullableString(disclaimer.zh) ??
+        PORTFOLIO_ANALYZER_DISCLAIMER.zh,
+      en:
+        readNullableString(disclaimer.en) ??
+        PORTFOLIO_ANALYZER_DISCLAIMER.en,
+    },
+  };
+}
+
 function normalizeIdentityPart(value: string | null | undefined) {
   const normalized = value?.trim().toUpperCase();
   return normalized || null;
@@ -420,7 +486,7 @@ async function callGptEnhancementProvider(
   }
 
   const parsed = portfolioAnalyzerGptEnhancementSchema.parse(
-    JSON.parse(outputText),
+    sanitizeGptEnhancementPayload(JSON.parse(outputText)),
   );
   return {
     enhancement: parsed,

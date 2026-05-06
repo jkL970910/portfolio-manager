@@ -130,6 +130,22 @@ test("portfolio analyzer GPT enhancement result requires non-advice disclaimer",
   assert.equal(parsed.sourceLabel, "GPT 增强解读 · 基于本地规则 + 缓存资料");
 });
 
+test("portfolio analyzer GPT enhancement result rejects non-normalized provider dates", () => {
+  const parsed = portfolioAnalyzerGptEnhancementSchema.safeParse({
+    generatedAt: "2026-05-06",
+    title: "VFV GPT 增强解读",
+    directAnswer: "VFV 可以作为候选观察。",
+    reasoning: ["它影响美股核心暴露。"],
+    decisionGates: ["确认当前价格。"],
+    boundary: null,
+    nextStep: null,
+    sourceLabel: "GPT 增强解读 · 基于本地规则 + 缓存资料",
+    disclaimer: PORTFOLIO_ANALYZER_DISCLAIMER,
+  });
+
+  assert.equal(parsed.success, false);
+});
+
 test("portfolio analyzer request rejects security scope without identity or holding id", () => {
   const parsed = portfolioAnalyzerRequestSchema.safeParse({
     scope: "security"

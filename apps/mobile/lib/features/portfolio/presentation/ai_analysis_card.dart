@@ -768,7 +768,7 @@ class _GptEnhancementPanel extends StatelessWidget {
                   }
                   if (snapshot.hasError) {
                     return Text(
-                      snapshot.error.toString(),
+                      "GPT 增强暂时失败，请稍后重试；上方智能快扫结果仍可继续参考。",
                       style: TextStyle(
                           color: Theme.of(context).colorScheme.error),
                     );
