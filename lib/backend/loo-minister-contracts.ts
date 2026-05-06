@@ -28,6 +28,19 @@ export const looMinisterSecurityIdentitySchema = z
     }
   });
 
+export const looMinisterRecentSubjectSchema = looMinisterSecurityIdentitySchema
+  .extend({
+    source: z.string().trim().min(1).max(80).optional(),
+  })
+  .transform((value) => ({
+    securityId: value.securityId ?? null,
+    symbol: value.symbol,
+    exchange: value.exchange ?? null,
+    currency: value.currency ?? null,
+    name: value.name ?? null,
+    source: value.source ?? "recent-subject-stack",
+  }));
+
 export const looMinisterPageSchema = z.enum([
   "overview",
   "portfolio",
@@ -187,6 +200,7 @@ export const looMinisterQuestionRequestSchema = z
   .object({
     pageContext: looMinisterPageContextSchema,
     question: z.string().trim().min(2).max(800),
+    recentSubjects: z.array(looMinisterRecentSubjectSchema).max(5).default([]),
     answerStyle: z.enum(["concise", "beginner", "deep"]).default("beginner"),
     cacheStrategy: z.enum(["prefer-cache", "refresh"]).default("prefer-cache"),
     includeExternalResearch: z.boolean().default(false),
@@ -215,6 +229,15 @@ export const looMinisterAnswerResultSchema = z
     page: looMinisterPageSchema,
     title: z.string().trim().min(1).max(140),
     answer: z.string().trim().min(1).max(2400),
+    structured: z
+      .object({
+        directAnswer: z.string().trim().min(1).max(700),
+        reasoning: z.array(z.string().trim().min(1).max(500)).max(6).default([]),
+        decisionGates: z.array(z.string().trim().min(1).max(500)).max(6).default([]),
+        boundary: z.string().trim().min(1).max(700).nullable().default(null),
+        nextStep: z.string().trim().min(1).max(500).nullable().default(null),
+      })
+      .optional(),
     keyPoints: z.array(z.string().trim().min(1).max(360)).max(8).default([]),
     suggestedActions: z
       .array(looMinisterSuggestedActionSchema)
@@ -273,6 +296,9 @@ export type LooMinisterPageContext = z.infer<
   typeof looMinisterPageContextSchema
 >;
 export type LooMinisterQuestionRequest = z.infer<
+  typeof looMinisterQuestionRequestSchema
+>;
+export type LooMinisterQuestionRequestInput = z.input<
   typeof looMinisterQuestionRequestSchema
 >;
 export type LooMinisterAnswerResult = z.infer<

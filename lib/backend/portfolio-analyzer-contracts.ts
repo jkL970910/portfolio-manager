@@ -84,6 +84,16 @@ export const portfolioAnalyzerResultSchema = z.object({
     thesis: z.string().trim().min(1).max(800),
     confidence: z.enum(["low", "medium", "high"])
   }),
+  securityDecision: z.object({
+    lens: z.enum(["existing-holding-review", "candidate-new-buy", "watchlist-review"]),
+    verdict: z.enum(["good-candidate", "watch-only", "weak-fit", "review-existing", "needs-more-data"]),
+    directAnswer: z.string().trim().min(1).max(800),
+    whyNow: z.array(z.string().trim().min(1).max(500)).max(6).default([]),
+    portfolioFit: z.array(z.string().trim().min(1).max(500)).max(6).default([]),
+    keyBlockers: z.array(z.string().trim().min(1).max(500)).max(8).default([]),
+    watchlistTriggers: z.array(z.string().trim().min(1).max(500)).max(8).default([]),
+    evidence: z.array(z.string().trim().min(1).max(500)).max(8).default([]),
+  }).optional(),
   scorecards: z.array(z.object({
     id: z.string().trim().min(1).max(80),
     label: z.string().trim().min(1).max(120),

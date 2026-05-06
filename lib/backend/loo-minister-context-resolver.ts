@@ -78,7 +78,7 @@ function intelligenceFacts(
     ]
       .filter(Boolean)
       .join("；")
-      .slice(0, 600),
+      .slice(0, 240),
     source: "external-intelligence",
   }));
 }
@@ -96,16 +96,24 @@ export async function resolveLooMinisterContext(input: {
   subjectUpdates: MinisterSubjectRef[];
 }> {
   const currentSubject = subjectFromPageContext(input.request.pageContext);
+  const recentRequestSubjects = (input.request.recentSubjects ?? []).map((subject) => ({
+    ...subject,
+    source: subject.source ?? "recent-subject-stack",
+  }));
+  const recentSessionSubjects = [
+    ...(input.sessionSubjects ?? []),
+    ...recentRequestSubjects,
+  ].slice(-5);
   const subjectUpdates = currentSubject ? [currentSubject] : [];
   const facts: LooMinisterFact[] = [
-    ...searchProjectKnowledgeTool({
+    ...(await searchProjectKnowledgeTool({
       page: input.request.pageContext.page,
       question: input.request.question,
-    }),
+    })),
   ];
   const comparisonSubjects: MinisterSubjectRef[] = [];
   const mentions = extractSecurityMentions(input.request.question);
-  const sessionSubjects = input.sessionSubjects ?? [];
+  const sessionSubjects = recentSessionSubjects;
 
   const resolvedMentions = await Promise.all(
     mentions.map(async (mention) => {
@@ -146,6 +154,27 @@ export async function resolveLooMinisterContext(input: {
         ...latestDifferent,
         source: latestDifferent.source ?? "chat-subject-history",
       });
+    }
+  }
+
+  if (comparisonSubjects.length === 0 && sessionSubjects.length > 0) {
+    const latestSubject = [...sessionSubjects].reverse().find((subject) =>
+      !isSameSubject(currentSubject, subject),
+    );
+    if (latestSubject && currentSubject) {
+      facts.push(
+        {
+          id: "session-subject-recent",
+          label: "最近关注标的",
+          value: [latestSubject.symbol, latestSubject.exchange, latestSubject.currency]
+            .filter(Boolean)
+            .join(" · "),
+          detail: latestSubject.name
+            ? `最近一轮关注的是 ${latestSubject.name}。系统会优先把它当作跨页面追问的候选上下文。`
+            : "系统会优先把最近关注对象当作跨页面追问的候选上下文。",
+          source: "system",
+        },
+      );
     }
   }
 

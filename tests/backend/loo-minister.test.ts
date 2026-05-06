@@ -75,6 +75,8 @@ test("Loo Minister deterministic answer uses page context and keeps disclaimer",
   assert.equal(response.data.role, "loo-minister");
   assert.equal(response.data.page, "overview");
   assert.match(response.data.answer, /总资产/);
+  assert.match(JSON.stringify(response.data.structured), /总资产/);
+  assert.ok((response.data.structured?.reasoning.length ?? 0) > 0);
   assert.match(response.data.disclaimer.zh, /不构成投资建议/);
   assert.equal(response.data.suggestedActions.length, 2);
 });
@@ -775,7 +777,6 @@ test("Loo Minister resolves multiple ticker mentions in one round", async () => 
             value: "CAD 100,000",
             detail: JSON.stringify({
               version: "portfolio-context.v1",
-              page: "portfolio",
               summary: {
                 totalNetWorthCad: 100000,
                 totalMarketValueCad: 80000,
@@ -784,43 +785,8 @@ test("Loo Minister resolves multiple ticker mentions in one round", async () => 
                 holdingCount: 4,
                 topHolding: "VFV 12.5%",
               },
-              accounts: [],
-              assetAllocation: [],
-              concentration: {
-                topHoldings: [],
-                topFiveWeightPct: 0,
-                largestHoldingWeightPct: 0,
-              },
-              health: {
-                score: 72,
-                status: "ok",
-                weakestDimension: null,
-                strongestDimension: null,
-                actionQueue: [],
-              },
-              preference: {
-                summary: "test",
-                riskProfile: "balanced",
-                cashBufferTargetCad: 0,
-                source: null,
-              },
-              recommendation: {
-                runId: null,
-                engineVersion: null,
-                topItems: [],
-                assumptions: [],
-              },
-              dataFreshness: {
-                portfolioAsOf: now,
-                quotesAsOf: now,
-                fxAsOf: now,
-                chartFreshness: "fresh",
-                sourceMode: "cached-external",
-              },
-              cachedIntelligence: { count: 0, summaries: [] },
-              analysisCache: { count: 0, summaries: [] },
-              contextCompleteness: { score: 100, missing: [], blocking: [] },
-              rules: [],
+              health: { score: 72, status: "ok" },
+              preference: { summary: "test", riskProfile: "balanced" },
             }),
             source: "analysis-cache",
           },
@@ -1022,6 +988,64 @@ test("Loo Minister hydrates mentioned ticker context on portfolio pages", async 
   assert.match(response.data.answer, /已识别标的/);
   assert.match(response.data.answer, /XBB/);
   assert.match(response.data.answer, /当前未持有不代表不能分析/);
+  assert.doesNotMatch(response.data.answer, /当前页面没有足够.*context/);
+});
+
+test("Loo Minister uses recent subject stack for cross-page follow-up questions", async () => {
+  const response = await getLooMinisterAnswer(
+    "user_casey",
+    {
+      pageContext: {
+        version: LOO_MINISTER_VERSION,
+        page: "portfolio",
+        locale: "zh",
+        title: "Loo国组合",
+        asOf: now,
+        displayCurrency: "CAD",
+        subject: {},
+        dataFreshness: {
+          portfolioAsOf: now,
+          quotesAsOf: now,
+          fxAsOf: now,
+          chartFreshness: "fresh",
+          sourceMode: "cached-external",
+        },
+        facts: [],
+        warnings: [],
+        allowedActions: [],
+      },
+      question: "和刚才那个标的比，这个组合里应该怎么看？",
+      recentSubjects: [
+        {
+          securityId: "security_vfv_cad",
+          symbol: "VFV",
+          exchange: "TSX",
+          currency: "CAD",
+          name: "Vanguard S&P 500 Index ETF",
+          source: "security-detail",
+        },
+      ],
+      answerStyle: "beginner",
+      cacheStrategy: "prefer-cache",
+      includeExternalResearch: false,
+    },
+    {
+      settings: {
+        mode: "local",
+        provider: "official-openai",
+        model: "gpt-5.5",
+        reasoningEffort: "medium",
+        endpoint: "https://api.openai.com/v1/responses",
+        apiKey: null,
+        apiKeySource: "none",
+        providerEnabled: false,
+      },
+      persistUsage: false,
+    },
+  );
+
+  assert.match(response.data.answer, /对比标的 1：VFV · TSX · CAD/);
+  assert.match(response.data.answer, /资料补齐状态：hydrated/);
   assert.doesNotMatch(response.data.answer, /当前页面没有足够.*context/);
 });
 
@@ -1458,6 +1482,111 @@ test("Loo Minister explains analysis handoff without actions when page cannot ru
 
   assert.match(response.data.answer, /当前页面没有提供可直接运行的 AI 快扫动作/);
   assert.equal(response.data.suggestedActions.length, 0);
+});
+
+test("Loo Minister uses global user context on settings page for preference questions", async () => {
+  const response = await getLooMinisterAnswer(
+    "user_casey",
+    {
+      pageContext: {
+        version: LOO_MINISTER_VERSION,
+        page: "settings",
+        locale: "zh",
+        title: "Loo国设置",
+        asOf: now,
+        displayCurrency: "CAD",
+        subject: {},
+        dataFreshness: {
+          portfolioAsOf: now,
+          quotesAsOf: now,
+          fxAsOf: now,
+          chartFreshness: "unknown",
+          sourceMode: "local",
+        },
+        facts: [
+          {
+            id: "preference-mode",
+            label: "偏好设置模式",
+            value: "新手引导 + 手动进阶",
+            source: "user-input",
+          },
+        ],
+        warnings: [],
+        allowedActions: [],
+      },
+      question: "我的投资偏好会怎样影响推荐？",
+      answerStyle: "beginner",
+      cacheStrategy: "prefer-cache",
+      includeExternalResearch: false,
+    },
+    {
+      settings: {
+        mode: "local",
+        provider: "official-openai",
+        model: "gpt-5.5",
+        reasoningEffort: "medium",
+        endpoint: "https://api.openai.com/v1/responses",
+        apiKey: null,
+        apiKeySource: "none",
+        providerEnabled: false,
+      },
+      persistUsage: false,
+    },
+  );
+
+  assert.match(response.data.answer, /全局用户背景/);
+  assert.match(response.data.answer, /风险档位 Growth/);
+  assert.match(response.data.answer, /前几大持仓/);
+  assert.match(response.data.answer, /用户级背景/);
+});
+
+test("Loo Minister uses global user context on import page when portfolio context is absent", async () => {
+  const response = await getLooMinisterAnswer(
+    "user_casey",
+    {
+      pageContext: {
+        version: LOO_MINISTER_VERSION,
+        page: "import",
+        locale: "zh",
+        title: "Loo国导入",
+        asOf: now,
+        displayCurrency: "CAD",
+        subject: {},
+        dataFreshness: {
+          portfolioAsOf: now,
+          quotesAsOf: now,
+          fxAsOf: now,
+          chartFreshness: "unknown",
+          sourceMode: "local",
+        },
+        facts: [],
+        warnings: [],
+        allowedActions: [],
+      },
+      question: "我现在已有持仓里有什么类似标的？",
+      answerStyle: "beginner",
+      cacheStrategy: "prefer-cache",
+      includeExternalResearch: false,
+    },
+    {
+      settings: {
+        mode: "local",
+        provider: "official-openai",
+        model: "gpt-5.5",
+        reasoningEffort: "medium",
+        endpoint: "https://api.openai.com/v1/responses",
+        apiKey: null,
+        apiKeySource: "none",
+        providerEnabled: false,
+      },
+      persistUsage: false,
+    },
+  );
+
+  assert.match(response.data.answer, /全局用户背景/);
+  assert.match(response.data.answer, /持仓/);
+  assert.match(response.data.answer, /前几大持仓/);
+  assert.doesNotMatch(response.data.answer, /当前页面没有提供足够的结构化事实/);
 });
 
 test("Loo Minister provider fallback redacts API keys in user-visible reason", async () => {

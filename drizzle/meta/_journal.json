@@ -183,6 +183,13 @@
       "when": 1778032800000,
       "tag": "0025_market_pulse_vix_fgi_matrix",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1778101200000,
+      "tag": "0026_loo_minister_context_packs",
+      "breakpoints": true
     }
   ]
 }

@@ -254,6 +254,15 @@ API integration plan:
 4. `/api/mobile/minister/chat` is the preferred floating 大臣 endpoint. It wraps
    the same answer engine with persisted session history and must keep external
    research disabled unless worker/cache policy explicitly enables it.
+   Flutter sends only the current page hint plus a bounded recent-subject stack
+   of at most 5 listing identities. The BFF resolver merges this with
+   server-side chat subject history and hydrates full portfolio/security/project
+   context from backend repositories and Context Packs. This is the canonical
+   cross-page path for questions such as `和刚才那个标的比呢？`.
+   Next P0 adds a default `global-user-context.v1` pack to every 大臣 request:
+   it contains a compact portfolio/preference/recommendation summary so 大臣
+   can answer user-level holding and preference questions from any page without
+   requiring Flutter to send large JSON payloads.
 5. GPT output is parsed back into `LooMinisterAnswerResult` and validated before
    being returned to mobile. Official OpenAI calls can use strict JSON Schema.
    OpenRouter-compatible calls use a single-message plain-text context summary
@@ -296,12 +305,26 @@ Runtime context architecture:
    - comparison questions such as `和 VFV 比呢？` now try to resolve VFV from
      user holdings/recommendations/cache and inject it as a comparison subject
 4. Context pack cache:
-   - first pass uses a process-local TTL store, but the cache is now behind the
+   - first pass used a process-local TTL store, but the cache is now behind the
      `LooMinisterContextPackStore` interface in
      `lib/backend/loo-minister-context-pack-cache.ts`
-   - cloud deployment should provide a Redis/DB-backed async store through
-     `setLooMinisterContextPackStore(...)`; the 大臣 enrichment code should not
-     change when replacing the backing cache
+   - P0.3 adds a Postgres/Neon-backed async store. Select it with
+     `LOO_MINISTER_CONTEXT_PACK_STORE=postgres`; omit the variable or set
+     `memory` for local process memory. The 大臣 enrichment code does not change
+     when replacing the backing cache.
+   - the backing table is `loo_minister_context_packs`, keyed by `pack_key`,
+     with `pack_kind`, JSON payload, `asOf`, `builtAt`, `expiresAt`, and
+     timestamps. This makes context packs reusable across Vercel/serverless
+     instances instead of depending on one warm process.
+   - every pack has a short TTL through `expiresAt`. Reads treat expired packs
+     as stale and rebuild when possible. Cloud pruning is handled by the
+     protected worker endpoint
+     `/api/workers/loo-minister/context-packs/prune`, which deletes expired
+     rows so stale Context Packs do not accumulate indefinitely in Neon.
+   - Redis/Upstash remains deferred. Postgres is the current cloud default
+     because this project already uses Neon, expected user count is low, and
+     context packs are compact TTL data rather than a high-frequency global
+     cache.
    - sync call sites remain supported only when the installed store exposes
      sync methods; async cloud stores are supported by `getOrBuildContextPack`
      and the async cache management APIs
@@ -313,11 +336,31 @@ Runtime context architecture:
      - `userPreferencePack:{userId}:{updatedAt/latest}` for Preference Factors
      - `latestRecommendationPack:{userId}:{runId/latest}` for recommendation
        context
-     - `securityContextPack:{userId}:{identity}:{quoteUpdatedAt}` for ticker
-       mention resolution and listing-level cached intelligence
-     - `chatSubjectPack:{sessionId}:{updatedAt}` for structured subject history
+    - `securityContextPack:{userId}:{identity}:{quoteUpdatedAt}` for ticker
+      mention resolution and listing-level cached intelligence
+    - `externalIntelligencePack:{userId}:{identity}:{quoteUpdatedAt/latest}`
+      for cached external evidence reuse
+    - `chatSubjectPack:{sessionId}:current` for structured subject history
    - chat sessions now persist `subjectHistoryJson` so follow-up comparison
      questions can reuse recent structured subjects
+   - project knowledge keys are based on stable domain intent instead of the
+     raw question string, so repeated wording changes do not rebuild the same
+     feature/domain context
+5. Global user context priority:
+   - P0.1: inject `global-user-context.v1` into every `/minister/ask` and
+     `/minister/chat` request. The pack is a compact fact set: total assets,
+     cash, account/holding counts, top holdings, leading allocation gap,
+     Health weakest dimension, Preference Factors summary, and latest
+     recommendation summary.
+   - P0.2: enforce prompt priority and budget. Current page context remains
+     highest priority, explicit mentioned securities and `security-context.v1`
+     override recent subjects, recent subjects only help cross-page follow-up,
+     and `global-user-context.v1` is baseline background. It must not override
+     a concrete security detail answer.
+   - P0.3: move Context Pack storage from process memory to the Postgres-backed
+     async store in cloud by setting `LOO_MINISTER_CONTEXT_PACK_STORE=postgres`.
+   - P0.4: add user-facing context badges such as `已参考：组合摘要、投资偏好、
+     VFV · TSX · CAD` without exposing DTO/sourceMode/provider jargon.
    - current invalidation is conservative TTL-based; cloud deployment should
      tighten preference/recommendation keys to true `updatedAt` / latest run ids
      where the repository exposes them
@@ -390,13 +433,29 @@ Runtime context architecture:
      Health Score, Account Detail, Holding Detail, and Security Detail.
    - `run-analysis` actions remain routed to the current page-owned
      `AiAnalysisCard`; 大臣 does not run a separate hidden analysis path.
+   - 大臣 only has proposal power. The user confirms the action, and the
+     page-owned AI 快扫 card owns the real request, cache strategy, quota,
+     loading state, and result rendering.
    - `open-form`, `update-preferences`, and `refresh-data` actions only route
      the user to the relevant page and explain that saving/refreshing still
      requires page-level confirmation.
    - 大臣 must not directly mutate portfolio data, save preferences, import
      holdings, or refresh quota-consuming providers without an explicit
      product UI confirmation.
-10. Security quick-scan readability and exposure classification:
+10. Structured Minister answer contract:
+   - 大臣 answers now support a backward-compatible structured block:
+     `directAnswer`, `reasoning`, `decisionGates`, `boundary`, and `nextStep`.
+   - The backend still accepts legacy `answer + keyPoints`, but local and GPT
+     paths should return the structured block so mobile can render the verdict,
+     rationale, limits, and next action consistently.
+   - `directAnswer` must answer the user's question first in 1-2 concise
+     sentences. `reasoning` explains the judgment. `decisionGates` lists what
+     would change the answer. `boundary` captures freshness/identity/context
+     limits. `nextStep` gives one concrete follow-up.
+   - Mobile renders structured answers before legacy body text and hides
+     engineering terms. The goal is closer to a ChatGPT-style portfolio-aware
+     answer, not a long debug-style paragraph.
+11. Security quick-scan readability and exposure classification:
    - AI 标的快扫 now separates listing identity from economic exposure.
      Listing identity (`securityId`, `symbol`, `exchange`, `currency`) remains
      the source of truth for quote/history/cache matching, while target-fit
@@ -405,15 +464,43 @@ Runtime context architecture:
    - Main mobile analysis copy must be reader-facing Chinese. Raw debug fields
      such as `quoteStatus=fresh`, `historyAsOf=...`, and `historyPoints=...`
      belong in backend logs or source metadata, not in the primary card body.
-   - The mobile section formerly labeled `下一步` is now `当前分析结论`.
+   - The mobile section formerly labeled `下一步` is now `买入前确认`.
      Identity repair should appear only when symbol/exchange/currency is
      incomplete or low-confidence; if identity is complete, conclusions should
      focus on concentration, target fit, account/tax placement, and data
      freshness.
-   - The current mobile layout order is `核心结论 / 当前分析结论 / 风险护栏 /
+   - The current mobile layout order is `投资判断 / 买入前确认 / 风险护栏 /
      税务账户提醒 / 组合适配 / 数据依据 / 来源详情`. Dense provider/source
-     metadata should stay in `数据依据` or the collapsed `来源详情`, not the
+     metadata should stay in the collapsed `数据依据` or `来源详情`, not the
      opening thesis.
+   - Security quick-scan thesis must answer the user's real decision question
+     first. For held securities, explain whether the current position is more
+     like hold/review/trim/add based on concentration, target sleeve, account
+     path, and preference factors. For unheld securities, treat 0% as
+     candidate-new-buy context and evaluate the security against target sleeve
+     gap, Preference Factors V2, existing exposure overlap, account/tax/FX, and
+     data freshness.
+   - Scorecards are supporting evidence, not the product answer. Mobile should
+     show them under `数据依据` after the decision narrative, and they should use
+     reader-facing labels such as `数据可信度`, `持仓影响`, `配置适配`, and
+     `偏好匹配`.
+   - Decision wording must not be driven by allocation gap alone. Avoided
+     sectors, low risk capacity, high-priority home purchase goals, stale or
+     thin price history, duplicate exposure, and USD/account/tax friction are
+     blockers/decision gates. They should appear before any buy/add language
+     and can downgrade the conclusion to `候选观察`.
+   - Mobile rendering is scope-aware. Security scans use `投资判断 / 买入前确认 /
+     组合适配`; portfolio, account, and recommendation scans use their own
+     diagnostic labels so the wording does not imply every analysis is a buy
+     decision.
+   - Security scans now have an explicit `securityDecision` block in addition
+     to legacy scorecards: `lens`, `verdict`, `directAnswer`, `whyNow`,
+     `portfolioFit`, `keyBlockers`, `watchlistTriggers`, and `evidence`.
+     Mobile should prefer this block for Security Detail so the card starts
+     with a decision-oriented view instead of a reformatted data dump.
+   - Supported verdict labels are `good-candidate`, `watch-only`, `weak-fit`,
+     `review-existing`, and `needs-more-data`. These are product-facing
+     judgments, not trade instructions.
    - `security-economic-exposure.ts` is the shared first-pass economic exposure
      registry. AI 快扫, Recommendation V2.1, Health Score, and 大臣 context now
      use it so CAD-listed US ETFs can keep their listing identity while
@@ -425,6 +512,7 @@ Runtime context architecture:
 Backend tests:
 
 - `tests/backend/portfolio-analyzer-contracts.test.ts`
+- `tests/backend/portfolio-analyzer.test.ts`
 
 The tests lock these behaviors:
 
@@ -432,6 +520,8 @@ The tests lock these behaviors:
 - security analysis requires a resolved identity or holding id
 - account analysis requires an account id
 - requests default to bounded cache reuse
+- held and unheld security quick scans produce a decision-first result instead
+  of blocking on 0% holding or only listing cached data
 - recommendation-run analysis requires a run id
 - result payloads require non-advice disclaimers
 - local analysis cannot claim external research freshness

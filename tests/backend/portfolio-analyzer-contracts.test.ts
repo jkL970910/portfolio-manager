@@ -33,6 +33,16 @@ function makeResult(overrides: Record<string, unknown> = {}) {
       thesis: "本轮只使用本地组合、行情缓存和推荐上下文生成结构化分析。",
       confidence: "medium"
     },
+    securityDecision: {
+      lens: "existing-holding-review",
+      verdict: "review-existing",
+      directAnswer: "AMZN 适合先复核现有仓位，而不是无条件加仓。",
+      whyNow: ["当前组合已有 AMZN 暴露。"],
+      portfolioFit: ["影响 US Equity 配置。"],
+      keyBlockers: ["单一标的集中度需要确认。"],
+      watchlistTriggers: ["刷新报价后再看。"],
+      evidence: ["使用本地持仓和报价缓存。"],
+    },
     scorecards: [
       {
         id: "portfolio-fit",
@@ -120,6 +130,13 @@ test("portfolio analyzer result requires disclaimer and local freshness honesty"
   const parsed = portfolioAnalyzerResultSchema.safeParse(makeResult());
 
   assert.equal(parsed.success, true);
+});
+
+test("portfolio analyzer result accepts security-specific decision structure", () => {
+  const parsed = portfolioAnalyzerResultSchema.parse(makeResult());
+
+  assert.equal(parsed.securityDecision?.verdict, "review-existing");
+  assert.ok(parsed.securityDecision?.keyBlockers.includes("单一标的集中度需要确认。"));
 });
 
 test("portfolio analyzer result rejects missing non-advice disclaimer", () => {

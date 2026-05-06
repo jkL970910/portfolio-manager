@@ -91,6 +91,23 @@ primary key.
 
 ## Recommended Cloud Stack
 
+### Free-tier reality check
+
+For this project scale, the free tiers are enough to start:
+
+- Neon Free: 100 CU-hours / project / month, 0.5 GB storage / project, scale-to-zero
+  on idle, up to 100 projects.
+- Vercel Hobby: free plan for personal projects, 1,000,000 function invocations / month,
+  100 GB-hours function duration, 4 CPU-hrs, 360 GB-hrs memory.
+- Cloudflare Workers Free: 100,000 requests / day, 10 ms CPU per request, 100,000
+  requests/day for Pages Functions too, 5 Cron Triggers/account, 50 subrequests/request.
+
+Implication:
+
+- Use free tiers for local dev, QA, and low-traffic personal use.
+- Keep scheduled workers bounded and batched.
+- Move to paid plans only when worker fan-out, data retention, or usage volume grows.
+
 ### Database: Neon Free
 
 Use Neon as the first cloud Postgres target.
@@ -141,6 +158,9 @@ Why:
 - Can call Vercel-hosted worker endpoints.
 - Avoids keeping an always-on worker server.
 - Works well with the current protected worker API boundary.
+- Keep each cron run short, bounded, and batch-based. On Workers Free, cron CPU
+  time is only 10 ms; if the app needs more time or heavier fan-out, move the
+  cron trigger to the paid plan or split work across multiple smaller invocations.
 
 Protected worker endpoints already exist:
 
@@ -241,6 +261,7 @@ AUTH_SECRET=
 PORTFOLIO_WORKER_SECRET=
 OPENAI_API_KEY=optional
 LOO_MINISTER_* provider settings as needed
+LOO_MINISTER_CONTEXT_PACK_STORE=postgres
 MARKET_DATA_* provider settings as needed
 PORTFOLIO_ANALYZER_EXTERNAL_* flags as needed
 ```
@@ -252,6 +273,13 @@ Validation:
 - Overview / Portfolio / Security Detail / Settings work.
 - AI 大臣 local mode works.
 - BYOK/GPT mode does not expose the API key to Flutter.
+- 大臣 Context Pack cache writes to `loo_minister_context_packs` when
+  `LOO_MINISTER_CONTEXT_PACK_STORE=postgres`, so repeated project/portfolio/
+  security context hydration can survive Vercel cold starts and instance swaps.
+- The same daily Cloudflare Cron run also calls
+  `/api/workers/loo-minister/context-packs/prune` to delete expired context-pack
+  rows. This is separate from TTL freshness checks: TTL prevents stale reads,
+  pruning prevents stale rows from piling up in Neon.
 
 ### Phase 3: Cloudflare Workers Cron
 

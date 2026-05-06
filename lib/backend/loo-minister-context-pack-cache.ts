@@ -1,3 +1,7 @@
+import { eq, like, sql } from "drizzle-orm";
+import { getDb } from "@/lib/db/client";
+import { looMinisterContextPacks } from "@/lib/db/schema";
+
 export type LooMinisterContextPackKind =
   | "project-knowledge"
   | "preference"
@@ -5,7 +9,8 @@ export type LooMinisterContextPackKind =
   | "portfolio"
   | "security"
   | "external-intelligence"
-  | "chat-subjects";
+  | "chat-subjects"
+  | "global-user";
 
 export type LooMinisterContextPackSource = "backend" | "memory-cache";
 export type LooMinisterContextPackFreshness = "fresh" | "stale";
@@ -37,11 +42,13 @@ export type LooMinisterContextPackStore = {
   set(pack: LooMinisterStoredContextPack): Promise<void>;
   clear(): Promise<void>;
   deletePrefix(prefix: string): Promise<void>;
+  pruneExpired?(nowMs?: number): Promise<number>;
   stats(nowMs?: number): Promise<LooMinisterContextPackCacheStats>;
   getSync?: (key: string) => LooMinisterStoredContextPack | null;
   setSync?: (pack: LooMinisterStoredContextPack) => void;
   clearSync?: () => void;
   deletePrefixSync?: (prefix: string) => void;
+  pruneExpiredSync?: (nowMs?: number) => number;
   statsSync?: (nowMs?: number) => LooMinisterContextPackCacheStats;
 };
 
@@ -53,6 +60,7 @@ export const LOO_MINISTER_CONTEXT_PACK_TTL_MS = {
   security: 60 * 1000,
   externalIntelligence: 2 * 60 * 1000,
   chatSubjects: 60 * 1000,
+  globalUser: 60 * 1000,
 } as const;
 
 class MemoryLooMinisterContextPackStore
@@ -96,6 +104,22 @@ class MemoryLooMinisterContextPackStore
     }
   }
 
+  async pruneExpired(nowMs = Date.now()) {
+    return this.pruneExpiredSync(nowMs);
+  }
+
+  pruneExpiredSync(nowMs = Date.now()) {
+    let deleted = 0;
+    for (const [key, pack] of this.packs.entries()) {
+      const expiresAt = Date.parse(pack.expiresAt);
+      if (!Number.isFinite(expiresAt) || expiresAt <= nowMs) {
+        this.packs.delete(key);
+        deleted += 1;
+      }
+    }
+    return deleted;
+  }
+
   async stats(nowMs = Date.now()) {
     return this.statsSync(nowMs);
   }
@@ -123,8 +147,109 @@ export function createMemoryLooMinisterContextPackStore() {
   return new MemoryLooMinisterContextPackStore();
 }
 
+function rowToStoredPack(
+  row: typeof looMinisterContextPacks.$inferSelect,
+): LooMinisterStoredContextPack {
+  return {
+    key: row.packKey,
+    kind: row.packKind as LooMinisterContextPackKind,
+    data: row.payloadJson,
+    asOf: row.asOf.toISOString(),
+    builtAt: row.builtAt.toISOString(),
+    expiresAt: row.expiresAt.toISOString(),
+  };
+}
+
+export function createPostgresLooMinisterContextPackStore(): LooMinisterContextPackStore {
+  return {
+    async get(key) {
+      const db = getDb();
+      const [row] = await db
+        .select()
+        .from(looMinisterContextPacks)
+        .where(eq(looMinisterContextPacks.packKey, key))
+        .limit(1);
+      return row ? rowToStoredPack(row) : null;
+    },
+    async set(pack) {
+      const db = getDb();
+      await db
+        .insert(looMinisterContextPacks)
+        .values({
+          packKey: pack.key,
+          packKind: pack.kind,
+          payloadJson: pack.data,
+          asOf: new Date(pack.asOf),
+          builtAt: new Date(pack.builtAt),
+          expiresAt: new Date(pack.expiresAt),
+          updatedAt: new Date(),
+        })
+        .onConflictDoUpdate({
+          target: looMinisterContextPacks.packKey,
+          set: {
+            packKind: pack.kind,
+            payloadJson: pack.data,
+            asOf: new Date(pack.asOf),
+            builtAt: new Date(pack.builtAt),
+            expiresAt: new Date(pack.expiresAt),
+            updatedAt: new Date(),
+          },
+        });
+    },
+    async clear() {
+      const db = getDb();
+      await db.delete(looMinisterContextPacks);
+    },
+    async deletePrefix(prefix) {
+      const db = getDb();
+      await db
+        .delete(looMinisterContextPacks)
+        .where(like(looMinisterContextPacks.packKey, `${prefix}%`));
+    },
+    async pruneExpired(nowMs = Date.now()) {
+      const db = getDb();
+      const result = await db
+        .delete(looMinisterContextPacks)
+        .where(sql`${looMinisterContextPacks.expiresAt} <= ${new Date(nowMs)}`);
+      return result.rowCount ?? 0;
+    },
+    async stats(nowMs = Date.now()) {
+      const db = getDb();
+      const now = new Date(nowMs);
+      const [row] = await db
+        .select({
+          total: sql<number>`count(*)::int`,
+          fresh:
+            sql<number>`count(*) filter (where ${looMinisterContextPacks.expiresAt} > ${now})::int`,
+          stale:
+            sql<number>`count(*) filter (where ${looMinisterContextPacks.expiresAt} <= ${now})::int`,
+        })
+        .from(looMinisterContextPacks);
+      return {
+        total: Number(row?.total ?? 0),
+        fresh: Number(row?.fresh ?? 0),
+        stale: Number(row?.stale ?? 0),
+      };
+    },
+  };
+}
+
+export type LooMinisterContextPackStoreMode = "memory" | "postgres";
+
+function getConfiguredStoreMode(): LooMinisterContextPackStoreMode {
+  return process.env.LOO_MINISTER_CONTEXT_PACK_STORE === "postgres"
+    ? "postgres"
+    : "memory";
+}
+
+export function createConfiguredLooMinisterContextPackStore() {
+  return getConfiguredStoreMode() === "postgres"
+    ? createPostgresLooMinisterContextPackStore()
+    : createMemoryLooMinisterContextPackStore();
+}
+
 let contextPackStore: LooMinisterContextPackStore =
-  createMemoryLooMinisterContextPackStore();
+  createConfiguredLooMinisterContextPackStore();
 
 export function setLooMinisterContextPackStore(
   store: LooMinisterContextPackStore,
@@ -133,7 +258,7 @@ export function setLooMinisterContextPackStore(
 }
 
 export function resetLooMinisterContextPackStore() {
-  contextPackStore = createMemoryLooMinisterContextPackStore();
+  contextPackStore = createConfiguredLooMinisterContextPackStore();
 }
 
 function nowIso(nowMs = Date.now()) {
@@ -305,13 +430,13 @@ function keyPart(value: string | number | null | undefined) {
 export function projectKnowledgePackKey(input: {
   version: string;
   page: string;
-  question: string;
+  intent: string;
 }) {
   return [
     "projectKnowledgePack",
     keyPart(input.version),
     keyPart(input.page),
-    keyPart(input.question),
+    keyPart(input.intent),
   ].join(":");
 }
 
@@ -338,8 +463,32 @@ export function securityContextPackKey(input: {
   ].join(":");
 }
 
-export function chatSubjectPackKey(sessionId: string, updatedAt: string) {
-  return ["chatSubjectPack", keyPart(sessionId), keyPart(updatedAt)].join(":");
+export function globalUserContextPackKey(input: {
+  userId: string;
+  asOf?: string | null;
+}) {
+  return [
+    "globalUserContextPack",
+    keyPart(input.userId),
+    keyPart(input.asOf),
+  ].join(":");
+}
+
+export function externalIntelligencePackKey(input: {
+  userId: string;
+  identity: string;
+  quoteUpdatedAt?: string | null;
+}) {
+  return [
+    "externalIntelligencePack",
+    keyPart(input.userId),
+    keyPart(input.identity),
+    keyPart(input.quoteUpdatedAt),
+  ].join(":");
+}
+
+export function chatSubjectPackKey(sessionId: string) {
+  return ["chatSubjectPack", keyPart(sessionId), "current"].join(":");
 }
 
 export function clearLooMinisterContextPackCache(prefix?: string) {
@@ -364,4 +513,11 @@ export function getLooMinisterContextPackCacheStats() {
 
 export async function getLooMinisterContextPackCacheStatsAsync() {
   return contextPackStore.stats();
+}
+
+export async function pruneExpiredLooMinisterContextPacks(nowMs = Date.now()) {
+  if (contextPackStore.pruneExpired) {
+    return contextPackStore.pruneExpired(nowMs);
+  }
+  return 0;
 }

@@ -120,6 +120,45 @@ class LooMinisterSubject {
   }
 }
 
+class LooMinisterRecentSubject {
+  const LooMinisterRecentSubject({
+    required this.symbol,
+    this.securityId,
+    this.exchange,
+    this.currency,
+    this.name,
+    this.source = "recent-subject-stack",
+  });
+
+  final String symbol;
+  final String? securityId;
+  final String? exchange;
+  final String? currency;
+  final String? name;
+  final String source;
+
+  String get stableKey {
+    return [
+      securityId?.trim().toUpperCase() ?? "",
+      symbol.trim().toUpperCase(),
+      exchange?.trim().toUpperCase() ?? "",
+      currency?.trim().toUpperCase() ?? "",
+    ].join("|");
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      if (securityId != null && securityId!.isNotEmpty)
+        "securityId": securityId,
+      "symbol": symbol,
+      if (exchange != null && exchange!.isNotEmpty) "exchange": exchange,
+      if (currency != null && currency!.isNotEmpty) "currency": currency,
+      if (name != null && name!.isNotEmpty) "name": name,
+      "source": source,
+    };
+  }
+}
+
 class LooMinisterSuggestedAction {
   const LooMinisterSuggestedAction({
     required this.id,
@@ -224,6 +263,7 @@ class LooMinisterQuestionRequest {
   const LooMinisterQuestionRequest({
     required this.pageContext,
     required this.question,
+    this.recentSubjects = const [],
     this.answerStyle = "beginner",
     this.cacheStrategy = "prefer-cache",
     this.includeExternalResearch = false,
@@ -231,6 +271,7 @@ class LooMinisterQuestionRequest {
 
   final LooMinisterPageContext pageContext;
   final String question;
+  final List<LooMinisterRecentSubject> recentSubjects;
   final String answerStyle;
   final String cacheStrategy;
   final bool includeExternalResearch;
@@ -239,6 +280,8 @@ class LooMinisterQuestionRequest {
     return {
       "pageContext": pageContext.toJson(),
       "question": question,
+      "recentSubjects":
+          recentSubjects.map((subject) => subject.toJson()).toList(),
       "answerStyle": answerStyle,
       "cacheStrategy": cacheStrategy,
       "includeExternalResearch": includeExternalResearch,

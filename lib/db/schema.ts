@@ -924,6 +924,37 @@ export const looMinisterChatMessages = pgTable(
   }),
 );
 
+export const looMinisterContextPacks = pgTable(
+  "loo_minister_context_packs",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    packKey: varchar("pack_key", { length: 360 }).notNull(),
+    packKind: varchar("pack_kind", { length: 40 }).notNull(),
+    payloadJson: jsonb("payload_json").notNull(),
+    asOf: timestamp("as_of", { withTimezone: true }).notNull(),
+    builtAt: timestamp("built_at", { withTimezone: true }).notNull(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => ({
+    keyIdx: uniqueIndex("loo_minister_context_packs_key_idx").on(
+      table.packKey,
+    ),
+    kindExpiresIdx: index("loo_minister_context_packs_kind_expires_idx").on(
+      table.packKind,
+      table.expiresAt,
+    ),
+    expiresIdx: index("loo_minister_context_packs_expires_idx").on(
+      table.expiresAt,
+    ),
+  }),
+);
+
 export const marketDataRefreshRuns = pgTable(
   "market_data_refresh_runs",
   {

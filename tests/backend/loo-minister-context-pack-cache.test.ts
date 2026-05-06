@@ -1,15 +1,20 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { sql } from "drizzle-orm";
 import {
   chatSubjectPackKey,
   clearLooMinisterContextPackCache,
   clearLooMinisterContextPackCacheAsync,
   createMemoryLooMinisterContextPackStore,
+  externalIntelligencePackKey,
+  createPostgresLooMinisterContextPackStore,
   getOrBuildContextPack,
   getOrBuildContextPackSync,
   getLooMinisterContextPackCacheStats,
   getLooMinisterContextPackCacheStatsAsync,
+  globalUserContextPackKey,
   latestRecommendationPackKey,
+  pruneExpiredLooMinisterContextPacks,
   projectKnowledgePackKey,
   resetLooMinisterContextPackStore,
   securityContextPackKey,
@@ -18,6 +23,7 @@ import {
   type LooMinisterStoredContextPack,
   userPreferencePackKey,
 } from "@/lib/backend/loo-minister-context-pack-cache";
+import { getDb } from "@/lib/db/client";
 
 function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -183,6 +189,76 @@ test("Loo Minister context pack cache supports a cloud-ready async store boundar
   }
 });
 
+test("Loo Minister context pack cache prunes expired packs", async () => {
+  setLooMinisterContextPackStore(createMemoryLooMinisterContextPackStore());
+  try {
+    await getOrBuildContextPack({
+      key: "prune:fresh",
+      kind: "security",
+      ttlMs: 60_000,
+      build: () => ({ symbol: "VFV" }),
+    });
+    await getOrBuildContextPack({
+      key: "prune:expired",
+      kind: "security",
+      ttlMs: 1,
+      build: () => ({ symbol: "XBB" }),
+    });
+    await sleep(5);
+
+    const deletedCount = await pruneExpiredLooMinisterContextPacks();
+    const stats = await getLooMinisterContextPackCacheStatsAsync();
+
+    assert.equal(deletedCount, 1);
+    assert.equal(stats.total, 1);
+    assert.equal(stats.fresh, 1);
+  } finally {
+    resetLooMinisterContextPackStore();
+  }
+});
+
+test("Loo Minister postgres context pack store prunes expired rows", async (t) => {
+  if (!process.env.DATABASE_URL) {
+    t.skip("DATABASE_URL is not configured.");
+    return;
+  }
+
+  const store = createPostgresLooMinisterContextPackStore();
+  const prefix = `test:postgres-prune:${Date.now()}:`;
+  await store.deletePrefix(prefix);
+
+  try {
+    await store.set({
+      key: `${prefix}fresh`,
+      kind: "security",
+      data: { symbol: "VFV" },
+      asOf: "2026-05-01T00:00:00.000Z",
+      builtAt: "2026-05-01T00:00:00.000Z",
+      expiresAt: "2026-05-01T00:10:00.000Z",
+    });
+    await store.set({
+      key: `${prefix}expired`,
+      kind: "security",
+      data: { symbol: "XBB" },
+      asOf: "2026-05-01T00:00:00.000Z",
+      builtAt: "2026-05-01T00:00:00.000Z",
+      expiresAt: "2026-05-01T00:00:01.000Z",
+    });
+
+    const deletedCount = await store.pruneExpired?.(
+      Date.parse("2026-05-01T00:05:00.000Z"),
+    );
+
+    assert.equal(deletedCount, 1);
+    assert.equal(await store.get(`${prefix}expired`), null);
+    assert.deepEqual((await store.get(`${prefix}fresh`))?.data, {
+      symbol: "VFV",
+    });
+  } finally {
+    await store.deletePrefix(prefix);
+  }
+});
+
 test("Loo Minister sync cache API requires a sync-capable store", () => {
   const asyncOnlyStore: LooMinisterContextPackStore = {
     async get() {
@@ -213,12 +289,79 @@ test("Loo Minister sync cache API requires a sync-capable store", () => {
   }
 });
 
+test("Loo Minister postgres context pack store persists, upserts, and clears packs", async (t) => {
+  if (!process.env.DATABASE_URL) {
+    t.skip("DATABASE_URL is not configured.");
+    return;
+  }
+
+  const db = getDb();
+  try {
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS "loo_minister_context_packs" (
+        "id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+        "pack_key" varchar(360) NOT NULL,
+        "pack_kind" varchar(40) NOT NULL,
+        "payload_json" jsonb NOT NULL,
+        "as_of" timestamp with time zone NOT NULL,
+        "built_at" timestamp with time zone NOT NULL,
+        "expires_at" timestamp with time zone NOT NULL,
+        "created_at" timestamp with time zone DEFAULT now() NOT NULL,
+        "updated_at" timestamp with time zone DEFAULT now() NOT NULL
+      );
+    `);
+    await db.execute(sql`
+      CREATE UNIQUE INDEX IF NOT EXISTS "loo_minister_context_packs_key_idx"
+        ON "loo_minister_context_packs" ("pack_key");
+    `);
+  } catch {
+    t.skip("loo_minister_context_packs table is not available.");
+    return;
+  }
+
+  const store = createPostgresLooMinisterContextPackStore();
+  const prefix = `test:postgres:${Date.now()}:`;
+  const key = `${prefix}security:vfv`;
+  await store.deletePrefix(prefix);
+
+  try {
+    await store.set({
+      key,
+      kind: "security",
+      data: { symbol: "VFV" },
+      asOf: "2026-05-01T00:00:00.000Z",
+      builtAt: "2026-05-01T00:00:00.000Z",
+      expiresAt: "2026-05-01T00:01:00.000Z",
+    });
+    assert.deepEqual((await store.get(key))?.data, { symbol: "VFV" });
+
+    await store.set({
+      key,
+      kind: "security",
+      data: { symbol: "XEQT" },
+      asOf: "2026-05-01T00:00:10.000Z",
+      builtAt: "2026-05-01T00:00:10.000Z",
+      expiresAt: "2026-05-01T00:02:00.000Z",
+    });
+    assert.deepEqual((await store.get(key))?.data, { symbol: "XEQT" });
+
+    const stats = await store.stats(Date.parse("2026-05-01T00:01:30.000Z"));
+    assert.ok(stats.total >= 1);
+    assert.ok(stats.fresh >= 1);
+
+    await store.deletePrefix(prefix);
+    assert.equal(await store.get(key), null);
+  } finally {
+    await store.deletePrefix(prefix);
+  }
+});
+
 test("Loo Minister context pack keys carry explicit invalidation dimensions", () => {
   assert.match(
     projectKnowledgePackKey({
       version: "v1",
       page: "overview",
-      question: "为什么总资产不同？",
+      intent: "page:overview",
     }),
     /^projectKnowledgePack:v1:overview:/,
   );
@@ -239,7 +382,22 @@ test("Loo Minister context pack keys carry explicit invalidation dimensions", ()
     "securityContextPack:user_1:vfv-tsx-cad:2026-05-01",
   );
   assert.equal(
-    chatSubjectPackKey("session_1", "2026-05-01T00:00:00.000Z"),
-    "chatSubjectPack:session_1:2026-05-01t00-00-00.000z",
+    chatSubjectPackKey("session_1"),
+    "chatSubjectPack:session_1:current",
+  );
+  assert.equal(
+    globalUserContextPackKey({
+      userId: "user_1",
+      asOf: "2026-05-01T00:00:00.000Z",
+    }),
+    "globalUserContextPack:user_1:2026-05-01t00-00-00.000z",
+  );
+  assert.equal(
+    externalIntelligencePackKey({
+      userId: "user_1",
+      identity: "security:VFV:TSX:CAD",
+      quoteUpdatedAt: "2026-05-01T00:00:00.000Z",
+    }),
+    "externalIntelligencePack:user_1:security-vfv-tsx-cad:2026-05-01t00-00-00.000z",
   );
 });

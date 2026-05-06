@@ -240,9 +240,11 @@ class _AiAnalysisCardState extends State<AiAnalysisCard> {
 
 class MobileAiAnalysisResult {
   const MobileAiAnalysisResult({
+    required this.scope,
     required this.title,
     required this.thesis,
     required this.confidence,
+    required this.securityDecision,
     required this.scorecards,
     required this.risks,
     required this.taxNotes,
@@ -256,9 +258,11 @@ class MobileAiAnalysisResult {
     required this.quoteFreshnessSummary,
   });
 
+  final String scope;
   final String title;
   final String thesis;
   final String confidence;
+  final MobileAiSecurityDecision? securityDecision;
   final List<MobileAiScorecard> scorecards;
   final List<MobileAiRisk> risks;
   final List<String> taxNotes;
@@ -276,9 +280,14 @@ class MobileAiAnalysisResult {
     final dataFreshness = _readMap(json["dataFreshness"]);
     final disclaimer = _readMap(json["disclaimer"]);
     return MobileAiAnalysisResult(
+      scope: json["scope"] as String? ?? "security",
       title: summary["title"] as String? ?? "AI 快速分析",
       thesis: _friendlyAnalysisText(summary["thesis"] as String? ?? ""),
       confidence: summary["confidence"] as String? ?? "medium",
+      securityDecision: json["securityDecision"] is Map<String, dynamic>
+          ? MobileAiSecurityDecision.fromJson(
+              json["securityDecision"] as Map<String, dynamic>)
+          : null,
       scorecards: _readMapList(json["scorecards"])
           .map(MobileAiScorecard.fromJson)
           .toList(),
@@ -303,6 +312,44 @@ class MobileAiAnalysisResult {
           _friendlyNullableText(dataFreshness["quoteSourceSummary"] as String?),
       quoteFreshnessSummary: _friendlyNullableText(
           dataFreshness["quoteFreshnessSummary"] as String?),
+    );
+  }
+}
+
+class MobileAiSecurityDecision {
+  const MobileAiSecurityDecision({
+    required this.verdict,
+    required this.directAnswer,
+    required this.whyNow,
+    required this.portfolioFit,
+    required this.keyBlockers,
+    required this.watchlistTriggers,
+    required this.evidence,
+  });
+
+  final String verdict;
+  final String directAnswer;
+  final List<String> whyNow;
+  final List<String> portfolioFit;
+  final List<String> keyBlockers;
+  final List<String> watchlistTriggers;
+  final List<String> evidence;
+
+  factory MobileAiSecurityDecision.fromJson(Map<String, dynamic> json) {
+    return MobileAiSecurityDecision(
+      verdict: json["verdict"] as String? ?? "watch-only",
+      directAnswer:
+          _friendlyAnalysisText(json["directAnswer"] as String? ?? ""),
+      whyNow: _readStringList(json["whyNow"]).map(_friendlyAnalysisText).toList(),
+      portfolioFit:
+          _readStringList(json["portfolioFit"]).map(_friendlyAnalysisText).toList(),
+      keyBlockers:
+          _readStringList(json["keyBlockers"]).map(_friendlyAnalysisText).toList(),
+      watchlistTriggers: _readStringList(json["watchlistTriggers"])
+          .map(_friendlyAnalysisText)
+          .toList(),
+      evidence:
+          _readStringList(json["evidence"]).map(_friendlyAnalysisText).toList(),
     );
   }
 }
@@ -434,26 +481,52 @@ class _AnalysisResultView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final labels = _AnalysisScopeLabels.forScope(data.scope);
+    final securityDecision = data.securityDecision;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _AnalysisSection(
-          title: "核心结论",
+          title: labels.summary,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(data.title, style: Theme.of(context).textTheme.titleMedium),
               const SizedBox(height: 6),
-              Text(data.thesis),
+              Text(securityDecision?.directAnswer.isNotEmpty == true
+                  ? securityDecision!.directAnswer
+                  : data.thesis),
               const SizedBox(height: 8),
               _MetaPill(
-                  "置信度 ${_confidenceLabel(data.confidence)} · ${_sourceModeLabel(data.sourceMode)}"),
+                  [
+                    if (securityDecision != null)
+                      _verdictLabel(securityDecision.verdict),
+                    "置信度 ${_confidenceLabel(data.confidence)}",
+                    _sourceModeLabel(data.sourceMode),
+                  ].join(" · ")),
             ],
           ),
         ),
+        if (securityDecision != null && securityDecision.whyNow.isNotEmpty)
+          _AnalysisSection(
+            title: "为什么现在看",
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: securityDecision.whyNow.take(4).map(_bullet).toList(),
+            ),
+          ),
+        if (securityDecision != null && securityDecision.keyBlockers.isNotEmpty)
+          _AnalysisSection(
+            title: "主要护栏",
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children:
+                  securityDecision.keyBlockers.take(4).map(_bullet).toList(),
+            ),
+          ),
         if (data.actionItems.isNotEmpty)
           _AnalysisSection(
-            title: "当前分析结论",
+            title: labels.actions,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: data.actionItems.take(4).map(_ActionRow.new).toList(),
@@ -478,19 +551,45 @@ class _AnalysisResultView extends StatelessWidget {
         ],
         if (data.portfolioFit.isNotEmpty)
           _AnalysisSection(
-            title: "组合适配",
+            title: labels.fit,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
-              children: data.portfolioFit.take(4).map(_bullet).toList(),
+              children: (securityDecision?.portfolioFit.isNotEmpty == true
+                      ? securityDecision!.portfolioFit
+                      : data.portfolioFit)
+                  .take(4)
+                  .map(_bullet)
+                  .toList(),
+            ),
+          ),
+        if (securityDecision != null &&
+            securityDecision.watchlistTriggers.isNotEmpty)
+          _AnalysisSection(
+            title: "观察触发点",
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: securityDecision.watchlistTriggers
+                  .take(4)
+                  .map(_bullet)
+                  .toList(),
             ),
           ),
         if (data.scorecards.isNotEmpty ||
             data.quoteSourceSummary != null ||
             data.quoteFreshnessSummary != null ||
             data.quotesAsOf != null)
-          _AnalysisSection(
-            title: "数据依据",
-            child: _DataEvidenceView(data),
+          ExpansionTile(
+            tilePadding: EdgeInsets.zero,
+            initiallyExpanded: false,
+            title: Text("数据依据",
+                style: Theme.of(context).textTheme.titleSmall),
+            childrenPadding: const EdgeInsets.only(bottom: 12),
+            children: [
+              Align(
+                alignment: Alignment.centerLeft,
+                child: _DataEvidenceView(data),
+              ),
+            ],
           ),
         if (data.sources.isNotEmpty)
           ExpansionTile(
@@ -512,6 +611,58 @@ class _AnalysisResultView extends StatelessWidget {
         Text(data.disclaimerZh, style: Theme.of(context).textTheme.bodySmall),
       ],
     );
+  }
+}
+
+String _verdictLabel(String value) {
+  return switch (value) {
+    "good-candidate" => "候选较强",
+    "weak-fit" => "适配偏弱",
+    "review-existing" => "复核持仓",
+    "needs-more-data" => "需补数据",
+    _ => "先观察",
+  };
+}
+
+class _AnalysisScopeLabels {
+  const _AnalysisScopeLabels({
+    required this.summary,
+    required this.actions,
+    required this.fit,
+  });
+
+  final String summary;
+  final String actions;
+  final String fit;
+
+  static _AnalysisScopeLabels forScope(String scope) {
+    return switch (scope) {
+      "security" => const _AnalysisScopeLabels(
+          summary: "投资判断",
+          actions: "买入前确认",
+          fit: "组合适配",
+        ),
+      "portfolio" => const _AnalysisScopeLabels(
+          summary: "组合诊断",
+          actions: "优先处理",
+          fit: "配置解读",
+        ),
+      "account" => const _AnalysisScopeLabels(
+          summary: "账户诊断",
+          actions: "账户动作",
+          fit: "账户角色",
+        ),
+      "recommendation-run" => const _AnalysisScopeLabels(
+          summary: "推荐诊断",
+          actions: "推荐确认",
+          fit: "推荐依据",
+        ),
+      _ => const _AnalysisScopeLabels(
+          summary: "分析结论",
+          actions: "下一步确认",
+          fit: "适配说明",
+        ),
+    };
   }
 }
 
@@ -632,7 +783,7 @@ class _ActionRow extends StatelessWidget {
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.only(top: 8),
-      child: Text("${action.title}：${action.detail}"),
+      child: Text("• ${action.title}：${action.detail}"),
     );
   }
 }

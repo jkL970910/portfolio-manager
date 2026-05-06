@@ -9,6 +9,7 @@ class LooMinisterCard extends StatefulWidget {
   const LooMinisterCard({
     required this.apiClient,
     required this.pageContext,
+    required this.recentSubjects,
     required this.suggestedQuestion,
     required this.onSuggestedActionConfirmed,
     super.key,
@@ -16,6 +17,7 @@ class LooMinisterCard extends StatefulWidget {
 
   final LooApiClient apiClient;
   final LooMinisterPageContext pageContext;
+  final List<LooMinisterRecentSubject> recentSubjects;
   final String suggestedQuestion;
   final ValueChanged<LooMinisterSuggestedAction> onSuggestedActionConfirmed;
 
@@ -28,6 +30,7 @@ class LooMinisterFloatingButton extends StatelessWidget {
     required this.apiClient,
     required this.navigatorKey,
     required this.pageContext,
+    required this.recentSubjects,
     required this.suggestedQuestion,
     required this.onSuggestedActionConfirmed,
     super.key,
@@ -36,6 +39,7 @@ class LooMinisterFloatingButton extends StatelessWidget {
   final LooApiClient apiClient;
   final GlobalKey<NavigatorState> navigatorKey;
   final LooMinisterPageContext pageContext;
+  final List<LooMinisterRecentSubject> recentSubjects;
   final String suggestedQuestion;
   final ValueChanged<LooMinisterSuggestedAction> onSuggestedActionConfirmed;
 
@@ -46,6 +50,7 @@ class LooMinisterFloatingButton extends StatelessWidget {
         apiClient: apiClient,
         navigatorKey: navigatorKey,
         pageContext: pageContext,
+        recentSubjects: recentSubjects,
         suggestedQuestion: suggestedQuestion,
         onSuggestedActionConfirmed: onSuggestedActionConfirmed,
       ),
@@ -58,6 +63,7 @@ class _DraggableMinisterButton extends StatefulWidget {
     required this.apiClient,
     required this.navigatorKey,
     required this.pageContext,
+    required this.recentSubjects,
     required this.suggestedQuestion,
     required this.onSuggestedActionConfirmed,
   });
@@ -65,6 +71,7 @@ class _DraggableMinisterButton extends StatefulWidget {
   final LooApiClient apiClient;
   final GlobalKey<NavigatorState> navigatorKey;
   final LooMinisterPageContext pageContext;
+  final List<LooMinisterRecentSubject> recentSubjects;
   final String suggestedQuestion;
   final ValueChanged<LooMinisterSuggestedAction> onSuggestedActionConfirmed;
 
@@ -205,6 +212,7 @@ class _DraggableMinisterButtonState extends State<_DraggableMinisterButton> {
       builder: (_) => _LooMinisterSheet(
         apiClient: widget.apiClient,
         pageContext: widget.pageContext,
+        recentSubjects: widget.recentSubjects,
         suggestedQuestion: widget.suggestedQuestion,
         onSuggestedActionConfirmed: widget.onSuggestedActionConfirmed,
       ),
@@ -220,12 +228,14 @@ class _LooMinisterSheet extends StatelessWidget {
   const _LooMinisterSheet({
     required this.apiClient,
     required this.pageContext,
+    required this.recentSubjects,
     required this.suggestedQuestion,
     required this.onSuggestedActionConfirmed,
   });
 
   final LooApiClient apiClient;
   final LooMinisterPageContext pageContext;
+  final List<LooMinisterRecentSubject> recentSubjects;
   final String suggestedQuestion;
   final ValueChanged<LooMinisterSuggestedAction> onSuggestedActionConfirmed;
 
@@ -259,6 +269,7 @@ class _LooMinisterSheet extends StatelessWidget {
               LooMinisterCard(
                 apiClient: apiClient,
                 pageContext: pageContext,
+                recentSubjects: recentSubjects,
                 suggestedQuestion: suggestedQuestion,
                 onSuggestedActionConfirmed: onSuggestedActionConfirmed,
               ),
@@ -295,6 +306,7 @@ class _LooMinisterCardState extends State<LooMinisterCard> {
     final request = LooMinisterQuestionRequest(
       pageContext: widget.pageContext,
       question: question,
+      recentSubjects: widget.recentSubjects,
     ).toJson();
     return widget.apiClient.askLooMinisterChat({
       ...request,
@@ -587,6 +599,7 @@ class LooMinisterAnswer {
   const LooMinisterAnswer({
     required this.title,
     required this.answer,
+    required this.structured,
     required this.keyPoints,
     required this.suggestedActions,
     required this.disclaimer,
@@ -594,6 +607,7 @@ class LooMinisterAnswer {
 
   final String title;
   final String answer;
+  final LooMinisterStructuredAnswer? structured;
   final List<String> keyPoints;
   final List<LooMinisterSuggestedAction> suggestedActions;
   final String disclaimer;
@@ -603,6 +617,10 @@ class LooMinisterAnswer {
     return LooMinisterAnswer(
       title: json["title"] as String? ?? "大臣答复",
       answer: json["answer"] as String? ?? "暂时没有答复。",
+      structured: json["structured"] is Map<String, dynamic>
+          ? LooMinisterStructuredAnswer.fromJson(
+              json["structured"] as Map<String, dynamic>)
+          : null,
       keyPoints: (json["keyPoints"] as List?)?.whereType<String>().toList() ??
           const [],
       suggestedActions: (json["suggestedActions"] as List?)
@@ -630,6 +648,35 @@ class LooMinisterAnswer {
   }
 }
 
+class LooMinisterStructuredAnswer {
+  const LooMinisterStructuredAnswer({
+    required this.directAnswer,
+    required this.reasoning,
+    required this.decisionGates,
+    required this.boundary,
+    required this.nextStep,
+  });
+
+  final String directAnswer;
+  final List<String> reasoning;
+  final List<String> decisionGates;
+  final String? boundary;
+  final String? nextStep;
+
+  factory LooMinisterStructuredAnswer.fromJson(Map<String, dynamic> json) {
+    return LooMinisterStructuredAnswer(
+      directAnswer: json["directAnswer"] as String? ?? "",
+      reasoning: (json["reasoning"] as List?)?.whereType<String>().toList() ??
+          const [],
+      decisionGates:
+          (json["decisionGates"] as List?)?.whereType<String>().toList() ??
+              const [],
+      boundary: json["boundary"] as String?,
+      nextStep: json["nextStep"] as String?,
+    );
+  }
+}
+
 class _MinisterAnswerView extends StatelessWidget {
   const _MinisterAnswerView(
     this.answer, {
@@ -641,6 +688,7 @@ class _MinisterAnswerView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final structured = answer.structured;
     return DecoratedBox(
       decoration: BoxDecoration(
         color: Theme.of(context)
@@ -657,8 +705,40 @@ class _MinisterAnswerView extends StatelessWidget {
           children: [
             Text(answer.title, style: Theme.of(context).textTheme.titleMedium),
             const SizedBox(height: 8),
-            Text(answer.answer),
-            if (answer.keyPoints.isNotEmpty) ...[
+            if (structured != null &&
+                structured.directAnswer.trim().isNotEmpty) ...[
+              Text(structured.directAnswer),
+              if (structured.reasoning.isNotEmpty) ...[
+                const SizedBox(height: 10),
+                Text("判断依据",
+                    style: Theme.of(context).textTheme.titleSmall),
+                const SizedBox(height: 4),
+                ...structured.reasoning.take(4).map((point) => Text("• $point")),
+              ],
+              if (structured.decisionGates.isNotEmpty) ...[
+                const SizedBox(height: 10),
+                Text("需要确认",
+                    style: Theme.of(context).textTheme.titleSmall),
+                const SizedBox(height: 4),
+                ...structured.decisionGates
+                    .take(4)
+                    .map((point) => Text("• $point")),
+              ],
+              if (structured.boundary != null &&
+                  structured.boundary!.trim().isNotEmpty) ...[
+                const SizedBox(height: 10),
+                Text("边界：${structured.boundary}",
+                    style: Theme.of(context).textTheme.bodySmall),
+              ],
+              if (structured.nextStep != null &&
+                  structured.nextStep!.trim().isNotEmpty) ...[
+                const SizedBox(height: 10),
+                Text("下一步：${structured.nextStep}"),
+              ],
+            ] else ...[
+              Text(answer.answer),
+            ],
+            if (structured == null && answer.keyPoints.isNotEmpty) ...[
               const SizedBox(height: 10),
               ...answer.keyPoints.take(4).map((point) => Text("• $point")),
             ],

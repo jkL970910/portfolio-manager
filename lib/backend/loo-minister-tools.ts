@@ -11,14 +11,17 @@ import type {
 } from "@/lib/backend/loo-minister-contracts";
 import {
   getOrBuildContextPack,
-  getOrBuildContextPackSync,
   LOO_MINISTER_CONTEXT_PACK_TTL_MS,
+  externalIntelligencePackKey,
   projectKnowledgePackKey,
   securityContextPackKey,
 } from "@/lib/backend/loo-minister-context-pack-cache";
 import { LOO_MINISTER_VERSION } from "@/lib/backend/loo-minister-contracts";
 import { getDailyIntelligenceItemsForUser } from "@/lib/backend/mobile-daily-intelligence";
-import { searchLooMinisterProjectKnowledge } from "@/lib/backend/loo-minister-domain-knowledge";
+import {
+  inferLooMinisterProjectKnowledgeIntent,
+  searchLooMinisterProjectKnowledge,
+} from "@/lib/backend/loo-minister-domain-knowledge";
 import { resolveSecurity } from "@/lib/market-data/service";
 import { resolveCanonicalSecurityIdentity } from "@/lib/market-data/security-identity";
 
@@ -130,15 +133,19 @@ function subjectToFact(subject: MinisterSubjectRef, index: number): LooMinisterF
     subject.exchange,
     subject.currency,
   ].filter(Boolean).join(" · ");
+  const detail = [
+    subject.name ? `名称=${subject.name}` : null,
+    subject.securityId ? `securityId=${subject.securityId}` : null,
+    subject.source ? `来源=${subject.source}` : null,
+  ]
+    .filter(Boolean)
+    .join("；")
+    .slice(0, 240);
   return {
     id: `comparison-subject-${index + 1}`,
     label: `对比标的 ${index + 1}`,
     value: display,
-    detail: [
-      subject.name,
-      subject.securityId ? `securityId=${subject.securityId}` : null,
-      subject.source ? `来源=${subject.source}` : null,
-    ].filter(Boolean).join("；").slice(0, 600),
+    detail,
     source: "portfolio-data",
   };
 }
@@ -160,24 +167,27 @@ export function isComparisonQuestion(question: string) {
   return /对比|比较|相比|比呢|和.+比|versus| vs\.? |compare/i.test(question);
 }
 
-export function searchProjectKnowledgeTool(input: {
+export async function searchProjectKnowledgeTool(input: {
   page: LooMinisterPageContext["page"];
   question: string;
 }) {
-  return getOrBuildContextPackSync({
-    key: projectKnowledgePackKey({
-      version: LOO_MINISTER_VERSION,
-      page: input.page,
-      question: input.question,
-    }),
-    kind: "project-knowledge",
-    ttlMs: LOO_MINISTER_CONTEXT_PACK_TTL_MS.projectKnowledge,
-    build: () =>
-      searchLooMinisterProjectKnowledge({
+  const intent = inferLooMinisterProjectKnowledgeIntent(input);
+  return (
+    await getOrBuildContextPack({
+      key: projectKnowledgePackKey({
+        version: LOO_MINISTER_VERSION,
         page: input.page,
-        question: input.question,
+        intent,
       }),
-  }).data;
+      kind: "project-knowledge",
+      ttlMs: LOO_MINISTER_CONTEXT_PACK_TTL_MS.projectKnowledge,
+      build: () =>
+        searchLooMinisterProjectKnowledge({
+          page: input.page,
+          question: input.question,
+        }),
+    })
+  ).data;
 }
 
 export async function resolveSecurityMentionTool(
@@ -326,7 +336,7 @@ export async function getCachedExternalIntelligenceTool(
   subject: MinisterSubjectRef,
 ) {
   const pack = await getOrBuildContextPack({
-    key: securityContextPackKey({
+    key: externalIntelligencePackKey({
       userId,
       identity: [
         subject.securityId,

@@ -36,6 +36,7 @@ class _LooWealthAppState extends State<LooWealthApp> {
 
   MobileAuthSession? _session;
   LooMinisterPageContext? _ministerContext;
+  List<LooMinisterRecentSubject> _recentMinisterSubjects = const [];
   Future<String?>? _refreshInFlight;
   var _loading = true;
 
@@ -127,6 +128,7 @@ class _LooWealthAppState extends State<LooWealthApp> {
     setState(() {
       _session = session;
       _ministerContext = null;
+      _recentMinisterSubjects = const [];
     });
   }
 
@@ -139,6 +141,7 @@ class _LooWealthAppState extends State<LooWealthApp> {
     setState(() {
       _session = null;
       _ministerContext = null;
+      _recentMinisterSubjects = const [];
     });
   }
 
@@ -149,7 +152,32 @@ class _LooWealthAppState extends State<LooWealthApp> {
 
     setState(() {
       _ministerContext = pageContext;
+      _recentMinisterSubjects = _updatedRecentMinisterSubjects(pageContext);
     });
+  }
+
+  List<LooMinisterRecentSubject> _updatedRecentMinisterSubjects(
+    LooMinisterPageContext pageContext,
+  ) {
+    final security = pageContext.subject.security;
+    if (security == null || security.symbol.trim().isEmpty) {
+      return _recentMinisterSubjects;
+    }
+
+    final recentSubject = LooMinisterRecentSubject(
+      symbol: security.symbol.trim().toUpperCase(),
+      securityId: security.securityId,
+      exchange: security.exchange,
+      currency: security.currency,
+      name: security.name,
+      source: pageContext.page,
+    );
+    final deduped = [
+      ..._recentMinisterSubjects
+          .where((subject) => subject.stableKey != recentSubject.stableKey),
+      recentSubject,
+    ];
+    return deduped.length <= 5 ? deduped : deduped.sublist(deduped.length - 5);
   }
 
   void _requestMinisterAnalysisAction(LooMinisterSuggestedAction action) {
@@ -420,6 +448,7 @@ class _LooWealthAppState extends State<LooWealthApp> {
                 apiClient: apiClient,
                 navigatorKey: _navigatorKey,
                 pageContext: _ministerContext ?? _fallbackMinisterContext,
+                recentSubjects: _recentMinisterSubjects,
                 suggestedQuestion: _suggestedMinisterQuestion,
                 onSuggestedActionConfirmed: _requestMinisterAnalysisAction,
               ),

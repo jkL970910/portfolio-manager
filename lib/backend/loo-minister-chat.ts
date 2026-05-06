@@ -4,7 +4,8 @@ import { apiSuccess } from "@/lib/backend/contracts";
 import { getLooMinisterAnswer } from "@/lib/backend/loo-minister";
 import {
   chatSubjectPackKey,
-  getOrBuildContextPackSync,
+  clearLooMinisterContextPackCacheAsync,
+  getOrBuildContextPack,
   LOO_MINISTER_CONTEXT_PACK_TTL_MS,
 } from "@/lib/backend/loo-minister-context-pack-cache";
 import { resolveLooMinisterContext } from "@/lib/backend/loo-minister-context-resolver";
@@ -210,15 +211,14 @@ export async function askLooMinisterChat(
     pageContextJson: input.pageContext,
   });
 
-  const sessionSubjectHistory = getOrBuildContextPackSync({
-    key: chatSubjectPackKey(
-      activeSession.id,
-      String(activeSession.updatedAt ?? activeSession.createdAt ?? "new"),
-    ),
-    kind: "chat-subjects",
-    ttlMs: LOO_MINISTER_CONTEXT_PACK_TTL_MS.chatSubjects,
-    build: () => parseSubjectHistory(activeSession.subjectHistoryJson),
-  }).data;
+  const sessionSubjectHistory = (
+    await getOrBuildContextPack({
+      key: chatSubjectPackKey(activeSession.id),
+      kind: "chat-subjects",
+      ttlMs: LOO_MINISTER_CONTEXT_PACK_TTL_MS.chatSubjects,
+      build: () => parseSubjectHistory(activeSession.subjectHistoryJson),
+    })
+  ).data;
   const resolvedContext = await resolveLooMinisterContext({
     userId,
     request: input,
@@ -274,6 +274,9 @@ export async function askLooMinisterChat(
       updatedAt: now,
     })
     .where(eq(looMinisterChatSessions.id, activeSession.id));
+  await clearLooMinisterContextPackCacheAsync(
+    chatSubjectPackKey(activeSession.id),
+  );
 
   return apiSuccess(
     {

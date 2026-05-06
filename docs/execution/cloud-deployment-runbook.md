@@ -26,6 +26,7 @@ PORTFOLIO_WORKER_SECRET=<same strong worker secret used by Cloudflare>
 LOO_MINISTER_ENCRYPTION_SECRET=<32+ char secret>
 LOO_MINISTER_PROVIDER_ENABLED=false
 LOO_MINISTER_ALLOW_SERVER_KEY=false
+LOO_MINISTER_CONTEXT_PACK_STORE=postgres
 SECURITY_METADATA_PROVIDER_ENABLED=false
 OPENFIGI_DAILY_QUOTA_LIMIT=25
 MARKET_DATA_REFRESH_MAX_USERS=1
@@ -56,6 +57,7 @@ APP_BASE_URL=https://<your-vercel-domain>
 ENABLE_SECURITY_METADATA_WORKER=true
 ENABLE_MARKET_DATA_WORKER=true
 ENABLE_EXTERNAL_RESEARCH_WORKER=true
+ENABLE_LOO_MINISTER_CONTEXT_PRUNE_WORKER=true
 EXTERNAL_RESEARCH_WORKER_MODE=daily-overview
 EXTERNAL_RESEARCH_DAILY_SOURCE=profile
 EXTERNAL_RESEARCH_DAILY_MAX_USERS=1
@@ -173,6 +175,10 @@ Expected:
   only enqueues a small set of complete-identity holdings, skips fresh cached
   documents, then drains the same external-research queue. Keep raw news/forum
   sources disabled until provider/cost policy is explicitly approved.
+- `loo-minister-context-prune` deletes expired rows from
+  `loo_minister_context_packs`. Context Pack reads already respect `expiresAt`;
+  this prune job is the physical cleanup step that prevents stale cloud context
+  rows from accumulating indefinitely.
 
 Mobile visibility:
 

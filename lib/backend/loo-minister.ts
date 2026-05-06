@@ -1,7 +1,7 @@
 import { apiSuccess } from "@/lib/backend/contracts";
 import {
   getOrBuildContextPack,
-  getOrBuildContextPackSync,
+  globalUserContextPackKey,
   latestRecommendationPackKey,
   LOO_MINISTER_CONTEXT_PACK_TTL_MS,
   projectKnowledgePackKey,
@@ -14,6 +14,8 @@ import {
   type LooMinisterAnswerResult,
   type LooMinisterFact,
   type LooMinisterQuestionRequest,
+  type LooMinisterQuestionRequestInput,
+  looMinisterQuestionRequestSchema,
   looMinisterAnswerResultSchema,
 } from "@/lib/backend/loo-minister-contracts";
 import {
@@ -39,6 +41,7 @@ import {
   inferEconomicAssetClass,
 } from "@/lib/backend/security-economic-exposure";
 import { extractSecurityMentions } from "@/lib/backend/loo-minister-tools";
+import { inferLooMinisterProjectKnowledgeIntent } from "@/lib/backend/loo-minister-domain-knowledge";
 
 const pageLabels: Record<
   LooMinisterQuestionRequest["pageContext"]["page"],
@@ -359,6 +362,18 @@ type PortfolioContext = {
   rules: string[];
 };
 
+type GlobalUserContext = {
+  version: "global-user-context.v1";
+  summary: PortfolioContext["summary"];
+  topHoldings: PortfolioContext["concentration"]["topHoldings"];
+  leadAllocation: PortfolioContext["assetAllocation"][number] | null;
+  health: PortfolioContext["health"];
+  preference: PortfolioContext["preference"];
+  recommendation: PortfolioContext["recommendation"];
+  contextCompleteness: PortfolioContext["contextCompleteness"];
+  asOf: string;
+};
+
 function factDisplayPriority(fact: LooMinisterFact) {
   if (fact.source === "external-intelligence") return 0;
   if (fact.source === "analysis-cache") return 1;
@@ -389,6 +404,7 @@ function isUserFacingFact(fact: LooMinisterFact) {
       "candidate-fit-context",
       "portfolio-context",
       "security-context",
+      "global-user-context",
     ].includes(fact.id)
   ) {
     return false;
@@ -588,10 +604,6 @@ function prioritizeFactsForPrompt(
     isCandidateFitQuestion(input.question);
 
   return [...facts].sort((a, b) => {
-    const aPortfolio = a.id.startsWith("portfolio-context") ? 0 : 1;
-    const bPortfolio = b.id.startsWith("portfolio-context") ? 0 : 1;
-    if (aPortfolio !== bPortfolio) return aPortfolio - bPortfolio;
-
     const aSecurity = a.id.startsWith("security-context") ? 0 : 1;
     const bSecurity = b.id.startsWith("security-context") ? 0 : 1;
     if (aSecurity !== bSecurity) return aSecurity - bSecurity;
@@ -601,6 +613,15 @@ function prioritizeFactsForPrompt(
       const bCandidate = b.id.startsWith("candidate-") ? 0 : 1;
       if (aCandidate !== bCandidate) return aCandidate - bCandidate;
     }
+
+    const aPortfolio = a.id.startsWith("portfolio-context") ? 0 : 1;
+    const bPortfolio = b.id.startsWith("portfolio-context") ? 0 : 1;
+    if (aPortfolio !== bPortfolio) return aPortfolio - bPortfolio;
+
+    const aGlobal = a.id.startsWith("global-user-context") ? 0 : 1;
+    const bGlobal = b.id.startsWith("global-user-context") ? 0 : 1;
+    if (aGlobal !== bGlobal) return aGlobal - bGlobal;
+
     return factDisplayPriority(a) - factDisplayPriority(b);
   });
 }
@@ -624,48 +645,112 @@ function attachDeterministicSuggestedActions(
 ) {
   const runAnalysisActions = getRunAnalysisActions(input);
   if (runAnalysisActions.length === 0) {
-    return looMinisterAnswerResultSchema.parse(answer);
+    return looMinisterAnswerResultSchema.parse(
+      ensureStructuredMinisterAnswer(answer),
+    );
   }
 
   return looMinisterAnswerResultSchema.parse({
-    ...answer,
+    ...ensureStructuredMinisterAnswer(answer),
     suggestedActions: runAnalysisActions,
   });
 }
 
-function buildProjectKnowledgeFacts(
-  input: LooMinisterQuestionRequest,
-): LooMinisterFact[] {
-  return getOrBuildContextPackSync({
-    key: projectKnowledgePackKey({
-      version: LOO_MINISTER_VERSION,
-      page: input.pageContext.page,
-      question: input.question,
-    }),
-    kind: "project-knowledge",
-    ttlMs: LOO_MINISTER_CONTEXT_PACK_TTL_MS.projectKnowledge,
-    build: () => {
-      const { pageContext, question } = input;
-      const selected = projectKnowledgeItems.filter(
-        (item) =>
-          item.pages.includes(pageContext.page) ||
-          item.triggers.some((trigger) => trigger.test(question)),
-      );
-      const unique = new Map<string, (typeof projectKnowledgeItems)[number]>();
-      for (const item of selected) {
-        unique.set(item.id, item);
-      }
+function splitAnswerLines(answer: string) {
+  return answer
+    .split(/\n+/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+}
 
-      const items = Array.from(unique.values()).slice(0, 5);
-      return items.map((item) => ({
-        id: item.id,
-        label: item.label,
-        value: item.value.slice(0, 240),
-        detail: item.detail.slice(0, 600),
-        source: "system" as const,
-      }));
+function truncateStructuredText(value: string | null, maxLength: number) {
+  if (!value) {
+    return value;
+  }
+  return value.length > maxLength ? `${value.slice(0, maxLength - 1)}…` : value;
+}
+
+function ensureStructuredMinisterAnswer(
+  answer: LooMinisterAnswerResult,
+): LooMinisterAnswerResult {
+  if (answer.structured) {
+    return answer;
+  }
+
+  const lines = splitAnswerLines(answer.answer);
+  const directAnswer = lines[0] ?? answer.answer;
+  const reasoning = lines.slice(1, 4);
+  const decisionGates = [
+    ...answer.keyPoints.slice(0, 3),
+    ...lines.filter((line) =>
+      /确认|护栏|边界|新鲜|缺口|账户|税务|汇率|风险/.test(line),
+    ).slice(0, 3),
+  ].slice(0, 6);
+  const boundary =
+    lines.find((line) => /边界|新鲜|缓存|不构成|实时|来源|资料完整度/.test(line)) ??
+    null;
+  const nextStep =
+    lines.find((line) => /下一步|建议|确认|运行|进入|点击/.test(line)) ??
+    answer.keyPoints[0] ??
+    null;
+
+  return {
+    ...answer,
+    structured: {
+      directAnswer: truncateStructuredText(directAnswer, 700) ?? answer.title,
+      reasoning: reasoning
+        .map((line) => truncateStructuredText(line, 500))
+        .filter((line): line is string => Boolean(line)),
+      decisionGates: decisionGates
+        .map((line) => truncateStructuredText(line, 500))
+        .filter((line): line is string => Boolean(line)),
+      boundary: truncateStructuredText(boundary, 700),
+      nextStep: truncateStructuredText(nextStep, 500),
     },
-  }).data;
+  };
+}
+
+async function buildProjectKnowledgeFacts(
+  input: LooMinisterQuestionRequest,
+): Promise<LooMinisterFact[]> {
+  return (
+    await getOrBuildContextPack({
+      key: projectKnowledgePackKey({
+        version: LOO_MINISTER_VERSION,
+        page: input.pageContext.page,
+        intent: inferLooMinisterProjectKnowledgeIntent({
+          page: input.pageContext.page,
+          question: input.question,
+        }),
+      }),
+      kind: "project-knowledge",
+      ttlMs: LOO_MINISTER_CONTEXT_PACK_TTL_MS.projectKnowledge,
+      build: () => {
+        const { pageContext, question } = input;
+        const selected = projectKnowledgeItems.filter(
+          (item) =>
+            item.pages.includes(pageContext.page) ||
+            item.triggers.some((trigger) => trigger.test(question)),
+        );
+        const unique = new Map<
+          string,
+          (typeof projectKnowledgeItems)[number]
+        >();
+        for (const item of selected) {
+          unique.set(item.id, item);
+        }
+
+        const items = Array.from(unique.values()).slice(0, 5);
+        return items.map((item) => ({
+          id: item.id,
+          label: item.label,
+          value: item.value.slice(0, 240),
+          detail: item.detail.slice(0, 600),
+          source: "system" as const,
+        }));
+      },
+    })
+  ).data;
 }
 
 function hasProjectKnowledge(facts: LooMinisterFact[]) {
@@ -789,6 +874,12 @@ function isPortfolioContextPage(
   );
 }
 
+function portfolioContextPageForInput(
+  page: LooMinisterQuestionRequest["pageContext"]["page"],
+): PortfolioContext["page"] {
+  return isPortfolioContextPage(page) ? page : "portfolio";
+}
+
 function getPortfolioContext(input: LooMinisterQuestionRequest) {
   const fact = findFact(input.pageContext.facts, "portfolio-context");
   if (!fact?.detail) return null;
@@ -798,6 +889,33 @@ function getPortfolioContext(input: LooMinisterQuestionRequest) {
   } catch {
     return null;
   }
+}
+
+function getGlobalUserContext(input: LooMinisterQuestionRequest) {
+  const fact = findFact(input.pageContext.facts, "global-user-context");
+  if (!fact?.detail) return null;
+  try {
+    const parsed = JSON.parse(fact.detail) as GlobalUserContext;
+    return parsed.version === "global-user-context.v1" ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+function formatGlobalUserContextLine(context: GlobalUserContext) {
+  return `全局用户背景：净资产 ${formatCad(context.summary.totalNetWorthCad)}；投资资产 ${formatCad(context.summary.totalMarketValueCad)}；现金 ${formatCad(context.summary.cashBalanceCad)}；账户 ${context.summary.accountCount}；持仓 ${context.summary.holdingCount}；风险档位 ${context.preference.riskProfile}。`;
+}
+
+function formatGlobalUserTopHoldings(context: GlobalUserContext) {
+  return context.topHoldings.length > 0
+    ? context.topHoldings
+        .slice(0, 5)
+        .map(
+          (holding) =>
+            `${holding.symbol} ${formatPct(holding.weightPct)} / ${holding.assetClass}`,
+        )
+        .join("、")
+    : "未记录";
 }
 
 function buildPortfolioContext(args: {
@@ -810,10 +928,6 @@ function buildPortfolioContext(args: {
   snapshots: PortfolioSnapshot[];
   analysisRuns: PortfolioAnalysisRun[];
 }): PortfolioContext {
-  if (!isPortfolioContextPage(args.input.pageContext.page)) {
-    throw new Error("Portfolio context requires a portfolio-level page.");
-  }
-
   const totalMarketValueCad = args.holdings.reduce(
     (sum, holding) => sum + holding.marketValueCad,
     0,
@@ -920,7 +1034,7 @@ function buildPortfolioContext(args: {
 
   return {
     version: "portfolio-context.v1",
-    page: args.input.pageContext.page,
+    page: portfolioContextPageForInput(args.input.pageContext.page),
     summary: {
       totalMarketValueCad,
       cashBalanceCad,
@@ -998,6 +1112,38 @@ function buildPortfolioContext(args: {
   };
 }
 
+async function buildPortfolioContextDataPack(userId: string) {
+  const repositories = getRepositories();
+  const [
+    accounts,
+    cashAccounts,
+    holdings,
+    profile,
+    recommendationRun,
+    snapshots,
+    analysisRuns,
+  ] = await Promise.all([
+    repositories.accounts.listByUserId(userId),
+    repositories.cashAccounts.listByUserId(userId),
+    repositories.holdings.listByUserId(userId),
+    repositories.preferences.getByUserId(userId),
+    repositories.recommendations
+      .getLatestByUserId(userId)
+      .catch(() => null),
+    repositories.snapshots.listByUserId(userId),
+    repositories.analysisRuns.listRecentByUserId(userId, 5),
+  ]);
+  return {
+    accounts,
+    cashAccounts,
+    holdings,
+    profile,
+    recommendationRun,
+    snapshots,
+    analysisRuns,
+  };
+}
+
 function mapPortfolioContextFacts(context: PortfolioContext): LooMinisterFact[] {
   const leadAllocation = context.assetAllocation[0];
   return [
@@ -1050,6 +1196,88 @@ function mapPortfolioContextFacts(context: PortfolioContext): LooMinisterFact[] 
       ]
         .filter(Boolean)
         .join("；") || undefined,
+      source: "analysis-cache",
+    },
+  ];
+}
+
+function buildGlobalUserContext(
+  portfolioContext: PortfolioContext,
+  asOf: string,
+): GlobalUserContext {
+  return {
+    version: "global-user-context.v1",
+    summary: portfolioContext.summary,
+    topHoldings: portfolioContext.concentration.topHoldings.slice(0, 5),
+    leadAllocation: portfolioContext.assetAllocation[0] ?? null,
+    health: portfolioContext.health,
+    preference: portfolioContext.preference,
+    recommendation: {
+      ...portfolioContext.recommendation,
+      topItems: portfolioContext.recommendation.topItems.slice(0, 3),
+      assumptions: portfolioContext.recommendation.assumptions.slice(0, 2),
+    },
+    contextCompleteness: portfolioContext.contextCompleteness,
+    asOf,
+  };
+}
+
+function mapGlobalUserContextFacts(context: GlobalUserContext): LooMinisterFact[] {
+  const leadAllocation = context.leadAllocation;
+  return [
+    {
+      id: "global-user-context",
+      label: "全局用户上下文",
+      value: `${formatCad(context.summary.totalNetWorthCad)} · ${context.summary.holdingCount} 个持仓 · ${context.preference.riskProfile}`,
+      detail: JSON.stringify(context),
+      source: "analysis-cache",
+    },
+    {
+      id: "global-user-context-summary",
+      label: "用户组合摘要",
+      value: `投资资产 ${formatCad(context.summary.totalMarketValueCad)}；现金 ${formatCad(context.summary.cashBalanceCad)}；账户 ${context.summary.accountCount}；持仓 ${context.summary.holdingCount}`,
+      detail: context.topHoldings.length > 0
+        ? `前几大持仓：${context.topHoldings
+            .map((holding) => `${holding.symbol} ${formatPct(holding.weightPct)}`)
+            .join("、")}`
+        : undefined,
+      source: "portfolio-data",
+    },
+    {
+      id: "global-user-context-preference",
+      label: "用户投资偏好",
+      value: context.preference.summary.slice(0, 240),
+      detail: [
+        `风险档位：${context.preference.riskProfile}`,
+        `现金缓冲目标：${formatCad(context.preference.cashBufferTargetCad)}`,
+        context.preference.source ? `来源：${context.preference.source}` : null,
+      ]
+        .filter(Boolean)
+        .join("；") || undefined,
+      source: "user-input",
+    },
+    {
+      id: "global-user-context-allocation",
+      label: "用户配置背景",
+      value: leadAllocation
+        ? `${leadAllocation.assetClass} 当前 ${formatPct(leadAllocation.currentPct)}；目标 ${formatPct(leadAllocation.targetPct)}；缺口 ${formatPct(leadAllocation.gapPct)}`
+        : "暂无主要配置缺口",
+      detail:
+        context.health.score == null
+          ? undefined
+          : `Health ${context.health.score}；最弱维度 ${context.health.weakestDimension ?? "未记录"}；最强维度 ${context.health.strongestDimension ?? "未记录"}`,
+      source: "analysis-cache",
+    },
+    {
+      id: "global-user-context-recommendation",
+      label: "用户最新推荐背景",
+      value: context.recommendation.runId
+        ? `${context.recommendation.engineVersion ?? "推荐版本未记录"}；${context.recommendation.topItems[0] ?? "无推荐摘要"}`
+        : "暂无最新推荐批次",
+      detail: [
+        ...context.recommendation.topItems.slice(0, 3),
+        ...context.recommendation.assumptions.slice(0, 2),
+      ].join("；") || undefined,
       source: "analysis-cache",
     },
   ];
@@ -1669,6 +1897,34 @@ function buildProductHelpAnswer(input: LooMinisterQuestionRequest) {
   ].join("\n");
 }
 
+function buildGlobalUserContextAnswer(input: LooMinisterQuestionRequest) {
+  const context = getGlobalUserContext(input);
+  const freshness = input.pageContext.dataFreshness;
+
+  if (!context) {
+    return [
+      "大臣会按用户级背景回答，但本轮没有可用的全局持仓/偏好上下文，只能给保守解释。",
+      `数据边界：${formatDataBoundaryForUser(freshness)}。`,
+    ].join("\n");
+  }
+
+  return [
+    `大臣会按用户级背景回答，而不是只看当前页面。`,
+    formatGlobalUserContextLine(context),
+    `前几大持仓：${formatGlobalUserTopHoldings(context)}。`,
+    context.leadAllocation
+      ? `主要配置缺口：${context.leadAllocation.assetClass} 当前 ${formatPct(context.leadAllocation.currentPct)}，目标 ${formatPct(context.leadAllocation.targetPct)}，缺口 ${formatPct(context.leadAllocation.gapPct)}。`
+      : "主要配置缺口：暂无可用资产类别缺口。",
+    `偏好：${context.preference.summary}。`,
+    context.recommendation.runId
+      ? `最新推荐：${context.recommendation.engineVersion ?? "版本未记录"}；${context.recommendation.topItems.slice(0, 3).join("；")}。`
+      : "最新推荐：暂无最新推荐批次。",
+    `资料完整度：${context.contextCompleteness.score}/100；缺口：${context.contextCompleteness.missing.length > 0 ? context.contextCompleteness.missing.join("、") : "无主要缺口"}。`,
+    `数据边界：${formatDataBoundaryForUser(freshness)}。`,
+    "这层背景可以帮助解释用户持仓、类似标的、偏好影响和推荐路径，但不会覆盖当前页面的标的身份和行情事实。",
+  ].join("\n");
+}
+
 function buildComparisonAnswer(input: LooMinisterQuestionRequest) {
   const current = getSecurityDisplayName(input.pageContext.subject.security);
   const comparisonFacts = input.pageContext.facts.filter((fact) =>
@@ -1717,6 +1973,7 @@ function buildMentionedSecurityAnswer(input: LooMinisterQuestionRequest) {
       fact.source === "external-intelligence",
   );
   const portfolioContext = getPortfolioContext(input);
+  const globalContext = getGlobalUserContext(input);
   const statusFacts = input.pageContext.facts.filter((fact) =>
     fact.id.startsWith("context-resolver-status-"),
   );
@@ -1735,7 +1992,9 @@ function buildMentionedSecurityAnswer(input: LooMinisterQuestionRequest) {
       : "所有已识别对象都会保留 symbol + exchange + currency 或 securityId，不会把同 ticker 的不同 listing 合并。",
     portfolioContext
       ? `组合背景：净资产 ${formatCad(portfolioContext.summary.totalNetWorthCad)}；投资资产 ${formatCad(portfolioContext.summary.totalMarketValueCad)}；现金 ${formatCad(portfolioContext.summary.cashBalanceCad)}；Health ${portfolioContext.health.score ?? "未记录"}。`
-      : "组合背景：本轮没有完整组合上下文，只能使用页面事实和已补齐资料保守分析。",
+      : globalContext
+        ? `${formatGlobalUserContextLine(globalContext)} 前几大持仓：${formatGlobalUserTopHoldings(globalContext)}。`
+        : "组合背景：本轮没有完整组合上下文，只能使用页面事实和已补齐资料保守分析。",
     intelligenceFacts.length > 0
       ? `缓存外部信息：${intelligenceFacts.slice(0, 3).map((fact) => `${fact.label}：${fact.value}`).join("；")}。`
       : "缓存外部信息：当前没有匹配到这些标的的秘闻缓存；这不是利好或利空，只是外部资料还不够。",
@@ -1751,8 +2010,28 @@ function buildMentionedSecurityAnswer(input: LooMinisterQuestionRequest) {
 
 function buildPortfolioContextAnswer(input: LooMinisterQuestionRequest) {
   const context = getPortfolioContext(input);
+  const globalContext = getGlobalUserContext(input);
   const freshness = input.pageContext.dataFreshness;
   if (!context) {
+    if (globalContext) {
+      return [
+        "大臣会按整体组合问题回答。本轮没有页面级组合 DTO，但已经读取到全局用户持仓和偏好背景。",
+        formatGlobalUserContextLine(globalContext),
+        `前几大持仓：${formatGlobalUserTopHoldings(globalContext)}。`,
+        globalContext.leadAllocation
+          ? `主要配置背景：${globalContext.leadAllocation.assetClass} 当前 ${formatPct(globalContext.leadAllocation.currentPct)}，目标 ${formatPct(globalContext.leadAllocation.targetPct)}，缺口 ${formatPct(globalContext.leadAllocation.gapPct)}。`
+          : "主要配置背景：暂无可用资产类别缺口。",
+        globalContext.health.score == null
+          ? "Health：本轮没有可用健康分。"
+          : `Health：${globalContext.health.score} / ${globalContext.health.status ?? "状态未记录"}；最弱维度 ${globalContext.health.weakestDimension ?? "未记录"}。`,
+        `偏好：${globalContext.preference.summary}。`,
+        globalContext.recommendation.runId
+          ? `最新推荐：${globalContext.recommendation.engineVersion ?? "版本未记录"}；${globalContext.recommendation.topItems.slice(0, 3).join("；")}。`
+          : "最新推荐：尚未读取到最新推荐结果。",
+        `资料完整度：${globalContext.contextCompleteness.score}/100；缺口：${globalContext.contextCompleteness.missing.length > 0 ? globalContext.contextCompleteness.missing.join("、") : "无主要缺口"}。`,
+        `数据边界：${formatDataBoundaryForUser(freshness)}。`,
+      ].join("\n");
+    }
     const facts = summarizeFacts(input.pageContext.facts);
     return [
       "大臣会按整体组合问题回答，但本轮没有生成完整组合上下文，只能使用页面事实保守解释。",
@@ -1793,6 +2072,7 @@ function buildPortfolioContextAnswer(input: LooMinisterQuestionRequest) {
 function buildRecommendationAnswer(input: LooMinisterQuestionRequest) {
   const facts = input.pageContext.facts;
   const context = getPortfolioContext(input);
+  const globalContext = getGlobalUserContext(input);
   const recommendationFacts = facts.filter(
     (fact) =>
       fact.id.includes("recommendation") ||
@@ -1823,7 +2103,9 @@ function buildRecommendationAnswer(input: LooMinisterQuestionRequest) {
     "推荐页的大臣回答会分四层：目标配置缺口、账户/税务/FX 路径、偏好因素、外部情报层。",
     context
       ? `组合上下文：净资产 ${formatCad(context.summary.totalNetWorthCad)}；健康分 ${context.health.score ?? "未记录"}；最大配置缺口 ${context.assetAllocation[0] ? `${context.assetAllocation[0].assetClass} ${formatPct(context.assetAllocation[0].gapPct)}` : "未记录"}。`
-      : "组合上下文：本轮没有完整组合上下文，只能解释推荐页面事实。",
+      : globalContext
+        ? `用户级背景：${formatGlobalUserContextLine(globalContext)} 前几大持仓：${formatGlobalUserTopHoldings(globalContext)}；主要配置背景：${globalContext.leadAllocation ? `${globalContext.leadAllocation.assetClass} 缺口 ${formatPct(globalContext.leadAllocation.gapPct)}` : "未记录"}。`
+        : "组合上下文：本轮没有完整组合上下文，只能解释推荐页面事实。",
     "V2 已经是历史/deprecated 口径；当前产品应称为 V2.1 Core，外部信息层称为 V3 Overlay。",
     "V2.1 Core 是确定性规则，不会因为外部消息直接跳过目标配置；V3 Overlay 只读取已缓存情报，不会在页面加载时实时抓新闻或论坛。",
     recommendationFacts.length > 0
@@ -1845,6 +2127,7 @@ function buildRecommendationAnswer(input: LooMinisterQuestionRequest) {
 function buildHealthAnswer(input: LooMinisterQuestionRequest) {
   const { pageContext } = input;
   const portfolioContext = getPortfolioContext(input);
+  const globalContext = getGlobalUserContext(input);
   const healthFacts = pageContext.facts.filter(
     (fact) =>
       fact.id.includes("health") ||
@@ -1870,7 +2153,9 @@ function buildHealthAnswer(input: LooMinisterQuestionRequest) {
     `大臣会按 Health Score 问题处理。评分口径：${lens}`,
     portfolioContext
       ? `组合上下文：净资产 ${formatCad(portfolioContext.summary.totalNetWorthCad)}；投资资产 ${formatCad(portfolioContext.summary.totalMarketValueCad)}；前五大持仓 ${formatPct(portfolioContext.concentration.topFiveWeightPct)}；Health ${portfolioContext.health.score ?? "未记录"}。`
-      : "组合上下文：本轮没有完整组合上下文，只能读取页面 Health 事实。",
+      : globalContext
+        ? `${formatGlobalUserContextLine(globalContext)} 前几大持仓：${formatGlobalUserTopHoldings(globalContext)}；Health ${globalContext.health.score ?? "未记录"}。`
+        : "组合上下文：本轮没有完整组合上下文，只能读取页面 Health 事实。",
     "层级边界：全组合 Health 用来判断总体风险和配置目标；账户级 Health 用来判断该账户内部是否适配，并把全组合目标作为参考而不是硬复制。",
     healthFacts.length > 0
       ? `当前健康相关事实：${healthFacts.slice(0, 5).map((fact) => `${fact.label}：${fact.value}${fact.detail ? `（${fact.detail}）` : ""}`).join("；")}。`
@@ -1885,6 +2170,7 @@ function buildHealthAnswer(input: LooMinisterQuestionRequest) {
 
 function buildPreferenceAnswer(input: LooMinisterQuestionRequest) {
   const facts = input.pageContext.facts;
+  const globalContext = getGlobalUserContext(input);
   const preferenceFacts = facts.filter(
     (fact) =>
       fact.id.includes("preference") ||
@@ -1898,7 +2184,9 @@ function buildPreferenceAnswer(input: LooMinisterQuestionRequest) {
     "投资偏好现在应理解为两条线：新手引导式问答生成完整参数，进阶用户直接手动编辑所有参数。",
     preferenceFacts.length > 0
       ? `当前可见偏好上下文：${preferenceFacts.slice(0, 4).map((fact) => `${fact.label}：${fact.value}`).join("；")}。`
-      : "当前页面没有给出具体偏好值；大臣只能解释设置方式，不能假设你的风险/行业/税务目标。",
+      : globalContext
+        ? `当前已应用偏好：${globalContext.preference.summary}。现金缓冲目标 ${formatCad(globalContext.preference.cashBufferTargetCad)}；来源 ${globalContext.preference.source ?? "未记录"}。`
+        : "当前页面没有给出具体偏好值；大臣只能解释设置方式，不能假设你的风险/行业/税务目标。",
     "新手流程应该覆盖完整 factors：风险容量、波动舒适度、投资期限、行业/风格/主题倾向、回避行业、现金缓冲、买房目标、税务敏感度、USD 路径、账户放置偏好、外部信息偏好和再平衡节奏。",
     "AI 大臣可以根据问答生成结构化草稿，但必须先展示给你确认；应用前仍允许手动微调，不能自动写入真实偏好。",
     "这些参数会进入 Health Score 解释和 Recommendation V2.1/V3：Health 用它解释目标偏离和风险护栏，Recommendation 用它调整候选排序和解释，但不能绕过目标配置、账户/税务/FX 和身份隔离规则。",
@@ -1908,6 +2196,7 @@ function buildPreferenceAnswer(input: LooMinisterQuestionRequest) {
 function buildSecurityDetailAnswer(input: LooMinisterQuestionRequest) {
   const securityName = getSecurityDisplayName(input.pageContext.subject.security);
   const context = getSecurityContext(input);
+  const globalContext = getGlobalUserContext(input);
   const facts = input.pageContext.facts;
   const identityFacts = facts.filter(
     (fact) =>
@@ -1940,6 +2229,9 @@ function buildSecurityDetailAnswer(input: LooMinisterQuestionRequest) {
       : "当前上下文没有完整身份/分类事实；如果缺少 exchange/currency，应先补齐 listing 身份。",
     context
       ? `持仓上下文：${context.holdingExposure.isHeld ? `${context.holdingExposure.holdingCount} 笔持仓，${formatCad(context.holdingExposure.marketValueCad)}，组合占比 ${formatPct(context.holdingExposure.holdingWeightPct)}` : "当前未持有该 listing"}。${context.holdingExposure.interpretation}`
+      : "",
+    globalContext
+      ? `全局组合背景：${globalContext.preference.riskProfile} 风险档位；前几大持仓 ${formatGlobalUserTopHoldings(globalContext)}。这里是背景信息，不能覆盖当前标的的 listing 身份和行情事实。`
       : "",
     context
       ? `行情/分析：价格 ${context.marketContext.priceLabel ?? "未记录"}；走势 ${context.marketContext.trendLabel ?? "未记录"}；报价时间 ${context.marketContext.quoteAsOf ?? "未知"}；来源 ${formatSourceModeForUser(context.marketContext.sourceMode)}${context.marketContext.provider ? `；资料源 ${context.marketContext.provider}` : ""}。`
@@ -2043,6 +2335,15 @@ function buildAnswer(input: LooMinisterQuestionRequest) {
     return buildFreshnessAnswer(input);
   }
   if (
+    !isPortfolioContextPage(pageContext.page) &&
+    getGlobalUserContext(input) &&
+    (isPortfolioQuestion(question) ||
+      isPreferenceQuestion(question) ||
+      isHealthQuestion(question))
+  ) {
+    return buildGlobalUserContextAnswer(input);
+  }
+  if (
     (pageContext.page === "security-detail" ||
       pageContext.page === "holding-detail") &&
     isSecurityDetailQuestion(question)
@@ -2054,6 +2355,7 @@ function buildAnswer(input: LooMinisterQuestionRequest) {
   }
 
   const facts = summarizeFacts(pageContext.facts);
+  const globalContext = getGlobalUserContext(input);
   const freshness = pageContext.dataFreshness;
   const freshnessNotes = [
     freshness.chartFreshness !== "unknown"
@@ -2071,7 +2373,9 @@ function buildAnswer(input: LooMinisterQuestionRequest) {
     `大臣收到你在「${pageLabels[pageContext.page]}」页面的问题：「${question}」。`,
     facts.length > 0
       ? `当前页面最关键的数据是：${facts.join("；")}。`
-      : "当前页面没有提供足够的结构化事实，大臣只能先给出保守解释。",
+      : globalContext
+        ? `${formatGlobalUserContextLine(globalContext)} 这能支持大臣回答用户级持仓、偏好和推荐背景问题，但具体页面操作仍以当前页面事实为准。`
+        : "当前页面没有提供足够的结构化事实，大臣只能先给出保守解释。",
     freshnessNotes.length > 0
       ? `需要先看数据新鲜度：${freshnessNotes.join("；")}。`
       : "当前上下文没有明确的数据新鲜度标记，建议先确认行情、FX 和图表来源。",
@@ -2226,6 +2530,7 @@ function buildRouterCompatiblePrompt(input: LooMinisterQuestionRequest) {
   const portfolioContext = getPortfolioContext(input);
   const securityContext = getSecurityContext(input);
   const candidateFitContext = getCandidateFitContext(input);
+  const globalUserContext = getGlobalUserContext(input);
   const mentionedSecurityFacts = pageContext.facts.filter(
     (fact) =>
       fact.id.startsWith("comparison-subject-") ||
@@ -2265,17 +2570,21 @@ function buildRouterCompatiblePrompt(input: LooMinisterQuestionRequest) {
     : "无";
 
   return [
-    "你是 Loo国大臣。只使用下面的页面摘要回答中文问题。",
+    "你是 Loo国大臣。你是项目内的投资管家型助手，不是数据字段解释器。只使用下面的页面摘要、用户持仓/偏好背景和缓存资料回答中文问题。",
+    "回答必须先给清晰结论，再说明为什么和用户相关、组合影响、主要风险、下一步可确认事项。不要把 provider、sourceMode、context pack、DTO、fallback、run-analysis 等工程词直接说给用户。",
     "不要编造实时行情、新闻或论坛结论；投资相关回答必须包含不构成投资建议的免责声明。",
     "如果用户要求帮忙分析、运行快扫或生成分析报告，只有在本轮 allowedActions 里存在 run-analysis 动作时，才可以说页面会提供确认式 AI 快扫按钮；否则必须说明当前聊天只能给轻量解释，并引导用户进入标的详情、Health Score、账户 Health 或推荐页运行对应快扫。suggestedActions 必须返回 []，后端会基于 allowedActions 附加确认动作。",
     "如果用户问整体持仓、组合、配置、Health 或推荐，必须优先解释组合上下文；如果用户问标的或持仓详情，必须优先解释标的上下文；如果进一步问是否适合买入/适配，必须解释候选适配；currentExposure=0 只代表未持有，不得阻止分析。",
+    "上下文优先级必须是：当前页面事实和 security-context/candidate-fit > 用户明确提到的标的 > recentSubjects 补齐资料 > portfolio-context > global-user-context > project knowledge。global-user-context 是用户级背景，只能补足持仓/偏好/推荐背景，不能覆盖当前页面或当前标的事实。",
     "如果用户在总览、组合或推荐页直接提到 ticker，必须先使用问题中提到的标的资料；有 comparison-subject 时表示 resolver 已补齐至少一个候选标的，不得再说没有资料。没有候选适配资料时，可以说明这是轻量问答而非完整快扫，但仍要基于已补齐标的、组合资料、偏好因素和数据边界回答。",
     "如果用户问 Health Score，要明确全组合评分和账户级评分是两个层级；账户级评分不是要求单个账户复制全组合目标。",
     "如果用户问推荐或约束，要分清确定性核心、偏好因素、推荐约束和外部情报层。",
     "如果用户问投资偏好，要说明新手引导和手动进阶两条线，并覆盖风险、行业/风格、现金、买房、税务、USD 路径、账户位置和外部信息偏好。",
-    "如果关键事实里有 analysis-cache 或 external-intelligence 结果，优先引用它；没有时说明当前只能基于页面上下文和本地缓存回答。",
+    "如果关键事实里有 analysis-cache 或 external-intelligence 结果，优先引用它；没有时说明当前只能基于页面上下文和本地缓存回答。引用时要解释这些资料对决策有什么影响，不要只罗列资料来源。",
+    "用户问某个标的是否值得买/加仓/比较时，必须把它当成投资判断问题：标的本身、底层经济暴露、现有持仓重复度、目标配置缺口、Preference Factors、账户/税务/FX、数据新鲜度都要纳入；不要只用组合占比或是否已持有作结论。",
     "只返回合法 JSON object，不要 markdown，不要额外解释。",
-    "JSON 字段必须是：version, generatedAt, role, page, title, answer, keyPoints, suggestedActions, sources, disclaimer。",
+    "JSON 字段必须是：version, generatedAt, role, page, title, answer, structured, keyPoints, suggestedActions, sources, disclaimer。",
+    "structured 必须包含 directAnswer, reasoning, decisionGates, boundary, nextStep。directAnswer 是 1-2 句直接结论；reasoning 是 2-4 条原因；decisionGates 是会改变判断的确认项；boundary 是数据/身份/新鲜度边界；nextStep 是一个具体下一步。",
     `固定字段：version=${LOO_MINISTER_VERSION}; role=loo-minister; page=${pageContext.page}。suggestedActions 必须返回 []；产品动作由后端 deterministic 附加，不能由模型生成。`,
     "sources 至少包含一个 {title, sourceType, asOf}，sourceType 可用 page-context、portfolio-data、quote-cache、fx-cache、analysis-cache、external-intelligence、manual。",
     `disclaimer 必须是 {"zh":"仅用于研究学习，不构成投资建议。","en":"For research and education only. This is not investment advice."}`,
@@ -2294,6 +2603,9 @@ function buildRouterCompatiblePrompt(input: LooMinisterQuestionRequest) {
     candidateFitContext
       ? `候选适配：${candidateFitContext.identity.symbol}；${candidateFitContext.analysisMode}；${candidateFitContext.economicExposure.assetClass}；目标 ${formatPct(candidateFitContext.target.targetPct)} / 当前 ${formatPct(candidateFitContext.target.currentSleevePct)} / 缺口 ${formatPct(candidateFitContext.target.gapPct)}；context ${candidateFitContext.contextCompleteness.score}/100。`
       : "候选适配：无。",
+    globalUserContext
+      ? `${formatGlobalUserContextLine(globalUserContext)} 前几大持仓：${formatGlobalUserTopHoldings(globalUserContext)}；主要配置：${globalUserContext.leadAllocation ? `${globalUserContext.leadAllocation.assetClass} 当前 ${formatPct(globalUserContext.leadAllocation.currentPct)} / 目标 ${formatPct(globalUserContext.leadAllocation.targetPct)} / 缺口 ${formatPct(globalUserContext.leadAllocation.gapPct)}` : "未记录"}；最新推荐：${globalUserContext.recommendation.topItems[0] ?? "未记录"}。`
+      : "全局用户背景：无。",
     mentionedSecurityBrief,
     facts ? `关键事实：\n${facts}` : "关键事实：无",
     warnings ? `页面提醒：\n${warnings}` : "页面提醒：无",
@@ -2349,6 +2661,32 @@ const answerJsonSchema = {
     },
     title: { type: "string" },
     answer: { type: "string" },
+    structured: {
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        directAnswer: { type: "string" },
+        reasoning: {
+          type: "array",
+          items: { type: "string" },
+          maxItems: 6,
+        },
+        decisionGates: {
+          type: "array",
+          items: { type: "string" },
+          maxItems: 6,
+        },
+        boundary: { type: ["string", "null"] },
+        nextStep: { type: ["string", "null"] },
+      },
+      required: [
+        "directAnswer",
+        "reasoning",
+        "decisionGates",
+        "boundary",
+        "nextStep",
+      ],
+    },
     keyPoints: { type: "array", items: { type: "string" }, maxItems: 8 },
     suggestedActions: {
       type: "array",
@@ -2403,6 +2741,7 @@ const answerJsonSchema = {
     "page",
     "title",
     "answer",
+    "structured",
     "keyPoints",
     "suggestedActions",
     "sources",
@@ -2542,7 +2881,7 @@ function buildExternalInput(
     {
       role: "system",
       content:
-        "你是 Loo国大臣。只用提供的页面 context 回答中文问题；如果 context 里有 portfolio-context、security-context、analysis-cache 或 external-intelligence 结果，优先引用它，但对用户要说“组合上下文、标的上下文、缓存分析、外部情报”，不要直接说 DTO、overlay、deterministic、sourceMode。没有资料时说明只能基于页面上下文和本地缓存回答。不要编造实时行情、新闻或论坛结论；保留 securityId 以及 symbol + exchange + currency 身份；所有投资相关回答必须包含不构成投资建议的免责声明。若用户要求帮忙分析、运行快扫或生成分析报告，只有当 pageContext.allowedActions 里存在 run-analysis 时，才可以说页面会提供确认式 AI 快扫按钮；否则必须说明当前聊天只能轻量解释，并引导用户进入标的详情、Health Score、账户 Health 或推荐页运行对应快扫。suggestedActions 必须返回 []，后端会基于 pageContext.allowedActions 附加确认动作。若用户问整体持仓、组合、配置、Health 或推荐，必须优先解释组合上下文；若用户问标的/持仓详情，必须优先解释标的上下文；若用户问某标的是否适合买入/适配，必须进一步解释候选适配资料；currentExposure=0 只代表未持有，不得阻止 candidate-new-buy 分析。若用户问 Health Score，要区分全组合评分与账户级评分。若用户问推荐，要区分 V2.1 规则核心、偏好因素、推荐约束和 V3 外部情报层。若用户问偏好，要说明新手引导与手动进阶两条线。只返回合法 JSON object，不要 markdown。JSON 必须符合 LooMinisterAnswerResult：version、generatedAt、role、page、title、answer、keyPoints、suggestedActions、sources、disclaimer。role 必须是 loo-minister，产品动作由本地应用控制。",
+        "你是 Loo国大臣，是项目内的投资管家型助手，不是数据字段解释器。只用提供的页面 context、用户持仓/偏好背景和缓存资料回答中文问题；先给清晰结论，再说明为什么和用户相关、组合影响、主要风险、下一步可确认事项。不要把 DTO、overlay、deterministic、sourceMode、provider、fallback、run-analysis、context pack 等工程词直接说给用户。如果 context 里有 portfolio-context、security-context、candidate-fit、global-user-context、analysis-cache 或 external-intelligence 结果，优先引用它，但对用户要说“组合上下文、标的上下文、候选适配、用户持仓和偏好背景、缓存分析、外部资料”。上下文优先级必须是：当前页面事实和 security-context/candidate-fit > 用户明确提到的标的 > recentSubjects 补齐资料 > portfolio-context > global-user-context > project knowledge。global-user-context 是用户级背景，只能补足持仓/偏好/推荐背景，不能覆盖当前页面或当前标的事实。没有资料时说明只能基于页面上下文和本地缓存回答。不要编造实时行情、新闻或论坛结论；保留 securityId 以及 symbol + exchange + currency 身份；所有投资相关回答必须包含不构成投资建议的免责声明。若用户要求帮忙分析、运行快扫或生成分析报告，只有当 pageContext.allowedActions 里存在 run-analysis 时，才可以说页面会提供确认式 AI 快扫按钮；否则必须说明当前聊天只能轻量解释，并引导用户进入标的详情、Health Score、账户 Health 或推荐页运行对应快扫。suggestedActions 必须返回 []，后端会基于 pageContext.allowedActions 附加确认动作。若用户问整体持仓、组合、配置、Health 或推荐，必须优先解释组合上下文；若缺少 portfolio-context 但存在 global-user-context，也必须使用用户持仓和偏好背景回答，不能说完全没有组合 context。若用户问标的/持仓详情，必须优先解释标的上下文；若用户问某标的是否适合买入/适配，必须进一步解释候选适配资料，并把标的本身、底层经济暴露、现有持仓重复度、目标配置缺口、Preference Factors、账户/税务/FX、数据新鲜度都纳入；currentExposure=0 只代表未持有，不得阻止 candidate-new-buy 分析。若用户问 Health Score，要区分全组合评分与账户级评分。若用户问推荐，要区分 V2.1 规则核心、偏好因素、推荐约束和 V3 外部情报层。若用户问偏好，要说明新手引导与手动进阶两条线。只返回合法 JSON object，不要 markdown。JSON 必须符合 LooMinisterAnswerResult：version、generatedAt、role、page、title、answer、structured、keyPoints、suggestedActions、sources、disclaimer。structured 必须包含 directAnswer, reasoning, decisionGates, boundary, nextStep；answer 可作为 structured 的简洁拼接文本。role 必须是 loo-minister，产品动作由本地应用控制。",
     },
     {
       role: "user",
@@ -2583,21 +2922,22 @@ function mapDailyIntelligenceFact(
   item: Awaited<ReturnType<typeof getDailyIntelligenceItemsForUser>>[number],
   index: number,
 ): LooMinisterFact {
+  const detail = [
+    item.reason,
+    item.freshnessLabel,
+    item.confidenceLabel,
+    item.relevanceLabel,
+    ...item.keyPoints.slice(0, 1),
+    ...item.riskFlags.slice(0, 1).map((flag) => `风险：${flag}`),
+  ]
+    .filter(Boolean)
+    .join("；")
+    .slice(0, 240);
   return {
     id: `daily-intelligence-${index + 1}`,
     label: `今日秘闻：${item.title}`.slice(0, 120),
     value: item.summary.slice(0, 240),
-    detail: [
-      item.reason,
-      item.freshnessLabel,
-      item.confidenceLabel,
-      item.relevanceLabel,
-      ...item.keyPoints.slice(0, 2),
-      ...item.riskFlags.slice(0, 2).map((flag) => `风险：${flag}`),
-    ]
-      .filter(Boolean)
-      .join("；")
-      .slice(0, 600),
+    detail,
     source: "external-intelligence",
   };
 }
@@ -2666,10 +3006,10 @@ async function enrichMinisterInputWithDailyIntelligence(
   }
 }
 
-function enrichMinisterInputWithProjectKnowledge(
+async function enrichMinisterInputWithProjectKnowledge(
   input: LooMinisterQuestionRequest,
-): LooMinisterQuestionRequest {
-  const knowledgeFacts = buildProjectKnowledgeFacts(input);
+): Promise<LooMinisterQuestionRequest> {
+  const knowledgeFacts = await buildProjectKnowledgeFacts(input);
   if (knowledgeFacts.length === 0) {
     return input;
   }
@@ -2686,6 +3026,57 @@ function enrichMinisterInputWithProjectKnowledge(
   };
 }
 
+async function enrichMinisterInputWithGlobalUserContext(
+  userId: string,
+  input: LooMinisterQuestionRequest,
+): Promise<LooMinisterQuestionRequest> {
+  try {
+    const dataPack = await getOrBuildContextPack({
+      key: globalUserContextPackKey({
+        userId,
+        asOf:
+          input.pageContext.dataFreshness.portfolioAsOf ??
+          input.pageContext.dataFreshness.quotesAsOf ??
+          input.pageContext.asOf,
+      }),
+      kind: "global-user",
+      ttlMs: LOO_MINISTER_CONTEXT_PACK_TTL_MS.globalUser,
+      build: () => buildPortfolioContextDataPack(userId),
+    });
+    const portfolioContext = buildPortfolioContext({
+      input,
+      ...dataPack.data,
+    });
+    const globalContext = buildGlobalUserContext(
+      portfolioContext,
+      dataPack.asOf,
+    );
+    const existingIds = new Set(input.pageContext.facts.map((fact) => fact.id));
+    const addedFacts = mapGlobalUserContextFacts(globalContext).filter(
+      (fact) => !existingIds.has(fact.id),
+    );
+
+    return {
+      ...input,
+      pageContext: {
+        ...input.pageContext,
+        facts: [...addedFacts, ...input.pageContext.facts].slice(0, 40),
+      },
+    };
+  } catch {
+    return {
+      ...input,
+      pageContext: {
+        ...input.pageContext,
+        warnings: [
+          ...input.pageContext.warnings,
+          "全局组合/偏好上下文暂时不可用；大臣本次会优先使用当前页面事实保守回答。",
+        ].slice(0, 20),
+      },
+    };
+  }
+}
+
 async function enrichMinisterInputWithPortfolioContext(
   userId: string,
   input: LooMinisterQuestionRequest,
@@ -2695,7 +3086,6 @@ async function enrichMinisterInputWithPortfolioContext(
   }
 
   try {
-    const repositories = getRepositories();
     const dataPack = await getOrBuildContextPack({
       key: securityContextPackKey({
         userId,
@@ -2713,36 +3103,7 @@ async function enrichMinisterInputWithPortfolioContext(
       }),
       kind: "portfolio",
       ttlMs: LOO_MINISTER_CONTEXT_PACK_TTL_MS.portfolio,
-      build: async () => {
-        const [
-          accounts,
-          cashAccounts,
-          holdings,
-          profile,
-          recommendationRun,
-          snapshots,
-          analysisRuns,
-        ] = await Promise.all([
-          repositories.accounts.listByUserId(userId),
-          repositories.cashAccounts.listByUserId(userId),
-          repositories.holdings.listByUserId(userId),
-          repositories.preferences.getByUserId(userId),
-          repositories.recommendations
-            .getLatestByUserId(userId)
-            .catch(() => null),
-          repositories.snapshots.listByUserId(userId),
-          repositories.analysisRuns.listRecentByUserId(userId, 5),
-        ]);
-        return {
-          accounts,
-          cashAccounts,
-          holdings,
-          profile,
-          recommendationRun,
-          snapshots,
-          analysisRuns,
-        };
-      },
+      build: () => buildPortfolioContextDataPack(userId),
     });
     const portfolioContext = buildPortfolioContext({
       input,
@@ -3010,7 +3371,7 @@ async function callExternalMinisterOnce(
 
 export async function getLooMinisterAnswer(
   userId: string,
-  input: LooMinisterQuestionRequest,
+  input: LooMinisterQuestionRequestInput,
   options: {
     settings?: ResolvedLooMinisterSettings;
     persistUsage?: boolean;
@@ -3019,20 +3380,27 @@ export async function getLooMinisterAnswer(
     allowProviderFallback?: boolean;
   } = {},
 ) {
+  const normalizedInput = looMinisterQuestionRequestSchema.parse(input);
   const settingsPromise =
     options.settings ?? resolveLooMinisterSettings(userId);
   const resolvedContext = options.skipContextResolver
-    ? { request: input }
-    : await resolveLooMinisterContext({ userId, request: input });
-  const projectKnowledgeInput = enrichMinisterInputWithProjectKnowledge(
+    ? { request: normalizedInput }
+    : await resolveLooMinisterContext({ userId, request: normalizedInput });
+  const projectKnowledgeInput = await enrichMinisterInputWithProjectKnowledge(
     resolvedContext.request,
   );
-  const [dailyIntelligenceInput, portfolioContextInput, securityContextInput] =
+  const [
+    dailyIntelligenceInput,
+    globalUserContextInput,
+    portfolioContextInput,
+    securityContextInput,
+  ] =
     await Promise.all([
       enrichMinisterInputWithDailyIntelligence(
         userId,
         projectKnowledgeInput,
       ),
+      enrichMinisterInputWithGlobalUserContext(userId, projectKnowledgeInput),
       enrichMinisterInputWithPortfolioContext(userId, projectKnowledgeInput),
       enrichMinisterInputWithSecurityContext(userId, projectKnowledgeInput),
     ]);
@@ -3043,6 +3411,7 @@ export async function getLooMinisterAnswer(
   const enrichedInput = mergeMinisterRequests(
     projectKnowledgeInput,
     dailyIntelligenceInput,
+    globalUserContextInput,
     portfolioContextInput,
     securityContextInput,
     candidateFitInput,

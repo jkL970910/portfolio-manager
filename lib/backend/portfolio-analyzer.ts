@@ -362,6 +362,188 @@ function getMarketDataConfidenceScore(marketData: ReturnType<typeof buildMarketD
   );
 }
 
+function formatPercent(value: number, digits = 1) {
+  return `${round(value, digits)}%`;
+}
+
+function getEconomicSleeveWeightPct(args: {
+  holdings: HoldingPosition[];
+  accounts: InvestmentAccount[];
+  economicAssetClass: string;
+}) {
+  const totalPortfolioCad = sum(args.accounts.map((account) => account.marketValueCad));
+  if (totalPortfolioCad <= 0) {
+    return 0;
+  }
+
+  const sleeveValueCad = sum(
+    args.holdings
+      .filter((holding) => getHoldingEconomicAssetClass(holding) === args.economicAssetClass)
+      .map((holding) => holding.marketValueCad),
+  );
+
+  return (sleeveValueCad / totalPortfolioCad) * 100;
+}
+
+function getPreferenceFitNotes(args: {
+  profile: PreferenceProfile;
+  sector: string | null | undefined;
+  economicAssetClass: string;
+  isHeld: boolean;
+}) {
+  const factors = args.profile.preferenceFactors;
+  const sector = args.sector?.trim();
+  const preferredSectors = factors.sectorTilts.preferredSectors;
+  const avoidedSectors = factors.sectorTilts.avoidedSectors;
+  const notes: string[] = [];
+  const blockers: string[] = [];
+  let score = 62;
+
+  if (sector) {
+    const isPreferred = preferredSectors.some(
+      (item) => item.trim().toLowerCase() === sector.toLowerCase(),
+    );
+    const isAvoided = avoidedSectors.some(
+      (item) => item.trim().toLowerCase() === sector.toLowerCase(),
+    );
+    if (isPreferred) {
+      notes.push(`行业偏好匹配：你的偏好里包含 ${sector}。`);
+      score += 18;
+    } else if (isAvoided) {
+      notes.push(`行业偏好冲突：你的规避列表里包含 ${sector}。`);
+      blockers.push(`行业偏好冲突：${sector} 在你的规避列表里。`);
+      score -= 25;
+    } else {
+      notes.push(`行业偏好中性：${sector} 没有被列为明确偏好或规避。`);
+    }
+  } else {
+    notes.push("行业资料还不完整，偏好匹配只能先按资产类别判断。");
+    score -= 8;
+  }
+
+  if (factors.behavior.riskCapacity === "high") {
+    notes.push("风险容量偏高，可以容忍更高波动，但仍要控制单一标的集中度。");
+    score += args.economicAssetClass.includes("Equity") ? 6 : 0;
+  } else if (factors.behavior.riskCapacity === "low") {
+    notes.push("风险容量偏低，新增或加仓前应更重视回撤和现金缓冲。");
+    if (args.economicAssetClass.includes("Equity")) {
+      blockers.push("风险容量偏低：新增权益类资产前需要更保守地确认回撤承受能力。");
+    }
+    score -= args.economicAssetClass.includes("Equity") ? 12 : 0;
+  }
+
+  if (factors.lifeGoals.homePurchase.enabled) {
+    notes.push("你设置了买房目标，新增波动资产前应确认不会挤压首付或现金计划。");
+    if (factors.lifeGoals.homePurchase.priority === "high") {
+      blockers.push("买房目标优先级高：新增买入前需要先确认首付和现金计划。");
+    }
+    score -= 6;
+  }
+
+  if (!args.isHeld) {
+    notes.push("当前未持有时，应把它当作新增候选标的，而不是现有仓位复盘。");
+  }
+
+  return {
+    score: Math.max(25, Math.min(90, score)),
+    summary: notes.join(" "),
+    notes,
+    blockers,
+  };
+}
+
+function getSecurityDecision(args: {
+  symbol: string;
+  isHeld: boolean;
+  heldWeightPct: number;
+  economicAssetClass: string;
+  targetPct: number;
+  currentSleevePct: number;
+  preferenceSummary: string;
+  blockers: string[];
+  marketData: ReturnType<typeof buildMarketDataSummary>;
+}) {
+  const gapPct = args.targetPct - args.currentSleevePct;
+  const hasEnoughMarketData = args.marketData.priceHistoryPointCount >= 5;
+  const hasBlockingGates = args.blockers.length > 0 || !hasEnoughMarketData;
+  const dataBoundary = hasEnoughMarketData
+    ? "缓存行情足够做第一层判断"
+    : "行情样本偏少，结论应作为初筛而不是下单依据";
+  const blockerLine = args.blockers.length > 0
+    ? `主要护栏是：${args.blockers.slice(0, 2).join("；")}。`
+    : "";
+
+  if (args.targetPct <= 0) {
+    return {
+      gapPct,
+      title: "当前判断",
+      detail: `${args.symbol} 暂时不应作为优先新增标的：你的偏好里没有为 ${args.economicAssetClass} 设置明确目标。${dataBoundary}。${blockerLine}`,
+    };
+  }
+
+  if (args.heldWeightPct >= 15) {
+    return {
+      gapPct,
+      title: "当前判断",
+      detail: `${args.symbol} 已经是组合里的高权重标的，下一步更像是复核是否继续持有或控制集中度，而不是无条件加仓。${args.economicAssetClass} 当前约 ${formatPercent(args.currentSleevePct)}，目标约 ${formatPercent(args.targetPct)}；${args.preferenceSummary}${blockerLine ? ` ${blockerLine}` : ""}`,
+    };
+  }
+
+  if (gapPct >= 5) {
+    if (hasBlockingGates) {
+      return {
+        gapPct,
+        title: "当前判断",
+        detail: `${args.symbol} 可以进入候选观察，但暂时不应只因为配置缺口就直接加仓。它会增加 ${args.economicAssetClass} 暴露，该类资产当前约 ${formatPercent(args.currentSleevePct)}、目标约 ${formatPercent(args.targetPct)}，仍有约 ${formatPercent(gapPct)} 缺口；${dataBoundary}。${blockerLine}`,
+      };
+    }
+    return {
+      gapPct,
+      title: "当前判断",
+      detail: `${args.symbol} 可以进入候选观察：它会增加 ${args.economicAssetClass} 暴露，而这一类资产当前约 ${formatPercent(args.currentSleevePct)}、目标约 ${formatPercent(args.targetPct)}，仍有约 ${formatPercent(gapPct)} 缺口。${dataBoundary}。`,
+    };
+  }
+
+  if (gapPct <= -5) {
+    return {
+      gapPct,
+      title: "当前判断",
+      detail: `${args.symbol} 更适合先观察而不是优先买入：${args.economicAssetClass} 当前约 ${formatPercent(args.currentSleevePct)}，已经高于目标约 ${formatPercent(args.targetPct)}。如果要买，应优先解释它和现有持仓的差异，而不是只看单个标的。${blockerLine}`,
+    };
+  }
+
+  return {
+    gapPct,
+    title: "当前判断",
+    detail: `${args.symbol} 属于可继续观察的中性候选：${args.economicAssetClass} 当前约 ${formatPercent(args.currentSleevePct)}，接近目标约 ${formatPercent(args.targetPct)}。是否买入主要取决于估值、与现有持仓重复度、账户位置和现金计划。${blockerLine}`,
+  };
+}
+
+function getSecurityDecisionVerdict(args: {
+  targetPct: number;
+  gapPct: number;
+  heldWeightPct: number;
+  hasBlockers: boolean;
+  hasEnoughMarketData: boolean;
+}): "good-candidate" | "watch-only" | "weak-fit" | "review-existing" | "needs-more-data" {
+  if (!args.hasEnoughMarketData) {
+    return "needs-more-data";
+  }
+  if (args.heldWeightPct >= 15) {
+    return "review-existing";
+  }
+  if (args.targetPct <= 0 || args.gapPct <= -5) {
+    return "weak-fit";
+  }
+  if (args.hasBlockers) {
+    return "watch-only";
+  }
+  if (args.gapPct >= 5) {
+    return "good-candidate";
+  }
+  return "watch-only";
+}
+
 export function buildSecurityAnalyzerQuickScan(args: {
   identity: AnalyzerSecurityIdentity;
   accounts: InvestmentAccount[];
@@ -393,6 +575,11 @@ export function buildSecurityAnalyzerQuickScan(args: {
       });
   const targetPct =
     args.profile.targetAllocation.find((target) => target.assetClass === economicAssetClass)?.targetPct ?? 0;
+  const currentSleevePct = getEconomicSleeveWeightPct({
+    holdings: args.holdings,
+    accounts: args.accounts,
+    economicAssetClass,
+  });
   const accountTypes = [...new Set(matchingHoldings
     .map((holding) => getHoldingAccount(holding, args.accounts)?.type)
     .filter((type): type is AccountType => Boolean(type)))];
@@ -407,6 +594,40 @@ export function buildSecurityAnalyzerQuickScan(args: {
     priceHistory: matchingHistory,
     portfolioSnapshots: args.marketData?.portfolioSnapshots,
     generatedAt,
+  });
+  const preferenceFit = getPreferenceFitNotes({
+    profile: args.profile,
+    sector: referenceHolding?.sector ?? null,
+    economicAssetClass,
+    isHeld: matchingHoldings.length > 0,
+  });
+  const blockers = [
+    ...preferenceFit.blockers,
+    ...(args.identity.currency === "USD" &&
+    args.profile.preferenceFactors.taxStrategy.usdFundingPath === "avoid"
+      ? ["USD 路径偏好为避免：买入前需要确认换汇、税务和账户位置是否值得。"]
+      : []),
+    ...(marketData.priceHistoryPointCount < 5
+      ? ["价格历史样本偏少：结论只能作为初筛，不能作为下单前价格依据。"]
+      : []),
+  ];
+  const decision = getSecurityDecision({
+    symbol: normalizedSymbol,
+    isHeld: matchingHoldings.length > 0,
+    heldWeightPct,
+    economicAssetClass,
+    targetPct,
+    currentSleevePct,
+    preferenceSummary: preferenceFit.summary,
+    blockers,
+    marketData,
+  });
+  const decisionVerdict = getSecurityDecisionVerdict({
+    targetPct,
+    gapPct: decision.gapPct,
+    heldWeightPct,
+    hasBlockers: blockers.length > 0,
+    hasEnoughMarketData: marketData.priceHistoryPointCount >= 5,
   });
 
   return assertAnalyzerResult({
@@ -430,17 +651,49 @@ export function buildSecurityAnalyzerQuickScan(args: {
     summary: {
       title: `${normalizedSymbol} AI 快速分析`,
       thesis: matchingHoldings.length > 0
-        ? `${normalizedSymbol} 当前在组合中约占 ${round(heldWeightPct, 1)}%，本轮基于本地组合、账户、偏好、缓存报价和价格历史分析。`
-        : `${normalizedSymbol} 当前还未持有，本轮按候选买入标的处理：结合完整交易身份、用户偏好目标、组合现有暴露、缓存行情和价格历史分析。`,
+        ? `${decision.detail} 当前已持有约占组合 ${formatPercent(heldWeightPct)}；本轮按标的本身、组合暴露、偏好因素、账户/税务路径和缓存行情综合判断。`
+        : `${decision.detail} 当前 0% 只代表尚未持有；本轮按新增候选标的处理，结合标的身份、底层经济暴露、目标配置、偏好因素和缓存行情分析。`,
       confidence:
         marketData.priceHistoryPointCount > 0
           ? "medium"
           : "low"
     },
+    securityDecision: {
+      lens: matchingHoldings.length > 0
+        ? "existing-holding-review"
+        : "candidate-new-buy",
+      verdict: decisionVerdict,
+      directAnswer: decision.detail,
+      whyNow: [
+        `${economicAssetClass} 当前约 ${formatPercent(currentSleevePct)}，目标约 ${formatPercent(targetPct)}，差距 ${formatPercent(decision.gapPct)}。`,
+        preferenceFit.summary,
+        matchingHoldings.length > 0
+          ? `当前已持有约占组合 ${formatPercent(heldWeightPct)}。`
+          : "当前未持有，按新增候选标的处理。",
+      ].filter(Boolean).slice(0, 6),
+      portfolioFit: [
+        `会影响 ${economicAssetClass} 配置袖口。`,
+        accountTypes.length > 0
+          ? `当前持仓账户：${accountTypes.join(" / ")}。`
+          : "新增买入前需要选择账户位置。",
+        `交易身份保留 ${identity.symbol} · ${identity.exchange ?? "未知交易所"} · ${identity.currency ?? "未知币种"}。`,
+      ],
+      keyBlockers: blockers.slice(0, 8),
+      watchlistTriggers: [
+        "刷新报价和价格历史后再确认数据新鲜度。",
+        "比较它和现有同类持仓的重复度。",
+        "确认买入账户、税务路径、USD/CAD 资金来源和现金计划。",
+      ],
+      evidence: [
+        marketData.quoteFreshnessSummary ?? "行情新鲜度未完整记录。",
+        marketData.quoteSourceSummary ?? "行情来源暂不完整。",
+        `价格历史样本 ${marketData.priceHistoryPointCount} 个交易日。`,
+      ],
+    },
     scorecards: [
       {
         id: "market-data-freshness",
-        label: "缓存行情可信度",
+        label: "数据可信度",
         score: getMarketDataConfidenceScore(marketData),
         rationale: marketData.quoteFreshnessSummary
           ? `行情口径：${marketData.quoteFreshnessSummary}。`
@@ -448,21 +701,29 @@ export function buildSecurityAnalyzerQuickScan(args: {
       },
       {
         id: "portfolio-weight",
-        label: "组合权重",
+        label: "持仓影响",
         score: Math.max(0, Math.min(100, 100 - Math.max(0, heldWeightPct - 12) * 5)),
-        rationale: `该标的当前约占组合 ${round(heldWeightPct, 1)}%。`
+        rationale: matchingHoldings.length > 0
+          ? `该标的当前约占组合 ${formatPercent(heldWeightPct)}，需要和单一标的集中度一起看。`
+          : "当前未持有，影响主要来自新增买入后会占用哪一类资产配置和账户位置。"
       },
       {
         id: "target-fit",
-        label: "目标配置适配",
-        score: targetPct > 0 ? 72 : 45,
+        label: "配置适配",
+        score: targetPct > 0 ? Math.max(35, Math.min(88, 72 + decision.gapPct)) : 45,
         rationale: referenceHolding
           ? economicAssetClass === referenceHolding.assetClass
-            ? `它按 ${economicAssetClass} 评估，该资产类别目标约 ${targetPct}%。`
-            : `它交易身份是 ${referenceHolding.exchangeOverride ?? "未知交易所"} / ${referenceHolding.currency ?? "未知币种"}，但底层经济暴露按 ${economicAssetClass} 评估；该资产类别目标约 ${targetPct}%。`
+            ? `它按 ${economicAssetClass} 评估；该类资产当前约 ${formatPercent(currentSleevePct)}，目标约 ${formatPercent(targetPct)}。`
+            : `它交易身份是 ${referenceHolding.exchangeOverride ?? "未知交易所"} / ${referenceHolding.currency ?? "未知币种"}，但底层经济暴露按 ${economicAssetClass} 评估；该类资产当前约 ${formatPercent(currentSleevePct)}，目标约 ${formatPercent(targetPct)}。`
           : targetPct > 0
-            ? `这是未持有候选标的，当前组合权重为 0%；按 ${economicAssetClass} 暴露评估，该资产类别目标约 ${targetPct}%。`
+            ? `这是未持有候选标的，当前组合权重为 0%；按 ${economicAssetClass} 暴露评估，该类资产当前约 ${formatPercent(currentSleevePct)}，目标约 ${formatPercent(targetPct)}。`
             : `这是未持有候选标的，当前组合权重为 0%；暂未找到 ${economicAssetClass} 的目标配置，需要先补齐偏好设置。`
+      },
+      {
+        id: "preference-fit",
+        label: "偏好匹配",
+        score: preferenceFit.score,
+        rationale: preferenceFit.summary,
       }
     ],
     risks: [
@@ -472,6 +733,12 @@ export function buildSecurityAnalyzerQuickScan(args: {
         detail: warning,
         relatedIdentity: identity
       })),
+      ...preferenceFit.blockers.map((blocker) => ({
+        severity: "medium" as const,
+        title: "偏好护栏",
+        detail: blocker,
+        relatedIdentity: identity,
+      })),
       ...(heldWeightPct >= 15 ? [{
         severity: "high" as const,
         title: "单一标的权重偏高",
@@ -480,13 +747,16 @@ export function buildSecurityAnalyzerQuickScan(args: {
       }] : []),
       ...(args.identity.currency === "USD" ? [{
         severity: "medium" as const,
-        title: "USD 交易币种",
-        detail: "该标的以 USD 交易，移动端展示和组合聚合需要保留原币种后再转换为 CAD。",
+        title: "汇率与账户路径",
+        detail: "该标的以 USD 交易，适合度判断应同时看 USD 资金来源、账户类型和最终 CAD 汇总影响。",
         relatedIdentity: args.identity
       }] : [])
     ],
     taxNotes,
     portfolioFit: [
+      decision.detail,
+      `配置关系：${economicAssetClass} 当前约 ${formatPercent(currentSleevePct)}，目标约 ${formatPercent(targetPct)}，差距 ${formatPercent(decision.gapPct)}。`,
+      preferenceFit.summary,
       referenceHolding && economicAssetClass
         ? buildEconomicExposureNote({
             holding: referenceHolding,
@@ -500,9 +770,6 @@ export function buildSecurityAnalyzerQuickScan(args: {
       accountTypes.length > 0
         ? `当前匹配持仓分布在 ${accountTypes.join(" / ")}。`
         : "当前没有匹配到账户内真实持仓；如要买入，应结合账户属性、税务口径和现金安排选择落点。",
-      marketData.quoteSourceSummary
-        ? `行情来源：${marketData.quoteSourceSummary}。`
-        : "行情来源：当前没有可审计 provider，只能低置信使用本地字段。",
       "分析身份保留 symbol、exchange、currency，避免 CAD 版本和美股正股混淆。"
     ],
     actionItems: [
@@ -515,6 +782,11 @@ export function buildSecurityAnalyzerQuickScan(args: {
               detail: `当前缺少交易所或币种，继续分析前需要补全 ${normalizedSymbol} 的 symbol、exchange、currency，避免混用同 ticker 的 CAD/US 版本。`,
             },
           ]),
+      {
+        priority: "P0" as const,
+        title: decision.title,
+        detail: decision.detail,
+      },
       ...(heldWeightPct >= 15
         ? [
             {
@@ -528,8 +800,8 @@ export function buildSecurityAnalyzerQuickScan(args: {
         ? [
             {
               priority: "P1" as const,
-              title: "核对目标配置",
-              detail: `${normalizedSymbol} 按 ${economicAssetClass} 暴露评估，该资产类别目标约 ${targetPct}%；后续判断应看组合整体是否仍需要补足这一类资产。`,
+              title: "买入前确认",
+              detail: `${normalizedSymbol} 按 ${economicAssetClass} 暴露评估；买入前应确认同类资产是否仍需要补足、和现有持仓是否重复、以及账户/税务/现金安排是否匹配。`,
             },
           ]
         : []),

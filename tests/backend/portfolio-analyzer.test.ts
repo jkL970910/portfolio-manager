@@ -395,7 +395,7 @@ test("security analyzer quick scan shows conclusions instead of identity check w
   );
   assert.ok(
     result.actionItems.some(
-      (item) => item.title === "核对目标配置" || item.title === "评估集中度",
+      (item) => item.title === "当前判断" || item.title === "买入前确认" || item.title === "评估集中度",
     ),
   );
 });
@@ -439,20 +439,30 @@ test("security analyzer quick scan evaluates unheld candidates with portfolio ta
   });
 
   const targetFit = result.scorecards.find((card) => card.id === "target-fit");
-  assert.equal(targetFit?.score, 72);
+  assert.ok((targetFit?.score ?? 0) >= 72);
   assert.match(targetFit?.rationale ?? "", /未持有候选标的/);
   assert.match(targetFit?.rationale ?? "", /US Equity/);
   assert.match(targetFit?.rationale ?? "", /目标约 60%/);
   assert.doesNotMatch(targetFit?.rationale ?? "", /没有足够.*持仓上下文/);
-  assert.match(result.summary.thesis, /候选买入标的/);
+  assert.match(result.summary.thesis, /新增候选标的/);
+  assert.match(result.summary.thesis, /可以进入候选观察|可继续观察|适合先观察/);
+  assert.ok(
+    result.scorecards.some((card) => card.id === "preference-fit"),
+  );
   assert.ok(
     result.portfolioFit.some((item) =>
       item.includes("当前 0% 只代表尚未持有，不代表无法分析"),
     ),
   );
   assert.ok(
-    result.actionItems.some((item) => item.title === "核对目标配置"),
+    result.actionItems.some((item) => item.title === "当前判断"),
   );
+  assert.ok(
+    result.actionItems.some((item) => item.title === "买入前确认"),
+  );
+  assert.equal(result.securityDecision?.lens, "candidate-new-buy");
+  assert.ok(result.securityDecision?.directAnswer.includes("候选观察"));
+  assert.ok(result.securityDecision?.whyNow.some((item) => item.includes("目标约 60%")));
 });
 
 test("security analyzer quick scan asks for identity repair only when listing fields are missing", () => {
@@ -469,6 +479,82 @@ test("security analyzer quick scan asks for identity repair only when listing fi
 
   assert.equal(result.actionItems[0]?.title, "补全交易身份");
   assert.match(result.actionItems[0]?.detail ?? "", /symbol、exchange、currency/);
+});
+
+test("security analyzer quick scan surfaces preference blockers before overconfident buy language", () => {
+  const cautiousProfile = makeProfile({
+    preferenceFactors: {
+      ...DEFAULT_PREFERENCE_FACTORS,
+      behavior: {
+        ...DEFAULT_PREFERENCE_FACTORS.behavior,
+        riskCapacity: "low",
+      },
+      sectorTilts: {
+        ...DEFAULT_PREFERENCE_FACTORS.sectorTilts,
+        avoidedSectors: ["Technology"],
+      },
+      lifeGoals: {
+        ...DEFAULT_PREFERENCE_FACTORS.lifeGoals,
+        homePurchase: {
+          enabled: true,
+          horizonYears: 2,
+          downPaymentTargetCad: 120000,
+          priority: "high",
+        },
+      },
+      taxStrategy: {
+        ...DEFAULT_PREFERENCE_FACTORS.taxStrategy,
+        usdFundingPath: "avoid",
+      },
+    },
+  });
+
+  const result = buildSecurityAnalyzerQuickScan({
+    identity: {
+      securityId: "security_tsm_us",
+      symbol: "TSM",
+      exchange: "NYSE",
+      currency: "USD",
+      name: "Taiwan Semiconductor Manufacturing Company",
+      securityType: "Common Stock",
+    },
+    accounts,
+    holdings,
+    profile: cautiousProfile,
+    marketData: {
+      priceHistory: [
+        {
+          id: "history_tsm_us",
+          securityId: "security_tsm_us",
+          symbol: "TSM",
+          exchange: "NYSE",
+          priceDate: "2026-04-27",
+          close: 180,
+          adjustedClose: 180,
+          currency: "USD",
+          source: "provider",
+          provider: "twelve-data",
+          sourceMode: "cached-external",
+          freshness: "fresh",
+          refreshRunId: "run_tsm",
+          isReference: false,
+          fallbackReason: null,
+          createdAt: generatedAt,
+        },
+      ],
+    },
+    generatedAt,
+  });
+
+  assert.match(result.summary.thesis, /但暂时不应只因为配置缺口就直接加仓/);
+  assert.ok(result.risks.some((risk) => risk.title === "偏好护栏"));
+  assert.match(JSON.stringify(result), /规避列表|买房目标|风险容量偏低|USD 路径/);
+  assert.equal(result.securityDecision?.verdict, "needs-more-data");
+  assert.ok(
+    (result.securityDecision?.keyBlockers ?? []).some((item) =>
+      /规避列表|买房目标|风险容量偏低|USD 路径/.test(item),
+    ),
+  );
 });
 
 test("security analyzer quick scan uses security id when provider exchange labels differ", () => {

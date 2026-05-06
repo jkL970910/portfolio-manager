@@ -81,6 +81,10 @@ function scheduledJobs(env) {
         maxJobs: env.EXTERNAL_RESEARCH_WORKER_MAX_JOBS || "3",
         maxRuntimeMs: env.EXTERNAL_RESEARCH_WORKER_MAX_RUNTIME_MS || "20000"
       }
+    },
+    envFlag(env.ENABLE_LOO_MINISTER_CONTEXT_PRUNE_WORKER, true) && {
+      name: "loo-minister-context-prune",
+      path: "/api/workers/loo-minister/context-packs/prune"
     }
   ].filter(Boolean);
 }

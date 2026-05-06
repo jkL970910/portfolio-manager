@@ -168,3 +168,32 @@ export function searchLooMinisterProjectKnowledge(input: {
       source: "system",
     }));
 }
+
+export function inferLooMinisterProjectKnowledgeIntent(input: {
+  page: LooMinisterPageContext["page"];
+  question: string;
+}) {
+  const text = input.question.toLowerCase();
+  if (/对比|比较|相比|versus|compare| vs\.? /.test(text)) {
+    return "comparison";
+  }
+  if (/买入|适合|适配|候选|analysis|analysis request|快扫/.test(text)) {
+    return "candidate-fit";
+  }
+  if (/health|健康|评分|风险护栏|偏离|再平衡/.test(text)) {
+    return "health";
+  }
+  if (/推荐|recommend|v2|v3|候选|优先/.test(text)) {
+    return "recommendation";
+  }
+  if (/偏好|preference|factor|买房|税务|现金/.test(text)) {
+    return "preference";
+  }
+  if (/秘闻|新闻|论坛|外部信息|external|research/.test(text)) {
+    return "daily-intelligence";
+  }
+  if (/总资产|组合|持仓|账户|配置|allocation|portfolio/.test(text)) {
+    return `page:${input.page}`;
+  }
+  return `page:${input.page}`;
+}
