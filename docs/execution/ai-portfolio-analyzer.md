@@ -107,7 +107,7 @@ P0.5 work order:
    sources stay disabled until worker scheduling, cache TTL, source limits, and
    provider failure handling are proven.
 3. Separate the two AI surfaces:
-   - `AI 标的分析` produces structured, saved analysis for a
+   - `智能标的分析` produces structured, saved analysis for a
      symbol/account/portfolio scope.
    - `AI 大臣` is the cross-page conversational layer. It answers questions
      using the current page context, cites known source/freshness state, and
@@ -423,7 +423,7 @@ Runtime context architecture:
      actions.
    - Mobile now displays those suggested actions as confirmation-gated handoff
      buttons. After confirmation, the handoff sends a trigger to the current
-     page-owned `AiAnalysisCard`; the actual AI 快扫 still runs through that
+     page-owned `AiAnalysisCard`; the actual 智能快扫 still runs through that
      card, so 大臣 does not bypass page state, backend validation, cache
      strategy, or provider quota policy.
 9. Direct-action routing boundary:
@@ -434,7 +434,7 @@ Runtime context architecture:
    - `run-analysis` actions remain routed to the current page-owned
      `AiAnalysisCard`; 大臣 does not run a separate hidden analysis path.
    - 大臣 only has proposal power. The user confirms the action, and the
-     page-owned AI 快扫 card owns the real request, cache strategy, quota,
+     page-owned 智能快扫 card owns the real request, cache strategy, quota,
      loading state, and result rendering.
    - `open-form`, `update-preferences`, and `refresh-data` actions only route
      the user to the relevant page and explain that saving/refreshing still
@@ -456,7 +456,7 @@ Runtime context architecture:
      engineering terms. The goal is closer to a ChatGPT-style portfolio-aware
      answer, not a long debug-style paragraph.
 11. Security quick-scan readability and exposure classification:
-   - AI 标的快扫 now separates listing identity from economic exposure.
+   - 智能标的快扫 now separates listing identity from economic exposure.
      Listing identity (`securityId`, `symbol`, `exchange`, `currency`) remains
      the source of truth for quote/history/cache matching, while target-fit
      scoring can classify CAD-listed ETFs such as ZQQ/QQC/VFV by their
@@ -502,12 +502,27 @@ Runtime context architecture:
      `review-existing`, and `needs-more-data`. These are product-facing
      judgments, not trade instructions.
    - `security-economic-exposure.ts` is the shared first-pass economic exposure
-     registry. AI 快扫, Recommendation V2.1, Health Score, and 大臣 context now
+     registry. 智能快扫, Recommendation V2.1, Health Score, and 大臣 context now
      use it so CAD-listed US ETFs can keep their listing identity while
      contributing to the correct underlying exposure sleeve. Gold /
      precious-metals instruments such as CGL.C are treated as Commodity /
      商品贵金属 exposure rather than Canadian Equity solely because they are
      CAD/TSX-listed.
+12. GPT enhancement boundary for quick scans:
+   - The default `AiAnalysisCard` is now product-labeled as `智能快扫`, not as a
+     hidden GPT answer. It is deterministic/backend-owned and uses local
+     holdings, Preference Factors, cached quote/history/FX, saved analysis, and
+     cached external documents.
+   - External GPT is available only through the explicit `GPT 增强解读` action
+     after a base smart scan exists. Flutter calls
+     `POST /api/mobile/analysis/quick-scan/gpt-enhance`, which reuses the same
+     user-scoped Loo Minister GPT settings and BYOK provider configuration.
+   - GPT enhancement returns a separate structured payload:
+     `directAnswer`, `reasoning`, `decisionGates`, `boundary`, `nextStep`,
+     `sourceLabel`, and disclaimer. The base smart scan remains visible if GPT
+     is disabled, missing a key, rate-limited, or returns an invalid response.
+   - This keeps cost and latency user-triggered while removing the misleading
+     implication that every quick scan already used external GPT.
 
 Backend tests:
 
@@ -650,7 +665,7 @@ Remaining before Flutter display:
 
 ## P0-C Flutter Plan
 
-Add a compact "AI 分析" section to:
+Add a compact "智能分析" section to:
 
 - Security Detail
 - Portfolio Health
@@ -672,12 +687,12 @@ Current status:
 
 - Reusable Flutter card implemented in
   `apps/mobile/lib/features/portfolio/presentation/ai_analysis_card.dart`.
-- Security Detail now shows a user-triggered "AI 标的快扫" card and sends
+- Security Detail now shows a user-triggered "智能标的快扫" card and sends
   `symbol`, `exchange`, `currency`, and `name` to the quick-scan API when
   available.
-- Portfolio Health now shows a user-triggered "AI 组合快扫" card for full
+- Portfolio Health now shows a user-triggered "智能组合快扫" card for full
   portfolio scope.
-- Account-scoped Health pages now show a user-triggered "AI 账户快扫" card and
+- Account-scoped Health pages now show a user-triggered "智能账户快扫" card and
   send the selected `accountId` to the quick-scan API.
 - Results render summary, confidence/source mode, scorecards, risks, tax notes,
   portfolio-fit notes, action items, sources, and non-advice disclaimer.
@@ -688,7 +703,7 @@ Next analyzer work:
   heavily on health output.
 - Flutter AI analysis cards expose `重新生成` after the first result and send
   `cacheStrategy: "refresh"` to bypass cached results.
-- Mobile Settings now exposes `AI 最近分析`, a compact history view backed by
+- Mobile Settings now exposes `智能分析记录`, a compact history view backed by
   `portfolio_analysis_runs`.
 - External research guard exists in `lib/backend/portfolio-external-research.ts`.
   It rejects live research by default and requires an explicit long-cache policy
@@ -749,7 +764,7 @@ Next analyzer work:
   scheduling state rather than a page-load problem.
 - Mobile Settings QA passed for recent external-research job visibility after
   the local smoke run.
-- `AI 最近分析` now exposes compact result details on mobile, including
+- `智能分析记录` now exposes compact result details on mobile, including
   scorecards, risks, action items, sources, source mode, and the non-advice
   disclaimer.
 - Cached market-data external consultation now filters local price history by

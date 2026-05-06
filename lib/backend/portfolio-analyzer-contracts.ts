@@ -55,6 +55,41 @@ export const portfolioAnalyzerRequestSchema = z.object({
   }
 });
 
+export const portfolioAnalyzerGptEnhancementRequestSchema = portfolioAnalyzerRequestSchema.extend({
+  forceFreshBaseAnalysis: z.boolean().default(false)
+});
+
+export const portfolioAnalyzerGptEnhancementSchema = z.object({
+  generatedAt: z.string().datetime(),
+  title: z.string().trim().min(1).max(120),
+  directAnswer: z.string().trim().min(1).max(800),
+  reasoning: z.array(z.string().trim().min(1).max(500)).max(6).default([]),
+  decisionGates: z.array(z.string().trim().min(1).max(500)).max(6).default([]),
+  boundary: z.string().trim().min(1).max(700).nullable().default(null),
+  nextStep: z.string().trim().min(1).max(500).nullable().default(null),
+  sourceLabel: z.string().trim().min(1).max(120),
+  disclaimer: z.object({
+    zh: z.string().trim().min(1),
+    en: z.string().trim().min(1)
+  })
+}).superRefine((value, context) => {
+  if (!value.disclaimer.zh.includes("不构成投资建议")) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["disclaimer", "zh"],
+      message: "Chinese disclaimer must state that this is not investment advice."
+    });
+  }
+
+  if (!value.disclaimer.en.toLowerCase().includes("not investment advice")) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["disclaimer", "en"],
+      message: "English disclaimer must state that this is not investment advice."
+    });
+  }
+});
+
 const severitySchema = z.enum(["info", "low", "medium", "high"]);
 
 export const portfolioAnalyzerResultSchema = z.object({
@@ -151,4 +186,6 @@ export const portfolioAnalyzerResultSchema = z.object({
 
 export type AnalyzerSecurityIdentity = z.infer<typeof analyzerSecurityIdentitySchema>;
 export type PortfolioAnalyzerRequest = z.infer<typeof portfolioAnalyzerRequestSchema>;
+export type PortfolioAnalyzerGptEnhancementRequest = z.infer<typeof portfolioAnalyzerGptEnhancementRequestSchema>;
 export type PortfolioAnalyzerResult = z.infer<typeof portfolioAnalyzerResultSchema>;
+export type PortfolioAnalyzerGptEnhancement = z.infer<typeof portfolioAnalyzerGptEnhancementSchema>;

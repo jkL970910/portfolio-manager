@@ -358,7 +358,7 @@ class MobileAccountDetailSnapshot {
         ),
         LooMinisterSuggestedAction(
           id: "run-account-analysis",
-          label: "运行 AI 账户快扫",
+          label: "运行智能账户快扫",
           actionType: "run-analysis",
           target: {"scope": "account"},
           requiresConfirmation: true,

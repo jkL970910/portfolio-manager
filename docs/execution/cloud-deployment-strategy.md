@@ -31,7 +31,7 @@ The target is not infrastructure purity. The target is a reliable data flow:
   - auth/session handling
   - Drizzle/Postgres access
   - recommendation / health / market-data logic
-  - AI 大臣 and AI 标的分析 APIs
+  - AI 大臣 and 智能标的分析 APIs
 - This is intentionally a BFF-style architecture. Flutter must not directly
   access Postgres, provider APIs, OpenAI/Router keys, or financial business
   logic.
@@ -61,7 +61,7 @@ Next.js / TypeScript = backend + BFF + financial business logic
 Postgres / Neon = source of truth + cache + run ledger
 Cloudflare Workers Cron = scheduler trigger
 External API providers = worker-only ingestion source
-AI 大臣 / AI 快扫 = cached/backend-context consumer
+AI 大臣 / 智能快扫 = cached/backend-context consumer
 ```
 
 ## Security Identity Rule

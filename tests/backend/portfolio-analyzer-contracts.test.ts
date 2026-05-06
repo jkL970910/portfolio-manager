@@ -3,6 +3,8 @@ import test from "node:test";
 import {
   PORTFOLIO_ANALYZER_DISCLAIMER,
   PORTFOLIO_ANALYZER_VERSION,
+  portfolioAnalyzerGptEnhancementRequestSchema,
+  portfolioAnalyzerGptEnhancementSchema,
   portfolioAnalyzerRequestSchema,
   portfolioAnalyzerResultSchema
 } from "@/lib/backend/portfolio-analyzer-contracts";
@@ -100,6 +102,32 @@ test("portfolio analyzer request defaults to bounded cache reuse", () => {
   assert.equal(parsed.cacheStrategy, "prefer-cache");
   assert.equal(parsed.maxCacheAgeSeconds, 900);
   assert.equal(parsed.includeExternalResearch, false);
+});
+
+test("portfolio analyzer GPT enhancement request preserves quick scan defaults", () => {
+  const parsed = portfolioAnalyzerGptEnhancementRequestSchema.parse({
+    scope: "security",
+    security: { symbol: "VFV", exchange: "TSX", currency: "CAD" },
+  });
+
+  assert.equal(parsed.cacheStrategy, "prefer-cache");
+  assert.equal(parsed.forceFreshBaseAnalysis, false);
+});
+
+test("portfolio analyzer GPT enhancement result requires non-advice disclaimer", () => {
+  const parsed = portfolioAnalyzerGptEnhancementSchema.parse({
+    generatedAt,
+    title: "VFV GPT 增强解读",
+    directAnswer: "VFV 可以作为候选观察，但仍要结合组合目标和数据新鲜度确认。",
+    reasoning: ["它影响美股核心暴露。"],
+    decisionGates: ["确认当前价格和目标配置缺口。"],
+    boundary: "只基于智能快扫结果，没有实时新闻。",
+    nextStep: "先刷新报价，再决定是否纳入观察。",
+    sourceLabel: "GPT 增强解读 · 基于本地规则 + 缓存资料",
+    disclaimer: PORTFOLIO_ANALYZER_DISCLAIMER,
+  });
+
+  assert.equal(parsed.sourceLabel, "GPT 增强解读 · 基于本地规则 + 缓存资料");
 });
 
 test("portfolio analyzer request rejects security scope without identity or holding id", () => {

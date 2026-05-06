@@ -303,10 +303,10 @@ Recommended product phases:
 3. P0-C: Flutter rendering surface
    - Status: implemented for first pass.
    - Added reusable Flutter AI analysis card.
-   - Security Detail exposes user-triggered "AI 标的快扫".
-   - Portfolio Health exposes user-triggered "AI 组合快扫" for full-portfolio
+   - Security Detail exposes user-triggered "智能标的快扫".
+   - Portfolio Health exposes user-triggered "智能组合快扫" for full-portfolio
      scope.
-   - Account-scoped Health pages expose user-triggered "AI 账户快扫" with the
+   - Account-scoped Health pages expose user-triggered "智能账户快扫" with the
      selected `accountId`.
    - Results render summary, confidence/source mode, scorecards, risks, tax
      notes, portfolio-fit notes, action items, sources, and disclaimer.
@@ -445,7 +445,7 @@ Next priority order:
    - Status: in progress.
    - Cached market-data external consultation now uses full
      `symbol + exchange + currency` identity when reading local price history.
-3. Align AI 标的分析 and AI 大臣 around the same backend-owned context:
+3. Align 智能标的分析 and AI 大臣 around the same backend-owned context:
    structured saved analysis for symbol/account/portfolio scopes, and
    cross-page conversational explanation that references or triggers those
    analyses instead of duplicating them.

@@ -56,6 +56,12 @@ class LooApiClient {
     return _postJson("/api/mobile/analysis/quick-scan", body: payload);
   }
 
+  Future<Map<String, dynamic>> createAnalyzerGptEnhancement(
+      Map<String, dynamic> payload) {
+    return _postJson("/api/mobile/analysis/quick-scan/gpt-enhance",
+        body: payload);
+  }
+
   Future<Map<String, dynamic>> getRecentAnalyzerRuns({int limit = 5}) {
     return _getJson("/api/mobile/analysis/recent?limit=$limit");
   }

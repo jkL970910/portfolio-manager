@@ -2,8 +2,12 @@ import { apiSuccess } from "@/lib/backend/contracts";
 import { getRepositories } from "@/lib/backend/repositories/factory";
 import { assertExternalResearchAllowed } from "@/lib/backend/portfolio-external-research";
 import {
+  PORTFOLIO_ANALYZER_DISCLAIMER,
+  PortfolioAnalyzerGptEnhancement,
+  PortfolioAnalyzerGptEnhancementRequest,
   PortfolioAnalyzerRequest,
   PortfolioAnalyzerResult,
+  portfolioAnalyzerGptEnhancementSchema,
   portfolioAnalyzerResultSchema
 } from "@/lib/backend/portfolio-analyzer-contracts";
 import {
@@ -15,6 +19,10 @@ import {
 } from "@/lib/backend/portfolio-analyzer";
 import type { AnalyzerSecurityIdentity } from "@/lib/backend/portfolio-analyzer-contracts";
 import type { HoldingPosition, SecurityPriceHistoryPoint } from "@/lib/backend/models";
+import {
+  recordLooMinisterUsage,
+  resolveLooMinisterSettings,
+} from "@/lib/backend/loo-minister-settings";
 
 function normalizePart(value: string | null | undefined) {
   return value?.trim().toUpperCase() || "_";
@@ -59,6 +67,54 @@ function expiresAtFrom(now: Date, maxCacheAgeSeconds: number) {
 
 function shouldUseCache(input: PortfolioAnalyzerRequest) {
   return input.cacheStrategy === "prefer-cache" && !input.includeExternalResearch;
+}
+
+function sanitizeProviderError(message: string) {
+  return message
+    .replace(/sk-[A-Za-z0-9_-]+/g, (match) => `sk-...${match.slice(-4)}`)
+    .slice(0, 500);
+}
+
+function extractOutputText(response: Record<string, unknown>) {
+  if (typeof response.output_text === "string") {
+    return response.output_text;
+  }
+
+  const output = response.output;
+  if (!Array.isArray(output)) {
+    return null;
+  }
+
+  for (const item of output) {
+    if (!item || typeof item !== "object") continue;
+    const content = (item as { content?: unknown }).content;
+    if (!Array.isArray(content)) continue;
+    for (const contentItem of content) {
+      if (!contentItem || typeof contentItem !== "object") continue;
+      const text = (contentItem as { text?: unknown }).text;
+      if (typeof text === "string" && text.trim()) {
+        return text;
+      }
+    }
+  }
+
+  return null;
+}
+
+function extractUsage(response: Record<string, unknown>) {
+  const usage = response.usage;
+  if (!usage || typeof usage !== "object") {
+    return {};
+  }
+  const value = usage as Record<string, unknown>;
+  return {
+    inputTokens:
+      typeof value.input_tokens === "number" ? value.input_tokens : null,
+    outputTokens:
+      typeof value.output_tokens === "number" ? value.output_tokens : null,
+    totalTokens:
+      typeof value.total_tokens === "number" ? value.total_tokens : null,
+  };
 }
 
 function normalizeIdentityPart(value: string | null | undefined) {
@@ -224,6 +280,154 @@ async function persistAnalyzerResult(
   }
 }
 
+function sourceModeLabel(value: PortfolioAnalyzerResult["dataFreshness"]["sourceMode"]) {
+  return value === "live-external"
+    ? "实时外部资料"
+    : value === "cached-external"
+      ? "本地规则 + 缓存外部资料"
+      : "本地规则 + 缓存资料";
+}
+
+function buildGptEnhancementPrompt(result: PortfolioAnalyzerResult) {
+  const securityDecision = result.securityDecision;
+  return [
+    "你是 Loo国的投资分析大臣。请把下面的“智能快扫”结果改写成一段更像 ChatGPT 的增强解读。",
+    "重要边界：不要编造实时行情、新闻、论坛或财报内容；只使用给定 JSON 的事实。不要说你已经做了外部研究。所有投资相关内容必须保留不构成投资建议。",
+    "回答目标：先给直接结论，再解释为什么和用户组合相关、主要护栏、哪些条件会改变结论、下一步该怎么确认。",
+    "只返回 JSON object，不要 markdown。",
+    "JSON 字段必须是：generatedAt, title, directAnswer, reasoning, decisionGates, boundary, nextStep, sourceLabel, disclaimer。",
+    `sourceLabel 必须写成：GPT 增强解读 · 基于${sourceModeLabel(result.dataFreshness.sourceMode)}。`,
+    `disclaimer 必须是 ${JSON.stringify(PORTFOLIO_ANALYZER_DISCLAIMER)}。`,
+    "",
+    `快扫范围：${result.scope}`,
+    `标的身份：${result.identity ? JSON.stringify(result.identity) : "无"}`,
+    `核心判断：${securityDecision?.directAnswer ?? result.summary.thesis}`,
+    `为什么现在看：${(securityDecision?.whyNow ?? []).join("；") || "无"}`,
+    `主要护栏：${(securityDecision?.keyBlockers ?? []).join("；") || "无"}`,
+    `组合适配：${(securityDecision?.portfolioFit ?? result.portfolioFit).join("；") || "无"}`,
+    `观察触发点：${(securityDecision?.watchlistTriggers ?? []).join("；") || "无"}`,
+    `评分卡：${result.scorecards.map((card) => `${card.label} ${card.score}: ${card.rationale}`).join("；")}`,
+    `风险：${result.risks.map((risk) => `${risk.title}: ${risk.detail}`).join("；") || "无"}`,
+    `数据边界：source=${result.dataFreshness.sourceMode}; quote=${result.dataFreshness.quoteFreshnessSummary ?? "未知"}; historyPoints=${result.dataFreshness.priceHistoryPointCount ?? 0}`,
+  ].join("\n");
+}
+
+function getGptEnhancementTextFormat(provider: string) {
+  if (provider === "openrouter-compatible") {
+    return { type: "json_object" };
+  }
+  return {
+    type: "json_schema",
+    name: "PortfolioAnalyzerGptEnhancement",
+    strict: true,
+    schema: {
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        generatedAt: { type: "string" },
+        title: { type: "string" },
+        directAnswer: { type: "string" },
+        reasoning: {
+          type: "array",
+          items: { type: "string" },
+          maxItems: 6,
+        },
+        decisionGates: {
+          type: "array",
+          items: { type: "string" },
+          maxItems: 6,
+        },
+        boundary: { type: ["string", "null"] },
+        nextStep: { type: ["string", "null"] },
+        sourceLabel: { type: "string" },
+        disclaimer: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            zh: { type: "string" },
+            en: { type: "string" },
+          },
+          required: ["zh", "en"],
+        },
+      },
+      required: [
+        "generatedAt",
+        "title",
+        "directAnswer",
+        "reasoning",
+        "decisionGates",
+        "boundary",
+        "nextStep",
+        "sourceLabel",
+        "disclaimer",
+      ],
+    },
+  };
+}
+
+async function callGptEnhancementProvider(
+  result: PortfolioAnalyzerResult,
+  settings: Awaited<ReturnType<typeof resolveLooMinisterSettings>>,
+): Promise<{ enhancement: PortfolioAnalyzerGptEnhancement; usage: ReturnType<typeof extractUsage> }> {
+  if (!settings.apiKey) {
+    throw new Error("智能快扫 GPT 增强缺少可用 API Key。请先在设置里配置外部 GPT。");
+  }
+
+  const response = await fetch(settings.endpoint, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${settings.apiKey}`,
+      "Content-Type": "application/json",
+      "HTTP-Referer": "http://localhost:3000",
+      "X-Title": "Loo Portfolio Manager",
+    },
+    body: JSON.stringify({
+      model: settings.model,
+      store:
+        process.env.LOO_MINISTER_DISABLE_RESPONSE_STORAGE === "true"
+          ? false
+          : undefined,
+      reasoning: { effort: settings.reasoningEffort },
+      text:
+        settings.provider === "openrouter-compatible"
+          ? { format: getGptEnhancementTextFormat(settings.provider) }
+          : {
+              verbosity: "low",
+              format: getGptEnhancementTextFormat(settings.provider),
+            },
+      input: buildGptEnhancementPrompt(result),
+    }),
+  });
+
+  const payload = (await response.json().catch(() => ({}))) as Record<
+    string,
+    unknown
+  >;
+  if (!response.ok) {
+    const error = payload.error;
+    const detail =
+      error && typeof error === "object" && "message" in error
+        ? String((error as { message?: unknown }).message)
+        : "No provider error body.";
+    throw new Error(
+      `GPT enhancement failed with status ${response.status}: ${detail}`,
+    );
+  }
+
+  const outputText = extractOutputText(payload);
+  if (!outputText) {
+    throw new Error("GPT enhancement response did not include output text.");
+  }
+
+  const parsed = portfolioAnalyzerGptEnhancementSchema.parse(
+    JSON.parse(outputText),
+  );
+  return {
+    enhancement: parsed,
+    usage: extractUsage(payload),
+  };
+}
+
 export async function getPortfolioAnalyzerQuickScan(userId: string, input: PortfolioAnalyzerRequest) {
   const repositories = getRepositories();
   const targetKey = buildPortfolioAnalyzerCacheKey(input);
@@ -346,4 +550,86 @@ export async function getPortfolioAnalyzerQuickScan(userId: string, input: Portf
 
   await persistAnalyzerResult(userId, input, targetKey, result);
   return apiSuccess(result, "database");
+}
+
+export async function getPortfolioAnalyzerGptEnhancement(
+  userId: string,
+  input: PortfolioAnalyzerGptEnhancementRequest,
+) {
+  const baseInput: PortfolioAnalyzerRequest = {
+    ...input,
+    cacheStrategy: input.forceFreshBaseAnalysis ? "refresh" : input.cacheStrategy,
+  };
+  const base = await getPortfolioAnalyzerQuickScan(userId, baseInput);
+  const settings = await resolveLooMinisterSettings(userId);
+
+  if (
+    settings.mode !== "gpt-5.5" ||
+    !settings.providerEnabled ||
+    !settings.apiKey
+  ) {
+    const message =
+      settings.mode === "local"
+        ? "当前设置为本地大臣。请先在设置里开启外部 GPT。"
+        : !settings.providerEnabled
+          ? "外部 GPT 未启用，请先在环境配置中开启 provider。"
+          : "缺少可用 API Key，请先在设置里保存 OpenAI 或兼容 Provider 的 API Key。";
+    await recordLooMinisterUsage(userId, {
+      page: "security-detail",
+      mode: settings.mode,
+      provider: settings.mode === "local" ? "local" : settings.provider,
+      model: settings.model,
+      status: "failed",
+      failureKind: "quick_scan_gpt_unavailable",
+      errorMessage: message,
+    });
+    throw new Error(message);
+  }
+
+  try {
+    const result = await callGptEnhancementProvider(base.data, settings);
+    await recordLooMinisterUsage(userId, {
+      page: base.data.scope === "security"
+        ? "security-detail"
+        : base.data.scope === "account"
+          ? "account-detail"
+          : base.data.scope === "recommendation-run"
+            ? "recommendations"
+            : "portfolio-health",
+      mode: settings.mode,
+      provider: `${settings.provider}-${settings.apiKeySource}`,
+      model: settings.model,
+      status: "success",
+      inputTokens: result.usage.inputTokens,
+      outputTokens: result.usage.outputTokens,
+      totalTokens: result.usage.totalTokens,
+    });
+    return apiSuccess(
+      {
+        baseAnalysis: base.data,
+        enhancement: result.enhancement,
+      },
+      "service",
+    );
+  } catch (error) {
+    const errorMessage = sanitizeProviderError(
+      error instanceof Error ? error.message : "GPT enhancement failed.",
+    );
+    await recordLooMinisterUsage(userId, {
+      page: base.data.scope === "security"
+        ? "security-detail"
+        : base.data.scope === "account"
+          ? "account-detail"
+          : base.data.scope === "recommendation-run"
+            ? "recommendations"
+            : "portfolio-health",
+      mode: settings.mode,
+      provider: `${settings.provider}-${settings.apiKeySource}`,
+      model: settings.model,
+      status: "failed",
+      failureKind: "quick_scan_gpt_failed",
+      errorMessage,
+    });
+    throw new Error(`GPT 增强解读失败：${errorMessage}`);
+  }
 }

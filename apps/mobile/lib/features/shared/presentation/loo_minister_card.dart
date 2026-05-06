@@ -819,7 +819,7 @@ class _MinisterSuggestedActionChip extends StatelessWidget {
 
   String get _confirmationDetail {
     return switch (action.actionType) {
-      "run-analysis" => "确认后，大臣会触发当前页面已有的 AI 快扫。真实请求、缓存策略和额度仍由页面分析卡片控制。",
+      "run-analysis" => "确认后，大臣会触发当前页面已有的智能快扫。真实请求、缓存策略和额度仍由页面分析卡片控制。",
       "navigate" => "确认后会打开对应页面，不会修改任何数据。",
       "open-form" => "确认后会打开对应入口。保存前仍需要你在页面内再次确认。",
       "update-preferences" => "确认后会打开偏好设置。大臣不会直接替你保存配置。",

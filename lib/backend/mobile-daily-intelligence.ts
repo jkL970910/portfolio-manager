@@ -84,7 +84,7 @@ function getAnalysisTitle(result: Record<string, unknown>) {
   const summary = readNestedMap(result.summary);
   return typeof summary.title === "string" && summary.title.trim()
     ? summary.title.trim()
-    : "AI 快扫记录";
+    : "智能快扫记录";
 }
 
 function getAnalysisSummary(result: Record<string, unknown>) {

@@ -66,7 +66,7 @@ export function getMobileDataFreshnessPolicy(): MobileDataFreshnessPolicy {
       label: "标的报价",
       ttlSeconds: quoteTtlSeconds,
       sourceLabel: "行情 provider + 本地报价缓存",
-      usageLabel: "持仓市值、标的详情、AI 快扫、推荐适配都会读取它。",
+      usageLabel: "持仓市值、标的详情、智能快扫、推荐适配都会读取它。",
       staleBehaviorLabel:
         "过期后仍可用于方向解释，但下单前应重新刷新报价。",
       workerTarget: true,
@@ -109,7 +109,7 @@ export function getMobileDataFreshnessPolicy(): MobileDataFreshnessPolicy {
       id: "external-intelligence",
       label: "外部情报/今日秘闻",
       ttlSeconds: externalTtlSeconds,
-      sourceLabel: "已缓存 AI 分析和外部研究文档",
+      sourceLabel: "已缓存智能分析和外部研究文档",
       usageLabel: "用于推荐 V3 overlay、今日秘闻、大臣问答补充。",
       staleBehaviorLabel:
         "未启用 live provider 前不会自动抓新闻/论坛；过期资料只作背景参考。",

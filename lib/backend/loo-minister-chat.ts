@@ -43,7 +43,7 @@ const projectContextFact: LooMinisterFact = {
   id: "project-context",
   label: "Loo国项目能力",
   value:
-    "大臣可以解释总览、组合、账户、持仓、标的、推荐、健康分、导入、设置偏好、行情刷新、今日秘闻和 AI 快扫。",
+    "大臣可以解释总览、组合、账户、持仓、标的、推荐、健康分、导入、设置偏好、行情刷新、今日秘闻和智能快扫。",
   detail:
     "回答必须基于当前页面 DTO、用户保存的偏好/推荐/缓存分析和明确的数据新鲜度；不能把实时新闻、论坛或未缓存外部信息当作事实。",
   source: "system",

@@ -161,7 +161,7 @@ test("daily intelligence endpoint combines documents and saved analysis without 
     result: {
       identity: { symbol: "AMZN", exchange: "NASDAQ", currency: "USD" },
       summary: {
-        title: "AMZN AI 快扫",
+        title: "AMZN 智能快扫",
         thesis: "本地分析指出该标的需要结合风险偏好复核。",
       },
       sources: [{ title: "Portfolio data", sourceType: "portfolio-data" }],

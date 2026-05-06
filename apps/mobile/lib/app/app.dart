@@ -193,7 +193,7 @@ class _LooWealthAppState extends State<LooWealthApp> {
     switch (action.actionType) {
       case "run-analysis":
         _triggerMinisterAnalysisAction(action);
-        _showMinisterActionMessage("已发送给当前页面的 AI 快扫。");
+        _showMinisterActionMessage("已发送给当前页面的智能快扫。");
       case "navigate":
       case "open-form":
       case "update-preferences":

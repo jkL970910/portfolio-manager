@@ -9,8 +9,8 @@ class AiAnalysisCard extends StatefulWidget {
   const AiAnalysisCard({
     required this.apiClient,
     required this.payload,
-    this.title = "AI 分析",
-    this.description = "基于当前组合、账户、偏好和本地报价缓存生成，不包含实时新闻或论坛情绪。",
+    this.title = "智能快扫",
+    this.description = "基于本地规则、当前组合、投资偏好和缓存资料生成；不会默认调用外部 GPT。",
     this.refreshKey,
     this.onCompleted,
     super.key,
@@ -29,9 +29,11 @@ class AiAnalysisCard extends StatefulWidget {
 
 class _AiAnalysisCardState extends State<AiAnalysisCard> {
   Future<MobileAiAnalysisResult>? _analysis;
+  Future<MobileAiGptEnhancement>? _gptEnhancement;
   ValueListenable<LooMinisterSuggestedAction?>? _ministerActionListenable;
   bool _hasResult = false;
   bool _isLoading = false;
+  bool _isEnhancing = false;
 
   @override
   void didChangeDependencies() {
@@ -68,7 +70,16 @@ class _AiAnalysisCardState extends State<AiAnalysisCard> {
   void _runAnalysis({bool refresh = false}) {
     setState(() {
       _isLoading = true;
+      _gptEnhancement = null;
       _analysis = _loadAnalysis(refresh: refresh);
+    });
+  }
+
+  void _runGptEnhancement() {
+    if (_isEnhancing || !_hasResult) return;
+    setState(() {
+      _isEnhancing = true;
+      _gptEnhancement = _loadGptEnhancement();
     });
   }
 
@@ -129,7 +140,7 @@ class _AiAnalysisCardState extends State<AiAnalysisCard> {
       final response = await widget.apiClient.createAnalyzerQuickScan(payload);
       final data = response["data"];
       if (data is! Map<String, dynamic>) {
-        throw const LooApiException("AI 分析格式不正确。");
+        throw const LooApiException("智能快扫格式不正确。");
       }
       final result = MobileAiAnalysisResult.fromJson(data);
       if (mounted) {
@@ -144,6 +155,37 @@ class _AiAnalysisCardState extends State<AiAnalysisCard> {
       if (mounted) {
         setState(() {
           _isLoading = false;
+        });
+      }
+      rethrow;
+    }
+  }
+
+  Future<MobileAiGptEnhancement> _loadGptEnhancement() async {
+    try {
+      final response = await widget.apiClient.createAnalyzerGptEnhancement({
+        ...widget.payload,
+        "forceFreshBaseAnalysis": false,
+      });
+      final data = response["data"];
+      if (data is! Map<String, dynamic>) {
+        throw const LooApiException("GPT 增强解读格式不正确。");
+      }
+      final enhancement = data["enhancement"];
+      if (enhancement is! Map<String, dynamic>) {
+        throw const LooApiException("GPT 增强解读为空。");
+      }
+      final result = MobileAiGptEnhancement.fromJson(enhancement);
+      if (mounted) {
+        setState(() {
+          _isEnhancing = false;
+        });
+      }
+      return result;
+    } on Object {
+      if (mounted) {
+        setState(() {
+          _isEnhancing = false;
         });
       }
       rethrow;
@@ -222,7 +264,7 @@ class _AiAnalysisCardState extends State<AiAnalysisCard> {
                   final data = snapshot.data;
                   if (data == null) {
                     return _AnalysisError(
-                      message: "没有拿到 AI 分析结果。",
+                      message: "没有拿到智能快扫结果。",
                       onRetry: () => _runAnalysis(refresh: true),
                     );
                   }
@@ -230,6 +272,14 @@ class _AiAnalysisCardState extends State<AiAnalysisCard> {
                   return _AnalysisResultView(data);
                 },
               ),
+              if (_hasResult) ...[
+                const SizedBox(height: 12),
+                _GptEnhancementPanel(
+                  future: _gptEnhancement,
+                  isLoading: _isEnhancing,
+                  onRun: _runGptEnhancement,
+                ),
+              ],
             ],
           ],
         ),
@@ -281,7 +331,7 @@ class MobileAiAnalysisResult {
     final disclaimer = _readMap(json["disclaimer"]);
     return MobileAiAnalysisResult(
       scope: json["scope"] as String? ?? "security",
-      title: summary["title"] as String? ?? "AI 快速分析",
+      title: summary["title"] as String? ?? "智能快扫",
       thesis: _friendlyAnalysisText(summary["thesis"] as String? ?? ""),
       confidence: summary["confidence"] as String? ?? "medium",
       securityDecision: json["securityDecision"] is Map<String, dynamic>
@@ -350,6 +400,46 @@ class MobileAiSecurityDecision {
           .toList(),
       evidence:
           _readStringList(json["evidence"]).map(_friendlyAnalysisText).toList(),
+    );
+  }
+}
+
+class MobileAiGptEnhancement {
+  const MobileAiGptEnhancement({
+    required this.title,
+    required this.directAnswer,
+    required this.reasoning,
+    required this.decisionGates,
+    required this.boundary,
+    required this.nextStep,
+    required this.sourceLabel,
+    required this.disclaimerZh,
+  });
+
+  final String title;
+  final String directAnswer;
+  final List<String> reasoning;
+  final List<String> decisionGates;
+  final String? boundary;
+  final String? nextStep;
+  final String sourceLabel;
+  final String disclaimerZh;
+
+  factory MobileAiGptEnhancement.fromJson(Map<String, dynamic> json) {
+    final disclaimer = _readMap(json["disclaimer"]);
+    return MobileAiGptEnhancement(
+      title: json["title"] as String? ?? "GPT 增强解读",
+      directAnswer: _friendlyAnalysisText(json["directAnswer"] as String? ?? ""),
+      reasoning:
+          _readStringList(json["reasoning"]).map(_friendlyAnalysisText).toList(),
+      decisionGates: _readStringList(json["decisionGates"])
+          .map(_friendlyAnalysisText)
+          .toList(),
+      boundary: _friendlyNullableText(json["boundary"] as String?),
+      nextStep: _friendlyNullableText(json["nextStep"] as String?),
+      sourceLabel: json["sourceLabel"] as String? ?? "GPT 增强解读",
+      disclaimerZh:
+          disclaimer["zh"] as String? ?? "仅用于研究学习，不构成投资建议。",
     );
   }
 }
@@ -483,6 +573,12 @@ class _AnalysisResultView extends StatelessWidget {
   Widget build(BuildContext context) {
     final labels = _AnalysisScopeLabels.forScope(data.scope);
     final securityDecision = data.securityDecision;
+    final visibleActionItems = _dedupeActionItems(data.actionItems);
+    final visibleFit = _dedupeStrings(
+      securityDecision?.portfolioFit.isNotEmpty == true
+          ? securityDecision!.portfolioFit
+          : data.portfolioFit,
+    );
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -524,12 +620,12 @@ class _AnalysisResultView extends StatelessWidget {
                   securityDecision.keyBlockers.take(4).map(_bullet).toList(),
             ),
           ),
-        if (data.actionItems.isNotEmpty)
+        if (visibleActionItems.isNotEmpty)
           _AnalysisSection(
             title: labels.actions,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
-              children: data.actionItems.take(4).map(_ActionRow.new).toList(),
+              children: visibleActionItems.take(4).map(_ActionRow.new).toList(),
             ),
           ),
         if (data.risks.isNotEmpty)
@@ -549,17 +645,12 @@ class _AnalysisResultView extends StatelessWidget {
             ),
           ),
         ],
-        if (data.portfolioFit.isNotEmpty)
+        if (visibleFit.isNotEmpty)
           _AnalysisSection(
             title: labels.fit,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
-              children: (securityDecision?.portfolioFit.isNotEmpty == true
-                      ? securityDecision!.portfolioFit
-                      : data.portfolioFit)
-                  .take(4)
-                  .map(_bullet)
-                  .toList(),
+              children: visibleFit.take(4).map(_bullet).toList(),
             ),
           ),
         if (securityDecision != null &&
@@ -608,6 +699,130 @@ class _AnalysisResultView extends StatelessWidget {
             ],
           ),
         const SizedBox(height: 8),
+        Text(data.disclaimerZh, style: Theme.of(context).textTheme.bodySmall),
+      ],
+    );
+  }
+}
+
+class _GptEnhancementPanel extends StatelessWidget {
+  const _GptEnhancementPanel({
+    required this.future,
+    required this.isLoading,
+    required this.onRun,
+  });
+
+  final Future<MobileAiGptEnhancement>? future;
+  final bool isLoading;
+  final VoidCallback onRun;
+
+  @override
+  Widget build(BuildContext context) {
+    final future = this.future;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Icon(Icons.auto_awesome, size: 18),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text("GPT 增强解读",
+                          style: Theme.of(context).textTheme.titleSmall),
+                      const SizedBox(height: 4),
+                      Text(
+                        "可选调用外部 GPT，把上方智能快扫改写成更自然的解释。会使用你在设置里配置的大臣 GPT。",
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                OutlinedButton(
+                  onPressed: isLoading ? null : onRun,
+                  child: Text(future == null ? "增强" : "重新增强"),
+                ),
+              ],
+            ),
+            if (isLoading) ...[
+              const SizedBox(height: 12),
+              const LinearProgressIndicator(),
+            ] else if (future != null) ...[
+              const SizedBox(height: 12),
+              FutureBuilder<MobileAiGptEnhancement>(
+                future: future,
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const LinearProgressIndicator();
+                  }
+                  if (snapshot.hasError) {
+                    return Text(
+                      snapshot.error.toString(),
+                      style: TextStyle(
+                          color: Theme.of(context).colorScheme.error),
+                    );
+                  }
+                  final data = snapshot.data;
+                  if (data == null) {
+                    return const Text("暂时没有 GPT 增强解读。");
+                  }
+                  return _GptEnhancementView(data);
+                },
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _GptEnhancementView extends StatelessWidget {
+  const _GptEnhancementView(this.data);
+
+  final MobileAiGptEnhancement data;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _MetaPill(data.sourceLabel),
+        const SizedBox(height: 8),
+        Text(data.title, style: Theme.of(context).textTheme.titleMedium),
+        const SizedBox(height: 6),
+        Text(data.directAnswer),
+        if (data.reasoning.isNotEmpty) ...[
+          const SizedBox(height: 10),
+          Text("判断依据", style: Theme.of(context).textTheme.titleSmall),
+          ...data.reasoning.take(4).map(_bullet),
+        ],
+        if (data.decisionGates.isNotEmpty) ...[
+          const SizedBox(height: 10),
+          Text("需要确认", style: Theme.of(context).textTheme.titleSmall),
+          ...data.decisionGates.take(4).map(_bullet),
+        ],
+        if (data.boundary != null) ...[
+          const SizedBox(height: 10),
+          Text("边界：${data.boundary}",
+              style: Theme.of(context).textTheme.bodySmall),
+        ],
+        if (data.nextStep != null) ...[
+          const SizedBox(height: 8),
+          Text("下一步：${data.nextStep}"),
+        ],
+        const SizedBox(height: 10),
         Text(data.disclaimerZh, style: Theme.of(context).textTheme.bodySmall),
       ],
     );
@@ -805,6 +1020,48 @@ class _SeverityDot extends StatelessWidget {
       child: Icon(Icons.circle, size: 10, color: color),
     );
   }
+}
+
+List<String> _dedupeStrings(List<String> values) {
+  final result = <String>[];
+  for (final value in values) {
+    final normalized = _normalizeForDedupe(value);
+    if (normalized.isEmpty) continue;
+    final isRepeated = result.any((existing) {
+      final existingNormalized = _normalizeForDedupe(existing);
+      return existingNormalized == normalized ||
+          existingNormalized.contains(normalized) ||
+          normalized.contains(existingNormalized);
+    });
+    if (!isRepeated) result.add(value);
+  }
+  return result;
+}
+
+List<MobileAiActionItem> _dedupeActionItems(List<MobileAiActionItem> values) {
+  final result = <MobileAiActionItem>[];
+  for (final value in values) {
+    final normalized = _normalizeForDedupe("${value.title} ${value.detail}");
+    if (normalized.isEmpty) continue;
+    final isRepeated = result.any((existing) {
+      final existingNormalized =
+          _normalizeForDedupe("${existing.title} ${existing.detail}");
+      return existingNormalized == normalized ||
+          existingNormalized.contains(normalized) ||
+          normalized.contains(existingNormalized);
+    });
+    if (!isRepeated) result.add(value);
+  }
+  return result;
+}
+
+String _normalizeForDedupe(String value) {
+  return value
+      .replaceAll(RegExp(r"\s+"), "")
+      .replaceAll("。", "")
+      .replaceAll("；", "")
+      .replaceAll("，", "")
+      .trim();
 }
 
 class _MetaPill extends StatelessWidget {

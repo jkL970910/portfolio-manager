@@ -118,7 +118,7 @@ class MobilePortfolioSnapshot {
         ),
         LooMinisterSuggestedAction(
           id: "run-portfolio-analysis",
-          label: "运行 AI 组合快扫",
+          label: "运行智能组合快扫",
           actionType: "run-analysis",
           target: {"page": "portfolio-health"},
           requiresConfirmation: true,

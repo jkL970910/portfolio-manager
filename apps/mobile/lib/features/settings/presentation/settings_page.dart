@@ -1431,7 +1431,7 @@ class _RecentAnalysisCardState extends State<_RecentAnalysisCard> {
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                        "AI 最近分析",
+                        "智能分析记录",
                         style: Theme.of(context).textTheme.titleLarge,
                       ),
                     ),
@@ -1459,7 +1459,7 @@ class _RecentAnalysisCardState extends State<_RecentAnalysisCard> {
                   ),
                 ] else if (items.isEmpty) ...[
                   const SizedBox(height: 12),
-                  const Text("还没有分析记录。先在标的、组合或账户页面生成一次 AI 快扫。"),
+                  const Text("还没有分析记录。先在标的、组合或账户页面生成一次智能快扫。"),
                 ] else ...[
                   const SizedBox(height: 12),
                   ...items.map(_RecentAnalysisTile.new),
@@ -2109,9 +2109,9 @@ class _RecentAnalysisItem {
   factory _RecentAnalysisItem.fromJson(Map<String, dynamic> json) {
     final rawGeneratedAt = json["generatedAt"];
     return _RecentAnalysisItem(
-      scopeLabel: json["scopeLabel"] as String? ?? "AI 快扫",
+      scopeLabel: json["scopeLabel"] as String? ?? "智能快扫",
       sourceLabel: json["sourceLabel"] as String? ?? "本地快扫",
-      title: json["title"] as String? ?? "AI 快扫记录",
+      title: json["title"] as String? ?? "智能快扫记录",
       detail: json["detail"] as String? ?? "",
       generatedAt:
           rawGeneratedAt is String ? DateTime.tryParse(rawGeneratedAt) : null,

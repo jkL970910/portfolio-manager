@@ -43,7 +43,7 @@ class MobileDailyIntelligenceSnapshot {
           .toList(),
       emptyTitle: emptyState["title"] as String? ?? "暂时没有可用秘闻",
       emptyDetail:
-          emptyState["detail"] as String? ?? "先运行 AI 快扫或缓存外部研究，系统不会自动抓取新闻或论坛。",
+          emptyState["detail"] as String? ?? "先运行智能快扫或缓存外部研究，系统不会自动抓取新闻或论坛。",
     );
   }
 }

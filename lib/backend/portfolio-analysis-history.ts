@@ -50,7 +50,7 @@ function getSummaryTitle(result: Record<string, unknown>) {
       return title.trim();
     }
   }
-  return "AI 快扫记录";
+  return "智能快扫记录";
 }
 
 function getSummaryThesis(result: Record<string, unknown>) {

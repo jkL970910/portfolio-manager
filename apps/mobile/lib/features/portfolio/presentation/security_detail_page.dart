@@ -164,7 +164,8 @@ class _SecurityDetailPageState extends State<SecurityDetailPage> {
                 const SizedBox(height: 12),
                 AiAnalysisCard(
                   apiClient: widget.apiClient,
-                  title: "AI 标的快扫",
+                  title: "智能标的快扫",
+                  description: "先用本地规则、组合上下文、投资偏好和缓存资料生成；如需外部 GPT，可在结果下方手动增强。",
                   onCompleted: _refreshDailyIntelligence,
                   refreshKey: [
                     data.quoteTimestamp,
@@ -479,7 +480,7 @@ class MobileSecurityDetailSnapshot {
       allowedActions: const [
         LooMinisterSuggestedAction(
           id: "run-security-analysis",
-          label: "运行 AI 标的快扫",
+          label: "运行智能标的快扫",
           actionType: "run-analysis",
           target: {"scope": "security"},
           requiresConfirmation: true,

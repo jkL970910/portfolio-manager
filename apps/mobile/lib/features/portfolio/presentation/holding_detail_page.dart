@@ -424,7 +424,7 @@ class MobileHoldingDetailSnapshot {
         ),
         LooMinisterSuggestedAction(
           id: "run-security-analysis",
-          label: "运行 AI 标的快扫",
+          label: "运行智能标的快扫",
           actionType: "run-analysis",
           target: {"scope": "security"},
           requiresConfirmation: true,

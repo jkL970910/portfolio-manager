@@ -122,7 +122,7 @@ function getTaxNotes(args: {
       continue;
     }
     if (holding.currency === "USD" && account.type === "TFSA") {
-      notes.push(`${holding.symbol} 是 USD 标的且放在 TFSA，后续 AI 分析需要提示美股股息预扣税无法在 TFSA 回收。`);
+      notes.push(`${holding.symbol} 是 USD 标的且放在 TFSA，后续智能分析需要提示美股股息预扣税无法在 TFSA 回收。`);
     }
     if (holding.currency === "USD" && account.type === "RRSP") {
       notes.push(`${holding.symbol} 是 USD 标的且放在 RRSP，后续分析应确认是否属于可享受税务协定优势的直接美股/ETF。`);
@@ -469,15 +469,12 @@ function getSecurityDecision(args: {
   const dataBoundary = hasEnoughMarketData
     ? "缓存行情足够做第一层判断"
     : "行情样本偏少，结论应作为初筛而不是下单依据";
-  const blockerLine = args.blockers.length > 0
-    ? `主要护栏是：${args.blockers.slice(0, 2).join("；")}。`
-    : "";
 
   if (args.targetPct <= 0) {
     return {
       gapPct,
       title: "当前判断",
-      detail: `${args.symbol} 暂时不应作为优先新增标的：你的偏好里没有为 ${args.economicAssetClass} 设置明确目标。${dataBoundary}。${blockerLine}`,
+      detail: `${args.symbol} 暂时不应作为优先新增标的：你的偏好里没有为 ${args.economicAssetClass} 设置明确目标。${dataBoundary}。`,
     };
   }
 
@@ -485,7 +482,7 @@ function getSecurityDecision(args: {
     return {
       gapPct,
       title: "当前判断",
-      detail: `${args.symbol} 已经是组合里的高权重标的，下一步更像是复核是否继续持有或控制集中度，而不是无条件加仓。${args.economicAssetClass} 当前约 ${formatPercent(args.currentSleevePct)}，目标约 ${formatPercent(args.targetPct)}；${args.preferenceSummary}${blockerLine ? ` ${blockerLine}` : ""}`,
+      detail: `${args.symbol} 已经是组合里的高权重标的，下一步更像是复核是否继续持有或控制集中度，而不是无条件加仓。${args.economicAssetClass} 当前约 ${formatPercent(args.currentSleevePct)}，目标约 ${formatPercent(args.targetPct)}。`,
     };
   }
 
@@ -494,7 +491,7 @@ function getSecurityDecision(args: {
       return {
         gapPct,
         title: "当前判断",
-        detail: `${args.symbol} 可以进入候选观察，但暂时不应只因为配置缺口就直接加仓。它会增加 ${args.economicAssetClass} 暴露，该类资产当前约 ${formatPercent(args.currentSleevePct)}、目标约 ${formatPercent(args.targetPct)}，仍有约 ${formatPercent(gapPct)} 缺口；${dataBoundary}。${blockerLine}`,
+        detail: `${args.symbol} 可以进入候选观察，但暂时不应只因为配置缺口就直接加仓。它会增加 ${args.economicAssetClass} 暴露，该类资产当前约 ${formatPercent(args.currentSleevePct)}、目标约 ${formatPercent(args.targetPct)}，仍有约 ${formatPercent(gapPct)} 缺口；${dataBoundary}。`,
       };
     }
     return {
@@ -508,14 +505,14 @@ function getSecurityDecision(args: {
     return {
       gapPct,
       title: "当前判断",
-      detail: `${args.symbol} 更适合先观察而不是优先买入：${args.economicAssetClass} 当前约 ${formatPercent(args.currentSleevePct)}，已经高于目标约 ${formatPercent(args.targetPct)}。如果要买，应优先解释它和现有持仓的差异，而不是只看单个标的。${blockerLine}`,
+      detail: `${args.symbol} 更适合先观察而不是优先买入：${args.economicAssetClass} 当前约 ${formatPercent(args.currentSleevePct)}，已经高于目标约 ${formatPercent(args.targetPct)}。如果要买，应优先解释它和现有持仓的差异，而不是只看单个标的。`,
     };
   }
 
   return {
     gapPct,
     title: "当前判断",
-    detail: `${args.symbol} 属于可继续观察的中性候选：${args.economicAssetClass} 当前约 ${formatPercent(args.currentSleevePct)}，接近目标约 ${formatPercent(args.targetPct)}。是否买入主要取决于估值、与现有持仓重复度、账户位置和现金计划。${blockerLine}`,
+    detail: `${args.symbol} 属于可继续观察的中性候选：${args.economicAssetClass} 当前约 ${formatPercent(args.currentSleevePct)}，接近目标约 ${formatPercent(args.targetPct)}。是否买入主要取决于估值、与现有持仓重复度、账户位置和现金计划。`,
   };
 }
 
@@ -629,6 +626,17 @@ export function buildSecurityAnalyzerQuickScan(args: {
     hasBlockers: blockers.length > 0,
     hasEnoughMarketData: marketData.priceHistoryPointCount >= 5,
   });
+  const summaryDecisionLabel = decisionVerdict === "good-candidate"
+    ? "可以进入候选观察"
+    : decisionVerdict === "review-existing"
+      ? "更适合持仓复核"
+      : decisionVerdict === "weak-fit"
+        ? "适配偏弱，适合先观察"
+        : decisionVerdict === "needs-more-data"
+          ? blockers.length > 0
+            ? "可以进入候选观察，但暂时不应只因为配置缺口就直接加仓"
+            : "需补充数据后再判断"
+          : "适合先观察";
 
   return assertAnalyzerResult({
     version: PORTFOLIO_ANALYZER_VERSION,
@@ -649,10 +657,10 @@ export function buildSecurityAnalyzerQuickScan(args: {
       fallbackPointCount: marketData.fallbackPointCount
     },
     summary: {
-      title: `${normalizedSymbol} AI 快速分析`,
+      title: `${normalizedSymbol} 智能快速分析`,
       thesis: matchingHoldings.length > 0
-        ? `${decision.detail} 当前已持有约占组合 ${formatPercent(heldWeightPct)}；本轮按标的本身、组合暴露、偏好因素、账户/税务路径和缓存行情综合判断。`
-        : `${decision.detail} 当前 0% 只代表尚未持有；本轮按新增候选标的处理，结合标的身份、底层经济暴露、目标配置、偏好因素和缓存行情分析。`,
+        ? `${summaryDecisionLabel}；当前已持有约占组合 ${formatPercent(heldWeightPct)}，本轮按标的本身、组合暴露、偏好因素、账户/税务路径和缓存行情综合判断。`
+        : `${summaryDecisionLabel}；当前 0% 只代表尚未持有，本轮按新增候选标的处理。`,
       confidence:
         marketData.priceHistoryPointCount > 0
           ? "medium"
@@ -754,7 +762,9 @@ export function buildSecurityAnalyzerQuickScan(args: {
     ],
     taxNotes,
     portfolioFit: [
-      decision.detail,
+      ...(matchingHoldings.length === 0
+        ? ["当前 0% 只代表尚未持有，不代表无法分析。"]
+        : []),
       `配置关系：${economicAssetClass} 当前约 ${formatPercent(currentSleevePct)}，目标约 ${formatPercent(targetPct)}，差距 ${formatPercent(decision.gapPct)}。`,
       preferenceFit.summary,
       referenceHolding && economicAssetClass
@@ -784,8 +794,12 @@ export function buildSecurityAnalyzerQuickScan(args: {
           ]),
       {
         priority: "P0" as const,
-        title: decision.title,
-        detail: decision.detail,
+        title: "当前判断",
+        detail: blockers.length > 0
+          ? blockers.slice(0, 2).join("；")
+          : matchingHoldings.length > 0
+            ? "复核当前持仓权重、同类资产重复度和是否仍符合账户目标。"
+            : "确认同类资产是否仍需要补足、现有持仓是否重复，以及账户/税务/现金安排是否匹配。",
       },
       ...(heldWeightPct >= 15
         ? [
@@ -863,7 +877,7 @@ export function buildPortfolioAnalyzerQuickScan(args: {
       fallbackPointCount: marketData.fallbackPointCount
     },
     summary: {
-      title: "组合 AI 快速诊断",
+      title: "组合 智能诊断",
       thesis: `当前组合健康分为 ${health.score}，本轮使用本地持仓、账户、偏好、健康分和缓存行情来源生成诊断。`,
       confidence: "medium"
     },
@@ -980,7 +994,7 @@ export function buildAccountAnalyzerQuickScan(args: {
       fallbackPointCount: marketData.fallbackPointCount
     },
     summary: {
-      title: `${accountLabel} AI 账户快扫`,
+      title: `${accountLabel} 智能账户快扫`,
       thesis: `${accountLabel} 当前约占总组合 ${round(accountWeightPct, 1)}%，账户健康分为 ${health.score}。本轮只使用本地账户、持仓、偏好和报价缓存。`,
       confidence: accountHoldings.length > 0 ? "medium" : "low"
     },
@@ -1097,7 +1111,7 @@ export function buildRecommendationRunAnalyzerQuickScan(args: {
       sourceMode: "local"
     },
     summary: {
-      title: "推荐运行 AI 解释",
+      title: "推荐智能解释",
       thesis: leadItem
         ? `本轮推荐优先处理 ${leadItem.assetClass}，建议金额约 CAD ${round(leadItem.amountCad, 0)}。`
         : "本轮推荐没有生成可执行条目。",

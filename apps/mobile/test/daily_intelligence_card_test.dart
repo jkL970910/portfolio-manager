@@ -52,7 +52,7 @@ void main() {
               securityManualRefreshEnabled: true,
               items: [item],
               emptyTitle: "暂时没有可用秘闻",
-              emptyDetail: "先运行 AI 快扫。",
+              emptyDetail: "先运行智能快扫。",
             ),
             isLoading: false,
             onViewSecurity: (item) => openedItem = item,

@@ -104,7 +104,8 @@ class _HealthScorePageState extends State<HealthScorePage> {
                   const SizedBox(height: 12),
                   AiAnalysisCard(
                     apiClient: widget.apiClient,
-                    title: "AI 组合快扫",
+                    title: "智能组合快扫",
+                    description: "基于本地规则、组合健康、投资偏好和缓存资料生成；不会默认调用外部 GPT。",
                     payload: const {
                       "scope": "portfolio",
                       "mode": "quick",
@@ -114,8 +115,8 @@ class _HealthScorePageState extends State<HealthScorePage> {
                   const SizedBox(height: 12),
                   AiAnalysisCard(
                     apiClient: widget.apiClient,
-                    title: "AI 账户快扫",
-                    description: "基于当前账户持仓、账户类型、投资偏好和本地报价缓存生成，不包含实时新闻或论坛情绪。",
+                    title: "智能账户快扫",
+                    description: "基于当前账户持仓、账户类型、投资偏好和缓存资料生成；不会默认调用外部 GPT。",
                     payload: {
                       "scope": "account",
                       "mode": "quick",
@@ -305,7 +306,7 @@ class MobileHealthSnapshot {
           id: isAccountScope
               ? "run-account-analysis"
               : "run-portfolio-analysis",
-          label: isAccountScope ? "运行 AI 账户快扫" : "运行 AI 组合快扫",
+          label: isAccountScope ? "运行智能账户快扫" : "运行智能组合快扫",
           actionType: "run-analysis",
           target: {
             "scope": isAccountScope ? "account" : "portfolio",

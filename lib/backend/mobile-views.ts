@@ -644,7 +644,7 @@ export function buildRecommendationV3Overlay(
     signals: [
       ...base.signals,
       hasListingRef ? "当前 listing 情报命中" : "底层资产情报命中",
-      hasExternalRef ? "缓存外部研究可用" : "本地 AI 快扫可用",
+      hasExternalRef ? "缓存外部研究可用" : "本地智能快扫可用",
       ...(hasMarketSentimentRef ? marketSentimentSignals : []),
     ],
     riskFlags,
