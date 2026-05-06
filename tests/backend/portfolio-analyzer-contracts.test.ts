@@ -8,6 +8,7 @@ import {
   portfolioAnalyzerRequestSchema,
   portfolioAnalyzerResultSchema
 } from "@/lib/backend/portfolio-analyzer-contracts";
+import { sanitizeGptEnhancementPayloadForTest } from "@/lib/backend/portfolio-analyzer-service";
 
 const generatedAt = "2026-04-28T04:00:00.000Z";
 
@@ -144,6 +145,37 @@ test("portfolio analyzer GPT enhancement result rejects non-normalized provider 
   });
 
   assert.equal(parsed.success, false);
+});
+
+test("portfolio analyzer GPT enhancement sanitizer clamps provider arrays", () => {
+  const normalized = sanitizeGptEnhancementPayloadForTest({
+    generatedAt: "2026-05-06",
+    title: "VFV GPT 增强解读",
+    directAnswer: "VFV 可以作为候选观察。",
+    reasoning: [
+      "理由 1",
+      "理由 2",
+      "理由 3",
+      "理由 4",
+      "理由 5",
+      "理由 6",
+      "理由 7",
+    ],
+    decisionGates: "确认报价。\n确认账户。\n确认现金。",
+    boundary: "只基于智能快扫结果。",
+    nextStep: "刷新报价后再复核。",
+    sourceLabel: "GPT 增强解读 · 基于本地规则 + 缓存资料",
+    disclaimer: PORTFOLIO_ANALYZER_DISCLAIMER,
+  });
+
+  const parsed = portfolioAnalyzerGptEnhancementSchema.parse(normalized);
+
+  assert.equal(parsed.reasoning.length, 6);
+  assert.deepEqual(parsed.decisionGates, [
+    "确认报价。",
+    "确认账户。",
+    "确认现金。",
+  ]);
 });
 
 test("portfolio analyzer request rejects security scope without identity or holding id", () => {

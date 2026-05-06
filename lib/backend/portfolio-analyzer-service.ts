@@ -123,29 +123,39 @@ function isIsoDateTime(value: unknown) {
     !Number.isNaN(Date.parse(value));
 }
 
-function readStringArray(value: unknown) {
+function clampText(value: string, maxLength: number) {
+  const trimmed = value.trim();
+  return trimmed.length > maxLength
+    ? `${trimmed.slice(0, Math.max(0, maxLength - 1)).trim()}…`
+    : trimmed;
+}
+
+function readStringArray(value: unknown, maxItems = 6, maxLength = 500) {
   if (Array.isArray(value)) {
     return value
       .filter((item): item is string => typeof item === "string")
-      .map((item) => item.trim())
-      .filter(Boolean);
+      .map((item) => clampText(item, maxLength))
+      .filter(Boolean)
+      .slice(0, maxItems);
   }
 
   if (typeof value === "string" && value.trim()) {
     return value
       .split(/\n+|[；;]\s*|(?<=。)\s*/u)
-      .map((item) => item.replace(/^[-•\d.、\s]+/, "").trim())
+      .map((item) => clampText(item.replace(/^[-•\d.、\s]+/, ""), maxLength))
       .filter(Boolean);
   }
 
   return [];
 }
 
-function readNullableString(value: unknown) {
-  return typeof value === "string" && value.trim() ? value.trim() : null;
+function readNullableString(value: unknown, maxLength = 700) {
+  return typeof value === "string" && value.trim()
+    ? clampText(value, maxLength)
+    : null;
 }
 
-function sanitizeGptEnhancementPayload(value: unknown) {
+export function sanitizeGptEnhancementPayloadForTest(value: unknown) {
   if (!value || typeof value !== "object") {
     return {};
   }
@@ -161,17 +171,17 @@ function sanitizeGptEnhancementPayload(value: unknown) {
     generatedAt: isIsoDateTime(data.generatedAt)
       ? data.generatedAt
       : new Date().toISOString(),
-    title: readNullableString(data.title) ?? "GPT 增强解读",
+    title: readNullableString(data.title, 120) ?? "GPT 增强解读",
     directAnswer:
-      readNullableString(data.directAnswer) ??
-      readNullableString(data.answer) ??
+      readNullableString(data.directAnswer, 800) ??
+      readNullableString(data.answer, 800) ??
       "已根据智能快扫结果生成增强解读。",
     reasoning: readStringArray(data.reasoning),
     decisionGates: readStringArray(data.decisionGates),
-    boundary: readNullableString(data.boundary),
-    nextStep: readNullableString(data.nextStep),
+    boundary: readNullableString(data.boundary, 700),
+    nextStep: readNullableString(data.nextStep, 500),
     sourceLabel:
-      readNullableString(data.sourceLabel) ?? "GPT 增强解读 · 基于智能快扫",
+      readNullableString(data.sourceLabel, 120) ?? "GPT 增强解读 · 基于智能快扫",
     disclaimer: {
       zh:
         readNullableString(disclaimer.zh) ??
@@ -486,7 +496,7 @@ async function callGptEnhancementProvider(
   }
 
   const parsed = portfolioAnalyzerGptEnhancementSchema.parse(
-    sanitizeGptEnhancementPayload(JSON.parse(outputText)),
+    sanitizeGptEnhancementPayloadForTest(JSON.parse(outputText)),
   );
   return {
     enhancement: parsed,
