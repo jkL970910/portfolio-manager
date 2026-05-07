@@ -9,6 +9,11 @@ Last updated: 2026-05-07
 
 Track execution against the new Flutter-first direction while preserving the current feature baseline and development progress.
 
+Current product-level requirements live in
+`docs/product/current-product-spec.md`. Use
+`docs/product/requirements-index.md` to decide which document to update for
+product, execution, architecture, cloud, or QA changes.
+
 ## Status Legend
 
 - `Completed`: implemented and usable in the current codebase baseline

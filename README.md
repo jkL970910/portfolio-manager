@@ -128,6 +128,8 @@ It is not the long-term commitment to a web-first frontend.
 
 ## Key Docs
 
+- `docs/product/current-product-spec.md`
+- `docs/product/requirements-index.md`
 - `docs/execution/flutter-mobile-migration-plan.md`
 - `docs/execution/backlog.md`
 - `docs/execution/frontend-backend-implementation-path.md`

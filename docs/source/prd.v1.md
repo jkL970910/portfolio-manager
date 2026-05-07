@@ -2,6 +2,12 @@
 
 > [!IMPORTANT]
 > As of 2026-04-25, this project is now Flutter-first, mobile-first, Chinese-only, and Loo皇-themed. When this document conflicts with `docs/execution/flutter-mobile-migration-plan.md`, follow the migration plan first.
+>
+> [!NOTE]
+> Historical baseline: this PRD preserves the 2026-04-25 mobile-first pivot.
+> Current product requirements now live in
+> `docs/product/current-product-spec.md`; current priorities live in
+> `docs/execution/backlog.md`.
 
 Last updated: 2026-04-25
 
