@@ -142,6 +142,8 @@ class _SettingsPageState extends State<SettingsPage> {
             Text(_error!,
                 style: TextStyle(color: Theme.of(context).colorScheme.error)),
           ],
+          const SizedBox(height: 12),
+          _FxDisplayPolicyCard(displayCurrency: _currency),
           const SizedBox(height: 16),
           Text("行情数据", style: Theme.of(context).textTheme.titleLarge),
           const SizedBox(height: 8),
@@ -1285,6 +1287,59 @@ class _MarketDataStatusCardState extends State<_MarketDataStatusCard> {
   }
 }
 
+class _FxDisplayPolicyCard extends StatelessWidget {
+  const _FxDisplayPolicyCard({required this.displayCurrency});
+
+  final String displayCurrency;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.currency_exchange),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    "FX 折算口径",
+                    style: Theme.of(context).textTheme.titleLarge,
+                  ),
+                ),
+                Chip(label: Text(displayCurrency)),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              "所有总资产、组合走势和跨币种持仓都会按当前显示币种折算；持仓自己的交易币种不会被改写。",
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
+            const SizedBox(height: 10),
+            const Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                Chip(label: Text("原始持仓保留交易币种")),
+                Chip(label: Text("汇率只用于展示折算")),
+                Chip(label: Text("失败时沿用最近可用汇率")),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              "完整的新鲜度、TTL 和最近刷新结果在下方 `行情状态` 查看。",
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _FreshnessPolicySummary extends StatelessWidget {
   const _FreshnessPolicySummary(this.policy);
 
@@ -1576,7 +1631,8 @@ class _ExternalResearchPolicyCardState
                     ],
                   ),
                   const SizedBox(height: 10),
-                  const Text("总览秘闻只由后台 worker 每日缓存；单个标的可显式刷新且受次数和 TTL 限制。页面加载不会抓取新闻、论坛或付费外部 API。"),
+                  const Text(
+                      "总览秘闻只由后台 worker 每日缓存；单个标的可显式刷新且受次数和 TTL 限制。页面加载不会抓取新闻、论坛或付费外部 API。"),
                   const SizedBox(height: 10),
                   Text(
                     "今日用量：${policy.usedRuns}/${policy.dailyRunLimit} 次；剩余 ${policy.remainingRuns} 次。",

@@ -114,10 +114,6 @@ class _PortfolioPageState extends State<PortfolioPage> {
                           snapshot.data!.summaryPoints,
                           onTap: _openHealthScore,
                         ),
-                      if (snapshot.data!.fxContext.hasContent) ...[
-                        const SizedBox(height: 18),
-                        _FxContextCard(snapshot.data!.fxContext),
-                      ],
                       if (!_isFiltered &&
                           (snapshot.data!.portfolioValueChart != null ||
                               snapshot.data!.performance.isNotEmpty)) ...[
@@ -316,41 +312,6 @@ class _FilterSummaryCard extends StatelessWidget {
               Expanded(child: Text("持仓 ${data.holdings.length} 个")),
             ],
           ),
-        ],
-      ),
-    );
-  }
-}
-
-class _FxContextCard extends StatelessWidget {
-  const _FxContextCard(this.context);
-
-  final MobileFxContext context;
-
-  @override
-  Widget build(BuildContext context) {
-    return _LooCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              const Icon(Icons.currency_exchange),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text("FX 折算口径",
-                    style: Theme.of(context).textTheme.titleLarge),
-              ),
-              Chip(label: Text(this.context.statusLabel)),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Text(this.context.label),
-          if (this.context.note.isNotEmpty) ...[
-            const SizedBox(height: 6),
-            Text(this.context.note,
-                style: Theme.of(context).textTheme.bodySmall),
-          ],
         ],
       ),
     );

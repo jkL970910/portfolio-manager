@@ -102,10 +102,6 @@ class _OverviewPageState extends State<OverviewPage> {
                   sliver: SliverList.list(
                     children: [
                       _MetricGrid(metrics: snapshot.data!.metrics),
-                      if (snapshot.data!.fxContext.hasContent) ...[
-                        const SizedBox(height: 18),
-                        _FxContextCard(snapshot.data!.fxContext),
-                      ],
                       if (snapshot.data!.netWorthChart != null ||
                           snapshot.data!.netWorthTrend.isNotEmpty) ...[
                         const SizedBox(height: 18),
@@ -283,41 +279,6 @@ class _MetricGrid extends StatelessWidget {
           ),
         );
       },
-    );
-  }
-}
-
-class _FxContextCard extends StatelessWidget {
-  const _FxContextCard(this.context);
-
-  final MobileFxContext context;
-
-  @override
-  Widget build(BuildContext context) {
-    return _LooCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              const Icon(Icons.currency_exchange),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text("FX 折算口径",
-                    style: Theme.of(context).textTheme.titleLarge),
-              ),
-              Chip(label: Text(this.context.statusLabel)),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Text(this.context.label),
-          if (this.context.note.isNotEmpty) ...[
-            const SizedBox(height: 6),
-            Text(this.context.note,
-                style: Theme.of(context).textTheme.bodySmall),
-          ],
-        ],
-      ),
     );
   }
 }
@@ -542,7 +503,9 @@ class _MarketSentimentCard extends StatelessWidget {
                   style: Theme.of(context).textTheme.titleLarge,
                 ),
               ),
-              Chip(label: Text("象限 ${sentiment.quadrant.isEmpty ? "-" : sentiment.quadrant}")),
+              Chip(
+                  label: Text(
+                      "象限 ${sentiment.quadrant.isEmpty ? "-" : sentiment.quadrant}")),
             ],
           ),
           const SizedBox(height: 12),
