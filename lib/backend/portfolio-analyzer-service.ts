@@ -475,16 +475,23 @@ async function callGptEnhancementProvider(
     }),
   });
 
-  const payload = (await response.json().catch(() => ({}))) as Record<
-    string,
-    unknown
-  >;
+  const responseText = await response.text().catch(() => "");
+  let payload: Record<string, unknown> = {};
+  if (responseText) {
+    try {
+      payload = JSON.parse(responseText) as Record<string, unknown>;
+    } catch {
+      payload = {};
+    }
+  }
   if (!response.ok) {
     const error = payload.error;
     const detail =
       error && typeof error === "object" && "message" in error
         ? String((error as { message?: unknown }).message)
-        : "No provider error body.";
+        : responseText.trim()
+          ? responseText.trim().slice(0, 500)
+          : "No provider error body.";
     throw new Error(
       `GPT enhancement failed with status ${response.status}: ${detail}`,
     );
