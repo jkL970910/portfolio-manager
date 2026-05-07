@@ -471,7 +471,12 @@ async function callGptEnhancementProvider(
               verbosity: "low",
               format: getGptEnhancementTextFormat(settings.provider),
             },
-      input: buildGptEnhancementPrompt(result),
+      input: [
+        {
+          role: "user",
+          content: buildGptEnhancementPrompt(result),
+        },
+      ],
     }),
   });
 
