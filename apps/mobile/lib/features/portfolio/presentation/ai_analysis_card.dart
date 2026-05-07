@@ -1,3 +1,5 @@
+import "dart:convert";
+
 import "package:flutter/material.dart";
 import "package:flutter/foundation.dart";
 
@@ -36,10 +38,12 @@ class _AiAnalysisCardState extends State<AiAnalysisCard> {
   bool _hasResult = false;
   bool _isLoading = false;
   bool _isEnhancing = false;
+  late String _payloadSignature;
 
   @override
   void initState() {
     super.initState();
+    _payloadSignature = _stableJsonSignature(widget.payload);
     if (widget.autoRun) {
       _isLoading = true;
       _analysis = _loadAnalysis(refresh: false);
@@ -68,16 +72,18 @@ class _AiAnalysisCardState extends State<AiAnalysisCard> {
   @override
   void didUpdateWidget(covariant AiAnalysisCard oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.autoRun && oldWidget.payload != widget.payload && !_isLoading) {
+    final nextPayloadSignature = _stableJsonSignature(widget.payload);
+    if (widget.autoRun &&
+        nextPayloadSignature != _payloadSignature &&
+        !_isLoading) {
+      _payloadSignature = nextPayloadSignature;
       _runAnalysis(refresh: false);
       return;
     }
-    if (
-      widget.refreshKey != null &&
-      oldWidget.refreshKey != widget.refreshKey &&
-      _hasResult &&
-      !_isLoading
-    ) {
+    if (widget.refreshKey != null &&
+        oldWidget.refreshKey != widget.refreshKey &&
+        _hasResult &&
+        !_isLoading) {
       _runAnalysis(refresh: true);
     }
   }
@@ -303,6 +309,26 @@ class _AiAnalysisCardState extends State<AiAnalysisCard> {
   }
 }
 
+String _stableJsonSignature(Object? value) {
+  return jsonEncode(_normalizeJsonValue(value));
+}
+
+Object? _normalizeJsonValue(Object? value) {
+  if (value is Map) {
+    final entries = value.entries
+        .map((entry) => MapEntry(entry.key.toString(), entry.value))
+        .toList()
+      ..sort((a, b) => a.key.compareTo(b.key));
+    return {
+      for (final entry in entries) entry.key: _normalizeJsonValue(entry.value),
+    };
+  }
+  if (value is Iterable) {
+    return value.map(_normalizeJsonValue).toList();
+  }
+  return value;
+}
+
 class MobileAiAnalysisResult {
   const MobileAiAnalysisResult({
     required this.scope,
@@ -365,9 +391,8 @@ class MobileAiAnalysisResult {
           .map(MobileAiScorecard.fromJson)
           .toList(),
       risks: _readMapList(json["risks"]).map(MobileAiRisk.fromJson).toList(),
-      taxNotes: _readStringList(json["taxNotes"])
-          .map(_friendlyAnalysisText)
-          .toList(),
+      taxNotes:
+          _readStringList(json["taxNotes"]).map(_friendlyAnalysisText).toList(),
       portfolioFit: _readStringList(json["portfolioFit"])
           .map(_friendlyAnalysisText)
           .toList(),
@@ -466,24 +491,29 @@ class MobileAiSecurityDecision {
     return MobileAiSecurityDecision(
       verdict: json["verdict"] as String? ?? "watch-only",
       decisionLabel: _friendlyNullableText(json["decisionLabel"] as String?),
-      confidenceScore:
-          confidenceScore is num ? confidenceScore.toDouble().clamp(0, 100) : null,
+      confidenceScore: confidenceScore is num
+          ? confidenceScore.toDouble().clamp(0, 100)
+          : null,
       directAnswer:
           _friendlyAnalysisText(json["directAnswer"] as String? ?? ""),
       primaryAction: json["primaryAction"] is Map<String, dynamic>
           ? MobileAiPrimaryAction.fromJson(
               json["primaryAction"] as Map<String, dynamic>)
           : null,
-      whyNow: _readStringList(json["whyNow"]).map(_friendlyAnalysisText).toList(),
-      portfolioFit:
-          _readStringList(json["portfolioFit"]).map(_friendlyAnalysisText).toList(),
-      keyBlockers:
-          _readStringList(json["keyBlockers"]).map(_friendlyAnalysisText).toList(),
+      whyNow:
+          _readStringList(json["whyNow"]).map(_friendlyAnalysisText).toList(),
+      portfolioFit: _readStringList(json["portfolioFit"])
+          .map(_friendlyAnalysisText)
+          .toList(),
+      keyBlockers: _readStringList(json["keyBlockers"])
+          .map(_friendlyAnalysisText)
+          .toList(),
       decisionGates: _readStringList(json["decisionGates"])
           .map(_friendlyAnalysisText)
           .toList(),
-      nextSteps:
-          _readStringList(json["nextSteps"]).map(_friendlyAnalysisText).toList(),
+      nextSteps: _readStringList(json["nextSteps"])
+          .map(_friendlyAnalysisText)
+          .toList(),
       boundary: _friendlyNullableText(json["boundary"] as String?),
       positionSizingIdea:
           _friendlyNullableText(json["positionSizingIdea"] as String?),
@@ -543,9 +573,11 @@ class MobileAiGptEnhancement {
     final disclaimer = _readMap(json["disclaimer"]);
     return MobileAiGptEnhancement(
       title: json["title"] as String? ?? "GPT 增强解读",
-      directAnswer: _friendlyAnalysisText(json["directAnswer"] as String? ?? ""),
-      reasoning:
-          _readStringList(json["reasoning"]).map(_friendlyAnalysisText).toList(),
+      directAnswer:
+          _friendlyAnalysisText(json["directAnswer"] as String? ?? ""),
+      reasoning: _readStringList(json["reasoning"])
+          .map(_friendlyAnalysisText)
+          .toList(),
       decisionGates: _readStringList(json["decisionGates"])
           .map(_friendlyAnalysisText)
           .toList(),
@@ -553,11 +585,9 @@ class MobileAiGptEnhancement {
       nextStep: _friendlyNullableText(json["nextStep"] as String?),
       sourceLabel: json["sourceLabel"] as String? ?? "GPT 增强解读",
       authorityBoundary: _friendlyAnalysisText(
-        json["authorityBoundary"] as String? ??
-            "GPT 只增强解释，不改变智能快扫结论、护栏或行动优先级。",
+        json["authorityBoundary"] as String? ?? "GPT 只增强解释，不改变智能快扫结论、护栏或行动优先级。",
       ),
-      disclaimerZh:
-          disclaimer["zh"] as String? ?? "仅用于研究学习，不构成投资建议。",
+      disclaimerZh: disclaimer["zh"] as String? ?? "仅用于研究学习，不构成投资建议。",
     );
   }
 }
@@ -711,17 +741,16 @@ class _AnalysisResultView extends StatelessWidget {
                   ? securityDecision!.directAnswer
                   : data.thesis),
               const SizedBox(height: 8),
-              _MetaPill(
-                  [
-                    if (securityDecision?.decisionLabel != null)
-                      securityDecision!.decisionLabel!,
-                    if (securityDecision != null)
-                      _verdictLabel(securityDecision.verdict),
-                    if (securityDecision?.confidenceScore != null)
-                      "决策置信 ${securityDecision!.confidenceScore!.round()}",
-                    "置信度 ${_confidenceLabel(data.confidence)}",
-                    _sourceModeLabel(data.sourceMode),
-                  ].join(" · ")),
+              _MetaPill([
+                if (securityDecision?.decisionLabel != null)
+                  securityDecision!.decisionLabel!,
+                if (securityDecision != null)
+                  _verdictLabel(securityDecision.verdict),
+                if (securityDecision?.confidenceScore != null)
+                  "决策置信 ${securityDecision!.confidenceScore!.round()}",
+                "置信度 ${_confidenceLabel(data.confidence)}",
+                _sourceModeLabel(data.sourceMode),
+              ].join(" · ")),
             ],
           ),
         ),
@@ -812,7 +841,8 @@ class _AnalysisResultView extends StatelessWidget {
             title: "下一步",
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
-              children: securityDecision.nextSteps.take(4).map(_bullet).toList(),
+              children:
+                  securityDecision.nextSteps.take(4).map(_bullet).toList(),
             ),
           ),
         if (securityDecision?.boundary != null)
@@ -834,8 +864,7 @@ class _AnalysisResultView extends StatelessWidget {
           ExpansionTile(
             tilePadding: EdgeInsets.zero,
             initiallyExpanded: false,
-            title: Text("数据依据",
-                style: Theme.of(context).textTheme.titleSmall),
+            title: Text("数据依据", style: Theme.of(context).textTheme.titleSmall),
             childrenPadding: const EdgeInsets.only(bottom: 12),
             children: [
               Align(
@@ -847,8 +876,7 @@ class _AnalysisResultView extends StatelessWidget {
         if (data.sources.isNotEmpty)
           ExpansionTile(
             tilePadding: EdgeInsets.zero,
-            title:
-                Text("来源详情", style: Theme.of(context).textTheme.titleSmall),
+            title: Text("来源详情", style: Theme.of(context).textTheme.titleSmall),
             childrenPadding: EdgeInsets.zero,
             children: [
               Align(
@@ -931,8 +959,8 @@ class _GptEnhancementPanel extends StatelessWidget {
                   if (snapshot.hasError) {
                     return Text(
                       "GPT 增强暂时失败，请稍后重试；上方智能快扫结果仍可继续参考。",
-                      style: TextStyle(
-                          color: Theme.of(context).colorScheme.error),
+                      style:
+                          TextStyle(color: Theme.of(context).colorScheme.error),
                     );
                   }
                   final data = snapshot.data;
