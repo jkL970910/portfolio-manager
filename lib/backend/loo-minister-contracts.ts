@@ -96,6 +96,12 @@ export const looMinisterSuggestedActionSchema = z
       })
       .default({}),
     requiresConfirmation: z.boolean().default(false),
+    authorityBoundary: z
+      .string()
+      .trim()
+      .min(1)
+      .max(300)
+      .default("大臣只能建议此动作；执行前必须由用户确认并走后端校验。"),
   })
   .superRefine((value, context) => {
     if (

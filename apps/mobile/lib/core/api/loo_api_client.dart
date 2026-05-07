@@ -88,6 +88,20 @@ class LooApiClient {
     return _postJson("/api/mobile/minister/chat", body: payload);
   }
 
+  Future<Map<String, dynamic>> getLooMinisterChatSessions({int limit = 10}) {
+    return _getJson("/api/mobile/minister/chat/sessions?limit=$limit");
+  }
+
+  Future<Map<String, dynamic>> getLooMinisterChatSession(String sessionId) {
+    return _getJson(
+        "/api/mobile/minister/chat/sessions/${Uri.encodeComponent(sessionId)}");
+  }
+
+  Future<void> deleteLooMinisterChatSession(String sessionId) async {
+    await _deleteJson(
+        "/api/mobile/minister/chat/sessions/${Uri.encodeComponent(sessionId)}");
+  }
+
   Future<Map<String, dynamic>> getRecommendations() {
     return _getJson("/api/mobile/recommendations");
   }

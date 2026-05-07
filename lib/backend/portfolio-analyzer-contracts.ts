@@ -62,12 +62,14 @@ export const portfolioAnalyzerGptEnhancementRequestSchema = portfolioAnalyzerReq
 export const portfolioAnalyzerGptEnhancementSchema = z.object({
   generatedAt: z.string().datetime(),
   title: z.string().trim().min(1).max(120),
+  role: z.literal("explanation-only").default("explanation-only"),
   directAnswer: z.string().trim().min(1).max(800),
   reasoning: z.array(z.string().trim().min(1).max(500)).max(6).default([]),
   decisionGates: z.array(z.string().trim().min(1).max(500)).max(6).default([]),
   boundary: z.string().trim().min(1).max(700).nullable().default(null),
   nextStep: z.string().trim().min(1).max(500).nullable().default(null),
   sourceLabel: z.string().trim().min(1).max(120),
+  authorityBoundary: z.string().trim().min(1).max(300).default("GPT 只增强解释，不改变智能快扫结论、护栏或行动优先级。"),
   disclaimer: z.object({
     zh: z.string().trim().min(1),
     en: z.string().trim().min(1)
@@ -91,6 +93,57 @@ export const portfolioAnalyzerGptEnhancementSchema = z.object({
 });
 
 const severitySchema = z.enum(["info", "low", "medium", "high"]);
+const guardrailCategorySchema = z.enum([
+  "identity",
+  "freshness",
+  "duplicate-exposure",
+  "preference-conflict",
+  "tax-account-mismatch",
+  "liquidity",
+  "account-fit",
+  "market-data",
+  "portfolio-fit"
+]);
+const securityGuardrailSchema = z.object({
+  id: z.string().trim().min(1).max(120),
+  category: guardrailCategorySchema,
+  severity: severitySchema,
+  title: z.string().trim().min(1).max(160),
+  detail: z.string().trim().min(1).max(800),
+  blocking: z.boolean(),
+  source: z.string().trim().min(1).max(120).nullable().optional()
+});
+const securityPortfolioFitSchema = z.object({
+  score: z.number().min(0).max(100),
+  targetGapPct: z.number(),
+  currentSleevePct: z.number().min(0),
+  targetPct: z.number().min(0),
+  heldWeightPct: z.number().min(0),
+  duplicateExposurePct: z.number().min(0),
+  accountFitScore: z.number().min(0).max(100),
+  taxFitScore: z.number().min(0).max(100),
+  fxFitScore: z.number().min(0).max(100),
+  liquidityFitScore: z.number().min(0).max(100),
+  summary: z.string().trim().min(1).max(800),
+  strengths: z.array(z.string().trim().min(1).max(500)).max(6).default([]),
+  concerns: z.array(z.string().trim().min(1).max(500)).max(8).default([]),
+  accountNotes: z.array(z.string().trim().min(1).max(500)).max(6).default([])
+});
+const analyzerPrimaryActionSchema = z.object({
+  priority: z.enum(["P0", "P1", "P2"]),
+  label: z.string().trim().min(1).max(120),
+  detail: z.string().trim().min(1).max(800)
+});
+const analyzerEvidenceItemSchema = z.object({
+  id: z.string().trim().min(1).max(120),
+  label: z.string().trim().min(1).max(160),
+  sourceType: z.enum(["portfolio-data", "quote-cache", "market-data", "news", "forum", "institutional", "manual", "derived"]),
+  sourceMode: z.enum(["local", "cached-external", "live-external", "derived"]),
+  confidence: z.enum(["low", "medium", "high"]),
+  freshness: z.enum(["fresh", "stale", "partial", "missing"]),
+  asOf: z.string().datetime().nullable().optional(),
+  detail: z.string().trim().min(1).max(800)
+});
 
 export const portfolioAnalyzerResultSchema = z.object({
   version: z.literal(PORTFOLIO_ANALYZER_VERSION),
@@ -103,6 +156,9 @@ export const portfolioAnalyzerResultSchema = z.object({
     quotesAsOf: z.string().datetime().nullable(),
     externalResearchAsOf: z.string().datetime().nullable(),
     sourceMode: z.enum(["local", "cached-external", "live-external"]),
+    freshnessLabel: z.string().trim().min(1).max(160).optional(),
+    reliabilityScore: z.number().min(0).max(100).optional(),
+    limitationSummary: z.string().trim().min(1).max(700).optional(),
     quoteSourceSummary: z.string().trim().min(1).max(240).nullable().optional(),
     quoteFreshnessSummary: z
       .string()
@@ -114,6 +170,7 @@ export const portfolioAnalyzerResultSchema = z.object({
     priceHistoryPointCount: z.number().int().min(0).optional(),
     fallbackPointCount: z.number().int().min(0).optional()
   }),
+  evidenceTrail: z.array(analyzerEvidenceItemSchema).max(12).default([]).optional(),
   summary: z.object({
     title: z.string().trim().min(1).max(120),
     thesis: z.string().trim().min(1).max(800),
@@ -122,10 +179,19 @@ export const portfolioAnalyzerResultSchema = z.object({
   securityDecision: z.object({
     lens: z.enum(["existing-holding-review", "candidate-new-buy", "watchlist-review"]),
     verdict: z.enum(["good-candidate", "watch-only", "weak-fit", "review-existing", "needs-more-data"]),
+    decisionLabel: z.string().trim().min(1).max(120).optional(),
+    confidenceScore: z.number().min(0).max(100).optional(),
     directAnswer: z.string().trim().min(1).max(800),
+    primaryAction: analyzerPrimaryActionSchema.optional(),
     whyNow: z.array(z.string().trim().min(1).max(500)).max(6).default([]),
     portfolioFit: z.array(z.string().trim().min(1).max(500)).max(6).default([]),
     keyBlockers: z.array(z.string().trim().min(1).max(500)).max(8).default([]),
+    guardrails: z.array(securityGuardrailSchema).max(12).default([]),
+    fit: securityPortfolioFitSchema.optional(),
+    decisionGates: z.array(z.string().trim().min(1).max(500)).max(8).default([]),
+    nextSteps: z.array(z.string().trim().min(1).max(500)).max(8).default([]),
+    boundary: z.string().trim().min(1).max(700).nullable().optional(),
+    positionSizingIdea: z.string().trim().min(1).max(500).nullable().optional(),
     watchlistTriggers: z.array(z.string().trim().min(1).max(500)).max(8).default([]),
     evidence: z.array(z.string().trim().min(1).max(500)).max(8).default([]),
   }).optional(),

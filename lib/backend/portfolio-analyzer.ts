@@ -16,6 +16,10 @@ import {
   portfolioAnalyzerResultSchema
 } from "@/lib/backend/portfolio-analyzer-contracts";
 import {
+  buildSecurityDecisionContext,
+  buildSecurityDecisionNarrative,
+} from "@/lib/backend/security-decision/context";
+import {
   getHoldingEconomicAssetClass,
   inferEconomicAssetClass,
 } from "@/lib/backend/security-economic-exposure";
@@ -362,6 +366,102 @@ function getMarketDataConfidenceScore(marketData: ReturnType<typeof buildMarketD
   );
 }
 
+function getAnalyzerFreshnessLabel(marketData: ReturnType<typeof buildMarketDataSummary>) {
+  if (marketData.sourceMode === "local") {
+    return "仅本地资料";
+  }
+  if (marketData.fallbackPointCount > 0 || marketData.stalePointCount > 0) {
+    return "缓存资料需复核";
+  }
+  if (marketData.freshHistoryPointCount >= 20) {
+    return "缓存行情较完整";
+  }
+  if (marketData.freshHistoryPointCount >= 5 || marketData.quoteProviderCount > 0) {
+    return "缓存行情可初筛";
+  }
+  return "资料有限";
+}
+
+function getAnalyzerReliabilityScore(marketData: ReturnType<typeof buildMarketDataSummary>) {
+  return getMarketDataConfidenceScore(marketData);
+}
+
+function getAnalyzerLimitationSummary(marketData: ReturnType<typeof buildMarketDataSummary>) {
+  const limits = [
+    marketData.sourceMode === "local"
+      ? "没有可审计外部行情来源"
+      : null,
+    marketData.priceHistoryPointCount < 5
+      ? "价格历史样本不足，不能支撑趋势判断"
+      : null,
+    marketData.fallbackPointCount > 0
+      ? `包含 ${marketData.fallbackPointCount} 个参考/兜底价格点`
+      : null,
+    marketData.stalePointCount > 0
+      ? `包含 ${marketData.stalePointCount} 个可能过期价格点`
+      : null,
+  ].filter((item): item is string => Boolean(item));
+  return limits.length > 0 ? limits.join("；") : "资料足够做第一层快扫，但仍不构成投资建议";
+}
+
+function buildAnalyzerEvidenceTrail(args: {
+  scope: PortfolioAnalyzerResult["scope"];
+  portfolioAsOf: string;
+  marketData: ReturnType<typeof buildMarketDataSummary>;
+  generatedAt: string;
+}) {
+  const reliabilityScore = getAnalyzerReliabilityScore(args.marketData);
+  const confidence = reliabilityScore >= 75
+    ? "high" as const
+    : reliabilityScore >= 58
+      ? "medium" as const
+      : "low" as const;
+  const freshness = args.marketData.sourceMode === "local"
+    ? "missing" as const
+    : args.marketData.fallbackPointCount > 0 || args.marketData.stalePointCount > 0
+      ? "partial" as const
+      : args.marketData.priceHistoryPointCount >= 5
+        ? "fresh" as const
+        : "partial" as const;
+
+  return [
+    {
+      id: "portfolio-data",
+      label: args.scope === "account" ? "账户/持仓资料" : "组合/持仓资料",
+      sourceType: "portfolio-data" as const,
+      sourceMode: "local" as const,
+      confidence: "high" as const,
+      freshness: "fresh" as const,
+      asOf: args.portfolioAsOf,
+      detail: "来自项目内已保存的账户、持仓、偏好和组合配置。",
+    },
+    {
+      id: "market-data",
+      label: "行情与历史价格",
+      sourceType: args.marketData.sourceMode === "local" ? "quote-cache" as const : "market-data" as const,
+      sourceMode: args.marketData.sourceMode,
+      confidence,
+      freshness,
+      asOf: args.marketData.quotesAsOf,
+      detail: [
+        args.marketData.quoteSourceSummary ?? "没有可审计行情 provider。",
+        args.marketData.quoteFreshnessSummary ?? "行情新鲜度未完整记录。",
+        getAnalyzerLimitationSummary(args.marketData),
+      ].join(" "),
+    },
+    {
+      id: "rule-engine",
+      label: "Loo国规则引擎",
+      sourceType: "derived" as const,
+      sourceMode: "derived" as const,
+      confidence: "medium" as const,
+      freshness: "fresh" as const,
+      asOf: args.generatedAt,
+      detail: "由确定性规则综合持仓、目标配置、偏好、账户/税务/FX 和行情可信度生成；GPT 只能解释，不能覆盖护栏。",
+    },
+  ];
+}
+
 function formatPercent(value: number, digits = 1) {
   return `${round(value, digits)}%`;
 }
@@ -385,160 +485,119 @@ function getEconomicSleeveWeightPct(args: {
   return (sleeveValueCad / totalPortfolioCad) * 100;
 }
 
-function getPreferenceFitNotes(args: {
-  profile: PreferenceProfile;
-  sector: string | null | undefined;
-  economicAssetClass: string;
-  isHeld: boolean;
+function getDecisionConfidenceScore(args: {
+  fitScore: number;
+  marketDataScore: number;
+  blockingGuardrailCount: number;
+  softGuardrailCount: number;
 }) {
-  const factors = args.profile.preferenceFactors;
-  const sector = args.sector?.trim();
-  const preferredSectors = factors.sectorTilts.preferredSectors;
-  const avoidedSectors = factors.sectorTilts.avoidedSectors;
-  const notes: string[] = [];
-  const blockers: string[] = [];
-  let score = 62;
-
-  if (sector) {
-    const isPreferred = preferredSectors.some(
-      (item) => item.trim().toLowerCase() === sector.toLowerCase(),
-    );
-    const isAvoided = avoidedSectors.some(
-      (item) => item.trim().toLowerCase() === sector.toLowerCase(),
-    );
-    if (isPreferred) {
-      notes.push(`行业偏好匹配：你的偏好里包含 ${sector}。`);
-      score += 18;
-    } else if (isAvoided) {
-      notes.push(`行业偏好冲突：你的规避列表里包含 ${sector}。`);
-      blockers.push(`行业偏好冲突：${sector} 在你的规避列表里。`);
-      score -= 25;
-    } else {
-      notes.push(`行业偏好中性：${sector} 没有被列为明确偏好或规避。`);
-    }
-  } else {
-    notes.push("行业资料还不完整，偏好匹配只能先按资产类别判断。");
-    score -= 8;
-  }
-
-  if (factors.behavior.riskCapacity === "high") {
-    notes.push("风险容量偏高，可以容忍更高波动，但仍要控制单一标的集中度。");
-    score += args.economicAssetClass.includes("Equity") ? 6 : 0;
-  } else if (factors.behavior.riskCapacity === "low") {
-    notes.push("风险容量偏低，新增或加仓前应更重视回撤和现金缓冲。");
-    if (args.economicAssetClass.includes("Equity")) {
-      blockers.push("风险容量偏低：新增权益类资产前需要更保守地确认回撤承受能力。");
-    }
-    score -= args.economicAssetClass.includes("Equity") ? 12 : 0;
-  }
-
-  if (factors.lifeGoals.homePurchase.enabled) {
-    notes.push("你设置了买房目标，新增波动资产前应确认不会挤压首付或现金计划。");
-    if (factors.lifeGoals.homePurchase.priority === "high") {
-      blockers.push("买房目标优先级高：新增买入前需要先确认首付和现金计划。");
-    }
-    score -= 6;
-  }
-
-  if (!args.isHeld) {
-    notes.push("当前未持有时，应把它当作新增候选标的，而不是现有仓位复盘。");
-  }
-
-  return {
-    score: Math.max(25, Math.min(90, score)),
-    summary: notes.join(" "),
-    notes,
-    blockers,
-  };
+  return Math.max(
+    0,
+    Math.min(
+      100,
+      Math.round(
+        args.fitScore * 0.45 +
+          args.marketDataScore * 0.35 +
+          Math.max(0, 100 - args.softGuardrailCount * 8) * 0.2 -
+          args.blockingGuardrailCount * 22,
+      ),
+    ),
+  );
 }
 
-function getSecurityDecision(args: {
+function buildPrimarySecurityAction(args: {
+  verdict: string;
   symbol: string;
-  isHeld: boolean;
-  heldWeightPct: number;
-  economicAssetClass: string;
-  targetPct: number;
-  currentSleevePct: number;
-  preferenceSummary: string;
   blockers: string[];
-  marketData: ReturnType<typeof buildMarketDataSummary>;
+  isHeld: boolean;
 }) {
-  const gapPct = args.targetPct - args.currentSleevePct;
-  const hasEnoughMarketData = args.marketData.priceHistoryPointCount >= 5;
-  const hasBlockingGates = args.blockers.length > 0 || !hasEnoughMarketData;
-  const dataBoundary = hasEnoughMarketData
-    ? "缓存行情足够做第一层判断"
-    : "行情样本偏少，结论应作为初筛而不是下单依据";
-
-  if (args.targetPct <= 0) {
+  if (args.verdict === "needs-more-data") {
     return {
-      gapPct,
-      title: "当前判断",
-      detail: `${args.symbol} 暂时不应作为优先新增标的：你的偏好里没有为 ${args.economicAssetClass} 设置明确目标。${dataBoundary}。`,
+      priority: "P0" as const,
+      label: "先补齐数据",
+      detail: args.blockers[0] ?? "先刷新报价、补齐价格历史和交易身份，再做候选判断。",
     };
   }
-
-  if (args.heldWeightPct >= 15) {
+  if (args.verdict === "review-existing") {
     return {
-      gapPct,
-      title: "当前判断",
-      detail: `${args.symbol} 已经是组合里的高权重标的，下一步更像是复核是否继续持有或控制集中度，而不是无条件加仓。${args.economicAssetClass} 当前约 ${formatPercent(args.currentSleevePct)}，目标约 ${formatPercent(args.targetPct)}。`,
+      priority: "P0" as const,
+      label: "复核现有仓位",
+      detail: `${args.symbol} 已经在组合中有真实权重，优先确认集中度、账户位置和是否仍符合目标配置。`,
     };
   }
-
-  if (gapPct >= 5) {
-    if (hasBlockingGates) {
-      return {
-        gapPct,
-        title: "当前判断",
-        detail: `${args.symbol} 可以进入候选观察，但暂时不应只因为配置缺口就直接加仓。它会增加 ${args.economicAssetClass} 暴露，该类资产当前约 ${formatPercent(args.currentSleevePct)}、目标约 ${formatPercent(args.targetPct)}，仍有约 ${formatPercent(gapPct)} 缺口；${dataBoundary}。`,
-      };
-    }
+  if (args.verdict === "good-candidate") {
     return {
-      gapPct,
-      title: "当前判断",
-      detail: `${args.symbol} 可以进入候选观察：它会增加 ${args.economicAssetClass} 暴露，而这一类资产当前约 ${formatPercent(args.currentSleevePct)}、目标约 ${formatPercent(args.targetPct)}，仍有约 ${formatPercent(gapPct)} 缺口。${dataBoundary}。`,
+      priority: "P1" as const,
+      label: "纳入候选观察",
+      detail: "组合目标和偏好方向支持继续研究，但买入前仍需确认报价新鲜度、账户位置、税务路径和现金计划。",
     };
   }
-
-  if (gapPct <= -5) {
+  if (args.verdict === "weak-fit") {
     return {
-      gapPct,
-      title: "当前判断",
-      detail: `${args.symbol} 更适合先观察而不是优先买入：${args.economicAssetClass} 当前约 ${formatPercent(args.currentSleevePct)}，已经高于目标约 ${formatPercent(args.targetPct)}。如果要买，应优先解释它和现有持仓的差异，而不是只看单个标的。`,
+      priority: "P1" as const,
+      label: "暂不优先",
+      detail: "当前组合目标或偏好因素不支持把它放在优先新增位置；除非你能说明它和现有持仓的差异。",
     };
   }
-
   return {
-    gapPct,
-    title: "当前判断",
-    detail: `${args.symbol} 属于可继续观察的中性候选：${args.economicAssetClass} 当前约 ${formatPercent(args.currentSleevePct)}，接近目标约 ${formatPercent(args.targetPct)}。是否买入主要取决于估值、与现有持仓重复度、账户位置和现金计划。`,
+    priority: args.isHeld ? "P0" as const : "P1" as const,
+    label: args.isHeld ? "继续观察持仓" : "保持观察",
+    detail: args.blockers[0] ?? "当前更适合观察并补充证据，而不是直接形成买入动作。",
   };
 }
 
-function getSecurityDecisionVerdict(args: {
-  targetPct: number;
-  gapPct: number;
+function buildSecurityDecisionGates(args: {
+  blockers: string[];
+  fitConcerns: string[];
+  priceHistoryPointCount: number;
+  currency?: string | null;
+}) {
+  const gates = [
+    ...args.blockers,
+    ...args.fitConcerns,
+    args.priceHistoryPointCount < 20
+      ? `价格历史样本只有 ${args.priceHistoryPointCount} 个交易日，趋势和波动判断仍偏弱。`
+      : null,
+    args.currency === "USD"
+      ? "确认 USD/CAD 换汇路径、账户币种和最终 CAD 汇总影响。"
+      : null,
+  ].filter((item): item is string => Boolean(item));
+  return [...new Set(gates)].slice(0, 8);
+}
+
+function buildSecurityNextSteps(args: {
+  hasCompleteIdentity: boolean;
+  priceHistoryPointCount: number;
+  isHeld: boolean;
+  verdict: string;
+}) {
+  const steps = [
+    !args.hasCompleteIdentity ? "先补齐 symbol、exchange、currency，避免同 ticker 不同上市地混淆。" : null,
+    args.priceHistoryPointCount < 20 ? "刷新报价和历史价格，让快扫证据从低样本升级到可复核状态。" : null,
+    args.isHeld ? "对比当前持仓权重、账户位置和目标配置差距。" : "把它和现有同类持仓做一次重合度比较。",
+    args.verdict === "good-candidate" ? "如果仍匹配，再进入观察清单或小额分批计划讨论。" : null,
+  ].filter((item): item is string => Boolean(item));
+  return [...new Set(steps)].slice(0, 6);
+}
+
+function buildPositionSizingIdea(args: {
+  verdict: string;
+  targetGapPct: number;
   heldWeightPct: number;
-  hasBlockers: boolean;
-  hasEnoughMarketData: boolean;
-}): "good-candidate" | "watch-only" | "weak-fit" | "review-existing" | "needs-more-data" {
-  if (!args.hasEnoughMarketData) {
-    return "needs-more-data";
+}) {
+  if (args.verdict === "needs-more-data") {
+    return "暂不讨论仓位，先补齐数据。";
   }
-  if (args.heldWeightPct >= 15) {
-    return "review-existing";
+  if (args.verdict === "review-existing") {
+    return "这是现有持仓复核场景，重点是是否控制集中度，而不是新增仓位。";
   }
-  if (args.targetPct <= 0 || args.gapPct <= -5) {
-    return "weak-fit";
+  if (args.verdict === "weak-fit") {
+    return "如果仍想跟踪，适合先放入观察，不适合直接按核心仓位处理。";
   }
-  if (args.hasBlockers) {
-    return "watch-only";
+  if (args.targetGapPct >= 10 && args.heldWeightPct === 0) {
+    return "若后续证据仍支持，可先按小额分批候选讨论，而不是一次性重仓。";
   }
-  if (args.gapPct >= 5) {
-    return "good-candidate";
-  }
-  return "watch-only";
+  return "当前只适合形成观察或小额分批讨论，不构成买入建议。";
 }
 
 export function buildSecurityAnalyzerQuickScan(args: {
@@ -551,92 +610,93 @@ export function buildSecurityAnalyzerQuickScan(args: {
 }): PortfolioAnalyzerResult {
   const generatedAt = args.generatedAt ?? new Date().toISOString();
   const normalizedSymbol = args.identity.symbol.trim().toUpperCase();
-  const matchingHoldings = args.holdings.filter((holding) => {
-    const sameSymbol = holding.symbol.trim().toUpperCase() === normalizedSymbol;
-    const sameExchange = !args.identity.exchange || holding.exchangeOverride === args.identity.exchange;
-    const sameCurrency = !args.identity.currency || holding.currency === args.identity.currency;
-    return sameSymbol && sameExchange && sameCurrency;
-  });
-  const totalPortfolioCad = sum(args.accounts.map((account) => account.marketValueCad));
-  const heldValueCad = sum(matchingHoldings.map((holding) => holding.marketValueCad));
-  const heldWeightPct = totalPortfolioCad > 0 ? (heldValueCad / totalPortfolioCad) * 100 : 0;
-  const referenceHolding = matchingHoldings[0] ?? args.holdings.find((holding) => holding.symbol.trim().toUpperCase() === normalizedSymbol);
-  const economicAssetClass = referenceHolding
-    ? getHoldingEconomicAssetClass(referenceHolding)
-    : inferEconomicAssetClass({
-        symbol: normalizedSymbol,
-        name: args.identity.name,
-        securityType: args.identity.securityType,
-        currency: args.identity.currency,
-        exchange: args.identity.exchange,
-      });
-  const targetPct =
-    args.profile.targetAllocation.find((target) => target.assetClass === economicAssetClass)?.targetPct ?? 0;
-  const currentSleevePct = getEconomicSleeveWeightPct({
-    holdings: args.holdings,
-    accounts: args.accounts,
-    economicAssetClass,
-  });
-  const accountTypes = [...new Set(matchingHoldings
-    .map((holding) => getHoldingAccount(holding, args.accounts)?.type)
-    .filter((type): type is AccountType => Boolean(type)))];
-  const taxNotes = getTaxNotes({ holdings: matchingHoldings, accounts: args.accounts });
   const identity = { ...args.identity, symbol: normalizedSymbol };
   const matchingHistory = filterHistoryForIdentity(
     args.marketData?.priceHistory ?? [],
     identity,
   );
   const marketData = buildMarketDataSummary({
-    holdings: matchingHoldings,
+    holdings: args.holdings.filter((holding) => {
+      const sameSymbol = holding.symbol.trim().toUpperCase() === normalizedSymbol;
+      const sameExchange = !args.identity.exchange || holding.exchangeOverride === args.identity.exchange;
+      const sameCurrency = !args.identity.currency || holding.currency === args.identity.currency;
+      return sameSymbol && sameExchange && sameCurrency;
+    }),
     priceHistory: matchingHistory,
     portfolioSnapshots: args.marketData?.portfolioSnapshots,
     generatedAt,
   });
-  const preferenceFit = getPreferenceFitNotes({
+  const decisionContext = buildSecurityDecisionContext({
+    identity,
+    accounts: args.accounts,
+    holdings: args.holdings,
     profile: args.profile,
-    sector: referenceHolding?.sector ?? null,
-    economicAssetClass,
-    isHeld: matchingHoldings.length > 0,
+    marketData: {
+      priceHistory: matchingHistory,
+      portfolioSnapshots: args.marketData?.portfolioSnapshots,
+    },
+    generatedAt,
   });
-  const blockers = [
-    ...preferenceFit.blockers,
-    ...(args.identity.currency === "USD" &&
-    args.profile.preferenceFactors.taxStrategy.usdFundingPath === "avoid"
-      ? ["USD 路径偏好为避免：买入前需要确认换汇、税务和账户位置是否值得。"]
-      : []),
-    ...(marketData.priceHistoryPointCount < 5
-      ? ["价格历史样本偏少：结论只能作为初筛，不能作为下单前价格依据。"]
-      : []),
-  ];
-  const decision = getSecurityDecision({
+  const decisionNarrative = buildSecurityDecisionNarrative(decisionContext);
+  const matchingHoldings = decisionContext.matchingHoldings;
+  const referenceHolding = decisionContext.referenceHolding;
+  const economicAssetClass = decisionContext.economicAssetClass;
+  const targetPct = decisionContext.targetPct;
+  const currentSleevePct = decisionContext.currentSleevePct;
+  const accountTypes = decisionContext.accountTypes;
+  const heldWeightPct = decisionContext.heldWeightPct;
+  const preferenceFit = decisionContext.preferenceFit;
+  const blockers = decisionContext.blockers;
+  const decision = decisionNarrative.decision;
+  const decisionVerdict = decisionNarrative.verdict;
+  const summaryDecisionLabel = decisionNarrative.summaryLabel;
+  const guardrails = decisionNarrative.guardrails;
+  const fit = decisionNarrative.fit;
+  const taxNotes = getTaxNotes({ holdings: matchingHoldings, accounts: args.accounts });
+  const blockingGuardrailCount = guardrails.filter((item) => item.blocking).length;
+  const softGuardrailCount = guardrails.length - blockingGuardrailCount;
+  const confidenceScore = getDecisionConfidenceScore({
+    fitScore: fit.score,
+    marketDataScore: getMarketDataConfidenceScore(marketData),
+    blockingGuardrailCount,
+    softGuardrailCount,
+  });
+  const hasCompleteIdentity = hasCompleteAnalyzerIdentity(identity);
+  const primaryAction = buildPrimarySecurityAction({
+    verdict: decisionVerdict,
     symbol: normalizedSymbol,
-    isHeld: matchingHoldings.length > 0,
-    heldWeightPct,
-    economicAssetClass,
-    targetPct,
-    currentSleevePct,
-    preferenceSummary: preferenceFit.summary,
     blockers,
+    isHeld: matchingHoldings.length > 0,
+  });
+  const decisionGates = buildSecurityDecisionGates({
+    blockers,
+    fitConcerns: fit.concerns,
+    priceHistoryPointCount: marketData.priceHistoryPointCount,
+    currency: identity.currency,
+  });
+  const nextSteps = buildSecurityNextSteps({
+    hasCompleteIdentity,
+    priceHistoryPointCount: marketData.priceHistoryPointCount,
+    isHeld: matchingHoldings.length > 0,
+    verdict: decisionVerdict,
+  });
+  const boundary = [
+    marketData.quoteFreshnessSummary ?? "行情新鲜度未完整记录",
+    `历史样本 ${marketData.priceHistoryPointCount} 个交易日`,
+    "本结果由确定性规则生成；GPT 只能增强解释，不能覆盖护栏。",
+  ].join("；");
+  const portfolioAsOf = latestIso(args.holdings.map((holding) => holding.updatedAt), generatedAt);
+  const evidenceTrail = buildAnalyzerEvidenceTrail({
+    scope: "security",
+    portfolioAsOf,
     marketData,
+    generatedAt,
   });
-  const decisionVerdict = getSecurityDecisionVerdict({
-    targetPct,
-    gapPct: decision.gapPct,
+  const positionSizingIdea = buildPositionSizingIdea({
+    verdict: decisionVerdict,
+    targetGapPct: fit.targetGapPct,
     heldWeightPct,
-    hasBlockers: blockers.length > 0,
-    hasEnoughMarketData: marketData.priceHistoryPointCount >= 5,
   });
-  const summaryDecisionLabel = decisionVerdict === "good-candidate"
-    ? "可以进入候选观察"
-    : decisionVerdict === "review-existing"
-      ? "更适合持仓复核"
-      : decisionVerdict === "weak-fit"
-        ? "适配偏弱，适合先观察"
-        : decisionVerdict === "needs-more-data"
-          ? blockers.length > 0
-            ? "可以进入候选观察，但暂时不应只因为配置缺口就直接加仓"
-            : "需补充数据后再判断"
-          : "适合先观察";
 
   return assertAnalyzerResult({
     version: PORTFOLIO_ANALYZER_VERSION,
@@ -647,15 +707,19 @@ export function buildSecurityAnalyzerQuickScan(args: {
       ...identity
     },
     dataFreshness: {
-      portfolioAsOf: latestIso(args.holdings.map((holding) => holding.updatedAt), generatedAt),
+      portfolioAsOf,
       quotesAsOf: marketData.quotesAsOf,
       externalResearchAsOf: null,
       sourceMode: marketData.sourceMode,
+      freshnessLabel: getAnalyzerFreshnessLabel(marketData),
+      reliabilityScore: getAnalyzerReliabilityScore(marketData),
+      limitationSummary: getAnalyzerLimitationSummary(marketData),
       quoteSourceSummary: marketData.quoteSourceSummary,
       quoteFreshnessSummary: marketData.quoteFreshnessSummary,
       priceHistoryPointCount: marketData.priceHistoryPointCount,
       fallbackPointCount: marketData.fallbackPointCount
     },
+    evidenceTrail,
     summary: {
       title: `${normalizedSymbol} 智能快速分析`,
       thesis: matchingHoldings.length > 0
@@ -671,7 +735,10 @@ export function buildSecurityAnalyzerQuickScan(args: {
         ? "existing-holding-review"
         : "candidate-new-buy",
       verdict: decisionVerdict,
+      decisionLabel: summaryDecisionLabel,
+      confidenceScore,
       directAnswer: decision.detail,
+      primaryAction,
       whyNow: [
         `${economicAssetClass} 当前约 ${formatPercent(currentSleevePct)}，目标约 ${formatPercent(targetPct)}，差距 ${formatPercent(decision.gapPct)}。`,
         preferenceFit.summary,
@@ -687,15 +754,19 @@ export function buildSecurityAnalyzerQuickScan(args: {
         `交易身份保留 ${identity.symbol} · ${identity.exchange ?? "未知交易所"} · ${identity.currency ?? "未知币种"}。`,
       ],
       keyBlockers: blockers.slice(0, 8),
+      guardrails: guardrails.slice(0, 12),
+      fit,
+      decisionGates,
+      nextSteps,
+      boundary,
+      positionSizingIdea,
       watchlistTriggers: [
         "刷新报价和价格历史后再确认数据新鲜度。",
         "比较它和现有同类持仓的重复度。",
         "确认买入账户、税务路径、USD/CAD 资金来源和现金计划。",
       ],
       evidence: [
-        marketData.quoteFreshnessSummary ?? "行情新鲜度未完整记录。",
-        marketData.quoteSourceSummary ?? "行情来源暂不完整。",
-        `价格历史样本 ${marketData.priceHistoryPointCount} 个交易日。`,
+        ...evidenceTrail.map((item) => `${item.label}：${item.detail}`),
       ],
     },
     scorecards: [
@@ -718,13 +789,13 @@ export function buildSecurityAnalyzerQuickScan(args: {
       {
         id: "target-fit",
         label: "配置适配",
-        score: targetPct > 0 ? Math.max(35, Math.min(88, 72 + decision.gapPct)) : 45,
+        score: fit.score,
         rationale: referenceHolding
           ? economicAssetClass === referenceHolding.assetClass
-            ? `它按 ${economicAssetClass} 评估；该类资产当前约 ${formatPercent(currentSleevePct)}，目标约 ${formatPercent(targetPct)}。`
-            : `它交易身份是 ${referenceHolding.exchangeOverride ?? "未知交易所"} / ${referenceHolding.currency ?? "未知币种"}，但底层经济暴露按 ${economicAssetClass} 评估；该类资产当前约 ${formatPercent(currentSleevePct)}，目标约 ${formatPercent(targetPct)}。`
+            ? fit.summary
+            : `它交易身份是 ${referenceHolding.exchangeOverride ?? "未知交易所"} / ${referenceHolding.currency ?? "未知币种"}，但底层经济暴露按 ${economicAssetClass} 评估；${fit.summary}`
           : targetPct > 0
-            ? `这是未持有候选标的，当前组合权重为 0%；按 ${economicAssetClass} 暴露评估，该类资产当前约 ${formatPercent(currentSleevePct)}，目标约 ${formatPercent(targetPct)}。`
+            ? `这是未持有候选标的，当前组合权重为 0%；${fit.summary}`
             : `这是未持有候选标的，当前组合权重为 0%；暂未找到 ${economicAssetClass} 的目标配置，需要先补齐偏好设置。`
       },
       {
@@ -765,7 +836,10 @@ export function buildSecurityAnalyzerQuickScan(args: {
       ...(matchingHoldings.length === 0
         ? ["当前 0% 只代表尚未持有，不代表无法分析。"]
         : []),
-      `配置关系：${economicAssetClass} 当前约 ${formatPercent(currentSleevePct)}，目标约 ${formatPercent(targetPct)}，差距 ${formatPercent(decision.gapPct)}。`,
+      fit.summary,
+      ...fit.strengths,
+      ...fit.concerns,
+      ...fit.accountNotes,
       preferenceFit.summary,
       referenceHolding && economicAssetClass
         ? buildEconomicExposureNote({
@@ -783,7 +857,7 @@ export function buildSecurityAnalyzerQuickScan(args: {
       "分析身份保留 symbol、exchange、currency，避免 CAD 版本和美股正股混淆。"
     ],
     actionItems: [
-      ...(hasCompleteAnalyzerIdentity(identity)
+      ...(hasCompleteIdentity
         ? []
         : [
             {
@@ -860,6 +934,13 @@ export function buildPortfolioAnalyzerQuickScan(args: {
     portfolioSnapshots: args.marketData?.portfolioSnapshots,
     generatedAt,
   });
+  const portfolioAsOf = latestIso(args.holdings.map((holding) => holding.updatedAt), generatedAt);
+  const evidenceTrail = buildAnalyzerEvidenceTrail({
+    scope: "portfolio",
+    portfolioAsOf,
+    marketData,
+    generatedAt,
+  });
 
   return assertAnalyzerResult({
     version: PORTFOLIO_ANALYZER_VERSION,
@@ -867,15 +948,19 @@ export function buildPortfolioAnalyzerQuickScan(args: {
     mode: "quick",
     generatedAt,
     dataFreshness: {
-      portfolioAsOf: latestIso(args.holdings.map((holding) => holding.updatedAt), generatedAt),
+      portfolioAsOf,
       quotesAsOf: marketData.quotesAsOf ?? getQuoteFreshness(args.holdings, generatedAt),
       externalResearchAsOf: null,
       sourceMode: marketData.sourceMode,
+      freshnessLabel: getAnalyzerFreshnessLabel(marketData),
+      reliabilityScore: getAnalyzerReliabilityScore(marketData),
+      limitationSummary: getAnalyzerLimitationSummary(marketData),
       quoteSourceSummary: marketData.quoteSourceSummary,
       quoteFreshnessSummary: marketData.quoteFreshnessSummary,
       priceHistoryPointCount: marketData.priceHistoryPointCount,
       fallbackPointCount: marketData.fallbackPointCount
     },
+    evidenceTrail,
     summary: {
       title: "组合 智能诊断",
       thesis: `当前组合健康分为 ${health.score}，本轮使用本地持仓、账户、偏好、健康分和缓存行情来源生成诊断。`,
@@ -977,6 +1062,13 @@ export function buildAccountAnalyzerQuickScan(args: {
     portfolioSnapshots: args.marketData?.portfolioSnapshots,
     generatedAt,
   });
+  const portfolioAsOf = latestIso(accountHoldings.map((holding) => holding.updatedAt), generatedAt);
+  const evidenceTrail = buildAnalyzerEvidenceTrail({
+    scope: "account",
+    portfolioAsOf,
+    marketData,
+    generatedAt,
+  });
 
   return assertAnalyzerResult({
     version: PORTFOLIO_ANALYZER_VERSION,
@@ -984,15 +1076,19 @@ export function buildAccountAnalyzerQuickScan(args: {
     mode: "quick",
     generatedAt,
     dataFreshness: {
-      portfolioAsOf: latestIso(accountHoldings.map((holding) => holding.updatedAt), generatedAt),
+      portfolioAsOf,
       quotesAsOf: marketData.quotesAsOf,
       externalResearchAsOf: null,
       sourceMode: marketData.sourceMode,
+      freshnessLabel: getAnalyzerFreshnessLabel(marketData),
+      reliabilityScore: getAnalyzerReliabilityScore(marketData),
+      limitationSummary: getAnalyzerLimitationSummary(marketData),
       quoteSourceSummary: marketData.quoteSourceSummary,
       quoteFreshnessSummary: marketData.quoteFreshnessSummary,
       priceHistoryPointCount: marketData.priceHistoryPointCount,
       fallbackPointCount: marketData.fallbackPointCount
     },
+    evidenceTrail,
     summary: {
       title: `${accountLabel} 智能账户快扫`,
       thesis: `${accountLabel} 当前约占总组合 ${round(accountWeightPct, 1)}%，账户健康分为 ${health.score}。本轮只使用本地账户、持仓、偏好和报价缓存。`,
@@ -1108,8 +1204,33 @@ export function buildRecommendationRunAnalyzerQuickScan(args: {
       portfolioAsOf: args.run.createdAt,
       quotesAsOf: null,
       externalResearchAsOf: null,
-      sourceMode: "local"
+      sourceMode: "local",
+      freshnessLabel: "推荐记录",
+      reliabilityScore: args.run.confidenceScore ?? 60,
+      limitationSummary: "推荐解释来自已落库推荐运行记录，不代表实时行情或外部研究。"
     },
+    evidenceTrail: [
+      {
+        id: "recommendation-run",
+        label: "推荐运行记录",
+        sourceType: "portfolio-data",
+        sourceMode: "local",
+        confidence: args.run.confidenceScore != null && args.run.confidenceScore >= 75 ? "high" : "medium",
+        freshness: "fresh",
+        asOf: args.run.createdAt,
+        detail: args.run.objective ?? "使用当前推荐引擎输出作为本地解释来源。",
+      },
+      {
+        id: "recommendation-constraints",
+        label: "推荐约束",
+        sourceType: "manual",
+        sourceMode: "local",
+        confidence: "medium",
+        freshness: "fresh",
+        asOf: generatedAt,
+        detail: "来自用户保存的推荐约束和投资偏好。",
+      },
+    ],
     summary: {
       title: "推荐智能解释",
       thesis: leadItem

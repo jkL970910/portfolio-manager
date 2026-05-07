@@ -162,10 +162,14 @@ class _SecurityDetailPageState extends State<SecurityDetailPage> {
                   onRefreshQuote: _refreshQuote,
                 ),
                 const SizedBox(height: 12),
+                _ResearchCockpitIntro(data),
+                const SizedBox(height: 12),
                 AiAnalysisCard(
                   apiClient: widget.apiClient,
-                  title: "智能标的快扫",
-                  description: "先用本地规则、组合上下文、投资偏好和缓存资料生成；如需外部 GPT，可在结果下方手动增强。",
+                  title: "Loo国研究工作台",
+                  description:
+                      "自动生成本地规则快扫：先看结论、护栏、组合适配和下一步；外部 GPT 只在你手动点增强时调用。",
+                  autoRun: true,
                   onCompleted: _refreshDailyIntelligence,
                   refreshKey: [
                     data.quoteTimestamp,
@@ -609,6 +613,83 @@ class _SummaryCard extends StatelessWidget {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _ResearchCockpitIntro extends StatelessWidget {
+  const _ResearchCockpitIntro(this.data);
+
+  final MobileSecurityDetailSnapshot data;
+
+  @override
+  Widget build(BuildContext context) {
+    final chips = [
+      if (data.assetClass.isNotEmpty) data.assetClass,
+      if (data.sector.isNotEmpty) data.sector,
+      if (data.exchange.isNotEmpty && data.currency.isNotEmpty)
+        "${data.exchange} · ${data.currency}",
+      if (data.heldPosition != null) "已持有" else "候选标的",
+    ];
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Icon(Icons.dashboard_customize_outlined),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text("研究视角",
+                          style: Theme.of(context).textTheme.titleMedium),
+                      const SizedBox(height: 6),
+                      Text(
+                        "本页先按你的持仓、账户、偏好、行情缓存和标的身份做确定性判断；不要把单一价格或单条新闻当作买入依据。",
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            if (chips.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: chips.map((chip) => _InfoChip(chip)).toList(),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _InfoChip extends StatelessWidget {
+  const _InfoChip(this.label);
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        child: Text(label, style: Theme.of(context).textTheme.bodySmall),
       ),
     );
   }

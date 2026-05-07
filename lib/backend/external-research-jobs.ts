@@ -547,7 +547,26 @@ export function buildAnalyzerResultFromExternalResearch(args: {
       quotesAsOf: null,
       externalResearchAsOf: args.providerResult.externalResearchAsOf,
       sourceMode: "cached-external",
+      freshnessLabel: "缓存外部研究",
+      reliabilityScore: args.providerResult.sources.length > 0 ? 60 : 35,
+      limitationSummary:
+        "该结果来自缓存外部研究资料，只说明资料覆盖和风险点，不代表实时市场判断。",
     },
+    evidenceTrail: [
+      {
+        id: "external-research-cache",
+        label: "缓存外部研究",
+        sourceType: "institutional",
+        sourceMode: "cached-external",
+        confidence: args.providerResult.sources.length > 0 ? "medium" : "low",
+        freshness: args.providerResult.externalResearchAsOf ? "fresh" : "partial",
+        asOf: args.providerResult.externalResearchAsOf,
+        detail:
+          args.providerResult.sources.length > 0
+            ? `已关联 ${args.providerResult.sources.length} 条缓存资料。`
+            : "没有可用来源明细，只能低置信展示 provider 摘要。",
+      },
+    ],
     summary: {
       title: `${args.providerResult.security?.symbol ?? "组合"} 缓存外部研究`,
       thesis:

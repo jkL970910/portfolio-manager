@@ -29,8 +29,33 @@ function makeResult(overrides: Record<string, unknown> = {}) {
       portfolioAsOf: generatedAt,
       quotesAsOf: generatedAt,
       externalResearchAsOf: null,
-      sourceMode: "local"
+      sourceMode: "local",
+      freshnessLabel: "仅本地资料",
+      reliabilityScore: 68,
+      limitationSummary: "本结果只使用本地资料。"
     },
+    evidenceTrail: [
+      {
+        id: "portfolio-data",
+        label: "组合/持仓资料",
+        sourceType: "portfolio-data",
+        sourceMode: "local",
+        confidence: "high",
+        freshness: "fresh",
+        asOf: generatedAt,
+        detail: "来自项目内已保存的账户、持仓、偏好和组合配置。"
+      },
+      {
+        id: "rule-engine",
+        label: "Loo国规则引擎",
+        sourceType: "derived",
+        sourceMode: "derived",
+        confidence: "medium",
+        freshness: "fresh",
+        asOf: generatedAt,
+        detail: "由确定性规则生成。"
+      }
+    ],
     summary: {
       title: "AMZN 快速分析",
       thesis: "本轮只使用本地组合、行情缓存和推荐上下文生成结构化分析。",
@@ -39,10 +64,48 @@ function makeResult(overrides: Record<string, unknown> = {}) {
     securityDecision: {
       lens: "existing-holding-review",
       verdict: "review-existing",
+      decisionLabel: "更适合持仓复核",
+      confidenceScore: 72,
       directAnswer: "AMZN 适合先复核现有仓位，而不是无条件加仓。",
+      primaryAction: {
+        priority: "P0",
+        label: "复核现有仓位",
+        detail: "确认集中度、账户位置和目标配置。"
+      },
       whyNow: ["当前组合已有 AMZN 暴露。"],
       portfolioFit: ["影响 US Equity 配置。"],
       keyBlockers: ["单一标的集中度需要确认。"],
+      guardrails: [
+        {
+          id: "single-security-concentration",
+          category: "duplicate-exposure",
+          severity: "high",
+          title: "单一标的权重偏高",
+          detail: "AMZN 当前约占组合 18%，新增前应先复核集中度。",
+          blocking: false,
+          source: "portfolio-holdings"
+        }
+      ],
+      fit: {
+        score: 68,
+        targetGapPct: 4,
+        currentSleevePct: 56,
+        targetPct: 60,
+        heldWeightPct: 18,
+        duplicateExposurePct: 18,
+        accountFitScore: 73,
+        taxFitScore: 62,
+        fxFitScore: 58,
+        liquidityFitScore: 70,
+        summary: "组合适配分 68/100。",
+        strengths: ["偏好因素整体匹配度较好。"],
+        concerns: ["该标的/同身份持仓已有约 18%。"],
+        accountNotes: ["当前匹配持仓账户：TFSA。"]
+      },
+      decisionGates: ["确认集中度。"],
+      nextSteps: ["对比当前持仓权重。"],
+      boundary: "本结果由确定性规则生成。",
+      positionSizingIdea: "重点是复核现有仓位。",
       watchlistTriggers: ["刷新报价后再看。"],
       evidence: ["使用本地持仓和报价缓存。"],
     },
@@ -213,6 +276,10 @@ test("portfolio analyzer result accepts security-specific decision structure", (
 
   assert.equal(parsed.securityDecision?.verdict, "review-existing");
   assert.ok(parsed.securityDecision?.keyBlockers.includes("单一标的集中度需要确认。"));
+  assert.equal(parsed.securityDecision?.guardrails[0]?.category, "duplicate-exposure");
+  assert.equal(parsed.securityDecision?.fit?.score, 68);
+  assert.equal(parsed.dataFreshness.reliabilityScore, 68);
+  assert.equal(parsed.evidenceTrail?.[0]?.label, "组合/持仓资料");
 });
 
 test("portfolio analyzer result rejects missing non-advice disclaimer", () => {

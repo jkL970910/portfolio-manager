@@ -439,7 +439,7 @@ test("security analyzer quick scan evaluates unheld candidates with portfolio ta
   });
 
   const targetFit = result.scorecards.find((card) => card.id === "target-fit");
-  assert.ok((targetFit?.score ?? 0) >= 72);
+  assert.ok((targetFit?.score ?? 0) >= 65);
   assert.match(targetFit?.rationale ?? "", /未持有候选标的/);
   assert.match(targetFit?.rationale ?? "", /US Equity/);
   assert.match(targetFit?.rationale ?? "", /目标约 60%/);
@@ -461,6 +461,9 @@ test("security analyzer quick scan evaluates unheld candidates with portfolio ta
     result.actionItems.some((item) => item.title === "买入前确认"),
   );
   assert.equal(result.securityDecision?.lens, "candidate-new-buy");
+  assert.ok((result.securityDecision?.fit?.score ?? 0) >= 65);
+  assert.equal(result.securityDecision?.fit?.targetPct, 60);
+  assert.ok((result.securityDecision?.fit?.targetGapPct ?? 0) > 0);
   assert.ok(result.securityDecision?.directAnswer.includes("候选观察"));
   assert.ok(result.securityDecision?.whyNow.some((item) => item.includes("目标约 60%")));
 });

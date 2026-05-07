@@ -5,9 +5,187 @@ import "package:flutter/material.dart";
 import "../../../core/api/loo_api_client.dart";
 import "../data/loo_minister_context_models.dart";
 
+class LooMinisterSessionController extends ChangeNotifier {
+  LooMinisterSessionController(this.apiClient);
+
+  final LooApiClient apiClient;
+  final List<LooMinisterChatMessage> _messages = [];
+  final List<LooMinisterChatSessionSummary> _sessions = [];
+  var _bootstrapped = false;
+  var _historyLoading = false;
+
+  String? activeSessionId;
+  String? activeTitle;
+  Object? lastHistoryError;
+
+  List<LooMinisterChatMessage> get messages => List.unmodifiable(_messages);
+  List<LooMinisterChatSessionSummary> get sessions =>
+      List.unmodifiable(_sessions);
+  bool get historyLoading => _historyLoading;
+  bool get hasActiveSession => activeSessionId != null;
+
+  Future<void> ensureLoaded() async {
+    if (_bootstrapped) {
+      return;
+    }
+    _bootstrapped = true;
+    await refreshSessions();
+    if (activeSessionId == null && _sessions.isNotEmpty) {
+      await loadSession(_sessions.first.id);
+    }
+  }
+
+  Future<void> refreshSessions() async {
+    _historyLoading = true;
+    lastHistoryError = null;
+    notifyListeners();
+    try {
+      final response = await apiClient.getLooMinisterChatSessions(limit: 12);
+      final data = response["data"];
+      final rawSessions =
+          data is Map<String, dynamic> ? data["sessions"] : null;
+      _sessions
+        ..clear()
+        ..addAll(
+          (rawSessions as List? ?? const [])
+              .whereType<Map<String, dynamic>>()
+              .map(LooMinisterChatSessionSummary.fromJson),
+        );
+    } catch (error) {
+      lastHistoryError = error;
+    } finally {
+      _historyLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> loadSession(String sessionId) async {
+    _historyLoading = true;
+    lastHistoryError = null;
+    notifyListeners();
+    try {
+      final response = await apiClient.getLooMinisterChatSession(sessionId);
+      final data = response["data"];
+      if (data is! Map<String, dynamic>) {
+        throw const LooApiException("大臣会话格式不正确。");
+      }
+      final session = data["session"];
+      final messages = data["messages"];
+      if (session is Map<String, dynamic>) {
+        activeSessionId = session["id"] as String? ?? sessionId;
+        activeTitle = session["title"] as String? ?? "大臣对话";
+      } else {
+        activeSessionId = sessionId;
+        activeTitle = "大臣对话";
+      }
+      _messages
+        ..clear()
+        ..addAll(
+          (messages as List? ?? const [])
+              .whereType<Map<String, dynamic>>()
+              .map(LooMinisterChatMessage.fromHistory)
+              .where((message) => message.text.trim().isNotEmpty),
+        );
+    } catch (error) {
+      lastHistoryError = error;
+      rethrow;
+    } finally {
+      _historyLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> deleteSession(String sessionId) async {
+    await apiClient.deleteLooMinisterChatSession(sessionId);
+    if (activeSessionId == sessionId) {
+      startNew(notify: false);
+    }
+    await refreshSessions();
+    notifyListeners();
+  }
+
+  void startNew({bool notify = true}) {
+    activeSessionId = null;
+    activeTitle = null;
+    _messages.clear();
+    if (notify) {
+      notifyListeners();
+    }
+  }
+
+  void addUserMessage(String question) {
+    _messages.add(LooMinisterChatMessage.user(question));
+    notifyListeners();
+  }
+
+  void addAssistantResponse(Map<String, dynamic> data) {
+    final answerData = data["answer"];
+    if (answerData is! Map<String, dynamic>) {
+      throw const LooApiException("Loo国大臣答复格式不正确。");
+    }
+    activeSessionId = data["sessionId"] as String? ?? activeSessionId;
+    activeTitle = data["title"] as String? ?? activeTitle;
+    _messages.add(LooMinisterChatMessage.assistant(
+      LooMinisterAnswer.fromJson(answerData),
+    ));
+    notifyListeners();
+    unawaited(refreshSessions());
+  }
+
+  void addError(String message) {
+    _messages.add(LooMinisterChatMessage.error(message));
+    notifyListeners();
+  }
+}
+
+class LooMinisterChatSessionSummary {
+  const LooMinisterChatSessionSummary({
+    required this.id,
+    required this.title,
+    required this.page,
+    required this.messageCount,
+    required this.updatedAtLabel,
+    this.summary,
+  });
+
+  final String id;
+  final String title;
+  final String page;
+  final int messageCount;
+  final String updatedAtLabel;
+  final String? summary;
+
+  factory LooMinisterChatSessionSummary.fromJson(Map<String, dynamic> json) {
+    return LooMinisterChatSessionSummary(
+      id: json["id"] as String? ?? "",
+      title: json["title"] as String? ?? "大臣对话",
+      page: json["page"] as String? ?? "unknown",
+      messageCount: json["messageCount"] as int? ?? 0,
+      updatedAtLabel: _shortTimeLabel(json["updatedAt"] as String?),
+      summary: json["summary"] as String?,
+    );
+  }
+
+  static String _shortTimeLabel(String? raw) {
+    if (raw == null || raw.isEmpty) {
+      return "";
+    }
+    final parsed = DateTime.tryParse(raw)?.toLocal();
+    if (parsed == null) {
+      return "";
+    }
+    final month = parsed.month.toString().padLeft(2, "0");
+    final day = parsed.day.toString().padLeft(2, "0");
+    final hour = parsed.hour.toString().padLeft(2, "0");
+    final minute = parsed.minute.toString().padLeft(2, "0");
+    return "$month-$day $hour:$minute";
+  }
+}
+
 class LooMinisterCard extends StatefulWidget {
   const LooMinisterCard({
     required this.apiClient,
+    required this.sessionController,
     required this.pageContext,
     required this.recentSubjects,
     required this.suggestedQuestion,
@@ -16,6 +194,7 @@ class LooMinisterCard extends StatefulWidget {
   });
 
   final LooApiClient apiClient;
+  final LooMinisterSessionController sessionController;
   final LooMinisterPageContext pageContext;
   final List<LooMinisterRecentSubject> recentSubjects;
   final String suggestedQuestion;
@@ -89,6 +268,14 @@ class _DraggableMinisterButtonState extends State<_DraggableMinisterButton> {
   var _dragging = false;
   var _movedDuringGesture = false;
   var _sheetOpen = false;
+  late final LooMinisterSessionController _sessionController =
+      LooMinisterSessionController(widget.apiClient);
+
+  @override
+  void dispose() {
+    _sessionController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -211,6 +398,7 @@ class _DraggableMinisterButtonState extends State<_DraggableMinisterButton> {
       useSafeArea: true,
       builder: (_) => _LooMinisterSheet(
         apiClient: widget.apiClient,
+        sessionController: _sessionController,
         pageContext: widget.pageContext,
         recentSubjects: widget.recentSubjects,
         suggestedQuestion: widget.suggestedQuestion,
@@ -227,6 +415,7 @@ class _DraggableMinisterButtonState extends State<_DraggableMinisterButton> {
 class _LooMinisterSheet extends StatelessWidget {
   const _LooMinisterSheet({
     required this.apiClient,
+    required this.sessionController,
     required this.pageContext,
     required this.recentSubjects,
     required this.suggestedQuestion,
@@ -234,6 +423,7 @@ class _LooMinisterSheet extends StatelessWidget {
   });
 
   final LooApiClient apiClient;
+  final LooMinisterSessionController sessionController;
   final LooMinisterPageContext pageContext;
   final List<LooMinisterRecentSubject> recentSubjects;
   final String suggestedQuestion;
@@ -268,6 +458,7 @@ class _LooMinisterSheet extends StatelessWidget {
               const SizedBox(height: 10),
               LooMinisterCard(
                 apiClient: apiClient,
+                sessionController: sessionController,
                 pageContext: pageContext,
                 recentSubjects: recentSubjects,
                 suggestedQuestion: suggestedQuestion,
@@ -286,17 +477,29 @@ class _LooMinisterCardState extends State<LooMinisterCard> {
 
   late final TextEditingController _questionController =
       TextEditingController(text: widget.suggestedQuestion);
-  final List<_MinisterChatMessage> _messages = [];
   final List<Timer> _phaseTimers = [];
   var _loading = false;
   String? _phaseLabel;
-  String? _sessionId;
+
+  @override
+  void initState() {
+    super.initState();
+    widget.sessionController.addListener(_handleSessionChanged);
+    unawaited(widget.sessionController.ensureLoaded());
+  }
 
   @override
   void dispose() {
     _clearPhaseTimers();
+    widget.sessionController.removeListener(_handleSessionChanged);
     _questionController.dispose();
     super.dispose();
+  }
+
+  void _handleSessionChanged() {
+    if (mounted) {
+      setState(() {});
+    }
   }
 
   Future<Map<String, dynamic>> _requestMinister(
@@ -311,7 +514,8 @@ class _LooMinisterCardState extends State<LooMinisterCard> {
     return widget.apiClient.askLooMinisterChat({
       ...request,
       "answerMode": answerMode,
-      if (_sessionId != null) "sessionId": _sessionId,
+      if (widget.sessionController.activeSessionId != null)
+        "sessionId": widget.sessionController.activeSessionId,
     });
   }
 
@@ -369,19 +573,11 @@ class _LooMinisterCardState extends State<LooMinisterCard> {
     if (data is! Map<String, dynamic>) {
       throw const LooApiException("Loo国大臣答复格式不正确。");
     }
-    final answerData = data["answer"];
-    if (answerData is! Map<String, dynamic>) {
-      throw const LooApiException("Loo国大臣答复格式不正确。");
-    }
-    final answer = LooMinisterAnswer.fromJson(answerData);
     if (!mounted) {
       return;
     }
-    setState(() {
-      _sessionId = data["sessionId"] as String? ?? _sessionId;
-      _messages.add(_MinisterChatMessage.assistant(answer));
-      _questionController.clear();
-    });
+    widget.sessionController.addAssistantResponse(data);
+    setState(() => _questionController.clear());
   }
 
   Future<void> _askMinister(String question) async {
@@ -422,13 +618,11 @@ class _LooMinisterCardState extends State<LooMinisterCard> {
 
     setState(() {
       _loading = true;
-      _messages.add(_MinisterChatMessage.user(question));
     });
+    widget.sessionController.addUserMessage(question);
     _askMinister(question).catchError((Object error) {
       if (mounted) {
-        setState(() {
-          _messages.add(_MinisterChatMessage.error(error.toString()));
-        });
+        widget.sessionController.addError(error.toString());
       }
     }).whenComplete(() {
       if (mounted) {
@@ -441,8 +635,104 @@ class _LooMinisterCardState extends State<LooMinisterCard> {
     });
   }
 
+  Future<void> _showHistory() async {
+    await widget.sessionController.refreshSessions();
+    if (!mounted) {
+      return;
+    }
+    await showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (sheetContext) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text("最近大臣对话", style: Theme.of(context).textTheme.titleMedium),
+              const SizedBox(height: 8),
+              if (widget.sessionController.sessions.isEmpty)
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 24),
+                  child: Text("还没有历史对话。"),
+                )
+              else
+                Flexible(
+                  child: ListView.separated(
+                    shrinkWrap: true,
+                    itemCount: widget.sessionController.sessions.length,
+                    separatorBuilder: (_, __) => const Divider(height: 1),
+                    itemBuilder: (context, index) {
+                      final session = widget.sessionController.sessions[index];
+                      return ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        title: Text(session.title),
+                        subtitle: Text(
+                          [
+                            if (session.updatedAtLabel.isNotEmpty)
+                              session.updatedAtLabel,
+                            "${session.messageCount} 条消息",
+                            session.page,
+                          ].join(" · "),
+                        ),
+                        trailing: IconButton(
+                          tooltip: "删除",
+                          icon: const Icon(Icons.delete_outline),
+                          onPressed: () => _confirmDeleteSession(
+                            sheetContext,
+                            session,
+                          ),
+                        ),
+                        onTap: () async {
+                          Navigator.of(sheetContext).pop();
+                          await widget.sessionController
+                              .loadSession(session.id);
+                        },
+                      );
+                    },
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _confirmDeleteSession(
+    BuildContext context,
+    LooMinisterChatSessionSummary session,
+  ) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text("删除这轮对话？"),
+        content: Text("删除「${session.title}」后，手机端无法再恢复这轮大臣会话。"),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text("取消"),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text("删除"),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true) {
+      await widget.sessionController.deleteSession(session.id);
+      if (context.mounted) {
+        Navigator.of(context).pop();
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    final messages = widget.sessionController.messages;
+    final activeSessionId = widget.sessionController.activeSessionId;
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -459,20 +749,40 @@ class _LooMinisterCardState extends State<LooMinisterCard> {
                     style: Theme.of(context).textTheme.titleLarge,
                   ),
                 ),
+                TextButton(
+                  onPressed: _loading
+                      ? null
+                      : () {
+                          widget.sessionController.startNew();
+                          _questionController.text = widget.suggestedQuestion;
+                        },
+                  child: const Text("新对话"),
+                ),
+                IconButton(
+                  tooltip: "最近对话",
+                  onPressed: _loading ? null : _showHistory,
+                  icon: const Icon(Icons.history),
+                ),
               ],
             ),
             const SizedBox(height: 8),
-            const Text("基于当前页面和本轮对话回答；暂不在聊天里实时抓新闻、论坛或外部研究。"),
-            if (_sessionId != null) ...[
+            const Text("大臣会保留最近对话，并结合当前页面、持仓和偏好上下文继续回答。"),
+            if (activeSessionId != null) ...[
               const SizedBox(height: 6),
               Text(
-                "本轮对话已开启，可继续追问。",
+                widget.sessionController.activeTitle == null
+                    ? "本轮对话已开启，可关闭后继续追问。"
+                    : "正在继续：${widget.sessionController.activeTitle}",
                 style: Theme.of(context).textTheme.bodySmall,
               ),
             ],
-            if (_messages.isNotEmpty) ...[
+            if (widget.sessionController.historyLoading) ...[
+              const SizedBox(height: 10),
+              const LinearProgressIndicator(),
+            ],
+            if (messages.isNotEmpty) ...[
               const SizedBox(height: 12),
-              ..._messages.map(
+              ...messages.map(
                 (message) => _MinisterChatBubble(
                   message,
                   onSuggestedActionConfirmed: widget.onSuggestedActionConfirmed,
@@ -522,26 +832,49 @@ class _MinisterSlowResponse {
 
 enum _MinisterTimeoutChoice { continueWaiting, useLocal }
 
-class _MinisterChatMessage {
-  const _MinisterChatMessage._({
+class LooMinisterChatMessage {
+  const LooMinisterChatMessage._({
     required this.role,
     required this.text,
     this.answer,
     this.isError = false,
   });
 
-  factory _MinisterChatMessage.user(String text) =>
-      _MinisterChatMessage._(role: "user", text: text);
+  factory LooMinisterChatMessage.user(String text) =>
+      LooMinisterChatMessage._(role: "user", text: text);
 
-  factory _MinisterChatMessage.assistant(LooMinisterAnswer answer) =>
-      _MinisterChatMessage._(
+  factory LooMinisterChatMessage.assistant(LooMinisterAnswer answer) =>
+      LooMinisterChatMessage._(
         role: "assistant",
         text: answer.answer,
         answer: answer,
       );
 
-  factory _MinisterChatMessage.error(String text) =>
-      _MinisterChatMessage._(role: "assistant", text: text, isError: true);
+  factory LooMinisterChatMessage.error(String text) =>
+      LooMinisterChatMessage._(role: "assistant", text: text, isError: true);
+
+  factory LooMinisterChatMessage.fromHistory(Map<String, dynamic> json) {
+    final role = json["role"] as String? ?? "assistant";
+    final content = json["content"] as String? ?? "";
+    if (role == "user") {
+      return LooMinisterChatMessage.user(content);
+    }
+    final answer = json["answer"];
+    if (answer is Map<String, dynamic>) {
+      return LooMinisterChatMessage.assistant(
+          LooMinisterAnswer.fromJson(answer));
+    }
+    return LooMinisterChatMessage.assistant(
+      LooMinisterAnswer(
+        title: "大臣答复",
+        answer: content,
+        structured: null,
+        keyPoints: const [],
+        suggestedActions: const [],
+        disclaimer: "仅用于研究学习，不构成投资建议。",
+      ),
+    );
+  }
 
   final String role;
   final String text;
@@ -555,7 +888,7 @@ class _MinisterChatBubble extends StatelessWidget {
     required this.onSuggestedActionConfirmed,
   });
 
-  final _MinisterChatMessage message;
+  final LooMinisterChatMessage message;
   final ValueChanged<LooMinisterSuggestedAction> onSuggestedActionConfirmed;
 
   @override
@@ -644,6 +977,8 @@ class LooMinisterAnswer {
       target:
           target is Map<String, dynamic> ? target : const <String, dynamic>{},
       requiresConfirmation: json["requiresConfirmation"] == true,
+      authorityBoundary:
+          json["authorityBoundary"] as String? ?? "大臣只能建议此动作；执行前必须由用户确认并走后端校验。",
     );
   }
 }
@@ -710,15 +1045,15 @@ class _MinisterAnswerView extends StatelessWidget {
               Text(structured.directAnswer),
               if (structured.reasoning.isNotEmpty) ...[
                 const SizedBox(height: 10),
-                Text("判断依据",
-                    style: Theme.of(context).textTheme.titleSmall),
+                Text("判断依据", style: Theme.of(context).textTheme.titleSmall),
                 const SizedBox(height: 4),
-                ...structured.reasoning.take(4).map((point) => Text("• $point")),
+                ...structured.reasoning
+                    .take(4)
+                    .map((point) => Text("• $point")),
               ],
               if (structured.decisionGates.isNotEmpty) ...[
                 const SizedBox(height: 10),
-                Text("需要确认",
-                    style: Theme.of(context).textTheme.titleSmall),
+                Text("需要确认", style: Theme.of(context).textTheme.titleSmall),
                 const SizedBox(height: 4),
                 ...structured.decisionGates
                     .take(4)
@@ -795,10 +1130,11 @@ class _MinisterSuggestedActionChip extends StatelessWidget {
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: Text(action.label),
-        content: Text([action.detail, confirmationDetail]
-            .whereType<String>()
-            .where((item) => item.isNotEmpty)
-            .join("\n\n")),
+        content: Text([
+          action.detail,
+          confirmationDetail,
+          action.authorityBoundary
+        ].whereType<String>().where((item) => item.isNotEmpty).join("\n\n")),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(dialogContext).pop(false),

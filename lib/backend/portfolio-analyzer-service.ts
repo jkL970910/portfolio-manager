@@ -172,6 +172,7 @@ export function sanitizeGptEnhancementPayloadForTest(value: unknown) {
       ? data.generatedAt
       : new Date().toISOString(),
     title: readNullableString(data.title, 120) ?? "GPT 增强解读",
+    role: "explanation-only",
     directAnswer:
       readNullableString(data.directAnswer, 800) ??
       readNullableString(data.answer, 800) ??
@@ -182,6 +183,8 @@ export function sanitizeGptEnhancementPayloadForTest(value: unknown) {
     nextStep: readNullableString(data.nextStep, 500),
     sourceLabel:
       readNullableString(data.sourceLabel, 120) ?? "GPT 增强解读 · 基于智能快扫",
+    authorityBoundary:
+      "GPT 只增强解释，不改变智能快扫结论、护栏或行动优先级。",
     disclaimer: {
       zh:
         readNullableString(disclaimer.zh) ??
@@ -368,10 +371,11 @@ function buildGptEnhancementPrompt(result: PortfolioAnalyzerResult) {
   const securityDecision = result.securityDecision;
   return [
     "你是 Loo国的投资分析大臣。请把下面的“智能快扫”结果改写成一段更像 ChatGPT 的增强解读。",
-    "重要边界：不要编造实时行情、新闻、论坛或财报内容；只使用给定 JSON 的事实。不要说你已经做了外部研究。所有投资相关内容必须保留不构成投资建议。",
+    "重要边界：你只能增强解释，不能改变智能快扫的结论、护栏、行动优先级或仓位边界。不要编造实时行情、新闻、论坛或财报内容；只使用给定 JSON 的事实。不要说你已经做了外部研究。所有投资相关内容必须保留不构成投资建议。",
     "回答目标：先给直接结论，再解释为什么和用户组合相关、主要护栏、哪些条件会改变结论、下一步该怎么确认。",
     "只返回 JSON object，不要 markdown。",
-    "JSON 字段必须是：generatedAt, title, directAnswer, reasoning, decisionGates, boundary, nextStep, sourceLabel, disclaimer。",
+    "JSON 字段必须是：generatedAt, title, role, directAnswer, reasoning, decisionGates, boundary, nextStep, sourceLabel, authorityBoundary, disclaimer。",
+    "role 必须是 explanation-only。authorityBoundary 必须说明 GPT 只增强解释，不改变智能快扫结论、护栏或行动优先级。",
     `sourceLabel 必须写成：GPT 增强解读 · 基于${sourceModeLabel(result.dataFreshness.sourceMode)}。`,
     `disclaimer 必须是 ${JSON.stringify(PORTFOLIO_ANALYZER_DISCLAIMER)}。`,
     "",
@@ -402,6 +406,7 @@ function getGptEnhancementTextFormat(provider: string) {
       properties: {
         generatedAt: { type: "string" },
         title: { type: "string" },
+        role: { type: "string", enum: ["explanation-only"] },
         directAnswer: { type: "string" },
         reasoning: {
           type: "array",
@@ -416,6 +421,7 @@ function getGptEnhancementTextFormat(provider: string) {
         boundary: { type: ["string", "null"] },
         nextStep: { type: ["string", "null"] },
         sourceLabel: { type: "string" },
+        authorityBoundary: { type: "string" },
         disclaimer: {
           type: "object",
           additionalProperties: false,
@@ -429,12 +435,14 @@ function getGptEnhancementTextFormat(provider: string) {
       required: [
         "generatedAt",
         "title",
+        "role",
         "directAnswer",
         "reasoning",
         "decisionGates",
         "boundary",
         "nextStep",
         "sourceLabel",
+        "authorityBoundary",
         "disclaimer",
       ],
     },

@@ -1,4 +1,4 @@
-import { and, desc, eq, sql } from "drizzle-orm";
+import { and, asc, desc, eq, sql } from "drizzle-orm";
 import type { z } from "zod";
 import { apiSuccess } from "@/lib/backend/contracts";
 import { getLooMinisterAnswer } from "@/lib/backend/loo-minister";
@@ -287,4 +287,121 @@ export async function askLooMinisterChat(
     },
     "service",
   );
+}
+
+function mapSessionSummary(
+  session: typeof looMinisterChatSessions.$inferSelect,
+) {
+  return {
+    id: session.id,
+    title: session.title,
+    page: session.page,
+    summary: session.summary,
+    messageCount: session.messageCount,
+    createdAt: session.createdAt.toISOString(),
+    updatedAt: session.updatedAt.toISOString(),
+  };
+}
+
+function mapChatMessage(message: typeof looMinisterChatMessages.$inferSelect) {
+  return {
+    id: message.id,
+    role: message.role,
+    content: message.content,
+    answer:
+      message.answerJson &&
+      typeof message.answerJson === "object" &&
+      !Array.isArray(message.answerJson)
+        ? message.answerJson
+        : null,
+    createdAt: message.createdAt.toISOString(),
+  };
+}
+
+export async function listLooMinisterChatSessions(
+  userId: string,
+  args: { limit?: number } = {},
+) {
+  const limit = Math.min(Math.max(args.limit ?? 10, 1), 30);
+  const db = getDb();
+  const sessions = await db.query.looMinisterChatSessions.findMany({
+    where: eq(looMinisterChatSessions.userId, userId),
+    orderBy: desc(looMinisterChatSessions.updatedAt),
+    limit,
+  });
+  return apiSuccess(
+    {
+      sessions: sessions.map(mapSessionSummary),
+    },
+    "service",
+  );
+}
+
+export async function getLooMinisterChatSession(
+  userId: string,
+  sessionId: string,
+) {
+  const db = getDb();
+  const session = await db.query.looMinisterChatSessions.findFirst({
+    where: and(
+      eq(looMinisterChatSessions.id, sessionId),
+      eq(looMinisterChatSessions.userId, userId),
+    ),
+  });
+  if (!session) {
+    throw new Error("Loo Minister chat session not found.");
+  }
+
+  const messages = await db.query.looMinisterChatMessages.findMany({
+    where: and(
+      eq(looMinisterChatMessages.sessionId, session.id),
+      eq(looMinisterChatMessages.userId, userId),
+    ),
+    orderBy: asc(looMinisterChatMessages.createdAt),
+    limit: 80,
+  });
+
+  return apiSuccess(
+    {
+      session: mapSessionSummary(session),
+      messages: messages.map(mapChatMessage),
+    },
+    "service",
+  );
+}
+
+export async function deleteLooMinisterChatSession(
+  userId: string,
+  sessionId: string,
+) {
+  const db = getDb();
+  const session = await db.query.looMinisterChatSessions.findFirst({
+    where: and(
+      eq(looMinisterChatSessions.id, sessionId),
+      eq(looMinisterChatSessions.userId, userId),
+    ),
+  });
+  if (!session) {
+    throw new Error("Loo Minister chat session not found.");
+  }
+
+  await db
+    .delete(looMinisterChatMessages)
+    .where(
+      and(
+        eq(looMinisterChatMessages.sessionId, session.id),
+        eq(looMinisterChatMessages.userId, userId),
+      ),
+    );
+  await db
+    .delete(looMinisterChatSessions)
+    .where(
+      and(
+        eq(looMinisterChatSessions.id, session.id),
+        eq(looMinisterChatSessions.userId, userId),
+      ),
+    );
+  await clearLooMinisterContextPackCacheAsync(chatSubjectPackKey(session.id));
+
+  return apiSuccess({ ok: true }, "service");
 }

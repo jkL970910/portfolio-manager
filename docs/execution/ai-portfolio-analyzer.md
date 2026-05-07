@@ -1,6 +1,6 @@
 # Loo国 AI Minister Integration
 
-Last updated: 2026-04-30
+Last updated: 2026-05-07
 
 ## Purpose
 
@@ -91,6 +91,80 @@ Initial page-context examples:
 This means current DTO work must model AI context as a first-class contract, not
 as a future bolt-on. Mobile pages should gradually expose reusable context DTOs
 that can be sent to the minister API when the user explicitly asks a question.
+
+## Finalized P0 Execution Plan
+
+Gemini signoff was obtained on the following P0 order. Treat this as the
+canonical implementation sequence before any broader UI polish or raw external
+research work:
+
+1. `P0.1 Decision Layer DTO`
+   - define the shared backend contract for quick-scan, GPT enhancement, and
+     Minister advice handoff
+   - include `decision`, `confidence`, `directAnswer`, `scores`,
+     `guardrails`, `suggestedActions`, `whyNow`, `portfolioFit`, `evidence`,
+     and `nextSteps`
+2. `P0.2 Guardrail Rules`
+   - deterministically evaluate identity completeness, freshness, duplicate
+     exposure, preference conflict, tax/account mismatch, and liquidity risk
+   - never let GPT override a blocker
+3. `P0.3 Portfolio Fit Engine`
+   - compute the private-context fit in Next.js BFF
+   - compare current exposure, target sleeve gap, recommendation path, and
+     account/tax/FX fit
+   - status: completed. Security quick scan now receives a structured
+     `securityDecision.fit` object with portfolio-fit score, target gap,
+     current sleeve exposure, duplicate exposure, account/tax/FX/liquidity
+     sub-scores, strengths, concerns, and account notes.
+4. `P0.4 Quick Scan Refactor`
+   - rebase smart scan output onto the Decision Layer DTO
+   - keep unheld securities analyzable as candidates instead of blocking on
+     `0%` exposure
+   - status: completed. Security quick scan now exposes decision-first fields:
+     `decisionLabel`, `confidenceScore`, `primaryAction`, `decisionGates`,
+     `nextSteps`, `boundary`, and `positionSizingIdea`. Flutter renders the
+     primary action, decision gates, position-sizing idea, next steps, and
+     boundary separately while legacy result fields stay populated for cache
+     and client compatibility.
+5. `P0.5 Security Research Cockpit UI`
+   - upgrade Security Detail into a true research cockpit with a decision card,
+     evidence, risk, and action rendering
+   - status: completed. Security Detail now adds a research-workbench intro,
+     auto-runs local deterministic quick scan, and renders the decision-first
+     quick-scan sections near the top of the page. GPT enhancement remains a
+     user-triggered optional step and is not invoked automatically.
+6. `P0.6 Evidence & Freshness Layer`
+   - expose source lineage, quote freshness, history depth, cache state, and
+     limitation labels in user-facing copy
+   - status: completed. Analyzer results now include `evidenceTrail` rows with
+     source type, source mode, confidence, freshness, as-of timestamp, and
+     detail. `dataFreshness` also exposes `freshnessLabel`,
+     `reliabilityScore`, and `limitationSummary`; Flutter renders these inside
+     the Data Evidence section.
+7. `P0.7 GPT / Minister Boundary Cleanup`
+   - keep GPT as explanation-only
+   - keep Minister as cross-page conversation and suggested-action layer
+   - do not silently execute worker actions
+   - status: completed. GPT enhancement now returns `role=explanation-only`
+     and an explicit `authorityBoundary`; prompts tell GPT it cannot change
+     quick-scan conclusions, guardrails, priority, or position boundaries.
+     Minister suggested actions carry an authority boundary and Flutter shows
+     it in confirmation dialogs.
+8. `P0.8 Manual QA SOP`
+   - add concrete phone QA steps for each major feature slice before moving on
+   - status: completed. `docs/guides/mobile-manual-qa-sop.md` now has a
+     dedicated P0.1-P0.7 decision-chain QA section covering candidate vs
+     holding review, guardrail precedence, portfolio fit, decision-first UI,
+     research cockpit auto quick scan, evidence/freshness display, GPT
+     explanation-only boundary, and Minister suggested-action confirmation.
+9. `P0.9 Minister Session Continuity`
+   - keep the floating 大臣 conversation alive across sheet close/reopen
+   - expose recent conversation history so accidentally closed sessions can be
+     resumed instead of restarting context from scratch
+   - status: completed. Backend now exposes user-scoped chat session list,
+     detail, and delete APIs; Flutter owns an app-scoped 大臣 session controller,
+     restores the latest session on open, and renders `新对话` / `最近对话`
+     controls in the floating sheet.
 
 ## P0.5 Focus: Real Data Before UI Overhaul
 
@@ -202,11 +276,18 @@ Current status:
   It is bearer/session protected, validates `LooMinisterQuestionRequest`, keeps
   live external research disabled, and currently returns a deterministic local
   `LooMinisterAnswerResult`.
-- First-pass multi-turn chat API exists at `POST /api/mobile/minister/chat`.
+- Multi-turn chat API exists at `POST /api/mobile/minister/chat`.
   It creates a user-scoped chat session, persists user/assistant messages,
   injects recent conversation history plus project-level 大臣 capability context,
   and returns the same validated answer contract under `data.answer`. This is
   the preferred mobile path for the floating 大臣 entry.
+- Mobile chat session recovery APIs now exist:
+  - `GET /api/mobile/minister/chat/sessions?limit=...`
+  - `GET /api/mobile/minister/chat/sessions/[sessionId]`
+  - `DELETE /api/mobile/minister/chat/sessions/[sessionId]`
+  They are bearer/session protected and only return sessions owned by the
+  current viewer. They support restoring an accidentally closed 大臣 panel and
+  cleaning up stale conversation history.
 - First-pass product-help knowledge now exists inside the backend answer engine.
   大臣 can answer "这个功能是什么 / 怎么用 / 下一步做什么" style questions
   with product boundaries for Overview, Portfolio, Security/Holding,
@@ -221,8 +302,10 @@ Current status:
 - Mobile shell now owns a persistent floating `问大臣` entry. Overview and
   Portfolio report their page-context DTOs into the shell, so the same floating
   entry can answer with current page context without injecting a separate card
-  into every page. The floating entry now keeps visible messages in the panel
-  and reuses the backend `sessionId` for follow-up questions.
+  into every page. The floating entry now keeps visible messages outside the
+  modal sheet, reuses the backend `sessionId` for follow-up questions, restores
+  the latest session on open, and provides a `最近对话` picker plus `新对话`
+  control.
 - Account Detail, Holding Detail, Security Detail, and Health pages now report
   first-pass page-context DTOs into the global minister scope. The floating
   entry remains above pushed detail routes instead of being limited to the
@@ -572,6 +655,16 @@ Request mode:
 
 Result sections:
 
+- `decision`
+- `confidence`
+- `directAnswer`
+- `scores`
+- `guardrails`
+- `suggestedActions`
+- `whyNow`
+- `portfolioFit`
+- `evidence`
+- `nextSteps`
 - `summary`
 - `scorecards`
 - `risks`
@@ -590,6 +683,45 @@ Current status:
 
 - First backend builder slice is implemented in
   `lib/backend/portfolio-analyzer.ts`.
+- P0.1 decision-layer modules now live under
+  `lib/backend/security-decision/`. They build a typed security decision
+  context, preserve listing identity, reuse the shared economic-exposure
+  registry, and feed the existing quick-scan builder without breaking legacy
+  result fields.
+- P0.2 guardrail modules now emit deterministic structured guardrails before
+  GPT enhancement or UI rendering. Hard guardrails currently cover incomplete
+  listing identity and insufficient price-history depth. Soft guardrails
+  collect concentration, preference conflicts, USD funding/account-tax
+  friction, liquidity priority, and missing target-sleeve diagnostics. GPT can
+  explain these guardrails but must not override a blocking guardrail.
+- P0.3 portfolio-fit engine now runs as a pure backend calculation in
+  `lib/backend/security-decision/portfolio-fit.ts`. It distinguishes unheld
+  candidates from existing holdings, compares economic exposure to target
+  allocation, penalizes duplicate exposure, and surfaces account/tax/FX and
+  liquidity constraints through both structured DTO fields and legacy
+  `portfolioFit` strings for current mobile compatibility.
+- P0.4 quick-scan refactor now makes the `securityDecision` block the primary
+  source of truth for security analysis UX. It adds a reader-facing decision
+  label, numeric decision confidence, primary action, decision gates, next
+  steps, boundary, and non-advice position-sizing idea while preserving
+  `summary`, `scorecards`, `portfolioFit`, and `actionItems` for existing
+  cache/mobile compatibility.
+- P0.5 Security Research Cockpit UI now moves the decision workflow to the top
+  of Security Detail. The page shows a research-frame intro, automatically
+  generates the local rules-based quick scan, and keeps GPT enhancement behind
+  an explicit user action to avoid hidden external API cost.
+- P0.6 Evidence & Freshness Layer now makes source credibility explicit instead
+  of hiding it in prose. Quick-scan responses include `evidenceTrail` entries
+  for portfolio data, market data, rule-engine derivation, and cached external
+  research where applicable. Mobile displays freshness labels, reliability
+  score, limitations, source mode, confidence, and as-of dates in the evidence
+  section.
+- P0.7 GPT / Minister Boundary Cleanup now codifies the AI boundary in
+  contracts and UI. GPT enhancement is marked `explanation-only` and cannot
+  override the deterministic quick-scan result. Minister suggested actions
+  include explicit authority boundaries, and Flutter confirmation dialogs
+  remind users that real execution still requires user confirmation and backend
+  validation.
 - Quick-scan builders now consume cached market-data lineage when available:
   holding quote provider/status fields, security price history keyed by
   `symbol + exchange + currency`, and portfolio snapshot freshness. Results
@@ -672,13 +804,17 @@ Add a compact "智能分析" section to:
 
 Render only existing contract sections:
 
+- decision card
+- confidence / direct answer
+- guardrails
+- suggested actions
 - summary thesis
 - scorecards
 - risks
 - tax notes
 - portfolio fit notes
 - action items
-- freshness/disclaimer footer
+- evidence / freshness footer
 
 Do not expose long-form chat or live research controls until the backend has
 cache/worker support.
@@ -822,7 +958,8 @@ P1:
 - standardized chart DTO migration, starting with Security Detail. See
   `docs/execution/mobile-chart-contracts.md`.
 - multi-turn AI 大臣 chat sessions with user-scoped conversation history,
-  bounded summarization, and project-level context injection
+  bounded summarization, project-level context injection, app-scoped mobile
+  session continuity, and recent-conversation recovery
 - mobile UI / IA overhaul after P0.5 real-data AI/external-consultation flows
   pass QA
 

@@ -11,6 +11,7 @@ class AiAnalysisCard extends StatefulWidget {
     required this.payload,
     this.title = "智能快扫",
     this.description = "基于本地规则、当前组合、投资偏好和缓存资料生成；不会默认调用外部 GPT。",
+    this.autoRun = false,
     this.refreshKey,
     this.onCompleted,
     super.key,
@@ -20,6 +21,7 @@ class AiAnalysisCard extends StatefulWidget {
   final Map<String, dynamic> payload;
   final String title;
   final String description;
+  final bool autoRun;
   final String? refreshKey;
   final VoidCallback? onCompleted;
 
@@ -34,6 +36,15 @@ class _AiAnalysisCardState extends State<AiAnalysisCard> {
   bool _hasResult = false;
   bool _isLoading = false;
   bool _isEnhancing = false;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.autoRun) {
+      _isLoading = true;
+      _analysis = _loadAnalysis(refresh: false);
+    }
+  }
 
   @override
   void didChangeDependencies() {
@@ -57,6 +68,10 @@ class _AiAnalysisCardState extends State<AiAnalysisCard> {
   @override
   void didUpdateWidget(covariant AiAnalysisCard oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (widget.autoRun && oldWidget.payload != widget.payload && !_isLoading) {
+      _runAnalysis(refresh: false);
+      return;
+    }
     if (
       widget.refreshKey != null &&
       oldWidget.refreshKey != widget.refreshKey &&
@@ -306,6 +321,10 @@ class MobileAiAnalysisResult {
     required this.quotesAsOf,
     required this.quoteSourceSummary,
     required this.quoteFreshnessSummary,
+    required this.freshnessLabel,
+    required this.reliabilityScore,
+    required this.limitationSummary,
+    required this.evidenceTrail,
   });
 
   final String scope;
@@ -324,6 +343,10 @@ class MobileAiAnalysisResult {
   final String? quotesAsOf;
   final String? quoteSourceSummary;
   final String? quoteFreshnessSummary;
+  final String? freshnessLabel;
+  final double? reliabilityScore;
+  final String? limitationSummary;
+  final List<MobileAiEvidenceItem> evidenceTrail;
 
   factory MobileAiAnalysisResult.fromJson(Map<String, dynamic> json) {
     final summary = _readMap(json["summary"]);
@@ -362,6 +385,45 @@ class MobileAiAnalysisResult {
           _friendlyNullableText(dataFreshness["quoteSourceSummary"] as String?),
       quoteFreshnessSummary: _friendlyNullableText(
           dataFreshness["quoteFreshnessSummary"] as String?),
+      freshnessLabel:
+          _friendlyNullableText(dataFreshness["freshnessLabel"] as String?),
+      reliabilityScore: dataFreshness["reliabilityScore"] is num
+          ? (dataFreshness["reliabilityScore"] as num).toDouble().clamp(0, 100)
+          : null,
+      limitationSummary:
+          _friendlyNullableText(dataFreshness["limitationSummary"] as String?),
+      evidenceTrail: _readMapList(json["evidenceTrail"])
+          .map(MobileAiEvidenceItem.fromJson)
+          .toList(),
+    );
+  }
+}
+
+class MobileAiEvidenceItem {
+  const MobileAiEvidenceItem({
+    required this.label,
+    required this.sourceMode,
+    required this.confidence,
+    required this.freshness,
+    required this.asOf,
+    required this.detail,
+  });
+
+  final String label;
+  final String sourceMode;
+  final String confidence;
+  final String freshness;
+  final String? asOf;
+  final String detail;
+
+  factory MobileAiEvidenceItem.fromJson(Map<String, dynamic> json) {
+    return MobileAiEvidenceItem(
+      label: _friendlyAnalysisText(json["label"] as String? ?? "数据来源"),
+      sourceMode: json["sourceMode"] as String? ?? "local",
+      confidence: json["confidence"] as String? ?? "medium",
+      freshness: json["freshness"] as String? ?? "partial",
+      asOf: json["asOf"] as String?,
+      detail: _friendlyAnalysisText(json["detail"] as String? ?? ""),
     );
   }
 }
@@ -369,37 +431,87 @@ class MobileAiAnalysisResult {
 class MobileAiSecurityDecision {
   const MobileAiSecurityDecision({
     required this.verdict,
+    required this.decisionLabel,
+    required this.confidenceScore,
     required this.directAnswer,
+    required this.primaryAction,
     required this.whyNow,
     required this.portfolioFit,
     required this.keyBlockers,
+    required this.decisionGates,
+    required this.nextSteps,
+    required this.boundary,
+    required this.positionSizingIdea,
     required this.watchlistTriggers,
     required this.evidence,
   });
 
   final String verdict;
+  final String? decisionLabel;
+  final double? confidenceScore;
   final String directAnswer;
+  final MobileAiPrimaryAction? primaryAction;
   final List<String> whyNow;
   final List<String> portfolioFit;
   final List<String> keyBlockers;
+  final List<String> decisionGates;
+  final List<String> nextSteps;
+  final String? boundary;
+  final String? positionSizingIdea;
   final List<String> watchlistTriggers;
   final List<String> evidence;
 
   factory MobileAiSecurityDecision.fromJson(Map<String, dynamic> json) {
+    final confidenceScore = json["confidenceScore"];
     return MobileAiSecurityDecision(
       verdict: json["verdict"] as String? ?? "watch-only",
+      decisionLabel: _friendlyNullableText(json["decisionLabel"] as String?),
+      confidenceScore:
+          confidenceScore is num ? confidenceScore.toDouble().clamp(0, 100) : null,
       directAnswer:
           _friendlyAnalysisText(json["directAnswer"] as String? ?? ""),
+      primaryAction: json["primaryAction"] is Map<String, dynamic>
+          ? MobileAiPrimaryAction.fromJson(
+              json["primaryAction"] as Map<String, dynamic>)
+          : null,
       whyNow: _readStringList(json["whyNow"]).map(_friendlyAnalysisText).toList(),
       portfolioFit:
           _readStringList(json["portfolioFit"]).map(_friendlyAnalysisText).toList(),
       keyBlockers:
           _readStringList(json["keyBlockers"]).map(_friendlyAnalysisText).toList(),
+      decisionGates: _readStringList(json["decisionGates"])
+          .map(_friendlyAnalysisText)
+          .toList(),
+      nextSteps:
+          _readStringList(json["nextSteps"]).map(_friendlyAnalysisText).toList(),
+      boundary: _friendlyNullableText(json["boundary"] as String?),
+      positionSizingIdea:
+          _friendlyNullableText(json["positionSizingIdea"] as String?),
       watchlistTriggers: _readStringList(json["watchlistTriggers"])
           .map(_friendlyAnalysisText)
           .toList(),
       evidence:
           _readStringList(json["evidence"]).map(_friendlyAnalysisText).toList(),
+    );
+  }
+}
+
+class MobileAiPrimaryAction {
+  const MobileAiPrimaryAction({
+    required this.priority,
+    required this.label,
+    required this.detail,
+  });
+
+  final String priority;
+  final String label;
+  final String detail;
+
+  factory MobileAiPrimaryAction.fromJson(Map<String, dynamic> json) {
+    return MobileAiPrimaryAction(
+      priority: json["priority"] as String? ?? "P1",
+      label: _friendlyAnalysisText(json["label"] as String? ?? "保持观察"),
+      detail: _friendlyAnalysisText(json["detail"] as String? ?? ""),
     );
   }
 }
@@ -413,6 +525,7 @@ class MobileAiGptEnhancement {
     required this.boundary,
     required this.nextStep,
     required this.sourceLabel,
+    required this.authorityBoundary,
     required this.disclaimerZh,
   });
 
@@ -423,6 +536,7 @@ class MobileAiGptEnhancement {
   final String? boundary;
   final String? nextStep;
   final String sourceLabel;
+  final String authorityBoundary;
   final String disclaimerZh;
 
   factory MobileAiGptEnhancement.fromJson(Map<String, dynamic> json) {
@@ -438,6 +552,10 @@ class MobileAiGptEnhancement {
       boundary: _friendlyNullableText(json["boundary"] as String?),
       nextStep: _friendlyNullableText(json["nextStep"] as String?),
       sourceLabel: json["sourceLabel"] as String? ?? "GPT 增强解读",
+      authorityBoundary: _friendlyAnalysisText(
+        json["authorityBoundary"] as String? ??
+            "GPT 只增强解释，不改变智能快扫结论、护栏或行动优先级。",
+      ),
       disclaimerZh:
           disclaimer["zh"] as String? ?? "仅用于研究学习，不构成投资建议。",
     );
@@ -595,14 +713,23 @@ class _AnalysisResultView extends StatelessWidget {
               const SizedBox(height: 8),
               _MetaPill(
                   [
+                    if (securityDecision?.decisionLabel != null)
+                      securityDecision!.decisionLabel!,
                     if (securityDecision != null)
                       _verdictLabel(securityDecision.verdict),
+                    if (securityDecision?.confidenceScore != null)
+                      "决策置信 ${securityDecision!.confidenceScore!.round()}",
                     "置信度 ${_confidenceLabel(data.confidence)}",
                     _sourceModeLabel(data.sourceMode),
                   ].join(" · ")),
             ],
           ),
         ),
+        if (securityDecision?.primaryAction != null)
+          _AnalysisSection(
+            title: "当前结论",
+            child: _PrimaryActionCard(securityDecision!.primaryAction!),
+          ),
         if (securityDecision != null && securityDecision.whyNow.isNotEmpty)
           _AnalysisSection(
             title: "为什么现在看",
@@ -619,6 +746,21 @@ class _AnalysisResultView extends StatelessWidget {
               children:
                   securityDecision.keyBlockers.take(4).map(_bullet).toList(),
             ),
+          ),
+        if (securityDecision != null &&
+            securityDecision.decisionGates.isNotEmpty)
+          _AnalysisSection(
+            title: "判断前提",
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children:
+                  securityDecision.decisionGates.take(4).map(_bullet).toList(),
+            ),
+          ),
+        if (securityDecision?.positionSizingIdea != null)
+          _AnalysisSection(
+            title: "仓位思路",
+            child: Text(securityDecision!.positionSizingIdea!),
           ),
         if (visibleActionItems.isNotEmpty)
           _AnalysisSection(
@@ -665,9 +807,29 @@ class _AnalysisResultView extends StatelessWidget {
                   .toList(),
             ),
           ),
+        if (securityDecision != null && securityDecision.nextSteps.isNotEmpty)
+          _AnalysisSection(
+            title: "下一步",
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: securityDecision.nextSteps.take(4).map(_bullet).toList(),
+            ),
+          ),
+        if (securityDecision?.boundary != null)
+          _AnalysisSection(
+            title: "边界说明",
+            child: Text(
+              securityDecision!.boundary!,
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+          ),
         if (data.scorecards.isNotEmpty ||
+            data.evidenceTrail.isNotEmpty ||
             data.quoteSourceSummary != null ||
             data.quoteFreshnessSummary != null ||
+            data.freshnessLabel != null ||
+            data.reliabilityScore != null ||
+            data.limitationSummary != null ||
             data.quotesAsOf != null)
           ExpansionTile(
             tilePadding: EdgeInsets.zero,
@@ -742,7 +904,7 @@ class _GptEnhancementPanel extends StatelessWidget {
                           style: Theme.of(context).textTheme.titleSmall),
                       const SizedBox(height: 4),
                       Text(
-                        "可选调用外部 GPT，把上方智能快扫改写成更自然的解释。会使用你在设置里配置的大臣 GPT。",
+                        "可选调用外部 GPT，把上方智能快扫改写成更自然的解释。GPT 只负责解释，不改变快扫结论、护栏或行动优先级。",
                         style: Theme.of(context).textTheme.bodySmall,
                       ),
                     ],
@@ -822,6 +984,11 @@ class _GptEnhancementView extends StatelessWidget {
           const SizedBox(height: 8),
           Text("下一步：${data.nextStep}"),
         ],
+        const SizedBox(height: 8),
+        Text(
+          data.authorityBoundary,
+          style: Theme.of(context).textTheme.bodySmall,
+        ),
         const SizedBox(height: 10),
         Text(data.disclaimerZh, style: Theme.of(context).textTheme.bodySmall),
       ],
@@ -911,9 +1078,13 @@ class _DataEvidenceView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final freshnessLines = [
+      if (data.freshnessLabel != null) data.freshnessLabel!,
+      if (data.reliabilityScore != null)
+        "可信度 ${data.reliabilityScore!.round()}",
       if (data.quotesAsOf != null) "行情截至 ${data.quotesAsOf!.substring(0, 10)}",
       if (data.quoteSourceSummary != null) data.quoteSourceSummary!,
       if (data.quoteFreshnessSummary != null) data.quoteFreshnessSummary!,
+      if (data.limitationSummary != null) data.limitationSummary!,
     ];
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -923,11 +1094,47 @@ class _DataEvidenceView extends StatelessWidget {
             freshnessLines.join(" · "),
             style: Theme.of(context).textTheme.bodySmall,
           ),
+        if (data.evidenceTrail.isNotEmpty) ...[
+          const SizedBox(height: 10),
+          ...data.evidenceTrail.take(4).map(_EvidenceRow.new),
+        ],
         if (data.scorecards.isNotEmpty) ...[
           const SizedBox(height: 10),
           ...data.scorecards.take(4).map(_ScorecardRow.new),
         ],
       ],
+    );
+  }
+}
+
+class _EvidenceRow extends StatelessWidget {
+  const _EvidenceRow(this.item);
+
+  final MobileAiEvidenceItem item;
+
+  @override
+  Widget build(BuildContext context) {
+    final meta = [
+      _sourceModeLabel(item.sourceMode),
+      _confidenceLabel(item.confidence),
+      _freshnessStatusLabel(item.freshness),
+      if (item.asOf != null && item.asOf!.length >= 10)
+        item.asOf!.substring(0, 10),
+    ].join(" · ");
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(item.label, style: Theme.of(context).textTheme.titleSmall),
+          const SizedBox(height: 3),
+          Text(meta, style: Theme.of(context).textTheme.bodySmall),
+          if (item.detail.isNotEmpty) ...[
+            const SizedBox(height: 3),
+            Text(item.detail),
+          ],
+        ],
+      ),
     );
   }
 }
@@ -958,6 +1165,56 @@ class _ScorecardRow extends StatelessWidget {
             Text(item.rationale, style: Theme.of(context).textTheme.bodySmall),
           ],
         ],
+      ),
+    );
+  }
+}
+
+class _PrimaryActionCard extends StatelessWidget {
+  const _PrimaryActionCard(this.action);
+
+  final MobileAiPrimaryAction action;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.primaryContainer,
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(Icons.flag_circle,
+                color: Theme.of(context).colorScheme.onPrimaryContainer),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    "${action.label} · ${action.priority}",
+                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                          color:
+                              Theme.of(context).colorScheme.onPrimaryContainer,
+                        ),
+                  ),
+                  if (action.detail.isNotEmpty) ...[
+                    const SizedBox(height: 6),
+                    Text(
+                      action.detail,
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.onPrimaryContainer,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -1132,10 +1389,20 @@ String _confidenceLabel(String value) {
   };
 }
 
+String _freshnessStatusLabel(String value) {
+  return switch (value) {
+    "fresh" => "较新",
+    "stale" => "可能过期",
+    "missing" => "缺失",
+    _ => "部分可用",
+  };
+}
+
 String _sourceModeLabel(String value) {
   return switch (value) {
     "live-external" => "实时外部研究",
     "cached-external" => "缓存外部研究",
+    "derived" => "规则派生",
     _ => "本地快扫",
   };
 }

@@ -167,6 +167,8 @@ class LooMinisterSuggestedAction {
     this.detail,
     this.target = const <String, dynamic>{},
     this.requiresConfirmation = false,
+    this.authorityBoundary =
+        "大臣只能建议此动作；执行前必须由用户确认并走后端校验。",
   });
 
   final String id;
@@ -175,6 +177,7 @@ class LooMinisterSuggestedAction {
   final String? detail;
   final Map<String, dynamic> target;
   final bool requiresConfirmation;
+  final String authorityBoundary;
 
   bool get isSafeConfirmationState {
     const mutatingActions = {
@@ -194,6 +197,7 @@ class LooMinisterSuggestedAction {
       "actionType": actionType,
       "target": target,
       "requiresConfirmation": requiresConfirmation,
+      "authorityBoundary": authorityBoundary,
     };
   }
 }
