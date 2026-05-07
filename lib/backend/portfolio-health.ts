@@ -781,11 +781,23 @@ export function buildPortfolioHealthSummary(args: {
     radar,
     highlights: [
       mainGap
-        ? pick(
-          language,
-          `${getAssetClassLabel(mainGap.assetClass, language)} 还是离目标最远的一块，下一笔钱通常会先补这里。`,
-          `${getAssetClassLabel(mainGap.assetClass, language)} remains the largest allocation gap.`
-        )
+        ? mainGap.gap > 0
+          ? mainUnderweightGap
+            ? pick(
+              language,
+              `${getAssetClassLabel(mainGap.assetClass, language)} 是离目标最远的一块，但它已经高于目标；下一笔钱不要继续补这里，先看低于目标的 ${mainUnderweightLabel}。`,
+              `${getAssetClassLabel(mainGap.assetClass, language)} is the largest target mismatch, but it is already overweight; do not route the next contribution here, and look first at the underweight ${mainUnderweightLabel} sleeve.`
+            )
+            : pick(
+              language,
+              `${getAssetClassLabel(mainGap.assetClass, language)} 是离目标最远的一块，但它已经高于目标；下一笔钱不要继续补这里，先保持现金或重新检查目标配置。`,
+              `${getAssetClassLabel(mainGap.assetClass, language)} is the largest target mismatch, but it is already overweight; do not route the next contribution here, and hold cash or revisit the target mix first.`
+            )
+          : pick(
+            language,
+            `${getAssetClassLabel(mainGap.assetClass, language)} 还是离目标最远的一块，下一笔钱通常会先补这里。`,
+            `${getAssetClassLabel(mainGap.assetClass, language)} remains the largest underweight allocation gap.`
+          )
         : pick(language, "当前配置已基本贴近目标。", "The portfolio is broadly aligned with its target mix."),
       topHolding
         ? pick(

@@ -185,6 +185,11 @@ test("health score does not route new money into an overweight sleeve", () => {
   assert.ok(allocation.actions[0]?.includes("不要继续加到 美国股票"));
   assert.ok(allocation.actions[0]?.includes("加拿大股票"));
   assert.ok(!allocation.actions[0]?.includes("先补到 美国股票"));
+  assert.ok(health.highlights[0]?.includes("美国股票"));
+  assert.ok(health.highlights[0]?.includes("已经高于目标"));
+  assert.ok(health.highlights[0]?.includes("不要继续补这里"));
+  assert.ok(health.highlights[0]?.includes("加拿大股票"));
+  assert.ok(!health.highlights[0]?.includes("通常会先补这里"));
 });
 
 test("account health exposes account-fit and portfolio-target reference lenses", () => {
