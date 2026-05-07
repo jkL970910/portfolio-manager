@@ -392,6 +392,17 @@ function buildGptEnhancementPrompt(result: PortfolioAnalyzerResult) {
   ].join("\n");
 }
 
+function buildGptEnhancementInstructions() {
+  return [
+    "你是 Loo国的投资分析大臣。",
+    "任务：只把后端智能快扫结果改写成更自然、更清晰的中文解释。",
+    "边界：GPT 只负责解释，不得改变智能快扫结论、护栏、行动优先级、仓位边界或数据新鲜度判断。",
+    "不得编造实时行情、新闻、论坛、财报、评级或外部研究；只能使用用户输入里给定的快扫事实。",
+    "必须返回 JSON object，不要 markdown。字段必须是 generatedAt, title, role, directAnswer, reasoning, decisionGates, boundary, nextStep, sourceLabel, authorityBoundary, disclaimer。",
+    "role 必须是 explanation-only。disclaimer 必须保留不构成投资建议。",
+  ].join("\n");
+}
+
 function getGptEnhancementTextFormat(provider: string) {
   if (provider === "openrouter-compatible") {
     return { type: "json_object" };
@@ -467,6 +478,7 @@ async function callGptEnhancementProvider(
     },
     body: JSON.stringify({
       model: settings.model,
+      instructions: buildGptEnhancementInstructions(),
       store:
         process.env.LOO_MINISTER_DISABLE_RESPONSE_STORAGE === "true"
           ? false
