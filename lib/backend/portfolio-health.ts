@@ -254,6 +254,16 @@ export function buildPortfolioHealthSummary(args: {
   const mainGapCurrentPct = mainGap ? (allocation.get(mainGap.assetClass) ?? 0) : 0;
   const mainGapAbsPct = mainGap ? Math.abs(mainGap.gap) : 0;
   const mainGapLabel = mainGap ? getAssetClassLabel(mainGap.assetClass, language) : "";
+  const mainUnderweightGap = targetAllocation
+    .map((target) => ({
+      assetClass: target.assetClass,
+      gap: (allocation.get(target.assetClass) ?? 0) - target.targetPct
+    }))
+    .filter((item) => item.gap < -0.1)
+    .sort((left, right) => left.gap - right.gap)[0];
+  const mainUnderweightLabel = mainUnderweightGap
+    ? getAssetClassLabel(mainUnderweightGap.assetClass, language)
+    : "";
   const mainGapDriver = mainGap
     ? mainGap.gap > 0
       ? pick(
@@ -316,11 +326,23 @@ export function buildPortfolioHealthSummary(args: {
     ],
     consequences: [
       mainGap
-        ? pick(
-          language,
-          `如果先不补这个缺口，后面推荐页大概率还会继续把新钱优先引到 ${getAssetClassLabel(mainGap.assetClass, language)}。`,
-          `If this gap is left alone, future funding runs will likely keep routing new money into ${getAssetClassLabel(mainGap.assetClass, language)}.`
-        )
+        ? mainGap.gap > 0
+          ? mainUnderweightGap
+            ? pick(
+              language,
+              `${mainGapLabel} 已经高于目标；如果继续把新钱加到这里，配置偏离会扩大。后面推荐页应优先查看低于目标的 ${mainUnderweightLabel}。`,
+              `${mainGapLabel} is already overweight; adding more here would widen the allocation drift. Future funding runs should first look at the underweight ${mainUnderweightLabel} sleeve.`
+            )
+            : pick(
+              language,
+              `${mainGapLabel} 已经高于目标；如果继续把新钱加到这里，配置偏离会扩大。当前没有明显低配资产，下一笔钱更适合先保持观望或按现金计划处理。`,
+              `${mainGapLabel} is already overweight; adding more here would widen the allocation drift. No clear underweight sleeve is available, so the next contribution is better held or routed by the cash plan first.`
+            )
+          : pick(
+            language,
+            `如果先不补这个缺口，后面推荐页大概率还会继续把新钱优先引到 ${mainGapLabel}。`,
+            `If this gap is left alone, future funding runs will likely keep routing new money into ${mainGapLabel}.`
+          )
         : pick(language, "这一项暂时不会拖后腿，短期内不用优先处理。", "This dimension is not the main drag right now.")
     ],
     actions: [
@@ -331,11 +353,23 @@ export function buildPortfolioHealthSummary(args: {
             `不要只因为这个账户偏离 ${mainGapLabel} 目标就硬调仓；先判断这是不是该账户角色需要承担的侧重点，再看全组合还缺什么。`,
             `Do not rebalance this account just because it differs from the ${mainGapLabel} target; first decide whether that tilt is intentional for the account, then check the full portfolio gap.`
           )
-          : pick(
-            language,
-            `下一笔钱先补到 ${mainGapLabel}，先把最大的缺口补起来。`,
-            `Route the next contribution toward ${mainGapLabel} first.`
-          )
+          : mainGap.gap > 0
+            ? mainUnderweightGap
+              ? pick(
+                language,
+                `下一笔钱不要继续加到 ${mainGapLabel}；优先补低于目标的 ${mainUnderweightLabel}，或先保持现金等待更清楚的机会。`,
+                `Do not route the next contribution into ${mainGapLabel}; prioritize the underweight ${mainUnderweightLabel} sleeve, or hold cash until the next opportunity is clearer.`
+              )
+              : pick(
+                language,
+                `下一笔钱先不要继续加到 ${mainGapLabel}；当前没有明显低配资产，优先保持现金或重新检查目标配置。`,
+                `Do not route the next contribution into ${mainGapLabel}; no clear underweight sleeve is available, so hold cash or revisit the target mix first.`
+              )
+            : pick(
+              language,
+              `下一笔钱先补到 ${mainGapLabel}，先把最大的缺口补起来。`,
+              `Route the next contribution toward ${mainGapLabel} first.`
+            )
         : pick(language, "当前可优先维护而非大幅调整。", "Maintain the mix instead of making large changes.")
     ]
   };

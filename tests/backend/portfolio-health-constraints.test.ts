@@ -162,6 +162,31 @@ test("health score describes overweight target gaps without saying only", () => 
   assert.ok(!allocation.drivers[0]?.includes("只有"));
 });
 
+test("health score does not route new money into an overweight sleeve", () => {
+  const health = buildPortfolioHealthSummary({
+    accounts,
+    holdings,
+    profile: makeProfile({
+      targetAllocation: [
+        { assetClass: "Canadian Equity", targetPct: 30 },
+        { assetClass: "US Equity", targetPct: 10 },
+        { assetClass: "International Equity", targetPct: 20 },
+        { assetClass: "Fixed Income", targetPct: 25 },
+        { assetClass: "Cash", targetPct: 15 }
+      ]
+    }),
+    language: "zh"
+  });
+  const allocation = health.dimensions.find((item) => item.id === "allocation");
+
+  assert.ok(allocation);
+  assert.ok(allocation.drivers[0]?.includes("美国股票"));
+  assert.ok(allocation.drivers[0]?.includes("高于目标"));
+  assert.ok(allocation.actions[0]?.includes("不要继续加到 美国股票"));
+  assert.ok(allocation.actions[0]?.includes("加拿大股票"));
+  assert.ok(!allocation.actions[0]?.includes("先补到 美国股票"));
+});
+
 test("account health exposes account-fit and portfolio-target reference lenses", () => {
   const health = buildPortfolioHealthSummary({
     accounts,
