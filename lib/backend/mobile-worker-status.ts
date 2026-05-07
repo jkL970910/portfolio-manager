@@ -386,13 +386,17 @@ export async function getMobileWorkerStatusCenter(userId: string) {
   const externalSummary =
     "summary" in externalData && externalData.summary
       ? (externalData.summary as {
+          latestStatus?: string;
           latestStatusLabel?: string;
           latestStatusNote?: string;
           runningCount?: number;
           queuedCount?: number;
           failedCount?: number;
+          skippedCount?: number;
+          latestFinishedAt?: string | null;
         })
       : null;
+  const latestExternalStatus = externalSummary?.latestStatus ?? "empty";
 
   const tasks = [
     {
@@ -415,15 +419,23 @@ export async function getMobileWorkerStatusCenter(userId: string) {
       status:
         (externalSummary?.runningCount ?? 0) > 0
           ? "running"
+          : (externalSummary?.queuedCount ?? 0) > 0
+            ? "queued"
           : (externalSummary?.failedCount ?? 0) > 0
             ? "partial"
-            : "disabled",
+            : latestExternalStatus === "succeeded"
+              ? "succeeded"
+              : latestExternalStatus === "skipped"
+                ? "skipped"
+                : latestExternalStatus === "cancelled"
+                  ? "skipped"
+                  : "empty",
       statusLabel: externalSummary?.latestStatusLabel ?? "当前默认关闭",
       note:
         externalSummary?.latestStatusNote ??
         "外部研究默认不自动抓新闻/论坛；必须通过 worker、缓存和来源白名单。",
-      lastFinishedAt: null,
-      metricsLabel: `运行 ${externalSummary?.runningCount ?? 0} / 排队 ${externalSummary?.queuedCount ?? 0} / 失败 ${externalSummary?.failedCount ?? 0}`,
+      lastFinishedAt: externalSummary?.latestFinishedAt ?? null,
+      metricsLabel: `运行 ${externalSummary?.runningCount ?? 0} / 排队 ${externalSummary?.queuedCount ?? 0} / 跳过 ${externalSummary?.skippedCount ?? 0} / 失败 ${externalSummary?.failedCount ?? 0}`,
     },
   ];
 

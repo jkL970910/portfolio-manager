@@ -79,6 +79,18 @@ class LooApiClient {
         "/api/mobile/analysis/external-research-jobs/recent?limit=$limit");
   }
 
+  Future<Map<String, dynamic>> enqueueExternalResearchJob(
+      Map<String, dynamic> payload,
+      {String? source}) {
+    return _postJson(
+      "/api/mobile/analysis/external-research-jobs",
+      body: {
+        ...payload,
+        if (source != null && source.isNotEmpty) "source": source,
+      },
+    );
+  }
+
   Future<Map<String, dynamic>> askLooMinister(Map<String, dynamic> payload) {
     return _postJson("/api/mobile/minister/ask", body: payload);
   }

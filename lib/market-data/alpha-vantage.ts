@@ -41,6 +41,11 @@ export interface AlphaVantageProfilePayload {
   payload: Record<string, unknown>;
 }
 
+export interface AlphaVantageEarningsPayload {
+  candidateSymbol: string;
+  payload: Record<string, unknown>;
+}
+
 export function getAlphaVantageCandidateSymbols(
   symbol: string,
   exchange?: string | null,
@@ -130,6 +135,13 @@ function hasEtfProfile(payload: Record<string, unknown>) {
   );
 }
 
+function hasEarningsPayload(payload: Record<string, unknown>) {
+  return (
+    Array.isArray(payload.annualEarnings) ||
+    Array.isArray(payload.quarterlyEarnings)
+  );
+}
+
 export async function getAlphaVantageProfile(
   symbol: string,
   exchange?: string | null,
@@ -173,6 +185,34 @@ export async function getAlphaVantageProfile(
           payload,
         };
       }
+    }
+  }
+
+  return null;
+}
+
+export async function getAlphaVantageEarnings(
+  symbol: string,
+  exchange?: string | null,
+  currency?: string | null,
+): Promise<AlphaVantageEarningsPayload | null> {
+  const { alphaVantageApiKey } = getMarketDataConfig();
+  if (!alphaVantageApiKey) {
+    return null;
+  }
+
+  for (const candidateSymbol of getAlphaVantageCandidateSymbols(
+    symbol,
+    exchange,
+    currency,
+  )) {
+    const payload = await fetchAlphaVantagePayload({
+      fn: "EARNINGS",
+      symbol: candidateSymbol,
+      apiKey: alphaVantageApiKey,
+    });
+    if (payload && hasEarningsPayload(payload)) {
+      return { candidateSymbol, payload };
     }
   }
 

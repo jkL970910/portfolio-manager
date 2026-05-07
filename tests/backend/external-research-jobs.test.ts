@@ -36,6 +36,15 @@ function enableProfileProvider() {
   process.env.ALPHA_VANTAGE_API_KEY = "test-alpha-vantage-key";
 }
 
+function enableInstitutionalProvider() {
+  process.env.PORTFOLIO_ANALYZER_EXTERNAL_RESEARCH = "enabled";
+  process.env.PORTFOLIO_ANALYZER_EXTERNAL_WORKER = "enabled";
+  process.env.PORTFOLIO_ANALYZER_EXTERNAL_PROVIDERS = "enabled";
+  process.env.PORTFOLIO_ANALYZER_EXTERNAL_ADAPTERS = "enabled";
+  process.env.PORTFOLIO_ANALYZER_EXTERNAL_SOURCE_INSTITUTIONAL = "enabled";
+  process.env.ALPHA_VANTAGE_API_KEY = "test-alpha-vantage-key";
+}
+
 function clearExternalResearchEnv() {
   delete process.env.PORTFOLIO_ANALYZER_EXTERNAL_RESEARCH;
   delete process.env.PORTFOLIO_ANALYZER_EXTERNAL_WORKER;
@@ -43,6 +52,7 @@ function clearExternalResearchEnv() {
   delete process.env.PORTFOLIO_ANALYZER_EXTERNAL_ADAPTERS;
   delete process.env.PORTFOLIO_ANALYZER_EXTERNAL_SOURCE_MARKET_DATA;
   delete process.env.PORTFOLIO_ANALYZER_EXTERNAL_SOURCE_PROFILE;
+  delete process.env.PORTFOLIO_ANALYZER_EXTERNAL_SOURCE_INSTITUTIONAL;
   delete process.env.ALPHA_VANTAGE_API_KEY;
 }
 
@@ -323,6 +333,8 @@ test("external research mobile jobs expose summary and retry labels", async () =
   );
 
   assert.equal(response.data.summary.latestStatusLabel, "排队中");
+  assert.equal(response.data.summary.latestStatus, "queued");
+  assert.equal(response.data.summary.latestFinishedAt, response.data.items[0]?.createdAt);
   assert.equal(response.data.summary.queuedCount, 1);
   assert.equal(response.data.summary.failedCount, 0);
   assert.equal(response.data.summary.skippedCount, 0);
@@ -495,6 +507,22 @@ test("external research smoke helper requires profile provider secret", () => {
   clearExternalResearchEnv();
 });
 
+test("external research smoke helper supports institutional source flags", () => {
+  clearExternalResearchEnv();
+  enableInstitutionalProvider();
+
+  assert.deepEqual(
+    getMissingExternalResearchSmokeFlags(process.env, "institutional"),
+    [],
+  );
+  assert.deepEqual(
+    getMissingExternalResearchSmokeSecrets(process.env, "institutional"),
+    [],
+  );
+
+  clearExternalResearchEnv();
+});
+
 test("external research smoke request preserves security identity", () => {
   const request = buildExternalResearchSmokeRequest({
     userId: "user_casey",
@@ -589,6 +617,41 @@ test("external research smoke enqueue creates a queued profile job", async () =>
   assert.equal(
     result.data.job.sourceAllowlist.some(
       (source) => source.id === "market-data" && source.enabled === true,
+    ),
+    false,
+  );
+
+  clearExternalResearchEnv();
+});
+
+test("external research smoke enqueue creates a queued institutional job", async () => {
+  enableInstitutionalProvider();
+
+  const result = await enqueueExternalResearchSmokeJob(
+    {
+      userId: "user_casey",
+      symbol: "RKLB",
+      currency: "USD",
+      exchange: "NASDAQ",
+      name: "Rocket Lab USA Inc.",
+      securityId: "security_rklb_nasdaq_usd",
+      securityType: "Common Stock",
+      source: "institutional",
+      maxCacheAgeSeconds: 21600,
+    },
+    new Date("2026-04-28T15:00:00.000Z"),
+  );
+
+  assert.equal(result.data.job.status, "queued");
+  assert.equal(
+    result.data.job.sourceAllowlist.some(
+      (source) => source.id === "institutional" && source.enabled === true,
+    ),
+    true,
+  );
+  assert.equal(
+    result.data.job.sourceAllowlist.some(
+      (source) => source.id === "profile" && source.enabled === true,
     ),
     false,
   );

@@ -18,7 +18,7 @@ interface ParsedArgs {
   name?: string;
   securityId?: string;
   securityType?: string;
-  source: "market-data" | "profile";
+  source: "market-data" | "profile" | "institutional";
   maxCacheAgeSeconds: number;
 }
 
@@ -34,7 +34,8 @@ Options:
   --name <name>                    Optional display name.
   --security-id <uuid>             Optional canonical security_id for strict identity matching.
   --security-type <type>           Optional security type. Example: Common Stock, ETF
-  --source <market-data|profile>   External research source. Default: market-data
+  --source <market-data|profile|institutional>
+                                  External research source. Default: market-data
   --max-cache-age-seconds <int>    Cache TTL. Default: 21600
   --help                           Show this help.
 
@@ -45,6 +46,7 @@ Required env flags:
   PORTFOLIO_ANALYZER_EXTERNAL_ADAPTERS=enabled
   PORTFOLIO_ANALYZER_EXTERNAL_SOURCE_MARKET_DATA=enabled for --source market-data
   PORTFOLIO_ANALYZER_EXTERNAL_SOURCE_PROFILE=enabled and ALPHA_VANTAGE_API_KEY for --source profile
+  PORTFOLIO_ANALYZER_EXTERNAL_SOURCE_INSTITUTIONAL=enabled and ALPHA_VANTAGE_API_KEY for --source institutional
 
 This only enqueues a job. External provider calls happen later when you run npm run worker:external-research:once.`);
 }
@@ -85,10 +87,16 @@ function parsePositiveInteger(value: string | undefined, fallback: number) {
   return parsed;
 }
 
-function parseSource(value: string | undefined): "market-data" | "profile" {
+function parseSource(
+  value: string | undefined,
+): "market-data" | "profile" | "institutional" {
   const normalized = (value ?? "market-data").trim().toLowerCase();
-  if (normalized !== "market-data" && normalized !== "profile") {
-    throw new Error("--source must be market-data or profile.");
+  if (
+    normalized !== "market-data" &&
+    normalized !== "profile" &&
+    normalized !== "institutional"
+  ) {
+    throw new Error("--source must be market-data, profile, or institutional.");
   }
   return normalized;
 }

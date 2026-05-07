@@ -38,6 +38,8 @@ class _SecurityDetailPageState extends State<SecurityDetailPage> {
   late Future<MobileSecurityDetailSnapshot?> _snapshot;
   late Future<MobileDailyIntelligenceSnapshot> _dailyIntelligence;
   bool _isRefreshingQuote = false;
+  bool _isSubmittingExternalResearch = false;
+  String? _externalResearchMessage;
   String? _securityId;
 
   @override
@@ -122,6 +124,52 @@ class _SecurityDetailPageState extends State<SecurityDetailPage> {
     }
   }
 
+  Future<void> _enqueueExternalResearch(
+    MobileSecurityDetailSnapshot data,
+    String source,
+  ) async {
+    setState(() {
+      _isSubmittingExternalResearch = true;
+      _externalResearchMessage = null;
+    });
+
+    try {
+      await widget.apiClient.enqueueExternalResearchJob(
+        {
+          "scope": "security",
+          "mode": "quick",
+          "cacheStrategy": "prefer-cache",
+          "maxCacheAgeSeconds": 21600,
+          "security": {
+            if (data.securityId.isNotEmpty) "securityId": data.securityId,
+            "symbol": data.symbol,
+            if (data.exchange.isNotEmpty) "exchange": data.exchange,
+            if (data.currency.isNotEmpty) "currency": data.currency,
+            "name": data.name,
+          },
+        },
+        source: source,
+      );
+      _refreshDailyIntelligence();
+      if (!mounted) return;
+      setState(() {
+        _externalResearchMessage =
+            "已提交后台刷新。结果写入缓存后，会出现在该标的秘闻、推荐证据和大臣上下文中。";
+      });
+    } on LooApiException catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _externalResearchMessage = error.message;
+      });
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSubmittingExternalResearch = false;
+        });
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -191,18 +239,35 @@ class _SecurityDetailPageState extends State<SecurityDetailPage> {
                 FutureBuilder<MobileDailyIntelligenceSnapshot>(
                   future: _dailyIntelligence,
                   builder: (context, intelligenceSnapshot) {
-                    return DailyIntelligenceCard(
-                      snapshot: intelligenceSnapshot.hasData
-                          ? _filterIntelligenceForSecurity(
-                              intelligenceSnapshot.data!,
-                              data,
-                            )
-                          : null,
-                      isLoading: intelligenceSnapshot.connectionState ==
-                          ConnectionState.waiting,
-                      errorMessage: intelligenceSnapshot.hasError
-                          ? intelligenceSnapshot.error.toString()
-                          : null,
+                    final filteredSnapshot = intelligenceSnapshot.hasData
+                        ? _filterIntelligenceForSecurity(
+                            intelligenceSnapshot.data!,
+                            data,
+                          )
+                        : null;
+                    return Column(
+                      children: [
+                        DailyIntelligenceCard(
+                          snapshot: filteredSnapshot,
+                          isLoading: intelligenceSnapshot.connectionState ==
+                              ConnectionState.waiting,
+                          errorMessage: intelligenceSnapshot.hasError
+                              ? intelligenceSnapshot.error.toString()
+                              : null,
+                        ),
+                        if (filteredSnapshot?.securityManualRefreshEnabled ??
+                            true) ...[
+                          const SizedBox(height: 12),
+                          _ExternalResearchRefreshCard(
+                            isSubmitting: _isSubmittingExternalResearch,
+                            message: _externalResearchMessage,
+                            onRefreshProfile: () =>
+                                _enqueueExternalResearch(data, "profile"),
+                            onRefreshInstitutional: () =>
+                                _enqueueExternalResearch(data, "institutional"),
+                          ),
+                        ],
+                      ],
                     );
                   },
                 ),
@@ -325,6 +390,79 @@ class _SecurityDetailPageState extends State<SecurityDetailPage> {
       emptyTitle: "暂时没有该标的秘闻",
       emptyDetail:
           "当前只显示同一标的，或完整 symbol/exchange/currency 匹配的缓存情报；不会把其他版本的资料混入当前标的。",
+    );
+  }
+}
+
+class _ExternalResearchRefreshCard extends StatelessWidget {
+  const _ExternalResearchRefreshCard({
+    required this.isSubmitting,
+    required this.onRefreshProfile,
+    required this.onRefreshInstitutional,
+    this.message,
+  });
+
+  final bool isSubmitting;
+  final String? message;
+  final VoidCallback onRefreshProfile;
+  final VoidCallback onRefreshInstitutional;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.cloud_sync_outlined),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    "刷新该标的资料",
+                    style: theme.textTheme.titleMedium,
+                  ),
+                ),
+                if (isSubmitting)
+                  const SizedBox(
+                    height: 18,
+                    width: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              "只提交后台任务，不在页面加载时实时抓取外部来源。任务完成后会写入缓存，供秘闻、推荐和大臣使用。",
+              style: theme.textTheme.bodySmall,
+            ),
+            if (message != null && message!.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Text(message!, style: theme.textTheme.bodySmall),
+            ],
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                OutlinedButton.icon(
+                  onPressed: isSubmitting ? null : onRefreshProfile,
+                  icon: const Icon(Icons.badge_outlined),
+                  label: const Text("基本资料"),
+                ),
+                OutlinedButton.icon(
+                  onPressed: isSubmitting ? null : onRefreshInstitutional,
+                  icon: const Icon(Icons.event_note_outlined),
+                  label: const Text("财报资料"),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

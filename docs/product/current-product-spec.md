@@ -206,6 +206,8 @@ Provider strategy:
 
 - OpenFIGI is identity/alias support.
 - Alpha Vantage profile is the first bounded structured external data adapter.
+- Alpha Vantage institutional earnings is the second bounded structured adapter
+  for company-style earnings context.
 - Twelve Data / Yahoo-style quote paths exist behind provider boundaries.
 - Raw news/forum/search feeds are not the first provider target.
 

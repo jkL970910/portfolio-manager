@@ -1,7 +1,29 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getMobileViewerFromRequest } from "@/lib/auth/mobile-tokens";
 import { enqueueExternalResearchJob } from "@/lib/backend/external-research-jobs";
+import type { ExternalResearchPolicy } from "@/lib/backend/portfolio-external-research";
 import { portfolioAnalyzerRequestSchema } from "@/lib/backend/portfolio-analyzer-contracts";
+
+function readSourceId(
+  body: unknown,
+): ExternalResearchPolicy["allowedSources"][number]["id"] | undefined {
+  if (!body || typeof body !== "object" || !("source" in body)) {
+    return undefined;
+  }
+  const source = String((body as { source?: unknown }).source ?? "")
+    .trim()
+    .toLowerCase();
+  if (
+    source === "market-data" ||
+    source === "profile" ||
+    source === "institutional" ||
+    source === "news" ||
+    source === "community"
+  ) {
+    return source;
+  }
+  return undefined;
+}
 
 export async function POST(request: NextRequest) {
   const viewer = await getMobileViewerFromRequest(request);
@@ -35,7 +57,13 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const result = await enqueueExternalResearchJob(viewer.id, parsed.data);
+    const sourceId = readSourceId(body);
+    const result = await enqueueExternalResearchJob(
+      viewer.id,
+      parsed.data,
+      new Date(),
+      sourceId ? { sourceIds: [sourceId] } : undefined,
+    );
     return NextResponse.json(result, { status: 202 });
   } catch (error) {
     const message =

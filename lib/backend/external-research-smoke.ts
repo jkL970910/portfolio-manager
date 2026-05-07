@@ -11,7 +11,10 @@ export const EXTERNAL_RESEARCH_SMOKE_REQUIRED_FLAGS = [
   "PORTFOLIO_ANALYZER_EXTERNAL_ADAPTERS",
 ] as const;
 
-export type ExternalResearchSmokeSource = "market-data" | "profile";
+export type ExternalResearchSmokeSource =
+  | "market-data"
+  | "profile"
+  | "institutional";
 
 type ExternalResearchSmokeEnv = Record<string, string | undefined>;
 
@@ -28,13 +31,19 @@ export interface ExternalResearchSmokeArgs {
 }
 
 function getRequiredSourceFlag(source: ExternalResearchSmokeSource) {
-  return source === "profile"
-    ? "PORTFOLIO_ANALYZER_EXTERNAL_SOURCE_PROFILE"
-    : "PORTFOLIO_ANALYZER_EXTERNAL_SOURCE_MARKET_DATA";
+  if (source === "profile") {
+    return "PORTFOLIO_ANALYZER_EXTERNAL_SOURCE_PROFILE";
+  }
+  if (source === "institutional") {
+    return "PORTFOLIO_ANALYZER_EXTERNAL_SOURCE_INSTITUTIONAL";
+  }
+  return "PORTFOLIO_ANALYZER_EXTERNAL_SOURCE_MARKET_DATA";
 }
 
 function getRequiredSourceSecrets(source: ExternalResearchSmokeSource) {
-  return source === "profile" ? (["ALPHA_VANTAGE_API_KEY"] as const) : [];
+  return source === "profile" || source === "institutional"
+    ? (["ALPHA_VANTAGE_API_KEY"] as const)
+    : [];
 }
 
 export function getMissingExternalResearchSmokeFlags(

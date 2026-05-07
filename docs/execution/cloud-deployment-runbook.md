@@ -249,7 +249,7 @@ Do not start with raw news/forum/search feeds.
 
 ### External Research Profile Adapter
 
-The first live external-information adapter is intentionally still structured
+The first live external-information adapters are intentionally still structured
 and low-frequency:
 
 - Source id: `profile`
@@ -257,6 +257,12 @@ and low-frequency:
 - Endpoints used: `OVERVIEW` for company/common-stock style securities and
   `ETF_PROFILE` for ETF/fund-like securities
 - Output: persisted `external_research_documents`
+- Source id: `institutional`
+- Provider: Alpha Vantage earnings data
+- Endpoint used: `EARNINGS`
+- Output: persisted `external_research_documents` with recent EPS / earnings
+  context for company-style securities. ETF/fund-like securities may skip safely
+  when earnings payloads do not exist.
 - Daily overview mode: Cloudflare Cron calls
   `/api/workers/external-research/run?mode=daily-overview&source=profile`
   with bounded `maxUsers`, `maxSymbolsPerUser`, and `maxJobs`; the endpoint
@@ -266,6 +272,10 @@ and low-frequency:
   Overview can display the full cached daily briefing. Recommendations should
   only display lightweight “external material incorporated” status and
   item-level evidence already present in the recommendation DTO.
+- Manual single-security refresh: Security Detail can enqueue `profile` or
+  `institutional` jobs for the visible listing. It only submits the background
+  job; the provider call and document persistence still happen through the
+  external-research worker.
 
 Required env for profile research QA:
 
@@ -275,6 +285,8 @@ PORTFOLIO_ANALYZER_EXTERNAL_WORKER=enabled
 PORTFOLIO_ANALYZER_EXTERNAL_PROVIDERS=enabled
 PORTFOLIO_ANALYZER_EXTERNAL_ADAPTERS=enabled
 PORTFOLIO_ANALYZER_EXTERNAL_SOURCE_PROFILE=enabled
+# Optional second structured adapter:
+PORTFOLIO_ANALYZER_EXTERNAL_SOURCE_INSTITUTIONAL=enabled
 PORTFOLIO_ANALYZER_EXTERNAL_DAILY_OVERVIEW=enabled
 PORTFOLIO_ANALYZER_EXTERNAL_SECURITY_MANUAL_REFRESH=enabled
 EXTERNAL_RESEARCH_DAILY_SOURCE=profile
@@ -297,6 +309,26 @@ Local smoke result:
 - `XBB:TSX:CAD` profile smoke failed safely because Alpha Vantage did not return
   a usable ETF profile payload. Treat this as provider coverage evidence before
   relying on Alpha Vantage for Canadian ETF profile data.
+- `source=institutional` can be used for company-style earnings context. Expect
+  ETFs/funds to skip safely if no earnings payload exists.
+
+Cloud smoke result:
+
+- 2026-05-07: the protected Vercel worker endpoint accepted the Cloudflare-style
+  worker secret and returned `enqueue + worker`.
+- Daily-overview `source=profile` selected `XEQT:TSX:CAD` and skipped safely
+  because no Alpha Vantage profile payload was available.
+- A direct `RKLB:NASDAQ:USD` profile job drained successfully through the cloud
+  worker endpoint and persisted an `alpha-vantage-profile` external research
+  document with high confidence and 2026-05-08 expiry.
+- `/api/mobile/intelligence/daily` returned the RKLB profile card, the cached
+  external analysis row, and the market pulse card.
+- `/api/mobile/workers/status` must show external research as the latest real
+  job status (`已完成` / `已跳过` / etc.); it should not label a completed recent
+  worker run as `disabled`.
+- Security Detail manual refresh should enqueue source-specific jobs. After the
+  worker drains them, the filtered security `Loo国今日秘闻` card should show only
+  matching `security_id` or full `symbol/exchange/currency` documents.
 
 ## QA Checklist
 

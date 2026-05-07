@@ -291,6 +291,100 @@ function buildAlphaVantageProfileDocument(args: {
   };
 }
 
+function firstObjectField(payload: Record<string, unknown>, key: string) {
+  const value = payload[key];
+  return Array.isArray(value) && value[0] && typeof value[0] === "object"
+    ? (value[0] as Record<string, unknown>)
+    : null;
+}
+
+function buildAlphaVantageEarningsDocument(args: {
+  input: ExternalResearchProviderInput;
+  candidateSymbol: string;
+  payload: Record<string, unknown>;
+}): ExternalResearchDocument {
+  const requestSecurity = args.input.request.security;
+  const ttlSeconds = Math.max(
+    args.input.request.maxCacheAgeSeconds ??
+      getExternalResearchPolicy().defaultTtlSeconds,
+    getExternalResearchPolicy().minTtlSeconds,
+  );
+  const symbol = normalizeNullable(requestSecurity?.symbol) ?? args.candidateSymbol;
+  const quarterly = firstObjectField(args.payload, "quarterlyEarnings");
+  const annual = firstObjectField(args.payload, "annualEarnings");
+  const fiscalQuarter = stringField(quarterly ?? {}, "fiscalDateEnding");
+  const reportedEps = stringField(quarterly ?? {}, "reportedEPS");
+  const estimatedEps = stringField(quarterly ?? {}, "estimatedEPS");
+  const surprisePercent = stringField(quarterly ?? {}, "surprisePercentage");
+  const annualFiscalDate = stringField(annual ?? {}, "fiscalDateEnding");
+  const annualEps = stringField(annual ?? {}, "reportedEPS");
+  const keyPoints = [
+    fiscalQuarter ? `最近季度截止日：${fiscalQuarter}` : null,
+    reportedEps ? `最近季度 EPS：${reportedEps}` : null,
+    estimatedEps ? `市场预估 EPS：${estimatedEps}` : null,
+    surprisePercent ? `EPS surprise：${surprisePercent}%` : null,
+    annualFiscalDate && annualEps
+      ? `最近年度 EPS：${annualEps}（${annualFiscalDate}）`
+      : null,
+  ].filter((item): item is string => Boolean(item));
+  const publishedAt = normalizeIsoDate(
+    fiscalQuarter ? `${fiscalQuarter}T00:00:00.000Z` : annualFiscalDate,
+    args.input.now.toISOString(),
+  );
+
+  return {
+    id: [
+      "alpha-vantage-earnings",
+      requestSecurity?.securityId ?? symbol,
+      requestSecurity?.exchange ?? "unknown-exchange",
+      requestSecurity?.currency ?? "unknown-currency",
+      args.input.now.toISOString().slice(0, 10),
+    ].join(":"),
+    userId: args.input.userId,
+    sourceType: "institutional",
+    providerId: "alpha-vantage-earnings",
+    sourceName: "Alpha Vantage 财报资料",
+    title: `${symbol} 财报节奏快照`,
+    summary:
+      keyPoints.slice(0, 4).join("；") ||
+      `${symbol} 的结构化财报资料已缓存。`,
+    url: null,
+    publishedAt,
+    capturedAt: args.input.now.toISOString(),
+    expiresAt: addSeconds(args.input.now, ttlSeconds).toISOString(),
+    language: "zh",
+    security: {
+      securityId: requestSecurity?.securityId ?? null,
+      symbol,
+      exchange: normalizeNullable(requestSecurity?.exchange),
+      currency:
+        requestSecurity?.currency === "CAD" || requestSecurity?.currency === "USD"
+          ? requestSecurity.currency
+          : null,
+      name: requestSecurity?.name ?? null,
+      provider: "alpha-vantage-earnings",
+      securityType: requestSecurity?.securityType ?? null,
+    },
+    underlyingId: null,
+    confidence: keyPoints.length >= 3 ? "medium" : "low",
+    sentiment: "neutral",
+    relevanceScore: keyPoints.length >= 3 ? 68 : 42,
+    sourceReliability: 70,
+    keyPoints: keyPoints.slice(0, 6),
+    riskFlags: [
+      "财报资料只说明历史盈利披露，不代表实时买卖建议。",
+      "ETF、基金或没有财报披露的标的可能没有可用 earnings 资料。",
+      "该资料需要结合持仓、目标配置、估值、现金计划和风险偏好一起判断。",
+    ],
+    tags: [
+      "institutional",
+      "alpha-vantage",
+      "earnings",
+      requestSecurity?.exchange ? "listing-identity" : "partial-identity",
+    ],
+  };
+}
+
 export const cachedMarketDataResearchProvider: ExternalResearchProvider = {
   id: "market-data",
   sourceType: "market-data",
@@ -502,6 +596,76 @@ export const alphaVantageProfileResearchProvider: ExternalResearchProvider = {
   },
 };
 
+export const alphaVantageInstitutionalResearchProvider: ExternalResearchProvider = {
+  id: "institutional",
+  sourceType: "institutional",
+  enabled(policy) {
+    return (
+      policy.liveProvidersEnabled &&
+      policy.adaptersImplemented &&
+      Boolean(process.env.ALPHA_VANTAGE_API_KEY?.trim()) &&
+      process.env.PORTFOLIO_ANALYZER_EXTERNAL_SOURCE_INSTITUTIONAL ===
+        "enabled" &&
+      policy.allowedSources.some(
+        (source) => source.id === "institutional" && source.enabled,
+      )
+    );
+  },
+  async fetch(input) {
+    if (!isSourceAllowed(input, "institutional")) {
+      throw new ExternalResearchProviderDisabledError(
+        "Institutional external research source is not allowed for this job.",
+      );
+    }
+
+    const security = input.request.security;
+    const symbol = normalizeNullable(security?.symbol);
+    if (!symbol) {
+      throw new ExternalResearchProviderDisabledError(
+        "Institutional external research requires a security symbol.",
+      );
+    }
+
+    const { getAlphaVantageEarnings } = await import(
+      "@/lib/market-data/alpha-vantage"
+    );
+    const earnings = await getAlphaVantageEarnings(
+      symbol,
+      security?.exchange,
+      security?.currency,
+    );
+    if (!earnings) {
+      throw new ExternalResearchProviderDisabledError(
+        "No Alpha Vantage earnings payload was available for this security.",
+      );
+    }
+
+    const document = buildAlphaVantageEarningsDocument({
+      input,
+      candidateSymbol: earnings.candidateSymbol,
+      payload: earnings.payload,
+    });
+
+    return {
+      sourceMode: "cached-external",
+      externalResearchAsOf: input.now.toISOString(),
+      targetKey: input.targetKey,
+      security,
+      summaryPoints: document.keyPoints.slice(0, 6),
+      risks: document.riskFlags.slice(0, 6),
+      sources: [
+        {
+          title: document.title,
+          date: document.publishedAt?.slice(0, 10),
+          sourceType: "institutional",
+          providerId: "institutional",
+        },
+      ],
+      documents: [document],
+    };
+  },
+};
+
 export const disabledMarketDataResearchProvider: ExternalResearchProvider = {
   id: "market-data",
   sourceType: "market-data",
@@ -516,7 +680,11 @@ export const disabledMarketDataResearchProvider: ExternalResearchProvider = {
 };
 
 export function getExternalResearchProviders() {
-  return [alphaVantageProfileResearchProvider, cachedMarketDataResearchProvider];
+  return [
+    alphaVantageProfileResearchProvider,
+    alphaVantageInstitutionalResearchProvider,
+    cachedMarketDataResearchProvider,
+  ];
 }
 
 export function getEnabledExternalResearchProviders(

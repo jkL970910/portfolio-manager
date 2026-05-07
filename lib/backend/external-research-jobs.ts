@@ -274,10 +274,12 @@ export async function getMobileExternalResearchJobs(userId: string, limit = 5) {
   return apiSuccess(
     {
       summary: {
+        latestStatus: latest?.status ?? "empty",
         latestStatusLabel: latest?.statusLabel ?? "还没有外部研究任务",
         latestStatusNote:
           latest?.statusNote ?? "最近没有外部研究任务；页面不会自动抓新闻或论坛。",
         latestTargetLabel: latest?.targetLabel ?? null,
+        latestFinishedAt: latest?.finishedAt ?? latest?.createdAt ?? null,
         runningCount,
         queuedCount,
         failedCount,

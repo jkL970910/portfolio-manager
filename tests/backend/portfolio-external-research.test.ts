@@ -20,6 +20,7 @@ function clearExternalResearchEnv() {
   delete process.env.PORTFOLIO_ANALYZER_EXTERNAL_ADAPTERS;
   delete process.env.PORTFOLIO_ANALYZER_EXTERNAL_SOURCE_MARKET_DATA;
   delete process.env.PORTFOLIO_ANALYZER_EXTERNAL_SOURCE_PROFILE;
+  delete process.env.PORTFOLIO_ANALYZER_EXTERNAL_SOURCE_INSTITUTIONAL;
   delete process.env.ALPHA_VANTAGE_API_KEY;
 }
 
@@ -176,6 +177,31 @@ test("profile provider is disabled unless source and api key are configured", ()
     true,
   );
   assert.equal(getEnabledExternalResearchProviders(policy).length, 0);
+
+  clearExternalResearchEnv();
+});
+
+test("institutional provider is enabled only with source flag and API key", () => {
+  process.env.PORTFOLIO_ANALYZER_EXTERNAL_RESEARCH = "enabled";
+  process.env.PORTFOLIO_ANALYZER_EXTERNAL_WORKER = "enabled";
+  process.env.PORTFOLIO_ANALYZER_EXTERNAL_PROVIDERS = "enabled";
+  process.env.PORTFOLIO_ANALYZER_EXTERNAL_ADAPTERS = "enabled";
+  process.env.PORTFOLIO_ANALYZER_EXTERNAL_SOURCE_INSTITUTIONAL = "enabled";
+  process.env.ALPHA_VANTAGE_API_KEY = "test-alpha-vantage-key";
+
+  const policy = getExternalResearchPolicy();
+  assert.equal(
+    getEnabledExternalResearchSources(policy).some(
+      (source) => source.id === "institutional",
+    ),
+    true,
+  );
+  assert.equal(
+    getEnabledExternalResearchProviders(policy).some(
+      (provider) => provider.id === "institutional",
+    ),
+    true,
+  );
 
   clearExternalResearchEnv();
 });
