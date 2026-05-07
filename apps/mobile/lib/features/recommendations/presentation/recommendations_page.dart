@@ -193,6 +193,7 @@ class _RecommendationsPageState extends State<RecommendationsPage> {
                         working: _working,
                         onAdd: _addWatchlistSymbol,
                         onRemove: _removeWatchlistSymbol,
+                        onOpen: _openWatchlistSymbol,
                       ),
                       if (snapshot.data!.explainer.isNotEmpty) ...[
                         const SizedBox(height: 16),
@@ -271,6 +272,23 @@ class _RecommendationsPageState extends State<RecommendationsPage> {
     );
   }
 
+  void _openWatchlistSymbol(String watchlistKey) {
+    final identity = _WatchlistIdentity.parse(watchlistKey);
+    if (identity.symbol.isEmpty) {
+      return;
+    }
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => SecurityDetailPage(
+          apiClient: widget.apiClient,
+          symbol: identity.symbol,
+          fallbackTitle: identity.label,
+          exchange: identity.exchange,
+          currency: identity.currency,
+        ),
+      ),
+    );
+  }
 }
 
 class _PageHeader extends StatelessWidget {
@@ -468,12 +486,14 @@ class _WatchlistCard extends StatefulWidget {
     required this.working,
     required this.onAdd,
     required this.onRemove,
+    required this.onOpen,
   });
 
   final List<String> symbols;
   final bool working;
   final ValueChanged<String> onAdd;
   final ValueChanged<String> onRemove;
+  final ValueChanged<String> onOpen;
 
   @override
   State<_WatchlistCard> createState() => _WatchlistCardState();
@@ -537,7 +557,9 @@ class _WatchlistCardState extends State<_WatchlistCard> {
                 children: widget.symbols
                     .map(
                       (symbol) => InputChip(
-                        label: Text(symbol),
+                        avatar: const Icon(Icons.open_in_new, size: 16),
+                        label: Text(_formatWatchlistLabel(symbol)),
+                        onPressed: () => widget.onOpen(symbol),
                         onDeleted: widget.working
                             ? null
                             : () => widget.onRemove(symbol),
@@ -548,6 +570,41 @@ class _WatchlistCardState extends State<_WatchlistCard> {
           ],
         ),
       ),
+    );
+  }
+}
+
+String _formatWatchlistLabel(String symbol) {
+  return symbol.split(":").where((part) => part.isNotEmpty).join(" · ");
+}
+
+class _WatchlistIdentity {
+  const _WatchlistIdentity({
+    required this.symbol,
+    required this.exchange,
+    required this.currency,
+  });
+
+  final String symbol;
+  final String? exchange;
+  final String? currency;
+
+  String get label => [
+        symbol,
+        if (exchange != null && exchange!.isNotEmpty) exchange!,
+        if (currency != null && currency!.isNotEmpty) currency!,
+      ].join(" · ");
+
+  static _WatchlistIdentity parse(String value) {
+    final parts = value
+        .split(":")
+        .map((part) => part.trim().toUpperCase())
+        .where((part) => part.isNotEmpty)
+        .toList();
+    return _WatchlistIdentity(
+      symbol: parts.isNotEmpty ? parts[0] : "",
+      exchange: parts.length > 1 ? parts[1] : null,
+      currency: parts.length > 2 ? parts[2] : null,
     );
   }
 }

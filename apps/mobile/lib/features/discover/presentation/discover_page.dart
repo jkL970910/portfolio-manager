@@ -88,8 +88,7 @@ class _DiscoverPageState extends State<DiscoverPage> {
       final results = data is Map<String, dynamic> ? data["results"] : null;
       final providerHealth =
           data is Map<String, dynamic> ? data["providerHealth"] : null;
-      final metadata =
-          data is Map<String, dynamic> ? data["metadata"] : null;
+      final metadata = data is Map<String, dynamic> ? data["metadata"] : null;
       final candidates = results is List
           ? results
               .whereType<Map<String, dynamic>>()
@@ -155,9 +154,8 @@ class _DiscoverPageState extends State<DiscoverPage> {
         });
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(tracked
-                ? "$watchlistKey 已移出观察列表。"
-                : "$watchlistKey 已加入观察列表。"),
+            content: Text(
+                tracked ? "$watchlistKey 已移出观察列表。" : "$watchlistKey 已加入观察列表。"),
           ),
         );
       }
@@ -185,6 +183,22 @@ class _DiscoverPageState extends State<DiscoverPage> {
     );
   }
 
+  void _openWatchlistSymbol(String watchlistKey) {
+    final identity = _WatchlistIdentity.parse(watchlistKey);
+    if (identity.symbol.isEmpty) return;
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => SecurityDetailPage(
+          apiClient: widget.apiClient,
+          symbol: identity.symbol,
+          fallbackTitle: identity.label,
+          exchange: identity.exchange,
+          currency: identity.currency,
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return RefreshIndicator(
@@ -204,7 +218,10 @@ class _DiscoverPageState extends State<DiscoverPage> {
           ),
           if (_watchlistSymbols.isNotEmpty) ...[
             const SizedBox(height: 16),
-            _WatchlistPreview(symbols: _watchlistSymbols.toList()..sort()),
+            _WatchlistPreview(
+              symbols: _watchlistSymbols.toList()..sort(),
+              onOpen: _openWatchlistSymbol,
+            ),
           ],
           if (_error != null) ...[
             const SizedBox(height: 16),
@@ -354,9 +371,10 @@ class _SearchCard extends StatelessWidget {
 }
 
 class _WatchlistPreview extends StatelessWidget {
-  const _WatchlistPreview({required this.symbols});
+  const _WatchlistPreview({required this.symbols, required this.onOpen});
 
   final List<String> symbols;
+  final ValueChanged<String> onOpen;
 
   @override
   Widget build(BuildContext context) {
@@ -373,7 +391,13 @@ class _WatchlistPreview extends StatelessWidget {
               runSpacing: 8,
               children: symbols
                   .take(20)
-                  .map((symbol) => Chip(label: Text(_formatWatchlistLabel(symbol))))
+                  .map(
+                    (symbol) => ActionChip(
+                      label: Text(_formatWatchlistLabel(symbol)),
+                      avatar: const Icon(Icons.open_in_new, size: 16),
+                      onPressed: () => onOpen(symbol),
+                    ),
+                  )
                   .toList(),
             ),
           ],
@@ -385,6 +409,37 @@ class _WatchlistPreview extends StatelessWidget {
 
 String _formatWatchlistLabel(String symbol) {
   return symbol.split(":").where((part) => part.isNotEmpty).join(" · ");
+}
+
+class _WatchlistIdentity {
+  const _WatchlistIdentity({
+    required this.symbol,
+    required this.exchange,
+    required this.currency,
+  });
+
+  final String symbol;
+  final String? exchange;
+  final String? currency;
+
+  String get label => [
+        symbol,
+        if (exchange != null && exchange!.isNotEmpty) exchange!,
+        if (currency != null && currency!.isNotEmpty) currency!,
+      ].join(" · ");
+
+  static _WatchlistIdentity parse(String value) {
+    final parts = value
+        .split(":")
+        .map((part) => part.trim().toUpperCase())
+        .where((part) => part.isNotEmpty)
+        .toList();
+    return _WatchlistIdentity(
+      symbol: parts.isNotEmpty ? parts[0] : "",
+      exchange: parts.length > 1 ? parts[1] : null,
+      currency: parts.length > 2 ? parts[2] : null,
+    );
+  }
 }
 
 class _SecurityResultCard extends StatelessWidget {
@@ -533,8 +588,7 @@ String _formatSearchStatus(int supportedCount, Object? metadata) {
   }
 
   final filteredOutCount = metadata["filteredOutCount"] as int? ?? 0;
-  final scope =
-      metadata["supportedScopeLabel"] as String? ?? "北美 CAD/USD 市场";
+  final scope = metadata["supportedScopeLabel"] as String? ?? "北美 CAD/USD 市场";
   if (supportedCount > 0) {
     return filteredOutCount > 0
         ? "找到 $supportedCount 个候选结果；已隐藏 $filteredOutCount 个不在$scope范围内的结果。"
