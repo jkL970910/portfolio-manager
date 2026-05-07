@@ -1699,6 +1699,7 @@ test("Loo Minister can call an OpenRouter-compatible Responses endpoint", async 
 
     return new Response(
       JSON.stringify({
+        output_text: "",
         choices: [
           {
             message: {

@@ -76,8 +76,9 @@ function sanitizeProviderError(message: string) {
 }
 
 function extractOutputText(response: Record<string, unknown>) {
-  if (typeof response.output_text === "string") {
-    return response.output_text;
+  const direct = extractTextFromContent(response.output_text);
+  if (direct) {
+    return direct;
   }
 
   const output = response.output;
