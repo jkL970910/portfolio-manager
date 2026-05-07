@@ -958,7 +958,7 @@ class _GptEnhancementPanel extends StatelessWidget {
                   }
                   if (snapshot.hasError) {
                     return Text(
-                      "GPT 增强暂时失败，请稍后重试；上方智能快扫结果仍可继续参考。",
+                      "GPT 增强暂时失败：${_friendlyErrorMessage(snapshot.error)}\n上方智能快扫结果仍可继续参考。",
                       style:
                           TextStyle(color: Theme.of(context).colorScheme.error),
                     );
@@ -976,6 +976,17 @@ class _GptEnhancementPanel extends StatelessWidget {
       ),
     );
   }
+}
+
+String _friendlyErrorMessage(Object? error) {
+  final raw = error?.toString().trim() ?? "";
+  if (raw.isEmpty) {
+    return "没有拿到错误详情。";
+  }
+  return raw
+      .replaceFirst(RegExp(r"^LooApiException:\s*"), "")
+      .replaceFirst(RegExp(r"^Exception:\s*"), "")
+      .replaceAll(RegExp(r"sk-[A-Za-z0-9_-]+"), "sk-****");
 }
 
 class _GptEnhancementView extends StatelessWidget {
