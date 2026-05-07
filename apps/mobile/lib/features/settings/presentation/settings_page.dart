@@ -182,24 +182,11 @@ class _SettingsPageState extends State<SettingsPage> {
                 style: TextStyle(color: Theme.of(context).colorScheme.error)),
           ],
           const SizedBox(height: 12),
-          _FxDisplayPolicyCard(displayCurrency: _currency),
-          const SizedBox(height: 8),
-          Card(
-            child: ListTile(
-              leading: const Icon(Icons.currency_exchange),
-              title: const Text("刷新 FX 汇率"),
-              subtitle: Text(
-                _fxRefreshResult ?? "手动更新 USD/CAD，用于总资产和组合汇总折算。",
-              ),
-              trailing: _refreshingFx
-                  ? const SizedBox(
-                      width: 22,
-                      height: 22,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Icon(Icons.chevron_right),
-              onTap: _refreshingFx ? null : _refreshFxRate,
-            ),
+          _FxDisplayPolicyCard(
+            displayCurrency: _currency,
+            refreshResult: _fxRefreshResult,
+            refreshing: _refreshingFx,
+            onRefresh: _refreshFxRate,
           ),
           const SizedBox(height: 16),
           Text("行情数据", style: Theme.of(context).textTheme.titleLarge),
@@ -1345,53 +1332,37 @@ class _MarketDataStatusCardState extends State<_MarketDataStatusCard> {
 }
 
 class _FxDisplayPolicyCard extends StatelessWidget {
-  const _FxDisplayPolicyCard({required this.displayCurrency});
+  const _FxDisplayPolicyCard({
+    required this.displayCurrency,
+    required this.refreshResult,
+    required this.refreshing,
+    required this.onRefresh,
+  });
 
   final String displayCurrency;
+  final String? refreshResult;
+  final bool refreshing;
+  final VoidCallback onRefresh;
 
   @override
   Widget build(BuildContext context) {
     return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                const Icon(Icons.currency_exchange),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    "FX 折算口径",
-                    style: Theme.of(context).textTheme.titleLarge,
-                  ),
-                ),
-                Chip(label: Text(displayCurrency)),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Text(
-              "所有总资产、组合走势和跨币种持仓都会按当前显示币种折算；持仓自己的交易币种不会被改写。",
-              style: Theme.of(context).textTheme.bodyMedium,
-            ),
-            const SizedBox(height: 10),
-            const Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                Chip(label: Text("原始持仓保留交易币种")),
-                Chip(label: Text("汇率只用于展示折算")),
-                Chip(label: Text("失败时沿用最近可用汇率")),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Text(
-              "完整的新鲜度、TTL 和最近刷新结果在下方 `行情状态` 查看。",
-              style: Theme.of(context).textTheme.bodySmall,
-            ),
-          ],
+      child: ListTile(
+        leading: const Icon(Icons.currency_exchange),
+        title: Text("FX 折算 · $displayCurrency"),
+        subtitle: Text(
+          refreshResult ?? "仅用于总资产和组合汇总；持仓仍保留原交易币种，失败时沿用最近汇率。",
         ),
+        trailing: refreshing
+            ? const SizedBox(
+                width: 22,
+                height: 22,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              )
+            : TextButton(
+                onPressed: onRefresh,
+                child: const Text("刷新"),
+              ),
       ),
     );
   }
