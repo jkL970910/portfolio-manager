@@ -2932,6 +2932,19 @@ function buildExternalInput(
   ];
 }
 
+function buildOpenRouterCompatibleInstructions() {
+  return [
+    "你是 Loo国大臣，是项目内的投资管家型助手。你必须用中文回答，先给直接结论，再说明组合影响、关键风险、确认项和下一步。",
+    "只能使用用户提供的页面 context、持仓/偏好背景、缓存分析和明确的数据新鲜度；不要编造实时新闻、论坛或未提供的行情。",
+    "不要向用户暴露 provider、sourceMode、context pack、DTO、fallback、run-analysis 等工程词。",
+    "如果用户问某标的是否适合买入/适配，必须把它当成候选标的分析；currentExposure=0 只代表未持有，不得阻止分析。",
+    "suggestedActions 必须返回 []；产品动作由后端 deterministic 附加。",
+    "只返回合法 JSON object，不要 markdown。JSON 字段必须是 version, generatedAt, role, page, title, answer, structured, keyPoints, suggestedActions, sources, disclaimer。",
+    "structured 必须包含 directAnswer, reasoning, decisionGates, boundary, nextStep。",
+    "disclaimer 必须说明仅用于研究学习，不构成投资建议。",
+  ].join("\n");
+}
+
 function getMinisterSecurityListingKey(
   security: LooMinisterQuestionRequest["pageContext"]["subject"]["security"],
 ) {
@@ -3354,6 +3367,10 @@ async function callExternalMinisterOnce(
     },
     body: JSON.stringify({
       model: settings.model,
+      instructions:
+        settings.provider === "openrouter-compatible"
+          ? buildOpenRouterCompatibleInstructions()
+          : undefined,
       store:
         process.env.LOO_MINISTER_DISABLE_RESPONSE_STORAGE === "true"
           ? false
@@ -3372,10 +3389,15 @@ async function callExternalMinisterOnce(
     }),
   });
 
-  const payload = (await response.json().catch(() => ({}))) as Record<
-    string,
-    unknown
-  >;
+  const responseText = await response.text().catch(() => "");
+  let payload: Record<string, unknown> = {};
+  if (responseText) {
+    try {
+      payload = JSON.parse(responseText) as Record<string, unknown>;
+    } catch {
+      payload = {};
+    }
+  }
 
   if (!response.ok) {
     const error = payload.error;
@@ -3386,7 +3408,9 @@ async function callExternalMinisterOnce(
     const detail =
       error && typeof error === "object" && "message" in error
         ? String((error as { message?: unknown }).message)
-        : "No provider error body.";
+        : responseText.trim()
+          ? responseText.trim().slice(0, 500)
+          : "No provider error body.";
     throw new Error(
       `${providerName} request failed with status ${response.status} for ${settings.endpoint} using model ${settings.model}: ${detail}`,
     );

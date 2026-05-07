@@ -1681,6 +1681,7 @@ test("Loo Minister can call an OpenRouter-compatible Responses endpoint", async 
   let requestedReasoningEffort = "";
   let requestedFormatType = "";
   let requestedInput: unknown;
+  let requestedInstructions = "";
 
   globalThis.fetch = async (input, init) => {
     requestedUrl = String(input);
@@ -1690,12 +1691,14 @@ test("Loo Minister can call an OpenRouter-compatible Responses endpoint", async 
       reasoning?: { effort?: string };
       text?: { format?: { type?: string } };
       input?: unknown;
+      instructions?: string;
     };
     requestedModel = body.model ?? "";
     requestedStore = body.store;
     requestedReasoningEffort = body.reasoning?.effort ?? "";
     requestedFormatType = body.text?.format?.type ?? "";
     requestedInput = body.input;
+    requestedInstructions = body.instructions ?? "";
 
     return new Response(
       JSON.stringify({
@@ -1811,6 +1814,7 @@ test("Loo Minister can call an OpenRouter-compatible Responses endpoint", async 
     assert.equal(requestedStore, false);
     assert.equal(requestedReasoningEffort, "medium");
     assert.equal(requestedFormatType, "json_object");
+    assert.match(requestedInstructions, /Loo国大臣/);
     assert.equal(Array.isArray(requestedInput), true);
     assert.equal((requestedInput as Array<unknown>).length, 1);
     assert.match(
