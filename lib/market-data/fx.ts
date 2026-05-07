@@ -20,6 +20,11 @@ export type StoredOrFallbackFxRate = {
   freshness: FxRateFreshness;
 };
 
+export type RefreshedFxRate = StoredOrFallbackFxRate & {
+  refreshed: boolean;
+  errorMessage: string | null;
+};
+
 function fallbackFxRate(from: CurrencyCode, to: CurrencyCode) {
   if (from === to) {
     return 1;
@@ -212,6 +217,119 @@ export async function getFxRate(
     );
   } catch {
     return getStoredOrFallbackFxRate(from, to);
+  }
+}
+
+export function formatFxRateLabel(input: {
+  rate: number;
+  rateDate: string | null;
+  source: string;
+  freshness: FxRateFreshness;
+}) {
+  const freshnessLabel =
+    input.freshness === "fresh"
+      ? "最新"
+      : input.freshness === "stale"
+        ? "可能过期"
+        : "保守兜底";
+  const sourceLabel =
+    input.source === "fallback-static" ? "本地保守兜底" : input.source;
+  return `USD/CAD ${input.rate.toFixed(4)} · ${freshnessLabel} · 日期 ${input.rateDate ?? "暂无"} · 来源 ${sourceLabel}`;
+}
+
+export async function refreshFxRate(
+  from: CurrencyCode,
+  to: CurrencyCode,
+  options: { force?: boolean } = {},
+): Promise<RefreshedFxRate> {
+  if (from === to) {
+    return {
+      from,
+      to,
+      rate: 1,
+      rateDate: new Date().toISOString().slice(0, 10),
+      source: "same-currency",
+      freshness: "fresh",
+      refreshed: true,
+      errorMessage: null,
+    };
+  }
+
+  if (!options.force) {
+    const stored = await getLatestStoredFxRate(from, to);
+    if (stored && classifyFxFreshness(stored.rateDate) === "fresh") {
+      return {
+        from,
+        to,
+        rate: stored.rate,
+        rateDate: stored.rateDate,
+        source: stored.source,
+        freshness: "fresh",
+        refreshed: false,
+        errorMessage: null,
+      };
+    }
+  }
+
+  try {
+    const usdCadQuote = await getQuoteFromTwelveData("USD/CAD");
+    const usdToCad =
+      usdCadQuote?.price && Number.isFinite(usdCadQuote.price)
+        ? usdCadQuote.price
+        : null;
+
+    if (!usdToCad || usdToCad <= 0) {
+      const current = await getStoredOrFallbackFxContext(from, to);
+      return {
+        ...current,
+        refreshed: false,
+        errorMessage: "没有拿到新的 USD/CAD 汇率，已沿用最近可用汇率。",
+      };
+    }
+
+    const source =
+      usdCadQuote?.provider === "twelve-data"
+        ? "twelve-data"
+        : "fallback-static";
+    const rateDate = new Date().toISOString().slice(0, 10);
+    await upsertStoredFxRate({
+      from: "USD",
+      to: "CAD",
+      rate: usdToCad,
+      rateDate,
+      source,
+    });
+
+    const rate =
+      from === "USD" && to === "CAD"
+        ? usdToCad
+        : from === "CAD" && to === "USD"
+          ? 1 / usdToCad
+          : 1;
+
+    return {
+      from,
+      to,
+      rate,
+      rateDate,
+      source,
+      freshness: "fresh",
+      refreshed: source === "twelve-data",
+      errorMessage:
+        source === "twelve-data"
+          ? null
+          : "没有拿到新的 USD/CAD 汇率，已沿用保守兜底汇率。",
+    };
+  } catch (error) {
+    const current = await getStoredOrFallbackFxContext(from, to);
+    return {
+      ...current,
+      refreshed: false,
+      errorMessage:
+        error instanceof Error
+          ? error.message
+          : "FX 汇率刷新失败，已沿用最近可用汇率。",
+    };
   }
 }
 

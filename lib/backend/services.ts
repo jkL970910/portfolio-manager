@@ -83,7 +83,9 @@ import type {
 } from "@/lib/backend/models";
 import {
   convertCurrencyAmount,
+  formatFxRateLabel,
   getStoredOrFallbackFxContext,
+  refreshFxRate,
 } from "@/lib/market-data/fx";
 import {
   getSecurityHistoricalSeries,
@@ -831,15 +833,7 @@ function formatFxRefreshLabel(input: {
   source: string;
   freshness: "fresh" | "stale" | "fallback";
 }) {
-  const freshnessLabel =
-    input.freshness === "fresh"
-      ? "最新"
-      : input.freshness === "stale"
-        ? "可能过期"
-        : "保守兜底";
-  const sourceLabel =
-    input.source === "fallback-static" ? "本地保守兜底" : input.source;
-  return `USD/CAD ${input.rate.toFixed(4)} · ${freshnessLabel} · 日期 ${input.rateDate ?? "暂无"} · 来源 ${sourceLabel}`;
+  return formatFxRateLabel(input);
 }
 
 function holdingIdentityKey(
@@ -2002,21 +1996,15 @@ export async function getPortfolioSecurityDetailView(
 ) {
   const repositories = getRepositories();
   const normalizedSymbol = symbol.trim().toUpperCase();
-  const [
-    user,
-    userAccounts,
-    userHoldings,
-    userEvents,
-    userSnapshots,
-    profile,
-  ] = await Promise.all([
-    repositories.users.getById(userId),
-    repositories.accounts.listByUserId(userId),
-    repositories.holdings.listByUserId(userId),
-    repositories.portfolioEvents.listByUserId(userId),
-    repositories.snapshots.listByUserId(userId),
-    repositories.preferences.getByUserId(userId),
-  ]);
+  const [user, userAccounts, userHoldings, userEvents, userSnapshots, profile] =
+    await Promise.all([
+      repositories.users.getById(userId),
+      repositories.accounts.listByUserId(userId),
+      repositories.holdings.listByUserId(userId),
+      repositories.portfolioEvents.listByUserId(userId),
+      repositories.snapshots.listByUserId(userId),
+      repositories.preferences.getByUserId(userId),
+    ]);
   let hydratedPriceHistory: SecurityPriceHistoryPoint[] = [];
 
   const display = await buildServiceDisplayContext(user.baseCurrency);
@@ -2048,9 +2036,10 @@ export async function getPortfolioSecurityDetailView(
           currency: identity?.currency ?? null,
           name: normalizedSymbol,
         }));
-  hydratedPriceHistory = await repositories.securityPriceHistory.listBySecurityId(
-    canonicalSecurity.id,
-  );
+  hydratedPriceHistory =
+    await repositories.securityPriceHistory.listBySecurityId(
+      canonicalSecurity.id,
+    );
   if (
     hydratedPriceHistory.length < 2 ||
     historyNeedsHigherDensity(hydratedPriceHistory)
@@ -2349,8 +2338,7 @@ export async function updateHoldingPosition(
           input.sectorOverride !== undefined
             ? input.sectorOverride
             : holding.sectorOverride,
-        securityTypeOverride:
-          nextSecurityType,
+        securityTypeOverride: nextSecurityType,
         exchangeOverride: nextExchange,
         marketSectorOverride: nextMarketSector,
         updatedAt: new Date(),
@@ -2467,7 +2455,13 @@ async function getHydratedSecurityPriceHistoryForHoldings(
   const repositories = getRepositories();
   const byIdentity = new Map<
     string,
-    { securityId: string; symbol: string; exchange: string; currency: CurrencyCode; holdings: HoldingPosition[] }
+    {
+      securityId: string;
+      symbol: string;
+      exchange: string;
+      currency: CurrencyCode;
+      holdings: HoldingPosition[];
+    }
   >();
   for (const holding of holdings) {
     const security = await resolveSecurityIdentityForHolding(holding);
@@ -4676,15 +4670,14 @@ export async function refreshPortfolioQuotes(
         }))
         .filter((holding) => holding.symbol)
         .filter((holding) =>
-          allowedSecurityIds ? allowedSecurityIds.has(holding.securityId) : true,
+          allowedSecurityIds
+            ? allowedSecurityIds.has(holding.securityId)
+            : true,
         )
-        .map((holding) => [
-          holding.securityId,
-          holding,
-        ]),
+        .map((holding) => [holding.securityId, holding]),
     ).values(),
   ];
-  const usdToCadFx = await getStoredOrFallbackFxContext("USD", "CAD");
+  const usdToCadFx = await refreshFxRate("USD", "CAD");
 
   if (uniqueSymbols.length === 0) {
     return {
@@ -4882,7 +4875,8 @@ export async function refreshPortfolioSecurityQuote(
   const repositories = getRepositories();
   const holdings = (await repositories.holdings.listByUserId(userId)).filter(
     (holding) => {
-      const sameSymbol = holding.symbol.trim().toUpperCase() === normalizedSymbol;
+      const sameSymbol =
+        holding.symbol.trim().toUpperCase() === normalizedSymbol;
       const sameSecurity =
         !requestedSecurityId || holding.securityId === requestedSecurityId;
       const sameExchange =
@@ -4922,7 +4916,7 @@ export async function refreshPortfolioSecurityQuote(
         .map((holding) => [holding.securityId, holding]),
     ).values(),
   ];
-  const usdToCadFx = await getStoredOrFallbackFxContext("USD", "CAD");
+  const usdToCadFx = await refreshFxRate("USD", "CAD");
 
   if (uniqueSymbols.length === 0) {
     const quote = await getSecurityQuote(normalizedSymbol, {
@@ -5002,10 +4996,7 @@ export async function refreshPortfolioSecurityQuote(
   quoteResults.results.forEach((quote, index) => {
     const request = uniqueSymbols[index];
     if (request && Number.isFinite(quote.price) && quote.price > 0) {
-      quoteMap.set(
-        request.securityId,
-        quote,
-      );
+      quoteMap.set(request.securityId, quote);
     }
   });
 

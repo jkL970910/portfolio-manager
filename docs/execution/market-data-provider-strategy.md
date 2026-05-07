@@ -157,13 +157,17 @@ Default cache policy:
 FX is now a separate data track:
 
 - `fx_rates` stores `base_currency + quote_currency + rate_date + rate`.
-- Quote refresh reads the latest stored FX rate, or a conservative fallback if
-  no stored value exists.
-- Quote refresh does not call a live FX API while refreshing USD holdings.
+- Manual quote/security refresh first checks the stored USD/CAD freshness; it
+  only calls the FX provider when the stored rate is missing or stale, then
+  reads the latest stored FX rate for CAD aggregation.
+- The Settings `刷新 FX 汇率` action is the explicit force-refresh path for a
+  user-requested live USD/CAD check.
+- If the FX provider is limited or unavailable, refresh reads the latest stored
+  FX rate, or a conservative fallback if no stored value exists.
 - Mobile overview/portfolio and quote-refresh results now expose FX as-of,
   source, and freshness so CAD total-asset figures can be audited by the user.
-- Live FX lookup may populate `fx_rates` in separate display/refresh paths, but
-  it should not change the holding's native quote currency or native price.
+- Live FX refresh populates `fx_rates`, but it must not change a holding's
+  native quote currency or native price.
 
 If a provider call fails after a cached value exists, the service can return stale cached data instead of failing immediately.
 

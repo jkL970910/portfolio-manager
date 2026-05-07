@@ -28,7 +28,9 @@ class _SettingsPageState extends State<SettingsPage> {
   late var _currency = widget.baseCurrency;
   var _savingCurrency = false;
   var _refreshingQuotes = false;
+  var _refreshingFx = false;
   String? _refreshResult;
+  String? _fxRefreshResult;
   String? _error;
 
   Future<void> _changeCurrency(String currency) async {
@@ -104,6 +106,43 @@ class _SettingsPageState extends State<SettingsPage> {
     }
   }
 
+  Future<void> _refreshFxRate() async {
+    if (_refreshingFx) {
+      return;
+    }
+
+    setState(() {
+      _refreshingFx = true;
+      _fxRefreshResult = null;
+      _error = null;
+    });
+
+    try {
+      final response = await widget.apiClient.refreshFxRate();
+      final data = response["data"];
+      final result =
+          data is Map<String, dynamic> ? data : const <String, dynamic>{};
+      final label = result["fxRateLabel"] as String? ?? "";
+      final message = result["message"] as String? ?? "FX 汇率已检查。";
+      if (mounted) {
+        setState(() {
+          _fxRefreshResult = [
+            message,
+            if (label.isNotEmpty) label,
+          ].join(" ");
+          _refreshingFx = false;
+        });
+      }
+    } catch (error) {
+      if (mounted) {
+        setState(() {
+          _error = error.toString();
+          _refreshingFx = false;
+        });
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return SingleChildScrollView(
@@ -144,6 +183,24 @@ class _SettingsPageState extends State<SettingsPage> {
           ],
           const SizedBox(height: 12),
           _FxDisplayPolicyCard(displayCurrency: _currency),
+          const SizedBox(height: 8),
+          Card(
+            child: ListTile(
+              leading: const Icon(Icons.currency_exchange),
+              title: const Text("刷新 FX 汇率"),
+              subtitle: Text(
+                _fxRefreshResult ?? "手动更新 USD/CAD，用于总资产和组合汇总折算。",
+              ),
+              trailing: _refreshingFx
+                  ? const SizedBox(
+                      width: 22,
+                      height: 22,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.chevron_right),
+              onTap: _refreshingFx ? null : _refreshFxRate,
+            ),
+          ),
           const SizedBox(height: 16),
           Text("行情数据", style: Theme.of(context).textTheme.titleLarge),
           const SizedBox(height: 8),
