@@ -162,13 +162,12 @@ class _SecurityDetailPageState extends State<SecurityDetailPage> {
                   onRefreshQuote: _refreshQuote,
                 ),
                 const SizedBox(height: 12),
-                _ResearchCockpitIntro(data),
+                _ResearchCockpitCard(data),
                 const SizedBox(height: 12),
                 AiAnalysisCard(
                   apiClient: widget.apiClient,
                   title: "Loo国研究工作台",
-                  description:
-                      "自动生成本地规则快扫：先看结论、护栏、组合适配和下一步；外部 GPT 只在你手动点增强时调用。",
+                  description: "自动生成基础智能快扫：先看结论、护栏和组合适配；外部 GPT 只在你手动点增强时调用。",
                   autoRun: true,
                   onCompleted: _refreshDailyIntelligence,
                   refreshKey: [
@@ -298,13 +297,12 @@ class _SecurityDetailPageState extends State<SecurityDetailPage> {
       final itemSymbol = identity.symbol.trim().toUpperCase();
       final itemExchange = identity.exchange.trim().toUpperCase();
       final itemCurrency = identity.currency.trim().toUpperCase();
-      final conflictsWithVisibleIdentity =
-          (itemExchange.isNotEmpty &&
-                  exchange.isNotEmpty &&
-                  itemExchange != exchange) ||
-              (itemCurrency.isNotEmpty &&
-                  currency.isNotEmpty &&
-                  itemCurrency != currency);
+      final conflictsWithVisibleIdentity = (itemExchange.isNotEmpty &&
+              exchange.isNotEmpty &&
+              itemExchange != exchange) ||
+          (itemCurrency.isNotEmpty &&
+              currency.isNotEmpty &&
+              itemCurrency != currency);
       if (securityId.isNotEmpty && identity.securityId == securityId) {
         return !conflictsWithVisibleIdentity;
       }
@@ -618,13 +616,17 @@ class _SummaryCard extends StatelessWidget {
   }
 }
 
-class _ResearchCockpitIntro extends StatelessWidget {
-  const _ResearchCockpitIntro(this.data);
+class _ResearchCockpitCard extends StatelessWidget {
+  const _ResearchCockpitCard(this.data);
 
   final MobileSecurityDetailSnapshot data;
 
   @override
   Widget build(BuildContext context) {
+    final decision = _SecurityResearchDecision.fromSnapshot(data);
+    final trust = _SecurityDataTrust.fromSnapshot(data);
+    final portfolioFit = _portfolioFitSummary(data);
+    final riskNotes = _topRiskNotes(data);
     final chips = [
       if (data.assetClass.isNotEmpty) data.assetClass,
       if (data.sector.isNotEmpty) data.sector,
@@ -642,24 +644,54 @@ class _ResearchCockpitIntro extends StatelessWidget {
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Icon(Icons.dashboard_customize_outlined),
+                Icon(Icons.dashboard_customize_outlined,
+                    color: decision.color(context)),
                 const SizedBox(width: 10),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text("研究视角",
+                      Text("Loo国研究台",
                           style: Theme.of(context).textTheme.titleMedium),
                       const SizedBox(height: 6),
                       Text(
-                        "本页先按你的持仓、账户、偏好、行情缓存和标的身份做确定性判断；不要把单一价格或单条新闻当作买入依据。",
+                        decision.directAnswer,
                         style: Theme.of(context).textTheme.bodySmall,
                       ),
                     ],
                   ),
                 ),
+                const SizedBox(width: 8),
+                _StatusPill(
+                  label: decision.label,
+                  color: decision.color(context),
+                ),
               ],
             ),
+            const SizedBox(height: 14),
+            _ResearchLine(
+              icon: Icons.account_balance_wallet_outlined,
+              label: "组合适配",
+              value: portfolioFit,
+            ),
+            const SizedBox(height: 10),
+            _ResearchLine(
+              icon: Icons.verified_outlined,
+              label: "数据可信度",
+              value: trust.summary,
+              trailing: _StatusPill(
+                label: trust.label,
+                color: trust.color(context),
+              ),
+            ),
+            if (riskNotes.isNotEmpty) ...[
+              const SizedBox(height: 10),
+              _ResearchLine(
+                icon: Icons.report_gmailerrorred_outlined,
+                label: "主要提醒",
+                value: riskNotes.take(2).join("；"),
+              ),
+            ],
             if (chips.isNotEmpty) ...[
               const SizedBox(height: 12),
               Wrap(
@@ -673,6 +705,208 @@ class _ResearchCockpitIntro extends StatelessWidget {
       ),
     );
   }
+}
+
+class _ResearchLine extends StatelessWidget {
+  const _ResearchLine({
+    required this.icon,
+    required this.label,
+    required this.value,
+    this.trailing,
+  });
+
+  final IconData icon;
+  final String label;
+  final String value;
+  final Widget? trailing;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(icon, size: 18, color: Theme.of(context).colorScheme.primary),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text.rich(
+            TextSpan(
+              children: [
+                TextSpan(
+                  text: "$label：",
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                ),
+                TextSpan(text: value),
+              ],
+            ),
+          ),
+        ),
+        if (trailing != null) ...[
+          const SizedBox(width: 8),
+          trailing!,
+        ],
+      ],
+    );
+  }
+}
+
+class _SecurityResearchDecision {
+  const _SecurityResearchDecision({
+    required this.label,
+    required this.directAnswer,
+    required this.tone,
+  });
+
+  final String label;
+  final String directAnswer;
+  final String tone;
+
+  static _SecurityResearchDecision fromSnapshot(
+      MobileSecurityDetailSnapshot data) {
+    final trust = _SecurityDataTrust.fromSnapshot(data);
+    if (trust.tone == "danger") {
+      return const _SecurityResearchDecision(
+        label: "需要补数据",
+        directAnswer: "这个标的的关键数据还不完整，先刷新报价或走势，再做买入判断。",
+        tone: "danger",
+      );
+    }
+
+    final current = data.analysis.currentAllocationPct;
+    final target = data.analysis.targetAllocationPct;
+    final gap = target - current;
+    if (data.heldPosition != null) {
+      return _SecurityResearchDecision(
+        label: gap < -3 ? "继续持有/复核" : "持仓复核",
+        directAnswer: gap < -3
+            ? "你已经持有相关暴露，且同类资产高于目标，重点是复核是否继续持有。"
+            : "这是已持有标的，重点看它是否仍符合账户、税务和目标配置。",
+        tone: gap < -3 ? "warning" : "success",
+      );
+    }
+
+    if (gap > 3) {
+      return const _SecurityResearchDecision(
+        label: "适合继续研究",
+        directAnswer: "这个标的对应的资产类别仍有配置空间，可以进入快扫看是否适合加入观察。",
+        tone: "success",
+      );
+    }
+    if (gap < -3) {
+      return const _SecurityResearchDecision(
+        label: "保持观察",
+        directAnswer: "当前同类资产已经高于目标，除非有更强理由，否则不应作为下一笔优先买入。",
+        tone: "warning",
+      );
+    }
+    return const _SecurityResearchDecision(
+      label: "中性观察",
+      directAnswer: "这个标的可以继续研究，但需要结合偏好、账户位置和数据新鲜度再判断。",
+      tone: "neutral",
+    );
+  }
+
+  Color color(BuildContext context) {
+    return switch (tone) {
+      "success" => Colors.green,
+      "warning" => Colors.orange,
+      "danger" => Theme.of(context).colorScheme.error,
+      _ => Theme.of(context).colorScheme.primary,
+    };
+  }
+}
+
+class _SecurityDataTrust {
+  const _SecurityDataTrust({
+    required this.label,
+    required this.summary,
+    required this.tone,
+  });
+
+  final String label;
+  final String summary;
+  final String tone;
+
+  static _SecurityDataTrust fromSnapshot(MobileSecurityDetailSnapshot data) {
+    final quoteFresh = data.freshnessVariant == "success";
+    final quoteWarning = data.freshnessVariant == "warning";
+    final chartStatus = data.priceHistoryChart?.freshness.status;
+    final hasChart = data.priceHistoryChart?.points.isNotEmpty == true;
+    final chartFresh = chartStatus == "fresh";
+    final chartFallback = chartStatus == "fallback";
+    final identityComplete = data.symbol.isNotEmpty &&
+        data.exchange.isNotEmpty &&
+        data.currency.isNotEmpty;
+
+    if (!identityComplete || (!quoteFresh && !hasChart)) {
+      return const _SecurityDataTrust(
+        label: "需补数据",
+        summary: "标的身份、报价或走势不完整，结论只能低置信参考。",
+        tone: "danger",
+      );
+    }
+    if (quoteWarning || chartFallback || !chartFresh) {
+      return _SecurityDataTrust(
+        label: "部分可用",
+        summary: [
+          data.quoteStatusLabel,
+          if (hasChart) data.priceHistoryChart!.freshness.label else "走势待补充",
+        ].where((item) => item.isNotEmpty).join("；"),
+        tone: "warning",
+      );
+    }
+    return _SecurityDataTrust(
+      label: "数据较新",
+      summary: [
+        data.quoteStatusLabel,
+        if (hasChart) data.priceHistoryChart!.freshness.label,
+      ].where((item) => item.isNotEmpty).join("；"),
+      tone: "success",
+    );
+  }
+
+  Color color(BuildContext context) {
+    return switch (tone) {
+      "success" => Colors.green,
+      "warning" => Colors.orange,
+      "danger" => Theme.of(context).colorScheme.error,
+      _ => Theme.of(context).colorScheme.primary,
+    };
+  }
+}
+
+String _portfolioFitSummary(MobileSecurityDetailSnapshot data) {
+  final current = data.analysis.currentAllocation;
+  final target = data.analysis.targetAllocation;
+  final drift = data.analysis.driftLabel;
+  final share = data.analysis.portfolioShare;
+  if (current == "--" && target == "--" && share == "--") {
+    return data.heldPosition == null
+        ? "未持有候选标的，需用快扫判断它是否补足目标配置。"
+        : "已持有标的，需复核账户位置、风险和目标配置。";
+  }
+  return [
+    if (share != "--") "组合占比 $share",
+    if (current != "--" || target != "--") "同类资产 $current / 目标 $target",
+    if (drift != "--") "偏离 $drift",
+  ].join("；");
+}
+
+List<String> _topRiskNotes(MobileSecurityDetailSnapshot data) {
+  final notes = <String>[
+    if (data.analysis.currentAllocationPct >
+        data.analysis.targetAllocationPct + 3)
+      "同类资产已高于目标",
+    if (data.freshnessVariant != "success") "报价需要确认",
+    if (data.priceHistoryChart?.freshness.status == "fallback") "走势含参考数据",
+    ...data.marketData.notes.take(2),
+  ];
+  final deduped = <String>[];
+  for (final note in notes.where((item) => item.trim().isNotEmpty)) {
+    if (!deduped.contains(note)) deduped.add(note);
+  }
+  return deduped;
 }
 
 class _InfoChip extends StatelessWidget {

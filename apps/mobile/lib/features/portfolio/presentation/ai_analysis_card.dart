@@ -645,7 +645,15 @@ String _friendlyAnalysisText(String value) {
       .replaceAll("Local portfolio health summary", "本地组合健康摘要")
       .replaceAll("Local account health summary", "本地账户健康摘要")
       .replaceAll("Local account holdings", "本地账户持仓")
-      .replaceAll("Local recommendation run", "本地推荐运行记录");
+      .replaceAll("Local recommendation run", "本地推荐记录")
+      .replaceAll("provider", "数据来源")
+      .replaceAll("Provider", "数据来源")
+      .replaceAll("sourceMode", "来源状态")
+      .replaceAll("fallback", "保守参考")
+      .replaceAll("Fallback", "保守参考")
+      .replaceAll("run-analysis", "智能快扫")
+      .replaceAll("DTO", "数据结构");
+  text = text.replaceAll(RegExp(r"\bP[0-3]\b\s*[:：]?\s*"), "");
   return text.replaceAll(RegExp(r"\s*;\s*"), "；").trim();
 }
 
@@ -762,11 +770,10 @@ class _AnalysisResultView extends StatelessWidget {
               _MetaPill([
                 if (securityDecision?.decisionLabel != null)
                   securityDecision!.decisionLabel!,
-                if (securityDecision != null)
-                  _verdictLabel(securityDecision.verdict),
                 if (securityDecision?.confidenceScore != null)
-                  "决策置信 ${securityDecision!.confidenceScore!.round()}",
-                "置信度 ${_confidenceLabel(data.confidence)}",
+                  "可信度 ${securityDecision!.confidenceScore!.round()}",
+                if (securityDecision?.confidenceScore == null)
+                  "可信度 ${_confidenceLabel(data.confidence)}",
                 _sourceModeLabel(data.sourceMode),
               ].join(" · ")),
             ],
@@ -856,7 +863,7 @@ class _AnalysisResultView extends StatelessWidget {
           ),
         if (securityDecision != null && securityDecision.nextSteps.isNotEmpty)
           _AnalysisSection(
-            title: "下一步",
+            title: "确认事项",
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children:
@@ -882,7 +889,8 @@ class _AnalysisResultView extends StatelessWidget {
           ExpansionTile(
             tilePadding: EdgeInsets.zero,
             initiallyExpanded: false,
-            title: Text("数据依据", style: Theme.of(context).textTheme.titleSmall),
+            title:
+                Text("可信度与依据", style: Theme.of(context).textTheme.titleSmall),
             childrenPadding: const EdgeInsets.only(bottom: 12),
             children: [
               Align(
@@ -1088,7 +1096,7 @@ class _GptEnhancementView extends StatelessWidget {
         ],
         if (data.nextStep != null) ...[
           const SizedBox(height: 8),
-          Text("下一步：${data.nextStep}"),
+          Text("建议：${data.nextStep}"),
         ],
         const SizedBox(height: 8),
         Text(
@@ -1100,16 +1108,6 @@ class _GptEnhancementView extends StatelessWidget {
       ],
     );
   }
-}
-
-String _verdictLabel(String value) {
-  return switch (value) {
-    "good-candidate" => "候选较强",
-    "weak-fit" => "适配偏弱",
-    "review-existing" => "复核持仓",
-    "needs-more-data" => "需补数据",
-    _ => "先观察",
-  };
 }
 
 class _AnalysisScopeLabels {
@@ -1127,7 +1125,7 @@ class _AnalysisScopeLabels {
     return switch (scope) {
       "security" => const _AnalysisScopeLabels(
           summary: "投资判断",
-          actions: "买入前确认",
+          actions: "确认事项",
           fit: "组合适配",
         ),
       "portfolio" => const _AnalysisScopeLabels(
@@ -1147,7 +1145,7 @@ class _AnalysisScopeLabels {
         ),
       _ => const _AnalysisScopeLabels(
           summary: "分析结论",
-          actions: "下一步确认",
+          actions: "确认事项",
           fit: "适配说明",
         ),
     };
@@ -1301,7 +1299,7 @@ class _PrimaryActionCard extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    "${action.label} · ${action.priority}",
+                    action.label,
                     style: Theme.of(context).textTheme.titleSmall?.copyWith(
                           color:
                               Theme.of(context).colorScheme.onPrimaryContainer,
@@ -1361,7 +1359,9 @@ class _ActionRow extends StatelessWidget {
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.only(top: 8),
-      child: Text("• ${action.title}：${action.detail}"),
+      child: Text(
+        "• ${action.title}${action.detail.isEmpty ? "" : "：${action.detail}"}",
+      ),
     );
   }
 }
@@ -1506,9 +1506,9 @@ String _freshnessStatusLabel(String value) {
 
 String _sourceModeLabel(String value) {
   return switch (value) {
-    "live-external" => "实时外部研究",
-    "cached-external" => "已保存外部资料",
+    "live-external" => "外部资料",
+    "cached-external" => "已保存资料",
     "derived" => "规则派生",
-    _ => "本地快扫",
+    _ => "基础快扫",
   };
 }
