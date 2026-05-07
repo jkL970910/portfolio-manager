@@ -199,7 +199,8 @@ function readStringArray(value: unknown, maxItems = 6, maxLength = 500) {
     return value
       .split(/\n+|[；;]\s*|(?<=。)\s*/u)
       .map((item) => clampText(item.replace(/^[-•\d.、\s]+/, ""), maxLength))
-      .filter(Boolean);
+      .filter(Boolean)
+      .slice(0, maxItems);
   }
 
   return [];
