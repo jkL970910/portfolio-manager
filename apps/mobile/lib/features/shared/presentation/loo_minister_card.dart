@@ -533,7 +533,7 @@ class _LooMinisterCardState extends State<LooMinisterCard> {
       _setPhase("补齐标的/项目资料...");
     }));
     _phaseTimers.add(Timer(const Duration(seconds: 2), () {
-      _setPhase("询问 GPT-5.5 或等待本地策略...");
+      _setPhase("等待外部 GPT 答复...");
     }));
   }
 
@@ -550,7 +550,7 @@ class _LooMinisterCardState extends State<LooMinisterCard> {
       builder: (dialogContext) => AlertDialog(
         title: const Text("大臣回复较慢"),
         content: const Text(
-          "GPT/Router 还在等待。你可以继续等真实模型答复，也可以改用本地大臣先给出基于缓存和页面 context 的答复。",
+          "外部 GPT 还在生成答复。你可以继续等待，也可以先使用基于已保存资料和当前页面上下文的本地答复。",
         ),
         actions: [
           TextButton(
@@ -596,7 +596,7 @@ class _LooMinisterCardState extends State<LooMinisterCard> {
       return;
     }
 
-    _setPhase("GPT/Router 响应较慢，等待你的选择...");
+    _setPhase("外部 GPT 响应较慢，等待你的选择...");
     final choice = await _showTimeoutChoice();
     if (choice == _MinisterTimeoutChoice.useLocal) {
       _setPhase("切换本地大臣答复...");
@@ -606,7 +606,7 @@ class _LooMinisterCardState extends State<LooMinisterCard> {
       return;
     }
 
-    _setPhase("继续等待 GPT-5.5 答复...");
+    _setPhase("继续等待外部 GPT 答复...");
     await _applyMinisterResponse(await remoteFuture);
   }
 
@@ -622,7 +622,7 @@ class _LooMinisterCardState extends State<LooMinisterCard> {
     widget.sessionController.addUserMessage(question);
     _askMinister(question).catchError((Object error) {
       if (mounted) {
-        widget.sessionController.addError(error.toString());
+        widget.sessionController.addError(_friendlyMinisterErrorMessage(error));
       }
     }).whenComplete(() {
       if (mounted) {
@@ -1155,7 +1155,7 @@ class _MinisterSuggestedActionChip extends StatelessWidget {
 
   String get _confirmationDetail {
     return switch (action.actionType) {
-      "run-analysis" => "确认后，大臣会触发当前页面已有的智能快扫。真实请求、缓存策略和额度仍由页面分析卡片控制。",
+      "run-analysis" => "确认后，大臣会触发当前页面已有的智能快扫。是否调用外部 GPT、是否重新生成，仍由页面分析卡片控制。",
       "navigate" => "确认后会打开对应页面，不会修改任何数据。",
       "open-form" => "确认后会打开对应入口。保存前仍需要你在页面内再次确认。",
       "update-preferences" => "确认后会打开偏好设置。大臣不会直接替你保存配置。",
@@ -1163,6 +1163,35 @@ class _MinisterSuggestedActionChip extends StatelessWidget {
       _ => "确认后会把这个建议交给当前应用处理。",
     };
   }
+}
+
+String _friendlyMinisterErrorMessage(Object? error) {
+  final raw = error?.toString().trim() ?? "";
+  final normalized = raw.toLowerCase();
+  if (raw.isEmpty) {
+    return "大臣暂时没有拿到答复，请稍后重试。";
+  }
+  if (normalized.contains("401") || normalized.contains("unauthorized")) {
+    return "登录状态已过期，请重新登录后再问大臣。";
+  }
+  if (normalized.contains("timeout") ||
+      normalized.contains("timed out") ||
+      normalized.contains("502") ||
+      normalized.contains("503") ||
+      normalized.contains("504")) {
+    return "外部 GPT 暂时响应较慢，请稍后重试，或选择本地大臣先给出答复。";
+  }
+  if (normalized.contains("schema") ||
+      normalized.contains("zod") ||
+      normalized.contains("json") ||
+      normalized.contains("exception") ||
+      normalized.contains("格式")) {
+    return "大臣答复暂时没有整理成可展示内容，请稍后重试。";
+  }
+  return raw
+      .replaceFirst(RegExp(r"^LooApiException:\s*"), "")
+      .replaceFirst(RegExp(r"^Exception:\s*"), "")
+      .replaceAll(RegExp(r"sk-[A-Za-z0-9_-]+"), "sk-****");
 }
 
 class _MinisterError extends StatelessWidget {

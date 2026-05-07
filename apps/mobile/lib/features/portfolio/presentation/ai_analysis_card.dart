@@ -12,7 +12,7 @@ class AiAnalysisCard extends StatefulWidget {
     required this.apiClient,
     required this.payload,
     this.title = "智能快扫",
-    this.description = "基于本地规则、当前组合、投资偏好和缓存资料生成；不会默认调用外部 GPT。",
+    this.description = "先用你的组合、偏好和已保存资料生成确定性判断；外部 GPT 只在你点击增强时调用。",
     this.autoRun = false,
     this.refreshKey,
     this.onCompleted,
@@ -294,7 +294,7 @@ class _AiAnalysisCardState extends State<AiAnalysisCard> {
 
                   if (snapshot.hasError) {
                     return _AnalysisError(
-                      message: snapshot.error.toString(),
+                      message: _friendlyAnalysisErrorMessage(snapshot.error),
                       onRetry: () => _runAnalysis(refresh: true),
                     );
                   }
@@ -978,7 +978,7 @@ class _GptEnhancementPanel extends StatelessWidget {
                   }
                   if (snapshot.hasError) {
                     return Text(
-                      "GPT 增强暂时失败：${_friendlyErrorMessage(snapshot.error)}\n上方智能快扫结果仍可继续参考。",
+                      "${_friendlyGptEnhancementErrorMessage(snapshot.error)}\n上方智能快扫结果仍可继续参考。",
                       style:
                           TextStyle(color: Theme.of(context).colorScheme.error),
                     );
@@ -998,10 +998,57 @@ class _GptEnhancementPanel extends StatelessWidget {
   }
 }
 
-String _friendlyErrorMessage(Object? error) {
+String _friendlyGptEnhancementErrorMessage(Object? error) {
   final raw = error?.toString().trim() ?? "";
+  final normalized = raw.toLowerCase();
   if (raw.isEmpty) {
-    return "没有拿到错误详情。";
+    return "GPT 增强暂时不可用，请稍后重试。";
+  }
+  if (normalized.contains("api key") ||
+      normalized.contains("unauthorized") ||
+      normalized.contains("401")) {
+    return "GPT 增强暂时不可用：请检查设置里的外部 GPT 开关和 API Key。";
+  }
+  if (normalized.contains("timeout") ||
+      normalized.contains("timed out") ||
+      normalized.contains("502") ||
+      normalized.contains("503") ||
+      normalized.contains("504")) {
+    return "GPT 增强暂时不可用：外部模型响应较慢或服务不稳定，请稍后重试。";
+  }
+  if (normalized.contains("schema") ||
+      normalized.contains("zod") ||
+      normalized.contains("too_big") ||
+      normalized.contains("expected") ||
+      normalized.contains("json") ||
+      normalized.contains("格式")) {
+    return "GPT 增强暂时不可用：外部模型返回内容需要重新整理，请稍后重试。";
+  }
+  return "GPT 增强暂时不可用，请稍后重试。";
+}
+
+String _friendlyAnalysisErrorMessage(Object? error) {
+  final raw = error?.toString().trim() ?? "";
+  final normalized = raw.toLowerCase();
+  if (raw.isEmpty) {
+    return "智能快扫暂时没有生成成功，请重试。";
+  }
+  if (normalized.contains("401") || normalized.contains("unauthorized")) {
+    return "登录状态已过期，请重新登录后再试。";
+  }
+  if (normalized.contains("timeout") ||
+      normalized.contains("timed out") ||
+      normalized.contains("502") ||
+      normalized.contains("503") ||
+      normalized.contains("504")) {
+    return "智能快扫暂时繁忙，请稍后重试。";
+  }
+  if (normalized.contains("格式") ||
+      normalized.contains("schema") ||
+      normalized.contains("zod") ||
+      normalized.contains("json") ||
+      normalized.contains("exception")) {
+    return "智能快扫暂时没有整理出可展示结果，请重试。";
   }
   return raw
       .replaceFirst(RegExp(r"^LooApiException:\s*"), "")
@@ -1460,7 +1507,7 @@ String _freshnessStatusLabel(String value) {
 String _sourceModeLabel(String value) {
   return switch (value) {
     "live-external" => "实时外部研究",
-    "cached-external" => "缓存外部研究",
+    "cached-external" => "已保存外部资料",
     "derived" => "规则派生",
     _ => "本地快扫",
   };

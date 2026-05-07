@@ -105,7 +105,8 @@ class _HealthScorePageState extends State<HealthScorePage> {
                   AiAnalysisCard(
                     apiClient: widget.apiClient,
                     title: "智能组合快扫",
-                    description: "基于本地规则、组合健康、投资偏好和缓存资料生成；不会默认调用外部 GPT。",
+                    description:
+                        "先用你的组合健康、投资偏好和已保存资料生成确定性判断；外部 GPT 只在你点击增强时调用。",
                     payload: const {
                       "scope": "portfolio",
                       "mode": "quick",
@@ -116,7 +117,8 @@ class _HealthScorePageState extends State<HealthScorePage> {
                   AiAnalysisCard(
                     apiClient: widget.apiClient,
                     title: "智能账户快扫",
-                    description: "基于当前账户持仓、账户类型、投资偏好和缓存资料生成；不会默认调用外部 GPT。",
+                    description:
+                        "先用当前账户持仓、账户类型、投资偏好和已保存资料生成确定性判断；外部 GPT 只在你点击增强时调用。",
                     payload: {
                       "scope": "account",
                       "mode": "quick",
