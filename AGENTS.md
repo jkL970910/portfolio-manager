@@ -164,10 +164,11 @@ Note: if `npm run lint` fails because ESLint 9 expects flat config, do not treat
 
 ## Current Priority Order
 
-1. QA mobile Overview `总资产走势`, Portfolio `组合价值走势`, and Account Detail account-value freshness labels. Reference curves must not be presented as real movement.
-2. Decide whether Holding Detail needs a dedicated account-specific chart beyond Security Detail. If yes, migrate it to `MobileChartSeries`; if not, document it as intentionally covered by Security Detail + Account Detail.
-3. Start preview stack stability hardening so API/DB/tunnel failures are detected before sending a phone QA URL.
-4. Keep external research guarded off by default. The DB-backed job/usage ledger, local worker command, mobile job status visibility, cached market-data provider, and admin-only smoke enqueue tooling are in place. The provider reads only local cached data and requires explicit env flags.
-5. Follow the current cloud plan before real external APIs: Neon Postgres, Vercel Next.js/API, Cloudflare Workers Cron calling protected worker endpoints, queue deferred until cron + DB ledger is insufficient.
-6. Keep financial logic in the existing Next.js / TypeScript backend for the current phase. Do not introduce Java/Python financial microservices unless explicitly requested.
-7. First real external API should be structured and cacheable, such as ETF metadata or company fundamentals. Do not start with raw news/forum/search feeds. Metadata refresh must go through the backend provider contract and worker endpoint, not Flutter page load.
+1. Validate cloud scheduled daily-overview profile smoke through the protected worker path, then confirm Overview `Loo国今日秘闻`, Recommendation lightweight external-material status, item-level `相关秘闻`, Settings worker status, and AI 大臣 context.
+2. Add one bounded announcement/filing/earnings-calendar style adapter behind the same worker/cache/quota/document boundary. Do not add raw news/forum/search first.
+3. Add explicit single-security manual intelligence refresh on Security Detail with daily quota and TTL reuse; keep it off Overview/Recommendations.
+4. Broaden security metadata provider QA from representative holdings to watchlist and non-held candidates. Preserve exact `SYMBOL:EXCHANGE:CURRENCY` identity and never reintroduce ticker-only joins.
+5. Finish production cloud validation: Vercel env, Cloudflare cron secret, worker smoke runs, mobile Settings status, and provider usage visibility.
+6. Continue Security Detail research-cockpit polish and mobile UI/IA cleanup only after the data/AI layer remains stable. User-facing copy must avoid debug terms such as provider internals, fallback labels, raw DTO/sourceMode, or non-interactive cache language.
+7. Keep financial logic in the existing Next.js / TypeScript backend for the current phase. Do not introduce Java/Python financial microservices unless explicitly requested.
+8. Track the AlphaPick screenshot ingestion idea as P1 next to the mobile UI/IA overhaul. It must be treated as an OCR/import pipeline with source attribution, not as trusted market data.

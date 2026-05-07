@@ -153,10 +153,11 @@ research work:
 8. `P0.8 Manual QA SOP`
    - add concrete phone QA steps for each major feature slice before moving on
    - status: completed. `docs/guides/mobile-manual-qa-sop.md` now has a
-     dedicated P0.1-P0.7 decision-chain QA section covering candidate vs
+     dedicated P0.1-P0.8 decision-chain QA section covering candidate vs
      holding review, guardrail precedence, portfolio fit, decision-first UI,
      research cockpit auto quick scan, evidence/freshness display, GPT
-     explanation-only boundary, and Minister suggested-action confirmation.
+     explanation-only boundary, quality polish, and Minister suggested-action
+     confirmation.
 9. `P0.9 Minister Session Continuity`
    - keep the floating 大臣 conversation alive across sheet close/reopen
    - expose recent conversation history so accidentally closed sessions can be
@@ -547,14 +548,16 @@ Runtime context architecture:
    - Main mobile analysis copy must be reader-facing Chinese. Raw debug fields
      such as `quoteStatus=fresh`, `historyAsOf=...`, and `historyPoints=...`
      belong in backend logs or source metadata, not in the primary card body.
-   - The mobile section formerly labeled `下一步` is now `买入前确认`.
+   - The mobile section formerly labeled `下一步` is now `确认事项`.
      Identity repair should appear only when symbol/exchange/currency is
      incomplete or low-confidence; if identity is complete, conclusions should
      focus on concentration, target fit, account/tax placement, and data
      freshness.
-   - The current mobile layout order is `投资判断 / 买入前确认 / 风险护栏 /
-     税务账户提醒 / 组合适配 / 数据依据 / 来源详情`. Dense provider/source
-     metadata should stay in the collapsed `数据依据` or `来源详情`, not the
+   - The current mobile layout starts with `Loo国研究台` on Security Detail:
+     conclusion, portfolio fit, data trust, and main reminders. The quick-scan
+     card then uses `投资判断 / 当前结论 / 为什么现在看 / 主要护栏 / 确认事项 /
+     组合适配 / 观察触发点 / 可信度与依据 / 来源详情`. Dense provider/source
+     metadata should stay in collapsed evidence/source sections, not the
      opening thesis.
    - Security quick-scan thesis must answer the user's real decision question
      first. For held securities, explain whether the current position is more
@@ -564,15 +567,15 @@ Runtime context architecture:
      gap, Preference Factors V2, existing exposure overlap, account/tax/FX, and
      data freshness.
    - Scorecards are supporting evidence, not the product answer. Mobile should
-     show them under `数据依据` after the decision narrative, and they should use
-     reader-facing labels such as `数据可信度`, `持仓影响`, `配置适配`, and
+     show them under `可信度与依据` after the decision narrative, and they should
+     use reader-facing labels such as `数据可信度`, `持仓影响`, `配置适配`, and
      `偏好匹配`.
    - Decision wording must not be driven by allocation gap alone. Avoided
      sectors, low risk capacity, high-priority home purchase goals, stale or
      thin price history, duplicate exposure, and USD/account/tax friction are
      blockers/decision gates. They should appear before any buy/add language
      and can downgrade the conclusion to `候选观察`.
-   - Mobile rendering is scope-aware. Security scans use `投资判断 / 买入前确认 /
+   - Mobile rendering is scope-aware. Security scans use `投资判断 / 确认事项 /
      组合适配`; portfolio, account, and recommendation scans use their own
      diagnostic labels so the wording does not imply every analysis is a buy
      decision.
@@ -707,15 +710,16 @@ Current status:
   `summary`, `scorecards`, `portfolioFit`, and `actionItems` for existing
   cache/mobile compatibility.
 - P0.5 Security Research Cockpit UI now moves the decision workflow to the top
-  of Security Detail. The page shows a research-frame intro, automatically
-  generates the local rules-based quick scan, and keeps GPT enhancement behind
-  an explicit user action to avoid hidden external API cost.
+  of Security Detail. The page shows `Loo国研究台` with conclusion, portfolio
+  fit, data trust, and main reminders, automatically generates the quick scan,
+  and keeps GPT enhancement behind an explicit user action to avoid hidden
+  external API cost.
 - P0.6 Evidence & Freshness Layer now makes source credibility explicit instead
   of hiding it in prose. Quick-scan responses include `evidenceTrail` entries
   for portfolio data, market data, rule-engine derivation, and cached external
   research where applicable. Mobile displays freshness labels, reliability
-  score, limitations, source mode, confidence, and as-of dates in the evidence
-  section.
+  score, limitations, source mode, confidence, and as-of dates in the
+  `可信度与依据` section.
 - P0.7 GPT / Minister Boundary Cleanup now codifies the AI boundary in
   contracts and UI. GPT enhancement is marked `explanation-only` and cannot
   override the deterministic quick-scan result. Minister suggested actions

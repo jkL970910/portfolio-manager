@@ -51,7 +51,9 @@ The roadmap also stays consistent with the current implementation state:
 
 ## Current Build Status
 
-This repository is in `alpha migration planning` stage.
+This repository is in an active Flutter-first alpha build stage. The mobile app,
+Next.js BFF, Postgres data model, worker/cache boundaries, and AI decision
+support surfaces are all under active implementation.
 
 Implemented already in the current codebase:
 
@@ -67,24 +69,35 @@ Implemented already in the current codebase:
 - Flutter mobile guided investment preference setup and health score drilldown
 - Flutter mobile recommendation regeneration plus watchlist management
 - watchlist persistence and candidate-scoring baseline
+- canonical `security_id` identity registry for listing-safe quote/history,
+  recommendations, intelligence, and AI analysis joins
+- AI quick scan decision layer with deterministic guardrails, portfolio fit,
+  evidence/freshness display, GPT enhancement, and Loo国大臣 handoff boundary
+- Loo国大臣 cross-page chat with session continuity and recent conversation
+  recovery
+- Neon/Vercel/Cloudflare-ready worker boundaries for market data, metadata, FX,
+  external research, and cached daily intelligence
 
 Still important to finish:
 
 - real historical performance completion
-- richer import review persistence
-- watchlist and target-constraint deepening
-- candidate scoring and recommendation explanation depth on mobile
-- reusable mobile chart foundation for asset allocation and price-history views
-- cloud-ready cache / worker boundaries
+- cloud production validation for scheduled workers and provider status
+- broader metadata/provider QA for watchlist and non-held candidates
+- one bounded announcement/filing/earnings-style external information adapter
+- mobile UI / IA overhaul after the current data and AI foundations stay stable
+- richer import review persistence and future spending/cash-account depth
 
 ## New Execution Order
 
-1. update docs and planning to the Flutter-first direction
-2. stabilize backend contracts for Flutter
-3. define the mobile navigation and Flutter design system
-4. migrate dashboard, portfolio, security detail, recommendations, and discover
-5. migrate settings, edits, and import workflows
-6. deepen AI-agent and cloud infrastructure later
+1. keep Flutter mobile as the primary client and Next.js as the BFF/API host
+2. preserve listing identity through `symbol + exchange + currency` and
+   canonical `security_id`
+3. keep financial decisions in backend contracts, not page-level Flutter logic
+4. route live/paid data through worker, cache, quota, and ledger boundaries
+5. keep GPT and Loo国大臣 explanation-oriented; deterministic quick scan remains
+   the decision source of truth
+6. continue mobile UI/IA cleanup only after data trust, AI, and cloud behavior
+   stay reliable
 
 ## Design Direction
 
@@ -103,7 +116,7 @@ Today this repository contains:
 - the current Next.js implementation baseline
 - backend route handlers and service logic
 - product and execution docs
-- future Flutter migration direction
+- Flutter mobile implementation and migration direction
 
 The repo is now the source of truth for:
 
