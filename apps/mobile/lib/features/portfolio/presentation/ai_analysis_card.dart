@@ -33,9 +33,10 @@ class AiAnalysisCard extends StatefulWidget {
 
 class _AiAnalysisCardState extends State<AiAnalysisCard> {
   Future<MobileAiAnalysisResult>? _analysis;
-  Future<MobileAiGptEnhancement>? _gptEnhancement;
+  Future<MobileAiGptEnhancement?>? _gptEnhancement;
   ValueListenable<LooMinisterSuggestedAction?>? _ministerActionListenable;
   bool _hasResult = false;
+  bool _hasGptEnhancementResult = false;
   bool _isLoading = false;
   bool _isEnhancing = false;
   late String _payloadSignature;
@@ -92,6 +93,7 @@ class _AiAnalysisCardState extends State<AiAnalysisCard> {
     setState(() {
       _isLoading = true;
       _gptEnhancement = null;
+      _hasGptEnhancementResult = false;
       _analysis = _loadAnalysis(refresh: refresh);
     });
   }
@@ -100,7 +102,7 @@ class _AiAnalysisCardState extends State<AiAnalysisCard> {
     if (_isEnhancing || !_hasResult) return;
     setState(() {
       _isEnhancing = true;
-      _gptEnhancement = _loadGptEnhancement();
+      _gptEnhancement = _loadGptEnhancement(forceFresh: true);
     });
   }
 
@@ -168,6 +170,10 @@ class _AiAnalysisCardState extends State<AiAnalysisCard> {
         setState(() {
           _hasResult = true;
           _isLoading = false;
+          _gptEnhancement ??= _loadGptEnhancement(
+            forceFresh: false,
+            readCacheOnly: true,
+          );
         });
         widget.onCompleted?.call();
       }
@@ -182,17 +188,31 @@ class _AiAnalysisCardState extends State<AiAnalysisCard> {
     }
   }
 
-  Future<MobileAiGptEnhancement> _loadGptEnhancement() async {
+  Future<MobileAiGptEnhancement?> _loadGptEnhancement({
+    bool forceFresh = true,
+    bool readCacheOnly = false,
+  }) async {
     try {
       final response = await widget.apiClient.createAnalyzerGptEnhancement({
         ...widget.payload,
         "forceFreshBaseAnalysis": false,
+        "forceFreshEnhancement": forceFresh,
+        "readCacheOnly": readCacheOnly,
       });
       final data = response["data"];
       if (data is! Map<String, dynamic>) {
         throw const LooApiException("GPT 增强解读格式不正确。");
       }
       final enhancement = data["enhancement"];
+      if (enhancement == null && readCacheOnly) {
+        if (mounted) {
+          setState(() {
+            _isEnhancing = false;
+            _hasGptEnhancementResult = false;
+          });
+        }
+        return null;
+      }
       if (enhancement is! Map<String, dynamic>) {
         throw const LooApiException("GPT 增强解读为空。");
       }
@@ -200,6 +220,7 @@ class _AiAnalysisCardState extends State<AiAnalysisCard> {
       if (mounted) {
         setState(() {
           _isEnhancing = false;
+          _hasGptEnhancementResult = true;
         });
       }
       return result;
@@ -207,6 +228,9 @@ class _AiAnalysisCardState extends State<AiAnalysisCard> {
       if (mounted) {
         setState(() {
           _isEnhancing = false;
+          if (readCacheOnly) {
+            _hasGptEnhancementResult = false;
+          }
         });
       }
       rethrow;
@@ -291,6 +315,7 @@ class _AiAnalysisCardState extends State<AiAnalysisCard> {
                 _GptEnhancementPanel(
                   future: _gptEnhancement,
                   isLoading: _isEnhancing,
+                  hasResult: _hasGptEnhancementResult,
                   onRun: _runGptEnhancement,
                 ),
               ],
@@ -892,11 +917,13 @@ class _GptEnhancementPanel extends StatelessWidget {
   const _GptEnhancementPanel({
     required this.future,
     required this.isLoading,
+    required this.hasResult,
     required this.onRun,
   });
 
-  final Future<MobileAiGptEnhancement>? future;
+  final Future<MobileAiGptEnhancement?>? future;
   final bool isLoading;
+  final bool hasResult;
   final VoidCallback onRun;
 
   @override
@@ -934,7 +961,7 @@ class _GptEnhancementPanel extends StatelessWidget {
                 const SizedBox(width: 8),
                 OutlinedButton(
                   onPressed: isLoading ? null : onRun,
-                  child: Text(future == null ? "增强" : "重新增强"),
+                  child: Text(hasResult ? "重新增强" : "增强"),
                 ),
               ],
             ),
@@ -943,7 +970,7 @@ class _GptEnhancementPanel extends StatelessWidget {
               const LinearProgressIndicator(),
             ] else if (future != null) ...[
               const SizedBox(height: 12),
-              FutureBuilder<MobileAiGptEnhancement>(
+              FutureBuilder<MobileAiGptEnhancement?>(
                 future: future,
                 builder: (context, snapshot) {
                   if (snapshot.connectionState == ConnectionState.waiting) {

@@ -12,6 +12,7 @@ import {
   importJobs,
   investmentAccounts,
   marketSentimentSnapshots,
+  portfolioAnalysisGptEnhancements,
   portfolioEvents,
   portfolioAnalysisRuns,
   portfolioSnapshots,
@@ -33,6 +34,7 @@ import {
   ExternalResearchJob,
   ExternalResearchUsageCounter,
   MarketSentimentSnapshot,
+  PortfolioAnalysisGptEnhancement,
   PortfolioEvent,
   PortfolioAnalysisRun,
   PortfolioSnapshot,
@@ -317,6 +319,29 @@ function mapPortfolioAnalysisRun(
     generatedAt: row.generatedAt.toISOString(),
     expiresAt: row.expiresAt.toISOString(),
     createdAt: row.createdAt.toISOString(),
+  };
+}
+
+function mapPortfolioAnalysisGptEnhancement(
+  row: typeof portfolioAnalysisGptEnhancements.$inferSelect,
+): PortfolioAnalysisGptEnhancement {
+  return {
+    id: row.id,
+    userId: row.userId,
+    scope: row.scope as PortfolioAnalysisGptEnhancement["scope"],
+    mode: row.mode as PortfolioAnalysisGptEnhancement["mode"],
+    targetKey: row.targetKey,
+    enhancementKey: row.enhancementKey,
+    baseGeneratedAt: row.baseGeneratedAt.toISOString(),
+    model: row.model,
+    reasoningEffort: row.reasoningEffort,
+    promptVersion: row.promptVersion,
+    request: row.requestJson as Record<string, unknown>,
+    enhancement: row.enhancementJson as Record<string, unknown>,
+    generatedAt: row.generatedAt.toISOString(),
+    expiresAt: row.expiresAt.toISOString(),
+    createdAt: row.createdAt.toISOString(),
+    updatedAt: row.updatedAt.toISOString(),
   };
 }
 
@@ -1056,6 +1081,66 @@ export const postgresRepositories: BackendRepositories = {
         throw new Error("Failed to persist portfolio analysis run.");
       }
       return mapPortfolioAnalysisRun(row);
+    },
+  },
+  analysisGptEnhancements: {
+    async getFreshByKey(userId, params) {
+      const db = getDb();
+      const row = await db.query.portfolioAnalysisGptEnhancements.findFirst({
+        where: and(
+          eq(portfolioAnalysisGptEnhancements.userId, userId),
+          eq(portfolioAnalysisGptEnhancements.enhancementKey, params.enhancementKey),
+          gt(portfolioAnalysisGptEnhancements.expiresAt, params.now),
+        ),
+        orderBy: desc(portfolioAnalysisGptEnhancements.createdAt),
+      });
+      return row ? mapPortfolioAnalysisGptEnhancement(row) : null;
+    },
+    async upsert(input) {
+      const db = getDb();
+      const [row] = await db
+        .insert(portfolioAnalysisGptEnhancements)
+        .values({
+          userId: input.userId,
+          scope: input.scope,
+          mode: input.mode,
+          targetKey: input.targetKey,
+          enhancementKey: input.enhancementKey,
+          baseGeneratedAt: new Date(input.baseGeneratedAt),
+          model: input.model,
+          reasoningEffort: input.reasoningEffort,
+          promptVersion: input.promptVersion,
+          requestJson: input.request,
+          enhancementJson: input.enhancement,
+          generatedAt: new Date(input.generatedAt),
+          expiresAt: new Date(input.expiresAt),
+          updatedAt: new Date(),
+        })
+        .onConflictDoUpdate({
+          target: [
+            portfolioAnalysisGptEnhancements.userId,
+            portfolioAnalysisGptEnhancements.enhancementKey,
+          ],
+          set: {
+            scope: input.scope,
+            mode: input.mode,
+            targetKey: input.targetKey,
+            baseGeneratedAt: new Date(input.baseGeneratedAt),
+            model: input.model,
+            reasoningEffort: input.reasoningEffort,
+            promptVersion: input.promptVersion,
+            requestJson: input.request,
+            enhancementJson: input.enhancement,
+            generatedAt: new Date(input.generatedAt),
+            expiresAt: new Date(input.expiresAt),
+            updatedAt: new Date(),
+          },
+        })
+        .returning();
+      if (!row) {
+        throw new Error("Failed to persist portfolio analysis GPT enhancement.");
+      }
+      return mapPortfolioAnalysisGptEnhancement(row);
     },
   },
   externalResearchJobs: {

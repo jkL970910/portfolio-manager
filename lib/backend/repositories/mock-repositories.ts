@@ -18,6 +18,7 @@ import {
 import {
   ExternalResearchDocumentRecord,
   MarketSentimentSnapshot,
+  PortfolioAnalysisGptEnhancement,
   PortfolioAnalysisRun,
 } from "@/lib/backend/models";
 import {
@@ -29,6 +30,7 @@ import { normalizePreferenceFactors } from "@/lib/backend/preference-factors";
 import { normalizeRecommendationConstraints } from "@/lib/backend/recommendation-constraints";
 
 const portfolioAnalysisRuns: PortfolioAnalysisRun[] = [];
+const portfolioAnalysisGptEnhancements: PortfolioAnalysisGptEnhancement[] = [];
 const externalResearchJobs: ExternalResearchJob[] = [];
 const externalResearchUsageCounters: ExternalResearchUsageCounter[] = [];
 const externalResearchDocuments: ExternalResearchDocumentRecord[] = [];
@@ -290,6 +292,45 @@ export const mockRepositories: BackendRepositories = {
       };
       portfolioAnalysisRuns.unshift(run);
       return run;
+    },
+  },
+  analysisGptEnhancements: {
+    async getFreshByKey(userId, params) {
+      const match = portfolioAnalysisGptEnhancements
+        .filter((item) => item.userId === userId)
+        .filter((item) => item.enhancementKey === params.enhancementKey)
+        .filter(
+          (item) => new Date(item.expiresAt).getTime() > params.now.getTime(),
+        )
+        .sort(
+          (left, right) =>
+            new Date(right.createdAt).getTime() -
+            new Date(left.createdAt).getTime(),
+        )[0];
+      return match ?? null;
+    },
+    async upsert(input) {
+      const now = new Date().toISOString();
+      const existingIndex = portfolioAnalysisGptEnhancements.findIndex(
+        (item) =>
+          item.userId === input.userId &&
+          item.enhancementKey === input.enhancementKey,
+      );
+      const existing = existingIndex >= 0
+        ? portfolioAnalysisGptEnhancements[existingIndex]
+        : null;
+      const item: PortfolioAnalysisGptEnhancement = {
+        ...input,
+        id: existing?.id ?? `analysis_gpt_${portfolioAnalysisGptEnhancements.length + 1}`,
+        createdAt: existing?.createdAt ?? now,
+        updatedAt: now,
+      };
+      if (existingIndex >= 0) {
+        portfolioAnalysisGptEnhancements[existingIndex] = item;
+      } else {
+        portfolioAnalysisGptEnhancements.unshift(item);
+      }
+      return item;
     },
   },
   externalResearchJobs: {

@@ -56,7 +56,9 @@ export const portfolioAnalyzerRequestSchema = z.object({
 });
 
 export const portfolioAnalyzerGptEnhancementRequestSchema = portfolioAnalyzerRequestSchema.extend({
-  forceFreshBaseAnalysis: z.boolean().default(false)
+  forceFreshBaseAnalysis: z.boolean().default(false),
+  forceFreshEnhancement: z.boolean().default(false),
+  readCacheOnly: z.boolean().default(false)
 });
 
 export const portfolioAnalyzerGptEnhancementSchema = z.object({

@@ -16,6 +16,7 @@ import {
   SecurityPriceHistoryPoint,
   SecurityRecord,
   MarketSentimentSnapshot,
+  PortfolioAnalysisGptEnhancement,
   PreferenceProfile,
   RecommendationRun,
   UserProfile,
@@ -142,6 +143,22 @@ export interface PortfolioAnalysisRunRepository {
   ): Promise<PortfolioAnalysisRun>;
 }
 
+export interface PortfolioAnalysisGptEnhancementRepository {
+  getFreshByKey(
+    userId: EntityId,
+    params: {
+      enhancementKey: string;
+      now: Date;
+    },
+  ): Promise<PortfolioAnalysisGptEnhancement | null>;
+  upsert(
+    input: Omit<
+      PortfolioAnalysisGptEnhancement,
+      "id" | "createdAt" | "updatedAt"
+    >,
+  ): Promise<PortfolioAnalysisGptEnhancement>;
+}
+
 export interface ExternalResearchJobRepository {
   create(
     input: Omit<ExternalResearchJob, "id" | "createdAt" | "updatedAt">,
@@ -229,6 +246,7 @@ export interface BackendRepositories {
   preferences: PreferenceRepository;
   recommendations: RecommendationRepository;
   analysisRuns: PortfolioAnalysisRunRepository;
+  analysisGptEnhancements: PortfolioAnalysisGptEnhancementRepository;
   externalResearchJobs: ExternalResearchJobRepository;
   externalResearchUsageCounters: ExternalResearchUsageCounterRepository;
   externalResearchDocuments: ExternalResearchDocumentRepository;

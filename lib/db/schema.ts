@@ -619,6 +619,46 @@ export const portfolioAnalysisRuns = pgTable(
   }),
 );
 
+export const portfolioAnalysisGptEnhancements = pgTable(
+  "portfolio_analysis_gpt_enhancements",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id),
+    scope: varchar("scope", { length: 32 }).notNull(),
+    mode: varchar("mode", { length: 16 }).notNull(),
+    targetKey: varchar("target_key", { length: 240 }).notNull(),
+    enhancementKey: varchar("enhancement_key", { length: 360 }).notNull(),
+    baseGeneratedAt: timestamp("base_generated_at", {
+      withTimezone: true,
+    }).notNull(),
+    model: varchar("model", { length: 80 }).notNull(),
+    reasoningEffort: varchar("reasoning_effort", { length: 24 }).notNull(),
+    promptVersion: varchar("prompt_version", { length: 32 }).notNull(),
+    requestJson: jsonb("request_json").notNull(),
+    enhancementJson: jsonb("enhancement_json").notNull(),
+    generatedAt: timestamp("generated_at", { withTimezone: true }).notNull(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => ({
+    lookupIdx: index("portfolio_analysis_gpt_enhancements_lookup_idx").on(
+      table.userId,
+      table.enhancementKey,
+      table.expiresAt,
+    ),
+    uniqueKeyIdx: uniqueIndex(
+      "portfolio_analysis_gpt_enhancements_key_idx",
+    ).on(table.userId, table.enhancementKey),
+  }),
+);
+
 export const externalResearchJobs = pgTable(
   "external_research_jobs",
   {

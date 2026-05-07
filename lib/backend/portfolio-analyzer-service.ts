@@ -24,6 +24,9 @@ import {
   resolveLooMinisterSettings,
 } from "@/lib/backend/loo-minister-settings";
 
+const GPT_ENHANCEMENT_PROMPT_VERSION = "gpt-enhance-v1";
+const GPT_ENHANCEMENT_TTL_SECONDS = 86400;
+
 function normalizePart(value: string | null | undefined) {
   return value?.trim().toUpperCase() || "_";
 }
@@ -67,6 +70,22 @@ function expiresAtFrom(now: Date, maxCacheAgeSeconds: number) {
 
 function shouldUseCache(input: PortfolioAnalyzerRequest) {
   return input.cacheStrategy === "prefer-cache" && !input.includeExternalResearch;
+}
+
+function buildGptEnhancementCacheKey(args: {
+  targetKey: string;
+  baseGeneratedAt: string;
+  model: string;
+  reasoningEffort: string;
+}) {
+  return [
+    "gpt-enhancement",
+    GPT_ENHANCEMENT_PROMPT_VERSION,
+    args.targetKey,
+    args.baseGeneratedAt,
+    normalizePart(args.model),
+    normalizePart(args.reasoningEffort),
+  ].join(":");
 }
 
 function sanitizeProviderError(message: string) {
@@ -701,12 +720,20 @@ export async function getPortfolioAnalyzerGptEnhancement(
   userId: string,
   input: PortfolioAnalyzerGptEnhancementRequest,
 ) {
+  const repositories = getRepositories();
   const baseInput: PortfolioAnalyzerRequest = {
     ...input,
     cacheStrategy: input.forceFreshBaseAnalysis ? "refresh" : input.cacheStrategy,
   };
   const base = await getPortfolioAnalyzerQuickScan(userId, baseInput);
   const settings = await resolveLooMinisterSettings(userId);
+  const targetKey = buildPortfolioAnalyzerCacheKey(baseInput);
+  const enhancementKey = buildGptEnhancementCacheKey({
+    targetKey,
+    baseGeneratedAt: base.data.generatedAt,
+    model: settings.model,
+    reasoningEffort: settings.reasoningEffort,
+  });
 
   if (
     settings.mode !== "gpt-5.5" ||
@@ -731,8 +758,63 @@ export async function getPortfolioAnalyzerGptEnhancement(
     throw new Error(message);
   }
 
+  if (!input.forceFreshEnhancement) {
+    const cached = await repositories.analysisGptEnhancements.getFreshByKey(
+      userId,
+      {
+        enhancementKey,
+        now: new Date(),
+      },
+    );
+    if (cached) {
+      return apiSuccess(
+        {
+          baseAnalysis: base.data,
+          enhancement: portfolioAnalyzerGptEnhancementSchema.parse(
+            cached.enhancement,
+          ),
+          cached: true,
+          generatedAt: cached.generatedAt,
+          expiresAt: cached.expiresAt,
+        },
+        "database",
+      );
+    }
+  }
+
+  if (input.readCacheOnly) {
+    return apiSuccess(
+      {
+        baseAnalysis: base.data,
+        enhancement: null,
+        cached: false,
+      },
+      "database",
+    );
+  }
+
   try {
     const result = await callGptEnhancementProvider(base.data, settings);
+    const generatedAt = result.enhancement.generatedAt;
+    const expiresAt = expiresAtFrom(
+      new Date(),
+      Math.max(input.maxCacheAgeSeconds, GPT_ENHANCEMENT_TTL_SECONDS),
+    );
+    await repositories.analysisGptEnhancements.upsert({
+      userId,
+      scope: base.data.scope,
+      mode: base.data.mode,
+      targetKey,
+      enhancementKey,
+      baseGeneratedAt: base.data.generatedAt,
+      model: settings.model,
+      reasoningEffort: settings.reasoningEffort,
+      promptVersion: GPT_ENHANCEMENT_PROMPT_VERSION,
+      request: input as unknown as Record<string, unknown>,
+      enhancement: result.enhancement as unknown as Record<string, unknown>,
+      generatedAt,
+      expiresAt,
+    });
     await recordLooMinisterUsage(userId, {
       page: base.data.scope === "security"
         ? "security-detail"
@@ -753,6 +835,9 @@ export async function getPortfolioAnalyzerGptEnhancement(
       {
         baseAnalysis: base.data,
         enhancement: result.enhancement,
+        cached: false,
+        generatedAt,
+        expiresAt,
       },
       "service",
     );

@@ -474,6 +474,25 @@ export interface PortfolioAnalysisRun {
   createdAt: string;
 }
 
+export interface PortfolioAnalysisGptEnhancement {
+  id: EntityId;
+  userId: EntityId;
+  scope: PortfolioAnalysisRun["scope"];
+  mode: PortfolioAnalysisRun["mode"];
+  targetKey: string;
+  enhancementKey: string;
+  baseGeneratedAt: string;
+  model: string;
+  reasoningEffort: string;
+  promptVersion: string;
+  request: Record<string, unknown>;
+  enhancement: Record<string, unknown>;
+  generatedAt: string;
+  expiresAt: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export type ExternalResearchScope = PortfolioAnalysisRun["scope"];
 export type ExternalResearchJobStatus =
   | "queued"
