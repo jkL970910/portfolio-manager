@@ -2768,24 +2768,60 @@ function extractOutputText(response: Record<string, unknown>) {
   }
 
   const output = response.output;
-  if (!Array.isArray(output)) {
-    return null;
-  }
-
-  for (const item of output) {
-    if (!item || typeof item !== "object") continue;
-    const content = (item as { content?: unknown }).content;
-    if (!Array.isArray(content)) continue;
-    for (const contentItem of content) {
-      if (!contentItem || typeof contentItem !== "object") continue;
-      const text = (contentItem as { text?: unknown }).text;
-      if (typeof text === "string" && text.trim()) {
+  if (Array.isArray(output)) {
+    for (const item of output) {
+      const text = extractTextFromContent(item);
+      if (text) {
         return text;
       }
     }
   }
 
+  const choices = response.choices;
+  if (Array.isArray(choices)) {
+    for (const choice of choices) {
+      const text = extractTextFromContent(choice);
+      if (text) {
+        return text;
+      }
+    }
+  }
+
+  return extractTextFromContent(response);
+}
+
+function extractTextFromContent(value: unknown): string | null {
+  if (typeof value === "string" && value.trim()) {
+    return value;
+  }
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      const text = extractTextFromContent(item);
+      if (text) return text;
+    }
+    return null;
+  }
+  if (!value || typeof value !== "object") {
+    return null;
+  }
+
+  const record = value as Record<string, unknown>;
+  for (const key of ["output_text", "text", "content"]) {
+    const text = extractTextFromContent(record[key]);
+    if (text) return text;
+  }
+  const messageText = extractTextFromContent(record.message);
+  if (messageText) return messageText;
+  const deltaText = extractTextFromContent(record.delta);
+  if (deltaText) return deltaText;
+
   return null;
+}
+
+function parseProviderJsonObject(text: string) {
+  const trimmed = text.trim();
+  const fenced = trimmed.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/i);
+  return JSON.parse((fenced?.[1] ?? trimmed).trim());
 }
 
 function extractUsage(response: Record<string, unknown>) {
@@ -3361,7 +3397,7 @@ async function callExternalMinisterOnce(
   }
 
   const parsed = looMinisterAnswerResultSchema.parse(
-    sanitizeExternalMinisterAnswerPayload(JSON.parse(outputText)),
+    sanitizeExternalMinisterAnswerPayload(parseProviderJsonObject(outputText)),
   );
     return {
       answer: attachDeterministicSuggestedActions(input, parsed),

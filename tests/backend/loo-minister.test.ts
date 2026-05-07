@@ -1699,27 +1699,33 @@ test("Loo Minister can call an OpenRouter-compatible Responses endpoint", async 
 
     return new Response(
       JSON.stringify({
-        output_text: JSON.stringify({
-          version: LOO_MINISTER_VERSION,
-          generatedAt: now,
-          role: "loo-minister",
-          page: "overview",
-          title: "总览大臣答复",
-          answer: "大臣按当前页面 context 给出真实模型答复。",
-          keyPoints: ["总资产: CAD 100,000"],
-          suggestedActions: [],
-          sources: [
-            {
-              title: "Loo国总览 页面上下文",
-              sourceType: "page-context",
-              asOf: now,
+        choices: [
+          {
+            message: {
+              content: `\`\`\`json\n${JSON.stringify({
+                version: LOO_MINISTER_VERSION,
+                generatedAt: now,
+                role: "loo-minister",
+                page: "overview",
+                title: "总览大臣答复",
+                answer: "大臣按当前页面 context 给出真实模型答复。",
+                keyPoints: ["总资产: CAD 100,000"],
+                suggestedActions: [],
+                sources: [
+                  {
+                    title: "Loo国总览 页面上下文",
+                    sourceType: "page-context",
+                    asOf: now,
+                  },
+                ],
+                disclaimer: {
+                  zh: "仅用于研究学习，不构成投资建议。",
+                  en: "For research and education only. This is not investment advice.",
+                },
+              })}\n\`\`\``,
             },
-          ],
-          disclaimer: {
-            zh: "仅用于研究学习，不构成投资建议。",
-            en: "For research and education only. This is not investment advice.",
           },
-        }),
+        ],
         usage: {
           input_tokens: 100,
           output_tokens: 50,
