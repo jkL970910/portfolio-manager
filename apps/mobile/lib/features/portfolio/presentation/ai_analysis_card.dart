@@ -252,13 +252,6 @@ class _AiAnalysisCardState extends State<AiAnalysisCard> {
                       icon: const Icon(Icons.auto_awesome),
                       label: Text(_hasResult ? "重新生成" : "生成"),
                     ),
-                    if (_hasResult) ...[
-                      const SizedBox(height: 6),
-                      Text(
-                        "跳过缓存",
-                        style: Theme.of(context).textTheme.bodySmall,
-                      ),
-                    ],
                   ],
                 ),
               ],
