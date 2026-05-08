@@ -89,6 +89,27 @@ class MobileDailyIntelligenceItem {
 
   bool get canOpenSecurity => identity.symbol.isNotEmpty;
 
+  String get displayTypeLabel {
+    if (sourceType == "market-sentiment") {
+      return "市场脉搏";
+    }
+    if (sourceType == "institutional") {
+      final normalizedTitle = title.toLowerCase();
+      if (normalizedTitle.contains("财报") ||
+          normalizedTitle.contains("earnings")) {
+        return "财报资料";
+      }
+      return "标的资料";
+    }
+    if (sourceType == "analysis") {
+      return "AI分析";
+    }
+    if (sourceType == "market-data") {
+      return "行情资料";
+    }
+    return "外部资料";
+  }
+
   String get identityLabel {
     final parts = [
       identity.symbol,
@@ -96,6 +117,36 @@ class MobileDailyIntelligenceItem {
       identity.currency,
     ].where((part) => part.isNotEmpty).toList();
     return parts.isEmpty ? "组合级情报" : parts.join(" · ");
+  }
+
+  String get compactFreshnessLabel {
+    final parts = freshnessLabel
+        .split("·")
+        .map((part) => part.trim())
+        .where((part) => part.isNotEmpty)
+        .toList();
+    if (parts.isEmpty) {
+      return "";
+    }
+    return parts.first;
+  }
+
+  String get compactMetaLabel {
+    final parts = [
+      identityLabel,
+      compactFreshnessLabel,
+    ].where((part) => part.isNotEmpty).toList();
+    return parts.join(" · ");
+  }
+
+  List<String> get visibleRiskFlags {
+    return riskFlags.where((risk) {
+      final normalized = risk.toLowerCase();
+      return !normalized.contains("不代表实时买卖建议") &&
+          !normalized.contains("not investment advice") &&
+          !normalized.contains("只说明") &&
+          !normalized.contains("需要结合持仓");
+    }).toList();
   }
 
   factory MobileDailyIntelligenceItem.fromJson(Map<String, dynamic> json) {

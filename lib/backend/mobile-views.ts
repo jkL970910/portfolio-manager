@@ -193,6 +193,16 @@ type MobileRecommendationsData = Omit<RecommendationsData, "priorities"> & {
 type MobileImportData = {
   manualSteps: { title: string; description: string }[];
   actionCards: { label: string; title: string; description: string }[];
+  brokerageProviders: {
+    id: "ibkr-flex" | "snaptrade";
+    name: string;
+    status: "ready-to-build" | "feasibility-check";
+    statusLabel: string;
+    description: string;
+    primaryUse: string;
+    setupItems: string[];
+    limitations: string[];
+  }[];
   existingAccounts: Array<
     ImportData["existingAccounts"][number] & {
       displayName: string;
@@ -783,9 +793,52 @@ function mapMobileImportData(data: ImportData): MobileImportData {
         description: "在已有账户下录入标的、数量、成本、币种和市场。",
       },
       {
+        label: "券商",
+        title: "券商同步",
+        description: "统一入口：先支持 IBKR Flex，Wealthsimple 走 SnapTrade 可行性验证。",
+      },
+      {
         label: "检查",
         title: "复核现有账户",
         description: "先看当前账户清单，再决定补哪个账户或持仓。",
+      },
+    ],
+    brokerageProviders: [
+      {
+        id: "ibkr-flex",
+        name: "IBKR Flex Query",
+        status: "ready-to-build",
+        statusLabel: "优先接入",
+        description:
+          "适合从 IBKR 导入账户、持仓、现金、交易、股息和费用；不作为实时行情源。",
+        primaryUse: "IBKR 真实账户导入",
+        setupItems: [
+          "在 IBKR Client Portal 创建 Activity Flex Query",
+          "准备 Flex Token 和 Query ID",
+          "导入前先预览账户、持仓、现金和交易差异",
+        ],
+        limitations: [
+          "只覆盖 IBKR，不覆盖 Wealthsimple",
+          "Flex Statement 适合手动或每日同步，不适合实时行情",
+        ],
+      },
+      {
+        id: "snaptrade",
+        name: "Wealthsimple via SnapTrade",
+        status: "feasibility-check",
+        statusLabel: "验证中",
+        description:
+          "用于验证 Wealthsimple 是否能稳定返回账户、持仓、现金、交易和币种信息。",
+        primaryUse: "Wealthsimple 连接验证",
+        setupItems: [
+          "申请 SnapTrade 开发者账户",
+          "验证 Wealthsimple 连接是否可用",
+          "确认返回字段能保留 symbol + exchange + currency",
+        ],
+        limitations: [
+          "Free plan 通常限制 brokerage connections",
+          "正式同步前必须确认费用、OAuth 流程和断连重连策略",
+        ],
       },
     ],
     existingAccounts: data.existingAccounts.map((account) => ({
@@ -803,6 +856,7 @@ function mapMobileImportData(data: ImportData): MobileImportData {
     notes: [
       "移动端 MVP 只保留手动/引导式导入，不迁移 CSV 上传和字段映射。",
       "CSV 批量导入后续可作为桌面高级功能保留。",
+      "券商同步会共用同一套导入预览：先识别账户/持仓/现金/交易，再由用户确认写入。",
       ...data.portfolioSuccessStates.slice(0, 2),
     ],
   };

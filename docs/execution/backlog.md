@@ -117,6 +117,48 @@ This is the current source of truth before starting the next P0 implementation.
 | Minister usage/cost dashboard with estimates | P1       | Current logs store provider/model/status/token counts; cost estimates can be added after pricing policy is fixed                                                                                                 |
 | Mobile UI / IA overhaul                      | P1       | Large visual/content hierarchy pass after true data, provider status, AI analysis, and external-consultation skill flows are stable                                                                              |
 | AlphaPick screenshot ingestion               | P1       | Convert purchased AlphaPick list screenshots into a reviewed watchlist/import pipeline with OCR, symbol identity resolution, source attribution, freshness labels, and manual confirmation before use.             |
+| Unified brokerage import                     | P1       | Add one `券商同步` flow for broker imports instead of provider-specific tabs. First build target: IBKR Flex Query. First feasibility spike: Wealthsimple via SnapTrade. Architecture source: `docs/execution/brokerage-import-architecture.md`. |
+
+## Unified Brokerage Import Plan
+
+The import product should stay simple for mobile users. Do not add separate
+IBKR, Wealthsimple, Plaid, or Flinks tabs. Use a single `券商同步` entry and
+route providers inside that flow.
+
+### Provider priority
+
+1. `IBKR Flex Query`
+   - Best first implementation target.
+   - User supplies Flex Token + Activity Query ID, optionally Trade Confirmation
+     Query ID.
+   - Pulls account, holding, cash, transaction, dividend, fee, and FX activity
+     from IBKR statements.
+   - Not a realtime quote source. Use existing quote/security metadata workers
+     after import.
+2. `Wealthsimple via SnapTrade`
+   - Feasibility spike before production integration.
+   - Verify Wealthsimple brokerage connection, holdings, cash balances,
+     transactions, account type, native currency, symbol, exchange, and
+     reconnect behavior.
+   - Confirm free-plan / connected-brokerage limits before relying on it.
+3. `Plaid / Flinks`
+   - Backup research paths only.
+   - Do not implement until SnapTrade feasibility is known.
+
+### Shared import contract
+
+Every brokerage provider should normalize into the same internal draft shape:
+
+- imported accounts
+- imported holdings
+- imported cash balances
+- imported transactions
+- imported dividends and fees
+- unresolved securities requiring review
+- raw source metadata for audit/debug, never shown as primary user copy
+
+The final write path must preserve `symbol + exchange + currency` identity and
+must require an explicit user confirmation after preview.
 
 ## Recommended Build Order From Here
 

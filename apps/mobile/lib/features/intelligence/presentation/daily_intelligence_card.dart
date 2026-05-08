@@ -39,13 +39,11 @@ class DailyIntelligenceCard extends StatelessWidget {
                     width: 18,
                     child: CircularProgressIndicator(strokeWidth: 2),
                   )
-                else
-                  const Chip(label: Text("缓存")),
               ],
             ),
             const SizedBox(height: 8),
             Text(
-              snapshot?.disclaimer ?? "这里只展示已缓存的 AI/行情研究，不会在页面加载时实时抓新闻或论坛。",
+              snapshot?.disclaimer ?? "这里展示已整理好的资料摘要；刷新资料需要你手动确认。",
               style: theme.textTheme.bodySmall,
             ),
             const SizedBox(height: 12),
@@ -105,7 +103,7 @@ class DailyIntelligenceSummaryCard extends StatelessWidget {
               ? "暂不可用"
               : isLoading
                   ? "正在整理缓存秘闻..."
-                  : "$countLabel · 只读缓存，不实时抓取外部源",
+                  : "$countLabel · 已整理资料摘要",
         ),
         trailing: isLoading
             ? const SizedBox(
@@ -174,23 +172,25 @@ class _DailyIntelligenceTile extends StatelessWidget {
               Text(item.title, style: theme.textTheme.titleMedium),
               const SizedBox(height: 6),
               Text(item.summary),
-              if (item.reason.isNotEmpty) ...[
-                const SizedBox(height: 6),
-                Text(item.reason, style: theme.textTheme.bodySmall),
-              ],
+              finalReason(item, theme),
               const SizedBox(height: 10),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
+              Row(
                 children: [
-                  _DailyInfoPill(item.sourceLabel),
-                  _DailyInfoPill(item.confidenceLabel),
-                  _DailyInfoPill(item.relevanceLabel),
-                  _DailyInfoPill(item.freshnessLabel),
-                  _DailyInfoPill(item.identityLabel),
+                  _DailyTypePill(item.displayTypeLabel),
+                  if (item.compactMetaLabel.isNotEmpty) ...[
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        item.compactMetaLabel,
+                        style: theme.textTheme.bodySmall,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
                 ],
               ),
-              if (item.keyPoints.isNotEmpty || item.riskFlags.isNotEmpty) ...[
+              if (item.keyPoints.isNotEmpty ||
+                  item.visibleRiskFlags.isNotEmpty) ...[
                 const SizedBox(height: 10),
                 ...item.keyPoints.take(2).map(
                       (point) => Text(
@@ -198,9 +198,9 @@ class _DailyIntelligenceTile extends StatelessWidget {
                         style: theme.textTheme.bodySmall,
                       ),
                     ),
-                ...item.riskFlags.take(1).map(
+                ...item.visibleRiskFlags.take(1).map(
                       (risk) => Text(
-                        "风险：$risk",
+                        "注意：$risk",
                         style: theme.textTheme.bodySmall?.copyWith(
                           color: theme.colorScheme.error,
                         ),
@@ -210,8 +210,10 @@ class _DailyIntelligenceTile extends StatelessWidget {
               if (item.sources.isNotEmpty) ...[
                 const SizedBox(height: 8),
                 Text(
-                  "来源：${item.sources.take(2).map((source) => source.label).join("；")}",
+                  "来源：${item.sources.take(1).map((source) => source.label).join("；")}",
                   style: theme.textTheme.bodySmall,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ],
               if (onViewSecurity != null) ...[
@@ -231,10 +233,23 @@ class _DailyIntelligenceTile extends StatelessWidget {
       ),
     );
   }
+
+  Widget finalReason(MobileDailyIntelligenceItem item, ThemeData theme) {
+    if (item.reason.isEmpty) {
+      return const SizedBox.shrink();
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SizedBox(height: 6),
+        Text(item.reason, style: theme.textTheme.bodySmall),
+      ],
+    );
+  }
 }
 
-class _DailyInfoPill extends StatelessWidget {
-  const _DailyInfoPill(this.label);
+class _DailyTypePill extends StatelessWidget {
+  const _DailyTypePill(this.label);
 
   final String label;
 

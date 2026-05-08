@@ -4,12 +4,14 @@ class MobileImportSnapshot {
   const MobileImportSnapshot({
     required this.manualSteps,
     required this.actionCards,
+    required this.brokerageProviders,
     required this.accounts,
     required this.notes,
   });
 
   final List<MobileImportStep> manualSteps;
   final List<MobileImportAction> actionCards;
+  final List<MobileBrokerageProvider> brokerageProviders;
   final List<MobileImportAccount> accounts;
   final List<String> notes;
 
@@ -20,6 +22,9 @@ class MobileImportSnapshot {
           .toList(),
       actionCards: readJsonList(json, "actionCards")
           .map(MobileImportAction.fromJson)
+          .toList(),
+      brokerageProviders: readJsonList(json, "brokerageProviders")
+          .map(MobileBrokerageProvider.fromJson)
           .toList(),
       accounts: readJsonList(json, "existingAccounts")
           .map(MobileImportAccount.fromJson)
@@ -62,6 +67,44 @@ class MobileImportAction {
       label: json["label"] as String? ?? "入口",
       title: json["title"] as String? ?? "手动导入",
       description: json["description"] as String? ?? "",
+    );
+  }
+}
+
+class MobileBrokerageProvider {
+  const MobileBrokerageProvider({
+    required this.id,
+    required this.name,
+    required this.status,
+    required this.statusLabel,
+    required this.description,
+    required this.primaryUse,
+    required this.setupItems,
+    required this.limitations,
+  });
+
+  final String id;
+  final String name;
+  final String status;
+  final String statusLabel;
+  final String description;
+  final String primaryUse;
+  final List<String> setupItems;
+  final List<String> limitations;
+
+  factory MobileBrokerageProvider.fromJson(Map<String, dynamic> json) {
+    return MobileBrokerageProvider(
+      id: json["id"] as String? ?? "",
+      name: json["name"] as String? ?? "券商导入",
+      status: json["status"] as String? ?? "feasibility-check",
+      statusLabel: json["statusLabel"] as String? ?? "待验证",
+      description: json["description"] as String? ?? "",
+      primaryUse: json["primaryUse"] as String? ?? "",
+      setupItems: (json["setupItems"] as List?)?.whereType<String>().toList() ??
+          const [],
+      limitations:
+          (json["limitations"] as List?)?.whereType<String>().toList() ??
+              const [],
     );
   }
 }

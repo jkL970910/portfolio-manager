@@ -80,6 +80,8 @@ class _ImportPageState extends State<ImportPage> {
                             "添加账户" => _openCreateAccountSheet,
                             "添加持仓" => () => _openCreateHoldingSheet(
                                 snapshot.data!.accounts),
+                            "券商同步" => () => _openBrokerageImportSheet(
+                                snapshot.data!.brokerageProviders),
                             _ => null,
                           },
                         ),
@@ -141,6 +143,15 @@ class _ImportPageState extends State<ImportPage> {
       _refresh();
       await _showImportResult(created);
     }
+  }
+
+  Future<void> _openBrokerageImportSheet(
+      List<MobileBrokerageProvider> providers) {
+    return showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) => _BrokerageImportSheet(providers: providers),
+    );
   }
 
   Future<void> _showImportResult(_ImportResult result) {
@@ -296,6 +307,146 @@ class _ActionCard extends StatelessWidget {
         trailing: onTap == null
             ? const Icon(Icons.lock_outline)
             : const Icon(Icons.chevron_right),
+      ),
+    );
+  }
+}
+
+class _BrokerageImportSheet extends StatelessWidget {
+  const _BrokerageImportSheet({required this.providers});
+
+  final List<MobileBrokerageProvider> providers;
+
+  @override
+  Widget build(BuildContext context) {
+    final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
+
+    return SafeArea(
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(20, 20, 20, bottomInset + 20),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text("券商同步", style: Theme.of(context).textTheme.headlineMedium),
+              const SizedBox(height: 8),
+              const Text("统一入口会先导入到预览区，确认账户、持仓、现金和交易后再写入 Loo国账本。"),
+              const SizedBox(height: 14),
+              ...providers.map(_BrokerageProviderCard.new),
+              const SizedBox(height: 12),
+              const _BrokerageFlowCard(),
+              const SizedBox(height: 16),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: const Text("知道了"),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _BrokerageProviderCard extends StatelessWidget {
+  const _BrokerageProviderCard(this.provider);
+
+  final MobileBrokerageProvider provider;
+
+  @override
+  Widget build(BuildContext context) {
+    final isReady = provider.status == "ready-to-build";
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: 10),
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text(provider.name,
+                      style: Theme.of(context).textTheme.titleMedium),
+                ),
+                DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: isReady
+                        ? colorScheme.primaryContainer
+                        : colorScheme.surfaceContainerHighest,
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: Padding(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                    child: Text(provider.statusLabel),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(provider.description),
+            if (provider.primaryUse.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Text("用途：${provider.primaryUse}",
+                  style: Theme.of(context).textTheme.bodyMedium),
+            ],
+            if (provider.setupItems.isNotEmpty) ...[
+              const SizedBox(height: 10),
+              ...provider.setupItems.take(3).map(
+                    (item) => _BrokerageBullet(text: item),
+                  ),
+            ],
+            if (provider.limitations.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Text("注意：${provider.limitations.first}",
+                  style: Theme.of(context).textTheme.bodySmall),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _BrokerageFlowCard extends StatelessWidget {
+  const _BrokerageFlowCard();
+
+  @override
+  Widget build(BuildContext context) {
+    return const _TextCard(
+      "计划流程\n"
+      "1. 连接券商或填写同步凭证\n"
+      "2. 拉取账户、持仓、现金和交易\n"
+      "3. 进入导入预览，检查 symbol + exchange + currency\n"
+      "4. 用户确认后才写入账本\n\n"
+      "当前阶段先展示入口和方案；真实连接会在下一步接入。",
+    );
+  }
+}
+
+class _BrokerageBullet extends StatelessWidget {
+  const _BrokerageBullet({required this.text});
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 6),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(Icons.check_circle_outline, size: 17),
+          const SizedBox(width: 8),
+          Expanded(child: Text(text)),
+        ],
       ),
     );
   }

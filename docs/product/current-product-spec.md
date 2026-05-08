@@ -252,6 +252,31 @@ background jobs.
 Mobile Import should preserve the current guided/manual flow and omit mobile CSV
 unless explicitly requested.
 
+Brokerage import should use one simple `券商同步` entry instead of separate
+IBKR / Wealthsimple tabs. The unified flow is:
+
+1. select or connect a brokerage source
+2. pull account, holding, cash, transaction, dividend, and fee data into a
+   review draft
+3. resolve every security by `symbol + exchange + currency`
+4. show an import preview/diff
+5. write to the ledger only after explicit user confirmation
+
+Provider priority:
+
+- `IBKR Flex Query` is the first build target. It is suitable for personal IBKR
+  account/holding/cash/transaction imports, but not for realtime quotes.
+- `Wealthsimple via SnapTrade` is the first feasibility spike. Before a formal
+  integration, verify Wealthsimple coverage, returned investment fields,
+  account/currency fidelity, OAuth/reconnect behavior, and free-plan limits.
+- `Plaid` and `Flinks` remain backup research paths. They should not be
+  implemented before SnapTrade feasibility is known.
+
+The architecture source of truth for this P1 flow is
+`docs/execution/brokerage-import-architecture.md`. It defines draft quarantine,
+unresolved-security blockers, idempotency keys, snapshot import modes, and
+cross-provider conflict handling.
+
 Future spending/cash-account monitoring is planned after investment and AI
 foundations are stable. Cash/spending accounts should eventually support
 Monarch-like transaction visibility, but this is not current P0.
@@ -275,10 +300,12 @@ Monarch-like transaction visibility, but this is not current P0.
 
 1. Mobile UI / IA overhaul.
 2. AlphaPick screenshot ingestion as a reviewed OCR/import pipeline.
-3. Per-account AI 大臣 opt-in.
-4. Minister usage/cost dashboard.
-5. Persist draggable 大臣 button position.
-6. Spending/cash-account monitoring.
+3. IBKR Flex Query import and Wealthsimple/SnapTrade feasibility spike under the
+   unified `券商同步` flow.
+4. Per-account AI 大臣 opt-in.
+5. Minister usage/cost dashboard.
+6. Persist draggable 大臣 button position.
+7. Spending/cash-account monitoring.
 
 ## Related Execution Docs
 
