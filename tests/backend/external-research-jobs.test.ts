@@ -156,7 +156,14 @@ test("external research job repository can claim and finish queued jobs", async 
     },
     status: "queued",
     sourceMode: "cached-external",
-    sourceAllowlist: [],
+    sourceAllowlist: [
+      {
+        id: "profile",
+        label: "标的基本资料",
+        enabled: true,
+        reason: "test",
+      },
+    ],
     priority: 10,
     attemptCount: 0,
     maxAttempts: 3,
@@ -235,7 +242,14 @@ test("external research job mobile mapping exposes readable security identity", 
     },
     status: "succeeded",
     sourceMode: "cached-external",
-    sourceAllowlist: [],
+    sourceAllowlist: [
+      {
+        id: "profile",
+        label: "标的基本资料",
+        enabled: true,
+        reason: "test",
+      },
+    ],
     priority: 10,
     attemptCount: 1,
     maxAttempts: 3,
@@ -261,6 +275,10 @@ test("external research job mobile mapping exposes readable security identity", 
   assert.equal(mapped.freshness.ttlLabel, "6 小时");
   assert.equal(mapped.freshness.freshnessLabel, "缓存有效期约 6 小时");
   assert.match(mapped.freshness.resultExpiresAtLabel ?? "", /2026-04-28 18:45/);
+  assert.deepEqual(mapped.sourceIds, ["profile"]);
+  assert.deepEqual(mapped.sources, [
+    { id: "profile", label: "标的基本资料", enabled: true },
+  ]);
 });
 
 test("external research job mobile mapping treats provider no-data as skipped", async () => {
@@ -288,7 +306,8 @@ test("external research job mobile mapping treats provider no-data as skipped", 
     lockedBy: null,
     startedAt: now.toISOString(),
     finishedAt: now.toISOString(),
-    errorMessage: "No Alpha Vantage profile payload was available for this security.",
+    errorMessage:
+      "No Alpha Vantage profile payload was available for this security.",
     resultRunId: null,
   });
 
@@ -334,12 +353,18 @@ test("external research mobile jobs expose summary and retry labels", async () =
 
   assert.equal(response.data.summary.latestStatusLabel, "排队中");
   assert.equal(response.data.summary.latestStatus, "queued");
-  assert.equal(response.data.summary.latestFinishedAt, response.data.items[0]?.createdAt);
+  assert.equal(
+    response.data.summary.latestFinishedAt,
+    response.data.items[0]?.createdAt,
+  );
   assert.equal(response.data.summary.queuedCount, 1);
   assert.equal(response.data.summary.failedCount, 0);
   assert.equal(response.data.summary.skippedCount, 0);
   assert.match(response.data.summary.workerBoundaryLabel, /worker/);
-  assert.equal(response.data.items[0]?.nextRetryLabel, "下次可运行：2026-04-28 16:00");
+  assert.equal(
+    response.data.items[0]?.nextRetryLabel,
+    "下次可运行：2026-04-28 16:00",
+  );
   assert.equal(response.data.items[0]?.freshness.ttlLabel, "3 小时");
 });
 
@@ -662,9 +687,8 @@ test("external research smoke enqueue creates a queued institutional job", async
 test("daily overview external research enqueue is disabled unless API host flag is enabled", async () => {
   enableProfileProvider();
   delete process.env.PORTFOLIO_ANALYZER_EXTERNAL_DAILY_OVERVIEW;
-  const { enqueueDailyOverviewExternalResearchJobs } = await import(
-    "@/lib/backend/external-research-jobs"
-  );
+  const { enqueueDailyOverviewExternalResearchJobs } =
+    await import("@/lib/backend/external-research-jobs");
 
   const result = await enqueueDailyOverviewExternalResearchJobs({
     now: new Date("2026-04-28T15:30:00.000Z"),

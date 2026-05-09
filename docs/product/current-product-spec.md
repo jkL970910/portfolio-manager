@@ -214,6 +214,10 @@ Current first pass:
   research regeneration. The backend actions stay separate; the mobile UI should
   not scatter separate `刷新报价`、`刷新资料`、`重新生成` buttons across unrelated
   cards.
+- The update sheet must show the user-facing manual-refresh boundary: daily
+  remaining quota, cache TTL/window, latest task state, and source-specific
+  availability for profile vs institutional refresh. Source status must be
+  matched by complete security identity and source id, not ticker-only.
 - Page load remains cache-only; new provider documents can invalidate old
   quick-scan cache entries so evidence is refreshed without live Flutter calls.
 

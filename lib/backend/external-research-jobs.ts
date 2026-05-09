@@ -87,7 +87,9 @@ function formatTtlSeconds(seconds: number | undefined) {
 function mapExternalResearchStatusNote(job: ExternalResearchJob) {
   if (job.status === "queued") {
     const runAfter = formatExternalResearchDateTime(job.runAfter);
-    return runAfter ? `排队中，计划 ${runAfter} 后运行。` : "排队中，等待 worker。";
+    return runAfter
+      ? `排队中，计划 ${runAfter} 后运行。`
+      : "排队中，等待 worker。";
   }
   if (job.status === "running") {
     return job.lockedBy
@@ -189,6 +191,26 @@ export function mapExternalResearchJobForMobile(job: ExternalResearchJob) {
         .join(" · ")
     : job.targetKey;
   const freshness = mapExternalResearchFreshness(job);
+  const sources = job.sourceAllowlist
+    .map((source) => {
+      const id =
+        typeof source.id === "string" ? source.id.trim().toLowerCase() : "";
+      if (
+        id !== "market-data" &&
+        id !== "profile" &&
+        id !== "institutional" &&
+        id !== "news" &&
+        id !== "community"
+      ) {
+        return null;
+      }
+      return {
+        id,
+        label: String(source.label ?? id),
+        enabled: source.enabled === true,
+      };
+    })
+    .filter((source): source is NonNullable<typeof source> => Boolean(source));
 
   return {
     id: job.id,
@@ -205,6 +227,8 @@ export function mapExternalResearchJobForMobile(job: ExternalResearchJob) {
     nextRetryLabel: mapExternalResearchNextRetryLabel(job),
     statusNote: mapExternalResearchStatusNote(job),
     freshness,
+    sources,
+    sourceIds: sources.map((source) => source.id),
     startedAt: job.startedAt,
     finishedAt: job.finishedAt,
     errorMessage: job.errorMessage,
@@ -277,7 +301,8 @@ export async function getMobileExternalResearchJobs(userId: string, limit = 5) {
         latestStatus: latest?.status ?? "empty",
         latestStatusLabel: latest?.statusLabel ?? "还没有外部研究任务",
         latestStatusNote:
-          latest?.statusNote ?? "最近没有外部研究任务；页面不会自动抓新闻或论坛。",
+          latest?.statusNote ??
+          "最近没有外部研究任务；页面不会自动抓新闻或论坛。",
         latestTargetLabel: latest?.targetLabel ?? null,
         latestFinishedAt: latest?.finishedAt ?? latest?.createdAt ?? null,
         runningCount,
@@ -394,13 +419,15 @@ export interface DailyOverviewExternalResearchEnqueueResult {
   errors: string[];
 }
 
-export async function enqueueDailyOverviewExternalResearchJobs(args: {
-  now?: Date;
-  maxUsers?: number;
-  maxSymbolsPerUser?: number;
-  sourceId?: string | null;
-  maxCacheAgeSeconds?: number;
-} = {}): Promise<DailyOverviewExternalResearchEnqueueResult> {
+export async function enqueueDailyOverviewExternalResearchJobs(
+  args: {
+    now?: Date;
+    maxUsers?: number;
+    maxSymbolsPerUser?: number;
+    sourceId?: string | null;
+    maxCacheAgeSeconds?: number;
+  } = {},
+): Promise<DailyOverviewExternalResearchEnqueueResult> {
   const now = args.now ?? new Date();
   const sourceId = normalizeDailySource(args.sourceId);
   const policy = getExternalResearchPolicy();
@@ -468,7 +495,12 @@ export async function enqueueDailyOverviewExternalResearchJobs(args: {
       const currency = holding.currency?.trim().toUpperCase();
       const exchange = holding.exchange?.trim().toUpperCase();
       const securityId = holding.securityId?.trim();
-      if (!symbol || !securityId || !currency || (currency !== "CAD" && currency !== "USD")) {
+      if (
+        !symbol ||
+        !securityId ||
+        !currency ||
+        (currency !== "CAD" && currency !== "USD")
+      ) {
         result.skippedInvalidIdentity += 1;
         continue;
       }
@@ -527,8 +559,8 @@ export async function enqueueDailyOverviewExternalResearchJobs(args: {
     result.errors.length > 0 && result.queuedJobs > 0
       ? "partial"
       : result.queuedJobs > 0
-      ? "queued"
-      : "skipped";
+        ? "queued"
+        : "skipped";
   return result;
 }
 
@@ -561,7 +593,9 @@ export function buildAnalyzerResultFromExternalResearch(args: {
         sourceType: "institutional",
         sourceMode: "cached-external",
         confidence: args.providerResult.sources.length > 0 ? "medium" : "low",
-        freshness: args.providerResult.externalResearchAsOf ? "fresh" : "partial",
+        freshness: args.providerResult.externalResearchAsOf
+          ? "fresh"
+          : "partial",
         asOf: args.providerResult.externalResearchAsOf,
         detail:
           args.providerResult.sources.length > 0
@@ -654,7 +688,7 @@ async function persistExternalResearchDocuments(args: {
     documents.map((document) =>
       repositories.externalResearchDocuments.create(
         mapExternalResearchDocumentForPersistence(args.userId, document),
-      )
+      ),
     ),
   );
 }
@@ -824,7 +858,10 @@ export async function runExternalResearchWorkerBatch(args: {
   now?: Date;
 }): Promise<ExternalResearchWorkerBatchResult> {
   const maxJobs = Math.min(parseDailyInteger(args.maxJobs, 3), 12);
-  const maxRuntimeMs = Math.min(parseDailyInteger(args.maxRuntimeMs, 20_000), 55_000);
+  const maxRuntimeMs = Math.min(
+    parseDailyInteger(args.maxRuntimeMs, 20_000),
+    55_000,
+  );
   const startedAt = Date.now();
   const results: ExternalResearchWorkerResult[] = [];
 
@@ -846,17 +883,23 @@ export async function runExternalResearchWorkerBatch(args: {
   }
 
   const processedJobs = results.filter((result) => result.job).length;
-  const succeeded = results.filter((result) => result.status === "succeeded").length;
-  const skipped = results.filter((result) => result.status === "skipped").length;
-  const failed = results.filter((result) => result.status === "failed-safe").length;
+  const succeeded = results.filter(
+    (result) => result.status === "succeeded",
+  ).length;
+  const skipped = results.filter(
+    (result) => result.status === "skipped",
+  ).length;
+  const failed = results.filter(
+    (result) => result.status === "failed-safe",
+  ).length;
   const status =
     processedJobs === 0
       ? "idle"
       : failed > 0 && (succeeded > 0 || skipped > 0)
-      ? "partial"
-      : failed > 0
-      ? "failed-safe"
-      : "succeeded";
+        ? "partial"
+        : failed > 0
+          ? "failed-safe"
+          : "succeeded";
 
   return {
     status,

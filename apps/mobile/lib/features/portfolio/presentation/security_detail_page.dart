@@ -130,103 +130,144 @@ class _SecurityDetailPageState extends State<SecurityDetailPage> {
 
   void _showResearchUpdateSheet(MobileSecurityDetailSnapshot data) {
     final trust = _SecurityDataTrust.fromSnapshot(data);
+    final refreshStatus = _loadResearchRefreshSnapshot(data);
     showModalBottomSheet<void>(
       context: context,
       showDragHandle: true,
       builder: (sheetContext) {
         return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  "研究资料更新",
-                  style: Theme.of(sheetContext).textTheme.titleLarge,
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  "按需更新资料；页面不会自动实时抓取外部来源。",
-                  style: Theme.of(sheetContext).textTheme.bodySmall,
-                ),
-                const SizedBox(height: 14),
-                _ResearchUpdateActionTile(
-                  icon: Icons.show_chart,
-                  title: "刷新报价与走势",
-                  detail: [
-                    data.quoteStatusLabel,
-                    data.priceHistoryChart?.freshness.label,
-                  ].whereType<String>().where((item) => item.isNotEmpty).join("；"),
-                  isBusy: _isRefreshingQuote,
-                  onTap: _isRefreshingQuote
-                      ? null
-                      : () {
-                          Navigator.of(sheetContext).pop();
-                          unawaited(_refreshQuote());
-                        },
-                ),
-                _ResearchUpdateActionTile(
-                  icon: Icons.badge_outlined,
-                  title: "刷新基本资料",
-                  detail: "目标价、PE、Beta、市值、52周区间等估值证据。",
-                  isBusy: _isSubmittingExternalResearch,
-                  onTap: _isSubmittingExternalResearch
-                      ? null
-                      : () {
-                          Navigator.of(sheetContext).pop();
-                          unawaited(_enqueueExternalResearch(data, "profile"));
-                        },
-                ),
-                _ResearchUpdateActionTile(
-                  icon: Icons.event_note_outlined,
-                  title: "刷新财报资料",
-                  detail: "财报/盈利披露资料，完成后进入缓存供研究台使用。",
-                  isBusy: _isSubmittingExternalResearch,
-                  onTap: _isSubmittingExternalResearch
-                      ? null
-                      : () {
-                          Navigator.of(sheetContext).pop();
-                          unawaited(
-                              _enqueueExternalResearch(data, "institutional"));
-                        },
-                ),
-                _ResearchUpdateActionTile(
-                  icon: Icons.auto_awesome,
-                  title: "重新生成研究结论",
-                  detail: "不抓新资料，只用当前缓存重新跑本地快扫。",
-                  onTap: () {
-                    Navigator.of(sheetContext).pop();
-                    _analysisController.runFresh();
-                  },
-                ),
-                const SizedBox(height: 8),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
+          child: FutureBuilder<_ResearchRefreshSnapshot>(
+            future: refreshStatus,
+            builder: (context, snapshot) {
+              final status = snapshot.data;
+              final profileStatus = status?.source("profile");
+              final institutionalStatus = status?.source("institutional");
+              final canSubmitProfile = !_isSubmittingExternalResearch &&
+                  (profileStatus?.canSubmit ?? true);
+              final canSubmitInstitutional = !_isSubmittingExternalResearch &&
+                  (institutionalStatus?.canSubmit ?? true);
+              return SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _StatusPill(
-                      label: trust.label,
-                      color: trust.color(sheetContext),
+                    Text(
+                      "研究资料更新",
+                      style: Theme.of(sheetContext).textTheme.titleLarge,
                     ),
-                    _InfoChip(data.quoteStatusLabel),
-                    if (data.priceHistoryChart != null)
-                      _InfoChip(data.priceHistoryChart!.freshness.label),
+                    const SizedBox(height: 6),
+                    Text(
+                      "报价、基本资料、财报资料分开刷新；研究结论只读取已经落入缓存的资料。",
+                      style: Theme.of(sheetContext).textTheme.bodySmall,
+                    ),
+                    const SizedBox(height: 14),
+                    _ResearchRefreshStatusCard(
+                      status: status,
+                      isLoading:
+                          snapshot.connectionState == ConnectionState.waiting,
+                      errorMessage:
+                          snapshot.hasError ? snapshot.error.toString() : null,
+                    ),
+                    const SizedBox(height: 10),
+                    _ResearchUpdateActionTile(
+                      icon: Icons.show_chart,
+                      title: "刷新报价与走势",
+                      detail: [
+                        data.quoteStatusLabel,
+                        data.priceHistoryChart?.freshness.label,
+                      ]
+                          .whereType<String>()
+                          .where((item) => item.isNotEmpty)
+                          .join("；"),
+                      isBusy: _isRefreshingQuote,
+                      onTap: _isRefreshingQuote
+                          ? null
+                          : () {
+                              Navigator.of(sheetContext).pop();
+                              unawaited(_refreshQuote());
+                            },
+                    ),
+                    _ResearchUpdateActionTile(
+                      icon: Icons.badge_outlined,
+                      title: "刷新基本资料",
+                      detail:
+                          profileStatus?.detail ?? "目标价、PE、Beta、市值、52周区间等估值证据。",
+                      isBusy: _isSubmittingExternalResearch,
+                      onTap: canSubmitProfile
+                          ? () {
+                              Navigator.of(sheetContext).pop();
+                              unawaited(
+                                  _enqueueExternalResearch(data, "profile"));
+                            }
+                          : null,
+                    ),
+                    _ResearchUpdateActionTile(
+                      icon: Icons.event_note_outlined,
+                      title: "刷新财报资料",
+                      detail: institutionalStatus?.detail ??
+                          "财报/盈利披露资料，完成后进入缓存供研究台使用。",
+                      isBusy: _isSubmittingExternalResearch,
+                      onTap: canSubmitInstitutional
+                          ? () {
+                              Navigator.of(sheetContext).pop();
+                              unawaited(_enqueueExternalResearch(
+                                  data, "institutional"));
+                            }
+                          : null,
+                    ),
+                    _ResearchUpdateActionTile(
+                      icon: Icons.auto_awesome,
+                      title: "重新生成研究结论",
+                      detail: "不抓新资料，只用当前缓存重新跑智能快扫。",
+                      onTap: () {
+                        Navigator.of(sheetContext).pop();
+                        _analysisController.runFresh();
+                      },
+                    ),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        _StatusPill(
+                          label: trust.label,
+                          color: trust.color(sheetContext),
+                        ),
+                        _InfoChip(data.quoteStatusLabel),
+                        if (data.priceHistoryChart != null)
+                          _InfoChip(data.priceHistoryChart!.freshness.label),
+                      ],
+                    ),
+                    if (_externalResearchMessage != null &&
+                        _externalResearchMessage!.isNotEmpty) ...[
+                      const SizedBox(height: 10),
+                      Text(
+                        _externalResearchMessage!,
+                        style: Theme.of(sheetContext).textTheme.bodySmall,
+                      ),
+                    ],
                   ],
                 ),
-                if (_externalResearchMessage != null &&
-                    _externalResearchMessage!.isNotEmpty) ...[
-                  const SizedBox(height: 10),
-                  Text(
-                    _externalResearchMessage!,
-                    style: Theme.of(sheetContext).textTheme.bodySmall,
-                  ),
-                ],
-              ],
-            ),
+              );
+            },
           ),
         );
       },
+    );
+  }
+
+  Future<_ResearchRefreshSnapshot> _loadResearchRefreshSnapshot(
+    MobileSecurityDetailSnapshot data,
+  ) async {
+    final responses = await Future.wait([
+      widget.apiClient.getExternalResearchUsage(),
+      widget.apiClient.getExternalResearchJobs(limit: 20),
+    ]);
+    return _ResearchRefreshSnapshot.fromResponses(
+      usageResponse: responses[0],
+      jobsResponse: responses[1],
+      security: data,
     );
   }
 
@@ -318,7 +359,12 @@ class _SecurityDetailPageState extends State<SecurityDetailPage> {
         if (items is List) {
           for (final item in items) {
             if (item is Map<String, dynamic> &&
-                item["targetKey"] == targetKey) {
+                item["targetKey"] == targetKey &&
+                _externalResearchJobMatchesSource(
+                  item,
+                  source,
+                  allowMissingSource: true,
+                )) {
               latest = item;
               break;
             }
@@ -1035,7 +1081,8 @@ class _ResearchUpdateStatusBar extends StatelessWidget {
       onTap: onTap,
       child: DecoratedBox(
         decoration: BoxDecoration(
-          color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.55),
+          color:
+              theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.55),
           borderRadius: BorderRadius.circular(16),
           border: Border.all(color: theme.colorScheme.outlineVariant),
         ),
@@ -1110,6 +1157,129 @@ class _ResearchUpdateStatusBar extends StatelessWidget {
   }
 }
 
+class _ResearchRefreshStatusCard extends StatelessWidget {
+  const _ResearchRefreshStatusCard({
+    required this.status,
+    required this.isLoading,
+    this.errorMessage,
+  });
+
+  final _ResearchRefreshSnapshot? status;
+  final bool isLoading;
+  final String? errorMessage;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    if (isLoading) {
+      return const _ResearchRefreshStatusShell(
+        icon: Icons.hourglass_empty,
+        title: "正在读取刷新状态",
+        detail: "确认今日额度、缓存窗口和最近任务状态。",
+      );
+    }
+    if (errorMessage != null && errorMessage!.isNotEmpty) {
+      return const _ResearchRefreshStatusShell(
+        icon: Icons.info_outline,
+        title: "刷新状态暂时不可用",
+        detail: "仍可尝试手动刷新；如果失败，错误会直接显示在研究台。",
+      );
+    }
+    final snapshot = status;
+    if (snapshot == null) {
+      return const SizedBox.shrink();
+    }
+    final color = snapshot.canSubmit
+        ? theme.colorScheme.primary
+        : theme.colorScheme.error;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color:
+            theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.45),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: theme.colorScheme.outlineVariant),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.fact_check_outlined, size: 18, color: color),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    snapshot.statusLabel,
+                    style: theme.textTheme.titleSmall,
+                  ),
+                ),
+                _StatusPill(label: snapshot.quotaLabel, color: color),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(snapshot.detail, style: theme.textTheme.bodySmall),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                _InfoChip(snapshot.ttlLabel),
+                if (snapshot.latestLabel.isNotEmpty)
+                  _InfoChip(snapshot.latestLabel),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ResearchRefreshStatusShell extends StatelessWidget {
+  const _ResearchRefreshStatusShell({
+    required this.icon,
+    required this.title,
+    required this.detail,
+  });
+
+  final IconData icon;
+  final String title;
+  final String detail;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color:
+            theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.45),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: theme.colorScheme.outlineVariant),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Row(
+          children: [
+            Icon(icon, size: 18, color: theme.colorScheme.primary),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(title, style: theme.textTheme.titleSmall),
+                  const SizedBox(height: 4),
+                  Text(detail, style: theme.textTheme.bodySmall),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _ResearchUpdateActionTile extends StatelessWidget {
   const _ResearchUpdateActionTile({
     required this.icon,
@@ -1143,6 +1313,246 @@ class _ResearchUpdateActionTile extends StatelessWidget {
       onTap: onTap,
     );
   }
+}
+
+class _ResearchRefreshSnapshot {
+  const _ResearchRefreshSnapshot({
+    required this.statusLabel,
+    required this.detail,
+    required this.quotaLabel,
+    required this.ttlLabel,
+    required this.latestLabel,
+    required this.canSubmit,
+    required this.sources,
+  });
+
+  final String statusLabel;
+  final String detail;
+  final String quotaLabel;
+  final String ttlLabel;
+  final String latestLabel;
+  final bool canSubmit;
+  final Map<String, _ResearchSourceRefreshStatus> sources;
+
+  _ResearchSourceRefreshStatus? source(String sourceId) => sources[sourceId];
+
+  factory _ResearchRefreshSnapshot.fromResponses({
+    required Map<String, dynamic> usageResponse,
+    required Map<String, dynamic> jobsResponse,
+    required MobileSecurityDetailSnapshot security,
+  }) {
+    final usageData = _readJsonMap(usageResponse["data"]);
+    final policy = _readJsonMap(usageData["policy"]);
+    final usage = _readJsonMap(usageData["usage"]);
+    final jobsData = _readJsonMap(jobsResponse["data"]);
+    final summary = _readJsonMap(jobsData["summary"]);
+    final items = (jobsData["items"] as List?)
+            ?.whereType<Map<String, dynamic>>()
+            .toList() ??
+        const <Map<String, dynamic>>[];
+
+    final remainingRuns = _readOptionalInt(usage["remainingRuns"]);
+    final dailyRunLimit = _readOptionalInt(usage["dailyRunLimit"]) ??
+        _readOptionalInt(policy["dailyRunLimit"]);
+    final defaultTtlSeconds = _readOptionalInt(policy["defaultTtlSeconds"]);
+    final canRunLiveResearch = policy["canRunLiveResearch"] == true;
+    final manualRefreshEnabled =
+        policy["securityManualRefreshEnabled"] != false;
+    final baseCanSubmit = canRunLiveResearch &&
+        manualRefreshEnabled &&
+        (remainingRuns == null || remainingRuns > 0);
+    final ttlLabel = defaultTtlSeconds == null
+        ? "缓存窗口待确认"
+        : "缓存 ${_formatTtl(defaultTtlSeconds)}";
+    final quotaLabel = dailyRunLimit == null
+        ? "今日额度待确认"
+        : "剩余 ${remainingRuns ?? "--"} / $dailyRunLimit";
+    final latestLabel = (summary["latestStatusLabel"] as String?)?.trim() ?? "";
+
+    final detail = !canRunLiveResearch
+        ? "外部资料来源尚未完整启用；当前只能使用已缓存资料和本地快扫。"
+        : !manualRefreshEnabled
+            ? "单标的手动刷新当前关闭；等待后台任务写入缓存。"
+            : remainingRuns == 0
+                ? "今日外部资料刷新次数已用完；报价刷新不受这个额度影响。"
+                : "点击基本资料或财报资料会提交后台任务，完成后再重新生成研究结论。";
+
+    return _ResearchRefreshSnapshot(
+      statusLabel: baseCanSubmit ? "可手动刷新外部资料" : "外部资料暂不可刷新",
+      detail: detail,
+      quotaLabel: quotaLabel,
+      ttlLabel: ttlLabel,
+      latestLabel: latestLabel,
+      canSubmit: baseCanSubmit,
+      sources: {
+        for (final sourceId in const ["profile", "institutional"])
+          sourceId: _ResearchSourceRefreshStatus.fromPolicyAndJobs(
+            sourceId: sourceId,
+            policy: policy,
+            jobs: items,
+            security: security,
+            baseCanSubmit: baseCanSubmit,
+            ttlLabel: ttlLabel,
+            blockedDetail: detail,
+          ),
+      },
+    );
+  }
+}
+
+class _ResearchSourceRefreshStatus {
+  const _ResearchSourceRefreshStatus({
+    required this.sourceId,
+    required this.label,
+    required this.detail,
+    required this.canSubmit,
+  });
+
+  final String sourceId;
+  final String label;
+  final String detail;
+  final bool canSubmit;
+
+  factory _ResearchSourceRefreshStatus.fromPolicyAndJobs({
+    required String sourceId,
+    required Map<String, dynamic> policy,
+    required List<Map<String, dynamic>> jobs,
+    required MobileSecurityDetailSnapshot security,
+    required bool baseCanSubmit,
+    required String ttlLabel,
+    required String blockedDetail,
+  }) {
+    final policySources = (policy["sources"] as List?)
+            ?.whereType<Map<String, dynamic>>()
+            .toList() ??
+        const <Map<String, dynamic>>[];
+    final sourcePolicy = policySources.cast<Map<String, dynamic>?>().firstWhere(
+          (source) => source?["id"] == sourceId,
+          orElse: () => null,
+        );
+    final label = sourcePolicy?["label"] as String? ??
+        _externalResearchSourceLabel(sourceId);
+    final sourceEnabled = sourcePolicy?["enabled"] == true;
+    final latest = jobs.cast<Map<String, dynamic>?>().firstWhere(
+          (job) =>
+              job != null &&
+              _externalResearchJobMatchesSecurity(job, security) &&
+              _externalResearchJobMatchesSource(job, sourceId),
+          orElse: () => null,
+        );
+    final canSubmit = baseCanSubmit && sourceEnabled;
+    final detail = !sourceEnabled
+        ? "$label 暂未启用；不会显示成可刷新。"
+        : !baseCanSubmit
+            ? blockedDetail
+            : latest == null
+                ? "未见最近刷新；点击会消耗 1 次今日额度，完成后进入$ttlLabel。"
+                : [
+                    latest["statusLabel"] as String?,
+                    _readJsonMap(latest["freshness"])["freshnessLabel"]
+                        as String?,
+                    latest["statusNote"] as String?,
+                    latest["errorMessage"] as String?,
+                  ]
+                    .whereType<String>()
+                    .where((value) => value.trim().isNotEmpty)
+                    .join(" · ");
+
+    return _ResearchSourceRefreshStatus(
+      sourceId: sourceId,
+      label: label,
+      detail: detail,
+      canSubmit: canSubmit,
+    );
+  }
+}
+
+String _externalResearchSourceLabel(String sourceId) {
+  return switch (sourceId) {
+    "profile" => "基本资料",
+    "institutional" => "财报资料",
+    _ => "外部资料",
+  };
+}
+
+Map<String, dynamic> _readJsonMap(Object? value) {
+  if (value is Map<String, dynamic>) {
+    return value;
+  }
+  if (value is Map) {
+    return Map<String, dynamic>.from(value);
+  }
+  return const <String, dynamic>{};
+}
+
+int? _readOptionalInt(Object? value) {
+  if (value is int) return value;
+  if (value is num) return value.toInt();
+  return int.tryParse(value?.toString() ?? "");
+}
+
+String _formatTtl(int seconds) {
+  if (seconds < 3600) {
+    return "${(seconds / 60).round()} 分钟";
+  }
+  if (seconds < 86400) {
+    return "${(seconds / 3600).round()} 小时";
+  }
+  return "${(seconds / 86400).round()} 天";
+}
+
+bool _externalResearchJobMatchesSecurity(
+  Map<String, dynamic> job,
+  MobileSecurityDetailSnapshot security,
+) {
+  final identity = _readJsonMap(job["identity"]);
+  final jobSecurityId = (identity["securityId"] as String?)?.trim();
+  if (jobSecurityId != null &&
+      jobSecurityId.isNotEmpty &&
+      security.securityId.isNotEmpty) {
+    return jobSecurityId == security.securityId;
+  }
+
+  final symbol = (identity["symbol"] as String?)?.trim().toUpperCase();
+  if (symbol == null || symbol != security.symbol.trim().toUpperCase()) {
+    return false;
+  }
+
+  final exchange = (identity["exchange"] as String?)?.trim().toUpperCase();
+  final currency = (identity["currency"] as String?)?.trim().toUpperCase();
+  final expectedExchange = security.exchange.trim().toUpperCase();
+  final expectedCurrency = security.currency.trim().toUpperCase();
+  final exchangeConflicts = exchange != null &&
+      exchange.isNotEmpty &&
+      expectedExchange.isNotEmpty &&
+      exchange != expectedExchange;
+  final currencyConflicts = currency != null &&
+      currency.isNotEmpty &&
+      expectedCurrency.isNotEmpty &&
+      currency != expectedCurrency;
+  return !exchangeConflicts && !currencyConflicts;
+}
+
+bool _externalResearchJobMatchesSource(
+  Map<String, dynamic> job,
+  String sourceId, {
+  bool allowMissingSource = false,
+}) {
+  final sourceIds = (job["sourceIds"] as List?)?.whereType<String>().toList();
+  if (sourceIds != null && sourceIds.isNotEmpty) {
+    return sourceIds.contains(sourceId);
+  }
+  final sources = (job["sources"] as List?)?.whereType<Map<String, dynamic>>();
+  if (sources != null) {
+    final ids = sources
+        .map((source) => source["id"] as String?)
+        .whereType<String>()
+        .toList();
+    if (ids.isNotEmpty) {
+      return ids.contains(sourceId);
+    }
+  }
+  return allowMissingSource;
 }
 
 class _SecurityResearchDecision {
