@@ -1,6 +1,6 @@
 # Loo国 AI Minister Integration
 
-Last updated: 2026-05-07
+Last updated: 2026-05-09
 
 ## Purpose
 
@@ -141,6 +141,13 @@ research work:
      detail. `dataFreshness` also exposes `freshnessLabel`,
      `reliabilityScore`, and `limitationSummary`; Flutter renders these inside
      the Data Evidence section.
+   - P1 extension: Security Research Cockpit now adds an optional
+     `securityResearchDecision` result block. It preserves legacy smart-scan
+     fields while adding portfolio-fit labels, valuation evidence, entry key
+     levels, action plans, and evidence rows for single-security research.
+     First-pass valuation evidence reads cached `alpha-vantage-profile`
+     documents only; GPT remains explanation-only and cannot override the
+     backend decision.
 7. `P0.7 GPT / Minister Boundary Cleanup`
    - keep GPT as explanation-only
    - keep Minister as cross-page conversation and suggested-action layer
@@ -166,6 +173,16 @@ research work:
      detail, and delete APIs; Flutter owns an app-scoped 大臣 session controller,
      restores the latest session on open, and renders `新对话` / `最近对话`
      controls in the floating sheet.
+
+10. `P0.10 Security Research Cockpit Plan Lock`
+   - status: planned. The next research-workbench expansion has been split into
+     a dedicated execution document:
+     `docs/execution/security-research-cockpit.md`.
+   - scope: valuation evidence with confidence and sanity checks, ETF macro
+     proxy, entry key levels, action-plan orchestration, and GPT/大臣
+     explanation-only boundaries.
+   - rule: this is not an automated DCF/trading-signal system. Backend
+     guardrails and portfolio-fit vetoes remain authoritative.
 
 ## P0.5 Focus: Real Data Before UI Overhaul
 

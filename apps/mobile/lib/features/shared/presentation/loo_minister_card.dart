@@ -263,6 +263,7 @@ class _DraggableMinisterButtonState extends State<_DraggableMinisterButton> {
   static const _buttonWidth = 124.0;
   static const _buttonHeight = 56.0;
   static const _edgeMargin = 14.0;
+  static const _bottomNavigationClearance = 112.0;
 
   Offset? _offset;
   var _dragging = false;
@@ -281,9 +282,12 @@ class _DraggableMinisterButtonState extends State<_DraggableMinisterButton> {
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
+        final bottomClearance =
+            _bottomNavigationClearance + MediaQuery.paddingOf(context).bottom;
         final position = _clampOffset(
-          _offset ?? _initialOffset(constraints),
+          _offset ?? _initialOffset(constraints, bottomClearance),
           constraints,
+          bottomClearance,
         );
 
         return Stack(
@@ -313,6 +317,7 @@ class _DraggableMinisterButtonState extends State<_DraggableMinisterButton> {
                       _offset = _clampOffset(
                         position + details.delta,
                         constraints,
+                        bottomClearance,
                       );
                     });
                   },
@@ -326,6 +331,7 @@ class _DraggableMinisterButtonState extends State<_DraggableMinisterButton> {
                     final current = _clampOffset(
                       _offset ?? position,
                       constraints,
+                      bottomClearance,
                     );
                     final snapLeft = current.dx + _buttonWidth / 2 <
                         constraints.maxWidth / 2;
@@ -341,6 +347,7 @@ class _DraggableMinisterButtonState extends State<_DraggableMinisterButton> {
                           current.dy,
                         ),
                         constraints,
+                        bottomClearance,
                       );
                     });
                     if (!_movedDuringGesture) {
@@ -364,16 +371,21 @@ class _DraggableMinisterButtonState extends State<_DraggableMinisterButton> {
     );
   }
 
-  Offset _initialOffset(BoxConstraints constraints) {
+  Offset _initialOffset(BoxConstraints constraints, double bottomClearance) {
     return Offset(
       constraints.maxWidth - _buttonWidth - _edgeMargin,
-      constraints.maxHeight - _buttonHeight - _edgeMargin,
+      constraints.maxHeight - _buttonHeight - _edgeMargin - bottomClearance,
     );
   }
 
-  Offset _clampOffset(Offset offset, BoxConstraints constraints) {
+  Offset _clampOffset(
+    Offset offset,
+    BoxConstraints constraints,
+    double bottomClearance,
+  ) {
     final maxX = constraints.maxWidth - _buttonWidth - _edgeMargin;
-    final maxY = constraints.maxHeight - _buttonHeight - _edgeMargin;
+    final maxY =
+        constraints.maxHeight - _buttonHeight - _edgeMargin - bottomClearance;
     return Offset(
       offset.dx.clamp(_edgeMargin, maxX < _edgeMargin ? _edgeMargin : maxX),
       offset.dy.clamp(_edgeMargin, maxY < _edgeMargin ? _edgeMargin : maxY),

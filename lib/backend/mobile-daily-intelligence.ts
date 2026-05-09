@@ -7,6 +7,7 @@ import { getExternalResearchPolicy } from "@/lib/backend/portfolio-external-rese
 import {
   getOrCreateLatestMarketSentiment,
   mapMarketSentimentForMobile,
+  mapMarketSentimentForMobileWithIndexes,
 } from "@/lib/backend/market-sentiment";
 import { getRepositories } from "@/lib/backend/repositories/factory";
 import type {
@@ -18,7 +19,7 @@ type DailyIntelligenceItem = DailyIntelligenceData["items"][number];
 
 function readNestedMap(value: unknown) {
   return value && typeof value === "object"
-    ? value as Record<string, unknown>
+    ? (value as Record<string, unknown>)
     : {};
 }
 
@@ -120,14 +121,15 @@ function getRunIdentity(
       : typeof requestSecurity.currency === "string"
         ? normalizeToken(requestSecurity.currency)
         : undefined;
-  const currency = currencyValue === "CAD" || currencyValue === "USD"
-    ? currencyValue
-    : undefined;
+  const currency =
+    currencyValue === "CAD" || currencyValue === "USD"
+      ? currencyValue
+      : undefined;
 
   return {
     securityId:
       typeof resultIdentity.securityId === "string" &&
-        resultIdentity.securityId.trim()
+      resultIdentity.securityId.trim()
         ? resultIdentity.securityId.trim()
         : undefined,
     symbol,
@@ -137,7 +139,9 @@ function getRunIdentity(
 }
 
 function mapRunSources(run: PortfolioAnalysisRun) {
-  const rawSources = Array.isArray(run.result.sources) ? run.result.sources : [];
+  const rawSources = Array.isArray(run.result.sources)
+    ? run.result.sources
+    : [];
   return rawSources.slice(0, 4).map((source) => {
     const value = readNestedMap(source);
     return {
@@ -186,10 +190,11 @@ export function mapExternalResearchDocumentForDailyIntelligence(
     securityId: document.security?.securityId ?? undefined,
     symbol: normalizeToken(document.security?.symbol ?? undefined),
     exchange: normalizeToken(document.security?.exchange ?? undefined),
-    currency: document.security?.currency === "CAD" ||
-        document.security?.currency === "USD"
-      ? document.security.currency
-      : undefined,
+    currency:
+      document.security?.currency === "CAD" ||
+      document.security?.currency === "USD"
+        ? document.security.currency
+        : undefined,
     underlyingId: document.underlyingId ?? undefined,
   };
   const payload = getSecurityActionPayload(identity);
@@ -353,17 +358,141 @@ export function mapMarketSentimentForDailyIntelligence(
   };
 }
 
+async function mapMarketSentimentSuiteForDailyIntelligence(
+  sentiment: Awaited<ReturnType<typeof getOrCreateLatestMarketSentiment>>,
+): Promise<DailyIntelligenceItem[]> {
+  const view = await mapMarketSentimentForMobileWithIndexes(sentiment);
+  const sourceMode = view.sourceMode === "manual" ? "local" : view.sourceMode;
+  const source = {
+    title: sentiment.provider,
+    sourceType: "market-sentiment",
+    date: sentiment.asOf.slice(0, 10),
+    url: sentiment.sourceUrl ?? undefined,
+  };
+  const base = mapMarketSentimentForDailyIntelligence(sentiment);
+  const indexLines = view.indexPerformances
+    .slice(0, 3)
+    .map((item) => `${item.label} ${item.changeLabel}`)
+    .filter((line) => !line.includes("--"));
+  const macroLines = view.macroIndicators
+    .slice(0, 4)
+    .map((item) => `${item.label}：${item.value}（${item.levelLabel}）`);
+
+  return [
+    base,
+    {
+      id: `sentiment-risk:${sentiment.id}`,
+      title: `波动与情绪：VIX ${view.vixValue?.toFixed(2) ?? "--"} · ${view.fgiLabel} ${view.fgiScore}`,
+      summary: `VIX 当前为 ${view.vixValue?.toFixed(2) ?? "--"}（${view.vixLevelLabel}），${view.fgiLabel} 为 ${view.fgiScore}/100（${view.fgiLevelLabel}）。这张卡只解释市场温度，不替代组合目标。`,
+      sourceLabel: view.sourceLabel,
+      sourceType: "market-sentiment",
+      sourceMode,
+      confidenceLabel:
+        view.sourceMode === "derived" ? "派生指标" : "缓存外部指数",
+      confidence: view.sourceMode === "derived" ? "medium" : "high",
+      relevanceScore: 66,
+      sourceReliability: view.sourceMode === "derived" ? 58 : 82,
+      freshnessLabel: view.freshnessLabel,
+      relevanceLabel: "情绪/波动温度",
+      generatedAt: sentiment.asOf,
+      expiresAt: sentiment.expiresAt,
+      identity: {},
+      reason: "用于判断今天是否需要放慢买入节奏或等待确认。",
+      keyPoints: [
+        `VIX：${view.vixValue?.toFixed(2) ?? "--"} · ${view.vixLevelLabel}`,
+        `${view.fgiLabel}：${view.fgiScore}/100 · ${view.fgiLevelLabel}`,
+        `综合变化：${view.scoreChange >= 0 ? "+" : ""}${view.scoreChange.toFixed(1)}`,
+      ],
+      riskFlags: [view.riskNote],
+      actions: [
+        {
+          label: "问大臣",
+          type: "ask-minister",
+          payload: { intelligenceId: `sentiment-risk:${sentiment.id}` },
+        },
+      ],
+      sources: [source],
+    },
+    {
+      id: `sentiment-indexes:${sentiment.id}`,
+      title: "美股主线：三大指数今日表现",
+      summary:
+        indexLines.length > 0
+          ? indexLines.join("；")
+          : "三大指数日内表现暂未缓存成功；当前只保留市场脉搏与宏观压力信号。",
+      sourceLabel: view.sourceLabel,
+      sourceType: "market-sentiment",
+      sourceMode,
+      confidenceLabel: indexLines.length > 0 ? "缓存外部指数" : "指数缓存待补",
+      confidence: indexLines.length > 0 ? "high" : "medium",
+      relevanceScore: 62,
+      sourceReliability: indexLines.length > 0 ? 80 : 55,
+      freshnessLabel: view.freshnessLabel,
+      relevanceLabel: "指数走势背景",
+      generatedAt: sentiment.asOf,
+      expiresAt: sentiment.expiresAt,
+      identity: {},
+      reason: "用于判断市场涨跌是否集中在单一板块，还是三大指数同步变化。",
+      keyPoints:
+        indexLines.length > 0
+          ? indexLines
+          : ["指数分时缓存暂缺，可先参考 VIX、FGI 与宏观压力。"],
+      riskFlags: indexLines.length > 0 ? [] : ["指数缓存不足，不应单独使用。"],
+      actions: [
+        {
+          label: "问大臣",
+          type: "ask-minister",
+          payload: { intelligenceId: `sentiment-indexes:${sentiment.id}` },
+        },
+      ],
+      sources: [source],
+    },
+    {
+      id: `sentiment-macro:${sentiment.id}`,
+      title: "宏观压力：利率、信用与估值背景",
+      summary:
+        macroLines.length > 0
+          ? macroLines.slice(0, 3).join("；")
+          : `${view.quadrantLabel}。${view.strategyDetail}`,
+      sourceLabel: view.sourceLabel,
+      sourceType: "market-sentiment",
+      sourceMode,
+      confidenceLabel: macroLines.length > 0 ? "缓存宏观数据" : "策略派生",
+      confidence: macroLines.length > 0 ? "high" : "medium",
+      relevanceScore: 60,
+      sourceReliability: macroLines.length > 0 ? 80 : 58,
+      freshnessLabel: view.freshnessLabel,
+      relevanceLabel: "宏观压力背景",
+      generatedAt: sentiment.asOf,
+      expiresAt: sentiment.expiresAt,
+      identity: {},
+      reason: "用于辅助判断定投节奏、现金缓冲和是否需要更高安全边际。",
+      keyPoints:
+        macroLines.length > 0
+          ? macroLines
+          : [view.quadrantLabel, view.strategyLabel, view.buySignalLabel],
+      riskFlags: [view.riskNote],
+      actions: [
+        {
+          label: "问大臣",
+          type: "ask-minister",
+          payload: { intelligenceId: `sentiment-macro:${sentiment.id}` },
+        },
+      ],
+      sources: [source],
+    },
+  ];
+}
+
 function dedupeItems(items: DailyIntelligenceItem[]) {
   const seen = new Set<string>();
   return items.filter((item) => {
     const key = [
       item.sourceType,
       item.identity.securityId ??
-        [
-          item.identity.symbol,
-          item.identity.exchange,
-          item.identity.currency,
-        ].filter(Boolean).join(":"),
+        [item.identity.symbol, item.identity.exchange, item.identity.currency]
+          .filter(Boolean)
+          .join(":"),
       item.title.trim().toUpperCase(),
     ].join("|");
     if (seen.has(key)) {
@@ -387,7 +516,9 @@ export function mapDailyIntelligenceItemToRecommendationBrief(
       item.freshnessLabel,
       item.confidenceLabel,
       item.relevanceLabel,
-    ].filter(Boolean).join(" · "),
+    ]
+      .filter(Boolean)
+      .join(" · "),
     generatedAt: item.generatedAt,
     symbols: [
       item.identity.symbol,
@@ -407,11 +538,12 @@ export function mapDailyIntelligenceItemToRecommendationBrief(
     })),
     confidence: item.confidenceLabel.includes("高")
       ? "high"
-      : item.confidence ?? (item.confidenceLabel.includes("中")
-        ? "medium"
-        : item.confidenceLabel.includes("低")
-          ? "low"
-          : undefined),
+      : (item.confidence ??
+        (item.confidenceLabel.includes("中")
+          ? "medium"
+          : item.confidenceLabel.includes("低")
+            ? "low"
+            : undefined)),
     relevanceScore: item.relevanceScore,
     sourceReliability: item.sourceReliability,
     riskFlags: item.riskFlags,
@@ -434,13 +566,17 @@ export async function getDailyIntelligenceItemsForUser(
     getOrCreateLatestMarketSentiment(now),
   ]);
 
+  const marketSentimentItems =
+    await mapMarketSentimentSuiteForDailyIntelligence(marketSentiment);
+
   return dedupeItems([
-    mapMarketSentimentForDailyIntelligence(marketSentiment),
+    ...marketSentimentItems,
     ...documents.map(mapExternalResearchDocumentForDailyIntelligence),
     ...analysisRuns.map(mapAnalysisRunForDailyIntelligence),
   ])
-    .sort((left, right) =>
-      Date.parse(right.generatedAt) - Date.parse(left.generatedAt)
+    .sort(
+      (left, right) =>
+        Date.parse(right.generatedAt) - Date.parse(left.generatedAt),
     )
     .slice(0, safeLimit);
 }
@@ -452,21 +588,24 @@ export async function getMobileDailyIntelligenceView(
   const policy = getExternalResearchPolicy();
   const items = await getDailyIntelligenceItemsForUser(userId, limit);
 
-  return apiSuccess<DailyIntelligenceData>({
-    generatedAt: new Date().toISOString(),
-    policy: {
-      manualTriggerOnly: !policy.scheduledOverviewEnabled,
-      scheduledOverviewEnabled: policy.scheduledOverviewEnabled,
-      securityManualRefreshEnabled: policy.securityManualRefreshEnabled,
-      sourceMode: policy.sourceMode,
-      disclaimer:
-        "Loo国今日秘闻只展示后台每日缓存资料和已保存分析；页面加载不会触发实时新闻、论坛或付费外部 API。",
+  return apiSuccess<DailyIntelligenceData>(
+    {
+      generatedAt: new Date().toISOString(),
+      policy: {
+        manualTriggerOnly: !policy.scheduledOverviewEnabled,
+        scheduledOverviewEnabled: policy.scheduledOverviewEnabled,
+        securityManualRefreshEnabled: policy.securityManualRefreshEnabled,
+        sourceMode: policy.sourceMode,
+        disclaimer:
+          "Loo国今日秘闻只展示后台每日缓存资料和已保存分析；页面加载不会触发实时新闻、论坛或付费外部 API。",
+      },
+      items,
+      emptyState: {
+        title: "暂时没有可用秘闻",
+        detail:
+          "等待每日 worker 缓存组合秘闻，或在标的详情手动刷新单个标的资料；系统不会在页面加载时抓取新闻或论坛。",
+      },
     },
-    items,
-    emptyState: {
-      title: "暂时没有可用秘闻",
-      detail:
-        "等待每日 worker 缓存组合秘闻，或在标的详情手动刷新单个标的资料；系统不会在页面加载时抓取新闻或论坛。",
-    },
-  }, "database");
+    "database",
+  );
 }

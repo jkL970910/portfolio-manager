@@ -9,6 +9,7 @@ class MobileHomeSnapshot {
     required this.health,
     required this.accounts,
     required this.topHoldings,
+    this.holdingCount = 0,
     required this.netWorthTrend,
     required this.netWorthChart,
     required this.fxContext,
@@ -22,6 +23,7 @@ class MobileHomeSnapshot {
   final MobileHomeHealth health;
   final List<MobileAccountCard> accounts;
   final List<MobileHoldingCard> topHoldings;
+  final int holdingCount;
   final List<MobileHomeTrendPoint> netWorthTrend;
   final MobileChartSeries? netWorthChart;
   final MobileFxContext fxContext;
@@ -119,6 +121,7 @@ class MobileHomeSnapshot {
   factory MobileHomeSnapshot.fromJson(Map<String, dynamic> json) {
     final viewer = json["viewer"];
     final recommendation = json["recommendation"];
+    final context = json["context"];
 
     return MobileHomeSnapshot(
       viewerName: viewer is Map<String, dynamic>
@@ -133,6 +136,9 @@ class MobileHomeSnapshot {
       topHoldings: readJsonList(json, "topHoldings")
           .map(MobileHoldingCard.fromJson)
           .toList(),
+      holdingCount: context is Map<String, dynamic>
+          ? context["holdingCount"] as int? ?? 0
+          : 0,
       netWorthTrend: readJsonList(json, "netWorthTrend")
           .map(MobileHomeTrendPoint.fromJson)
           .toList(),
@@ -158,10 +164,15 @@ class MobileMarketSentiment {
     required this.title,
     required this.score,
     required this.ratingLabel,
+    required this.fgiLabel,
+    required this.fgiSourceMode,
     required this.fgiScore,
+    required this.fgiChange,
     required this.fgiLevelLabel,
     required this.vixValue,
+    required this.vixChange,
     required this.vixLevelLabel,
+    required this.scoreChange,
     required this.quadrant,
     required this.quadrantLabel,
     required this.strategyLabel,
@@ -172,15 +183,22 @@ class MobileMarketSentiment {
     required this.freshnessLabel,
     required this.sourceLabel,
     required this.components,
+    required this.indexPerformances,
+    required this.macroIndicators,
   });
 
   final String title;
   final int score;
   final String ratingLabel;
+  final String fgiLabel;
+  final String fgiSourceMode;
   final int fgiScore;
+  final double fgiChange;
   final String fgiLevelLabel;
   final double? vixValue;
+  final double? vixChange;
   final String vixLevelLabel;
+  final double scoreChange;
   final String quadrant;
   final String quadrantLabel;
   final String strategyLabel;
@@ -191,6 +209,8 @@ class MobileMarketSentiment {
   final String freshnessLabel;
   final String sourceLabel;
   final List<MobileMarketSentimentComponent> components;
+  final List<MobileMarketIndexPerformance> indexPerformances;
+  final List<MobileMarketPulseIndicator> macroIndicators;
 
   bool get hasContent => title.isNotEmpty;
   String get vixDisplay =>
@@ -204,12 +224,17 @@ class MobileMarketSentiment {
       title: value["title"] as String? ?? "美股恐惧贪婪",
       score: (value["score"] as num?)?.round() ?? 50,
       ratingLabel: value["ratingLabel"] as String? ?? "中性",
+      fgiLabel: value["fgiLabel"] as String? ?? "Loo 情绪分",
+      fgiSourceMode: value["fgiSourceMode"] as String? ?? "derived",
       fgiScore: (value["fgiScore"] as num?)?.round() ??
           (value["score"] as num?)?.round() ??
           50,
+      fgiChange: (value["fgiChange"] as num?)?.toDouble() ?? 0,
       fgiLevelLabel: value["fgiLevelLabel"] as String? ?? "中性",
       vixValue: (value["vixValue"] as num?)?.toDouble(),
+      vixChange: (value["vixChange"] as num?)?.toDouble(),
       vixLevelLabel: value["vixLevelLabel"] as String? ?? "波动待确认",
+      scoreChange: (value["scoreChange"] as num?)?.toDouble() ?? 0,
       quadrant: value["quadrant"] as String? ?? "",
       quadrantLabel: value["quadrantLabel"] as String? ?? "矩阵待确认",
       strategyLabel: value["strategyLabel"] as String? ?? "中性定投",
@@ -223,6 +248,85 @@ class MobileMarketSentiment {
       components: readJsonList(value, "components")
           .map(MobileMarketSentimentComponent.fromJson)
           .toList(),
+      indexPerformances: readJsonList(value, "indexPerformances")
+          .map(MobileMarketIndexPerformance.fromJson)
+          .toList(),
+      macroIndicators: readJsonList(value, "macroIndicators")
+          .map(MobileMarketPulseIndicator.fromJson)
+          .toList(),
+    );
+  }
+}
+
+class MobileMarketPulseIndicator {
+  const MobileMarketPulseIndicator({
+    required this.id,
+    required this.label,
+    required this.value,
+    required this.changeLabel,
+    required this.levelLabel,
+    required this.detail,
+    required this.sourceLabel,
+    required this.asOf,
+    required this.score,
+  });
+
+  final String id;
+  final String label;
+  final String value;
+  final String changeLabel;
+  final String levelLabel;
+  final String detail;
+  final String sourceLabel;
+  final String asOf;
+  final double? score;
+
+  factory MobileMarketPulseIndicator.fromJson(Map<String, dynamic> json) {
+    return MobileMarketPulseIndicator(
+      id: json["id"] as String? ?? "",
+      label: json["label"] as String? ?? "指标",
+      value: json["value"] as String? ?? "--",
+      changeLabel: json["changeLabel"] as String? ?? "--",
+      levelLabel: json["levelLabel"] as String? ?? "待确认",
+      detail: json["detail"] as String? ?? "",
+      sourceLabel: json["sourceLabel"] as String? ?? "",
+      asOf: json["asOf"] as String? ?? "",
+      score: (json["score"] as num?)?.toDouble(),
+    );
+  }
+}
+
+class MobileMarketIndexPerformance {
+  const MobileMarketIndexPerformance({
+    required this.id,
+    required this.label,
+    required this.value,
+    required this.changePct,
+    required this.changeLabel,
+    required this.points,
+    required this.sourceLabel,
+  });
+
+  final String id;
+  final String label;
+  final String value;
+  final double? changePct;
+  final String changeLabel;
+  final List<double> points;
+  final String sourceLabel;
+
+  factory MobileMarketIndexPerformance.fromJson(Map<String, dynamic> json) {
+    return MobileMarketIndexPerformance(
+      id: json["id"] as String? ?? "",
+      label: json["label"] as String? ?? "指数",
+      value: json["value"] as String? ?? "--",
+      changePct: (json["changePct"] as num?)?.toDouble(),
+      changeLabel: json["changeLabel"] as String? ?? "--",
+      points: (json["points"] as List? ?? const [])
+          .map((point) => point is num ? point.toDouble() : null)
+          .whereType<double>()
+          .toList(),
+      sourceLabel: json["sourceLabel"] as String? ?? "",
     );
   }
 }

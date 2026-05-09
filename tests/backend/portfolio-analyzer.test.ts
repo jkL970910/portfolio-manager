@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import type {
+  ExternalResearchDocumentRecord,
   HoldingPosition,
   InvestmentAccount,
   PreferenceProfile,
@@ -21,6 +22,54 @@ import {
 } from "@/lib/backend/portfolio-analyzer-service";
 
 const generatedAt = "2026-04-28T04:00:00.000Z";
+
+function makeExternalResearchDocument(
+  overrides: Partial<ExternalResearchDocumentRecord> = {},
+): ExternalResearchDocumentRecord {
+  return {
+    id: "external_doc_test",
+    userId: "user_test",
+    providerDocumentId: "alpha-vantage-profile:security_tsm_us:2026-04-28",
+    sourceType: "institutional",
+    providerId: "alpha-vantage-profile",
+    sourceName: "Alpha Vantage 标的资料",
+    title: "TSM 基本资料快照",
+    summary: "市盈率：24.5；分析师目标价：215；52周区间：120 - 205",
+    url: null,
+    publishedAt: "2026-03-31T00:00:00.000Z",
+    capturedAt: generatedAt,
+    expiresAt: "2026-04-29T04:00:00.000Z",
+    language: "zh",
+    security: {
+      securityId: "security_tsm_us",
+      symbol: "TSM",
+      exchange: "NYSE",
+      currency: "USD",
+      name: "Taiwan Semiconductor Manufacturing",
+      provider: "alpha-vantage-profile",
+      securityType: "Common Stock",
+    },
+    underlyingId: null,
+    confidence: "high",
+    sentiment: "neutral",
+    relevanceScore: 82,
+    sourceReliability: 76,
+    keyPoints: [
+      "资产类型：Common Stock",
+      "行业板块：Technology",
+      "市盈率：24.5",
+      "分析师目标价：215",
+      "52周区间：120 - 205",
+      "市值：950000000000",
+    ],
+    riskFlags: [],
+    tags: ["profile", "alpha-vantage"],
+    rawPayload: {},
+    createdAt: generatedAt,
+    updatedAt: generatedAt,
+    ...overrides,
+  };
+}
 
 const accounts: InvestmentAccount[] = [
   {
@@ -466,6 +515,149 @@ test("security analyzer quick scan evaluates unheld candidates with portfolio ta
   assert.ok((result.securityDecision?.fit?.targetGapPct ?? 0) > 0);
   assert.ok(result.securityDecision?.directAnswer.includes("候选观察"));
   assert.ok(result.securityDecision?.whyNow.some((item) => item.includes("目标约 60%")));
+  assert.equal(result.securityResearchDecision?.version, "security-research-v1");
+  assert.equal(result.securityResearchDecision?.security.assetType, "stock");
+  assert.equal(result.securityResearchDecision?.valuationEvidence.method, "unavailable");
+  assert.ok(
+    result.securityResearchDecision?.valuationEvidence.summary.includes("不声称已完成 DCF"),
+  );
+  assert.ok(
+    (result.securityResearchDecision?.entryTiming.keyLevels.length ?? 0) >= 1,
+  );
+});
+
+test("security research decision uses cached valuation evidence for stock candidates", () => {
+  const result = buildSecurityAnalyzerQuickScan({
+    identity: {
+      securityId: "security_tsm_us",
+      symbol: "TSM",
+      exchange: "NYSE",
+      currency: "USD",
+      name: "Taiwan Semiconductor Manufacturing Company",
+      securityType: "Common Stock",
+    },
+    accounts,
+    holdings,
+    profile: makeProfile(),
+    marketData: {
+      priceHistory: [
+        {
+          id: "history_tsm_us",
+          securityId: "security_tsm_us",
+          symbol: "TSM",
+          exchange: "NYSE",
+          priceDate: "2026-04-27",
+          close: 180,
+          adjustedClose: 180,
+          currency: "USD",
+          source: "provider",
+          provider: "twelve-data",
+          sourceMode: "cached-external",
+          freshness: "fresh",
+          refreshRunId: "run_tsm",
+          isReference: false,
+          fallbackReason: null,
+          createdAt: generatedAt,
+        },
+      ],
+    },
+    valuationDocuments: [makeExternalResearchDocument()],
+    generatedAt,
+  });
+
+  assert.equal(result.dataFreshness.externalResearchAsOf, generatedAt);
+  assert.equal(result.securityResearchDecision?.valuationEvidence.method, "analyst_consensus");
+  assert.equal(result.securityResearchDecision?.valuationEvidence.confidence, "high");
+  assert.ok(
+    result.securityResearchDecision?.valuationEvidence.anchors.some(
+      (anchor) => anchor.label === "分析师目标价" && anchor.value === "215",
+    ),
+  );
+  assert.ok(
+    result.securityResearchDecision?.valuationEvidence.summary.includes("不等同于自动 DCF"),
+  );
+  assert.ok(
+    result.sources.some((source) => source.title.includes("Alpha Vantage 标的资料")),
+  );
+});
+
+test("security research decision routes ETF candidates through macro proxy", () => {
+  const result = buildSecurityAnalyzerQuickScan({
+    identity: {
+      securityId: "security_vfv_cad",
+      symbol: "VFV",
+      exchange: "TSX",
+      currency: "CAD",
+      name: "Vanguard S&P 500 Index ETF",
+      securityType: "ETF",
+    },
+    accounts,
+    holdings,
+    profile: makeProfile(),
+    marketData: {
+      priceHistory: Array.from({ length: 25 }, (_, index) => ({
+        id: `history_vfv_cad_${index}`,
+        securityId: "security_vfv_cad",
+        symbol: "VFV",
+        exchange: "TSX",
+        priceDate: `2026-04-${String(index + 1).padStart(2, "0")}`,
+        close: 145 + index * 0.4,
+        adjustedClose: 145 + index * 0.4,
+        currency: "CAD" as const,
+        source: "provider",
+        provider: "yahoo-finance",
+        sourceMode: "cached-external",
+        freshness: "fresh",
+        refreshRunId: "run_vfv",
+        isReference: false,
+        fallbackReason: null,
+        createdAt: generatedAt,
+      })),
+    },
+    valuationDocuments: [
+      makeExternalResearchDocument({
+        id: "external_doc_vfv",
+        providerDocumentId: "alpha-vantage-profile:security_vfv_cad:2026-04-28",
+        title: "VFV 基本资料快照",
+        summary: "费用率：0.09；分红/收益率：0.011；52周区间：112 - 148",
+        security: {
+          securityId: "security_vfv_cad",
+          symbol: "VFV",
+          exchange: "TSX",
+          currency: "CAD",
+          name: "Vanguard S&P 500 Index ETF",
+          provider: "alpha-vantage-profile",
+          securityType: "ETF",
+        },
+        keyPoints: [
+          "资产类型：ETF",
+          "费用率：0.09",
+          "分红/收益率：0.011",
+          "52周区间：112 - 148",
+        ],
+      }),
+    ],
+    generatedAt,
+  });
+
+  assert.equal(result.securityResearchDecision?.security.assetType, "etf");
+  assert.equal(result.securityResearchDecision?.valuationEvidence.method, "etf_macro_proxy");
+  assert.ok(
+    result.securityResearchDecision?.valuationEvidence.anchors.some((anchor) =>
+      anchor.label === "费用率",
+    ),
+  );
+  assert.ok(
+    result.securityResearchDecision?.valuationEvidence.sanityChecks.some((check) =>
+      check.detail.includes("不应直接套用单公司 DCF"),
+    ),
+  );
+  assert.equal(result.securityResearchDecision?.actionPlans[0]?.type, "dca_accumulate");
+  assert.ok(
+    result.securityResearchDecision?.entryTiming.keyLevels.some((level) =>
+      level.label === "样本高点",
+    ),
+  );
 });
 
 test("security analyzer quick scan asks for identity repair only when listing fields are missing", () => {
@@ -683,6 +875,20 @@ test("portfolio analyzer cache is stale when refreshed market data is newer", ()
       },
     }),
     false,
+  );
+
+  assert.equal(
+    isAnalyzerCacheOlderThanMarketData("2026-04-30T12:00:00.000Z", {
+      holdings: [],
+      marketData: { priceHistory: [], portfolioSnapshots: [] },
+      externalResearchDocuments: [
+        makeExternalResearchDocument({
+          capturedAt: "2026-04-30T12:15:00.000Z",
+          updatedAt: "2026-04-30T12:15:00.000Z",
+        }),
+      ],
+    }),
+    true,
   );
 });
 

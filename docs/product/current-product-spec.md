@@ -1,6 +1,6 @@
 # Loo国的财富宝库 Current Product Spec
 
-Last updated: 2026-05-07
+Last updated: 2026-05-09
 
 ## Purpose
 
@@ -57,6 +57,37 @@ mistakes, understand context, and make better-researched decisions.
    remains the decision source of truth.
 8. User-facing copy must avoid debug/internal terms such as raw provider IDs,
    DTO, sourceMode, fallback, run-analysis, and non-interactive cache jargon.
+9. Mobile UI should use progressive disclosure: decision, numbers, charts, and
+   clear actions first; long explanations move to expandable sections, AI 大臣,
+   or explicit detail screens.
+
+## Mobile UI v2 Direction
+
+The next Flutter design system is Figma-led and should replace the current
+scattered Material-style layout with a coherent `Rose Treasury` visual system.
+
+Source design file:
+
+- Figma Design: `https://www.figma.com/design/aYsiPJ8eybrWa6BcY1peIn`
+
+Design direction:
+
+- Keep the Loo国 identity and warm rose/pink brand tone.
+- Use a dark `Rose Treasury` theme for the current premium look.
+- Add a matching light `Rose Day` theme for future light/dark/system switching.
+- Use semantic color tokens, not raw one-off colors inside widgets.
+- Prefer dense financial cards, tables, compact charts, decision cards, radar
+  health views, and tappable list rows over long prose cards.
+- Remove intrusive list badges such as `已更新` / `未持有` from account, holding,
+  recommendation, and watchlist rows. Put those details inside the detail page
+  or subtle metadata line when actually useful.
+- Remove small detail arrows from list rows. The whole row/card should be the
+  tap target.
+- Technical configuration and source details belong in Settings or advanced
+  expandable blocks, not the first fold of Overview, Portfolio, or Security
+  Detail.
+- The implementation plan and component mapping live in
+  `docs/ui/mobile-ui-v2-figma-plan.md`.
 
 ## Current Core Features
 
@@ -124,6 +155,7 @@ The current decision system is backend-first:
 - P0.7 GPT / Minister Boundary Cleanup: completed.
 - P0.8 Manual QA SOP: completed.
 - P0.9 Minister Session Continuity: completed.
+- P0.10 Security Research Cockpit Plan Lock: completed / implementation started.
 
 Decision wording must not be driven by allocation gap alone. Avoided sectors,
 low risk capacity, home-purchase/cash goals, stale data, duplicate exposure,
@@ -132,6 +164,27 @@ candidate.
 
 Unheld securities must still be analyzable. `0%` means not currently held; it is
 not a reason to say the app has no context.
+
+The next research-workbench expansion is `Security Research Cockpit /
+估值证据链`. It should not become an automated DCF or trading-signal module.
+The backend must treat valuation as evidence with confidence and sanity checks,
+then combine it with portfolio fit, account/tax constraints, preference
+factors, market pulse, and entry key levels. ETF/fund analysis must use macro /
+rebalancing / DCA framing rather than stock-style intrinsic price ranges. GPT
+and AI 大臣 may explain or discuss the result, but deterministic backend
+guardrails remain authoritative.
+
+Current first pass:
+
+- `SecurityResearchDecision` is an additive backend result block; legacy smart
+  scan fields remain populated for mobile compatibility.
+- Cached `alpha-vantage-profile` external-research documents can contribute
+  valuation anchors such as analyst target, P/E, forward P/E, PEG, P/B, 52-week
+  range, dividend yield, market cap, and beta.
+- ETF/fund candidates keep an `etf_macro_proxy` path and must not claim
+  stock-style intrinsic price targets.
+- Page load remains cache-only; new provider documents can invalidate old
+  quick-scan cache entries so evidence is refreshed without live Flutter calls.
 
 ### 6. AI 大臣
 
@@ -285,32 +338,37 @@ Monarch-like transaction visibility, but this is not current P0.
 
 ### P0 Next
 
-1. Run cloud scheduled daily-overview profile smoke and verify Overview,
-   Recommendation, Settings worker status, and AI 大臣 context.
-2. Add one bounded announcement/filing/earnings-calendar style adapter behind
-   worker/cache/quota/document boundaries.
-3. Add explicit single-security manual intelligence refresh on Security Detail
+1. Finish the active Overview UI v2 QA/polish pass and keep the mobile surface
+   compact, non-debug, and phone-readable.
+2. Lock `P0.10 Security Research Cockpit / 估值证据链` architecture before
+   coding the next analysis feature.
+3. Run cloud scheduled daily-overview profile/institutional smoke and verify
+   Overview, Recommendation, Settings worker status, and AI 大臣 context.
+4. Add explicit single-security manual intelligence refresh on Security Detail
    with daily quota and TTL reuse.
-4. Broaden security metadata provider QA from held securities to watchlist and
+5. Broaden security metadata provider QA from held securities to watchlist and
    non-held candidates.
-5. Finish production cloud validation for Vercel env, Cloudflare cron secret,
-   worker smoke runs, Settings status, and provider usage visibility.
 
 ### P1
 
-1. Mobile UI / IA overhaul.
-2. AlphaPick screenshot ingestion as a reviewed OCR/import pipeline.
-3. IBKR Flex Query import and Wealthsimple/SnapTrade feasibility spike under the
+1. Mobile UI / IA v2 implementation from the approved Figma design.
+2. Security Research Cockpit / 估值证据链 implementation:
+   `SecurityResearchDecision` DTO first pass is implemented; next work is
+   valuation evidence, ETF macro proxy depth, entry key levels, action-plan
+   orchestration, and Flutter research UI.
+3. AlphaPick screenshot ingestion as a reviewed OCR/import pipeline.
+4. IBKR Flex Query import and Wealthsimple/SnapTrade feasibility spike under the
    unified `券商同步` flow.
-4. Per-account AI 大臣 opt-in.
-5. Minister usage/cost dashboard.
-6. Persist draggable 大臣 button position.
-7. Spending/cash-account monitoring.
+5. Per-account AI 大臣 opt-in.
+6. Minister usage/cost dashboard.
+7. Persist draggable 大臣 button position.
+8. Spending/cash-account monitoring.
 
 ## Related Execution Docs
 
 - `docs/execution/backlog.md`
 - `docs/execution/ai-portfolio-analyzer.md`
+- `docs/execution/security-research-cockpit.md`
 - `docs/execution/cloud-deployment-strategy.md`
 - `docs/execution/cloud-deployment-runbook.md`
 - `docs/execution/market-data-provider-strategy.md`

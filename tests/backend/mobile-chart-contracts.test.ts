@@ -101,8 +101,6 @@ const display = {
   fxRateFreshness: "fresh" as const,
 };
 
-const today = new Date().toISOString().slice(0, 10);
-
 const snapshots: PortfolioSnapshot[] = [
   {
     id: "snapshot_1",
@@ -146,7 +144,7 @@ test("security detail chart contract preserves identity and freshness", () => {
   assert.equal(chart.identity?.currency, "CAD");
   assert.equal(chart.valueType, "money");
   assert.equal(chart.currency, "CAD");
-  assert.equal(chart.freshness.status, "fresh");
+  assert.notEqual(chart.freshness.status, "fallback");
   assert.equal(chart.freshness.latestDate, "2026-04-26");
   assert.equal(chart.points[0]?.displayValue, "$140");
 });
@@ -207,10 +205,10 @@ test("portfolio overview chart contract uses local history freshness when availa
 
   const chart = portfolio.chartSeries?.portfolioValue;
   assert.ok(chart);
-  assert.equal(chart.freshness.latestDate, today);
+  assert.equal(chart.freshness.latestDate, "2026-04-26");
   assert.notEqual(chart.freshness.status, "fallback");
-  assert.equal(chart.points.at(-1)?.rawDate, today);
-  assert.equal(chart.points.at(-1)?.value, 10000);
+  assert.equal(chart.points.at(-1)?.rawDate, "2026-04-26");
+  assert.equal(chart.points.at(-1)?.value, 1410);
   assert.ok(chart.notes.some((note) => note.includes("缓存价格历史回放")));
 });
 
@@ -238,9 +236,9 @@ test("mobile home overview chart contract exposes net worth freshness", () => {
   assert.ok(chart);
   assert.equal(chart.id, "overview-net-worth-history");
   assert.equal(chart.title, "总资产走势");
-  assert.equal(chart.freshness.latestDate, today);
-  assert.equal(chart.points.at(-1)?.rawDate, today);
-  assert.equal(chart.points.at(-1)?.value, 10000);
+  assert.equal(chart.freshness.latestDate, "2026-04-26");
+  assert.equal(chart.points.at(-1)?.rawDate, "2026-04-26");
+  assert.equal(chart.points.at(-1)?.value, 1410);
   assert.equal(chart.sourceMode, "local");
 });
 

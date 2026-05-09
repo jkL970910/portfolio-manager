@@ -48,6 +48,7 @@ export interface DashboardData {
     name: string;
     caption: string;
     value: string;
+    gainLoss: string;
     room: string;
     badge: string;
     badgeVariant: "primary" | "success" | "warning" | "neutral";
@@ -76,6 +77,7 @@ export interface DashboardData {
     quoteStatusLabel?: string;
     weight: string;
     value: string;
+    gainLoss: string;
   }[];
   trendContext: {
     title: string;
@@ -113,12 +115,17 @@ export interface DashboardData {
     score: number;
     rating: "extreme-fear" | "fear" | "neutral" | "greed" | "extreme-greed";
     ratingLabel: string;
+    fgiLabel: string;
+    fgiSourceMode: "cnn" | "derived";
     fgiScore: number;
+    fgiChange: number;
     fgiLevel: "fear" | "neutral" | "greed";
     fgiLevelLabel: string;
     vixValue: number | null;
+    vixChange: number | null;
     vixLevel: "low" | "normal" | "high" | null;
     vixLevelLabel: string;
+    scoreChange: number;
     quadrant: "A" | "B" | "C" | "D" | "E" | "F" | "G" | "H" | "I" | null;
     quadrantLabel: string;
     strategyLabel: string;
@@ -136,6 +143,26 @@ export interface DashboardData {
       label: string;
       score: number;
       detail: string;
+    }[];
+    indexPerformances: {
+      id: "dow" | "sp500" | "nasdaq";
+      label: string;
+      value: string;
+      changePct: number | null;
+      changeLabel: string;
+      points: number[];
+      sourceLabel: string;
+    }[];
+    macroIndicators: {
+      id: string;
+      label: string;
+      value: string;
+      changeLabel: string;
+      levelLabel: string;
+      detail: string;
+      sourceLabel: string;
+      asOf: string;
+      score: number | null;
     }[];
   };
 }
@@ -671,7 +698,12 @@ export interface RecommendationsData {
     title: string;
     detail: string;
     sourceLabel: string;
-    sourceMode: "local" | "cached-external" | "live-external" | "derived" | "manual";
+    sourceMode:
+      | "local"
+      | "cached-external"
+      | "live-external"
+      | "derived"
+      | "manual";
     freshnessLabel: string;
     generatedAt: string;
     symbols: string[];
@@ -779,7 +811,14 @@ export interface DailyIntelligenceData {
     title: string;
     summary: string;
     sourceLabel: string;
-    sourceType: "market-data" | "news" | "forum" | "institutional" | "manual" | "analysis" | "market-sentiment";
+    sourceType:
+      | "market-data"
+      | "news"
+      | "forum"
+      | "institutional"
+      | "manual"
+      | "analysis"
+      | "market-sentiment";
     sourceMode: "local" | "cached-external" | "live-external" | "derived";
     confidenceLabel: string;
     confidence?: "low" | "medium" | "high";

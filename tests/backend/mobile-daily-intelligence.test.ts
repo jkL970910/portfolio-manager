@@ -87,11 +87,7 @@ test("daily intelligence maps profile documents into institutional cards", async
     sentiment: "neutral",
     relevanceScore: 78,
     sourceReliability: 76,
-    keyPoints: [
-      "资产类型：Common Stock",
-      "行业板块：Technology",
-      "地区：USA",
-    ],
+    keyPoints: ["资产类型：Common Stock", "行业板块：Technology", "地区：USA"],
     riskFlags: ["OVERVIEW 只提供公司基本资料快照，不代表实时买卖建议。"],
     tags: ["profile", "alpha-vantage", "company-overview"],
     rawPayload: {},
@@ -180,8 +176,44 @@ test("daily intelligence endpoint combines documents and saved analysis without 
   assert.equal(response.data.policy.scheduledOverviewEnabled, false);
   assert.equal(response.data.policy.securityManualRefreshEnabled, true);
   assert.match(response.data.policy.disclaimer, /不会触发实时新闻/);
-  assert.equal(response.data.items.length, 3);
-  assert.ok(response.data.items.some((item) => item.id.startsWith("sentiment:")));
+  assert.ok(response.data.items.length >= 3);
+  assert.ok(
+    response.data.items.some((item) => item.id.startsWith("sentiment:")),
+  );
+  assert.ok(
+    response.data.items.some((item) => item.id.startsWith("sentiment-risk:")),
+  );
+  assert.ok(
+    response.data.items.some((item) =>
+      item.id.startsWith("sentiment-indexes:"),
+    ),
+  );
+  assert.ok(
+    response.data.items.some((item) => item.id.startsWith("sentiment-macro:")),
+  );
   assert.ok(response.data.items.some((item) => item.title.includes("XBB")));
   assert.ok(response.data.items.some((item) => item.title.includes("AMZN")));
+});
+
+test("daily intelligence returns at least three market pulse cards without research cache", async () => {
+  const response = await getMobileDailyIntelligenceView(
+    "daily_intel_empty_user",
+    8,
+  );
+
+  assert.ok(response.data.items.length >= 3);
+  assert.ok(
+    response.data.items.some((item) => item.id.startsWith("sentiment:")),
+  );
+  assert.ok(
+    response.data.items.some((item) => item.id.startsWith("sentiment-risk:")),
+  );
+  assert.ok(
+    response.data.items.some((item) =>
+      item.id.startsWith("sentiment-indexes:"),
+    ),
+  );
+  assert.ok(
+    response.data.items.some((item) => item.id.startsWith("sentiment-macro:")),
+  );
 });

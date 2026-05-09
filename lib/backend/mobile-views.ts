@@ -24,7 +24,7 @@ import {
 } from "@/lib/backend/mobile-daily-intelligence";
 import {
   getOrCreateLatestMarketSentiment,
-  mapMarketSentimentForMobile,
+  mapMarketSentimentForMobileWithIndexes,
 } from "@/lib/backend/market-sentiment";
 import type { Viewer } from "@/lib/auth/session";
 
@@ -37,6 +37,7 @@ type MobileHomeData = {
     name: string;
     caption: string;
     value: string;
+    gainLoss: string;
     room: string;
     badge: string;
     badgeVariant: "primary" | "success" | "warning" | "neutral";
@@ -55,6 +56,7 @@ type MobileHomeData = {
     quoteStatusLabel?: string;
     weight: string;
     value: string;
+    gainLoss: string;
   }>;
   netWorthTrend: DashboardData["netWorthTrend"];
   chartSeries?: DashboardData["chartSeries"];
@@ -227,6 +229,7 @@ async function mapMobileHomeData(
       name: account.name,
       caption: account.caption,
       value: account.value,
+      gainLoss: account.gainLoss,
       room: account.room,
       badge: account.badge,
       badgeVariant: account.badgeVariant,
@@ -245,12 +248,14 @@ async function mapMobileHomeData(
       quoteStatusLabel: holding.quoteStatusLabel,
       weight: holding.weight,
       value: holding.value,
+      gainLoss: holding.gainLoss,
     })),
     netWorthTrend: payload.data.netWorthTrend,
     chartSeries: payload.data.chartSeries,
     healthScore: payload.data.healthScore,
     recommendation: payload.data.recommendation,
-    marketSentiment: mapMarketSentimentForMobile(marketSentiment),
+    marketSentiment:
+      await mapMarketSentimentForMobileWithIndexes(marketSentiment),
     context: payload.data.context,
   };
 }
@@ -438,12 +443,12 @@ function mapMobileRecommendationsData(
     ...data,
     engine: {
       ...data.engine,
-      version: externalBriefCount > 0
-        ? "V3 Overlay / V2.1 Core"
-        : data.engine.version,
-      objective: externalBriefCount > 0
-        ? `${data.engine.objective} · 已接入 ${externalBriefCount} 条缓存外部情报`
-        : data.engine.objective,
+      version:
+        externalBriefCount > 0 ? "V3 Overlay / V2.1 Core" : data.engine.version,
+      objective:
+        externalBriefCount > 0
+          ? `${data.engine.objective} · 已接入 ${externalBriefCount} 条缓存外部情报`
+          : data.engine.objective,
     },
     intelligenceBriefs,
     preferenceContext,
@@ -472,8 +477,7 @@ function mapMobileRecommendationsData(
             ? [
                 {
                   label: "外部情报覆盖",
-                  detail:
-                    `已关联 ${intelligenceRefs.length} 条缓存秘闻；V3 外部情报分 ${v3Overlay?.externalInsightScore?.toFixed(0) ?? "--"}/100，最终分 ${v3Overlay?.finalScore.toFixed(0) ?? "--"}/100。`,
+                  detail: `已关联 ${intelligenceRefs.length} 条缓存秘闻；V3 外部情报分 ${v3Overlay?.externalInsightScore?.toFixed(0) ?? "--"}/100，最终分 ${v3Overlay?.finalScore.toFixed(0) ?? "--"}/100。`,
                   variant: "success" as const,
                 },
               ]
@@ -505,20 +509,21 @@ export function mapRecommendationIntelligenceRefs(
   intelligenceBriefs: RecommendationsData["intelligenceBriefs"],
 ): RecommendationsData["priorities"][number]["intelligenceRefs"] {
   const exactSecurityRefs = priority.securityId
-    ? intelligenceBriefs.filter((brief) =>
-        brief.identity.securityId === priority.securityId
+    ? intelligenceBriefs.filter(
+        (brief) => brief.identity.securityId === priority.securityId,
       )
     : [];
-  const exactListingRefs = exactSecurityRefs.length > 0
-    ? exactSecurityRefs
-    : intelligenceBriefs.filter((brief) =>
-        briefMatchesPriorityListing(brief, priority)
-      );
+  const exactListingRefs =
+    exactSecurityRefs.length > 0
+      ? exactSecurityRefs
+      : intelligenceBriefs.filter((brief) =>
+          briefMatchesPriorityListing(brief, priority),
+        );
   if (exactListingRefs.length > 0) {
     return [
-      ...exactListingRefs.slice(0, 2).map((brief) =>
-      mapIntelligenceBriefRef(brief, "listing")
-      ),
+      ...exactListingRefs
+        .slice(0, 2)
+        .map((brief) => mapIntelligenceBriefRef(brief, "listing")),
       ...getMarketSentimentBriefRefs(intelligenceBriefs),
     ].slice(0, 3);
   }
@@ -530,11 +535,9 @@ export function mapRecommendationIntelligenceRefs(
 
   return [
     ...intelligenceBriefs
-    .filter((brief) =>
-      symbols.has(normalizeSymbolKey(brief.identity.symbol)),
-    )
-    .slice(0, 2)
-    .map((brief) => mapIntelligenceBriefRef(brief, "underlying")),
+      .filter((brief) => symbols.has(normalizeSymbolKey(brief.identity.symbol)))
+      .slice(0, 2)
+      .map((brief) => mapIntelligenceBriefRef(brief, "underlying")),
     ...getMarketSentimentBriefRefs(intelligenceBriefs),
   ].slice(0, 3);
 }
@@ -559,9 +562,7 @@ function mapIntelligenceBriefRef(
     sourceLabel: brief.sourceLabel,
     freshnessLabel: brief.freshnessLabel,
     scope,
-    scopeLabel: scope === "underlying"
-      ? "底层资产情报"
-      : "当前上市版本情报",
+    scopeLabel: scope === "underlying" ? "底层资产情报" : "当前上市版本情报",
     listingLabel: getBriefListingLabel(brief),
   };
 }
@@ -582,15 +583,16 @@ export function buildRecommendationV3Overlay(
 
   const matchedBriefs = intelligenceRefs
     .map((ref) => intelligenceBriefs.find((brief) => brief.id === ref.id))
-    .filter((brief): brief is RecommendationsData["intelligenceBriefs"][number] =>
-      Boolean(brief)
+    .filter(
+      (brief): brief is RecommendationsData["intelligenceBriefs"][number] =>
+        Boolean(brief),
     );
   const hasListingRef = intelligenceRefs.some((ref) => ref.scope === "listing");
   const hasMarketSentimentRef = matchedBriefs.some((brief) =>
     brief.id.startsWith("sentiment:"),
   );
-  const hasExternalRef = matchedBriefs.some((brief) =>
-    brief.sourceMode !== "local" && brief.sourceMode !== "derived"
+  const hasExternalRef = matchedBriefs.some(
+    (brief) => brief.sourceMode !== "local" && brief.sourceMode !== "derived",
   );
   const newestGeneratedAt = matchedBriefs
     .map((brief) => Date.parse(brief.generatedAt))
@@ -599,30 +601,34 @@ export function buildRecommendationV3Overlay(
   const ageDays = newestGeneratedAt
     ? Math.max(0, (Date.now() - newestGeneratedAt) / 86_400_000)
     : null;
-  const stalePenalty = ageDays == null
-    ? 6
-    : ageDays > 14
-      ? 14
-      : ageDays > 7
-        ? 8
-        : ageDays > 2
-          ? 4
-          : 0;
+  const stalePenalty =
+    ageDays == null
+      ? 6
+      : ageDays > 14
+        ? 14
+        : ageDays > 7
+          ? 8
+          : ageDays > 2
+            ? 4
+            : 0;
   const scopeBoost = hasListingRef ? 10 : 3;
   const sourceBoost = hasExternalRef ? 8 : 2;
   const documentEvidenceScores = matchedBriefs
-    .map((brief) => getBriefEvidenceScore(brief, {
-      scopeBoost,
-      sourceBoost,
-      stalePenalty,
-    }))
+    .map((brief) =>
+      getBriefEvidenceScore(brief, {
+        scopeBoost,
+        sourceBoost,
+        stalePenalty,
+      }),
+    )
     .filter((value): value is number => value != null);
-  const externalInsightScore = documentEvidenceScores.length > 0
-    ? clampScore(
-        documentEvidenceScores.reduce((sum, value) => sum + value, 0) /
-          documentEvidenceScores.length,
-      )
-    : clampScore(50 + scopeBoost + sourceBoost - stalePenalty);
+  const externalInsightScore =
+    documentEvidenceScores.length > 0
+      ? clampScore(
+          documentEvidenceScores.reduce((sum, value) => sum + value, 0) /
+            documentEvidenceScores.length,
+        )
+      : clampScore(50 + scopeBoost + sourceBoost - stalePenalty);
   const preferenceFitScore = base.preferenceFitScore ?? base.baselineScore;
   const finalScore = clampScore(
     base.baselineScore * 0.7 +
@@ -639,8 +645,12 @@ export function buildRecommendationV3Overlay(
   const riskFlags = [
     ...base.riskFlags,
     ...matchedBriefs.flatMap((brief) => brief.riskFlags ?? []).slice(0, 3),
-    ...(!hasListingRef ? ["仅匹配到底层资产情报，不能当作当前 listing 报价依据。"] : []),
-    ...(stalePenalty >= 8 ? ["外部情报较旧，需要刷新后再作为高权重参考。"] : []),
+    ...(!hasListingRef
+      ? ["仅匹配到底层资产情报，不能当作当前 listing 报价依据。"]
+      : []),
+    ...(stalePenalty >= 8
+      ? ["外部情报较旧，需要刷新后再作为高权重参考。"]
+      : []),
   ];
 
   return {
@@ -658,8 +668,7 @@ export function buildRecommendationV3Overlay(
       ...(hasMarketSentimentRef ? marketSentimentSignals : []),
     ],
     riskFlags,
-    explanation:
-      `V3 最终分 = V2.1 基线 ${base.baselineScore.toFixed(0)} * 70% + 偏好契合 ${preferenceFitScore.toFixed(0)} * 15% + 外部情报 ${externalInsightScore.toFixed(0)} * 15%。`,
+    explanation: `V3 最终分 = V2.1 基线 ${base.baselineScore.toFixed(0)} * 70% + 偏好契合 ${preferenceFitScore.toFixed(0)} * 15% + 外部情报 ${externalInsightScore.toFixed(0)} * 15%。`,
   };
 }
 
@@ -681,11 +690,8 @@ function getBriefEvidenceScore(
   ) {
     return null;
   }
-  const confidenceBoost = brief.confidence === "high"
-    ? 12
-    : brief.confidence === "medium"
-      ? 6
-      : 0;
+  const confidenceBoost =
+    brief.confidence === "high" ? 12 : brief.confidence === "medium" ? 6 : 0;
   const riskPenalty = Math.min((brief.riskFlags ?? []).length * 4, 12);
   return clampScore(
     brief.relevanceScore * 0.45 +
@@ -729,7 +735,9 @@ function getBriefListingLabel(
     brief.identity.symbol,
     brief.identity.exchange,
     brief.identity.currency,
-  ].filter(Boolean).join(" · ");
+  ]
+    .filter(Boolean)
+    .join(" · ");
 }
 
 function getRecommendationPrioritySymbols(
@@ -740,10 +748,7 @@ function getRecommendationPrioritySymbols(
 ) {
   const symbols = new Set<string>();
   const leadSymbol = priority.security.split(/\s|-/)[0];
-  const candidates = [
-    leadSymbol,
-    ...priority.tickers.split(/[,\s/]+/),
-  ];
+  const candidates = [leadSymbol, ...priority.tickers.split(/[,\s/]+/)];
 
   for (const candidate of candidates) {
     const normalized = normalizeSymbolKey(candidate);
@@ -756,7 +761,10 @@ function getRecommendationPrioritySymbols(
 }
 
 function normalizeSymbolKey(value: string) {
-  return value.trim().toUpperCase().replace(/[^A-Z0-9.:-]/g, "");
+  return value
+    .trim()
+    .toUpperCase()
+    .replace(/[^A-Z0-9.:-]/g, "");
 }
 
 function mapMobileImportData(data: ImportData): MobileImportData {
@@ -795,7 +803,8 @@ function mapMobileImportData(data: ImportData): MobileImportData {
       {
         label: "券商",
         title: "券商同步",
-        description: "统一入口：先支持 IBKR Flex，Wealthsimple 走 SnapTrade 可行性验证。",
+        description:
+          "统一入口：先支持 IBKR Flex，Wealthsimple 走 SnapTrade 可行性验证。",
       },
       {
         label: "检查",
@@ -939,17 +948,21 @@ export async function getMobileRecommendationsView(userId: string) {
     mapDailyIntelligenceItemToRecommendationBrief,
   );
   return {
-    data: mapMobileRecommendationsData(payload.data, {
-      riskProfile: profile.riskProfile,
-      targetAllocation: profile.targetAllocation,
-      accountFundingPriority: profile.accountFundingPriority,
-      taxAwarePlacement: profile.taxAwarePlacement,
-      recommendationStrategy: profile.recommendationStrategy,
-      rebalancingTolerancePct: profile.rebalancingTolerancePct,
-      watchlistSymbols: profile.watchlistSymbols,
-      recommendationConstraints: profile.recommendationConstraints,
-      preferenceFactors: profile.preferenceFactors,
-    }, intelligenceBriefs),
+    data: mapMobileRecommendationsData(
+      payload.data,
+      {
+        riskProfile: profile.riskProfile,
+        targetAllocation: profile.targetAllocation,
+        accountFundingPriority: profile.accountFundingPriority,
+        taxAwarePlacement: profile.taxAwarePlacement,
+        recommendationStrategy: profile.recommendationStrategy,
+        rebalancingTolerancePct: profile.rebalancingTolerancePct,
+        watchlistSymbols: profile.watchlistSymbols,
+        recommendationConstraints: profile.recommendationConstraints,
+        preferenceFactors: profile.preferenceFactors,
+      },
+      intelligenceBriefs,
+    ),
     meta: payload.meta,
   };
 }

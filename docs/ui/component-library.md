@@ -10,6 +10,48 @@ This document defines the reusable component library for Loo国的财富宝库.
 
 Use it as the source of truth before introducing any new UI component.
 
+## Active Flutter UI v2 Direction
+
+Last updated: 2026-05-08
+
+The current active mobile design direction is Figma-led:
+
+- Figma Design: `https://www.figma.com/design/aYsiPJ8eybrWa6BcY1peIn`
+- Implementation plan: `docs/ui/mobile-ui-v2-figma-plan.md`
+
+This legacy component catalog still documents useful product behavior from the
+React/Web implementation, but Flutter UI v2 should not copy desktop layouts or
+old Web component names by default.
+
+Flutter v2 component targets:
+
+- `LooHeroHeader`
+- `LooGlassCard`
+- `LooMetricCard`
+- `LooDecisionCard`
+- `LooChartCard`
+- `LooKeyValueTable`
+- `LooHealthScoreCard`
+- `LooHealthRadarCard`
+- `LooAccountRow`
+- `LooHoldingRow`
+- `LooWatchlistRow`
+- `LooAIQuickScanCard`
+- `LooMinisterChatBubble`
+- `LooPreferenceDraftCard`
+- `LooImportProviderCard`
+- `LooStatePanel`
+- `LooBottomSheet`
+
+Component migration rules:
+
+- Reuse behavior from existing components, not their desktop layout.
+- Support `Rose Treasury` dark and `Rose Day` light tokens.
+- Keep primary mobile cards concise; move source/provider details to Settings
+  or expanders.
+- Rows should be tappable as a whole; avoid arrow-only affordances.
+- Technical/debug words stay out of primary user-facing components.
+
 ## Principles
 
 - Prefer extension over duplication

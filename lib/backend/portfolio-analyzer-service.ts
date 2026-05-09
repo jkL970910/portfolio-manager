@@ -18,7 +18,11 @@ import {
   buildSecurityAnalyzerQuickScan
 } from "@/lib/backend/portfolio-analyzer";
 import type { AnalyzerSecurityIdentity } from "@/lib/backend/portfolio-analyzer-contracts";
-import type { HoldingPosition, SecurityPriceHistoryPoint } from "@/lib/backend/models";
+import type {
+  ExternalResearchDocumentRecord,
+  HoldingPosition,
+  SecurityPriceHistoryPoint
+} from "@/lib/backend/models";
 import {
   recordLooMinisterUsage,
   resolveLooMinisterSettings,
@@ -333,6 +337,7 @@ async function readCachedAnalyzerResult(
   freshnessContext?: {
     holdings: HoldingPosition[];
     marketData: AnalyzerMarketDataContext;
+    externalResearchDocuments?: ExternalResearchDocumentRecord[];
   },
 ) {
   if (!shouldUseCache(input)) {
@@ -365,6 +370,7 @@ export function isAnalyzerCacheOlderThanMarketData(
   context: {
     holdings: HoldingPosition[];
     marketData: AnalyzerMarketDataContext;
+    externalResearchDocuments?: ExternalResearchDocumentRecord[];
   },
 ) {
   const cacheTime = new Date(generatedAt).getTime();
@@ -381,12 +387,36 @@ export function isAnalyzerCacheOlderThanMarketData(
     ...(context.marketData.portfolioSnapshots ?? []).map(
       (snapshot) => snapshot.createdAt,
     ),
+    ...(context.externalResearchDocuments ?? []).flatMap((document) => [
+      document.capturedAt,
+      document.updatedAt,
+    ]),
   ]
     .map((value) => (value ? new Date(value).getTime() : Number.NaN))
     .filter(Number.isFinite)
     .sort((left, right) => right - left)[0];
 
   return latestMarketDataTime != null && latestMarketDataTime > cacheTime;
+}
+
+async function loadSecurityValuationDocuments(args: {
+  userId: string;
+  identity: AnalyzerSecurityIdentity;
+}) {
+  const repositories = getRepositories();
+  try {
+    return repositories.externalResearchDocuments.listFreshByUserId(args.userId, {
+      now: new Date(),
+      limit: 8,
+      securityId: args.identity.securityId ?? null,
+      symbol: args.identity.symbol,
+      exchange: args.identity.exchange ?? null,
+      currency: args.identity.currency ?? null,
+    });
+  } catch (error) {
+    console.warn("Portfolio analyzer valuation evidence read skipped.", error);
+    return [];
+  }
 }
 
 async function persistAnalyzerResult(
@@ -683,9 +713,14 @@ export async function getPortfolioAnalyzerQuickScan(userId: string, input: Portf
       holdings,
       identity,
     });
+    const valuationDocuments = await loadSecurityValuationDocuments({
+      userId,
+      identity,
+    });
     cached = await readCachedAnalyzerResult(userId, input, targetKey, {
       holdings: scopedHoldings,
       marketData,
+      externalResearchDocuments: valuationDocuments,
     });
     if (cached) {
       return apiSuccess(cached, "database");
@@ -696,6 +731,7 @@ export async function getPortfolioAnalyzerQuickScan(userId: string, input: Portf
       holdings,
       profile,
       marketData,
+      valuationDocuments,
     });
   } else {
     cached = await readCachedAnalyzerResult(userId, input, targetKey);

@@ -431,7 +431,9 @@ class _LooWealthAppState extends State<LooWealthApp> {
       navigatorKey: _navigatorKey,
       title: "Loo国的财富宝库",
       debugShowCheckedModeBanner: false,
-      theme: buildLooTheme(),
+      theme: buildLooLightTheme(),
+      darkTheme: buildLooDarkTheme(),
+      themeMode: LooThemeMode.dark.materialThemeMode,
       builder: (context, child) {
         final currentChild = child ?? const SizedBox.shrink();
         if (_loading || session == null || apiClient == null) {

@@ -4,14 +4,14 @@ import "package:loo_wealth_mobile/features/intelligence/data/daily_intelligence_
 import "package:loo_wealth_mobile/features/intelligence/presentation/daily_intelligence_card.dart";
 
 void main() {
-  testWidgets("renders cached daily intelligence and opens security callback",
+  testWidgets("renders daily intelligence and opens security callback",
       (tester) async {
     MobileDailyIntelligenceItem? openedItem;
     const item = MobileDailyIntelligenceItem(
       id: "doc-1",
-      title: "XBB 缓存行情复核",
-      summary: "缓存行情显示 XBB 报价较新，但仍需要保留 listing 身份。",
-      sourceLabel: "缓存行情情报",
+      title: "XBB 行情复核",
+      summary: "XBB 报价较新，但仍需要保留 listing 身份。",
+      sourceLabel: "行情资料",
       sourceType: "market-data",
       sourceMode: "cached-external",
       confidenceLabel: "可信度高",
@@ -46,7 +46,7 @@ void main() {
           body: DailyIntelligenceCard(
             snapshot: const MobileDailyIntelligenceSnapshot(
               generatedAt: "2026-04-30T12:00:00.000Z",
-              disclaimer: "只展示缓存资料，不实时抓取外部 API。",
+              disclaimer: "只展示已整理资料，不实时抓取外部 API。",
               manualTriggerOnly: true,
               scheduledOverviewEnabled: false,
               securityManualRefreshEnabled: true,
@@ -62,9 +62,9 @@ void main() {
     );
 
     expect(find.text("Loo国今日秘闻"), findsOneWidget);
-    expect(find.text("XBB 缓存行情复核"), findsOneWidget);
-    expect(find.text("缓存"), findsOneWidget);
-    expect(find.text("XBB · TSX · CAD"), findsOneWidget);
+    expect(find.text("XBB 行情复核"), findsOneWidget);
+    expect(find.text("行情资料"), findsOneWidget);
+    expect(find.textContaining("XBB · TSX · CAD"), findsWidgets);
 
     await tester.tap(find.text("查看标的"));
     expect(openedItem?.identity.securityId, "sec-xbb");

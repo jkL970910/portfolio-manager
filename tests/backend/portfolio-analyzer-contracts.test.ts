@@ -6,7 +6,8 @@ import {
   portfolioAnalyzerGptEnhancementRequestSchema,
   portfolioAnalyzerGptEnhancementSchema,
   portfolioAnalyzerRequestSchema,
-  portfolioAnalyzerResultSchema
+  portfolioAnalyzerResultSchema,
+  securityResearchDecisionSchema
 } from "@/lib/backend/portfolio-analyzer-contracts";
 import { sanitizeGptEnhancementPayloadForTest } from "@/lib/backend/portfolio-analyzer-service";
 
@@ -280,6 +281,123 @@ test("portfolio analyzer result accepts security-specific decision structure", (
   assert.equal(parsed.securityDecision?.fit?.score, 68);
   assert.equal(parsed.dataFreshness.reliabilityScore, 68);
   assert.equal(parsed.evidenceTrail?.[0]?.label, "组合/持仓资料");
+});
+
+test("security research decision schema accepts evidence-led stock contract", () => {
+  const parsed = securityResearchDecisionSchema.parse({
+    version: "security-research-v1",
+    generatedAt,
+    security: {
+      securityId: "security_amzn_us",
+      symbol: "AMZN",
+      exchange: "NASDAQ",
+      currency: "USD",
+      name: "Amazon.com",
+      assetType: "stock",
+      identityStatus: "resolved",
+    },
+    decision: {
+      label: "保持观察",
+      confidenceScore: 62,
+      primaryReason: "估值证据尚未接入，当前只适合观察。",
+      vetoedBy: [],
+    },
+    guardrails: [],
+    portfolioFit: {
+      score: 68,
+      sleeve: "US Equity",
+      targetGapLabel: "目标差距 4%",
+      currentExposureLabel: "当前袖口 56%",
+      duplicateExposureLabel: "同标的/同身份约 18%",
+      accountTaxFitLabel: "账户/税务适配 68/100",
+      liquidityFitLabel: "现金/流动性适配 70/100",
+    },
+    valuationEvidence: {
+      method: "unavailable",
+      confidence: "low",
+      summary: "估值证据 provider 尚未接入。",
+      anchors: [],
+      sanityChecks: [
+        {
+          label: "估值证据",
+          status: "unavailable",
+          detail: "P1.2 接入后再提高置信度。",
+        },
+      ],
+    },
+    entryTiming: {
+      posture: "wait_for_confirmation",
+      keyLevels: [],
+      marketPulseLabel: "市场脉搏只作为低权重参考。",
+    },
+    actionPlans: [
+      {
+        type: "value_pullback",
+        title: "等待估值证据确认",
+        detail: "先补齐估值证据。",
+        isBlockedByPortfolioFit: false,
+        requiredConfirmations: ["估值证据 provider"],
+      },
+    ],
+    evidence: [
+      {
+        source: "组合/持仓资料",
+        sourceType: "portfolio",
+        freshnessLabel: "fresh",
+        reliabilityLabel: "high",
+      },
+    ],
+  });
+
+  assert.equal(parsed.valuationEvidence.method, "unavailable");
+});
+
+test("portfolio analyzer result preserves legacy fields while accepting research decision", () => {
+  const parsed = portfolioAnalyzerResultSchema.parse(makeResult({
+    securityResearchDecision: {
+      version: "security-research-v1",
+      generatedAt,
+      security: {
+        securityId: "security_amzn_us",
+        symbol: "AMZN",
+        exchange: "NASDAQ",
+        currency: "USD",
+        name: "Amazon.com",
+        assetType: "stock",
+        identityStatus: "resolved",
+      },
+      decision: {
+        label: "继续持有观察",
+        confidenceScore: 72,
+        primaryReason: "复核现有仓位。",
+        vetoedBy: [],
+      },
+      guardrails: [],
+      portfolioFit: {
+        score: 68,
+        sleeve: "US Equity",
+        targetGapLabel: "目标差距 4%",
+        currentExposureLabel: "当前袖口 56%",
+      },
+      valuationEvidence: {
+        method: "unavailable",
+        confidence: "low",
+        summary: "估值证据 provider 尚未接入。",
+        anchors: [],
+        sanityChecks: [],
+      },
+      entryTiming: {
+        posture: "wait_for_confirmation",
+        keyLevels: [],
+      },
+      actionPlans: [],
+      evidence: [],
+    },
+  }));
+
+  assert.equal(parsed.summary.title, "AMZN 快速分析");
+  assert.equal(parsed.securityDecision?.verdict, "review-existing");
+  assert.equal(parsed.securityResearchDecision?.version, "security-research-v1");
 });
 
 test("portfolio analyzer result rejects missing non-advice disclaimer", () => {

@@ -9,14 +9,26 @@ import "../features/settings/presentation/settings_page.dart";
 
 class MobileRootShellController extends ChangeNotifier {
   int _index = 0;
+  PortfolioInitialSection? _portfolioInitialSection;
+  int _portfolioSectionRequestToken = 0;
 
   int get index => _index;
+  PortfolioInitialSection? get portfolioInitialSection =>
+      _portfolioInitialSection;
+  int get portfolioSectionRequestToken => _portfolioSectionRequestToken;
 
   void openTab(int index) {
     if (index == _index) {
       return;
     }
     _index = index;
+    notifyListeners();
+  }
+
+  void openPortfolioSection(PortfolioInitialSection section) {
+    _portfolioInitialSection = section;
+    _portfolioSectionRequestToken += 1;
+    _index = 1;
     notifyListeners();
   }
 }
@@ -45,11 +57,14 @@ class MobileRootShell extends StatefulWidget {
 
 class _MobileRootShellState extends State<MobileRootShell> {
   int _index = 0;
+  int _portfolioSectionRequestToken = 0;
 
   @override
   void initState() {
     super.initState();
     _index = widget.controller?.index ?? _index;
+    _portfolioSectionRequestToken =
+        widget.controller?.portfolioSectionRequestToken ?? 0;
     widget.controller?.addListener(_handleControllerChanged);
   }
 
@@ -61,6 +76,8 @@ class _MobileRootShellState extends State<MobileRootShell> {
     }
     oldWidget.controller?.removeListener(_handleControllerChanged);
     _index = widget.controller?.index ?? _index;
+    _portfolioSectionRequestToken =
+        widget.controller?.portfolioSectionRequestToken ?? 0;
     widget.controller?.addListener(_handleControllerChanged);
   }
 
@@ -72,10 +89,19 @@ class _MobileRootShellState extends State<MobileRootShell> {
 
   void _handleControllerChanged() {
     final nextIndex = widget.controller?.index ?? _index;
-    if (nextIndex == _index || !mounted) {
+    final nextPortfolioSectionRequestToken =
+        widget.controller?.portfolioSectionRequestToken ??
+            _portfolioSectionRequestToken;
+    if ((nextIndex == _index &&
+            nextPortfolioSectionRequestToken ==
+                _portfolioSectionRequestToken) ||
+        !mounted) {
       return;
     }
-    setState(() => _index = nextIndex);
+    setState(() {
+      _index = nextIndex;
+      _portfolioSectionRequestToken = nextPortfolioSectionRequestToken;
+    });
   }
 
   void _selectTab(int index) {
@@ -85,11 +111,31 @@ class _MobileRootShellState extends State<MobileRootShell> {
     }
   }
 
+  void _openPortfolioSection(PortfolioInitialSection section) {
+    widget.controller?.openPortfolioSection(section);
+    if (widget.controller == null) {
+      setState(() => _index = 1);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final pages = <Widget>[
-      OverviewPage(apiClient: widget.apiClient),
-      PortfolioPage(apiClient: widget.apiClient),
+      OverviewPage(
+        apiClient: widget.apiClient,
+        onOpenAccounts: () => _openPortfolioSection(
+          PortfolioInitialSection.accounts,
+        ),
+        onOpenHoldings: () => _openPortfolioSection(
+          PortfolioInitialSection.holdings,
+        ),
+        onOpenRecommendations: () => _selectTab(2),
+      ),
+      PortfolioPage(
+        apiClient: widget.apiClient,
+        initialSection: widget.controller?.portfolioInitialSection,
+        sectionRequestToken: _portfolioSectionRequestToken,
+      ),
       RecommendationsPage(apiClient: widget.apiClient),
       ImportPage(apiClient: widget.apiClient),
       SettingsPage(

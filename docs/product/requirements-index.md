@@ -1,6 +1,6 @@
 # Loo国 Requirements Index
 
-Last updated: 2026-05-07
+Last updated: 2026-05-09
 
 ## Purpose
 
@@ -15,12 +15,18 @@ architecture, execution priority, or QA coverage changes.
    `docs/execution/backlog.md`
 3. AI / decision engine architecture:
    `docs/execution/ai-portfolio-analyzer.md`
+   `docs/execution/security-research-cockpit.md`
 4. Cloud / worker / deployment architecture:
    `docs/execution/cloud-deployment-strategy.md`
    `docs/execution/cloud-deployment-runbook.md`
 5. Manual mobile QA:
    `docs/guides/mobile-manual-qa-sop.md`
-6. Historical baseline:
+6. Mobile UI / design system:
+   `docs/ui/mobile-ui-v2-figma-plan.md`
+   `docs/ui/component-inventory.md`
+   `docs/ui/component-library.md`
+   `docs/ux/ia-and-navigation.md`
+7. Historical baseline:
    `docs/source/brd.md`
    `docs/source/prd.v1.md`
    `docs/source/information_arch.md`
@@ -64,6 +70,18 @@ Update when:
 - security decision, guardrail, portfolio fit, evidence, or context-pack logic
   changes
 
+### `docs/execution/security-research-cockpit.md`
+
+Update when:
+
+- Security Research Cockpit / Loo国研究台 expands beyond the current quick-scan
+  contract
+- valuation evidence, ETF macro proxy, entry key levels, or action-plan
+  orchestration changes
+- provider strategy for valuation/fundamental evidence changes
+- Gemini/user signoff changes the P0.10/P1 research-workbench implementation
+  order
+
 ### Cloud And Data Docs
 
 Use:
@@ -90,6 +108,26 @@ Each QA addition should include:
 - identity/freshness/provider boundaries when relevant
 - known non-goals or limitations
 
+### Mobile UI / Design Docs
+
+Use:
+
+- `docs/ui/mobile-ui-v2-figma-plan.md` for the approved Figma-driven visual
+  system, page scope, component mapping, and implementation order
+- `docs/ui/component-inventory.md` for Flutter component categories
+- `docs/ui/component-library.md` for the current reusable component catalog and
+  migration status
+- `docs/ux/ia-and-navigation.md` for navigation, page ownership, and
+  information hierarchy
+
+Update when:
+
+- Figma design direction changes
+- theme tokens, light/dark behavior, or component names change
+- mobile page hierarchy, card density, row interactions, or route entry points
+  change
+- user-facing debug/internal wording rules change
+
 ### Historical Source Docs
 
 `docs/source/brd.md`, `docs/source/prd.v1.md`, and
@@ -110,5 +148,6 @@ Do not use them as the active P0/P1 planning surface.
 - Deterministic quick scan as the decision source of truth.
 - AI 大臣 as cross-page project/user-context assistant.
 - Worker/cache/quota boundary before live external data.
-- Mobile UI/IA overhaul after data and AI foundations are stable.
+- Mobile UI/IA v2 implementation from the approved Figma Rose Treasury / Rose
+  Day design system.
 - AlphaPick screenshot ingestion as P1 reviewed OCR/import pipeline.

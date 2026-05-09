@@ -28,22 +28,25 @@ function buildUrl(baseUrl, path, query = {}) {
 async function postWorkerEndpoint(env, job) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), DEFAULT_TIMEOUT_MS);
-  const response = await fetch(buildUrl(requireEnv(env, "APP_BASE_URL"), job.path, job.query), {
-    method: "POST",
-    headers: {
-      authorization: `Bearer ${requireEnv(env, "PORTFOLIO_WORKER_SECRET")}`,
-      "content-type": "application/json",
-      "user-agent": "portfolio-manager-cloudflare-cron/1.0"
+  const response = await fetch(
+    buildUrl(requireEnv(env, "APP_BASE_URL"), job.path, job.query),
+    {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${requireEnv(env, "PORTFOLIO_WORKER_SECRET")}`,
+        "content-type": "application/json",
+        "user-agent": "portfolio-manager-cloudflare-cron/1.0",
+      },
+      signal: controller.signal,
     },
-    signal: controller.signal
-  }).finally(() => clearTimeout(timeout));
+  ).finally(() => clearTimeout(timeout));
 
   const text = await response.text();
   return {
     name: job.name,
     ok: response.ok,
     status: response.status,
-    body: text.slice(0, 1000)
+    body: text.slice(0, 1000),
   };
 }
 
@@ -54,8 +57,8 @@ function scheduledJobs(env) {
       path: "/api/workers/security-metadata/run",
       query: {
         maxSecurities: env.SECURITY_METADATA_REFRESH_MAX_SECURITIES || "50",
-        maxAgeDays: env.SECURITY_METADATA_REFRESH_MAX_AGE_DAYS || "30"
-      }
+        maxAgeDays: env.SECURITY_METADATA_REFRESH_MAX_AGE_DAYS || "30",
+      },
     },
     envFlag(env.ENABLE_MARKET_DATA_WORKER, true) && {
       name: "market-data",
@@ -64,10 +67,13 @@ function scheduledJobs(env) {
         maxUsers: env.MARKET_DATA_REFRESH_MAX_USERS || "1",
         maxSymbols: env.MARKET_DATA_REFRESH_MAX_SYMBOLS || "20",
         batchSize: env.MARKET_DATA_REFRESH_BATCH_SIZE || "20",
-        maxBatchesPerRun:
-          env.MARKET_DATA_REFRESH_MAX_BATCHES_PER_RUN || "3",
-        maxRuntimeSeconds: env.MARKET_DATA_REFRESH_MAX_RUNTIME_SECONDS || "45"
-      }
+        maxBatchesPerRun: env.MARKET_DATA_REFRESH_MAX_BATCHES_PER_RUN || "3",
+        maxRuntimeSeconds: env.MARKET_DATA_REFRESH_MAX_RUNTIME_SECONDS || "45",
+      },
+    },
+    envFlag(env.ENABLE_MARKET_SENTIMENT_WORKER, true) && {
+      name: "market-sentiment",
+      path: "/api/workers/market-sentiment/run",
     },
     envFlag(env.ENABLE_EXTERNAL_RESEARCH_WORKER, false) && {
       name: "external-research",
@@ -79,13 +85,13 @@ function scheduledJobs(env) {
         maxSymbolsPerUser:
           env.EXTERNAL_RESEARCH_DAILY_MAX_SYMBOLS_PER_USER || "3",
         maxJobs: env.EXTERNAL_RESEARCH_WORKER_MAX_JOBS || "3",
-        maxRuntimeMs: env.EXTERNAL_RESEARCH_WORKER_MAX_RUNTIME_MS || "20000"
-      }
+        maxRuntimeMs: env.EXTERNAL_RESEARCH_WORKER_MAX_RUNTIME_MS || "20000",
+      },
     },
     envFlag(env.ENABLE_LOO_MINISTER_CONTEXT_PRUNE_WORKER, true) && {
       name: "loo-minister-context-prune",
-      path: "/api/workers/loo-minister/context-packs/prune"
-    }
+      path: "/api/workers/loo-minister/context-packs/prune",
+    },
   ].filter(Boolean);
 }
 
@@ -107,11 +113,16 @@ export default {
     if (url.pathname !== "/run-once") {
       return new Response("Not found", { status: 404 });
     }
-    const requestSecret = request.headers.get("authorization")?.replace(/^Bearer\s+/i, "");
-    if (!requestSecret || requestSecret !== requireEnv(env, "PORTFOLIO_WORKER_SECRET")) {
+    const requestSecret = request.headers
+      .get("authorization")
+      ?.replace(/^Bearer\s+/i, "");
+    if (
+      !requestSecret ||
+      requestSecret !== requireEnv(env, "PORTFOLIO_WORKER_SECRET")
+    ) {
       return Response.json({ error: "Unauthorized." }, { status: 401 });
     }
     const results = await runJobs(env);
     return Response.json({ data: results });
-  }
+  },
 };

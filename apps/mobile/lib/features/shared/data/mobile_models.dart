@@ -23,6 +23,7 @@ class MobileAccountCard {
     required this.id,
     required this.name,
     required this.value,
+    required this.gainLoss,
     required this.detail,
     required this.typeId,
   });
@@ -30,6 +31,7 @@ class MobileAccountCard {
   final String id;
   final String name;
   final String value;
+  final String gainLoss;
   final String detail;
   final String typeId;
 
@@ -38,6 +40,7 @@ class MobileAccountCard {
       id: json["id"] as String? ?? "",
       name: json["name"] as String? ?? "未知账户",
       value: json["value"] as String? ?? "--",
+      gainLoss: json["gainLoss"] as String? ?? "",
       detail: (json["caption"] as String?) ??
           (json["typeLabel"] as String?) ??
           (json["institution"] as String?) ??
@@ -53,6 +56,8 @@ class MobileHoldingCard {
     required this.symbol,
     required this.name,
     required this.value,
+    required this.gainLoss,
+    required this.weight,
     required this.detail,
     required this.accountType,
     required this.lastUpdated,
@@ -67,6 +72,8 @@ class MobileHoldingCard {
   final String symbol;
   final String name;
   final String value;
+  final String gainLoss;
+  final String weight;
   final String detail;
   final String accountType;
   final String lastUpdated;
@@ -101,6 +108,8 @@ class MobileHoldingCard {
       symbol: symbol,
       name: json["name"] as String? ?? "未知标的",
       value: json["value"] as String? ?? "--",
+      gainLoss: json["gainLoss"] as String? ?? "",
+      weight: weight,
       detail: [account, weight, quoteStatus]
           .where((item) => item.isNotEmpty)
           .join(" · "),

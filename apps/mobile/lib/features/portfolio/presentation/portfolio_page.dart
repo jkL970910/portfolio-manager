@@ -1,27 +1,33 @@
 import "package:flutter/material.dart";
 
 import "../../../core/api/loo_api_client.dart";
+import "../../../core/presentation/loo_components.dart";
+import "../../../core/theme/loo_theme.dart";
+import "../../shared/data/mobile_chart_models.dart";
+import "../../shared/data/mobile_models.dart";
+import "../../shared/presentation/loo_charts.dart";
+import "../../shared/presentation/loo_minister_scope.dart";
 import "../data/mobile_portfolio_models.dart";
 import "account_detail_page.dart";
 import "asset_class_drilldown_page.dart";
 import "health_score_page.dart";
 import "holding_detail_page.dart";
-import "../../shared/data/mobile_chart_models.dart";
-import "../../shared/data/mobile_models.dart";
-import "../../shared/presentation/loo_charts.dart";
-import "../../shared/presentation/loo_minister_scope.dart";
 
 class PortfolioPage extends StatefulWidget {
   const PortfolioPage({
     required this.apiClient,
     this.accountTypeFilter,
     this.title,
+    this.initialSection,
+    this.sectionRequestToken = 0,
     super.key,
   });
 
   final LooApiClient apiClient;
   final String? accountTypeFilter;
   final String? title;
+  final PortfolioInitialSection? initialSection;
+  final int sectionRequestToken;
 
   @override
   State<PortfolioPage> createState() => _PortfolioPageState();
@@ -29,11 +35,21 @@ class PortfolioPage extends StatefulWidget {
 
 class _PortfolioPageState extends State<PortfolioPage> {
   late Future<MobilePortfolioSnapshot> _snapshot;
+  final _scrollController = ScrollController();
+  final _accountsKey = GlobalKey();
+  final _holdingsKey = GlobalKey();
+  int _handledSectionRequestToken = -1;
 
   @override
   void initState() {
     super.initState();
     _snapshot = _loadSnapshot();
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
   }
 
   Future<MobilePortfolioSnapshot> _loadSnapshot() async {
@@ -80,104 +96,137 @@ class _PortfolioPageState extends State<PortfolioPage> {
     return FutureBuilder<MobilePortfolioSnapshot>(
       future: _snapshot,
       builder: (context, snapshot) {
+        if (snapshot.hasData) {
+          _scheduleInitialSectionScroll();
+        }
         return RefreshIndicator(
           onRefresh: () async => _refresh(),
-          child: CustomScrollView(
-            physics: const AlwaysScrollableScrollPhysics(),
-            slivers: [
-              SliverToBoxAdapter(
-                child: _PageHeader(
-                  title: widget.title ?? "组合御览",
-                  subtitle: snapshot.hasData
-                      ? snapshot.data!.quoteStatus
-                      : "正在整理 Loo国资产账本...",
-                ),
-              ),
-              if (snapshot.connectionState == ConnectionState.waiting)
-                const SliverFillRemaining(
-                    child: Center(child: CircularProgressIndicator()))
-              else if (snapshot.hasError)
-                SliverFillRemaining(
-                  child: _ErrorState(
-                      message: snapshot.error.toString(), onRetry: _refresh),
-                )
-              else if (snapshot.hasData)
-                SliverPadding(
-                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 28),
-                  sliver: SliverList.list(
-                    children: [
-                      if (_isFiltered)
-                        _FilterSummaryCard(snapshot.data!)
-                      else
-                        _HealthCard(
-                          snapshot.data!.healthScore,
-                          snapshot.data!.summaryPoints,
-                          onTap: _openHealthScore,
-                        ),
-                      if (!_isFiltered &&
-                          (snapshot.data!.portfolioValueChart != null ||
-                              snapshot.data!.performance.isNotEmpty)) ...[
-                        const SizedBox(height: 18),
-                        _PortfolioTrendCard(
-                          chart: snapshot.data!.portfolioValueChart,
-                          fallbackPoints: snapshot.data!.performance,
-                        ),
-                      ],
-                      if (!_isFiltered &&
-                          snapshot.data!.accountTypeAllocation.isNotEmpty) ...[
-                        const SizedBox(height: 18),
-                        _AllocationCard(
-                          title: "账户类型分布",
-                          points: snapshot.data!.accountTypeAllocation,
-                        ),
-                      ],
-                      if (!_isFiltered &&
-                          snapshot
-                              .data!.accountInstanceAllocation.isNotEmpty) ...[
-                        const SizedBox(height: 18),
-                        _AllocationCard(
-                          title: "账户实例分布",
-                          points: snapshot.data!.accountInstanceAllocation,
-                        ),
-                      ],
-                      if (!_isFiltered &&
-                          snapshot.data!.assetClassDrilldown.isNotEmpty) ...[
-                        const SizedBox(height: 18),
-                        _AssetClassCard(
-                          items: snapshot.data!.assetClassDrilldown,
-                          onTap: _openAssetClassDrilldown,
-                        ),
-                      ],
-                      const SizedBox(height: 18),
-                      _SectionTitle(
-                          title: "账户",
-                          actionLabel: "${snapshot.data!.accounts.length} 个"),
-                      const SizedBox(height: 10),
-                      ...snapshot.data!.accounts.map(
-                        (account) => _AccountTile(
-                          account,
-                          onTap: () => _openAccountDetail(account),
-                        ),
-                      ),
-                      const SizedBox(height: 18),
-                      _SectionTitle(
-                          title: "持仓",
-                          actionLabel: "${snapshot.data!.holdings.length} 个"),
-                      const SizedBox(height: 10),
-                      ...snapshot.data!.holdings.take(12).map(
-                            (holding) => _HoldingTile(
-                              holding,
-                              onTap: () => _openHoldingDetail(holding),
-                            ),
-                          ),
-                    ],
+          child: LooPageGradient(
+            child: CustomScrollView(
+              controller: _scrollController,
+              physics: const AlwaysScrollableScrollPhysics(),
+              slivers: [
+                SliverToBoxAdapter(
+                  child: _PageHeader(
+                    title: widget.title ?? "组合御览",
+                    subtitle: snapshot.hasData
+                        ? snapshot.data!.quoteStatus
+                        : "正在整理 Loo国资产账本...",
                   ),
                 ),
-            ],
+                if (snapshot.connectionState == ConnectionState.waiting)
+                  const SliverFillRemaining(
+                      child: Center(child: CircularProgressIndicator()))
+                else if (snapshot.hasError)
+                  SliverFillRemaining(
+                    child: _ErrorState(
+                        message: snapshot.error.toString(), onRetry: _refresh),
+                  )
+                else if (snapshot.hasData)
+                  SliverPadding(
+                    padding: const EdgeInsets.fromLTRB(20, 0, 20, 28),
+                    sliver: SliverList.list(
+                      children: [
+                        if (_isFiltered)
+                          _FilterSummaryCard(snapshot.data!)
+                        else
+                          _HealthCard(
+                            snapshot.data!.healthScore,
+                            snapshot.data!.summaryPoints,
+                            onTap: _openHealthScore,
+                          ),
+                        if (!_isFiltered &&
+                            (snapshot.data!.portfolioValueChart != null ||
+                                snapshot.data!.performance.isNotEmpty)) ...[
+                          const SizedBox(height: 18),
+                          _PortfolioTrendCard(
+                            chart: snapshot.data!.portfolioValueChart,
+                            fallbackPoints: snapshot.data!.performance,
+                          ),
+                        ],
+                        if (!_isFiltered &&
+                            snapshot
+                                .data!.accountTypeAllocation.isNotEmpty) ...[
+                          const SizedBox(height: 18),
+                          _AllocationCard(
+                            title: "账户类型分布",
+                            points: snapshot.data!.accountTypeAllocation,
+                          ),
+                        ],
+                        if (!_isFiltered &&
+                            snapshot.data!.accountInstanceAllocation
+                                .isNotEmpty) ...[
+                          const SizedBox(height: 18),
+                          _AllocationCard(
+                            title: "账户实例分布",
+                            points: snapshot.data!.accountInstanceAllocation,
+                          ),
+                        ],
+                        if (!_isFiltered &&
+                            snapshot.data!.assetClassDrilldown.isNotEmpty) ...[
+                          const SizedBox(height: 18),
+                          _AssetClassCard(
+                            items: snapshot.data!.assetClassDrilldown,
+                            onTap: _openAssetClassDrilldown,
+                          ),
+                        ],
+                        const SizedBox(height: 18),
+                        _SectionTitle(
+                            key: _accountsKey,
+                            title: "账户",
+                            actionLabel: "${snapshot.data!.accounts.length} 个"),
+                        const SizedBox(height: 10),
+                        ...snapshot.data!.accounts.map(
+                          (account) => _AccountTile(
+                            account,
+                            onTap: () => _openAccountDetail(account),
+                          ),
+                        ),
+                        const SizedBox(height: 18),
+                        _SectionTitle(
+                            key: _holdingsKey,
+                            title: "持仓",
+                            actionLabel: "${snapshot.data!.holdings.length} 个"),
+                        const SizedBox(height: 10),
+                        ...snapshot.data!.holdings.map(
+                          (holding) => _HoldingTile(
+                            holding,
+                            onTap: () => _openHoldingDetail(holding),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+              ],
+            ),
           ),
         );
       },
     );
+  }
+
+  void _scheduleInitialSectionScroll() {
+    final section = widget.initialSection;
+    if (section == null ||
+        _handledSectionRequestToken == widget.sectionRequestToken) {
+      return;
+    }
+    _handledSectionRequestToken = widget.sectionRequestToken;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final key = switch (section) {
+        PortfolioInitialSection.accounts => _accountsKey,
+        PortfolioInitialSection.holdings => _holdingsKey,
+      };
+      final targetContext = key.currentContext;
+      if (targetContext == null) return;
+      Scrollable.ensureVisible(
+        targetContext,
+        duration: const Duration(milliseconds: 280),
+        curve: Curves.easeOutCubic,
+        alignment: 0.08,
+      );
+    });
   }
 
   void _openAccountDetail(MobileAccountCard account) {
@@ -227,6 +276,8 @@ class _PortfolioPageState extends State<PortfolioPage> {
       widget.accountTypeFilter != null && widget.accountTypeFilter!.isNotEmpty;
 }
 
+enum PortfolioInitialSection { accounts, holdings }
+
 class _PageHeader extends StatelessWidget {
   const _PageHeader({required this.title, required this.subtitle});
 
@@ -235,16 +286,10 @@ class _PageHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 22, 20, 18),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(title, style: Theme.of(context).textTheme.headlineMedium),
-          const SizedBox(height: 8),
-          Text(subtitle, style: Theme.of(context).textTheme.bodyLarge),
-        ],
-      ),
+    return LooHeroHeader(
+      eyebrow: "Portfolio",
+      title: title,
+      subtitle: subtitle,
     );
   }
 }
@@ -258,34 +303,34 @@ class _HealthCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return _LooCard(
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(18),
-        child: Padding(
-          padding: const EdgeInsets.all(2),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+    final tokens = context.looTokens;
+    return LooGlassCard(
+      onTap: onTap,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
             children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: Text("国库健康度",
-                        style: Theme.of(context).textTheme.titleLarge),
-                  ),
-                  const Icon(Icons.chevron_right),
-                ],
+              Expanded(
+                child: Text("国库健康度",
+                    style: Theme.of(context).textTheme.titleLarge),
               ),
-              const SizedBox(height: 8),
-              Text(score, style: Theme.of(context).textTheme.headlineMedium),
-              const SizedBox(height: 8),
-              ...summaryPoints.take(3).map((point) => Padding(
-                    padding: const EdgeInsets.only(top: 4),
-                    child: Text("• $point"),
-                  )),
+              Text(
+                "查看巡查",
+                style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                      color: tokens.accent,
+                    ),
+              ),
             ],
           ),
-        ),
+          SizedBox(height: tokens.gapSm),
+          Text(score, style: Theme.of(context).textTheme.headlineMedium),
+          SizedBox(height: tokens.gapSm),
+          ...summaryPoints.take(3).map((point) => Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: Text("• $point"),
+              )),
+        ],
       ),
     );
   }
@@ -298,7 +343,7 @@ class _FilterSummaryCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return _LooCard(
+    return LooGlassCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -351,7 +396,7 @@ class _PortfolioTrendCard extends StatelessWidget {
     final last = points.last;
     final freshness = chart?.freshness;
 
-    return _LooCard(
+    return LooGlassCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -407,7 +452,7 @@ class _AllocationCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final shownPoints =
         points.where((point) => point.value > 0).take(6).toList();
-    return _LooCard(
+    return LooGlassCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -452,7 +497,8 @@ class _AssetClassCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final shownItems =
         items.where((item) => item.currentPct > 0).take(6).toList();
-    return _LooCard(
+    final tokens = context.looTokens;
+    return LooGlassCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -470,19 +516,13 @@ class _AssetClassCard extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           ...shownItems.map(
-            (item) => ListTile(
-              contentPadding: EdgeInsets.zero,
-              onTap: () => onTap(item),
-              title: Text(item.name),
-              subtitle: Text("目标 ${item.target} · 当前 ${item.current}"),
-              trailing: Wrap(
-                crossAxisAlignment: WrapCrossAlignment.center,
-                spacing: 8,
-                children: [
-                  Text(item.driftLabel,
-                      style: Theme.of(context).textTheme.titleMedium),
-                  const Icon(Icons.chevron_right),
-                ],
+            (item) => Padding(
+              padding: EdgeInsets.only(top: tokens.gapSm),
+              child: LooTappableRow(
+                title: item.name,
+                subtitle: "目标 ${item.target} · 当前 ${item.current}",
+                value: item.driftLabel,
+                onTap: () => onTap(item),
               ),
             ),
           ),
@@ -493,7 +533,11 @@ class _AssetClassCard extends StatelessWidget {
 }
 
 class _SectionTitle extends StatelessWidget {
-  const _SectionTitle({required this.title, required this.actionLabel});
+  const _SectionTitle({
+    required this.title,
+    required this.actionLabel,
+    super.key,
+  });
 
   final String title;
   final String actionLabel;
@@ -504,7 +548,12 @@ class _SectionTitle extends StatelessWidget {
       children: [
         Expanded(
             child: Text(title, style: Theme.of(context).textTheme.titleLarge)),
-        Text(actionLabel, style: Theme.of(context).textTheme.bodyMedium),
+        Text(
+          actionLabel,
+          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: context.looTokens.mutedText,
+              ),
+        ),
       ],
     );
   }
@@ -518,22 +567,13 @@ class _AccountTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return _LooCard(
+    return LooTappableRow(
       margin: const EdgeInsets.only(bottom: 10),
-      child: ListTile(
-        contentPadding: EdgeInsets.zero,
-        onTap: onTap,
-        title: Text(account.name),
-        subtitle: Text(account.detail),
-        trailing: Wrap(
-          crossAxisAlignment: WrapCrossAlignment.center,
-          spacing: 8,
-          children: [
-            Text(account.value, style: Theme.of(context).textTheme.titleLarge),
-            const Icon(Icons.chevron_right),
-          ],
-        ),
-      ),
+      title: account.name,
+      subtitle: account.detail,
+      value: account.value,
+      valueDetail: account.gainLoss,
+      onTap: onTap,
     );
   }
 }
@@ -546,22 +586,13 @@ class _HoldingTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return _LooCard(
+    return LooTappableRow(
       margin: const EdgeInsets.only(bottom: 10),
-      child: ListTile(
-        contentPadding: EdgeInsets.zero,
-        onTap: onTap,
-        title: Text("${holding.symbol} · ${holding.name}"),
-        subtitle: Text(holding.detail),
-        trailing: Wrap(
-          crossAxisAlignment: WrapCrossAlignment.center,
-          spacing: 8,
-          children: [
-            Text(holding.value, style: Theme.of(context).textTheme.titleLarge),
-            const Icon(Icons.chevron_right),
-          ],
-        ),
-      ),
+      title: "${holding.symbol} · ${holding.name}",
+      subtitle: holding.detail,
+      value: holding.value,
+      valueDetail: holding.gainLoss,
+      onTap: onTap,
     );
   }
 }
@@ -574,36 +605,11 @@ class _ErrorState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Text("Loo国资产账本暂时打不开", style: Theme.of(context).textTheme.titleLarge),
-          const SizedBox(height: 8),
-          Text(message, textAlign: TextAlign.center),
-          const SizedBox(height: 16),
-          FilledButton(onPressed: onRetry, child: const Text("重新翻阅")),
-        ],
-      ),
-    );
-  }
-}
-
-class _LooCard extends StatelessWidget {
-  const _LooCard({required this.child, this.margin});
-
-  final Widget child;
-  final EdgeInsetsGeometry? margin;
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      margin: margin,
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: child,
-      ),
+    return LooStatePanel(
+      title: "Loo国资产账本暂时打不开",
+      message: message,
+      actionLabel: "重新翻阅",
+      onAction: onRetry,
     );
   }
 }

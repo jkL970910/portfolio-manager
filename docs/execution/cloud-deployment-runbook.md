@@ -171,6 +171,14 @@ Expected:
   unbounded provider calls. If the list grows beyond the current run budget, the
   run should be `partial` with a mobile-readable “remaining symbols will refresh
   next run” status, not a full skip.
+- `market-sentiment` writes a fresh `market_sentiment_snapshots` row. It fetches
+  VIX through the market-data provider layer, attempts CNN Fear & Greed
+  GraphData once per cron run, and fetches real macro indicators from FRED
+  (`BAMLH0A0HYM2`, `DGS10`, `DFII10`, `T10Y2Y`) plus selected ETF proxies
+  through the market-data provider layer. This is HTTP parsing, not an LLM call,
+  so it does not consume GPT tokens. If a source blocks or changes shape, the
+  mobile UI must omit/mark that metric unavailable instead of fabricating a
+  value.
 - `external-research` may run in `daily-overview` mode with tight limits. It
   only enqueues a small set of complete-identity holdings, skips fresh cached
   documents, then drains the same external-research queue. Keep raw news/forum

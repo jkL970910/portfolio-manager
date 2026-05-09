@@ -1119,12 +1119,32 @@ function anchorSeriesToCurrentValue(args: {
   display: DisplayContext;
 }) {
   const today = new Date().toISOString().slice(0, 10);
+  const sortedSeries = [...args.series].sort((left, right) =>
+    (left.rawDate ?? left.label).localeCompare(right.rawDate ?? right.label),
+  );
   const currentPoint = {
     label: formatSnapshotLabel(today, args.language),
     rawDate: today,
     value: round(convertCadToDisplay(args.currentValueCad, args.display), 2),
   };
-  const withoutToday = args.series.filter((point) => point.rawDate !== today);
+  const existingToday = sortedSeries.find((point) => point.rawDate === today);
+  const withoutToday = sortedSeries.filter((point) => point.rawDate !== today);
+  const lastHistorical = withoutToday.at(-1) ?? null;
+  const comparisonPoint = existingToday ?? lastHistorical;
+
+  if (!comparisonPoint || comparisonPoint.value <= 0) {
+    return [...withoutToday, currentPoint].sort((left, right) =>
+      (left.rawDate ?? left.label).localeCompare(right.rawDate ?? right.label),
+    );
+  }
+
+  const currentDeltaPct =
+    Math.abs(currentPoint.value - comparisonPoint.value) /
+    comparisonPoint.value;
+  if (currentDeltaPct > 0.15) {
+    return sortedSeries;
+  }
+
   return [...withoutToday, currentPoint].sort((left, right) =>
     (left.rawDate ?? left.label).localeCompare(right.rawDate ?? right.label),
   );
@@ -1979,6 +1999,15 @@ export function buildDashboardData(args: {
         ),
       },
       {
+        label: pick(language, "累计收益", "All-time return"),
+        value: getAccountGainLossSummary(holdings, display, language),
+        detail: pick(
+          language,
+          "按已有持仓成本价估算；缺少成本价的持仓不会参与百分比计算。",
+          "Estimated from available holding cost basis; holdings without cost basis are excluded from percentage calculation.",
+        ),
+      },
+      {
         label: pick(language, "可用额度", "Available Room"),
         value: formatDisplayCurrency(availableRoom, display),
         detail: pick(
@@ -2022,6 +2051,11 @@ export function buildDashboardData(args: {
           account.marketValueCad,
           display,
         ),
+        gainLoss: getAccountGainLossSummary(
+          holdings.filter((holding) => holding.accountId === account.id),
+          display,
+          language,
+        ),
         room: formatRoomDetail(account, display, language),
         badge: getAccountBadgeLabel(
           index,
@@ -2048,7 +2082,7 @@ export function buildDashboardData(args: {
     })),
     topHoldings: [...holdings]
       .sort((left, right) => right.marketValueCad - left.marketValueCad)
-      .slice(0, 3)
+      .slice(0, 5)
       .map((holding) => ({
         id: holding.id,
         symbol: holding.symbol,
@@ -2083,6 +2117,7 @@ export function buildDashboardData(args: {
           holding.marketValueCad,
           display,
         ),
+        gainLoss: formatSignedPercent(holding.gainLossPct, 1),
       })),
     trendContext: {
       title: cashBalanceTrend
@@ -3919,9 +3954,10 @@ function buildBaseRecommendationV3Overlay(
     item.accountFitScore,
     item.taxFitScore,
   ].filter((score): score is number => typeof score === "number");
-  const baselineScore = scoreInputs.length > 0
-    ? round(sum(scoreInputs) / scoreInputs.length, 1)
-    : 60;
+  const baselineScore =
+    scoreInputs.length > 0
+      ? round(sum(scoreInputs) / scoreInputs.length, 1)
+      : 60;
   const preferenceFitScore =
     typeof item.preferenceFitScore === "number"
       ? round(item.preferenceFitScore, 1)
@@ -4131,11 +4167,12 @@ export function buildRecommendationsData(args: {
       display,
     ),
     engine: {
-      version: latestRun?.engineVersion === "v2.1"
-        ? "V2.1 Core"
-        : latestRun?.engineVersion
-          ? `${latestRun.engineVersion.toUpperCase()} deprecated`
-          : "V2.1 Core",
+      version:
+        latestRun?.engineVersion === "v2.1"
+          ? "V2.1 Core"
+          : latestRun?.engineVersion
+            ? `${latestRun.engineVersion.toUpperCase()} deprecated`
+            : "V2.1 Core",
       objective: latestRun?.objective
         ? pick(
             language,
@@ -4516,7 +4553,11 @@ export function buildRecommendationsData(args: {
                 : ("neutral" as const),
           },
           {
-            label: pick(language, "进阶偏好因子", "Advanced preference factors"),
+            label: pick(
+              language,
+              "进阶偏好因子",
+              "Advanced preference factors",
+            ),
             detail: item.rationale?.preferenceSignals?.length
               ? pick(
                   language,

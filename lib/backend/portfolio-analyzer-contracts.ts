@@ -147,6 +147,91 @@ const analyzerEvidenceItemSchema = z.object({
   detail: z.string().trim().min(1).max(800)
 });
 
+const securityResearchGuardrailSchema = z.object({
+  id: z.string().trim().min(1).max(120),
+  severity: z.enum(["info", "warning", "blocker"]),
+  title: z.string().trim().min(1).max(160),
+  detail: z.string().trim().min(1).max(800)
+});
+
+export const securityResearchDecisionSchema = z.object({
+  version: z.literal("security-research-v1"),
+  generatedAt: z.string().datetime(),
+  security: z.object({
+    securityId: z.string().trim().min(1).max(80).nullable().optional(),
+    symbol: z.string().trim().min(1).max(32),
+    exchange: z.string().trim().min(1).max(64).nullable().optional(),
+    currency: currencySchema.nullable().optional(),
+    name: z.string().trim().min(1).max(160).nullable().optional(),
+    assetType: z.enum(["stock", "etf", "fund", "cash", "other"]),
+    identityStatus: z.enum(["resolved", "ambiguous", "missing"])
+  }),
+  decision: z.object({
+    label: z.enum(["适合继续研究", "继续持有观察", "保持观察", "暂不适合", "需要补充数据"]),
+    confidenceScore: z.number().min(0).max(100),
+    primaryReason: z.string().trim().min(1).max(500),
+    vetoedBy: z
+      .array(z.enum(["identity", "freshness", "portfolio_fit", "account_tax", "liquidity"]))
+      .max(8)
+      .default([])
+  }),
+  guardrails: z.array(securityResearchGuardrailSchema).max(16).default([]),
+  portfolioFit: z.object({
+    score: z.number().min(0).max(100),
+    sleeve: z.string().trim().min(1).max(120),
+    targetGapLabel: z.string().trim().min(1).max(160),
+    currentExposureLabel: z.string().trim().min(1).max(160),
+    duplicateExposureLabel: z.string().trim().min(1).max(160).nullable().optional(),
+    accountTaxFitLabel: z.string().trim().min(1).max(160).nullable().optional(),
+    liquidityFitLabel: z.string().trim().min(1).max(160).nullable().optional()
+  }),
+  valuationEvidence: z.object({
+    method: z.enum([
+      "multiples_evidence",
+      "analyst_consensus",
+      "dcf_reference",
+      "etf_macro_proxy",
+      "unavailable"
+    ]),
+    confidence: z.enum(["low", "medium", "high"]),
+    summary: z.string().trim().min(1).max(700),
+    anchors: z.array(z.object({
+      label: z.string().trim().min(1).max(120),
+      value: z.string().trim().min(1).max(160),
+      source: z.string().trim().min(1).max(160),
+      asOf: z.string().trim().min(1).max(80).nullable().optional()
+    })).max(8).default([]),
+    sanityChecks: z.array(z.object({
+      label: z.string().trim().min(1).max(120),
+      status: z.enum(["pass", "watch", "fail", "unavailable"]),
+      detail: z.string().trim().min(1).max(500)
+    })).max(8).default([])
+  }),
+  entryTiming: z.object({
+    posture: z.enum(["consider_now", "wait_for_pullback", "wait_for_confirmation", "not_applicable"]),
+    keyLevels: z.array(z.object({
+      label: z.string().trim().min(1).max(120),
+      value: z.string().trim().min(1).max(160),
+      type: z.enum(["MA200", "52W_HIGH", "52W_LOW", "RECENT_HIGH", "RECENT_LOW", "VALUATION_ANCHOR"]),
+      source: z.string().trim().min(1).max(160)
+    })).max(10).default([]),
+    marketPulseLabel: z.string().trim().min(1).max(160).nullable().optional()
+  }),
+  actionPlans: z.array(z.object({
+    type: z.enum(["watch_only", "dca_accumulate", "value_pullback", "breakout_confirmed", "avoid"]),
+    title: z.string().trim().min(1).max(160),
+    detail: z.string().trim().min(1).max(800),
+    isBlockedByPortfolioFit: z.boolean(),
+    requiredConfirmations: z.array(z.string().trim().min(1).max(200)).max(8).default([])
+  })).max(8).default([]),
+  evidence: z.array(z.object({
+    source: z.string().trim().min(1).max(160),
+    sourceType: z.enum(["quote", "history", "fundamental", "macro", "portfolio", "preference", "external_research"]),
+    freshnessLabel: z.string().trim().min(1).max(160),
+    reliabilityLabel: z.string().trim().min(1).max(160)
+  })).max(12).default([])
+});
+
 export const portfolioAnalyzerResultSchema = z.object({
   version: z.literal(PORTFOLIO_ANALYZER_VERSION),
   scope: z.enum(["security", "portfolio", "account", "recommendation-run"]),
@@ -197,6 +282,7 @@ export const portfolioAnalyzerResultSchema = z.object({
     watchlistTriggers: z.array(z.string().trim().min(1).max(500)).max(8).default([]),
     evidence: z.array(z.string().trim().min(1).max(500)).max(8).default([]),
   }).optional(),
+  securityResearchDecision: securityResearchDecisionSchema.optional(),
   scorecards: z.array(z.object({
     id: z.string().trim().min(1).max(80),
     label: z.string().trim().min(1).max(120),
@@ -253,6 +339,7 @@ export const portfolioAnalyzerResultSchema = z.object({
 });
 
 export type AnalyzerSecurityIdentity = z.infer<typeof analyzerSecurityIdentitySchema>;
+export type SecurityResearchDecision = z.infer<typeof securityResearchDecisionSchema>;
 export type PortfolioAnalyzerRequest = z.infer<typeof portfolioAnalyzerRequestSchema>;
 export type PortfolioAnalyzerGptEnhancementRequest = z.infer<typeof portfolioAnalyzerGptEnhancementRequestSchema>;
 export type PortfolioAnalyzerResult = z.infer<typeof portfolioAnalyzerResultSchema>;

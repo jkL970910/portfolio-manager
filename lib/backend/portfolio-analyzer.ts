@@ -1,5 +1,6 @@
 import {
   AccountType,
+  ExternalResearchDocumentRecord,
   HoldingPosition,
   InvestmentAccount,
   PreferenceProfile,
@@ -13,6 +14,7 @@ import {
   PORTFOLIO_ANALYZER_DISCLAIMER,
   PORTFOLIO_ANALYZER_VERSION,
   PortfolioAnalyzerResult,
+  SecurityResearchDecision,
   portfolioAnalyzerResultSchema
 } from "@/lib/backend/portfolio-analyzer-contracts";
 import {
@@ -580,6 +582,459 @@ function buildSecurityNextSteps(args: {
   return [...new Set(steps)].slice(0, 6);
 }
 
+function getSecurityResearchAssetType(args: {
+  identity: AnalyzerSecurityIdentity;
+  referenceHolding?: HoldingPosition;
+}): SecurityResearchDecision["security"]["assetType"] {
+  const securityType = [
+    args.identity.securityType,
+    args.referenceHolding?.securityTypeOverride,
+    args.referenceHolding?.assetClass,
+    args.identity.name,
+  ].filter(Boolean).join(" ").toLowerCase();
+  if (/\bcash\b|money market/.test(securityType)) return "cash";
+  if (/etf|fund|index|bond|commodity/.test(securityType)) return "etf";
+  if (/stock|common|equity|share/.test(securityType)) return "stock";
+  return "other";
+}
+
+function getSecurityResearchIdentityStatus(identity: AnalyzerSecurityIdentity): SecurityResearchDecision["security"]["identityStatus"] {
+  if (!identity.symbol?.trim()) return "missing";
+  if (!identity.exchange || !identity.currency) return "missing";
+  return "resolved";
+}
+
+function mapSecurityResearchLabel(
+  verdict: ReturnType<typeof buildSecurityDecisionNarrative>["verdict"],
+): SecurityResearchDecision["decision"]["label"] {
+  switch (verdict) {
+    case "good-candidate":
+      return "适合继续研究";
+    case "review-existing":
+      return "继续持有观察";
+    case "watch-only":
+      return "保持观察";
+    case "weak-fit":
+      return "暂不适合";
+    case "needs-more-data":
+    default:
+      return "需要补充数据";
+  }
+}
+
+function mapSecurityResearchGuardrailSeverity(severity: "info" | "low" | "medium" | "high", blocking: boolean) {
+  if (blocking || severity === "high") return "blocker" as const;
+  if (severity === "medium") return "warning" as const;
+  return "info" as const;
+}
+
+function getSecurityResearchVetoes(args: {
+  guardrails: ReturnType<typeof buildSecurityDecisionNarrative>["guardrails"];
+  fit: ReturnType<typeof buildSecurityDecisionNarrative>["fit"];
+}): SecurityResearchDecision["decision"]["vetoedBy"] {
+  const vetoes = new Set<SecurityResearchDecision["decision"]["vetoedBy"][number]>();
+  for (const guardrail of args.guardrails) {
+    if (!guardrail.blocking) continue;
+    if (guardrail.category === "identity") vetoes.add("identity");
+    if (guardrail.category === "freshness" || guardrail.category === "market-data") vetoes.add("freshness");
+    if (
+      guardrail.category === "portfolio-fit" ||
+      guardrail.category === "duplicate-exposure" ||
+      guardrail.category === "preference-conflict"
+    ) {
+      vetoes.add("portfolio_fit");
+    }
+    if (guardrail.category === "tax-account-mismatch" || guardrail.category === "account-fit") vetoes.add("account_tax");
+    if (guardrail.category === "liquidity") vetoes.add("liquidity");
+  }
+  if (args.fit.score < 45) vetoes.add("portfolio_fit");
+  return [...vetoes];
+}
+
+function normalizeValuationMetric(value: string | null | undefined) {
+  const trimmed = value?.trim();
+  if (!trimmed || trimmed === "None" || trimmed === "0" || trimmed === "0.00" || trimmed === "-") {
+    return null;
+  }
+  return trimmed;
+}
+
+function extractKeyPointValue(document: ExternalResearchDocumentRecord, label: string) {
+  const prefix = `${label}：`;
+  const keyPoint = document.keyPoints.find((item) => item.startsWith(prefix));
+  return normalizeValuationMetric(keyPoint?.slice(prefix.length));
+}
+
+function isFreshExternalResearchDocument(document: ExternalResearchDocumentRecord, generatedAt: string) {
+  return Date.parse(document.expiresAt) > Date.parse(generatedAt);
+}
+
+function getBestValuationDocument(documents: ExternalResearchDocumentRecord[] | undefined, generatedAt: string) {
+  return [...(documents ?? [])]
+    .filter((document) => document.providerId === "alpha-vantage-profile")
+    .filter((document) => isFreshExternalResearchDocument(document, generatedAt))
+    .sort((left, right) => {
+      const scoreDelta = right.relevanceScore - left.relevanceScore;
+      if (scoreDelta !== 0) return scoreDelta;
+      return Date.parse(right.capturedAt) - Date.parse(left.capturedAt);
+    })[0];
+}
+
+function buildValuationAnchorsFromDocument(document: ExternalResearchDocumentRecord) {
+  const metricLabels = [
+    "分析师目标价",
+    "市盈率",
+    "Forward P/E",
+    "PEG",
+    "市净率",
+    "52周区间",
+    "分红/收益率",
+    "费用率",
+    "市值",
+    "Beta",
+  ];
+
+  return metricLabels
+    .map((label) => {
+      const value = extractKeyPointValue(document, label);
+      return value
+        ? {
+            label,
+            value,
+            source: document.sourceName,
+            asOf: document.publishedAt ?? document.capturedAt,
+          }
+        : null;
+    })
+    .filter((item): item is NonNullable<typeof item> => Boolean(item))
+    .slice(0, 8);
+}
+
+function getValuationConfidence(args: {
+  document: ExternalResearchDocumentRecord;
+  anchors: Array<{ label: string; value: string; source: string; asOf?: string | null }>;
+}) {
+  if (args.document.confidence === "high" && args.document.sourceReliability >= 70 && args.anchors.length >= 3) {
+    return "high" as const;
+  }
+  if (args.anchors.length >= 2) {
+    return "medium" as const;
+  }
+  return "low" as const;
+}
+
+function buildSecurityResearchValuationEvidence(args: {
+  assetType: SecurityResearchDecision["security"]["assetType"];
+  symbol: string;
+  generatedAt: string;
+  valuationDocuments?: ExternalResearchDocumentRecord[];
+}): SecurityResearchDecision["valuationEvidence"] {
+  const valuationDocument = getBestValuationDocument(args.valuationDocuments, args.generatedAt);
+  const anchors = valuationDocument ? buildValuationAnchorsFromDocument(valuationDocument) : [];
+
+  if (args.assetType === "etf" || args.assetType === "fund") {
+    if (valuationDocument && anchors.length > 0) {
+      return {
+        method: "etf_macro_proxy",
+        confidence: getValuationConfidence({ document: valuationDocument, anchors }),
+        summary: `${args.symbol} 已读取缓存 ETF/基金资料；当前只把费用、收益率、52周区间等作为宏观/配置证据，不输出单公司式内在价值或目标价结论。`,
+        anchors,
+        sanityChecks: [
+          {
+            label: "DCF 适用性",
+            status: "unavailable",
+            detail: "ETF/基金不应直接套用单公司 DCF；需要以底层指数、宏观水位、费用/跟踪和组合再平衡为主。",
+          },
+          {
+            label: "资料新鲜度",
+            status: "pass",
+            detail: `使用缓存资料 ${valuationDocument.sourceName}，捕获时间 ${valuationDocument.capturedAt.slice(0, 10)}。`,
+          },
+        ],
+      };
+    }
+
+    return {
+      method: "etf_macro_proxy",
+      confidence: "low",
+      summary: "该标的按 ETF/基金研究路径处理：MVP 阶段不输出个股式内在价值区间，后续应接入宏观水位、指数估值、费用/跟踪和再平衡证据。",
+      anchors: [
+        {
+          label: "估值方法",
+          value: "ETF macro proxy",
+          source: "Loo国研究台规则",
+          asOf: args.generatedAt,
+        },
+      ],
+      sanityChecks: [
+        {
+          label: "DCF 适用性",
+          status: "unavailable",
+          detail: "ETF/基金不应直接套用单公司 DCF；需要以底层指数、宏观水位和组合再平衡为主。",
+        },
+      ],
+    };
+  }
+
+  if (valuationDocument && anchors.length > 0) {
+    const hasAnalystTarget = anchors.some((anchor) => anchor.label === "分析师目标价");
+    return {
+      method: hasAnalystTarget ? "analyst_consensus" : "multiples_evidence",
+      confidence: getValuationConfidence({ document: valuationDocument, anchors }),
+      summary: `${args.symbol} 已读取缓存估值证据：${anchors.slice(0, 3).map((anchor) => `${anchor.label} ${anchor.value}`).join("，")}。这些资料用于交叉验证，不等同于自动 DCF 或买卖指令。`,
+      anchors,
+      sanityChecks: [
+        {
+          label: "估值证据来源",
+          status: valuationDocument.sourceReliability >= 70 ? "pass" : "watch",
+          detail: `${valuationDocument.sourceName}，可靠度 ${valuationDocument.sourceReliability}/100，缓存时间 ${valuationDocument.capturedAt.slice(0, 10)}。`,
+        },
+        {
+          label: "DCF 边界",
+          status: "watch",
+          detail: "P1 MVP 不自动生成 DCF 内在价值；倍数和目标价只作为证据锚点，需要结合组合适配和护栏。",
+        },
+        {
+          label: "交叉验证",
+          status: anchors.length >= 3 ? "pass" : "watch",
+          detail: anchors.length >= 3
+            ? "已有多个估值锚点，可作为第一层证据链。"
+            : "估值锚点较少，后续应补充更多 provider 或历史分位。",
+        },
+      ],
+    };
+  }
+
+  return {
+    method: "unavailable",
+    confidence: "low",
+    summary: `${args.symbol} 的估值证据 provider 尚未接入；当前结论只使用组合适配、偏好、账户/税务和缓存行情，不声称已完成 DCF 或目标价判断。`,
+    anchors: [],
+    sanityChecks: [
+      {
+        label: "估值证据",
+        status: "unavailable",
+        detail: "P1.2 将接入 analyst consensus、估值倍数、历史分位等证据后再提高置信度。",
+      },
+    ],
+  };
+}
+
+function formatResearchPrice(value: number, currency: string | null | undefined) {
+  return `${currency ?? ""} ${round(value, 2)}`.trim();
+}
+
+function buildSecurityResearchEntryTiming(args: {
+  priceHistory: SecurityPriceHistoryPoint[];
+  currency: string | null | undefined;
+  verdict: ReturnType<typeof buildSecurityDecisionNarrative>["verdict"];
+}): SecurityResearchDecision["entryTiming"] {
+  const sorted = [...args.priceHistory].sort((left, right) => left.priceDate.localeCompare(right.priceDate));
+  const closes = sorted
+    .map((point) => point.adjustedClose ?? point.close)
+    .filter((value) => Number.isFinite(value));
+  const latest = closes.at(-1);
+  const keyLevels: SecurityResearchDecision["entryTiming"]["keyLevels"] = [];
+
+  if (latest !== undefined) {
+    keyLevels.push({
+      label: "最近收盘价",
+      value: formatResearchPrice(latest, args.currency),
+      type: "RECENT_HIGH",
+      source: "缓存价格历史",
+    });
+  }
+
+  if (closes.length >= 2) {
+    keyLevels.push({
+      label: "样本高点",
+      value: formatResearchPrice(Math.max(...closes), args.currency),
+      type: "RECENT_HIGH",
+      source: "缓存价格历史",
+    });
+    keyLevels.push({
+      label: "样本低点",
+      value: formatResearchPrice(Math.min(...closes), args.currency),
+      type: "RECENT_LOW",
+      source: "缓存价格历史",
+    });
+  }
+
+  if (closes.length >= 200) {
+    keyLevels.push({
+      label: "MA200",
+      value: formatResearchPrice(sum(closes.slice(-200)) / 200, args.currency),
+      type: "MA200",
+      source: "缓存价格历史",
+    });
+  }
+
+  return {
+    posture: args.verdict === "needs-more-data"
+      ? "not_applicable"
+      : args.verdict === "good-candidate"
+        ? "wait_for_pullback"
+        : args.verdict === "weak-fit"
+          ? "not_applicable"
+          : "wait_for_confirmation",
+    keyLevels: keyLevels.slice(0, 6),
+    marketPulseLabel: "市场脉搏仅作为低权重 timing 参考，不覆盖组合护栏。",
+  };
+}
+
+function buildSecurityResearchActionPlans(args: {
+  assetType: SecurityResearchDecision["security"]["assetType"];
+  verdict: ReturnType<typeof buildSecurityDecisionNarrative>["verdict"];
+  vetoes: SecurityResearchDecision["decision"]["vetoedBy"];
+  valuationSummary: string;
+}): SecurityResearchDecision["actionPlans"] {
+  const blockedByPortfolioFit = args.vetoes.includes("portfolio_fit");
+  if (args.verdict === "needs-more-data") {
+    return [{
+      type: "watch_only",
+      title: "先补齐资料",
+      detail: "身份、行情或估值证据不足时，只能进入观察/补资料流程，不能输出强行动计划。",
+      isBlockedByPortfolioFit: blockedByPortfolioFit,
+      requiredConfirmations: ["完整 symbol / exchange / currency", "可审计报价与历史样本", "估值证据来源"],
+    }];
+  }
+  if (args.verdict === "weak-fit" || blockedByPortfolioFit) {
+    return [{
+      type: "avoid",
+      title: "暂不行动",
+      detail: blockedByPortfolioFit
+        ? "组合适配或偏好护栏优先级高于估值吸引力；即使估值证据改善，也应先处理组合暴露问题。"
+        : "当前适配度偏弱，更适合保持观察而不是新增仓位。",
+      isBlockedByPortfolioFit: blockedByPortfolioFit,
+      requiredConfirmations: ["组合配置缺口", "账户/税务位置", "现金计划"],
+    }];
+  }
+  if (args.assetType === "etf" || args.assetType === "fund") {
+    return [{
+      type: "dca_accumulate",
+      title: "分批/再平衡路径",
+      detail: "ETF/基金优先按资产配置、宏观水位和再平衡节奏处理，不用单点目标价替代长期配置纪律。",
+      isBlockedByPortfolioFit: false,
+      requiredConfirmations: ["目标配置缺口", "市场脉搏状态", "现金缓冲"],
+    }];
+  }
+  return [{
+    type: "value_pullback",
+    title: "等待估值证据确认",
+    detail: args.valuationSummary,
+    isBlockedByPortfolioFit: false,
+    requiredConfirmations: ["估值证据 provider", "关键价位", "组合暴露变化"],
+  }];
+}
+
+function buildSecurityResearchEvidence(args: {
+  evidenceTrail: NonNullable<PortfolioAnalyzerResult["evidenceTrail"]>;
+  valuationEvidence: SecurityResearchDecision["valuationEvidence"];
+}): SecurityResearchDecision["evidence"] {
+  const mapped: SecurityResearchDecision["evidence"] = args.evidenceTrail.map((item) => {
+    const sourceType = item.sourceType === "portfolio-data"
+      ? "portfolio" as const
+      : item.sourceType === "quote-cache" || item.sourceType === "market-data"
+        ? "quote" as const
+        : item.sourceType === "institutional"
+          ? "external_research" as const
+          : "preference" as const;
+    return {
+      source: item.label,
+      sourceType,
+      freshnessLabel: item.freshness,
+      reliabilityLabel: item.confidence,
+    };
+  });
+
+  mapped.push({
+    source: "估值证据链",
+    sourceType: args.valuationEvidence.method === "etf_macro_proxy" ? "macro" : "fundamental",
+    freshnessLabel: args.valuationEvidence.method === "unavailable" ? "missing" : "partial",
+    reliabilityLabel: args.valuationEvidence.confidence,
+  });
+
+  return mapped.slice(0, 12);
+}
+
+function buildSecurityResearchDecision(args: {
+  identity: AnalyzerSecurityIdentity;
+  referenceHolding?: HoldingPosition;
+  generatedAt: string;
+  decisionNarrative: ReturnType<typeof buildSecurityDecisionNarrative>;
+  confidenceScore: number;
+  priceHistory: SecurityPriceHistoryPoint[];
+  economicAssetClass: string;
+  evidenceTrail: NonNullable<PortfolioAnalyzerResult["evidenceTrail"]>;
+  valuationDocuments?: ExternalResearchDocumentRecord[];
+}): SecurityResearchDecision {
+  const assetType = getSecurityResearchAssetType({
+    identity: args.identity,
+    referenceHolding: args.referenceHolding,
+  });
+  const valuationEvidence = buildSecurityResearchValuationEvidence({
+    assetType,
+    symbol: args.identity.symbol,
+    generatedAt: args.generatedAt,
+    valuationDocuments: args.valuationDocuments,
+  });
+  const vetoedBy = getSecurityResearchVetoes({
+    guardrails: args.decisionNarrative.guardrails,
+    fit: args.decisionNarrative.fit,
+  });
+
+  return {
+    version: "security-research-v1",
+    generatedAt: args.generatedAt,
+    security: {
+      securityId: args.identity.securityId ?? null,
+      symbol: args.identity.symbol,
+      exchange: args.identity.exchange ?? null,
+      currency: args.identity.currency ?? null,
+      name: args.identity.name ?? null,
+      assetType,
+      identityStatus: getSecurityResearchIdentityStatus(args.identity),
+    },
+    decision: {
+      label: mapSecurityResearchLabel(args.decisionNarrative.verdict),
+      confidenceScore: args.confidenceScore,
+      primaryReason: args.decisionNarrative.decision.detail,
+      vetoedBy,
+    },
+    guardrails: args.decisionNarrative.guardrails.map((guardrail) => ({
+      id: guardrail.id,
+      severity: mapSecurityResearchGuardrailSeverity(guardrail.severity, guardrail.blocking),
+      title: guardrail.title,
+      detail: guardrail.detail,
+    })),
+    portfolioFit: {
+      score: args.decisionNarrative.fit.score,
+      sleeve: args.economicAssetClass,
+      targetGapLabel: `目标差距 ${formatPercent(args.decisionNarrative.fit.targetGapPct)}`,
+      currentExposureLabel: `当前袖口 ${formatPercent(args.decisionNarrative.fit.currentSleevePct)}`,
+      duplicateExposureLabel: `同标的/同身份约 ${formatPercent(args.decisionNarrative.fit.duplicateExposurePct)}`,
+      accountTaxFitLabel: `账户/税务适配 ${round((args.decisionNarrative.fit.accountFitScore + args.decisionNarrative.fit.taxFitScore) / 2)}/100`,
+      liquidityFitLabel: `现金/流动性适配 ${round(args.decisionNarrative.fit.liquidityFitScore)}/100`,
+    },
+    valuationEvidence,
+    entryTiming: buildSecurityResearchEntryTiming({
+      priceHistory: args.priceHistory,
+      currency: args.identity.currency,
+      verdict: args.decisionNarrative.verdict,
+    }),
+    actionPlans: buildSecurityResearchActionPlans({
+      assetType,
+      verdict: args.decisionNarrative.verdict,
+      vetoes: vetoedBy,
+      valuationSummary: valuationEvidence.summary,
+    }),
+    evidence: buildSecurityResearchEvidence({
+      evidenceTrail: args.evidenceTrail,
+      valuationEvidence,
+    }),
+  };
+}
+
 function buildPositionSizingIdea(args: {
   verdict: string;
   targetGapPct: number;
@@ -606,6 +1061,7 @@ export function buildSecurityAnalyzerQuickScan(args: {
   holdings: HoldingPosition[];
   profile: PreferenceProfile;
   marketData?: AnalyzerMarketDataContext;
+  valuationDocuments?: ExternalResearchDocumentRecord[];
   generatedAt?: string;
 }): PortfolioAnalyzerResult {
   const generatedAt = args.generatedAt ?? new Date().toISOString();
@@ -692,10 +1148,28 @@ export function buildSecurityAnalyzerQuickScan(args: {
     marketData,
     generatedAt,
   });
+  const valuationDocuments = args.valuationDocuments ?? [];
+  const externalResearchAsOf = latestIsoOrNull(
+    valuationDocuments.map((document) => document.capturedAt),
+  );
+  const resultSourceMode = marketData.sourceMode === "local" && valuationDocuments.length > 0
+    ? "cached-external" as const
+    : marketData.sourceMode;
   const positionSizingIdea = buildPositionSizingIdea({
     verdict: decisionVerdict,
     targetGapPct: fit.targetGapPct,
     heldWeightPct,
+  });
+  const securityResearchDecision = buildSecurityResearchDecision({
+    identity,
+    referenceHolding,
+    generatedAt,
+    decisionNarrative,
+    confidenceScore,
+    priceHistory: matchingHistory,
+    economicAssetClass,
+    evidenceTrail,
+    valuationDocuments: args.valuationDocuments,
   });
 
   return assertAnalyzerResult({
@@ -709,8 +1183,8 @@ export function buildSecurityAnalyzerQuickScan(args: {
     dataFreshness: {
       portfolioAsOf,
       quotesAsOf: marketData.quotesAsOf,
-      externalResearchAsOf: null,
-      sourceMode: marketData.sourceMode,
+      externalResearchAsOf,
+      sourceMode: resultSourceMode,
       freshnessLabel: getAnalyzerFreshnessLabel(marketData),
       reliabilityScore: getAnalyzerReliabilityScore(marketData),
       limitationSummary: getAnalyzerLimitationSummary(marketData),
@@ -769,6 +1243,7 @@ export function buildSecurityAnalyzerQuickScan(args: {
         ...evidenceTrail.map((item) => `${item.label}：${item.detail}`),
       ],
     },
+    securityResearchDecision,
     scorecards: [
       {
         id: "market-data-freshness",
@@ -906,6 +1381,11 @@ export function buildSecurityAnalyzerQuickScan(args: {
     sources: [
       { title: "本地持仓与账户数据", sourceType: "portfolio-data" },
       { title: "缓存持仓报价字段", sourceType: "quote-cache" },
+      ...valuationDocuments.slice(0, 4).map((document) => ({
+        title: `${document.sourceName}：${document.title}`,
+        sourceType: document.sourceType,
+        date: document.capturedAt.slice(0, 10),
+      })),
       ...marketData.sources
     ],
     disclaimer: PORTFOLIO_ANALYZER_DISCLAIMER

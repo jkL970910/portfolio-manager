@@ -218,16 +218,35 @@ function buildAlphaVantageProfileDocument(args: {
   const assetType = stringField(args.payload, "AssetType");
   const description = stringField(args.payload, "Description");
   const expenseRatio = stringField(args.payload, "net_expense_ratio");
+  const marketCap = stringField(args.payload, "MarketCapitalization");
+  const peRatio = stringField(args.payload, "PERatio");
+  const forwardPe = stringField(args.payload, "ForwardPE");
+  const pegRatio = stringField(args.payload, "PEGRatio");
+  const priceToBook = stringField(args.payload, "PriceToBookRatio");
+  const analystTargetPrice = stringField(args.payload, "AnalystTargetPrice");
+  const weekHigh52 = stringField(args.payload, "52WeekHigh");
+  const weekLow52 = stringField(args.payload, "52WeekLow");
+  const beta = stringField(args.payload, "Beta");
+  const eps = stringField(args.payload, "EPS");
   const dividendYield =
     stringField(args.payload, "DividendYield") ??
     stringField(args.payload, "dividend_yield");
   const keyPoints = [
     assetType ? `资产类型：${assetType}` : null,
     sector ? `行业板块：${sector}` : null,
-    industry ? `细分行业：${industry}` : null,
     country ? `地区：${country}` : null,
-    expenseRatio ? `费用率：${expenseRatio}` : null,
+    peRatio ? `市盈率：${peRatio}` : null,
+    analystTargetPrice ? `分析师目标价：${analystTargetPrice}` : null,
     dividendYield ? `分红/收益率：${dividendYield}` : null,
+    weekHigh52 && weekLow52 ? `52周区间：${weekLow52} - ${weekHigh52}` : null,
+    marketCap ? `市值：${marketCap}` : null,
+    industry ? `细分行业：${industry}` : null,
+    forwardPe ? `Forward P/E：${forwardPe}` : null,
+    pegRatio ? `PEG：${pegRatio}` : null,
+    priceToBook ? `市净率：${priceToBook}` : null,
+    beta ? `Beta：${beta}` : null,
+    eps ? `EPS：${eps}` : null,
+    expenseRatio ? `费用率：${expenseRatio}` : null,
     description ? `资料摘要：${description.slice(0, 160)}` : null,
   ].filter((item): item is string => Boolean(item));
   const riskFlags = [
