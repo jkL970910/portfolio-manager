@@ -1,5 +1,6 @@
 import { apiSuccess } from "@/lib/backend/contracts";
 import { getRepositories } from "@/lib/backend/repositories/factory";
+import { getOrCreateLatestMarketSentiment } from "@/lib/backend/market-sentiment";
 import { assertExternalResearchAllowed } from "@/lib/backend/portfolio-external-research";
 import {
   PORTFOLIO_ANALYZER_DISCLAIMER,
@@ -338,6 +339,7 @@ async function readCachedAnalyzerResult(
     holdings: HoldingPosition[];
     marketData: AnalyzerMarketDataContext;
     externalResearchDocuments?: ExternalResearchDocumentRecord[];
+    marketSentiment?: Awaited<ReturnType<typeof getOrCreateLatestMarketSentiment>> | null;
   },
 ) {
   if (!shouldUseCache(input)) {
@@ -371,6 +373,7 @@ export function isAnalyzerCacheOlderThanMarketData(
     holdings: HoldingPosition[];
     marketData: AnalyzerMarketDataContext;
     externalResearchDocuments?: ExternalResearchDocumentRecord[];
+    marketSentiment?: Awaited<ReturnType<typeof getOrCreateLatestMarketSentiment>> | null;
   },
 ) {
   const cacheTime = new Date(generatedAt).getTime();
@@ -391,12 +394,23 @@ export function isAnalyzerCacheOlderThanMarketData(
       document.capturedAt,
       document.updatedAt,
     ]),
+    context.marketSentiment?.asOf,
+    context.marketSentiment?.updatedAt,
   ]
     .map((value) => (value ? new Date(value).getTime() : Number.NaN))
     .filter(Number.isFinite)
     .sort((left, right) => right - left)[0];
 
   return latestMarketDataTime != null && latestMarketDataTime > cacheTime;
+}
+
+async function loadMarketSentimentForAnalyzer() {
+  try {
+    return await getOrCreateLatestMarketSentiment();
+  } catch (error) {
+    console.warn("Portfolio analyzer market sentiment read skipped.", error);
+    return null;
+  }
 }
 
 async function loadSecurityValuationDocuments(args: {
@@ -717,10 +731,12 @@ export async function getPortfolioAnalyzerQuickScan(userId: string, input: Portf
       userId,
       identity,
     });
+    const marketSentiment = await loadMarketSentimentForAnalyzer();
     cached = await readCachedAnalyzerResult(userId, input, targetKey, {
       holdings: scopedHoldings,
       marketData,
       externalResearchDocuments: valuationDocuments,
+      marketSentiment,
     });
     if (cached) {
       return apiSuccess(cached, "database");
@@ -732,6 +748,7 @@ export async function getPortfolioAnalyzerQuickScan(userId: string, input: Portf
       profile,
       marketData,
       valuationDocuments,
+      marketSentiment,
     });
   } else {
     cached = await readCachedAnalyzerResult(userId, input, targetKey);

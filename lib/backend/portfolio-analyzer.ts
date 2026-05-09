@@ -3,6 +3,7 @@ import {
   ExternalResearchDocumentRecord,
   HoldingPosition,
   InvestmentAccount,
+  MarketSentimentSnapshot,
   PreferenceProfile,
   PortfolioSnapshot,
   RecommendationRun,
@@ -723,22 +724,106 @@ function getValuationConfidence(args: {
   return "low" as const;
 }
 
+function getMarketPulseAnchor(snapshot: MarketSentimentSnapshot | null | undefined) {
+  if (!snapshot) return null;
+  const fgiLabel = snapshot.fgiLevel === "fear"
+    ? "恐惧"
+    : snapshot.fgiLevel === "greed"
+      ? "贪婪"
+      : "中性";
+  const vixLabel = snapshot.vixLevel === "high"
+    ? "高波动"
+    : snapshot.vixLevel === "low"
+      ? "低波动"
+      : snapshot.vixLevel === "normal"
+        ? "正常波动"
+        : "VIX 暂缺";
+  return {
+    label: "市场脉搏",
+    value: `FGI ${snapshot.fgiScore}/100 · ${fgiLabel}；VIX ${snapshot.vixValue?.toFixed(2) ?? "--"} · ${vixLabel}`,
+    source: snapshot.sourceMode === "cached-external" ? "缓存市场脉搏" : "Loo国市场脉搏",
+    asOf: snapshot.asOf,
+  };
+}
+
+function getEtfMacroPosture(args: {
+  sentiment?: MarketSentimentSnapshot | null;
+  targetGapPct: number;
+  fitScore: number;
+}) {
+  const signal = args.sentiment?.buySignal;
+  const overTarget = args.targetGapPct <= -5;
+  if (overTarget || args.fitScore < 45) {
+    return {
+      posture: "rebalance_watch" as const,
+      title: "配置优先",
+      detail: "组合适配或目标配置已经不支持继续补仓，ETF 即使本身质量可用，也应优先看再平衡和仓位纪律。",
+    };
+  }
+  if (signal === "accumulate" && args.targetGapPct >= 5) {
+    return {
+      posture: "dca_favorable" as const,
+      title: "可考虑分批",
+      detail: "市场脉搏偏恐惧且该类资产仍有目标缺口，更适合用小额分批/定投方式讨论，而不是一次性重仓。",
+    };
+  }
+  if (signal === "caution") {
+    return {
+      posture: "wait_for_pullback" as const,
+      title: "等待确认",
+      detail: "市场情绪偏贪婪时，ETF 更适合等待回撤、分批或用再平衡纪律控制节奏。",
+    };
+  }
+  return {
+    posture: "neutral_dca" as const,
+    title: "中性分批",
+    detail: "市场脉搏没有给出极端信号，ETF 决策应主要由目标配置缺口、费用、跟踪和现金计划决定。",
+  };
+}
+
 function buildSecurityResearchValuationEvidence(args: {
   assetType: SecurityResearchDecision["security"]["assetType"];
   symbol: string;
   generatedAt: string;
   valuationDocuments?: ExternalResearchDocumentRecord[];
+  marketSentiment?: MarketSentimentSnapshot | null;
+  targetGapPct: number;
+  fitScore: number;
 }): SecurityResearchDecision["valuationEvidence"] {
   const valuationDocument = getBestValuationDocument(args.valuationDocuments, args.generatedAt);
   const anchors = valuationDocument ? buildValuationAnchorsFromDocument(valuationDocument) : [];
+  const marketPulseAnchor = getMarketPulseAnchor(args.marketSentiment);
 
   if (args.assetType === "etf" || args.assetType === "fund") {
+    const macroPosture = getEtfMacroPosture({
+      sentiment: args.marketSentiment,
+      targetGapPct: args.targetGapPct,
+      fitScore: args.fitScore,
+    });
+    const pulseStrategyLabel = args.marketSentiment?.strategyLabel ?? macroPosture.title;
+    const etfAnchors = [
+      ...anchors,
+      ...(marketPulseAnchor ? [marketPulseAnchor] : []),
+      {
+        label: "配置缺口",
+        value: formatPercent(args.targetGapPct),
+        source: "Loo国组合适配",
+        asOf: args.generatedAt,
+      },
+      {
+        label: "ETF 行动口径",
+        value: macroPosture.title,
+        source: "Loo国 ETF 规则",
+        asOf: args.generatedAt,
+      },
+    ].slice(0, 8);
+
     if (valuationDocument && anchors.length > 0) {
       return {
         method: "etf_macro_proxy",
-        confidence: getValuationConfidence({ document: valuationDocument, anchors }),
-        summary: `${args.symbol} 已读取缓存 ETF/基金资料；当前只把费用、收益率、52周区间等作为宏观/配置证据，不输出单公司式内在价值或目标价结论。`,
-        anchors,
+        confidence: getValuationConfidence({ document: valuationDocument, anchors: etfAnchors }),
+        summary: `${args.symbol} 已读取缓存 ETF/基金资料，并结合市场脉搏与目标配置缺口形成 ${pulseStrategyLabel} 口径；当前不输出单公司式内在价值或目标价结论。${macroPosture.detail}`,
+        anchors: etfAnchors,
         sanityChecks: [
           {
             label: "DCF 适用性",
@@ -750,6 +835,11 @@ function buildSecurityResearchValuationEvidence(args: {
             status: "pass",
             detail: `使用缓存资料 ${valuationDocument.sourceName}，捕获时间 ${valuationDocument.capturedAt.slice(0, 10)}。`,
           },
+          {
+            label: "配置优先级",
+            status: args.fitScore < 45 || args.targetGapPct <= -5 ? "watch" : "pass",
+            detail: "ETF 结论必须先服从组合目标、账户位置和现金计划，再看市场脉搏。",
+          },
         ],
       };
     }
@@ -757,7 +847,7 @@ function buildSecurityResearchValuationEvidence(args: {
     return {
       method: "etf_macro_proxy",
       confidence: "low",
-      summary: "该标的按 ETF/基金研究路径处理：MVP 阶段不输出个股式内在价值区间，后续应接入宏观水位、指数估值、费用/跟踪和再平衡证据。",
+      summary: `该标的按 ETF/基金研究路径处理：当前可结合市场脉搏和配置缺口形成 ${macroPosture.title} 口径，但缺少缓存基金资料，置信度仍低。${macroPosture.detail}`,
       anchors: [
         {
           label: "估值方法",
@@ -765,12 +855,24 @@ function buildSecurityResearchValuationEvidence(args: {
           source: "Loo国研究台规则",
           asOf: args.generatedAt,
         },
-      ],
+        ...(marketPulseAnchor ? [marketPulseAnchor] : []),
+        {
+          label: "配置缺口",
+          value: formatPercent(args.targetGapPct),
+          source: "Loo国组合适配",
+          asOf: args.generatedAt,
+        },
+      ].slice(0, 8),
       sanityChecks: [
         {
           label: "DCF 适用性",
           status: "unavailable",
           detail: "ETF/基金不应直接套用单公司 DCF；需要以底层指数、宏观水位和组合再平衡为主。",
+        },
+        {
+          label: "基金资料",
+          status: "watch",
+          detail: "缺少费用、跟踪、分红或底层指数资料时，只能做配置级初筛。",
         },
       ],
     };
@@ -828,6 +930,9 @@ function buildSecurityResearchEntryTiming(args: {
   priceHistory: SecurityPriceHistoryPoint[];
   currency: string | null | undefined;
   verdict: ReturnType<typeof buildSecurityDecisionNarrative>["verdict"];
+  marketSentiment?: MarketSentimentSnapshot | null;
+  valuationEvidence?: SecurityResearchDecision["valuationEvidence"];
+  assetType?: SecurityResearchDecision["security"]["assetType"];
 }): SecurityResearchDecision["entryTiming"] {
   const sorted = [...args.priceHistory].sort((left, right) => left.priceDate.localeCompare(right.priceDate));
   const closes = sorted
@@ -869,6 +974,18 @@ function buildSecurityResearchEntryTiming(args: {
     });
   }
 
+  if (
+    (args.assetType === "etf" || args.assetType === "fund") &&
+    args.marketSentiment
+  ) {
+    keyLevels.push({
+      label: "市场脉搏",
+      value: `${args.marketSentiment.strategyLabel} · ${args.marketSentiment.fgiScore}/100`,
+      type: "VALUATION_ANCHOR",
+      source: "缓存市场脉搏",
+    });
+  }
+
   return {
     posture: args.verdict === "needs-more-data"
       ? "not_applicable"
@@ -878,7 +995,9 @@ function buildSecurityResearchEntryTiming(args: {
           ? "not_applicable"
           : "wait_for_confirmation",
     keyLevels: keyLevels.slice(0, 6),
-    marketPulseLabel: "市场脉搏仅作为低权重 timing 参考，不覆盖组合护栏。",
+    marketPulseLabel: args.marketSentiment
+      ? `${args.marketSentiment.strategyLabel}；市场脉搏仅作为低权重 timing 参考，不覆盖组合护栏。`
+      : "市场脉搏仅作为低权重 timing 参考，不覆盖组合护栏。",
   };
 }
 
@@ -887,6 +1006,9 @@ function buildSecurityResearchActionPlans(args: {
   verdict: ReturnType<typeof buildSecurityDecisionNarrative>["verdict"];
   vetoes: SecurityResearchDecision["decision"]["vetoedBy"];
   valuationSummary: string;
+  marketSentiment?: MarketSentimentSnapshot | null;
+  targetGapPct: number;
+  fitScore: number;
 }): SecurityResearchDecision["actionPlans"] {
   const blockedByPortfolioFit = args.vetoes.includes("portfolio_fit");
   if (args.verdict === "needs-more-data") {
@@ -910,12 +1032,21 @@ function buildSecurityResearchActionPlans(args: {
     }];
   }
   if (args.assetType === "etf" || args.assetType === "fund") {
+    const macroPosture = getEtfMacroPosture({
+      sentiment: args.marketSentiment,
+      targetGapPct: args.targetGapPct,
+      fitScore: args.fitScore,
+    });
     return [{
       type: "dca_accumulate",
-      title: "分批/再平衡路径",
-      detail: "ETF/基金优先按资产配置、宏观水位和再平衡节奏处理，不用单点目标价替代长期配置纪律。",
+      title: macroPosture.posture === "rebalance_watch"
+        ? "先看再平衡"
+        : macroPosture.posture === "wait_for_pullback"
+          ? "等待回撤/确认"
+          : "分批/再平衡路径",
+      detail: `${macroPosture.detail} ETF/基金优先按资产配置、宏观水位和再平衡节奏处理，不用单点目标价替代长期配置纪律。`,
       isBlockedByPortfolioFit: false,
-      requiredConfirmations: ["目标配置缺口", "市场脉搏状态", "现金缓冲"],
+      requiredConfirmations: ["目标配置缺口", "市场脉搏状态", "费用/跟踪资料", "现金缓冲"],
     }];
   }
   return [{
@@ -930,6 +1061,7 @@ function buildSecurityResearchActionPlans(args: {
 function buildSecurityResearchEvidence(args: {
   evidenceTrail: NonNullable<PortfolioAnalyzerResult["evidenceTrail"]>;
   valuationEvidence: SecurityResearchDecision["valuationEvidence"];
+  marketSentiment?: MarketSentimentSnapshot | null;
 }): SecurityResearchDecision["evidence"] {
   const mapped: SecurityResearchDecision["evidence"] = args.evidenceTrail.map((item) => {
     const sourceType = item.sourceType === "portfolio-data"
@@ -954,6 +1086,15 @@ function buildSecurityResearchEvidence(args: {
     reliabilityLabel: args.valuationEvidence.confidence,
   });
 
+  if (args.marketSentiment) {
+    mapped.push({
+      source: "市场脉搏",
+      sourceType: "macro",
+      freshnessLabel: args.marketSentiment.sourceMode,
+      reliabilityLabel: args.marketSentiment.provider,
+    });
+  }
+
   return mapped.slice(0, 12);
 }
 
@@ -967,6 +1108,7 @@ function buildSecurityResearchDecision(args: {
   economicAssetClass: string;
   evidenceTrail: NonNullable<PortfolioAnalyzerResult["evidenceTrail"]>;
   valuationDocuments?: ExternalResearchDocumentRecord[];
+  marketSentiment?: MarketSentimentSnapshot | null;
 }): SecurityResearchDecision {
   const assetType = getSecurityResearchAssetType({
     identity: args.identity,
@@ -977,6 +1119,9 @@ function buildSecurityResearchDecision(args: {
     symbol: args.identity.symbol,
     generatedAt: args.generatedAt,
     valuationDocuments: args.valuationDocuments,
+    marketSentiment: args.marketSentiment,
+    targetGapPct: args.decisionNarrative.fit.targetGapPct,
+    fitScore: args.decisionNarrative.fit.score,
   });
   const vetoedBy = getSecurityResearchVetoes({
     guardrails: args.decisionNarrative.guardrails,
@@ -1021,16 +1166,23 @@ function buildSecurityResearchDecision(args: {
       priceHistory: args.priceHistory,
       currency: args.identity.currency,
       verdict: args.decisionNarrative.verdict,
+      marketSentiment: args.marketSentiment,
+      valuationEvidence,
+      assetType,
     }),
     actionPlans: buildSecurityResearchActionPlans({
       assetType,
       verdict: args.decisionNarrative.verdict,
       vetoes: vetoedBy,
       valuationSummary: valuationEvidence.summary,
+      marketSentiment: args.marketSentiment,
+      targetGapPct: args.decisionNarrative.fit.targetGapPct,
+      fitScore: args.decisionNarrative.fit.score,
     }),
     evidence: buildSecurityResearchEvidence({
       evidenceTrail: args.evidenceTrail,
       valuationEvidence,
+      marketSentiment: args.marketSentiment,
     }),
   };
 }
@@ -1062,6 +1214,7 @@ export function buildSecurityAnalyzerQuickScan(args: {
   profile: PreferenceProfile;
   marketData?: AnalyzerMarketDataContext;
   valuationDocuments?: ExternalResearchDocumentRecord[];
+  marketSentiment?: MarketSentimentSnapshot | null;
   generatedAt?: string;
 }): PortfolioAnalyzerResult {
   const generatedAt = args.generatedAt ?? new Date().toISOString();
@@ -1170,6 +1323,7 @@ export function buildSecurityAnalyzerQuickScan(args: {
     economicAssetClass,
     evidenceTrail,
     valuationDocuments: args.valuationDocuments,
+    marketSentiment: args.marketSentiment,
   });
 
   return assertAnalyzerResult({

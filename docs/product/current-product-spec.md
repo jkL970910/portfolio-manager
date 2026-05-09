@@ -183,6 +183,9 @@ Current first pass:
   range, dividend yield, market cap, and beta.
 - ETF/fund candidates keep an `etf_macro_proxy` path and must not claim
   stock-style intrinsic price targets.
+- ETF/fund proxy first pass combines cached profile anchors, target allocation
+  gap, and cached market pulse (`FGI/VIX/strategy`) to frame DCA, wait,
+  neutral accumulation, or rebalance-watch paths.
 - Page load remains cache-only; new provider documents can invalidate old
   quick-scan cache entries so evidence is refreshed without live Flutter calls.
 

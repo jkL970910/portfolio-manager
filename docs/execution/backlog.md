@@ -117,7 +117,7 @@ This is the current source of truth before starting the next P0 implementation.
 | Persist draggable Minister button position   | P1               | Current drag position is session-local; persist later after UX settles                                                                                                                                                                                         |
 | Minister usage/cost dashboard with estimates | P1               | Current logs store provider/model/status/token counts; cost estimates can be added after pricing policy is fixed                                                                                                                                               |
 | Mobile UI / IA v2 implementation             | P1 / Active Next | Approved Figma direction exists in `https://www.figma.com/design/aYsiPJ8eybrWa6BcY1peIn`; next work is Flutter theme tokens, reusable components, page layout rewrites, full-list navigation, compact data visualization, and light/dark/system theme support. |
-| Security Research Cockpit / 估值证据链       | P1 / Active Feature | Build the signed-off research-workbench stack from `docs/execution/security-research-cockpit.md`: `SecurityResearchDecision` DTO and cached Alpha Vantage profile valuation evidence first passes are implemented; next is deeper ETF macro proxy, entry key levels, action-plan orchestration, and Flutter rendering. |
+| Security Research Cockpit / 估值证据链       | P1 / Active Feature | Build the signed-off research-workbench stack from `docs/execution/security-research-cockpit.md`: `SecurityResearchDecision`, cached Alpha Vantage valuation evidence, and ETF macro proxy first passes are implemented; next is entry key levels, action-plan orchestration, and Flutter rendering. |
 | AlphaPick screenshot ingestion               | P1               | Convert purchased AlphaPick list screenshots into a reviewed watchlist/import pipeline with OCR, symbol identity resolution, source attribution, freshness labels, and manual confirmation before use.                                                         |
 | Unified brokerage import                     | P1               | Add one `券商同步` flow for broker imports instead of provider-specific tabs. First build target: IBKR Flex Query. First feasibility spike: Wealthsimple via SnapTrade. Architecture source: `docs/execution/brokerage-import-architecture.md`.                |
 
@@ -178,9 +178,10 @@ must require an explicit user confirmation after preview.
    profile pass: add historical multiple percentile / second-provider sanity
    checks later, but do not build full automated DCF until the DTO and mobile
    rendering are stable.
-5. Implement `P1.2b ETF Macro Proxy` so VFV/QQQ/XBB-style funds are evaluated
-   through macro water level, allocation fit, DCA, and rebalancing logic rather
-   than stock-style intrinsic-price claims.
+5. Extend `P1.2b ETF Macro Proxy` later with deeper ETF data such as holdings,
+   tracking error, index valuation, and flows if provider coverage is available.
+   First pass already combines cached fund profile anchors, allocation gap, and
+   market pulse without stock-style intrinsic-price claims.
 6. Implement `P1.3/P1.4 Entry Key Levels + Action Plan Orchestrator`: MA200 /
    52-week / recent high-low / valuation anchors, then watch/DCA/pullback /
    confirmation / avoid plans with portfolio-fit veto precedence.

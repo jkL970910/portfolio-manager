@@ -207,9 +207,15 @@ architecture boundaries before coding the next feature:
      provider usage records.
    - Page load must read cached evidence only.
 4. `P1.2b ETF Macro Proxy`
+   - Status: first pass implemented on 2026-05-09.
    - For ETFs, expose macro water level, expense/tracking/asset-class context,
      and DCA/rebalancing framing.
    - Do not output fake intrinsic price ranges for ETFs.
+   - Current implementation combines cached ETF/fund profile anchors, target
+     allocation gap, and cached market pulse (`FGI/VIX/strategyLabel`) into an
+     ETF-specific macro proxy. It can distinguish DCA/fear-driven accumulation,
+     wait-for-pullback, neutral DCA, and rebalance-watch framing without
+     creating a fake single-security target price.
 5. `P1.3 Entry Timing Key Levels`
    - Use simple, durable levels: MA200/MA250, 52-week high/low, recent high/low,
      and valuation anchors.

@@ -4,6 +4,7 @@ import type {
   ExternalResearchDocumentRecord,
   HoldingPosition,
   InvestmentAccount,
+  MarketSentimentSnapshot,
   PreferenceProfile,
   RecommendationRun,
   SecurityPriceHistoryPoint
@@ -65,6 +66,51 @@ function makeExternalResearchDocument(
     riskFlags: [],
     tags: ["profile", "alpha-vantage"],
     rawPayload: {},
+    createdAt: generatedAt,
+    updatedAt: generatedAt,
+    ...overrides,
+  };
+}
+
+function makeMarketSentimentSnapshot(
+  overrides: Partial<MarketSentimentSnapshot> = {},
+): MarketSentimentSnapshot {
+  return {
+    id: "sentiment_test",
+    provider: "loo-market-pulse-vix-live",
+    indexName: "US Market Pulse",
+    score: 32,
+    rating: "fear",
+    fgiScore: 28,
+    fgiLevel: "fear",
+    vixValue: 24.6,
+    vixLevel: "normal",
+    quadrant: "D",
+    quadrantLabel: "恐惧 + 正常波动",
+    strategyLabel: "分批优先",
+    strategyDetail: "市场偏恐惧但波动未失控，适合小额分批而不是一次性重仓。",
+    asOf: generatedAt,
+    sourceMode: "cached-external",
+    sourceUrl: "https://www.cnn.com/markets/fear-and-greed",
+    components: [
+      {
+        id: "fgi",
+        label: "CNN FGI",
+        score: 28,
+        detail: "恐惧区间。",
+      },
+      {
+        id: "vix",
+        label: "VIX 波动率",
+        score: 45,
+        detail: "正常波动。",
+      },
+    ],
+    summary: "市场偏恐惧。",
+    buySignal: "accumulate",
+    riskNote: "市场脉搏只作为低权重 timing 参考。",
+    rawPayload: {},
+    expiresAt: "2026-04-29T04:00:00.000Z",
     createdAt: generatedAt,
     updatedAt: generatedAt,
     ...overrides,
@@ -637,6 +683,7 @@ test("security research decision routes ETF candidates through macro proxy", () 
         ],
       }),
     ],
+    marketSentiment: makeMarketSentimentSnapshot(),
     generatedAt,
   });
 
@@ -646,6 +693,22 @@ test("security research decision routes ETF candidates through macro proxy", () 
     result.securityResearchDecision?.valuationEvidence.anchors.some((anchor) =>
       anchor.label === "费用率",
     ),
+  );
+  assert.ok(
+    result.securityResearchDecision?.valuationEvidence.anchors.some((anchor) =>
+      anchor.label === "市场脉搏" && anchor.value.includes("FGI 28/100"),
+    ),
+  );
+  assert.ok(
+    result.securityResearchDecision?.valuationEvidence.summary.includes("分批优先"),
+  );
+  assert.ok(
+    result.securityResearchDecision?.entryTiming.keyLevels.some((level) =>
+      level.label === "市场脉搏",
+    ),
+  );
+  assert.ok(
+    result.securityResearchDecision?.actionPlans[0]?.detail.includes("小额分批"),
   );
   assert.ok(
     result.securityResearchDecision?.valuationEvidence.sanityChecks.some((check) =>
@@ -881,12 +944,24 @@ test("portfolio analyzer cache is stale when refreshed market data is newer", ()
     isAnalyzerCacheOlderThanMarketData("2026-04-30T12:00:00.000Z", {
       holdings: [],
       marketData: { priceHistory: [], portfolioSnapshots: [] },
-      externalResearchDocuments: [
-        makeExternalResearchDocument({
-          capturedAt: "2026-04-30T12:15:00.000Z",
-          updatedAt: "2026-04-30T12:15:00.000Z",
-        }),
-      ],
+    externalResearchDocuments: [
+      makeExternalResearchDocument({
+        capturedAt: "2026-04-30T12:15:00.000Z",
+        updatedAt: "2026-04-30T12:15:00.000Z",
+      }),
+    ],
+  }),
+  true,
+  );
+
+  assert.equal(
+    isAnalyzerCacheOlderThanMarketData("2026-04-30T12:00:00.000Z", {
+      holdings: [],
+      marketData: { priceHistory: [], portfolioSnapshots: [] },
+      marketSentiment: makeMarketSentimentSnapshot({
+        asOf: "2026-04-30T12:20:00.000Z",
+        updatedAt: "2026-04-30T12:20:00.000Z",
+      }),
     }),
     true,
   );
