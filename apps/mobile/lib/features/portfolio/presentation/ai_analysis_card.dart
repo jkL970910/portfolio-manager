@@ -2335,6 +2335,7 @@ String _entryPostureLabel(String value) {
     "consider_now" => "可继续确认",
     "wait_for_pullback" => "等待回撤",
     "wait_for_confirmation" => "等待确认",
+    "portfolio_guardrail" => "组合护栏优先",
     _ => "暂不适用",
   };
 }

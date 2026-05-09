@@ -827,6 +827,80 @@ test("security analyzer quick scan surfaces preference blockers before overconfi
   );
 });
 
+test("security research decision keeps key levels visible when portfolio guardrails dominate", () => {
+  const result = buildSecurityAnalyzerQuickScan({
+    identity: {
+      securityId: "security_tsm_us",
+      symbol: "TSM",
+      exchange: "NYSE",
+      currency: "USD",
+      name: "Taiwan Semiconductor Manufacturing Company",
+      securityType: "Common Stock",
+    },
+    accounts,
+    holdings: [
+      {
+        ...holdings[0],
+        id: "holding_tsm_us",
+        securityId: "security_tsm_us",
+        symbol: "TSM",
+        name: "Taiwan Semiconductor Manufacturing Company",
+        assetClass: "US Equity",
+        sector: "Technology",
+        exchangeOverride: "NYSE",
+        currency: "USD",
+        marketValueCad: 12000,
+        weightPct: 12,
+      },
+      holdings[2]!,
+    ],
+    profile: makeProfile({
+      targetAllocation: [
+        { assetClass: "Canadian Equity", targetPct: 20 },
+        { assetClass: "US Equity", targetPct: 5 },
+        { assetClass: "International Equity", targetPct: 20 },
+        { assetClass: "Fixed Income", targetPct: 25 },
+        { assetClass: "Cash", targetPct: 10 },
+      ],
+    }),
+    marketData: {
+      priceHistory: Array.from({ length: 5 }, (_, index) => ({
+        id: `history_tsm_us_${index}`,
+        securityId: "security_tsm_us",
+        symbol: "TSM",
+        exchange: "NYSE",
+        priceDate: `2026-04-${23 + index}`,
+        close: 176 + index,
+        adjustedClose: 176 + index,
+        currency: "USD",
+        source: "provider",
+        provider: "twelve-data",
+        sourceMode: "cached-external" as const,
+        freshness: "fresh" as const,
+        refreshRunId: "run_tsm",
+        isReference: false,
+        fallbackReason: null,
+        createdAt: generatedAt,
+      })),
+    },
+    valuationDocuments: [makeExternalResearchDocument()],
+    generatedAt,
+  });
+
+  assert.equal(result.securityDecision?.verdict, "weak-fit");
+  assert.equal(result.securityResearchDecision?.entryTiming.posture, "portfolio_guardrail");
+  assert.ok(
+    result.securityResearchDecision?.entryTiming.keyLevels.some(
+      (level) => level.label === "分析师目标价" && level.type === "VALUATION_ANCHOR",
+    ),
+  );
+  assert.ok(
+    result.securityResearchDecision?.entryTiming.keyLevels.some(
+      (level) => level.label === "最近收盘价",
+    ),
+  );
+});
+
 test("security analyzer quick scan uses security id when provider exchange labels differ", () => {
   const result = buildSecurityAnalyzerQuickScan({
     identity: {

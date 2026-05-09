@@ -1007,7 +1007,7 @@ function buildSecurityResearchEntryTiming(args: {
       : args.verdict === "good-candidate"
         ? "wait_for_pullback"
         : args.verdict === "weak-fit"
-          ? "not_applicable"
+          ? "portfolio_guardrail"
           : "wait_for_confirmation",
     keyLevels: keyLevels.slice(0, 10),
     marketPulseLabel: args.marketSentiment

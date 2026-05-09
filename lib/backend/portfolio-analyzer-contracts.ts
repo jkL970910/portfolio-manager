@@ -208,7 +208,13 @@ export const securityResearchDecisionSchema = z.object({
     })).max(8).default([])
   }),
   entryTiming: z.object({
-    posture: z.enum(["consider_now", "wait_for_pullback", "wait_for_confirmation", "not_applicable"]),
+    posture: z.enum([
+      "consider_now",
+      "wait_for_pullback",
+      "wait_for_confirmation",
+      "portfolio_guardrail",
+      "not_applicable"
+    ]),
     keyLevels: z.array(z.object({
       label: z.string().trim().min(1).max(120),
       value: z.string().trim().min(1).max(160),
