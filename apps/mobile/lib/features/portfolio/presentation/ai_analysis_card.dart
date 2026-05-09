@@ -1406,7 +1406,8 @@ class _ValuationEvidenceView extends StatelessWidget {
           const _InlineInfoCallout(
             icon: Icons.badge_outlined,
             title: "需要先缓存基本资料",
-            detail: "到本页下方的「刷新该标的资料」点击「基本资料」。后台任务完成后，再点「重新生成」即可看到估值锚点。",
+            detail:
+                "到本页下方的「刷新该标的资料」提交「基本资料」或「财报资料」。任务完成并写入缓存后，再点「重新生成」即可看到估值锚点。",
           ),
         ],
         if (anchors.isNotEmpty) ...[

@@ -1,3 +1,5 @@
+import "dart:async";
+
 import "package:flutter/material.dart";
 
 import "../../../core/api/loo_api_client.dart";
@@ -39,6 +41,7 @@ class _SecurityDetailPageState extends State<SecurityDetailPage> {
   late Future<MobileDailyIntelligenceSnapshot> _dailyIntelligence;
   bool _isRefreshingQuote = false;
   bool _isSubmittingExternalResearch = false;
+  int _externalResearchRefreshRevision = 0;
   String? _externalResearchMessage;
   String? _securityId;
 
@@ -134,7 +137,7 @@ class _SecurityDetailPageState extends State<SecurityDetailPage> {
     });
 
     try {
-      await widget.apiClient.enqueueExternalResearchJob(
+      final response = await widget.apiClient.enqueueExternalResearchJob(
         {
           "scope": "security",
           "mode": "quick",
@@ -150,12 +153,22 @@ class _SecurityDetailPageState extends State<SecurityDetailPage> {
         },
         source: source,
       );
+      final payload = response["data"];
+      final job = payload is Map<String, dynamic>
+          ? payload["job"] as Map<String, dynamic>?
+          : null;
+      final targetKey = job?["targetKey"] as String?;
       _refreshDailyIntelligence();
       if (!mounted) return;
       setState(() {
-        _externalResearchMessage =
-            "已提交后台刷新。结果写入缓存后，会出现在该标的秘闻、推荐证据和大臣上下文中。";
+        _externalResearchMessage = "已提交后台刷新。系统会轮询任务状态，等资料真正写入缓存后再自动更新研究结果。";
       });
+      if (targetKey != null && targetKey.isNotEmpty) {
+        unawaited(_waitForExternalResearchJobCompletion(
+          targetKey,
+          source: source,
+        ));
+      }
     } on LooApiException catch (error) {
       if (!mounted) return;
       setState(() {
@@ -166,6 +179,86 @@ class _SecurityDetailPageState extends State<SecurityDetailPage> {
         setState(() {
           _isSubmittingExternalResearch = false;
         });
+      }
+    }
+  }
+
+  Future<void> _waitForExternalResearchJobCompletion(
+    String targetKey, {
+    required String source,
+  }) async {
+    String sourceLabel(String value) {
+      return switch (value) {
+        "profile" => "基本资料",
+        "institutional" => "财报资料",
+        _ => "资料",
+      };
+    }
+
+    const attempts = 18;
+    for (var index = 0; index < attempts; index += 1) {
+      if (!mounted) {
+        return;
+      }
+      await Future.delayed(const Duration(seconds: 2));
+      if (!mounted) {
+        return;
+      }
+
+      try {
+        final response =
+            await widget.apiClient.getExternalResearchJobs(limit: 8);
+        final data = response["data"];
+        final items = data is Map<String, dynamic> ? data["items"] : null;
+        Map<String, dynamic>? latest;
+        if (items is List) {
+          for (final item in items) {
+            if (item is Map<String, dynamic> &&
+                item["targetKey"] == targetKey) {
+              latest = item;
+              break;
+            }
+          }
+        }
+        final status = latest?["status"] as String?;
+        final statusLabel = latest?["statusLabel"] as String?;
+        final statusNote = latest?["statusNote"] as String?;
+        final errorMessage = latest?["errorMessage"] as String?;
+        if (status == null) {
+          continue;
+        }
+        if (status == "queued" || status == "running") {
+          if (index == attempts - 1 && mounted) {
+            setState(() {
+              _externalResearchMessage =
+                  "资料任务仍在${status == "queued" ? "排队" : "运行"}，完成后研究卡片会自动更新。";
+            });
+          }
+          continue;
+        }
+
+        if (mounted) {
+          setState(() {
+            _externalResearchRefreshRevision += 1;
+            _externalResearchMessage = [
+              sourceLabel(source),
+              statusLabel,
+              statusNote,
+              errorMessage,
+            ]
+                .whereType<String>()
+                .where((value) => value.isNotEmpty)
+                .join(" · ");
+          });
+        }
+        _refreshDailyIntelligence();
+        return;
+      } catch (_) {
+        if (index == attempts - 1 && mounted) {
+          setState(() {
+            _externalResearchMessage = "已提交后台刷新，但任务状态暂时无法查询。你可以稍后再点一次重新生成。";
+          });
+        }
       }
     }
   }
@@ -221,6 +314,7 @@ class _SecurityDetailPageState extends State<SecurityDetailPage> {
                   refreshKey: [
                     data.quoteTimestamp,
                     data.priceHistoryChart?.freshness.latestDate,
+                    _externalResearchRefreshRevision.toString(),
                   ].where((part) => part != null && part.isNotEmpty).join("|"),
                   payload: {
                     "scope": "security",
