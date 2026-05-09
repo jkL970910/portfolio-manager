@@ -49,7 +49,7 @@ export const DEFAULT_EXTERNAL_RESEARCH_POLICY: ExternalResearchPolicy = {
   workerEnabled: false,
   scheduledOverviewEnabled: false,
   securityManualRefreshEnabled: true,
-  dailyRunLimit: 20,
+  dailyRunLimit: 25,
   maxSymbolsPerRun: 12,
   liveProvidersEnabled: false,
   adaptersImplemented: false,
@@ -88,6 +88,14 @@ export const DEFAULT_EXTERNAL_RESEARCH_POLICY: ExternalResearchPolicy = {
   ],
 };
 
+function readPositiveIntegerEnv(name: string, fallback: number) {
+  const value = Number(process.env[name]);
+  if (!Number.isFinite(value) || value <= 0) {
+    return fallback;
+  }
+  return Math.max(Math.trunc(value), 1);
+}
+
 export function getExternalResearchPolicy(): ExternalResearchPolicy {
   const sourceEnv: Record<ExternalResearchSource["id"], string | undefined> = {
     "market-data": process.env.PORTFOLIO_ANALYZER_EXTERNAL_SOURCE_MARKET_DATA,
@@ -100,6 +108,14 @@ export function getExternalResearchPolicy(): ExternalResearchPolicy {
   return {
     ...DEFAULT_EXTERNAL_RESEARCH_POLICY,
     enabled: process.env.PORTFOLIO_ANALYZER_EXTERNAL_RESEARCH === "enabled",
+    dailyRunLimit: readPositiveIntegerEnv(
+      "PORTFOLIO_ANALYZER_EXTERNAL_DAILY_RUN_LIMIT",
+      DEFAULT_EXTERNAL_RESEARCH_POLICY.dailyRunLimit,
+    ),
+    maxSymbolsPerRun: readPositiveIntegerEnv(
+      "PORTFOLIO_ANALYZER_EXTERNAL_MAX_SYMBOLS_PER_RUN",
+      DEFAULT_EXTERNAL_RESEARCH_POLICY.maxSymbolsPerRun,
+    ),
     workerEnabled: process.env.PORTFOLIO_ANALYZER_EXTERNAL_WORKER === "enabled",
     scheduledOverviewEnabled:
       process.env.PORTFOLIO_ANALYZER_EXTERNAL_DAILY_OVERVIEW === "enabled",

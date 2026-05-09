@@ -21,6 +21,8 @@ function clearExternalResearchEnv() {
   delete process.env.PORTFOLIO_ANALYZER_EXTERNAL_SOURCE_MARKET_DATA;
   delete process.env.PORTFOLIO_ANALYZER_EXTERNAL_SOURCE_PROFILE;
   delete process.env.PORTFOLIO_ANALYZER_EXTERNAL_SOURCE_INSTITUTIONAL;
+  delete process.env.PORTFOLIO_ANALYZER_EXTERNAL_DAILY_RUN_LIMIT;
+  delete process.env.PORTFOLIO_ANALYZER_EXTERNAL_MAX_SYMBOLS_PER_RUN;
   delete process.env.ALPHA_VANTAGE_API_KEY;
 }
 
@@ -29,14 +31,34 @@ test("external research is disabled unless explicitly enabled", () => {
 
   assert.equal(getExternalResearchPolicy().enabled, false);
   assert.equal(DEFAULT_EXTERNAL_RESEARCH_POLICY.requiresWorker, true);
-  assert.equal(DEFAULT_EXTERNAL_RESEARCH_POLICY.scheduledOverviewEnabled, false);
-  assert.equal(DEFAULT_EXTERNAL_RESEARCH_POLICY.securityManualRefreshEnabled, true);
+  assert.equal(
+    DEFAULT_EXTERNAL_RESEARCH_POLICY.scheduledOverviewEnabled,
+    false,
+  );
+  assert.equal(
+    DEFAULT_EXTERNAL_RESEARCH_POLICY.securityManualRefreshEnabled,
+    true,
+  );
+  assert.equal(DEFAULT_EXTERNAL_RESEARCH_POLICY.dailyRunLimit, 25);
   assert.equal(
     DEFAULT_EXTERNAL_RESEARCH_POLICY.allowedSources.every(
       (source) => !source.enabled,
     ),
     true,
   );
+});
+
+test("external research quota can be adjusted by provider plan env", () => {
+  clearExternalResearchEnv();
+  process.env.PORTFOLIO_ANALYZER_EXTERNAL_DAILY_RUN_LIMIT = "75";
+  process.env.PORTFOLIO_ANALYZER_EXTERNAL_MAX_SYMBOLS_PER_RUN = "4";
+
+  const policy = getExternalResearchPolicy();
+
+  assert.equal(policy.dailyRunLimit, 75);
+  assert.equal(policy.maxSymbolsPerRun, 4);
+
+  clearExternalResearchEnv();
 });
 
 test("external research policy summary is safe for mobile display", () => {
@@ -148,13 +170,13 @@ test("cached market-data provider keeps exchange and currency identity separate"
     ),
   );
   assert.ok(
-    result.risks.some((risk) =>
-      risk.includes("组合内没有找到完全匹配的持仓"),
-    ),
+    result.risks.some((risk) => risk.includes("组合内没有找到完全匹配的持仓")),
   );
   assert.ok(
     result.summaryPoints.some((point) =>
-      point.includes("securityId=未指定, symbol=VFV, exchange=NASDAQ, currency=USD"),
+      point.includes(
+        "securityId=未指定, symbol=VFV, exchange=NASDAQ, currency=USD",
+      ),
     ),
   );
 

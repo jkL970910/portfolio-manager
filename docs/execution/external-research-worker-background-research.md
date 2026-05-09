@@ -267,6 +267,16 @@ Settings should show:
 - daily limit
 - source allowlist disabled state
 
+Quota policy:
+
+- The default manual external-research limit is `25` runs/day, matching the
+  current Alpha Vantage free-plan daily request budget used by the profile and
+  institutional adapters.
+- Override with `PORTFOLIO_ANALYZER_EXTERNAL_DAILY_RUN_LIMIT` only after
+  upgrading the provider plan or moving a source to a separate quota pool.
+- Keep `PORTFOLIO_ANALYZER_EXTERNAL_MAX_SYMBOLS_PER_RUN` separate from daily
+  quota; single-security mobile refresh consumes one run per source action.
+
 Do not add a user-facing "run external research" button until the worker and at
 least one source adapter are actually enabled.
 
