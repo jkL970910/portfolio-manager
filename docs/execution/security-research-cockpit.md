@@ -67,6 +67,32 @@ Flutter Security Detail / Loo国研究台
 All IO belongs in the route/service context builder. The evaluator should stay
 pure and testable with fixture JSON.
 
+## DTO Boundary: Security Facts vs User Overlay
+
+The research workbench must not let a user-specific decision hide
+security-level facts.
+
+Use two additive layers:
+
+- `securityResearchProfile`: listing-level research facts. This includes
+  identity, valuation evidence, key levels, quote/history freshness, market
+  pulse, and evidence sources. It is intended to be the same for every user who
+  opens the same resolved security/listing at the same cache time.
+- `securityResearchDecision`: user-specific overlay. This includes portfolio
+  fit, target gaps, duplicate exposure, account/tax/liquidity guardrails,
+  decision labels, action plans, and blocked/wait/needs-data states.
+
+Rendering order should follow the same boundary:
+
+1. Show `securityResearchProfile` first as `标的资料 / 研究证据`.
+2. Show `securityResearchDecision` second as `Loo国适配判断 / 行动计划`.
+3. GPT/大臣 may explain both layers, but cannot change either deterministic
+   layer.
+
+Example: if AMZN is overweight for the current user, the decision layer can say
+`组合护栏优先`; the profile layer must still show AMZN's key levels, analyst
+target, multiples, 52-week range, and data freshness if available.
+
 ## Proposed DTO
 
 ```ts
@@ -157,6 +183,23 @@ type SecurityResearchDecision = {
     reliabilityLabel: string;
   }>;
 };
+
+type SecurityResearchProfile = {
+  version: "security-research-profile-v1";
+  generatedAt: string;
+  security: SecurityResearchDecision["security"];
+  valuationEvidence: SecurityResearchDecision["valuationEvidence"];
+  keyLevels: SecurityResearchDecision["entryTiming"]["keyLevels"];
+  marketPulseLabel?: string;
+  dataFreshness: {
+    sourceMode: "local" | "cached-external" | "live-external";
+    quoteFreshnessSummary?: string;
+    externalResearchAsOf?: string;
+    priceHistoryPointCount?: number;
+    limitationSummary?: string;
+  };
+  evidence: SecurityResearchDecision["evidence"];
+};
 ```
 
 ## P0 / P1 Split
@@ -188,6 +231,9 @@ architecture boundaries before coding the next feature:
    - Current quick scan emits stock vs ETF asset type, identity status,
      portfolio-fit labels, valuation evidence placeholder/proxy, entry key
      levels from cached history, action plans, and evidence rows.
+   - Next compatibility step: split reusable security facts into
+     `securityResearchProfile` so key levels and valuation evidence are never
+     hidden by user-specific guardrails.
 2. `P1.2 Valuation Evidence MVP`
    - Status: first pass implemented on 2026-05-09.
    - Starts with the existing cached `alpha-vantage-profile` external-research

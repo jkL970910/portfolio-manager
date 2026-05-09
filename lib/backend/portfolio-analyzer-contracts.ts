@@ -242,6 +242,24 @@ export const securityResearchDecisionSchema = z.object({
   })).max(12).default([])
 });
 
+export const securityResearchProfileSchema = z.object({
+  version: z.literal("security-research-profile-v1"),
+  generatedAt: z.string().datetime(),
+  security: securityResearchDecisionSchema.shape.security,
+  valuationEvidence: securityResearchDecisionSchema.shape.valuationEvidence,
+  keyLevels: securityResearchDecisionSchema.shape.entryTiming.shape.keyLevels,
+  marketPulseLabel:
+    securityResearchDecisionSchema.shape.entryTiming.shape.marketPulseLabel,
+  dataFreshness: z.object({
+    sourceMode: z.enum(["local", "cached-external", "live-external"]),
+    quoteFreshnessSummary: z.string().trim().min(1).max(240).nullable().optional(),
+    externalResearchAsOf: z.string().datetime().nullable().optional(),
+    priceHistoryPointCount: z.number().int().min(0).optional(),
+    limitationSummary: z.string().trim().min(1).max(700).nullable().optional()
+  }),
+  evidence: securityResearchDecisionSchema.shape.evidence
+});
+
 export const portfolioAnalyzerResultSchema = z.object({
   version: z.literal(PORTFOLIO_ANALYZER_VERSION),
   scope: z.enum(["security", "portfolio", "account", "recommendation-run"]),
@@ -292,6 +310,7 @@ export const portfolioAnalyzerResultSchema = z.object({
     watchlistTriggers: z.array(z.string().trim().min(1).max(500)).max(8).default([]),
     evidence: z.array(z.string().trim().min(1).max(500)).max(8).default([]),
   }).optional(),
+  securityResearchProfile: securityResearchProfileSchema.optional(),
   securityResearchDecision: securityResearchDecisionSchema.optional(),
   scorecards: z.array(z.object({
     id: z.string().trim().min(1).max(80),
@@ -350,6 +369,7 @@ export const portfolioAnalyzerResultSchema = z.object({
 
 export type AnalyzerSecurityIdentity = z.infer<typeof analyzerSecurityIdentitySchema>;
 export type SecurityResearchDecision = z.infer<typeof securityResearchDecisionSchema>;
+export type SecurityResearchProfile = z.infer<typeof securityResearchProfileSchema>;
 export type PortfolioAnalyzerRequest = z.infer<typeof portfolioAnalyzerRequestSchema>;
 export type PortfolioAnalyzerGptEnhancementRequest = z.infer<typeof portfolioAnalyzerGptEnhancementRequestSchema>;
 export type PortfolioAnalyzerResult = z.infer<typeof portfolioAnalyzerResultSchema>;

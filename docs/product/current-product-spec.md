@@ -178,6 +178,11 @@ Current first pass:
 
 - `SecurityResearchDecision` is an additive backend result block; legacy smart
   scan fields remain populated for mobile compatibility.
+- Security-level facts must be separate from user-specific fit decisions.
+  `securityResearchProfile` owns listing-level facts such as valuation
+  evidence, key levels, quote/history freshness, market pulse, and evidence
+  sources. These facts should remain visible even when `securityResearchDecision`
+  says the current user's portfolio has a blocker or guardrail.
 - Cached `alpha-vantage-profile` external-research documents can contribute
   valuation anchors such as analyst target, P/E, forward P/E, PEG, P/B, 52-week
   range, dividend yield, market cap, and beta.

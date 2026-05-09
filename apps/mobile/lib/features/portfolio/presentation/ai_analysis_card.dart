@@ -354,6 +354,7 @@ class MobileAiAnalysisResult {
     required this.thesis,
     required this.confidence,
     required this.securityDecision,
+    required this.securityResearchProfile,
     required this.securityResearchDecision,
     required this.scorecards,
     required this.risks,
@@ -377,6 +378,7 @@ class MobileAiAnalysisResult {
   final String thesis;
   final String confidence;
   final MobileAiSecurityDecision? securityDecision;
+  final MobileSecurityResearchProfile? securityResearchProfile;
   final MobileSecurityResearchDecision? securityResearchDecision;
   final List<MobileAiScorecard> scorecards;
   final List<MobileAiRisk> risks;
@@ -407,6 +409,11 @@ class MobileAiAnalysisResult {
           ? MobileAiSecurityDecision.fromJson(
               json["securityDecision"] as Map<String, dynamic>)
           : null,
+      securityResearchProfile:
+          json["securityResearchProfile"] is Map<String, dynamic>
+              ? MobileSecurityResearchProfile.fromJson(
+                  json["securityResearchProfile"] as Map<String, dynamic>)
+              : null,
       securityResearchDecision:
           json["securityResearchDecision"] is Map<String, dynamic>
               ? MobileSecurityResearchDecision.fromJson(
@@ -567,6 +574,63 @@ class MobileAiPrimaryAction {
       priority: json["priority"] as String? ?? "P1",
       label: _friendlyAnalysisText(json["label"] as String? ?? "保持观察"),
       detail: _friendlyAnalysisText(json["detail"] as String? ?? ""),
+    );
+  }
+}
+
+class MobileSecurityResearchProfile {
+  const MobileSecurityResearchProfile({
+    required this.securityLabel,
+    required this.assetType,
+    required this.valuationEvidence,
+    required this.entryTiming,
+    required this.evidence,
+    required this.sourceMode,
+    required this.quoteFreshnessSummary,
+    required this.limitationSummary,
+  });
+
+  final String securityLabel;
+  final String assetType;
+  final MobileResearchValuationEvidence valuationEvidence;
+  final MobileResearchEntryTiming entryTiming;
+  final List<MobileResearchEvidence> evidence;
+  final String sourceMode;
+  final String? quoteFreshnessSummary;
+  final String? limitationSummary;
+
+  factory MobileSecurityResearchProfile.fromJson(Map<String, dynamic> json) {
+    final security = _readMap(json["security"]);
+    final dataFreshness = _readMap(json["dataFreshness"]);
+    final symbol = security["symbol"] as String? ?? "标的";
+    final exchange = security["exchange"] as String?;
+    final currency = security["currency"] as String?;
+    return MobileSecurityResearchProfile(
+      securityLabel: [
+        symbol,
+        if (exchange != null && exchange.isNotEmpty) exchange,
+        if (currency != null && currency.isNotEmpty) currency,
+      ].join(" · "),
+      assetType: security["assetType"] as String? ?? "other",
+      valuationEvidence: MobileResearchValuationEvidence.fromJson(
+        _readMap(json["valuationEvidence"]),
+      ),
+      entryTiming: MobileResearchEntryTiming(
+        posture: "security_profile",
+        keyLevels: _readMapList(json["keyLevels"])
+            .map(MobileResearchKeyLevel.fromJson)
+            .toList(),
+        marketPulseLabel:
+            _friendlyNullableText(json["marketPulseLabel"] as String?),
+      ),
+      evidence: _readMapList(json["evidence"])
+          .map(MobileResearchEvidence.fromJson)
+          .toList(),
+      sourceMode: dataFreshness["sourceMode"] as String? ?? "local",
+      quoteFreshnessSummary:
+          _friendlyNullableText(dataFreshness["quoteFreshnessSummary"] as String?),
+      limitationSummary:
+          _friendlyNullableText(dataFreshness["limitationSummary"] as String?),
     );
   }
 }
@@ -1055,6 +1119,7 @@ class _AnalysisResultView extends StatelessWidget {
   Widget build(BuildContext context) {
     final labels = _AnalysisScopeLabels.forScope(data.scope);
     final securityDecision = data.securityDecision;
+    final researchProfile = data.securityResearchProfile;
     final researchDecision = data.securityResearchDecision;
     final showLegacySecuritySections = researchDecision == null;
     final visibleActionItems = _dedupeActionItems(data.actionItems);
@@ -1094,8 +1159,13 @@ class _AnalysisResultView extends StatelessWidget {
             title: "当前结论",
             child: _PrimaryActionCard(securityDecision!.primaryAction!),
           ),
+        if (researchProfile != null)
+          _SecurityResearchProfileView(researchProfile),
         if (researchDecision != null)
-          _SecurityResearchDecisionView(researchDecision),
+          _SecurityResearchDecisionView(
+            researchDecision,
+            showFactSections: researchProfile == null,
+          ),
         if (showLegacySecuritySections &&
             securityDecision != null &&
             securityDecision.whyNow.isNotEmpty)
@@ -1242,10 +1312,84 @@ class _AnalysisResultView extends StatelessWidget {
   }
 }
 
+class _SecurityResearchProfileView extends StatelessWidget {
+  const _SecurityResearchProfileView(this.data);
+
+  final MobileSecurityResearchProfile data;
+
+  @override
+  Widget build(BuildContext context) {
+    final evidence = data.evidence.take(4).toList();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _AnalysisSection(
+          title: "标的资料",
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  _MetaPill(data.securityLabel),
+                  _MetaPill(_assetTypeLabel(data.assetType)),
+                  _MetaPill(_sourceModeLabel(data.sourceMode)),
+                ],
+              ),
+              if (data.quoteFreshnessSummary != null) ...[
+                const SizedBox(height: 10),
+                Text(data.quoteFreshnessSummary!),
+              ],
+              if (data.limitationSummary != null) ...[
+                const SizedBox(height: 6),
+                Text(
+                  data.limitationSummary!,
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+              ],
+            ],
+          ),
+        ),
+        _AnalysisSection(
+          title: "估值证据",
+          child: _ValuationEvidenceView(data.valuationEvidence),
+        ),
+        if (data.entryTiming.keyLevels.isNotEmpty ||
+            data.entryTiming.marketPulseLabel != null)
+          _AnalysisSection(
+            title: "关键价位",
+            child: _EntryTimingView(data.entryTiming),
+          ),
+        if (evidence.isNotEmpty)
+          ExpansionTile(
+            tilePadding: EdgeInsets.zero,
+            initiallyExpanded: false,
+            title: Text("标的证据", style: Theme.of(context).textTheme.titleSmall),
+            childrenPadding: const EdgeInsets.only(bottom: 12),
+            children: [
+              Align(
+                alignment: Alignment.centerLeft,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: evidence.map(_ResearchEvidenceRow.new).toList(),
+                ),
+              ),
+            ],
+          ),
+      ],
+    );
+  }
+}
+
 class _SecurityResearchDecisionView extends StatelessWidget {
-  const _SecurityResearchDecisionView(this.data);
+  const _SecurityResearchDecisionView(
+    this.data, {
+    this.showFactSections = true,
+  });
 
   final MobileSecurityResearchDecision data;
+  final bool showFactSections;
 
   @override
   Widget build(BuildContext context) {
@@ -1280,16 +1424,18 @@ class _SecurityResearchDecisionView extends StatelessWidget {
                   .toList(),
             ),
           ),
-        _AnalysisSection(
-          title: "估值证据",
-          child: _ValuationEvidenceView(data.valuationEvidence),
-        ),
-        if (data.entryTiming.keyLevels.isNotEmpty ||
-            data.entryTiming.marketPulseLabel != null)
+        if (showFactSections) ...[
           _AnalysisSection(
-            title: "关键价位",
-            child: _EntryTimingView(data.entryTiming),
+            title: "估值证据",
+            child: _ValuationEvidenceView(data.valuationEvidence),
           ),
+          if (data.entryTiming.keyLevels.isNotEmpty ||
+              data.entryTiming.marketPulseLabel != null)
+            _AnalysisSection(
+              title: "关键价位",
+              child: _EntryTimingView(data.entryTiming),
+            ),
+        ],
         if (fitLines.isNotEmpty)
           _AnalysisSection(
             title: "组合适配",
@@ -2339,6 +2485,7 @@ String _entryPostureLabel(String value, {bool hasKeyLevels = false}) {
     "wait_for_pullback" => "等待回撤",
     "wait_for_confirmation" => "等待确认",
     "portfolio_guardrail" => "组合护栏优先",
+    "security_profile" => "标的事实",
     _ => hasKeyLevels ? "关键价位参考" : "资料不足",
   };
 }

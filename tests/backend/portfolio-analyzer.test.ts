@@ -888,6 +888,14 @@ test("security research decision keeps key levels visible when portfolio guardra
   });
 
   assert.equal(result.securityDecision?.verdict, "weak-fit");
+  assert.equal(result.securityResearchProfile?.version, "security-research-profile-v1");
+  assert.equal(result.securityResearchProfile?.security.symbol, "TSM");
+  assert.equal(result.securityResearchProfile?.valuationEvidence.method, "analyst_consensus");
+  assert.ok(
+    result.securityResearchProfile?.keyLevels.some(
+      (level) => level.label === "分析师目标价" && level.type === "VALUATION_ANCHOR",
+    ),
+  );
   assert.equal(result.securityResearchDecision?.entryTiming.posture, "portfolio_guardrail");
   assert.ok(
     result.securityResearchDecision?.entryTiming.keyLevels.some(

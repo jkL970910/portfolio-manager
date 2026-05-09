@@ -16,6 +16,7 @@ import {
   PORTFOLIO_ANALYZER_VERSION,
   PortfolioAnalyzerResult,
   SecurityResearchDecision,
+  SecurityResearchProfile,
   portfolioAnalyzerResultSchema
 } from "@/lib/backend/portfolio-analyzer-contracts";
 import {
@@ -1250,6 +1251,34 @@ function buildSecurityResearchDecision(args: {
   };
 }
 
+function buildSecurityResearchProfile(args: {
+  researchDecision: SecurityResearchDecision;
+  dataFreshness: PortfolioAnalyzerResult["dataFreshness"];
+}): SecurityResearchProfile {
+  const profileEvidence = args.researchDecision.evidence.filter(
+    (item) => item.sourceType !== "portfolio" && item.sourceType !== "preference",
+  );
+  return {
+    version: "security-research-profile-v1",
+    generatedAt: args.researchDecision.generatedAt,
+    security: args.researchDecision.security,
+    valuationEvidence: args.researchDecision.valuationEvidence,
+    keyLevels: args.researchDecision.entryTiming.keyLevels,
+    marketPulseLabel: args.researchDecision.entryTiming.marketPulseLabel ?? null,
+    dataFreshness: {
+      sourceMode: args.dataFreshness.sourceMode,
+      quoteFreshnessSummary: args.dataFreshness.quoteFreshnessSummary ?? null,
+      externalResearchAsOf: args.dataFreshness.externalResearchAsOf ?? null,
+      priceHistoryPointCount: args.dataFreshness.priceHistoryPointCount,
+      limitationSummary: args.dataFreshness.limitationSummary ?? null,
+    },
+    evidence:
+      profileEvidence.length > 0
+        ? profileEvidence
+        : args.researchDecision.evidence.slice(0, 4),
+  };
+}
+
 function buildPositionSizingIdea(args: {
   verdict: string;
   targetGapPct: number;
@@ -1388,6 +1417,23 @@ export function buildSecurityAnalyzerQuickScan(args: {
     valuationDocuments: args.valuationDocuments,
     marketSentiment: args.marketSentiment,
   });
+  const dataFreshness: PortfolioAnalyzerResult["dataFreshness"] = {
+    portfolioAsOf,
+    quotesAsOf: marketData.quotesAsOf,
+    externalResearchAsOf,
+    sourceMode: resultSourceMode,
+    freshnessLabel: getAnalyzerFreshnessLabel(marketData),
+    reliabilityScore: getAnalyzerReliabilityScore(marketData),
+    limitationSummary: getAnalyzerLimitationSummary(marketData),
+    quoteSourceSummary: marketData.quoteSourceSummary,
+    quoteFreshnessSummary: marketData.quoteFreshnessSummary,
+    priceHistoryPointCount: marketData.priceHistoryPointCount,
+    fallbackPointCount: marketData.fallbackPointCount
+  };
+  const securityResearchProfile = buildSecurityResearchProfile({
+    researchDecision: securityResearchDecision,
+    dataFreshness,
+  });
 
   return assertAnalyzerResult({
     version: PORTFOLIO_ANALYZER_VERSION,
@@ -1397,19 +1443,7 @@ export function buildSecurityAnalyzerQuickScan(args: {
     identity: {
       ...identity
     },
-    dataFreshness: {
-      portfolioAsOf,
-      quotesAsOf: marketData.quotesAsOf,
-      externalResearchAsOf,
-      sourceMode: resultSourceMode,
-      freshnessLabel: getAnalyzerFreshnessLabel(marketData),
-      reliabilityScore: getAnalyzerReliabilityScore(marketData),
-      limitationSummary: getAnalyzerLimitationSummary(marketData),
-      quoteSourceSummary: marketData.quoteSourceSummary,
-      quoteFreshnessSummary: marketData.quoteFreshnessSummary,
-      priceHistoryPointCount: marketData.priceHistoryPointCount,
-      fallbackPointCount: marketData.fallbackPointCount
-    },
+    dataFreshness,
     evidenceTrail,
     summary: {
       title: `${normalizedSymbol} 智能快速分析`,
@@ -1460,6 +1494,7 @@ export function buildSecurityAnalyzerQuickScan(args: {
         ...evidenceTrail.map((item) => `${item.label}：${item.detail}`),
       ],
     },
+    securityResearchProfile,
     securityResearchDecision,
     scorecards: [
       {
