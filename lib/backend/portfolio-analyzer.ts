@@ -952,15 +952,15 @@ function buildSecurityResearchEntryTiming(args: {
 
   if (closes.length >= 2) {
     keyLevels.push({
-      label: "样本高点",
+      label: "52周/样本高点",
       value: formatResearchPrice(Math.max(...closes), args.currency),
-      type: "RECENT_HIGH",
+      type: closes.length >= 200 ? "52W_HIGH" : "RECENT_HIGH",
       source: "缓存价格历史",
     });
     keyLevels.push({
-      label: "样本低点",
+      label: "52周/样本低点",
       value: formatResearchPrice(Math.min(...closes), args.currency),
-      type: "RECENT_LOW",
+      type: closes.length >= 200 ? "52W_LOW" : "RECENT_LOW",
       source: "缓存价格历史",
     });
   }
@@ -972,6 +972,21 @@ function buildSecurityResearchEntryTiming(args: {
       type: "MA200",
       source: "缓存价格历史",
     });
+  }
+
+  for (const anchor of args.valuationEvidence?.anchors ?? []) {
+    if (
+      anchor.label === "分析师目标价" ||
+      anchor.label === "52周区间" ||
+      anchor.label === "市场脉搏"
+    ) {
+      keyLevels.push({
+        label: anchor.label,
+        value: anchor.value,
+        type: "VALUATION_ANCHOR",
+        source: anchor.source,
+      });
+    }
   }
 
   if (
@@ -994,7 +1009,7 @@ function buildSecurityResearchEntryTiming(args: {
         : args.verdict === "weak-fit"
           ? "not_applicable"
           : "wait_for_confirmation",
-    keyLevels: keyLevels.slice(0, 6),
+    keyLevels: keyLevels.slice(0, 10),
     marketPulseLabel: args.marketSentiment
       ? `${args.marketSentiment.strategyLabel}；市场脉搏仅作为低权重 timing 参考，不覆盖组合护栏。`
       : "市场脉搏仅作为低权重 timing 参考，不覆盖组合护栏。",
@@ -1005,18 +1020,33 @@ function buildSecurityResearchActionPlans(args: {
   assetType: SecurityResearchDecision["security"]["assetType"];
   verdict: ReturnType<typeof buildSecurityDecisionNarrative>["verdict"];
   vetoes: SecurityResearchDecision["decision"]["vetoedBy"];
-  valuationSummary: string;
+  valuationEvidence: SecurityResearchDecision["valuationEvidence"];
+  entryTiming: SecurityResearchDecision["entryTiming"];
   marketSentiment?: MarketSentimentSnapshot | null;
   targetGapPct: number;
   fitScore: number;
 }): SecurityResearchDecision["actionPlans"] {
   const blockedByPortfolioFit = args.vetoes.includes("portfolio_fit");
-  if (args.verdict === "needs-more-data") {
+  const hardNeedsData = args.verdict === "needs-more-data" && (
+    args.vetoes.includes("identity") ||
+    (args.vetoes.includes("freshness") && args.entryTiming.keyLevels.length === 0) ||
+    args.valuationEvidence.method === "unavailable"
+  );
+  const evidenceLabels = [
+    ...args.valuationEvidence.anchors.map((anchor) => anchor.label),
+    ...args.entryTiming.keyLevels.map((level) => level.label),
+  ].filter((value, index, values) => values.indexOf(value) === index).slice(0, 8);
+
+  if (hardNeedsData) {
     return [{
       type: "watch_only",
       title: "先补齐资料",
       detail: "身份、行情或估值证据不足时，只能进入观察/补资料流程，不能输出强行动计划。",
       isBlockedByPortfolioFit: blockedByPortfolioFit,
+      priority: "P0",
+      status: "needs_data",
+      triggerLabel: "补齐身份、报价和估值证据后重新快扫",
+      evidenceLabels,
       requiredConfirmations: ["完整 symbol / exchange / currency", "可审计报价与历史样本", "估值证据来源"],
     }];
   }
@@ -1028,6 +1058,10 @@ function buildSecurityResearchActionPlans(args: {
         ? "组合适配或偏好护栏优先级高于估值吸引力；即使估值证据改善，也应先处理组合暴露问题。"
         : "当前适配度偏弱，更适合保持观察而不是新增仓位。",
       isBlockedByPortfolioFit: blockedByPortfolioFit,
+      priority: "P0",
+      status: "blocked",
+      triggerLabel: "组合适配改善后再重新评估",
+      evidenceLabels,
       requiredConfirmations: ["组合配置缺口", "账户/税务位置", "现金计划"],
     }];
   }
@@ -1046,14 +1080,41 @@ function buildSecurityResearchActionPlans(args: {
           : "分批/再平衡路径",
       detail: `${macroPosture.detail} ETF/基金优先按资产配置、宏观水位和再平衡节奏处理，不用单点目标价替代长期配置纪律。`,
       isBlockedByPortfolioFit: false,
+      priority: macroPosture.posture === "dca_favorable" ? "P1" : "P2",
+      status: macroPosture.posture === "dca_favorable" ? "ready" : "wait",
+      triggerLabel: macroPosture.posture === "wait_for_pullback"
+        ? "等待回撤或市场脉搏降温"
+        : macroPosture.posture === "dca_favorable"
+          ? "用小额分批确认目标配置"
+          : "按再平衡计划观察",
+      evidenceLabels,
       requiredConfirmations: ["目标配置缺口", "市场脉搏状态", "费用/跟踪资料", "现金缓冲"],
+    }];
+  }
+  if (args.valuationEvidence.method === "unavailable") {
+    return [{
+      type: "watch_only",
+      title: "等待估值证据",
+      detail: args.valuationEvidence.summary,
+      isBlockedByPortfolioFit: false,
+      priority: "P1",
+      status: "needs_data",
+      triggerLabel: "缓存到估值证据后重新快扫",
+      evidenceLabels,
+      requiredConfirmations: ["估值证据 provider", "关键价位", "组合暴露变化"],
     }];
   }
   return [{
     type: "value_pullback",
-    title: "等待估值证据确认",
-    detail: args.valuationSummary,
+    title: args.verdict === "good-candidate" ? "按证据等待/分批" : "观察估值与关键位",
+    detail: `${args.valuationEvidence.summary} 行动前仍需用关键价位和组合暴露确认，不因单一目标价直接行动。`,
     isBlockedByPortfolioFit: false,
+    priority: args.verdict === "good-candidate" ? "P1" : "P2",
+    status: args.verdict === "good-candidate" ? "wait" : "wait",
+    triggerLabel: args.entryTiming.keyLevels.find((level) => level.type === "MA200")?.value
+      ? `重点观察 ${args.entryTiming.keyLevels.find((level) => level.type === "MA200")?.label}`
+      : "等待估值证据和关键位共同确认",
+    evidenceLabels,
     requiredConfirmations: ["估值证据 provider", "关键价位", "组合暴露变化"],
   }];
 }
@@ -1127,6 +1188,14 @@ function buildSecurityResearchDecision(args: {
     guardrails: args.decisionNarrative.guardrails,
     fit: args.decisionNarrative.fit,
   });
+  const entryTiming = buildSecurityResearchEntryTiming({
+    priceHistory: args.priceHistory,
+    currency: args.identity.currency,
+    verdict: args.decisionNarrative.verdict,
+    marketSentiment: args.marketSentiment,
+    valuationEvidence,
+    assetType,
+  });
 
   return {
     version: "security-research-v1",
@@ -1162,19 +1231,13 @@ function buildSecurityResearchDecision(args: {
       liquidityFitLabel: `现金/流动性适配 ${round(args.decisionNarrative.fit.liquidityFitScore)}/100`,
     },
     valuationEvidence,
-    entryTiming: buildSecurityResearchEntryTiming({
-      priceHistory: args.priceHistory,
-      currency: args.identity.currency,
-      verdict: args.decisionNarrative.verdict,
-      marketSentiment: args.marketSentiment,
-      valuationEvidence,
-      assetType,
-    }),
+    entryTiming,
     actionPlans: buildSecurityResearchActionPlans({
       assetType,
       verdict: args.decisionNarrative.verdict,
       vetoes: vetoedBy,
-      valuationSummary: valuationEvidence.summary,
+      valuationEvidence,
+      entryTiming,
       marketSentiment: args.marketSentiment,
       targetGapPct: args.decisionNarrative.fit.targetGapPct,
       fitScore: args.decisionNarrative.fit.score,

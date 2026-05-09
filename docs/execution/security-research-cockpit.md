@@ -144,6 +144,10 @@ type SecurityResearchDecision = {
     title: string;
     detail: string;
     isBlockedByPortfolioFit: boolean;
+    priority: "P0" | "P1" | "P2";
+    status: "ready" | "wait" | "blocked" | "needs_data";
+    triggerLabel?: string;
+    evidenceLabels: string[];
     requiredConfirmations: string[];
   }>;
   evidence: Array<{
@@ -217,13 +221,25 @@ architecture boundaries before coding the next feature:
      wait-for-pullback, neutral DCA, and rebalance-watch framing without
      creating a fake single-security target price.
 5. `P1.3 Entry Timing Key Levels`
+   - Status: first pass implemented on 2026-05-09.
    - Use simple, durable levels: MA200/MA250, 52-week high/low, recent high/low,
      and valuation anchors.
    - Avoid complex support/resistance/FVG algorithms in MVP.
+   - Current implementation emits cached-history levels (`MA200`,
+     `52周/样本高点`, `52周/样本低点`) and valuation anchors such as analyst
+     target / 52-week range / market pulse when available. It does not invent
+     support zones if history or provider evidence is missing.
 6. `P1.4 Action Plan Orchestrator`
+   - Status: first pass implemented on 2026-05-09.
    - Apply priority: Portfolio Fit > Valuation > Entry Timing.
    - Convert evidence into watch/DCA/pullback/confirmation/avoid plans.
    - Mark plans blocked by portfolio fit instead of hiding them.
+   - Current implementation adds plan `priority`, `status`, `triggerLabel`,
+     `evidenceLabels`, and `requiredConfirmations`.
+   - Hard short-circuit remains limited to garbage-in cases: missing identity,
+     no usable quote/key level, or unavailable valuation evidence. Sparse
+     history lowers confidence / confirmation requirements but does not block a
+     valuation-backed candidate plan by itself.
 7. `P1.5 Flutter Research Cockpit UI`
    - Render verdict, veto/guardrails, valuation evidence, key levels, action
      plans, evidence freshness, and optional GPT explanation.

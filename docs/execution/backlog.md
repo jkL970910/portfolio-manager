@@ -117,7 +117,7 @@ This is the current source of truth before starting the next P0 implementation.
 | Persist draggable Minister button position   | P1               | Current drag position is session-local; persist later after UX settles                                                                                                                                                                                         |
 | Minister usage/cost dashboard with estimates | P1               | Current logs store provider/model/status/token counts; cost estimates can be added after pricing policy is fixed                                                                                                                                               |
 | Mobile UI / IA v2 implementation             | P1 / Active Next | Approved Figma direction exists in `https://www.figma.com/design/aYsiPJ8eybrWa6BcY1peIn`; next work is Flutter theme tokens, reusable components, page layout rewrites, full-list navigation, compact data visualization, and light/dark/system theme support. |
-| Security Research Cockpit / 估值证据链       | P1 / Active Feature | Build the signed-off research-workbench stack from `docs/execution/security-research-cockpit.md`: `SecurityResearchDecision`, cached Alpha Vantage valuation evidence, and ETF macro proxy first passes are implemented; next is entry key levels, action-plan orchestration, and Flutter rendering. |
+| Security Research Cockpit / 估值证据链       | P1 / Active Feature | Build the signed-off research-workbench stack from `docs/execution/security-research-cockpit.md`: `SecurityResearchDecision`, cached Alpha Vantage valuation evidence, ETF macro proxy, entry key levels, and action-plan orchestration first passes are implemented; next is Flutter rendering for the richer research decision. |
 | AlphaPick screenshot ingestion               | P1               | Convert purchased AlphaPick list screenshots into a reviewed watchlist/import pipeline with OCR, symbol identity resolution, source attribution, freshness labels, and manual confirmation before use.                                                         |
 | Unified brokerage import                     | P1               | Add one `券商同步` flow for broker imports instead of provider-specific tabs. First build target: IBKR Flex Query. First feasibility spike: Wealthsimple via SnapTrade. Architecture source: `docs/execution/brokerage-import-architecture.md`.                |
 
@@ -182,22 +182,19 @@ must require an explicit user confirmation after preview.
    tracking error, index valuation, and flows if provider coverage is available.
    First pass already combines cached fund profile anchors, allocation gap, and
    market pulse without stock-style intrinsic-price claims.
-6. Implement `P1.3/P1.4 Entry Key Levels + Action Plan Orchestrator`: MA200 /
-   52-week / recent high-low / valuation anchors, then watch/DCA/pullback /
-   confirmation / avoid plans with portfolio-fit veto precedence.
-7. Migrate Security Detail into the next `Loo国研究台` UI after the contract is
+6. Migrate Security Detail into the next `Loo国研究台` UI after the contract is
    stable: verdict, guardrails, valuation evidence, key levels, action plans,
    evidence freshness, and optional GPT explanation.
-8. Resume broader Mobile UI / IA v2 page migration: Portfolio, Account Detail,
+7. Resume broader Mobile UI / IA v2 page migration: Portfolio, Account Detail,
    Recommendations, Import, Preferences, Minister, Settings, and Health.
-9. Run cloud scheduled daily-overview profile/institutional smoke and validate
+8. Run cloud scheduled daily-overview profile/institutional smoke and validate
    single-security manual refresh. Keep page loads cache-only and avoid raw
    live provider calls from Flutter.
-10. Broaden security metadata provider QA from representative holdings to
+9. Broaden security metadata provider QA from representative holdings to
    watchlist and non-held candidates. Keep exact
    `SYMBOL:EXCHANGE:CURRENCY` identities and never reintroduce ticker-only
    joins.
-11. Continue lower-priority P1 work after the research cockpit path is usable:
+10. Continue lower-priority P1 work after the research cockpit path is usable:
    AlphaPick ingestion, unified brokerage import, per-account 大臣 opt-in,
    usage/cost dashboard, draggable button persistence, and spending/cash
    monitoring.

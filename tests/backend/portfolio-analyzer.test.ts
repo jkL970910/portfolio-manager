@@ -509,15 +509,14 @@ test("security analyzer quick scan evaluates unheld candidates with portfolio ta
     holdings,
     profile: makeProfile(),
     marketData: {
-      priceHistory: [
-        {
-          id: "history_tsm_us",
+      priceHistory: Array.from({ length: 5 }, (_, index) => ({
+          id: `history_tsm_us_${index}`,
           securityId: "security_tsm_us",
           symbol: "TSM",
           exchange: "NYSE",
-          priceDate: "2026-04-27",
-          close: 180,
-          adjustedClose: 180,
+          priceDate: `2026-04-${String(index + 23).padStart(2, "0")}`,
+          close: 176 + index,
+          adjustedClose: 176 + index,
           currency: "USD",
           source: "provider",
           provider: "twelve-data",
@@ -527,8 +526,7 @@ test("security analyzer quick scan evaluates unheld candidates with portfolio ta
           isReference: false,
           fallbackReason: null,
           createdAt: generatedAt,
-        },
-      ],
+        })),
     },
     generatedAt,
   });
@@ -618,6 +616,16 @@ test("security research decision uses cached valuation evidence for stock candid
     result.securityResearchDecision?.valuationEvidence.anchors.some(
       (anchor) => anchor.label === "分析师目标价" && anchor.value === "215",
     ),
+  );
+  assert.ok(
+    result.securityResearchDecision?.entryTiming.keyLevels.some(
+      (level) => level.label === "分析师目标价" && level.type === "VALUATION_ANCHOR",
+    ),
+  );
+  assert.equal(result.securityResearchDecision?.actionPlans[0]?.type, "value_pullback");
+  assert.equal(result.securityResearchDecision?.actionPlans[0]?.status, "wait");
+  assert.ok(
+    result.securityResearchDecision?.actionPlans[0]?.evidenceLabels.includes("分析师目标价"),
   );
   assert.ok(
     result.securityResearchDecision?.valuationEvidence.summary.includes("不等同于自动 DCF"),
@@ -710,6 +718,10 @@ test("security research decision routes ETF candidates through macro proxy", () 
   assert.ok(
     result.securityResearchDecision?.actionPlans[0]?.detail.includes("小额分批"),
   );
+  assert.equal(result.securityResearchDecision?.actionPlans[0]?.status, "ready");
+  assert.ok(
+    result.securityResearchDecision?.actionPlans[0]?.evidenceLabels.includes("市场脉搏"),
+  );
   assert.ok(
     result.securityResearchDecision?.valuationEvidence.sanityChecks.some((check) =>
       check.detail.includes("不应直接套用单公司 DCF"),
@@ -718,7 +730,7 @@ test("security research decision routes ETF candidates through macro proxy", () 
   assert.equal(result.securityResearchDecision?.actionPlans[0]?.type, "dca_accumulate");
   assert.ok(
     result.securityResearchDecision?.entryTiming.keyLevels.some((level) =>
-      level.label === "样本高点",
+      level.label === "52周/样本高点",
     ),
   );
 });

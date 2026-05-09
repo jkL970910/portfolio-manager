@@ -222,6 +222,10 @@ export const securityResearchDecisionSchema = z.object({
     title: z.string().trim().min(1).max(160),
     detail: z.string().trim().min(1).max(800),
     isBlockedByPortfolioFit: z.boolean(),
+    priority: z.enum(["P0", "P1", "P2"]).default("P1"),
+    status: z.enum(["ready", "wait", "blocked", "needs_data"]).default("wait"),
+    triggerLabel: z.string().trim().min(1).max(200).nullable().optional(),
+    evidenceLabels: z.array(z.string().trim().min(1).max(120)).max(8).default([]),
     requiredConfirmations: z.array(z.string().trim().min(1).max(200)).max(8).default([])
   })).max(8).default([]),
   evidence: z.array(z.object({

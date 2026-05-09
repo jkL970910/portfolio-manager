@@ -186,6 +186,14 @@ Current first pass:
 - ETF/fund proxy first pass combines cached profile anchors, target allocation
   gap, and cached market pulse (`FGI/VIX/strategy`) to frame DCA, wait,
   neutral accumulation, or rebalance-watch paths.
+- Entry timing first pass uses cached-history key levels and valuation anchors
+  only: MA200 when enough history exists, recent/52-week high-low, analyst
+  target, 52-week range, and market pulse. It does not synthesize complex
+  support/resistance zones.
+- Action plans now carry explicit priority/status/trigger/evidence fields so
+  the UI can distinguish `ready`, `wait`, `blocked`, and `needs_data` without
+  recalculating financial logic on the client. Portfolio-fit blockers retain
+  veto precedence over attractive valuation evidence.
 - Page load remains cache-only; new provider documents can invalidate old
   quick-scan cache entries so evidence is refreshed without live Flutter calls.
 
