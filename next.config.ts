@@ -9,7 +9,7 @@ const nextConfig: NextConfig = {
         headers: [
           {
             key: "Access-Control-Allow-Origin",
-            value: "https://portfolio-manager-mobile.pages.dev",
+            value: "*",
           },
           {
             key: "Access-Control-Allow-Methods",
