@@ -1446,7 +1446,10 @@ class _EntryTimingView extends StatelessWidget {
           spacing: 8,
           runSpacing: 8,
           children: [
-            _MetaPill(_entryPostureLabel(data.posture)),
+            _MetaPill(_entryPostureLabel(
+              data.posture,
+              hasKeyLevels: data.keyLevels.isNotEmpty,
+            )),
             if (data.marketPulseLabel != null)
               _MetaPill(data.marketPulseLabel!),
           ],
@@ -2330,13 +2333,13 @@ String _valuationMethodLabel(String value) {
   };
 }
 
-String _entryPostureLabel(String value) {
+String _entryPostureLabel(String value, {bool hasKeyLevels = false}) {
   return switch (value) {
     "consider_now" => "可继续确认",
     "wait_for_pullback" => "等待回撤",
     "wait_for_confirmation" => "等待确认",
     "portfolio_guardrail" => "组合护栏优先",
-    _ => "暂不适用",
+    _ => hasKeyLevels ? "关键价位参考" : "资料不足",
   };
 }
 
