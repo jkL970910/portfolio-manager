@@ -209,6 +209,11 @@ Current first pass:
   PE/Forward PE, 52-week range, Beta, market cap, and one extra valuation anchor
   when available. Longer provider summaries, sanity checks, and extra metrics
   should be collapsed behind optional detail sections.
+- Security Detail should expose one user-facing `研究资料状态 / 更新` entry for
+  quote/history refresh, profile refresh, institutional refresh, and local
+  research regeneration. The backend actions stay separate; the mobile UI should
+  not scatter separate `刷新报价`、`刷新资料`、`重新生成` buttons across unrelated
+  cards.
 - Page load remains cache-only; new provider documents can invalidate old
   quick-scan cache entries so evidence is refreshed without live Flutter calls.
 

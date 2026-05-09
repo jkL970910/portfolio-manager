@@ -7,24 +7,46 @@ import "../../../core/api/loo_api_client.dart";
 import "../../shared/data/loo_minister_context_models.dart";
 import "../../shared/presentation/loo_minister_scope.dart";
 
+class AiAnalysisController {
+  VoidCallback? _runFresh;
+
+  void _attach(VoidCallback runFresh) {
+    _runFresh = runFresh;
+  }
+
+  void _detach(VoidCallback runFresh) {
+    if (_runFresh == runFresh) {
+      _runFresh = null;
+    }
+  }
+
+  void runFresh() {
+    _runFresh?.call();
+  }
+}
+
 class AiAnalysisCard extends StatefulWidget {
   const AiAnalysisCard({
     required this.apiClient,
     required this.payload,
+    this.controller,
     this.title = "智能快扫",
     this.description = "先用你的组合、偏好和已保存资料生成确定性判断；外部 GPT 只在你点击增强时调用。",
     this.autoRun = false,
     this.refreshKey,
+    this.showGenerateButton = true,
     this.onCompleted,
     super.key,
   });
 
   final LooApiClient apiClient;
   final Map<String, dynamic> payload;
+  final AiAnalysisController? controller;
   final String title;
   final String description;
   final bool autoRun;
   final String? refreshKey;
+  final bool showGenerateButton;
   final VoidCallback? onCompleted;
 
   @override
@@ -45,6 +67,7 @@ class _AiAnalysisCardState extends State<AiAnalysisCard> {
   void initState() {
     super.initState();
     _payloadSignature = _stableJsonSignature(widget.payload);
+    widget.controller?._attach(_runFreshFromController);
     if (widget.autoRun) {
       _isLoading = true;
       _analysis = _loadAnalysis(refresh: false);
@@ -67,12 +90,17 @@ class _AiAnalysisCardState extends State<AiAnalysisCard> {
   @override
   void dispose() {
     _ministerActionListenable?.removeListener(_handleMinisterAction);
+    widget.controller?._detach(_runFreshFromController);
     super.dispose();
   }
 
   @override
   void didUpdateWidget(covariant AiAnalysisCard oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (oldWidget.controller != widget.controller) {
+      oldWidget.controller?._detach(_runFreshFromController);
+      widget.controller?._attach(_runFreshFromController);
+    }
     final nextPayloadSignature = _stableJsonSignature(widget.payload);
     if (widget.autoRun &&
         nextPayloadSignature != _payloadSignature &&
@@ -96,6 +124,11 @@ class _AiAnalysisCardState extends State<AiAnalysisCard> {
       _hasGptEnhancementResult = false;
       _analysis = _loadAnalysis(refresh: refresh);
     });
+  }
+
+  void _runFreshFromController() {
+    if (_isLoading) return;
+    _runAnalysis(refresh: _hasResult);
   }
 
   void _runGptEnhancement() {
@@ -261,23 +294,25 @@ class _AiAnalysisCardState extends State<AiAnalysisCard> {
                     ],
                   ),
                 ),
-                const SizedBox(width: 12),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    FilledButton.icon(
-                      onPressed: _isLoading
-                          ? null
-                          : future == null
-                              ? () => _runAnalysis()
-                              : _hasResult
-                                  ? () => _runAnalysis(refresh: true)
-                                  : null,
-                      icon: const Icon(Icons.auto_awesome),
-                      label: Text(_hasResult ? "重新生成" : "生成"),
-                    ),
-                  ],
-                ),
+                if (widget.showGenerateButton) ...[
+                  const SizedBox(width: 12),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      FilledButton.icon(
+                        onPressed: _isLoading
+                            ? null
+                            : future == null
+                                ? () => _runAnalysis()
+                                : _hasResult
+                                    ? () => _runAnalysis(refresh: true)
+                                    : null,
+                        icon: const Icon(Icons.auto_awesome),
+                        label: Text(_hasResult ? "重新生成" : "生成"),
+                      ),
+                    ],
+                  ),
+                ],
               ],
             ),
             if (future != null) ...[
@@ -1578,7 +1613,7 @@ class _ValuationEvidenceView extends StatelessWidget {
             icon: Icons.badge_outlined,
             title: "需要先缓存基本资料",
             detail:
-                "到本页下方的「刷新该标的资料」提交「基本资料」或「财报资料」。任务完成并写入缓存后，再点「重新生成」即可看到估值锚点。",
+                "点击标的详情里的「研究资料状态」提交「基本资料」或「财报资料」。任务完成并写入缓存后，再重新生成研究结论即可看到估值锚点。",
           ),
         ],
         if (remainingAnchors.isNotEmpty) ...[

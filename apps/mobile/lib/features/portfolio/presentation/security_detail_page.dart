@@ -44,6 +44,7 @@ class _SecurityDetailPageState extends State<SecurityDetailPage> {
   int _externalResearchRefreshRevision = 0;
   String? _externalResearchMessage;
   String? _securityId;
+  final AiAnalysisController _analysisController = AiAnalysisController();
 
   @override
   void initState() {
@@ -125,6 +126,108 @@ class _SecurityDetailPageState extends State<SecurityDetailPage> {
         });
       }
     }
+  }
+
+  void _showResearchUpdateSheet(MobileSecurityDetailSnapshot data) {
+    final trust = _SecurityDataTrust.fromSnapshot(data);
+    showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (sheetContext) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  "研究资料更新",
+                  style: Theme.of(sheetContext).textTheme.titleLarge,
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  "按需更新资料；页面不会自动实时抓取外部来源。",
+                  style: Theme.of(sheetContext).textTheme.bodySmall,
+                ),
+                const SizedBox(height: 14),
+                _ResearchUpdateActionTile(
+                  icon: Icons.show_chart,
+                  title: "刷新报价与走势",
+                  detail: [
+                    data.quoteStatusLabel,
+                    data.priceHistoryChart?.freshness.label,
+                  ].whereType<String>().where((item) => item.isNotEmpty).join("；"),
+                  isBusy: _isRefreshingQuote,
+                  onTap: _isRefreshingQuote
+                      ? null
+                      : () {
+                          Navigator.of(sheetContext).pop();
+                          unawaited(_refreshQuote());
+                        },
+                ),
+                _ResearchUpdateActionTile(
+                  icon: Icons.badge_outlined,
+                  title: "刷新基本资料",
+                  detail: "目标价、PE、Beta、市值、52周区间等估值证据。",
+                  isBusy: _isSubmittingExternalResearch,
+                  onTap: _isSubmittingExternalResearch
+                      ? null
+                      : () {
+                          Navigator.of(sheetContext).pop();
+                          unawaited(_enqueueExternalResearch(data, "profile"));
+                        },
+                ),
+                _ResearchUpdateActionTile(
+                  icon: Icons.event_note_outlined,
+                  title: "刷新财报资料",
+                  detail: "财报/盈利披露资料，完成后进入缓存供研究台使用。",
+                  isBusy: _isSubmittingExternalResearch,
+                  onTap: _isSubmittingExternalResearch
+                      ? null
+                      : () {
+                          Navigator.of(sheetContext).pop();
+                          unawaited(
+                              _enqueueExternalResearch(data, "institutional"));
+                        },
+                ),
+                _ResearchUpdateActionTile(
+                  icon: Icons.auto_awesome,
+                  title: "重新生成研究结论",
+                  detail: "不抓新资料，只用当前缓存重新跑本地快扫。",
+                  onTap: () {
+                    Navigator.of(sheetContext).pop();
+                    _analysisController.runFresh();
+                  },
+                ),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    _StatusPill(
+                      label: trust.label,
+                      color: trust.color(sheetContext),
+                    ),
+                    _InfoChip(data.quoteStatusLabel),
+                    if (data.priceHistoryChart != null)
+                      _InfoChip(data.priceHistoryChart!.freshness.label),
+                  ],
+                ),
+                if (_externalResearchMessage != null &&
+                    _externalResearchMessage!.isNotEmpty) ...[
+                  const SizedBox(height: 10),
+                  Text(
+                    _externalResearchMessage!,
+                    style: Theme.of(sheetContext).textTheme.bodySmall,
+                  ),
+                ],
+              ],
+            ),
+          ),
+        );
+      },
+    );
   }
 
   Future<void> _enqueueExternalResearch(
@@ -300,17 +403,23 @@ class _SecurityDetailPageState extends State<SecurityDetailPage> {
               children: [
                 _SummaryCard(
                   data,
-                  isRefreshingQuote: _isRefreshingQuote,
-                  onRefreshQuote: _refreshQuote,
                 ),
                 const SizedBox(height: 12),
-                _ResearchCockpitCard(data),
+                _ResearchCockpitCard(
+                  data,
+                  isRefreshingQuote: _isRefreshingQuote,
+                  isSubmittingExternalResearch: _isSubmittingExternalResearch,
+                  externalResearchMessage: _externalResearchMessage,
+                  onOpenUpdateSheet: () => _showResearchUpdateSheet(data),
+                ),
                 const SizedBox(height: 12),
                 AiAnalysisCard(
                   apiClient: widget.apiClient,
+                  controller: _analysisController,
                   title: "Loo国研究工作台",
                   description: "自动生成基础智能快扫：先看结论、护栏和组合适配；外部 GPT 只在你手动点增强时调用。",
                   autoRun: true,
+                  showGenerateButton: false,
                   onCompleted: _refreshDailyIntelligence,
                   refreshKey: [
                     data.quoteTimestamp,
@@ -350,18 +459,6 @@ class _SecurityDetailPageState extends State<SecurityDetailPage> {
                               ? intelligenceSnapshot.error.toString()
                               : null,
                         ),
-                        if (filteredSnapshot?.securityManualRefreshEnabled ??
-                            true) ...[
-                          const SizedBox(height: 12),
-                          _ExternalResearchRefreshCard(
-                            isSubmitting: _isSubmittingExternalResearch,
-                            message: _externalResearchMessage,
-                            onRefreshProfile: () =>
-                                _enqueueExternalResearch(data, "profile"),
-                            onRefreshInstitutional: () =>
-                                _enqueueExternalResearch(data, "institutional"),
-                          ),
-                        ],
                       ],
                     );
                   },
@@ -485,79 +582,6 @@ class _SecurityDetailPageState extends State<SecurityDetailPage> {
       emptyTitle: "暂时没有该标的秘闻",
       emptyDetail:
           "当前只显示同一标的，或完整 symbol/exchange/currency 匹配的缓存情报；不会把其他版本的资料混入当前标的。",
-    );
-  }
-}
-
-class _ExternalResearchRefreshCard extends StatelessWidget {
-  const _ExternalResearchRefreshCard({
-    required this.isSubmitting,
-    required this.onRefreshProfile,
-    required this.onRefreshInstitutional,
-    this.message,
-  });
-
-  final bool isSubmitting;
-  final String? message;
-  final VoidCallback onRefreshProfile;
-  final VoidCallback onRefreshInstitutional;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(14),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                const Icon(Icons.cloud_sync_outlined),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    "刷新该标的资料",
-                    style: theme.textTheme.titleMedium,
-                  ),
-                ),
-                if (isSubmitting)
-                  const SizedBox(
-                    height: 18,
-                    width: 18,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Text(
-              "只提交后台任务，不在页面加载时实时抓取外部来源。任务完成后会写入缓存，供秘闻、推荐和大臣使用。",
-              style: theme.textTheme.bodySmall,
-            ),
-            if (message != null && message!.isNotEmpty) ...[
-              const SizedBox(height: 8),
-              Text(message!, style: theme.textTheme.bodySmall),
-            ],
-            const SizedBox(height: 10),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                OutlinedButton.icon(
-                  onPressed: isSubmitting ? null : onRefreshProfile,
-                  icon: const Icon(Icons.badge_outlined),
-                  label: const Text("基本资料"),
-                ),
-                OutlinedButton.icon(
-                  onPressed: isSubmitting ? null : onRefreshInstitutional,
-                  icon: const Icon(Icons.event_note_outlined),
-                  label: const Text("财报资料"),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
     );
   }
 }
@@ -775,15 +799,9 @@ class MobileSecurityDetailSnapshot {
 }
 
 class _SummaryCard extends StatelessWidget {
-  const _SummaryCard(
-    this.data, {
-    required this.isRefreshingQuote,
-    required this.onRefreshQuote,
-  });
+  const _SummaryCard(this.data);
 
   final MobileSecurityDetailSnapshot data;
-  final bool isRefreshingQuote;
-  final VoidCallback onRefreshQuote;
 
   @override
   Widget build(BuildContext context) {
@@ -829,18 +847,6 @@ class _SummaryCard extends StatelessWidget {
                 const SizedBox(height: 8),
                 Text(data.quoteTimestamp, style: theme.textTheme.bodySmall),
               ],
-              const SizedBox(height: 14),
-              FilledButton.icon(
-                onPressed: isRefreshingQuote ? null : onRefreshQuote,
-                icon: isRefreshingQuote
-                    ? const SizedBox(
-                        width: 16,
-                        height: 16,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Icon(Icons.refresh),
-                label: Text(isRefreshingQuote ? "刷新中" : "刷新此标的"),
-              ),
             ],
           ),
         ),
@@ -850,9 +856,19 @@ class _SummaryCard extends StatelessWidget {
 }
 
 class _ResearchCockpitCard extends StatelessWidget {
-  const _ResearchCockpitCard(this.data);
+  const _ResearchCockpitCard(
+    this.data, {
+    required this.isRefreshingQuote,
+    required this.isSubmittingExternalResearch,
+    required this.onOpenUpdateSheet,
+    this.externalResearchMessage,
+  });
 
   final MobileSecurityDetailSnapshot data;
+  final bool isRefreshingQuote;
+  final bool isSubmittingExternalResearch;
+  final String? externalResearchMessage;
+  final VoidCallback onOpenUpdateSheet;
 
   @override
   Widget build(BuildContext context) {
@@ -900,6 +916,15 @@ class _ResearchCockpitCard extends StatelessWidget {
                   color: decision.color(context),
                 ),
               ],
+            ),
+            const SizedBox(height: 12),
+            _ResearchUpdateStatusBar(
+              data: data,
+              trust: trust,
+              isRefreshingQuote: isRefreshingQuote,
+              isSubmittingExternalResearch: isSubmittingExternalResearch,
+              message: externalResearchMessage,
+              onTap: onOpenUpdateSheet,
             ),
             const SizedBox(height: 14),
             _ResearchLine(
@@ -980,6 +1005,142 @@ class _ResearchLine extends StatelessWidget {
           trailing!,
         ],
       ],
+    );
+  }
+}
+
+class _ResearchUpdateStatusBar extends StatelessWidget {
+  const _ResearchUpdateStatusBar({
+    required this.data,
+    required this.trust,
+    required this.isRefreshingQuote,
+    required this.isSubmittingExternalResearch,
+    required this.onTap,
+    this.message,
+  });
+
+  final MobileSecurityDetailSnapshot data;
+  final _SecurityDataTrust trust;
+  final bool isRefreshingQuote;
+  final bool isSubmittingExternalResearch;
+  final String? message;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final isBusy = isRefreshingQuote || isSubmittingExternalResearch;
+    final theme = Theme.of(context);
+    return InkWell(
+      borderRadius: BorderRadius.circular(16),
+      onTap: onTap,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.55),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: theme.colorScheme.outlineVariant),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(
+                    Icons.cloud_sync_outlined,
+                    size: 18,
+                    color: theme.colorScheme.primary,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      "研究资料状态",
+                      style: theme.textTheme.titleSmall,
+                    ),
+                  ),
+                  if (isBusy)
+                    const SizedBox(
+                      height: 16,
+                      width: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  else
+                    Text(
+                      "更新",
+                      style: theme.textTheme.labelLarge?.copyWith(
+                        color: theme.colorScheme.primary,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  const SizedBox(width: 4),
+                  Icon(
+                    Icons.chevron_right,
+                    color: theme.colorScheme.primary,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  _StatusPill(
+                    label: trust.label,
+                    color: trust.color(context),
+                  ),
+                  _InfoChip(data.quoteStatusLabel),
+                  if (data.priceHistoryChart != null)
+                    _InfoChip(data.priceHistoryChart!.freshness.label),
+                ],
+              ),
+              if (message != null && message!.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                Text(
+                  message!,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.bodySmall,
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ResearchUpdateActionTile extends StatelessWidget {
+  const _ResearchUpdateActionTile({
+    required this.icon,
+    required this.title,
+    required this.detail,
+    required this.onTap,
+    this.isBusy = false,
+  });
+
+  final IconData icon;
+  final String title;
+  final String detail;
+  final bool isBusy;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListTile(
+      contentPadding: EdgeInsets.zero,
+      leading: Icon(icon),
+      title: Text(title),
+      subtitle: detail.isEmpty ? null : Text(detail),
+      trailing: isBusy
+          ? const SizedBox(
+              height: 18,
+              width: 18,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            )
+          : const Icon(Icons.chevron_right),
+      enabled: onTap != null,
+      onTap: onTap,
     );
   }
 }
