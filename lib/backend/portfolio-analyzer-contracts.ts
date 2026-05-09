@@ -219,7 +219,18 @@ export const securityResearchDecisionSchema = z.object({
       label: z.string().trim().min(1).max(120),
       value: z.string().trim().min(1).max(160),
       type: z.enum(["MA200", "52W_HIGH", "52W_LOW", "RECENT_HIGH", "RECENT_LOW", "VALUATION_ANCHOR"]),
-      source: z.string().trim().min(1).max(160)
+      source: z.string().trim().min(1).max(160),
+      role: z.enum([
+        "current_price",
+        "resistance",
+        "pullback_zone",
+        "deep_support",
+        "valuation_anchor",
+        "range_reference",
+        "sentiment_reference"
+      ]).optional(),
+      tone: z.enum(["neutral", "caution", "opportunity", "target", "risk"]).optional(),
+      note: z.string().trim().min(1).max(280).optional()
     })).max(10).default([]),
     marketPulseLabel: z.string().trim().min(1).max(160).nullable().optional()
   }),

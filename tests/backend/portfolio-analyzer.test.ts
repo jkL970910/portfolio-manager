@@ -893,7 +893,20 @@ test("security research decision keeps key levels visible when portfolio guardra
   assert.equal(result.securityResearchProfile?.valuationEvidence.method, "analyst_consensus");
   assert.ok(
     result.securityResearchProfile?.keyLevels.some(
-      (level) => level.label === "分析师目标价" && level.type === "VALUATION_ANCHOR",
+      (level) =>
+        level.label === "分析师目标价" &&
+        level.type === "VALUATION_ANCHOR" &&
+        level.role === "valuation_anchor",
+    ),
+  );
+  assert.ok(
+    result.securityResearchProfile?.keyLevels.some(
+      (level) => level.role === "current_price" && level.note?.includes("当前观察锚点"),
+    ),
+  );
+  assert.ok(
+    result.securityResearchProfile?.keyLevels.some(
+      (level) => level.role === "resistance" && level.tone === "caution",
     ),
   );
   assert.equal(result.securityResearchDecision?.entryTiming.posture, "portfolio_guardrail");

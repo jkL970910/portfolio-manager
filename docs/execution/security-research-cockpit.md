@@ -93,6 +93,20 @@ Example: if AMZN is overweight for the current user, the decision layer can say
 `组合护栏优先`; the profile layer must still show AMZN's key levels, analyst
 target, multiples, 52-week range, and data freshness if available.
 
+`keyLevels` are not only raw rows. They must carry a semantic role so the
+mobile UI can render a price map instead of a debug-like table:
+
+- `current_price`: latest close / current observation anchor.
+- `resistance`: recent or 52-week high zone.
+- `pullback_zone`: MA200 or first pullback observation area.
+- `deep_support`: recent or 52-week low reference.
+- `valuation_anchor`: analyst target / valuation target reference.
+- `range_reference`: broad 52-week range text.
+- `sentiment_reference`: market pulse reference, never a price target.
+
+The UI should show these as `当前价 / 回撤观察区 / 上方压力 / 估值锚点` first,
+then put raw source rows behind a `数据依据` expander.
+
 ## Proposed DTO
 
 ```ts
@@ -162,6 +176,9 @@ type SecurityResearchDecision = {
       value: string;
       type: "MA200" | "52W_HIGH" | "52W_LOW" | "RECENT_HIGH" | "RECENT_LOW" | "VALUATION_ANCHOR";
       source: string;
+      role?: "current_price" | "resistance" | "pullback_zone" | "deep_support" | "valuation_anchor" | "range_reference" | "sentiment_reference";
+      tone?: "neutral" | "caution" | "opportunity" | "target" | "risk";
+      note?: string;
     }>;
     marketPulseLabel?: string;
   };

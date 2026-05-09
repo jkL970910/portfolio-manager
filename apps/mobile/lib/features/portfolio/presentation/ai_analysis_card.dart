@@ -852,19 +852,30 @@ class MobileResearchKeyLevel {
     required this.value,
     required this.type,
     required this.source,
+    required this.role,
+    required this.tone,
+    this.note,
   });
 
   final String label;
   final String value;
   final String type;
   final String source;
+  final String role;
+  final String tone;
+  final String? note;
 
   factory MobileResearchKeyLevel.fromJson(Map<String, dynamic> json) {
+    final type = json["type"] as String? ?? "VALUATION_ANCHOR";
+    final label = _friendlyAnalysisText(json["label"] as String? ?? "关键位");
     return MobileResearchKeyLevel(
-      label: _friendlyAnalysisText(json["label"] as String? ?? "关键位"),
+      label: label,
       value: _friendlyAnalysisText(json["value"] as String? ?? ""),
-      type: json["type"] as String? ?? "VALUATION_ANCHOR",
+      type: type,
       source: _friendlyAnalysisText(json["source"] as String? ?? ""),
+      role: json["role"] as String? ?? _fallbackKeyLevelRole(type, label),
+      tone: json["tone"] as String? ?? _fallbackKeyLevelTone(type, label),
+      note: _friendlyNullableText(json["note"] as String?),
     );
   }
 }
@@ -1359,7 +1370,10 @@ class _SecurityResearchProfileView extends StatelessWidget {
             data.entryTiming.marketPulseLabel != null)
           _AnalysisSection(
             title: "关键价位",
-            child: _EntryTimingView(data.entryTiming),
+            child: _EntryTimingView(
+              data.entryTiming,
+              showPosturePill: false,
+            ),
           ),
         if (evidence.isNotEmpty)
           ExpansionTile(
@@ -1579,30 +1593,55 @@ class _ValuationEvidenceView extends StatelessWidget {
 }
 
 class _EntryTimingView extends StatelessWidget {
-  const _EntryTimingView(this.data);
+  const _EntryTimingView(
+    this.data, {
+    this.showPosturePill = true,
+  });
 
   final MobileResearchEntryTiming data;
+  final bool showPosturePill;
 
   @override
   Widget build(BuildContext context) {
+    final evidenceLevels = data.keyLevels.take(8).toList();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: [
-            _MetaPill(_entryPostureLabel(
-              data.posture,
-              hasKeyLevels: data.keyLevels.isNotEmpty,
-            )),
-            if (data.marketPulseLabel != null)
-              _MetaPill(data.marketPulseLabel!),
-          ],
-        ),
         if (data.keyLevels.isNotEmpty) ...[
+          _KeyLevelPriceMapView(data.keyLevels),
           const SizedBox(height: 10),
-          ...data.keyLevels.take(6).map(_ResearchKeyLevelRow.new),
+        ],
+        if (showPosturePill || data.marketPulseLabel != null)
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              if (showPosturePill)
+                _MetaPill(_entryPostureLabel(
+                  data.posture,
+                  hasKeyLevels: data.keyLevels.isNotEmpty,
+                )),
+              if (data.marketPulseLabel != null)
+                _MetaPill(data.marketPulseLabel!),
+            ],
+          ),
+        if (evidenceLevels.isNotEmpty) ...[
+          const SizedBox(height: 10),
+          ExpansionTile(
+            tilePadding: EdgeInsets.zero,
+            dense: true,
+            initiallyExpanded: false,
+            title: Text("数据依据", style: Theme.of(context).textTheme.titleSmall),
+            childrenPadding: const EdgeInsets.only(bottom: 8),
+            children: [
+              Align(
+                alignment: Alignment.centerLeft,
+                child: Column(
+                  children: evidenceLevels.map(_ResearchKeyLevelRow.new).toList(),
+                ),
+              ),
+            ],
+          ),
         ],
       ],
     );
@@ -1723,6 +1762,92 @@ class _ResearchSanityCheckRow extends StatelessWidget {
             ].join("：")),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _KeyLevelPriceMapView extends StatelessWidget {
+  const _KeyLevelPriceMapView(this.levels);
+
+  final List<MobileResearchKeyLevel> levels;
+
+  @override
+  Widget build(BuildContext context) {
+    final visible = [
+      _pickKeyLevel(levels, ["current_price"]),
+      _pickKeyLevel(levels, ["pullback_zone", "deep_support"]),
+      _pickKeyLevel(levels, ["resistance"]),
+      _pickKeyLevel(levels, ["valuation_anchor", "range_reference"]),
+    ].whereType<MobileResearchKeyLevel>().toList();
+    if (visible.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final gap = constraints.maxWidth >= 360 ? 10.0 : 8.0;
+        final itemWidth = (constraints.maxWidth - gap) / 2;
+        return Wrap(
+          spacing: gap,
+          runSpacing: gap,
+          children: visible
+              .map((level) => SizedBox(
+                    width: itemWidth > 0 ? itemWidth : constraints.maxWidth,
+                    child: _KeyLevelMapTile(level),
+                  ))
+              .toList(),
+        );
+      },
+    );
+  }
+}
+
+class _KeyLevelMapTile extends StatelessWidget {
+  const _KeyLevelMapTile(this.level);
+
+  final MobileResearchKeyLevel level;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final color = _keyLevelToneColor(colorScheme, level.tone);
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        border: Border.all(color: color.withValues(alpha: 0.35)),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(11),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              _keyLevelRoleLabel(level),
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: color,
+                    fontWeight: FontWeight.w700,
+                  ),
+            ),
+            const SizedBox(height: 5),
+            Text(
+              level.value,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w800,
+                  ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              level.note ?? level.label,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -2487,6 +2612,62 @@ String _entryPostureLabel(String value, {bool hasKeyLevels = false}) {
     "portfolio_guardrail" => "组合护栏优先",
     "security_profile" => "标的事实",
     _ => hasKeyLevels ? "关键价位参考" : "资料不足",
+  };
+}
+
+String _fallbackKeyLevelRole(String type, String label) {
+  if (label.contains("收盘")) return "current_price";
+  if (type == "MA200") return "pullback_zone";
+  if (type == "52W_HIGH" || label.contains("高点")) return "resistance";
+  if (type == "52W_LOW" || label.contains("低点")) return "deep_support";
+  if (label.contains("目标价")) return "valuation_anchor";
+  if (label.contains("区间")) return "range_reference";
+  if (label.contains("脉搏")) return "sentiment_reference";
+  return "valuation_anchor";
+}
+
+String _fallbackKeyLevelTone(String type, String label) {
+  final role = _fallbackKeyLevelRole(type, label);
+  return switch (role) {
+    "resistance" => "caution",
+    "pullback_zone" || "deep_support" => "opportunity",
+    "valuation_anchor" => "target",
+    _ => "neutral",
+  };
+}
+
+MobileResearchKeyLevel? _pickKeyLevel(
+  List<MobileResearchKeyLevel> levels,
+  List<String> roles,
+) {
+  for (final role in roles) {
+    for (final level in levels) {
+      if (level.role == role) return level;
+    }
+  }
+  return null;
+}
+
+String _keyLevelRoleLabel(MobileResearchKeyLevel level) {
+  return switch (level.role) {
+    "current_price" => "当前价",
+    "resistance" => "上方压力",
+    "pullback_zone" => "回撤观察区",
+    "deep_support" => "深度低位",
+    "valuation_anchor" => "估值锚点",
+    "range_reference" => "历史区间",
+    "sentiment_reference" => "市场脉搏",
+    _ => level.label,
+  };
+}
+
+Color _keyLevelToneColor(ColorScheme colorScheme, String tone) {
+  return switch (tone) {
+    "caution" => colorScheme.tertiary,
+    "opportunity" => colorScheme.primary,
+    "target" => colorScheme.secondary,
+    "risk" => colorScheme.error,
+    _ => colorScheme.onSurfaceVariant,
   };
 }
 

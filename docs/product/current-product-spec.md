@@ -194,7 +194,9 @@ Current first pass:
 - Entry timing first pass uses cached-history key levels and valuation anchors
   only: MA200 when enough history exists, recent/52-week high-low, analyst
   target, 52-week range, and market pulse. It does not synthesize complex
-  support/resistance zones.
+  support/resistance zones. These raw levels must still be mapped into
+  user-facing roles (`当前价 / 回撤观察区 / 上方压力 / 估值锚点`) so the mobile
+  view reads like a price map rather than an evidence table.
 - Action plans now carry explicit priority/status/trigger/evidence fields so
   the UI can distinguish `ready`, `wait`, `blocked`, and `needs_data` without
   recalculating financial logic on the client. Portfolio-fit blockers retain

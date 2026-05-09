@@ -392,7 +392,17 @@ test("portfolio analyzer result preserves legacy fields while accepting research
       },
       entryTiming: {
         posture: "wait_for_confirmation",
-        keyLevels: [],
+        keyLevels: [
+          {
+            label: "MA200",
+            value: "USD 228.24",
+            type: "MA200",
+            source: "缓存价格历史",
+            role: "pullback_zone",
+            tone: "opportunity",
+            note: "中长线回撤观察区。",
+          },
+        ],
       },
       actionPlans: [],
       evidence: [],

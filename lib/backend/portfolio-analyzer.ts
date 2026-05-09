@@ -948,21 +948,34 @@ function buildSecurityResearchEntryTiming(args: {
       value: formatResearchPrice(latest, args.currency),
       type: "RECENT_HIGH",
       source: "缓存价格历史",
+      role: "current_price",
+      tone: "neutral",
+      note: "当前观察锚点，用来判断离压力位或回撤区有多远。",
     });
   }
 
   if (closes.length >= 2) {
+    const high = Math.max(...closes);
+    const low = Math.min(...closes);
     keyLevels.push({
       label: "52周/样本高点",
-      value: formatResearchPrice(Math.max(...closes), args.currency),
+      value: formatResearchPrice(high, args.currency),
       type: closes.length >= 200 ? "52W_HIGH" : "RECENT_HIGH",
       source: "缓存价格历史",
+      role: "resistance",
+      tone: latest !== undefined && high > 0 && latest / high >= 0.97 ? "caution" : "neutral",
+      note: latest !== undefined && high > 0 && latest / high >= 0.97
+        ? "当前价已接近上方压力区，更适合作为突破确认位，而不是低吸区。"
+        : "上方压力参考，接近时需要确认趋势和估值是否仍支持。",
     });
     keyLevels.push({
       label: "52周/样本低点",
-      value: formatResearchPrice(Math.min(...closes), args.currency),
+      value: formatResearchPrice(low, args.currency),
       type: closes.length >= 200 ? "52W_LOW" : "RECENT_LOW",
       source: "缓存价格历史",
+      role: "deep_support",
+      tone: "opportunity",
+      note: "深度回撤参考位，不等于自动买入价；需要结合基本面是否恶化。",
     });
   }
 
@@ -972,6 +985,9 @@ function buildSecurityResearchEntryTiming(args: {
       value: formatResearchPrice(sum(closes.slice(-200)) / 200, args.currency),
       type: "MA200",
       source: "缓存价格历史",
+      role: "pullback_zone",
+      tone: "opportunity",
+      note: "中长线回撤观察区，可作为分批或等待回落的第一层参考。",
     });
   }
 
@@ -981,11 +997,23 @@ function buildSecurityResearchEntryTiming(args: {
       anchor.label === "52周区间" ||
       anchor.label === "市场脉搏"
     ) {
+      const role = anchor.label === "分析师目标价"
+        ? "valuation_anchor"
+        : anchor.label === "52周区间"
+          ? "range_reference"
+          : "sentiment_reference";
       keyLevels.push({
         label: anchor.label,
         value: anchor.value,
         type: "VALUATION_ANCHOR",
         source: anchor.source,
+        role,
+        tone: role === "valuation_anchor" ? "target" : "neutral",
+        note: role === "valuation_anchor"
+          ? "外部共识锚点，只用于估值交叉验证，不是买入或卖出指令。"
+          : role === "range_reference"
+            ? "价格历史区间参考，用来判断当前位置是否偏高或偏低。"
+            : "市场情绪只作为低权重 timing 参考，不覆盖组合护栏。",
       });
     }
   }
@@ -999,6 +1027,9 @@ function buildSecurityResearchEntryTiming(args: {
       value: `${args.marketSentiment.strategyLabel} · ${args.marketSentiment.fgiScore}/100`,
       type: "VALUATION_ANCHOR",
       source: "缓存市场脉搏",
+      role: "sentiment_reference",
+      tone: "neutral",
+      note: "市场脉搏用于辅助判断分批节奏，不代表标的自身估值。",
     });
   }
 
