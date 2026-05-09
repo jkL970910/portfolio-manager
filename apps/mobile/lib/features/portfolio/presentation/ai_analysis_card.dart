@@ -1385,6 +1385,7 @@ class _ValuationEvidenceView extends StatelessWidget {
   Widget build(BuildContext context) {
     final anchors = data.anchors.take(6).toList();
     final checks = data.sanityChecks.take(3).toList();
+    final needsCachedProfile = data.method == "unavailable";
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1399,6 +1400,14 @@ class _ValuationEvidenceView extends StatelessWidget {
         if (data.summary.isNotEmpty) ...[
           const SizedBox(height: 10),
           Text(data.summary),
+        ],
+        if (needsCachedProfile) ...[
+          const SizedBox(height: 10),
+          const _InlineInfoCallout(
+            icon: Icons.badge_outlined,
+            title: "需要先缓存基本资料",
+            detail: "到本页下方的「刷新该标的资料」点击「基本资料」。后台任务完成后，再点「重新生成」即可看到估值锚点。",
+          ),
         ],
         if (anchors.isNotEmpty) ...[
           const SizedBox(height: 10),
@@ -1637,6 +1646,50 @@ class _ResearchValuePill extends StatelessWidget {
             Text(label, style: Theme.of(context).textTheme.bodySmall),
             const SizedBox(height: 2),
             Text(value, style: Theme.of(context).textTheme.titleSmall),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _InlineInfoCallout extends StatelessWidget {
+  const _InlineInfoCallout({
+    required this.icon,
+    required this.title,
+    required this.detail,
+  });
+
+  final IconData icon;
+  final String title;
+  final String detail;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: colorScheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: colorScheme.outlineVariant),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(icon, size: 18, color: colorScheme.primary),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(title, style: Theme.of(context).textTheme.titleSmall),
+                  const SizedBox(height: 4),
+                  Text(detail, style: Theme.of(context).textTheme.bodySmall),
+                ],
+              ),
+            ),
           ],
         ),
       ),

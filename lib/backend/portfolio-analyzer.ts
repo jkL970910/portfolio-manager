@@ -910,13 +910,13 @@ function buildSecurityResearchValuationEvidence(args: {
   return {
     method: "unavailable",
     confidence: "low",
-    summary: `${args.symbol} 的估值证据 provider 尚未接入；当前结论只使用组合适配、偏好、账户/税务和缓存行情，不声称已完成 DCF 或目标价判断。`,
+    summary: `${args.symbol} 尚未缓存可用的估值资料；当前结论只使用组合适配、偏好、账户/税务和缓存行情，不声称已完成 DCF 或目标价判断。可在标的详情页提交“基本资料”后台刷新，任务完成后重新生成快扫。`,
     anchors: [],
     sanityChecks: [
       {
         label: "估值证据",
         status: "unavailable",
-        detail: "P1.2 将接入 analyst consensus、估值倍数、历史分位等证据后再提高置信度。",
+        detail: "当前没有可用的缓存基本面/估值资料；提交“基本资料”刷新后，系统会尝试缓存 analyst consensus、估值倍数、52周区间等证据。",
       },
     ],
   };

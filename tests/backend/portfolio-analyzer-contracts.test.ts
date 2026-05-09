@@ -315,13 +315,13 @@ test("security research decision schema accepts evidence-led stock contract", ()
     valuationEvidence: {
       method: "unavailable",
       confidence: "low",
-      summary: "估值证据 provider 尚未接入。",
+      summary: "尚未缓存可用的估值资料。",
       anchors: [],
       sanityChecks: [
         {
           label: "估值证据",
           status: "unavailable",
-          detail: "P1.2 接入后再提高置信度。",
+          detail: "提交基本资料刷新后再提高置信度。",
         },
       ],
     },
@@ -386,7 +386,7 @@ test("portfolio analyzer result preserves legacy fields while accepting research
       valuationEvidence: {
         method: "unavailable",
         confidence: "low",
-        summary: "估值证据 provider 尚未接入。",
+        summary: "尚未缓存可用的估值资料。",
         anchors: [],
         sanityChecks: [],
       },
