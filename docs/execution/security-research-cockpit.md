@@ -241,9 +241,15 @@ architecture boundaries before coding the next feature:
      history lowers confidence / confirmation requirements but does not block a
      valuation-backed candidate plan by itself.
 7. `P1.5 Flutter Research Cockpit UI`
+   - Status: first pass implemented on 2026-05-09.
    - Render verdict, veto/guardrails, valuation evidence, key levels, action
      plans, evidence freshness, and optional GPT explanation.
    - Keep the first fold compact and decision-first.
+   - Current implementation parses `securityResearchDecision` in Flutter and
+     renders dedicated sections for research conclusion, action plans,
+     valuation evidence, key levels, portfolio fit, guardrails, and research
+     evidence while preserving the legacy quick-scan renderer for non-security
+     scopes.
 8. `P1.6 Minister / Quick Scan Integration`
    - 大臣 can explain the current research decision and answer follow-up
      questions using cached context.

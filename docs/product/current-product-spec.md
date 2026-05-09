@@ -194,6 +194,10 @@ Current first pass:
   the UI can distinguish `ready`, `wait`, `blocked`, and `needs_data` without
   recalculating financial logic on the client. Portfolio-fit blockers retain
   veto precedence over attractive valuation evidence.
+- Flutter Security Detail now parses and renders this research decision as
+  dedicated `研究结论 / 行动计划 / 估值证据 / 关键价位 / 组合适配 / 主要护栏 /
+  研究证据` sections. Portfolio/account/recommendation smart scans keep the
+  legacy renderer until their own contracts are upgraded.
 - Page load remains cache-only; new provider documents can invalidate old
   quick-scan cache entries so evidence is refreshed without live Flutter calls.
 
@@ -364,9 +368,9 @@ Monarch-like transaction visibility, but this is not current P0.
 
 1. Mobile UI / IA v2 implementation from the approved Figma design.
 2. Security Research Cockpit / 估值证据链 implementation:
-   `SecurityResearchDecision` DTO first pass is implemented; next work is
-   valuation evidence, ETF macro proxy depth, entry key levels, action-plan
-   orchestration, and Flutter research UI.
+   backend DTO, valuation evidence, ETF macro proxy, entry key levels,
+   action-plan orchestration, and Flutter research UI first passes are
+   implemented; next work is manual QA, visual polish, and deeper provider data.
 3. AlphaPick screenshot ingestion as a reviewed OCR/import pipeline.
 4. IBKR Flex Query import and Wealthsimple/SnapTrade feasibility spike under the
    unified `券商同步` flow.

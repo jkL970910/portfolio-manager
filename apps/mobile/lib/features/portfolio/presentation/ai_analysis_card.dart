@@ -354,6 +354,7 @@ class MobileAiAnalysisResult {
     required this.thesis,
     required this.confidence,
     required this.securityDecision,
+    required this.securityResearchDecision,
     required this.scorecards,
     required this.risks,
     required this.taxNotes,
@@ -376,6 +377,7 @@ class MobileAiAnalysisResult {
   final String thesis;
   final String confidence;
   final MobileAiSecurityDecision? securityDecision;
+  final MobileSecurityResearchDecision? securityResearchDecision;
   final List<MobileAiScorecard> scorecards;
   final List<MobileAiRisk> risks;
   final List<String> taxNotes;
@@ -405,6 +407,11 @@ class MobileAiAnalysisResult {
           ? MobileAiSecurityDecision.fromJson(
               json["securityDecision"] as Map<String, dynamic>)
           : null,
+      securityResearchDecision:
+          json["securityResearchDecision"] is Map<String, dynamic>
+              ? MobileSecurityResearchDecision.fromJson(
+                  json["securityResearchDecision"] as Map<String, dynamic>)
+              : null,
       scorecards: _readMapList(json["scorecards"])
           .map(MobileAiScorecard.fromJson)
           .toList(),
@@ -560,6 +567,307 @@ class MobileAiPrimaryAction {
       priority: json["priority"] as String? ?? "P1",
       label: _friendlyAnalysisText(json["label"] as String? ?? "保持观察"),
       detail: _friendlyAnalysisText(json["detail"] as String? ?? ""),
+    );
+  }
+}
+
+class MobileSecurityResearchDecision {
+  const MobileSecurityResearchDecision({
+    required this.decisionLabel,
+    required this.confidenceScore,
+    required this.primaryReason,
+    required this.assetType,
+    required this.vetoedBy,
+    required this.guardrails,
+    required this.portfolioFit,
+    required this.valuationEvidence,
+    required this.entryTiming,
+    required this.actionPlans,
+    required this.evidence,
+  });
+
+  final String decisionLabel;
+  final double? confidenceScore;
+  final String primaryReason;
+  final String assetType;
+  final List<String> vetoedBy;
+  final List<MobileResearchGuardrail> guardrails;
+  final MobileResearchPortfolioFit portfolioFit;
+  final MobileResearchValuationEvidence valuationEvidence;
+  final MobileResearchEntryTiming entryTiming;
+  final List<MobileResearchActionPlan> actionPlans;
+  final List<MobileResearchEvidence> evidence;
+
+  factory MobileSecurityResearchDecision.fromJson(Map<String, dynamic> json) {
+    final decision = _readMap(json["decision"]);
+    final security = _readMap(json["security"]);
+    return MobileSecurityResearchDecision(
+      decisionLabel:
+          _friendlyAnalysisText(decision["label"] as String? ?? "保持观察"),
+      confidenceScore: decision["confidenceScore"] is num
+          ? (decision["confidenceScore"] as num).toDouble().clamp(0, 100)
+          : null,
+      primaryReason:
+          _friendlyAnalysisText(decision["primaryReason"] as String? ?? ""),
+      assetType: security["assetType"] as String? ?? "other",
+      vetoedBy: _readStringList(decision["vetoedBy"]),
+      guardrails: _readMapList(json["guardrails"])
+          .map(MobileResearchGuardrail.fromJson)
+          .toList(),
+      portfolioFit:
+          MobileResearchPortfolioFit.fromJson(_readMap(json["portfolioFit"])),
+      valuationEvidence: MobileResearchValuationEvidence.fromJson(
+          _readMap(json["valuationEvidence"])),
+      entryTiming:
+          MobileResearchEntryTiming.fromJson(_readMap(json["entryTiming"])),
+      actionPlans: _readMapList(json["actionPlans"])
+          .map(MobileResearchActionPlan.fromJson)
+          .toList(),
+      evidence: _readMapList(json["evidence"])
+          .map(MobileResearchEvidence.fromJson)
+          .toList(),
+    );
+  }
+}
+
+class MobileResearchGuardrail {
+  const MobileResearchGuardrail({
+    required this.severity,
+    required this.title,
+    required this.detail,
+  });
+
+  final String severity;
+  final String title;
+  final String detail;
+
+  factory MobileResearchGuardrail.fromJson(Map<String, dynamic> json) {
+    return MobileResearchGuardrail(
+      severity: json["severity"] as String? ?? "info",
+      title: _friendlyAnalysisText(json["title"] as String? ?? "护栏"),
+      detail: _friendlyAnalysisText(json["detail"] as String? ?? ""),
+    );
+  }
+}
+
+class MobileResearchPortfolioFit {
+  const MobileResearchPortfolioFit({
+    required this.score,
+    required this.sleeve,
+    required this.targetGapLabel,
+    required this.currentExposureLabel,
+    required this.duplicateExposureLabel,
+    required this.accountTaxFitLabel,
+    required this.liquidityFitLabel,
+  });
+
+  final double? score;
+  final String sleeve;
+  final String targetGapLabel;
+  final String currentExposureLabel;
+  final String? duplicateExposureLabel;
+  final String? accountTaxFitLabel;
+  final String? liquidityFitLabel;
+
+  factory MobileResearchPortfolioFit.fromJson(Map<String, dynamic> json) {
+    return MobileResearchPortfolioFit(
+      score: json["score"] is num
+          ? (json["score"] as num).toDouble().clamp(0, 100)
+          : null,
+      sleeve: _friendlyAnalysisText(json["sleeve"] as String? ?? "组合"),
+      targetGapLabel:
+          _friendlyAnalysisText(json["targetGapLabel"] as String? ?? ""),
+      currentExposureLabel:
+          _friendlyAnalysisText(json["currentExposureLabel"] as String? ?? ""),
+      duplicateExposureLabel:
+          _friendlyNullableText(json["duplicateExposureLabel"] as String?),
+      accountTaxFitLabel:
+          _friendlyNullableText(json["accountTaxFitLabel"] as String?),
+      liquidityFitLabel:
+          _friendlyNullableText(json["liquidityFitLabel"] as String?),
+    );
+  }
+}
+
+class MobileResearchValuationEvidence {
+  const MobileResearchValuationEvidence({
+    required this.method,
+    required this.confidence,
+    required this.summary,
+    required this.anchors,
+    required this.sanityChecks,
+  });
+
+  final String method;
+  final String confidence;
+  final String summary;
+  final List<MobileResearchAnchor> anchors;
+  final List<MobileResearchSanityCheck> sanityChecks;
+
+  factory MobileResearchValuationEvidence.fromJson(Map<String, dynamic> json) {
+    return MobileResearchValuationEvidence(
+      method: json["method"] as String? ?? "unavailable",
+      confidence: json["confidence"] as String? ?? "low",
+      summary: _friendlyAnalysisText(json["summary"] as String? ?? ""),
+      anchors: _readMapList(json["anchors"])
+          .map(MobileResearchAnchor.fromJson)
+          .toList(),
+      sanityChecks: _readMapList(json["sanityChecks"])
+          .map(MobileResearchSanityCheck.fromJson)
+          .toList(),
+    );
+  }
+}
+
+class MobileResearchAnchor {
+  const MobileResearchAnchor({
+    required this.label,
+    required this.value,
+    required this.source,
+  });
+
+  final String label;
+  final String value;
+  final String source;
+
+  factory MobileResearchAnchor.fromJson(Map<String, dynamic> json) {
+    return MobileResearchAnchor(
+      label: _friendlyAnalysisText(json["label"] as String? ?? "证据"),
+      value: _friendlyAnalysisText(json["value"] as String? ?? ""),
+      source: _friendlyAnalysisText(json["source"] as String? ?? ""),
+    );
+  }
+}
+
+class MobileResearchSanityCheck {
+  const MobileResearchSanityCheck({
+    required this.label,
+    required this.status,
+    required this.detail,
+  });
+
+  final String label;
+  final String status;
+  final String detail;
+
+  factory MobileResearchSanityCheck.fromJson(Map<String, dynamic> json) {
+    return MobileResearchSanityCheck(
+      label: _friendlyAnalysisText(json["label"] as String? ?? "校验"),
+      status: json["status"] as String? ?? "unavailable",
+      detail: _friendlyAnalysisText(json["detail"] as String? ?? ""),
+    );
+  }
+}
+
+class MobileResearchEntryTiming {
+  const MobileResearchEntryTiming({
+    required this.posture,
+    required this.keyLevels,
+    required this.marketPulseLabel,
+  });
+
+  final String posture;
+  final List<MobileResearchKeyLevel> keyLevels;
+  final String? marketPulseLabel;
+
+  factory MobileResearchEntryTiming.fromJson(Map<String, dynamic> json) {
+    return MobileResearchEntryTiming(
+      posture: json["posture"] as String? ?? "not_applicable",
+      keyLevels: _readMapList(json["keyLevels"])
+          .map(MobileResearchKeyLevel.fromJson)
+          .toList(),
+      marketPulseLabel:
+          _friendlyNullableText(json["marketPulseLabel"] as String?),
+    );
+  }
+}
+
+class MobileResearchKeyLevel {
+  const MobileResearchKeyLevel({
+    required this.label,
+    required this.value,
+    required this.type,
+    required this.source,
+  });
+
+  final String label;
+  final String value;
+  final String type;
+  final String source;
+
+  factory MobileResearchKeyLevel.fromJson(Map<String, dynamic> json) {
+    return MobileResearchKeyLevel(
+      label: _friendlyAnalysisText(json["label"] as String? ?? "关键位"),
+      value: _friendlyAnalysisText(json["value"] as String? ?? ""),
+      type: json["type"] as String? ?? "VALUATION_ANCHOR",
+      source: _friendlyAnalysisText(json["source"] as String? ?? ""),
+    );
+  }
+}
+
+class MobileResearchActionPlan {
+  const MobileResearchActionPlan({
+    required this.type,
+    required this.title,
+    required this.detail,
+    required this.isBlockedByPortfolioFit,
+    required this.priority,
+    required this.status,
+    required this.triggerLabel,
+    required this.evidenceLabels,
+    required this.requiredConfirmations,
+  });
+
+  final String type;
+  final String title;
+  final String detail;
+  final bool isBlockedByPortfolioFit;
+  final String priority;
+  final String status;
+  final String? triggerLabel;
+  final List<String> evidenceLabels;
+  final List<String> requiredConfirmations;
+
+  factory MobileResearchActionPlan.fromJson(Map<String, dynamic> json) {
+    return MobileResearchActionPlan(
+      type: json["type"] as String? ?? "watch_only",
+      title: _friendlyAnalysisText(json["title"] as String? ?? "行动计划"),
+      detail: _friendlyAnalysisText(json["detail"] as String? ?? ""),
+      isBlockedByPortfolioFit: json["isBlockedByPortfolioFit"] == true,
+      priority: json["priority"] as String? ?? "P1",
+      status: json["status"] as String? ?? "wait",
+      triggerLabel: _friendlyNullableText(json["triggerLabel"] as String?),
+      evidenceLabels: _readStringList(json["evidenceLabels"])
+          .map(_friendlyAnalysisText)
+          .toList(),
+      requiredConfirmations: _readStringList(json["requiredConfirmations"])
+          .map(_friendlyAnalysisText)
+          .toList(),
+    );
+  }
+}
+
+class MobileResearchEvidence {
+  const MobileResearchEvidence({
+    required this.source,
+    required this.sourceType,
+    required this.freshnessLabel,
+    required this.reliabilityLabel,
+  });
+
+  final String source;
+  final String sourceType;
+  final String freshnessLabel;
+  final String reliabilityLabel;
+
+  factory MobileResearchEvidence.fromJson(Map<String, dynamic> json) {
+    return MobileResearchEvidence(
+      source: _friendlyAnalysisText(json["source"] as String? ?? "证据"),
+      sourceType: json["sourceType"] as String? ?? "portfolio",
+      freshnessLabel:
+          _friendlyAnalysisText(json["freshnessLabel"] as String? ?? "部分可用"),
+      reliabilityLabel: _friendlyAnalysisText(
+          json["reliabilityLabel"] as String? ?? "medium"),
     );
   }
 }
@@ -747,6 +1055,8 @@ class _AnalysisResultView extends StatelessWidget {
   Widget build(BuildContext context) {
     final labels = _AnalysisScopeLabels.forScope(data.scope);
     final securityDecision = data.securityDecision;
+    final researchDecision = data.securityResearchDecision;
+    final showLegacySecuritySections = researchDecision == null;
     final visibleActionItems = _dedupeActionItems(data.actionItems);
     final visibleFit = _dedupeStrings(
       securityDecision?.portfolioFit.isNotEmpty == true
@@ -784,7 +1094,11 @@ class _AnalysisResultView extends StatelessWidget {
             title: "当前结论",
             child: _PrimaryActionCard(securityDecision!.primaryAction!),
           ),
-        if (securityDecision != null && securityDecision.whyNow.isNotEmpty)
+        if (researchDecision != null)
+          _SecurityResearchDecisionView(researchDecision),
+        if (showLegacySecuritySections &&
+            securityDecision != null &&
+            securityDecision.whyNow.isNotEmpty)
           _AnalysisSection(
             title: "为什么现在看",
             child: Column(
@@ -792,7 +1106,9 @@ class _AnalysisResultView extends StatelessWidget {
               children: securityDecision.whyNow.take(4).map(_bullet).toList(),
             ),
           ),
-        if (securityDecision != null && securityDecision.keyBlockers.isNotEmpty)
+        if (showLegacySecuritySections &&
+            securityDecision != null &&
+            securityDecision.keyBlockers.isNotEmpty)
           _AnalysisSection(
             title: "主要护栏",
             child: Column(
@@ -801,7 +1117,8 @@ class _AnalysisResultView extends StatelessWidget {
                   securityDecision.keyBlockers.take(4).map(_bullet).toList(),
             ),
           ),
-        if (securityDecision != null &&
+        if (showLegacySecuritySections &&
+            securityDecision != null &&
             securityDecision.decisionGates.isNotEmpty)
           _AnalysisSection(
             title: "判断前提",
@@ -811,12 +1128,13 @@ class _AnalysisResultView extends StatelessWidget {
                   securityDecision.decisionGates.take(4).map(_bullet).toList(),
             ),
           ),
-        if (securityDecision?.positionSizingIdea != null)
+        if (showLegacySecuritySections &&
+            securityDecision?.positionSizingIdea != null)
           _AnalysisSection(
             title: "仓位思路",
             child: Text(securityDecision!.positionSizingIdea!),
           ),
-        if (visibleActionItems.isNotEmpty)
+        if (showLegacySecuritySections && visibleActionItems.isNotEmpty)
           _AnalysisSection(
             title: labels.actions,
             child: Column(
@@ -824,7 +1142,7 @@ class _AnalysisResultView extends StatelessWidget {
               children: visibleActionItems.take(4).map(_ActionRow.new).toList(),
             ),
           ),
-        if (data.risks.isNotEmpty)
+        if (showLegacySecuritySections && data.risks.isNotEmpty)
           _AnalysisSection(
             title: "风险护栏",
             child: Column(
@@ -841,7 +1159,7 @@ class _AnalysisResultView extends StatelessWidget {
             ),
           ),
         ],
-        if (visibleFit.isNotEmpty)
+        if (showLegacySecuritySections && visibleFit.isNotEmpty)
           _AnalysisSection(
             title: labels.fit,
             child: Column(
@@ -849,7 +1167,8 @@ class _AnalysisResultView extends StatelessWidget {
               children: visibleFit.take(4).map(_bullet).toList(),
             ),
           ),
-        if (securityDecision != null &&
+        if (showLegacySecuritySections &&
+            securityDecision != null &&
             securityDecision.watchlistTriggers.isNotEmpty)
           _AnalysisSection(
             title: "观察触发点",
@@ -861,7 +1180,9 @@ class _AnalysisResultView extends StatelessWidget {
                   .toList(),
             ),
           ),
-        if (securityDecision != null && securityDecision.nextSteps.isNotEmpty)
+        if (showLegacySecuritySections &&
+            securityDecision != null &&
+            securityDecision.nextSteps.isNotEmpty)
           _AnalysisSection(
             title: "确认事项",
             child: Column(
@@ -870,7 +1191,7 @@ class _AnalysisResultView extends StatelessWidget {
                   securityDecision.nextSteps.take(4).map(_bullet).toList(),
             ),
           ),
-        if (securityDecision?.boundary != null)
+        if (showLegacySecuritySections && securityDecision?.boundary != null)
           _AnalysisSection(
             title: "边界说明",
             child: Text(
@@ -917,6 +1238,428 @@ class _AnalysisResultView extends StatelessWidget {
         const SizedBox(height: 8),
         Text(data.disclaimerZh, style: Theme.of(context).textTheme.bodySmall),
       ],
+    );
+  }
+}
+
+class _SecurityResearchDecisionView extends StatelessWidget {
+  const _SecurityResearchDecisionView(this.data);
+
+  final MobileSecurityResearchDecision data;
+
+  @override
+  Widget build(BuildContext context) {
+    final guardrails = data.guardrails.take(4).toList();
+    final actionPlans = data.actionPlans.take(3).toList();
+    final fitLines = [
+      data.portfolioFit.targetGapLabel,
+      data.portfolioFit.currentExposureLabel,
+      if (data.portfolioFit.duplicateExposureLabel != null)
+        data.portfolioFit.duplicateExposureLabel!,
+      if (data.portfolioFit.accountTaxFitLabel != null)
+        data.portfolioFit.accountTaxFitLabel!,
+      if (data.portfolioFit.liquidityFitLabel != null)
+        data.portfolioFit.liquidityFitLabel!,
+    ].where((item) => item.trim().isNotEmpty).toList();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _AnalysisSection(
+          title: "研究结论",
+          child: _ResearchDecisionHeader(data),
+        ),
+        if (actionPlans.isNotEmpty)
+          _AnalysisSection(
+            title: "行动计划",
+            child: Column(
+              children: actionPlans
+                  .map((plan) => Padding(
+                        padding: const EdgeInsets.only(bottom: 10),
+                        child: _ResearchActionPlanCard(plan),
+                      ))
+                  .toList(),
+            ),
+          ),
+        _AnalysisSection(
+          title: "估值证据",
+          child: _ValuationEvidenceView(data.valuationEvidence),
+        ),
+        if (data.entryTiming.keyLevels.isNotEmpty ||
+            data.entryTiming.marketPulseLabel != null)
+          _AnalysisSection(
+            title: "关键价位",
+            child: _EntryTimingView(data.entryTiming),
+          ),
+        if (fitLines.isNotEmpty)
+          _AnalysisSection(
+            title: "组合适配",
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: fitLines.take(5).map(_bullet).toList(),
+            ),
+          ),
+        if (guardrails.isNotEmpty)
+          _AnalysisSection(
+            title: "主要护栏",
+            child: Column(
+              children: guardrails
+                  .map((guardrail) => _ResearchGuardrailRow(guardrail))
+                  .toList(),
+            ),
+          ),
+        if (data.evidence.isNotEmpty)
+          ExpansionTile(
+            tilePadding: EdgeInsets.zero,
+            initiallyExpanded: false,
+            title: Text("研究证据", style: Theme.of(context).textTheme.titleSmall),
+            childrenPadding: const EdgeInsets.only(bottom: 12),
+            children: [
+              Align(
+                alignment: Alignment.centerLeft,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: data.evidence
+                      .take(5)
+                      .map(_ResearchEvidenceRow.new)
+                      .toList(),
+                ),
+              ),
+            ],
+          ),
+      ],
+    );
+  }
+}
+
+class _ResearchDecisionHeader extends StatelessWidget {
+  const _ResearchDecisionHeader(this.data);
+
+  final MobileSecurityResearchDecision data;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.primaryContainer,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                _MetaPill(data.decisionLabel),
+                _MetaPill(_assetTypeLabel(data.assetType)),
+                if (data.confidenceScore != null)
+                  _MetaPill("可信度 ${data.confidenceScore!.round()}"),
+                if (data.vetoedBy.isNotEmpty)
+                  _MetaPill("护栏 ${data.vetoedBy.length}"),
+              ],
+            ),
+            if (data.primaryReason.isNotEmpty) ...[
+              const SizedBox(height: 10),
+              Text(
+                data.primaryReason,
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.onPrimaryContainer,
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ValuationEvidenceView extends StatelessWidget {
+  const _ValuationEvidenceView(this.data);
+
+  final MobileResearchValuationEvidence data;
+
+  @override
+  Widget build(BuildContext context) {
+    final anchors = data.anchors.take(6).toList();
+    final checks = data.sanityChecks.take(3).toList();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            _MetaPill(_valuationMethodLabel(data.method)),
+            _MetaPill("置信 ${_confidenceLabel(data.confidence)}"),
+          ],
+        ),
+        if (data.summary.isNotEmpty) ...[
+          const SizedBox(height: 10),
+          Text(data.summary),
+        ],
+        if (anchors.isNotEmpty) ...[
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: anchors
+                .map((anchor) => _ResearchValuePill(
+                      label: anchor.label,
+                      value: anchor.value,
+                    ))
+                .toList(),
+          ),
+        ],
+        if (checks.isNotEmpty) ...[
+          const SizedBox(height: 10),
+          ...checks.map(_ResearchSanityCheckRow.new),
+        ],
+      ],
+    );
+  }
+}
+
+class _EntryTimingView extends StatelessWidget {
+  const _EntryTimingView(this.data);
+
+  final MobileResearchEntryTiming data;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            _MetaPill(_entryPostureLabel(data.posture)),
+            if (data.marketPulseLabel != null)
+              _MetaPill(data.marketPulseLabel!),
+          ],
+        ),
+        if (data.keyLevels.isNotEmpty) ...[
+          const SizedBox(height: 10),
+          ...data.keyLevels.take(6).map(_ResearchKeyLevelRow.new),
+        ],
+      ],
+    );
+  }
+}
+
+class _ResearchActionPlanCard extends StatelessWidget {
+  const _ResearchActionPlanCard(this.plan);
+
+  final MobileResearchActionPlan plan;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final statusColor = switch (plan.status) {
+      "ready" => colorScheme.primary,
+      "blocked" => colorScheme.error,
+      "needs_data" => colorScheme.tertiary,
+      _ => colorScheme.secondary,
+    };
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        border: Border.all(color: colorScheme.outlineVariant),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(Icons.route, size: 18, color: statusColor),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(plan.title,
+                      style: Theme.of(context).textTheme.titleSmall),
+                ),
+                _SmallStatusPill(_actionStatusLabel(plan.status)),
+              ],
+            ),
+            if (plan.detail.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Text(plan.detail),
+            ],
+            if (plan.triggerLabel != null) ...[
+              const SizedBox(height: 8),
+              Text("触发：${plan.triggerLabel!}",
+                  style: Theme.of(context).textTheme.bodySmall),
+            ],
+            if (plan.evidenceLabels.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 6,
+                runSpacing: 6,
+                children: plan.evidenceLabels
+                    .take(4)
+                    .map((label) => _SmallStatusPill(label))
+                    .toList(),
+              ),
+            ],
+            if (plan.requiredConfirmations.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              ...plan.requiredConfirmations.take(3).map(_bullet),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ResearchGuardrailRow extends StatelessWidget {
+  const _ResearchGuardrailRow(this.guardrail);
+
+  final MobileResearchGuardrail guardrail;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _SeverityDot(_guardrailSeverityToRisk(guardrail.severity)),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text([
+              guardrail.title,
+              if (guardrail.detail.isNotEmpty) guardrail.detail,
+            ].join("：")),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ResearchSanityCheckRow extends StatelessWidget {
+  const _ResearchSanityCheckRow(this.check);
+
+  final MobileResearchSanityCheck check;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _SmallStatusPill(_sanityStatusLabel(check.status)),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text([
+              check.label,
+              if (check.detail.isNotEmpty) check.detail,
+            ].join("：")),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ResearchKeyLevelRow extends StatelessWidget {
+  const _ResearchKeyLevelRow(this.level);
+
+  final MobileResearchKeyLevel level;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        children: [
+          Expanded(child: Text(level.label)),
+          const SizedBox(width: 10),
+          Text(level.value, style: Theme.of(context).textTheme.titleSmall),
+        ],
+      ),
+    );
+  }
+}
+
+class _ResearchEvidenceRow extends StatelessWidget {
+  const _ResearchEvidenceRow(this.item);
+
+  final MobileResearchEvidence item;
+
+  @override
+  Widget build(BuildContext context) {
+    final meta = [
+      _researchSourceTypeLabel(item.sourceType),
+      _freshnessStatusLabel(item.freshnessLabel),
+      _confidenceLabel(item.reliabilityLabel),
+    ].join(" · ");
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(item.source, style: Theme.of(context).textTheme.titleSmall),
+          const SizedBox(height: 3),
+          Text(meta, style: Theme.of(context).textTheme.bodySmall),
+        ],
+      ),
+    );
+  }
+}
+
+class _ResearchValuePill extends StatelessWidget {
+  const _ResearchValuePill({required this.label, required this.value});
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(label, style: Theme.of(context).textTheme.bodySmall),
+            const SizedBox(height: 2),
+            Text(value, style: Theme.of(context).textTheme.titleSmall),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SmallStatusPill extends StatelessWidget {
+  const _SmallStatusPill(this.label);
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        child: Text(label, style: Theme.of(context).textTheme.labelSmall),
+      ),
     );
   }
 }
@@ -1510,5 +2253,72 @@ String _sourceModeLabel(String value) {
     "cached-external" => "已保存资料",
     "derived" => "规则派生",
     _ => "基础快扫",
+  };
+}
+
+String _assetTypeLabel(String value) {
+  return switch (value) {
+    "stock" => "股票",
+    "etf" => "ETF",
+    "fund" => "基金",
+    "cash" => "现金",
+    _ => "其他资产",
+  };
+}
+
+String _valuationMethodLabel(String value) {
+  return switch (value) {
+    "multiples_evidence" => "倍数证据",
+    "analyst_consensus" => "分析师共识",
+    "dcf_reference" => "DCF 参考",
+    "etf_macro_proxy" => "ETF 宏观代理",
+    _ => "估值资料不足",
+  };
+}
+
+String _entryPostureLabel(String value) {
+  return switch (value) {
+    "consider_now" => "可继续确认",
+    "wait_for_pullback" => "等待回撤",
+    "wait_for_confirmation" => "等待确认",
+    _ => "暂不适用",
+  };
+}
+
+String _actionStatusLabel(String value) {
+  return switch (value) {
+    "ready" => "可执行前确认",
+    "blocked" => "被护栏阻断",
+    "needs_data" => "需补资料",
+    _ => "等待",
+  };
+}
+
+String _sanityStatusLabel(String value) {
+  return switch (value) {
+    "pass" => "通过",
+    "watch" => "观察",
+    "fail" => "不通过",
+    _ => "缺资料",
+  };
+}
+
+String _researchSourceTypeLabel(String value) {
+  return switch (value) {
+    "quote" => "行情",
+    "history" => "历史价格",
+    "fundamental" => "基本面",
+    "macro" => "宏观",
+    "preference" => "偏好",
+    "external_research" => "外部资料",
+    _ => "组合资料",
+  };
+}
+
+String _guardrailSeverityToRisk(String value) {
+  return switch (value) {
+    "blocker" => "high",
+    "warning" => "medium",
+    _ => "info",
   };
 }
