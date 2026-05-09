@@ -1543,7 +1543,11 @@ class _ValuationEvidenceView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final anchors = data.anchors.take(6).toList();
+    final primaryAnchors = _primaryValuationAnchors(data.anchors);
+    final remainingAnchors = data.anchors
+        .where((anchor) => !primaryAnchors.contains(anchor))
+        .take(6)
+        .toList();
     final checks = data.sanityChecks.take(3).toList();
     final needsCachedProfile = data.method == "unavailable";
     return Column(
@@ -1557,9 +1561,16 @@ class _ValuationEvidenceView extends StatelessWidget {
             _MetaPill("置信 ${_confidenceLabel(data.confidence)}"),
           ],
         ),
+        if (primaryAnchors.isNotEmpty) ...[
+          const SizedBox(height: 10),
+          _ValuationAnchorGrid(primaryAnchors),
+        ],
         if (data.summary.isNotEmpty) ...[
           const SizedBox(height: 10),
-          Text(data.summary),
+          _CompactResearchNote(
+            title: "证据解读",
+            text: data.summary,
+          ),
         ],
         if (needsCachedProfile) ...[
           const SizedBox(height: 10),
@@ -1570,22 +1581,48 @@ class _ValuationEvidenceView extends StatelessWidget {
                 "到本页下方的「刷新该标的资料」提交「基本资料」或「财报资料」。任务完成并写入缓存后，再点「重新生成」即可看到估值锚点。",
           ),
         ],
-        if (anchors.isNotEmpty) ...[
+        if (remainingAnchors.isNotEmpty) ...[
           const SizedBox(height: 10),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: anchors
-                .map((anchor) => _ResearchValuePill(
-                      label: anchor.label,
-                      value: anchor.value,
-                    ))
-                .toList(),
+          ExpansionTile(
+            tilePadding: EdgeInsets.zero,
+            dense: true,
+            initiallyExpanded: false,
+            title: Text("更多估值数据", style: Theme.of(context).textTheme.titleSmall),
+            childrenPadding: const EdgeInsets.only(bottom: 8),
+            children: [
+              Align(
+                alignment: Alignment.centerLeft,
+                child: Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: remainingAnchors
+                      .map((anchor) => _ResearchValuePill(
+                            label: anchor.label,
+                            value: anchor.value,
+                          ))
+                      .toList(),
+                ),
+              ),
+            ],
           ),
         ],
         if (checks.isNotEmpty) ...[
           const SizedBox(height: 10),
-          ...checks.map(_ResearchSanityCheckRow.new),
+          ExpansionTile(
+            tilePadding: EdgeInsets.zero,
+            dense: true,
+            initiallyExpanded: false,
+            title: Text("校验依据", style: Theme.of(context).textTheme.titleSmall),
+            childrenPadding: const EdgeInsets.only(bottom: 8),
+            children: [
+              Align(
+                alignment: Alignment.centerLeft,
+                child: Column(
+                  children: checks.map(_ResearchSanityCheckRow.new).toList(),
+                ),
+              ),
+            ],
+          ),
         ],
       ],
     );
@@ -1762,6 +1799,121 @@ class _ResearchSanityCheckRow extends StatelessWidget {
             ].join("：")),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _ValuationAnchorGrid extends StatelessWidget {
+  const _ValuationAnchorGrid(this.anchors);
+
+  final List<MobileResearchAnchor> anchors;
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final gap = constraints.maxWidth >= 360 ? 10.0 : 8.0;
+        final itemWidth = (constraints.maxWidth - gap) / 2;
+        return Wrap(
+          spacing: gap,
+          runSpacing: gap,
+          children: anchors
+              .map((anchor) => SizedBox(
+                    width: itemWidth > 0 ? itemWidth : constraints.maxWidth,
+                    child: _ValuationAnchorTile(anchor),
+                  ))
+              .toList(),
+        );
+      },
+    );
+  }
+}
+
+class _ValuationAnchorTile extends StatelessWidget {
+  const _ValuationAnchorTile(this.anchor);
+
+  final MobileResearchAnchor anchor;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final color = _valuationAnchorColor(colorScheme, anchor.label);
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.10),
+        border: Border.all(color: color.withValues(alpha: 0.28)),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(11),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              _valuationAnchorLabel(anchor.label),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: color,
+                    fontWeight: FontWeight.w700,
+                  ),
+            ),
+            const SizedBox(height: 5),
+            Text(
+              anchor.value,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w800,
+                  ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              _valuationAnchorHint(anchor.label),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _CompactResearchNote extends StatelessWidget {
+  const _CompactResearchNote({
+    required this.title,
+    required this.text,
+  });
+
+  final String title;
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.55),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(title, style: Theme.of(context).textTheme.titleSmall),
+            const SizedBox(height: 5),
+            Text(
+              text,
+              maxLines: 4,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -2624,6 +2776,73 @@ String _fallbackKeyLevelRole(String type, String label) {
   if (label.contains("区间")) return "range_reference";
   if (label.contains("脉搏")) return "sentiment_reference";
   return "valuation_anchor";
+}
+
+List<MobileResearchAnchor> _primaryValuationAnchors(
+  List<MobileResearchAnchor> anchors,
+) {
+  final picked = <MobileResearchAnchor>[];
+  void add(List<String> labels) {
+    final anchor = _pickValuationAnchor(anchors, labels);
+    if (anchor != null && !picked.contains(anchor)) {
+      picked.add(anchor);
+    }
+  }
+
+  add(["分析师目标价"]);
+  add(["市盈率", "Forward P/E"]);
+  add(["52周区间"]);
+  add(["Beta"]);
+  add(["市值"]);
+  add(["PEG", "市净率", "分红/收益率", "费用率"]);
+  return picked.take(6).toList();
+}
+
+MobileResearchAnchor? _pickValuationAnchor(
+  List<MobileResearchAnchor> anchors,
+  List<String> labels,
+) {
+  for (final label in labels) {
+    for (final anchor in anchors) {
+      if (anchor.label == label) return anchor;
+    }
+  }
+  return null;
+}
+
+String _valuationAnchorLabel(String label) {
+  return switch (label) {
+    "分析师目标价" => "目标价",
+    "Forward P/E" => "Forward PE",
+    "52周区间" => "52周区间",
+    "分红/收益率" => "收益率",
+    _ => label,
+  };
+}
+
+String _valuationAnchorHint(String label) {
+  return switch (label) {
+    "分析师目标价" => "外部共识锚点",
+    "市盈率" || "Forward P/E" => "估值倍数",
+    "52周区间" => "价格水位参考",
+    "Beta" => "波动敏感度",
+    "市值" => "规模锚点",
+    "PEG" => "成长估值参考",
+    "市净率" => "资产估值参考",
+    "分红/收益率" => "现金回报参考",
+    "费用率" => "持有成本参考",
+    _ => "估值证据",
+  };
+}
+
+Color _valuationAnchorColor(ColorScheme colorScheme, String label) {
+  if (label == "分析师目标价") return colorScheme.secondary;
+  if (label == "52周区间") return colorScheme.primary;
+  if (label == "Beta") return colorScheme.tertiary;
+  if (label == "市盈率" || label == "Forward P/E" || label == "PEG") {
+    return colorScheme.primary;
+  }
+  return colorScheme.onSurfaceVariant;
 }
 
 String _fallbackKeyLevelTone(String type, String label) {

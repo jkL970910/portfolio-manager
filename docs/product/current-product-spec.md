@@ -205,6 +205,10 @@ Current first pass:
   dedicated `研究结论 / 行动计划 / 估值证据 / 关键价位 / 组合适配 / 主要护栏 /
   研究证据` sections. Portfolio/account/recommendation smart scans keep the
   legacy renderer until their own contracts are upgraded.
+- `估值证据` should render as a compact evidence dashboard first: target price,
+  PE/Forward PE, 52-week range, Beta, market cap, and one extra valuation anchor
+  when available. Longer provider summaries, sanity checks, and extra metrics
+  should be collapsed behind optional detail sections.
 - Page load remains cache-only; new provider documents can invalidate old
   quick-scan cache entries so evidence is refreshed without live Flutter calls.
 
