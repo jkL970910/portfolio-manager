@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getMobileViewerFromRequest } from "@/lib/auth/mobile-tokens";
-import { enqueueExternalResearchJob } from "@/lib/backend/external-research-jobs";
+import {
+  enqueueExternalResearchJob,
+  runExternalResearchWorkerBatch,
+} from "@/lib/backend/external-research-jobs";
 import type { ExternalResearchPolicy } from "@/lib/backend/portfolio-external-research";
 import { portfolioAnalyzerRequestSchema } from "@/lib/backend/portfolio-analyzer-contracts";
 
@@ -23,6 +26,15 @@ function readSourceId(
     return source;
   }
   return undefined;
+}
+
+function readDrainNow(body: unknown) {
+  return Boolean(
+    body &&
+      typeof body === "object" &&
+      "drainNow" in body &&
+      (body as { drainNow?: unknown }).drainNow === true,
+  );
 }
 
 export async function POST(request: NextRequest) {
@@ -64,6 +76,17 @@ export async function POST(request: NextRequest) {
       new Date(),
       sourceId ? { sourceIds: [sourceId] } : undefined,
     );
+    if (readDrainNow(body)) {
+      const worker = await runExternalResearchWorkerBatch({
+        workerId: "mobile-user-refresh",
+        maxJobs: 3,
+        maxRuntimeMs: 30_000,
+      });
+      return NextResponse.json(
+        { ...result, data: { ...result.data, worker } },
+        { status: 202 },
+      );
+    }
     return NextResponse.json(result, { status: 202 });
   } catch (error) {
     const message =

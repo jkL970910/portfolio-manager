@@ -143,6 +143,7 @@ class _SecurityDetailPageState extends State<SecurityDetailPage> {
           "mode": "quick",
           "cacheStrategy": "prefer-cache",
           "maxCacheAgeSeconds": 21600,
+          "drainNow": true,
           "security": {
             if (data.securityId.isNotEmpty) "securityId": data.securityId,
             "symbol": data.symbol,
