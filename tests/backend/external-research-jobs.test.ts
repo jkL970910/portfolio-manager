@@ -313,6 +313,9 @@ test("external research job mobile mapping treats provider no-data as skipped", 
 
   const mapped = mapExternalResearchJobForMobile(job);
   assert.equal(mapped.statusLabel, "已跳过");
+  assert.equal(mapped.resultKind, "no_data");
+  assert.equal(mapped.resultLabel, "来源暂无资料");
+  assert.match(mapped.resultDetail, /基本资料来源没有返回这只标的/);
   assert.equal(mapped.nextRetryLabel, null);
   assert.match(mapped.statusNote, /Alpha Vantage profile/);
 });

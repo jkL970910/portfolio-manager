@@ -158,6 +158,141 @@ function mapExternalResearchFreshness(job: ExternalResearchJob) {
   };
 }
 
+function getExternalResearchPrimarySource(job: ExternalResearchJob) {
+  return (
+    job.sourceAllowlist.find((source) => source.enabled)?.id ??
+    job.sourceAllowlist[0]?.id ??
+    null
+  );
+}
+
+function getExternalResearchSourceLabel(job: ExternalResearchJob) {
+  const sourceId = getExternalResearchPrimarySource(job);
+  if (sourceId === "profile") {
+    return "基本资料";
+  }
+  if (sourceId === "institutional") {
+    return "财报资料";
+  }
+  if (sourceId === "market-data") {
+    return "行情资料";
+  }
+  if (sourceId === "news") {
+    return "新闻资料";
+  }
+  if (sourceId === "community") {
+    return "社区资料";
+  }
+  return "外部资料";
+}
+
+function mapExternalResearchResultForMobile(job: ExternalResearchJob) {
+  const errorMessage = job.errorMessage ?? "";
+  const lowerError = errorMessage.toLowerCase();
+  const inferredSourceLabel = lowerError.includes("profile")
+    ? "基本资料"
+    : lowerError.includes("institutional") || lowerError.includes("earnings")
+      ? "财报资料"
+      : lowerError.includes("market")
+        ? "行情资料"
+        : null;
+  const sourceLabel =
+    inferredSourceLabel ?? getExternalResearchSourceLabel(job);
+  const isNoData =
+    lowerError.includes("no alpha vantage") ||
+    lowerError.includes("no profile") ||
+    lowerError.includes("no institutional") ||
+    lowerError.includes("no payload") ||
+    lowerError.includes("payload was available") ||
+    lowerError.includes("source returned no") ||
+    lowerError.includes("provider returned no");
+  const isUnavailable =
+    lowerError.includes("not enabled") ||
+    lowerError.includes("provider disabled") ||
+    lowerError.includes("source is not enabled") ||
+    lowerError.includes("source is disabled") ||
+    lowerError.includes("allowlist") ||
+    lowerError.includes("unavailable");
+
+  if (job.status === "queued") {
+    return {
+      resultKind: "queued",
+      resultLabel: "等待刷新",
+      resultDetail: mapExternalResearchStatusNote(job),
+      resultSeverity: "info",
+    };
+  }
+
+  if (job.status === "running") {
+    return {
+      resultKind: "running",
+      resultLabel: "正在刷新",
+      resultDetail: mapExternalResearchStatusNote(job),
+      resultSeverity: "info",
+    };
+  }
+
+  if (job.status === "succeeded") {
+    return {
+      resultKind: "updated",
+      resultLabel: "已更新资料",
+      resultDetail: `${sourceLabel}已写入缓存；可以重新生成研究结论。`,
+      resultSeverity: "success",
+    };
+  }
+
+  if (job.status === "skipped") {
+    if (isUnavailable) {
+      return {
+        resultKind: "unavailable",
+        resultLabel: "来源未启用",
+        resultDetail: `${sourceLabel}来源当前不可用；不会影响已有行情、组合护栏和本地研究结论。`,
+        resultSeverity: "warning",
+      };
+    }
+    if (isNoData) {
+      return {
+        resultKind: "no_data",
+        resultLabel: "来源暂无资料",
+        resultDetail: `${sourceLabel}来源没有返回这只标的的可写入资料；研究台仍会使用已有行情、组合护栏和缓存分析。`,
+        resultSeverity: "warning",
+      };
+    }
+    return {
+      resultKind: "skipped",
+      resultLabel: "本次无新资料",
+      resultDetail:
+        "后台任务已安全结束，但没有写入新的资料；可以稍后重试或使用当前缓存生成研究结论。",
+      resultSeverity: "warning",
+    };
+  }
+
+  if (job.status === "failed") {
+    return {
+      resultKind: "failed",
+      resultLabel: "刷新失败",
+      resultDetail: mapExternalResearchStatusNote(job),
+      resultSeverity: "error",
+    };
+  }
+
+  if (job.status === "cancelled") {
+    return {
+      resultKind: "cancelled",
+      resultLabel: "刷新已取消",
+      resultDetail: "这次后台刷新已取消，没有写入新资料。",
+      resultSeverity: "neutral",
+    };
+  }
+
+  return {
+    resultKind: "unknown",
+    resultLabel: "状态待确认",
+    resultDetail: mapExternalResearchStatusNote(job),
+    resultSeverity: "neutral",
+  };
+}
+
 export function mapExternalResearchJobForMobile(job: ExternalResearchJob) {
   const statusLabels: Record<ExternalResearchJob["status"], string> = {
     queued: "排队中",
@@ -191,6 +326,7 @@ export function mapExternalResearchJobForMobile(job: ExternalResearchJob) {
         .join(" · ")
     : job.targetKey;
   const freshness = mapExternalResearchFreshness(job);
+  const result = mapExternalResearchResultForMobile(job);
   const sources = job.sourceAllowlist
     .map((source) => {
       const id =
@@ -226,6 +362,7 @@ export function mapExternalResearchJobForMobile(job: ExternalResearchJob) {
     runAfter: job.runAfter,
     nextRetryLabel: mapExternalResearchNextRetryLabel(job),
     statusNote: mapExternalResearchStatusNote(job),
+    ...result,
     freshness,
     sources,
     sourceIds: sources.map((source) => source.id),

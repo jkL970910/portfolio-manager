@@ -373,6 +373,8 @@ class _SecurityDetailPageState extends State<SecurityDetailPage> {
         final status = latest?["status"] as String?;
         final statusLabel = latest?["statusLabel"] as String?;
         final statusNote = latest?["statusNote"] as String?;
+        final resultLabel = latest?["resultLabel"] as String?;
+        final resultDetail = latest?["resultDetail"] as String?;
         final errorMessage = latest?["errorMessage"] as String?;
         if (status == null) {
           continue;
@@ -392,9 +394,9 @@ class _SecurityDetailPageState extends State<SecurityDetailPage> {
             _externalResearchRefreshRevision += 1;
             _externalResearchMessage = [
               sourceLabel(source),
-              statusLabel,
-              statusNote,
-              errorMessage,
+              resultLabel ?? statusLabel,
+              resultDetail ?? statusNote,
+              if (resultDetail == null) errorMessage,
             ]
                 .whereType<String>()
                 .where((value) => value.isNotEmpty)
@@ -1448,11 +1450,15 @@ class _ResearchSourceRefreshStatus {
             : latest == null
                 ? "未见最近刷新；点击会消耗 1 次今日额度，完成后进入$ttlLabel。"
                 : [
-                    latest["statusLabel"] as String?,
-                    _readJsonMap(latest["freshness"])["freshnessLabel"]
-                        as String?,
-                    latest["statusNote"] as String?,
-                    latest["errorMessage"] as String?,
+                    latest["resultLabel"] as String? ??
+                        latest["statusLabel"] as String?,
+                    if (latest["status"] == "succeeded")
+                      _readJsonMap(latest["freshness"])["freshnessLabel"]
+                          as String?,
+                    latest["resultDetail"] as String? ??
+                        latest["statusNote"] as String?,
+                    if (latest["resultDetail"] == null)
+                      latest["errorMessage"] as String?,
                   ]
                     .whereType<String>()
                     .where((value) => value.trim().isNotEmpty)

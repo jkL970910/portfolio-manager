@@ -566,16 +566,7 @@ export function buildRecommendationV2(args: {
     .filter((target) => target.gapPct > 0)
     .sort((left, right) => right.gapPct - left.gapPct);
 
-  const priorities = (targetGaps.length > 0 ? targetGaps : targetAllocation
-    .slice()
-    .sort((left, right) => right.targetPct - left.targetPct)
-    .map((target) => ({
-      assetClass: target.assetClass,
-      currentPct: allocation.get(target.assetClass) ?? 0,
-      targetPct: getConstrainedTargetPct(profile, target.assetClass, target.targetPct),
-      gapPct: getConstrainedTargetPct(profile, target.assetClass, target.targetPct)
-    })))
-    .slice(0, 3);
+  const priorities = targetGaps.slice(0, 3);
 
   const totalGap = priorities.reduce((sum, item) => sum + item.gapPct, 0) || 1;
   let allocatedSoFar = 0;
@@ -660,12 +651,29 @@ export function buildRecommendationV2(args: {
     1
   );
 
+  const noPositiveGapNotes =
+    priorities.length === 0
+      ? [
+          pick(
+            language,
+            "当前没有明确低于目标的资产类别；本轮不强行把新增资金放进已经达标或超配的袖口。",
+            "No asset class is clearly under target right now, so this run does not force new money into sleeves that are already on target or overweight."
+          ),
+          pick(
+            language,
+            "如果仍想投入新增资金，先检查现金计划、目标配置和再平衡容忍度；否则更适合暂存现金或等待下一次再平衡窗口。",
+            "If you still want to deploy new money, first review the cash plan, target allocation, and rebalancing tolerance; otherwise holding cash or waiting for the next rebalance window is cleaner."
+          ),
+        ]
+      : [];
+
   return {
     engineVersion: "v2.1",
     objective: "target-tracking",
     confidenceScore,
     assumptions: buildRunNotes(profile, fxPolicy, language),
     notes: [
+      ...noPositiveGapNotes,
       pick(language, "这一版只帮你安排新增的钱，不会主动建议你先卖出旧持仓。", "This version only plans new money and does not ask you to sell old holdings first."),
       pick(language, "V2.1 已开始读取进阶偏好，但账户匹配、税务放置和标的 universe 仍然是规则型判断。", "V2.1 now reads advanced preferences, but account fit, tax placement, and the security universe remain rule-based."),
       fxPolicy.hasUsdFundingPath
