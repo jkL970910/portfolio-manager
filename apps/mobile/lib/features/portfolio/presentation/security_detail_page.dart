@@ -2472,6 +2472,7 @@ class _AccountDistributionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = context.looTokens;
     final accounts = position.accountSummaries
         .where((account) => account.positionSharePct > 0)
         .take(6)
@@ -2480,7 +2481,15 @@ class _AccountDistributionCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const _SectionHeader(title: "账户拆分", trailing: "点击看账户内仓位"),
+          const _SectionHeader(title: "账户拆分", trailing: "按总仓位"),
+          const SizedBox(height: 6),
+          Text(
+            "右侧百分比表示该标的总仓位在各账户间的分布；账户内占比另行展示。",
+            style: Theme.of(context)
+                .textTheme
+                .bodySmall
+                ?.copyWith(color: tokens.mutedText),
+          ),
           const SizedBox(height: 10),
           LooDistributionBar(
             segments: accounts
@@ -2493,8 +2502,14 @@ class _AccountDistributionCard extends StatelessWidget {
                 .toList(),
           ),
           const SizedBox(height: 10),
-          ...accounts.map(
-            (account) => Padding(
+          ...accounts.map((account) {
+            final detailParts = [
+              if (account.accountShare.isNotEmpty)
+                "账户内占比 ${account.accountShare}",
+              if (account.value.isNotEmpty) account.value,
+              if (account.gainLoss.isNotEmpty) "盈亏 ${account.gainLoss}",
+            ];
+            return Padding(
               padding: const EdgeInsets.only(top: 8),
               child: InkWell(
                 borderRadius: BorderRadius.circular(12),
@@ -2506,12 +2521,31 @@ class _AccountDistributionCard extends StatelessWidget {
                   child: Row(
                     children: [
                       Expanded(
-                        child: Text(
-                          [
-                            account.accountLabel,
-                            account.accountType,
-                            account.accountShare,
-                          ].where((item) => item.isNotEmpty).join(" · "),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              [
+                                account.accountLabel,
+                                account.accountType,
+                              ].where((item) => item.isNotEmpty).join(" · "),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: Theme.of(context).textTheme.bodyMedium,
+                            ),
+                            if (detailParts.isNotEmpty) ...[
+                              const SizedBox(height: 3),
+                              Text(
+                                detailParts.join(" · "),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .bodySmall
+                                    ?.copyWith(color: tokens.mutedText),
+                              ),
+                            ],
+                          ],
                         ),
                       ),
                       Text(
@@ -2528,8 +2562,8 @@ class _AccountDistributionCard extends StatelessWidget {
                   ),
                 ),
               ),
-            ),
-          ),
+            );
+          }),
         ],
       ),
     );
