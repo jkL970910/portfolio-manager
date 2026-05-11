@@ -386,12 +386,42 @@ export function buildMobileResearchRefreshActions(input: {
     mobilePolicy.canRunLiveResearch &&
     policy.securityManualRefreshEnabled &&
     usage.remainingRuns > 0;
+  const chartIdentity = data.chartSeries?.priceHistory?.identity;
+  const rawExchange = data.security.exchange.trim();
+  const resolvedExchange =
+    rawExchange === "正在识别" ||
+    rawExchange === "Resolving" ||
+    rawExchange === "未知交易所" ||
+    rawExchange === "Unknown exchange"
+      ? (chartIdentity?.exchange ?? rawExchange)
+      : rawExchange;
+  const rawCurrency = data.security.currency.trim();
+  const resolvedCurrency =
+    rawCurrency === "正在识别" ||
+    rawCurrency === "Resolving" ||
+    rawCurrency === "未知币种" ||
+    rawCurrency === "Unknown currency"
+      ? (chartIdentity?.currency ?? rawCurrency)
+      : rawCurrency;
   const symbol = data.security.symbol.trim().toUpperCase();
-  const exchange = data.security.exchange.trim().toUpperCase();
-  const currency = data.security.currency.trim().toUpperCase();
+  const exchange = resolvedExchange.trim().toUpperCase();
+  const currency = resolvedCurrency.trim().toUpperCase();
   const securityId = data.security.securityId?.trim() ?? "";
 
   function latestFor(sourceId: "profile" | "institutional") {
+    function isFreshSucceededJob(
+      job: ReturnType<typeof mapExternalResearchJobForMobile>,
+    ) {
+      const lastUpdatedAt =
+        job.finishedAt ?? job.startedAt ?? job.createdAt ?? null;
+      const lastDate = parseMobileDate(lastUpdatedAt);
+      if (!lastDate || job.status !== "succeeded") {
+        return false;
+      }
+      const freshUntil = new Date(lastDate.getTime() + ttlSeconds * 1000);
+      return Number.isFinite(freshUntil.getTime()) && freshUntil > now;
+    }
+
     function matchesSecurityIdentity(
       job: ReturnType<typeof mapExternalResearchJobForMobile>,
     ) {
@@ -417,13 +447,16 @@ export function buildMobileResearchRefreshActions(input: {
       return securityIdMatches || listingMatches || targetListingMatches;
     }
 
-    return (
-      jobs.find((job) => {
+    const matchingJobs = jobs.filter((job) => {
         if (!job.sourceIds.includes(sourceId)) {
           return false;
         }
         return matchesSecurityIdentity(job);
-      }) ?? null
+    });
+    return (
+      matchingJobs.find((job) => isFreshSucceededJob(job)) ??
+      matchingJobs[0] ??
+      null
     );
   }
 

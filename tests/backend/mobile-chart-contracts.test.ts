@@ -205,6 +205,7 @@ test("mobile security refresh actions require confirmation for fresh external ca
   });
   assert.ok(detail);
   detail.security.securityId = "security_amzn_resolved_later";
+  detail.security.exchange = "未知交易所";
 
   const policy = getExternalResearchPolicy();
   const now = new Date("2026-04-28T12:00:00.000Z");
