@@ -1,4 +1,4 @@
-import { and, desc, eq, gt, isNull, lte, sql } from "drizzle-orm";
+import { and, desc, eq, gt, isNull, lte, or, sql } from "drizzle-orm";
 import { getDb } from "@/lib/db/client";
 import {
   allocationTargets,
@@ -1385,22 +1385,30 @@ export const postgresRepositories: BackendRepositories = {
       const symbol = params.symbol?.trim().toUpperCase() || null;
       const exchange = params.exchange?.trim().toUpperCase() || null;
       const currency = params.currency?.trim().toUpperCase() || null;
+      const identityFilter =
+        params.securityId && symbol && exchange && currency
+          ? or(
+              eq(externalResearchDocuments.securityId, params.securityId),
+              and(
+                eq(externalResearchDocuments.symbol, symbol),
+                eq(externalResearchDocuments.exchange, exchange),
+                eq(externalResearchDocuments.currency, currency),
+              ),
+            )
+          : params.securityId
+            ? eq(externalResearchDocuments.securityId, params.securityId)
+            : symbol && exchange && currency
+              ? and(
+                  eq(externalResearchDocuments.symbol, symbol),
+                  eq(externalResearchDocuments.exchange, exchange),
+                  eq(externalResearchDocuments.currency, currency),
+                )
+              : undefined;
       const rows = await db.query.externalResearchDocuments.findMany({
         where: and(
           eq(externalResearchDocuments.userId, userId),
           gt(externalResearchDocuments.expiresAt, params.now),
-          params.securityId
-            ? eq(externalResearchDocuments.securityId, params.securityId)
-            : undefined,
-          !params.securityId && symbol
-            ? eq(externalResearchDocuments.symbol, symbol)
-            : undefined,
-          !params.securityId && exchange
-            ? eq(externalResearchDocuments.exchange, exchange)
-            : undefined,
-          !params.securityId && currency
-            ? eq(externalResearchDocuments.currency, currency)
-            : undefined,
+          identityFilter,
           params.underlyingId
             ? eq(externalResearchDocuments.underlyingId, params.underlyingId)
             : undefined,

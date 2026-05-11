@@ -478,26 +478,24 @@ export const mockRepositories: BackendRepositories = {
       return externalResearchDocuments
         .filter((document) => document.userId === userId)
         .filter((document) => Date.parse(document.expiresAt) > params.now.getTime())
-        .filter((document) =>
-          params.securityId
+        .filter((document) => {
+          const securityIdMatches = params.securityId
             ? document.security?.securityId === params.securityId
-            : true,
-        )
-        .filter((document) =>
-          !params.securityId && symbol
-            ? document.security?.symbol?.trim().toUpperCase() === symbol
-            : true,
-        )
-        .filter((document) =>
-          !params.securityId && exchange
-            ? document.security?.exchange?.trim().toUpperCase() === exchange
-            : true,
-        )
-        .filter((document) =>
-          !params.securityId && currency
-            ? document.security?.currency === currency
-            : true,
-        )
+            : false;
+          const listingMatches = Boolean(
+            symbol &&
+              exchange &&
+              currency &&
+              document.security?.symbol?.trim().toUpperCase() === symbol &&
+              document.security?.exchange?.trim().toUpperCase() === exchange &&
+              document.security?.currency === currency,
+          );
+          return (
+            securityIdMatches ||
+            listingMatches ||
+            (!params.securityId && !symbol)
+          );
+        })
         .filter((document) =>
           params.underlyingId
             ? document.underlyingId === params.underlyingId

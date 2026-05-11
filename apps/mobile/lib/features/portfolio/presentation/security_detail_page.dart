@@ -140,139 +140,158 @@ class _SecurityDetailPageState extends State<SecurityDetailPage> {
 
   void _showResearchUpdateSheet(MobileSecurityDetailSnapshot data) {
     final trust = _SecurityDataTrust.fromSnapshot(data);
-    final refreshStatus = _loadResearchRefreshSnapshot(data);
+    var refreshStatus = _loadResearchRefreshSnapshot(data);
     showModalBottomSheet<void>(
       context: context,
       showDragHandle: true,
       builder: (sheetContext) {
         return SafeArea(
-          child: FutureBuilder<_ResearchRefreshSnapshot>(
-            future: refreshStatus,
-            builder: (context, snapshot) {
-              final status = snapshot.data;
-              _syncRunningExternalResearchFromSnapshot(status);
-              final quoteAction = data.researchRefreshAction("quote-history");
-              final profileAction = data.researchRefreshAction("profile");
-              final institutionalAction =
-                  data.researchRefreshAction("institutional");
-              final isRefreshingProfile = _isResearchSourceRunning("profile");
-              final isRefreshingInstitutional =
-                  _isResearchSourceRunning("institutional");
-              return SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      "研究资料更新",
-                      style: Theme.of(sheetContext).textTheme.titleLarge,
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      "报价、基本资料、财报资料分开刷新；研究结论只读取已经落入缓存的资料。",
-                      style: Theme.of(sheetContext).textTheme.bodySmall,
-                    ),
-                    const SizedBox(height: 14),
-                    _ResearchRefreshStatusCard(
-                      status: status,
-                      isLoading:
-                          snapshot.connectionState == ConnectionState.waiting,
-                      errorMessage:
-                          snapshot.hasError ? snapshot.error.toString() : null,
-                    ),
-                    const SizedBox(height: 10),
-                    _ResearchUpdateActionTile(
-                      icon: Icons.show_chart,
-                      title: quoteAction?.label ?? "刷新报价与走势",
-                      detail: quoteAction?.detail ??
-                          [
-                            data.quoteStatusLabel,
-                            data.priceHistoryChart?.freshness.label,
-                          ]
-                              .whereType<String>()
-                              .where((item) => item.isNotEmpty)
-                              .join("；"),
-                      isBusy: _isRefreshingQuote,
-                      onTap: _isRefreshingQuote
-                          ? null
-                          : () {
-                              Navigator.of(sheetContext).pop();
-                              unawaited(_refreshQuote());
-                            },
-                    ),
-                    _ResearchUpdateActionTile(
-                      icon: Icons.badge_outlined,
-                      title: profileAction?.label ?? "刷新基本资料",
-                      detail: profileAction?.displayDetail ??
-                          "目标价、PE、Beta、市值、52周区间等估值证据。",
-                      isBusy: isRefreshingProfile,
-                      onTap: !isRefreshingProfile &&
-                              (profileAction?.enabled ?? false)
-                          ? () {
-                              unawaited(_runExternalResearchAction(
-                                sheetContext,
-                                data,
-                                profileAction!,
-                              ));
-                            }
-                          : null,
-                    ),
-                    _ResearchUpdateActionTile(
-                      icon: Icons.event_note_outlined,
-                      title: institutionalAction?.label ?? "刷新财报资料",
-                      detail: institutionalAction?.displayDetail ??
-                          "财报/盈利披露资料，完成后进入缓存供研究台使用。",
-                      isBusy: isRefreshingInstitutional,
-                      onTap: !isRefreshingInstitutional &&
-                              (institutionalAction?.enabled ?? false)
-                          ? () {
-                              unawaited(_runExternalResearchAction(
-                                sheetContext,
-                                data,
-                                institutionalAction!,
-                              ));
-                            }
-                          : null,
-                    ),
-                    _ResearchUpdateActionTile(
-                      icon: Icons.auto_awesome,
-                      title: "重新生成研究结论",
-                      detail: _isSubmittingExternalResearch
-                          ? "资料刷新完成后会自动更新；也可以稍后手动重新生成。"
-                          : "不抓新资料，只用当前缓存重新跑智能快扫。",
-                      isBusy: _isSubmittingExternalResearch,
-                      onTap: _isSubmittingExternalResearch
-                          ? null
-                          : () {
-                              Navigator.of(sheetContext).pop();
-                              _analysisController.runFresh();
-                            },
-                    ),
-                    const SizedBox(height: 8),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
+          child: StatefulBuilder(
+            builder: (sheetContext, setSheetState) {
+              return FutureBuilder<_ResearchRefreshSnapshot>(
+                future: refreshStatus,
+                builder: (context, snapshot) {
+                  final status = snapshot.data;
+                  _syncRunningExternalResearchFromSnapshot(status);
+                  final quoteAction =
+                      data.researchRefreshAction("quote-history");
+                  final profileAction = data.researchRefreshAction("profile");
+                  final institutionalAction =
+                      data.researchRefreshAction("institutional");
+                  final isRefreshingProfile =
+                      _isResearchSourceRunning("profile");
+                  final isRefreshingInstitutional =
+                      _isResearchSourceRunning("institutional");
+                  return SingleChildScrollView(
+                    padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        _StatusPill(
-                          label: trust.label,
-                          color: trust.color(sheetContext),
+                        Text(
+                          "研究资料更新",
+                          style: Theme.of(sheetContext).textTheme.titleLarge,
                         ),
-                        _InfoChip(data.quoteStatusLabel),
-                        if (data.priceHistoryChart != null)
-                          _InfoChip(data.priceHistoryChart!.freshness.label),
+                        const SizedBox(height: 6),
+                        Text(
+                          "报价、基本资料、财报资料分开刷新；研究结论只读取已经落入缓存的资料。",
+                          style: Theme.of(sheetContext).textTheme.bodySmall,
+                        ),
+                        const SizedBox(height: 14),
+                        _ResearchRefreshStatusCard(
+                          status: status,
+                          isLoading: snapshot.connectionState ==
+                              ConnectionState.waiting,
+                          errorMessage: snapshot.hasError
+                              ? snapshot.error.toString()
+                              : null,
+                        ),
+                        const SizedBox(height: 10),
+                        _ResearchUpdateActionTile(
+                          icon: Icons.show_chart,
+                          title: quoteAction?.label ?? "刷新报价与走势",
+                          detail: quoteAction?.detail ??
+                              [
+                                data.quoteStatusLabel,
+                                data.priceHistoryChart?.freshness.label,
+                              ]
+                                  .whereType<String>()
+                                  .where((item) => item.isNotEmpty)
+                                  .join("；"),
+                          isBusy: _isRefreshingQuote,
+                          onTap: _isRefreshingQuote
+                              ? null
+                              : () {
+                                  Navigator.of(sheetContext).pop();
+                                  unawaited(_refreshQuote());
+                                },
+                        ),
+                        _ResearchUpdateActionTile(
+                          icon: Icons.badge_outlined,
+                          title: profileAction?.label ?? "刷新基本资料",
+                          detail: profileAction?.displayDetail ??
+                              "目标价、PE、Beta、市值、52周区间等估值证据。",
+                          isBusy: isRefreshingProfile,
+                          onTap: !isRefreshingProfile &&
+                                  (profileAction?.enabled ?? false)
+                              ? () {
+                                  unawaited(_runExternalResearchAction(
+                                    sheetContext,
+                                    data,
+                                    profileAction!,
+                                    onStateChanged: setSheetState,
+                                    reloadRefreshStatus: () {
+                                      refreshStatus =
+                                          _loadResearchRefreshSnapshot(data);
+                                    },
+                                  ));
+                                }
+                              : null,
+                        ),
+                        _ResearchUpdateActionTile(
+                          icon: Icons.event_note_outlined,
+                          title: institutionalAction?.label ?? "刷新财报资料",
+                          detail: institutionalAction?.displayDetail ??
+                              "财报/盈利披露资料，完成后进入缓存供研究台使用。",
+                          isBusy: isRefreshingInstitutional,
+                          onTap: !isRefreshingInstitutional &&
+                                  (institutionalAction?.enabled ?? false)
+                              ? () {
+                                  unawaited(_runExternalResearchAction(
+                                    sheetContext,
+                                    data,
+                                    institutionalAction!,
+                                    onStateChanged: setSheetState,
+                                    reloadRefreshStatus: () {
+                                      refreshStatus =
+                                          _loadResearchRefreshSnapshot(data);
+                                    },
+                                  ));
+                                }
+                              : null,
+                        ),
+                        _ResearchUpdateActionTile(
+                          icon: Icons.auto_awesome,
+                          title: "重新生成研究结论",
+                          detail: _isSubmittingExternalResearch
+                              ? "资料刷新完成后会自动更新；也可以稍后手动重新生成。"
+                              : "不抓新资料，只用当前缓存重新跑智能快扫。",
+                          isBusy: _isSubmittingExternalResearch,
+                          onTap: _isSubmittingExternalResearch
+                              ? null
+                              : () {
+                                  Navigator.of(sheetContext).pop();
+                                  _analysisController.runFresh();
+                                },
+                        ),
+                        const SizedBox(height: 8),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: [
+                            _StatusPill(
+                              label: trust.label,
+                              color: trust.color(sheetContext),
+                            ),
+                            _InfoChip(data.quoteStatusLabel),
+                            if (data.priceHistoryChart != null)
+                              _InfoChip(
+                                data.priceHistoryChart!.freshness.label,
+                              ),
+                          ],
+                        ),
+                        if (_externalResearchMessage != null &&
+                            _externalResearchMessage!.isNotEmpty) ...[
+                          const SizedBox(height: 10),
+                          Text(
+                            _externalResearchMessage!,
+                            style: Theme.of(sheetContext).textTheme.bodySmall,
+                          ),
+                        ],
                       ],
                     ),
-                    if (_externalResearchMessage != null &&
-                        _externalResearchMessage!.isNotEmpty) ...[
-                      const SizedBox(height: 10),
-                      Text(
-                        _externalResearchMessage!,
-                        style: Theme.of(sheetContext).textTheme.bodySmall,
-                      ),
-                    ],
-                  ],
-                ),
+                  );
+                },
               );
             },
           ),
@@ -299,11 +318,14 @@ class _SecurityDetailPageState extends State<SecurityDetailPage> {
     MobileSecurityDetailSnapshot data,
     String source, {
     bool bypassCache = false,
+    StateSetter? onStateChanged,
+    VoidCallback? reloadRefreshStatus,
   }) async {
     setState(() {
       _runningResearchSources.add(source);
       _externalResearchMessage = null;
     });
+    onStateChanged?.call(() {});
 
     try {
       final response = await widget.apiClient.enqueueExternalResearchJob(
@@ -336,6 +358,8 @@ class _SecurityDetailPageState extends State<SecurityDetailPage> {
           _runningResearchTargetKeys[source] = targetKey;
         }
       });
+      reloadRefreshStatus?.call();
+      onStateChanged?.call(() {});
       if (targetKey != null && targetKey.isNotEmpty) {
         _startExternalResearchPolling();
         unawaited(_pollExternalResearchJobs());
@@ -343,6 +367,8 @@ class _SecurityDetailPageState extends State<SecurityDetailPage> {
         setState(() {
           _runningResearchSources.remove(source);
         });
+        reloadRefreshStatus?.call();
+        onStateChanged?.call(() {});
       }
     } on LooApiException catch (error) {
       if (!mounted) return;
@@ -351,14 +377,18 @@ class _SecurityDetailPageState extends State<SecurityDetailPage> {
         _runningResearchTargetKeys.remove(source);
         _externalResearchMessage = error.message;
       });
+      reloadRefreshStatus?.call();
+      onStateChanged?.call(() {});
     }
   }
 
   Future<void> _runExternalResearchAction(
     BuildContext sheetContext,
     MobileSecurityDetailSnapshot data,
-    MobileResearchRefreshAction action,
-  ) async {
+    MobileResearchRefreshAction action, {
+    required StateSetter onStateChanged,
+    required VoidCallback reloadRefreshStatus,
+  }) async {
     if (action.sourceId == null) {
       return;
     }
@@ -389,14 +419,12 @@ class _SecurityDetailPageState extends State<SecurityDetailPage> {
         return;
       }
     }
-    if (!mounted) return;
-    if (sheetContext.mounted) {
-      Navigator.of(sheetContext).pop();
-    }
     await _enqueueExternalResearch(
       data,
       action.sourceId!,
       bypassCache: action.cache.confirmationRequired,
+      onStateChanged: onStateChanged,
+      reloadRefreshStatus: reloadRefreshStatus,
     );
   }
 
