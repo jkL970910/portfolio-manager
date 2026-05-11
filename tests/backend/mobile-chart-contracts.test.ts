@@ -680,6 +680,92 @@ test("asset class drilldown chart contract exposes sleeve freshness", () => {
   assert.ok(chart.notes.some((note) => note.includes("缓存价格历史回放")));
 });
 
+test("portfolio aggregates the same security across accounts for mobile holdings", () => {
+  const multiAccountAccounts: InvestmentAccount[] = [
+    ...accounts,
+    {
+      id: "acct_rrsp",
+      userId: "user_test",
+      institution: "Wealthsimple",
+      type: "RRSP",
+      nickname: "RRSP",
+      currency: "CAD",
+      marketValueCad: 5000,
+      contributionRoomCad: 2000,
+    },
+  ];
+  const multiAccountHoldings: HoldingPosition[] = [
+    {
+      ...holdings[0]!,
+      id: "holding_zqq_tfsa",
+      accountId: "acct_tfsa",
+      securityId: "security_zqq",
+      symbol: "ZQQ",
+      name: "BMO Nasdaq 100 Equity Hedged to CAD Index ETF",
+      exchangeOverride: "TSX",
+      quantity: 10,
+      avgCostPerShareCad: 100,
+      avgCostPerShareAmount: 100,
+      costBasisCad: 1000,
+      costBasisAmount: 1000,
+      marketValueCad: 1200,
+      marketValueAmount: 1200,
+      weightPct: 8,
+      gainLossPct: 20,
+    },
+    {
+      ...holdings[0]!,
+      id: "holding_zqq_rrsp",
+      accountId: "acct_rrsp",
+      securityId: "security_zqq",
+      symbol: "ZQQ",
+      name: "BMO Nasdaq 100 Equity Hedged to CAD Index ETF",
+      exchangeOverride: "TSX",
+      quantity: 5,
+      avgCostPerShareCad: 90,
+      avgCostPerShareAmount: 90,
+      costBasisCad: 450,
+      costBasisAmount: 450,
+      marketValueCad: 600,
+      marketValueAmount: 600,
+      weightPct: 4,
+      gainLossPct: 33.3,
+    },
+  ];
+  const portfolio = buildPortfolioData({
+    language: "zh",
+    accounts: multiAccountAccounts,
+    holdings: multiAccountHoldings,
+    profile,
+    display,
+  });
+  const dashboard = buildDashboardData({
+    viewer: {
+      id: "user_test",
+      email: "test@example.com",
+      displayName: "Tester",
+      displayLanguage: "zh",
+      baseCurrency: "CAD",
+    },
+    accounts: multiAccountAccounts,
+    holdings: multiAccountHoldings,
+    transactions: [],
+    profile,
+    latestRun: null,
+    display,
+  });
+
+  assert.equal(portfolio.holdings.length, 2);
+  assert.equal(portfolio.securityHoldings.length, 1);
+  assert.equal(portfolio.securityHoldings[0]?.symbol, "ZQQ");
+  assert.equal(portfolio.securityHoldings[0]?.accountCount, "2");
+  assert.equal(portfolio.securityHoldings[0]?.lotCount, "2");
+  assert.equal(portfolio.securityHoldings[0]?.quantity, "15");
+  assert.match(portfolio.securityHoldings[0]?.value ?? "", /\$1,800/);
+  assert.equal(dashboard.topHoldings.length, 1);
+  assert.equal(dashboard.topHoldings[0]?.id, portfolio.securityHoldings[0]?.id);
+});
+
 test("holding detail chart contract exposes holding value freshness", () => {
   const detail = buildPortfolioHoldingDetailData({
     language: "zh",

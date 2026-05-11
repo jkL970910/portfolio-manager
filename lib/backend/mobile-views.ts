@@ -53,9 +53,14 @@ type MobileHomeData = {
   }>;
   topHoldings: Array<{
     id: string;
+    securityId?: string | null;
     symbol: string;
     name: string;
     account: string;
+    accountCount?: string;
+    lotCount?: string;
+    currency?: "CAD" | "USD";
+    exchange?: string | null;
     lastPrice: string;
     lastUpdated: string;
     freshnessVariant: "success" | "warning" | "neutral";
@@ -122,6 +127,33 @@ type MobilePortfolioOverviewData = {
     quoteStatusLabel?: string;
     portfolioShare: string;
     accountShare: string;
+    gainLoss: string;
+    signal: string;
+  }>;
+  securityHoldings: Array<{
+    id: string;
+    securityId?: string | null;
+    symbol: string;
+    name: string;
+    assetClass: string;
+    sector: string;
+    currency: "CAD" | "USD";
+    exchange?: string | null;
+    account: string;
+    accountCount: string;
+    lotCount: string;
+    quantity: string;
+    avgCost: string;
+    costBasis: string;
+    value: string;
+    lastPrice: string;
+    lastUpdated: string;
+    freshnessVariant: "success" | "warning" | "neutral";
+    quoteProvider?: string | null;
+    quoteSourceMode?: string | null;
+    quoteStatus?: string | null;
+    quoteStatusLabel?: string;
+    portfolioShare: string;
     gainLoss: string;
     signal: string;
   }>;
@@ -636,9 +668,14 @@ async function mapMobileHomeData(
     })),
     topHoldings: payload.data.topHoldings.map((holding) => ({
       id: holding.id,
+      securityId: holding.securityId,
       symbol: holding.symbol,
       name: holding.name,
       account: holding.account,
+      accountCount: holding.accountCount,
+      lotCount: holding.lotCount,
+      currency: holding.currency,
+      exchange: holding.exchange,
       lastPrice: holding.lastPrice,
       lastUpdated: holding.lastUpdated,
       freshnessVariant: holding.freshnessVariant,
@@ -708,6 +745,33 @@ function mapMobilePortfolioOverviewData(
       quoteStatusLabel: holding.quoteStatusLabel,
       portfolioShare: holding.portfolioShare,
       accountShare: holding.accountShare,
+      gainLoss: holding.gainLoss,
+      signal: holding.signal,
+    })),
+    securityHoldings: payload.data.securityHoldings.map((holding) => ({
+      id: holding.id,
+      securityId: holding.securityId,
+      symbol: holding.symbol,
+      name: holding.name,
+      assetClass: holding.assetClass,
+      sector: holding.sector,
+      currency: holding.currency,
+      exchange: holding.exchange,
+      account: holding.account,
+      accountCount: holding.accountCount,
+      lotCount: holding.lotCount,
+      quantity: holding.quantity,
+      avgCost: holding.avgCost,
+      costBasis: holding.costBasis,
+      value: holding.value,
+      lastPrice: holding.lastPrice,
+      lastUpdated: holding.lastUpdated,
+      freshnessVariant: holding.freshnessVariant,
+      quoteProvider: holding.quoteProvider,
+      quoteSourceMode: holding.quoteSourceMode,
+      quoteStatus: holding.quoteStatus,
+      quoteStatusLabel: holding.quoteStatusLabel,
+      portfolioShare: holding.portfolioShare,
       gainLoss: holding.gainLoss,
       signal: holding.signal,
     })),

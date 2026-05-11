@@ -35,6 +35,7 @@ import {
   buildPortfolioHoldingDetailData,
   buildPortfolioSecurityDetailData,
   buildDashboardData,
+  buildSecurityHoldingSummaries,
   buildImportData,
   buildPortfolioData,
   buildRecommendationsData,
@@ -1492,7 +1493,12 @@ export async function getDashboardView(userId: string) {
       context: {
         userId: user.id,
         accountCount: userAccounts.length,
-        holdingCount: userHoldings.length,
+        holdingCount: buildSecurityHoldingSummaries({
+          language: user.displayLanguage,
+          accounts: userAccounts,
+          holdings: userHoldings,
+          display,
+        }).length,
         viewerName: user.displayName,
       },
     },
@@ -1534,9 +1540,12 @@ export async function getPortfolioView(userId: string) {
           0,
         ),
         topHoldingSymbol:
-          [...userHoldings].sort(
-            (left, right) => right.marketValueCad - left.marketValueCad,
-          )[0]?.symbol ?? null,
+          buildSecurityHoldingSummaries({
+            language: user.displayLanguage,
+            accounts: userAccounts,
+            holdings: userHoldings,
+            display,
+          })[0]?.symbol ?? null,
       },
     },
     "database",

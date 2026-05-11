@@ -1235,7 +1235,11 @@ class _PortfolioFitSection extends StatelessWidget {
             if (data.heldPosition!.accountSummaries.isNotEmpty)
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-                child: _AccountDistributionCard(data.heldPosition!),
+                child: _AccountDistributionCard(
+                  data.heldPosition!,
+                  onOpenHolding: (holdingId) =>
+                      context.push(MobileRoutes.holdingDetail(holdingId)),
+                ),
               ),
           ],
           if (data.relatedHoldings.isNotEmpty) ...[
@@ -2029,6 +2033,8 @@ class MobileHeldPosition {
 
 class MobileHeldAccountSummary {
   const MobileHeldAccountSummary({
+    required this.holdingId,
+    required this.accountId,
     required this.accountLabel,
     required this.accountType,
     required this.value,
@@ -2038,6 +2044,8 @@ class MobileHeldAccountSummary {
     required this.gainLoss,
   });
 
+  final String holdingId;
+  final String accountId;
   final String accountLabel;
   final String accountType;
   final String value;
@@ -2048,6 +2056,8 @@ class MobileHeldAccountSummary {
 
   factory MobileHeldAccountSummary.fromJson(Map<String, dynamic> json) {
     return MobileHeldAccountSummary(
+      holdingId: json["holdingId"] as String? ?? "",
+      accountId: json["accountId"] as String? ?? "",
       accountLabel: json["accountLabel"] as String? ?? "未知账户",
       accountType: json["accountType"] as String? ?? "",
       value: json["value"] as String? ?? "--",
@@ -2452,9 +2462,13 @@ class _PerformanceChartCard extends StatelessWidget {
 }
 
 class _AccountDistributionCard extends StatelessWidget {
-  const _AccountDistributionCard(this.position);
+  const _AccountDistributionCard(
+    this.position, {
+    required this.onOpenHolding,
+  });
 
   final MobileHeldPosition position;
+  final ValueChanged<String> onOpenHolding;
 
   @override
   Widget build(BuildContext context) {
@@ -2482,22 +2496,37 @@ class _AccountDistributionCard extends StatelessWidget {
           ...accounts.map(
             (account) => Padding(
               padding: const EdgeInsets.only(top: 8),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      [
-                        account.accountLabel,
-                        account.accountType,
-                        account.accountShare,
-                      ].where((item) => item.isNotEmpty).join(" · "),
-                    ),
+              child: InkWell(
+                borderRadius: BorderRadius.circular(12),
+                onTap: account.holdingId.isEmpty
+                    ? null
+                    : () => onOpenHolding(account.holdingId),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 6),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          [
+                            account.accountLabel,
+                            account.accountType,
+                            account.accountShare,
+                          ].where((item) => item.isNotEmpty).join(" · "),
+                        ),
+                      ),
+                      Text(
+                        account.positionShare,
+                        style: Theme.of(context).textTheme.titleSmall,
+                      ),
+                      const SizedBox(width: 6),
+                      Icon(
+                        Icons.arrow_forward_rounded,
+                        size: 16,
+                        color: context.looTokens.mutedText,
+                      ),
+                    ],
                   ),
-                  Text(
-                    account.positionShare,
-                    style: Theme.of(context).textTheme.titleSmall,
-                  ),
-                ],
+                ),
               ),
             ),
           ),

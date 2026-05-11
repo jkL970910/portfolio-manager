@@ -167,7 +167,7 @@ class _PortfolioPageState extends State<PortfolioPage> {
                         const SizedBox(height: 10),
                         _HoldingsSummaryEntryCard(
                           key: _holdingsKey,
-                          holdings: snapshot.data!.holdings,
+                          holdings: snapshot.data!.securityHoldings,
                           onOpenHoldings: () => context.push(
                             MobileRoutes.portfolioHoldings,
                           ),
@@ -297,7 +297,7 @@ class _FilterSummaryCard extends StatelessWidget {
           Row(
             children: [
               Expanded(child: Text("账户 ${data.accounts.length} 个")),
-              Expanded(child: Text("持仓 ${data.holdings.length} 个")),
+              Expanded(child: Text("标的 ${data.securityHoldings.length} 个")),
             ],
           ),
         ],

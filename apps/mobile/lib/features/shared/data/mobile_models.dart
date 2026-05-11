@@ -53,6 +53,7 @@ class MobileAccountCard {
 class MobileHoldingCard {
   const MobileHoldingCard({
     required this.id,
+    required this.securityId,
     required this.symbol,
     required this.name,
     required this.value,
@@ -60,6 +61,10 @@ class MobileHoldingCard {
     required this.weight,
     required this.detail,
     required this.accountType,
+    required this.accountCount,
+    required this.lotCount,
+    required this.currency,
+    required this.exchange,
     required this.lastUpdated,
     required this.freshnessVariant,
     required this.quoteProvider,
@@ -69,6 +74,7 @@ class MobileHoldingCard {
   });
 
   final String id;
+  final String securityId;
   final String symbol;
   final String name;
   final String value;
@@ -76,6 +82,10 @@ class MobileHoldingCard {
   final String weight;
   final String detail;
   final String accountType;
+  final String accountCount;
+  final String lotCount;
+  final String currency;
+  final String exchange;
   final String lastUpdated;
   final String freshnessVariant;
   final String? quoteProvider;
@@ -86,6 +96,8 @@ class MobileHoldingCard {
   factory MobileHoldingCard.fromJson(Map<String, dynamic> json) {
     final symbol = json["symbol"] as String? ?? "--";
     final account = json["account"] as String? ?? "";
+    final accountCount = json["accountCount"] as String? ?? "";
+    final lotCount = json["lotCount"] as String? ?? "";
     final weight =
         json["weight"] as String? ?? json["portfolioShare"] as String? ?? "";
     final lastUpdated = json["lastUpdated"] as String? ?? "";
@@ -105,15 +117,27 @@ class MobileHoldingCard {
 
     return MobileHoldingCard(
       id: json["id"] as String? ?? symbol,
+      securityId: json["securityId"] as String? ?? "",
       symbol: symbol,
       name: json["name"] as String? ?? "未知标的",
       value: json["value"] as String? ?? "--",
       gainLoss: json["gainLoss"] as String? ?? "",
       weight: weight,
-      detail: [account, weight, quoteStatus]
+      detail: [
+        account,
+        if (accountCount.isNotEmpty && accountCount != "1")
+          "$accountCount 个账户",
+        if (lotCount.isNotEmpty && lotCount != "1") "$lotCount 笔仓位",
+        weight,
+        quoteStatus,
+      ]
           .where((item) => item.isNotEmpty)
           .join(" · "),
       accountType: json["accountType"] as String? ?? "",
+      accountCount: accountCount,
+      lotCount: lotCount,
+      currency: json["currency"] as String? ?? "",
+      exchange: json["exchange"] as String? ?? "",
       lastUpdated: lastUpdated,
       freshnessVariant: freshnessVariant,
       quoteProvider: quoteProvider,

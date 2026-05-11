@@ -5,6 +5,7 @@
   PortfolioHoldingDetailData,
   MobileChartSeries,
   PortfolioSecurityDetailData,
+  PortfolioSecurityHoldingSummary,
   PortfolioData,
   RecommendationsData,
   SettingsData,
@@ -1535,6 +1536,185 @@ function getPortfolioQuoteStatus(
   };
 }
 
+function getSecurityHoldingGroupKey(holding: HoldingPosition) {
+  const securityId = holding.securityId?.trim();
+  if (securityId) {
+    return `security:${securityId}`;
+  }
+  const symbol = holding.symbol.trim().toUpperCase();
+  const exchange =
+    holding.exchangeOverride?.trim().toUpperCase() ||
+    holding.quoteExchange?.trim().toUpperCase() ||
+    "UNKNOWN";
+  const currency = holding.currency ?? holding.quoteCurrency ?? "CAD";
+  return `listing:${symbol}:${exchange}:${currency}`;
+}
+
+export function buildSecurityHoldingSummaries(args: {
+  language: DisplayLanguage;
+  accounts: InvestmentAccount[];
+  holdings: HoldingPosition[];
+  display: DisplayContext;
+}): PortfolioSecurityHoldingSummary[] {
+  const { language, accounts, holdings, display } = args;
+  type SortableSecurityHoldingSummary = PortfolioSecurityHoldingSummary & {
+    _sortValueCad: number;
+  };
+  const { instanceLabelMap } = buildAccountLabelMaps(accounts, language);
+  const totalPortfolioCad = sum(holdings.map((holding) => holding.marketValueCad));
+  const groups = new Map<string, HoldingPosition[]>();
+
+  for (const holding of holdings) {
+    const key = getSecurityHoldingGroupKey(holding);
+    groups.set(key, [...(groups.get(key) ?? []), holding]);
+  }
+
+  return [...groups.entries()]
+    .map<SortableSecurityHoldingSummary | null>(([groupKey, groupHoldings]) => {
+      const sortedHoldings = [...groupHoldings].sort(
+        (left, right) => right.marketValueCad - left.marketValueCad,
+      );
+      const reference = sortedHoldings[0];
+      if (!reference) return null;
+
+      const totalValueCad = sum(
+        groupHoldings.map((holding) => holding.marketValueCad),
+      );
+      const totalValueAmount = sum(
+        groupHoldings.map((holding) => holding.marketValueAmount ?? 0),
+      );
+      const totalQuantity = sum(
+        groupHoldings
+          .map((holding) => holding.quantity ?? 0)
+          .filter((value) => Number.isFinite(value)),
+      );
+      const totalCostBasisCad = sum(
+        groupHoldings.map((holding) => holding.costBasisCad ?? 0),
+      );
+      const totalCostBasisAmount = sum(
+        groupHoldings.map((holding) => holding.costBasisAmount ?? 0),
+      );
+      const weightedAvgCostAmount =
+        totalQuantity > 0
+          ? sum(
+              groupHoldings.map(
+                (holding) =>
+                  (holding.quantity ?? 0) *
+                  (holding.avgCostPerShareAmount ?? 0),
+              ),
+            ) / totalQuantity
+          : null;
+      const weightedAvgCostCad =
+        totalQuantity > 0
+          ? sum(
+              groupHoldings.map(
+                (holding) =>
+                  (holding.quantity ?? 0) *
+                  (holding.avgCostPerShareCad ?? 0),
+              ),
+            ) / totalQuantity
+          : null;
+      const gainLossPct =
+        totalCostBasisCad > 0
+          ? ((totalValueCad - totalCostBasisCad) / totalCostBasisCad) * 100
+          : reference.gainLossPct;
+      const accountIds = new Set(
+        groupHoldings.map((holding) => holding.accountId),
+      );
+      const accountLabel =
+        accountIds.size === 1
+          ? (instanceLabelMap.get(reference.accountId) ??
+            pick(language, "账户", "Account"))
+          : pick(
+              language,
+              `${accountIds.size} 个账户`,
+              `${accountIds.size} accounts`,
+            );
+      const latestUpdatedAt = groupHoldings
+        .map((holding) => getHoldingQuoteTimestamp(holding))
+        .filter((value): value is string => Boolean(value))
+        .sort()
+        .at(-1);
+      const nativeCurrency = reference.currency ?? "CAD";
+      const exchange =
+        reference.exchangeOverride ?? reference.quoteExchange ?? null;
+      const securityParams = new URLSearchParams();
+      if (reference.securityId) securityParams.set("securityId", reference.securityId);
+      if (exchange) securityParams.set("exchange", exchange);
+      if (nativeCurrency) securityParams.set("currency", nativeCurrency);
+      const query = securityParams.toString();
+
+      return {
+        id: encodeURIComponent(groupKey),
+        securityId: reference.securityId ?? null,
+        symbol: reference.symbol,
+        name: reference.name,
+        assetClass: reference.assetClass,
+        sector: reference.sector,
+        currency: nativeCurrency,
+        exchange,
+        account: accountLabel,
+        accountCount: String(accountIds.size),
+        lotCount: String(groupHoldings.length),
+        securityHref: `/portfolio/security/${encodeURIComponent(reference.symbol)}${
+          query ? `?${query}` : ""
+        }`,
+        quantity: formatHoldingQuantity(totalQuantity, language),
+        avgCost: formatHoldingAmount(
+          weightedAvgCostAmount,
+          nativeCurrency,
+          weightedAvgCostCad,
+          display,
+          language,
+        ),
+        costBasis: formatHoldingAmount(
+          totalCostBasisAmount,
+          nativeCurrency,
+          totalCostBasisCad,
+          display,
+          language,
+        ),
+        value: formatMoneyForDisplay(
+          totalValueAmount,
+          nativeCurrency,
+          totalValueCad,
+          display,
+        ),
+        lastPrice: formatHoldingPrice(
+          reference.lastPriceAmount,
+          nativeCurrency,
+          reference.lastPriceCad,
+          display,
+          language,
+        ),
+        lastUpdated: latestUpdatedAt
+          ? formatHoldingLastUpdated(latestUpdatedAt, language)
+          : pick(language, "还没刷新过", "Not refreshed yet"),
+        freshnessVariant: getHoldingFreshnessVariant(latestUpdatedAt),
+        quoteProvider: reference.quoteProvider ?? null,
+        quoteSourceMode: reference.quoteSourceMode ?? null,
+        quoteStatus: reference.quoteStatus ?? null,
+        quoteStatusLabel: getHoldingQuoteStatusLabel(reference, language),
+        portfolioShare:
+          totalPortfolioCad > 0
+            ? formatCompactPercent((totalValueCad / totalPortfolioCad) * 100, 1)
+            : "0%",
+        gainLoss: formatSignedPercent(gainLossPct, 1),
+        signal: pick(
+          language,
+          accountIds.size > 1 ? "跨账户汇总" : "单账户持仓",
+          accountIds.size > 1 ? "Cross-account position" : "Single-account lot",
+        ),
+        _sortValueCad: totalValueCad,
+      };
+    })
+    .filter((item): item is SortableSecurityHoldingSummary => item !== null)
+    .sort((left, right) => right._sortValueCad - left._sortValueCad)
+    .map(({ _sortValueCad: _sortValueCad, ...item }) => {
+      return item;
+    });
+}
+
 function sortTargetsForDisplay(targets: AllocationTarget[]) {
   return [...targets].sort((left, right) => {
     const order = [
@@ -1910,6 +2090,12 @@ export function buildDashboardData(args: {
     profile,
     language,
   });
+  const securityHoldings = buildSecurityHoldingSummaries({
+    language,
+    accounts,
+    holdings,
+    display,
+  });
   const drift = [...targetAllocation.entries()]
     .map(([assetClass, targetPct]) => ({
       assetClass,
@@ -2080,44 +2266,30 @@ export function buildDashboardData(args: {
       name: getAssetClassLabel(name, language),
       value: round(value, 0),
     })),
-    topHoldings: [...holdings]
-      .sort((left, right) => right.marketValueCad - left.marketValueCad)
+    topHoldings: securityHoldings
       .slice(0, 5)
       .map((holding) => ({
         id: holding.id,
+        securityId: holding.securityId,
         symbol: holding.symbol,
         name: holding.name,
-        account:
-          instanceLabelMap.get(holding.accountId) ??
-          pick(language, "账户", "Account"),
-        href: `/portfolio/holding/${holding.id}`,
-        securityHref: `/portfolio/security/${encodeURIComponent(holding.symbol)}`,
-        lastPrice: formatHoldingPrice(
-          holding.lastPriceAmount,
-          holding.currency,
-          holding.lastPriceCad,
-          display,
-          language,
-        ),
-        lastUpdated: formatHoldingLastUpdated(
-          getHoldingQuoteTimestamp(holding),
-          language,
-        ),
-        freshnessVariant: getHoldingFreshnessVariant(
-          getHoldingQuoteTimestamp(holding),
-        ),
-        quoteProvider: holding.quoteProvider ?? null,
-        quoteSourceMode: holding.quoteSourceMode ?? null,
-        quoteStatus: holding.quoteStatus ?? null,
-        quoteStatusLabel: getHoldingQuoteStatusLabel(holding, language),
-        weight: formatCompactPercent(holding.weightPct, 1),
-        value: formatMoneyForDisplay(
-          holding.marketValueAmount,
-          holding.currency ?? "CAD",
-          holding.marketValueCad,
-          display,
-        ),
-        gainLoss: formatSignedPercent(holding.gainLossPct, 1),
+        account: holding.account,
+        accountCount: holding.accountCount,
+        lotCount: holding.lotCount,
+        href: holding.securityHref,
+        securityHref: holding.securityHref,
+        currency: holding.currency,
+        exchange: holding.exchange,
+        lastPrice: holding.lastPrice,
+        lastUpdated: holding.lastUpdated,
+        freshnessVariant: holding.freshnessVariant,
+        quoteProvider: holding.quoteProvider,
+        quoteSourceMode: holding.quoteSourceMode,
+        quoteStatus: holding.quoteStatus,
+        quoteStatusLabel: holding.quoteStatusLabel,
+        weight: holding.portfolioShare,
+        value: holding.value,
+        gainLoss: holding.gainLoss,
       })),
     trendContext: {
       title: cashBalanceTrend
@@ -2214,6 +2386,12 @@ export function buildPortfolioData(args: {
     holdings,
     profile,
     language,
+  });
+  const securityHoldings = buildSecurityHoldingSummaries({
+    language,
+    accounts,
+    holdings,
+    display,
   });
   const totalPortfolio = sum(accounts.map((account) => account.marketValueCad));
   const replayedPortfolioPerformance = buildReplayedAggregateValueSeries({
@@ -2661,6 +2839,7 @@ export function buildPortfolioData(args: {
       accountDrilldown: health.accountDrilldown,
       holdingDrilldown: health.holdingDrilldown,
     },
+    securityHoldings,
     holdings: [...holdings]
       .sort((left, right) => right.marketValueCad - left.marketValueCad)
       .map((holding) => {
@@ -3502,6 +3681,9 @@ export function buildPortfolioSecurityDetailData(args: {
         : null;
 
     return {
+      holdingId:
+        accountViews.find((view) => view.holding.accountId === accountId)
+          ?.holding.id ?? accountId,
       accountId,
       accountLabel:
         representativeView?.holding.accountName ??

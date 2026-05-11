@@ -95,6 +95,12 @@ class MobileHomeSnapshot {
                 "${marketSentiment!.strategyLabel}：${marketSentiment!.strategyDetail}",
             source: "analysis-cache",
           ),
+        LooMinisterFact(
+          id: "security-count",
+          label: "标的数量",
+          value: "$holdingCount 个",
+          source: "portfolio-data",
+        ),
       ],
       warnings: [
         ...health.highlights.take(4),

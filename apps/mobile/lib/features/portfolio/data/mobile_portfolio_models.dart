@@ -6,6 +6,7 @@ class MobilePortfolioSnapshot {
   const MobilePortfolioSnapshot({
     required this.accounts,
     required this.holdings,
+    required this.securityHoldings,
     required this.quoteStatus,
     required this.healthScore,
     required this.summaryPoints,
@@ -19,6 +20,7 @@ class MobilePortfolioSnapshot {
 
   final List<MobileAccountCard> accounts;
   final List<MobileHoldingCard> holdings;
+  final List<MobileHoldingCard> securityHoldings;
   final String quoteStatus;
   final String healthScore;
   final List<String> summaryPoints;
@@ -81,7 +83,7 @@ class MobilePortfolioSnapshot {
         LooMinisterFact(
           id: "holding-count",
           label: "持仓数量",
-          value: "${holdings.length} 个",
+          value: "${securityHoldings.length} 个",
         ),
         ...accountTypeAllocation.take(5).map(
               (point) => LooMinisterFact(
@@ -138,6 +140,9 @@ class MobilePortfolioSnapshot {
       holdings: readJsonList(json, "holdings")
           .map(MobileHoldingCard.fromJson)
           .toList(),
+      securityHoldings: readJsonList(json, "securityHoldings")
+          .map(MobileHoldingCard.fromJson)
+          .toList(),
       quoteStatus: quoteStatus is Map<String, dynamic>
           ? quoteStatus["lastRefreshed"] as String? ?? "报价状态待刷新"
           : "报价状态待刷新",
@@ -175,6 +180,7 @@ class MobilePortfolioSnapshot {
       holdings: holdings
           .where((holding) => holding.accountType == accountType)
           .toList(),
+      securityHoldings: securityHoldings,
       quoteStatus: "已筛选 $accountType 账户类型 · $quoteStatus",
       healthScore: healthScore,
       summaryPoints: summaryPoints,

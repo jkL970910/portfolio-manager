@@ -171,6 +171,7 @@ void main() {
     const snapshot = MobilePortfolioSnapshot(
       accounts: [],
       holdings: [],
+      securityHoldings: [],
       quoteStatus: "报价刚刚刷新",
       healthScore: "78 分",
       summaryPoints: ["US Equity 超过目标。"],

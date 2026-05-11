@@ -5,6 +5,7 @@ import "../../../app/mobile_routes.dart";
 import "../../../core/api/loo_api_client.dart";
 import "../../../core/presentation/loo_components.dart";
 import "../../../core/theme/loo_theme.dart";
+import "../../shared/data/mobile_models.dart";
 import "../data/mobile_portfolio_models.dart";
 
 class HoldingsListPage extends StatefulWidget {
@@ -40,6 +41,17 @@ class _HoldingsListPageState extends State<HoldingsListPage> {
     });
   }
 
+  void _openSecurityPosition(MobileHoldingCard holding) {
+    context.push(
+      MobileRoutes.securityDetail(
+        symbol: holding.symbol,
+        securityId: holding.securityId.isEmpty ? null : holding.securityId,
+        exchange: holding.exchange.isEmpty ? null : holding.exchange,
+        currency: holding.currency.isEmpty ? null : holding.currency,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return FutureBuilder<MobilePortfolioSnapshot>(
@@ -56,7 +68,7 @@ class _HoldingsListPageState extends State<HoldingsListPage> {
                     eyebrow: "Holdings",
                     title: "持仓列表",
                     subtitle: snapshot.hasData
-                        ? "共 ${snapshot.data!.holdings.length} 个持仓 · 点击查看单笔仓位"
+                        ? "共 ${snapshot.data!.securityHoldings.length} 个标的 · 点击查看汇总仓位"
                         : "正在整理持仓账本...",
                   ),
                 ),
@@ -80,16 +92,14 @@ class _HoldingsListPageState extends State<HoldingsListPage> {
                       children: [
                         _HoldingsSummaryCard(snapshot.data!),
                         const SizedBox(height: 14),
-                        ...snapshot.data!.holdings.map(
+                        ...snapshot.data!.securityHoldings.map(
                           (holding) => LooTappableRow(
                             margin: const EdgeInsets.only(bottom: 10),
                             title: "${holding.symbol} · ${holding.name}",
                             subtitle: holding.detail,
                             value: holding.value,
                             valueDetail: holding.gainLoss,
-                            onTap: () => context.push(
-                              MobileRoutes.holdingDetail(holding.id),
-                            ),
+                            onTap: () => _openSecurityPosition(holding),
                           ),
                         ),
                       ],
@@ -117,8 +127,8 @@ class _HoldingsSummaryCard extends StatelessWidget {
         children: [
           Expanded(
             child: _SummaryMetric(
-              label: "持仓数",
-              value: "${snapshot.holdings.length}",
+              label: "标的数",
+              value: "${snapshot.securityHoldings.length}",
             ),
           ),
           SizedBox(width: tokens.gapMd),

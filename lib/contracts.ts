@@ -33,6 +33,35 @@ export interface MobileChartSeries {
   notes: string[];
 }
 
+export interface PortfolioSecurityHoldingSummary {
+  id: string;
+  securityId?: string | null;
+  symbol: string;
+  name: string;
+  assetClass: string;
+  sector: string;
+  currency: "CAD" | "USD";
+  exchange?: string | null;
+  account: string;
+  accountCount: string;
+  lotCount: string;
+  securityHref: string;
+  quantity: string;
+  avgCost: string;
+  costBasis: string;
+  value: string;
+  lastPrice: string;
+  lastUpdated: string;
+  freshnessVariant: "success" | "warning" | "neutral";
+  quoteProvider?: string | null;
+  quoteSourceMode?: string | null;
+  quoteStatus?: string | null;
+  quoteStatusLabel?: string;
+  portfolioShare: string;
+  gainLoss: string;
+  signal: string;
+}
+
 export interface DashboardData {
   displayContext: {
     currency: "CAD" | "USD";
@@ -63,11 +92,16 @@ export interface DashboardData {
   assetMix: { name: string; value: number }[];
   topHoldings: {
     id: string;
+    securityId?: string | null;
     symbol: string;
     name: string;
     account: string;
+    accountCount?: string;
+    lotCount?: string;
     href: string;
     securityHref: string;
+    currency?: "CAD" | "USD";
+    exchange?: string | null;
     lastPrice: string;
     lastUpdated: string;
     freshnessVariant: "success" | "warning" | "neutral";
@@ -390,6 +424,7 @@ export interface PortfolioData {
     gainLoss: string;
     signal: string;
   }[];
+  securityHoldings: PortfolioSecurityHoldingSummary[];
   summaryPoints: string[];
 }
 
@@ -652,6 +687,7 @@ export interface PortfolioSecurityDetailData {
       summary: string;
     }[];
     accountSummaries: {
+      holdingId: string;
       accountId: string;
       accountLabel: string;
       accountType: string;
