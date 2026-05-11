@@ -1,6 +1,10 @@
 import "package:flutter/material.dart";
+import "package:go_router/go_router.dart";
 
+import "../../../app/mobile_routes.dart";
 import "../../../core/api/loo_api_client.dart";
+import "../../../core/presentation/loo_components.dart";
+import "../../../core/theme/loo_theme.dart";
 import "../../shared/data/loo_minister_context_models.dart";
 import "../../shared/data/mobile_models.dart";
 import "../../shared/presentation/loo_charts.dart";
@@ -8,7 +12,6 @@ import "../../shared/presentation/loo_minister_scope.dart";
 import "account_type_portfolio_page.dart";
 import "ai_analysis_card.dart";
 import "detail_state_widgets.dart";
-import "holding_detail_page.dart";
 
 class HealthScorePage extends StatefulWidget {
   const HealthScorePage({
@@ -66,116 +69,107 @@ class _HealthScorePageState extends State<HealthScorePage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: Text(widget.fallbackTitle)),
-      body: FutureBuilder<MobileHealthSnapshot>(
-        future: _snapshot,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
+      body: LooPageGradient(
+        child: FutureBuilder<MobileHealthSnapshot>(
+          future: _snapshot,
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const Center(child: CircularProgressIndicator());
+            }
 
-          if (snapshot.hasError) {
-            return DetailErrorState(
-              title: "健康巡查暂时打不开",
-              message: snapshot.error.toString(),
-              onRetry: _refresh,
-            );
-          }
+            if (snapshot.hasError) {
+              return DetailErrorState(
+                title: "健康巡查暂时打不开",
+                message: snapshot.error.toString(),
+                onRetry: _refresh,
+              );
+            }
 
-          if (!snapshot.hasData) {
-            return DetailNotFoundState(
-              title: "没有健康评分",
-              message: "Loo国还没有足够的组合数据来生成健康巡查。",
-              onRetry: _refresh,
-            );
-          }
+            if (!snapshot.hasData) {
+              return DetailNotFoundState(
+                title: "没有健康评分",
+                message: "Loo国还没有足够的组合数据来生成健康巡查。",
+                onRetry: _refresh,
+              );
+            }
 
-          final data = snapshot.data!;
-          return RefreshIndicator(
-            onRefresh: () async => _refresh(),
-            child: ListView(
-              padding: const EdgeInsets.fromLTRB(20, 12, 20, 28),
-              children: [
-                _SummaryCard(data),
-                if (data.isAccountScope) ...[
-                  const SizedBox(height: 12),
-                  const _AccountScopeExplanationCard(),
-                ],
-                if (widget.accountId == null) ...[
-                  const SizedBox(height: 12),
-                  AiAnalysisCard(
-                    apiClient: widget.apiClient,
-                    title: "智能组合快扫",
-                    description:
-                        "先用你的组合健康、投资偏好和已保存资料生成确定性判断；外部 GPT 只在你点击增强时调用。",
-                    payload: const {
-                      "scope": "portfolio",
-                      "mode": "quick",
-                    },
-                  ),
-                ] else ...[
+            final data = snapshot.data!;
+            return RefreshIndicator(
+              onRefresh: () async => _refresh(),
+              child: ListView(
+                padding: const EdgeInsets.fromLTRB(20, 12, 20, 28),
+                children: [
+                  _SummaryCard(data),
+                  if (data.isAccountScope) ...[
+                    const SizedBox(height: 12),
+                    const _AccountScopeExplanationCard(),
+                  ],
                   const SizedBox(height: 12),
                   AiAnalysisCard(
                     apiClient: widget.apiClient,
-                    title: "智能账户快扫",
-                    description:
-                        "先用当前账户持仓、账户类型、投资偏好和已保存资料生成确定性判断；外部 GPT 只在你点击增强时调用。",
+                    title: widget.accountId == null ? "智能组合快扫" : "智能账户快扫",
+                    description: widget.accountId == null
+                        ? "先用组合健康、投资偏好和已保存资料生成确定性判断；GPT 增强需手动点击。"
+                        : "先用当前账户持仓、账户类型和偏好生成确定性判断；GPT 增强需手动点击。",
                     payload: {
-                      "scope": "account",
+                      "scope":
+                          widget.accountId == null ? "portfolio" : "account",
                       "mode": "quick",
-                      "accountId": widget.accountId,
+                      if (widget.accountId != null)
+                        "accountId": widget.accountId,
                     },
                   ),
-                ],
-                if (data.highlights.isNotEmpty) ...[
-                  const SizedBox(height: 16),
-                  const _SectionTitle("Loo皇批注"),
-                  const SizedBox(height: 8),
-                  _BulletCard(data.highlights),
-                ],
-                if (data.actionQueue.isNotEmpty) ...[
-                  const SizedBox(height: 16),
-                  const _SectionTitle("优先行动"),
-                  const SizedBox(height: 8),
-                  _BulletCard(data.actionQueue, prefix: "行动"),
-                ],
-                if (data.radar.isNotEmpty) ...[
-                  const SizedBox(height: 16),
-                  const _SectionTitle("雷达维度"),
-                  const SizedBox(height: 8),
-                  _RadarCard(data.radar),
-                ],
-                if (data.dimensions.isNotEmpty) ...[
-                  const SizedBox(height: 16),
-                  const _SectionTitle("健康维度"),
-                  const SizedBox(height: 8),
-                  ...data.dimensions.map(_DimensionCard.new),
-                ],
-                if (data.accountDrilldown.isNotEmpty) ...[
-                  const SizedBox(height: 16),
-                  const _SectionTitle("账户巡查"),
-                  const SizedBox(height: 8),
-                  ...data.accountDrilldown.map(
-                    (item) => _DrilldownCard(
-                      item,
-                      onTap: () => _openAccountTypePortfolio(item),
+                  if (data.highlights.isNotEmpty) ...[
+                    const SizedBox(height: 16),
+                    const _SectionTitle("Loo皇批注"),
+                    const SizedBox(height: 8),
+                    _BulletCard(data.highlights),
+                  ],
+                  if (data.actionQueue.isNotEmpty) ...[
+                    const SizedBox(height: 16),
+                    const _SectionTitle("优先行动"),
+                    const SizedBox(height: 8),
+                    _BulletCard(data.actionQueue, prefix: "行动"),
+                  ],
+                  if (data.radar.isNotEmpty) ...[
+                    const SizedBox(height: 16),
+                    const _SectionTitle("雷达维度"),
+                    const SizedBox(height: 8),
+                    _RadarCard(data.radar),
+                  ],
+                  if (data.dimensions.isNotEmpty) ...[
+                    const SizedBox(height: 16),
+                    const _SectionTitle("健康维度"),
+                    const SizedBox(height: 8),
+                    ...data.dimensions.map(_DimensionCard.new),
+                  ],
+                  if (data.accountDrilldown.isNotEmpty) ...[
+                    const SizedBox(height: 16),
+                    const _SectionTitle("账户巡查"),
+                    const SizedBox(height: 8),
+                    ...data.accountDrilldown.map(
+                      (item) => _DrilldownCard(
+                        item,
+                        onTap: () => _openAccountTypePortfolio(item),
+                      ),
                     ),
-                  ),
-                ],
-                if (data.holdingDrilldown.isNotEmpty) ...[
-                  const SizedBox(height: 16),
-                  const _SectionTitle("持仓巡查"),
-                  const SizedBox(height: 8),
-                  ...data.holdingDrilldown.map(
-                    (item) => _DrilldownCard(
-                      item,
-                      onTap: () => _openHoldingDetail(item),
+                  ],
+                  if (data.holdingDrilldown.isNotEmpty) ...[
+                    const SizedBox(height: 16),
+                    const _SectionTitle("持仓巡查"),
+                    const SizedBox(height: 8),
+                    ...data.holdingDrilldown.map(
+                      (item) => _DrilldownCard(
+                        item,
+                        onTap: () => _openHoldingDetail(item),
+                      ),
                     ),
-                  ),
+                  ],
                 ],
-              ],
-            ),
-          );
-        },
+              ),
+            );
+          },
+        ),
       ),
     );
   }
@@ -184,15 +178,7 @@ class _HealthScorePageState extends State<HealthScorePage> {
     if (item.id.isEmpty) {
       return;
     }
-    Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (_) => HoldingDetailPage(
-          apiClient: widget.apiClient,
-          holdingId: item.id,
-          fallbackTitle: item.label,
-        ),
-      ),
-    );
+    context.push(MobileRoutes.holdingDetail(item.id));
   }
 
   void _openAccountTypePortfolio(MobileHealthDrilldownItem item) {
@@ -484,42 +470,45 @@ class _SummaryCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Card(
-      clipBehavior: Clip.antiAlias,
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              theme.colorScheme.primaryContainer,
-              theme.colorScheme.surface,
-            ],
+    final tokens = context.looTokens;
+    return LooGlassCard(
+      isHero: true,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(data.scopeName, style: theme.textTheme.headlineMedium),
+          const SizedBox(height: 10),
+          _ScopePill(data.scopeLabel),
+          const SizedBox(height: 8),
+          Text(
+            data.scopeDetail,
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: tokens.mutedText,
+            ),
           ),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.all(18),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          const SizedBox(height: 14),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              Text(data.scopeName, style: theme.textTheme.headlineMedium),
-              const SizedBox(height: 10),
-              _ScopePill(data.scopeLabel),
-              const SizedBox(height: 8),
-              Text(data.scopeDetail),
-              const SizedBox(height: 14),
               Text(data.score, style: theme.textTheme.displaySmall),
-              const SizedBox(height: 8),
-              Text(data.status),
-              const SizedBox(height: 14),
-              Text(
-                  "最强：${data.strongestDimension.label} · ${data.strongestDimension.value}"),
-              const SizedBox(height: 4),
-              Text(
-                  "最弱：${data.weakestDimension.label} · ${data.weakestDimension.value}"),
+              const Spacer(),
+              Text(data.status, style: theme.textTheme.titleMedium),
             ],
           ),
-        ),
+          const SizedBox(height: 14),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              _InfoPill(
+                "最强：${data.strongestDimension.label} · ${data.strongestDimension.value}",
+              ),
+              _InfoPill(
+                "最弱：${data.weakestDimension.label} · ${data.weakestDimension.value}",
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
@@ -531,21 +520,23 @@ class _AccountScopeExplanationCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text("评分口径", style: theme.textTheme.titleLarge),
-            const SizedBox(height: 8),
-            const Text("账户 Health 分成两个层级，不要求单个账户复制全组合目标。"),
-            const SizedBox(height: 10),
-            const Text("• 账户内适配：看这个账户自身属性、账户类型、持仓是否放得顺。"),
-            const SizedBox(height: 6),
-            const Text("• 全组合目标参考：看这个账户对总组合目标的贡献。"),
-          ],
-        ),
+    return LooGlassCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text("评分口径", style: theme.textTheme.titleLarge),
+          const SizedBox(height: 8),
+          Text(
+            "账户 Health 分成两个层级，不要求单个账户复制全组合目标。",
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: context.looTokens.mutedText,
+            ),
+          ),
+          const SizedBox(height: 10),
+          const Text("• 账户内适配：看账户类型、税务和持仓是否放得顺。"),
+          const SizedBox(height: 6),
+          const Text("• 全组合目标参考：看这个账户对总组合目标的贡献。"),
+        ],
       ),
     );
   }
@@ -569,15 +560,36 @@ class _ScopePill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerHighest,
+        color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.34),
         borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: context.looTokens.cardBorder),
       ),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-        child: Text(label, style: theme.textTheme.bodySmall),
+        child: Text(label, style: Theme.of(context).textTheme.bodySmall),
+      ),
+    );
+  }
+}
+
+class _InfoPill extends StatelessWidget {
+  const _InfoPill(this.label);
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.34),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: context.looTokens.cardBorder),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        child: Text(label, style: Theme.of(context).textTheme.labelMedium),
       ),
     );
   }
@@ -591,21 +603,18 @@ class _BulletCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: items
-              .take(6)
-              .map(
-                (item) => Padding(
-                  padding: const EdgeInsets.only(bottom: 8),
-                  child: Text(prefix == null ? "• $item" : "$prefix：$item"),
-                ),
-              )
-              .toList(),
-        ),
+    return LooGlassCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: items
+            .take(6)
+            .map(
+              (item) => Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Text(prefix == null ? "• $item" : "$prefix：$item"),
+              ),
+            )
+            .toList(),
       ),
     );
   }
@@ -647,23 +656,20 @@ class _RadarCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
-        child: Column(
-          children: [
-            LooRadarChart(
-              points: points
-                  .map((point) => LooRadarPoint(
-                        label: point.dimension,
-                        value: point.value,
-                      ))
-                  .toList(),
-            ),
-            const SizedBox(height: 8),
-            ...points.map(_RadarTile.new),
-          ],
-        ),
+    return LooGlassCard(
+      child: Column(
+        children: [
+          LooRadarChart(
+            points: points
+                .map((point) => LooRadarPoint(
+                      label: point.dimension,
+                      value: point.value,
+                    ))
+                .toList(),
+          ),
+          const SizedBox(height: 8),
+          ...points.map(_RadarTile.new),
+        ],
       ),
     );
   }
@@ -676,35 +682,38 @@ class _DimensionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text("${dimension.label} · ${dimension.score}",
-                style: Theme.of(context).textTheme.titleLarge),
-            const SizedBox(height: 6),
-            Text(dimension.status),
-            if (dimension.summary.isNotEmpty) ...[
-              const SizedBox(height: 8),
-              Text(dimension.summary),
-            ],
-            ...dimension.drivers.take(3).map(_smallBullet),
-            ...dimension.consequences.take(2).map(
-                  (item) => Padding(
-                    padding: const EdgeInsets.only(top: 6),
-                    child: Text("影响：$item"),
+    return LooGlassCard(
+      margin: const EdgeInsets.only(bottom: 10),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text("${dimension.label} · ${dimension.score}",
+              style: Theme.of(context).textTheme.titleLarge),
+          const SizedBox(height: 6),
+          Text(dimension.status),
+          if (dimension.summary.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Text(
+              dimension.summary,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: context.looTokens.mutedText,
                   ),
-                ),
-            ...dimension.actions.take(3).map(
-                  (item) => Padding(
-                    padding: const EdgeInsets.only(top: 6),
-                    child: Text("行动：$item"),
-                  ),
-                ),
+            ),
           ],
-        ),
+          ...dimension.drivers.take(3).map(_smallBullet),
+          ...dimension.consequences.take(2).map(
+                (item) => Padding(
+                  padding: const EdgeInsets.only(top: 6),
+                  child: Text("影响：$item"),
+                ),
+              ),
+          ...dimension.actions.take(3).map(
+                (item) => Padding(
+                  padding: const EdgeInsets.only(top: 6),
+                  child: Text("行动：$item"),
+                ),
+              ),
+        ],
       ),
     );
   }
@@ -718,27 +727,17 @@ class _DrilldownCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      child: ListTile(
-        onTap: onTap,
-        title: Text(item.label),
-        subtitle: Text(
-          [
-            item.status,
-            if (item.summary.isNotEmpty) item.summary,
-            ...item.drivers.take(2),
-            ...item.actions.take(2).map((action) => "行动：$action"),
-          ].join("\n"),
-        ),
-        trailing: Wrap(
-          crossAxisAlignment: WrapCrossAlignment.center,
-          spacing: 8,
-          children: [
-            Text(item.score, style: Theme.of(context).textTheme.titleMedium),
-            if (onTap != null) const Icon(Icons.chevron_right),
-          ],
-        ),
-      ),
+    return LooTappableRow(
+      margin: const EdgeInsets.only(bottom: 10),
+      title: item.label,
+      subtitle: [
+        item.status,
+        if (item.summary.isNotEmpty) item.summary,
+        ...item.drivers.take(1),
+        ...item.actions.take(1).map((action) => "行动：$action"),
+      ].join("\n"),
+      value: item.score,
+      onTap: onTap,
     );
   }
 }

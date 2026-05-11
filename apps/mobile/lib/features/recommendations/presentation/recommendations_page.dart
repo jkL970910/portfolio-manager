@@ -1,9 +1,12 @@
 import "package:flutter/material.dart";
+import "package:go_router/go_router.dart";
 
+import "../../../app/mobile_routes.dart";
 import "../../../core/api/loo_api_client.dart";
-import "../data/mobile_recommendation_models.dart";
+import "../../../core/presentation/loo_components.dart";
+import "../../../core/theme/loo_theme.dart";
 import "../../discover/presentation/discover_page.dart";
-import "../../portfolio/presentation/security_detail_page.dart";
+import "../data/mobile_recommendation_models.dart";
 
 class RecommendationsPage extends StatefulWidget {
   const RecommendationsPage({
@@ -148,90 +151,109 @@ class _RecommendationsPageState extends State<RecommendationsPage> {
     return FutureBuilder<MobileRecommendationsSnapshot>(
       future: _snapshot,
       builder: (context, snapshot) {
-        return RefreshIndicator(
-          onRefresh: () async => _refresh(),
-          child: CustomScrollView(
-            physics: const AlwaysScrollableScrollPhysics(),
-            slivers: [
-              SliverToBoxAdapter(
-                child: _PageHeader(
-                  title: "Loo皇谕令",
-                  subtitle: snapshot.hasData
-                      ? snapshot.data!.engineLine
-                      : "正在读取 Loo国投资军令...",
-                ),
-              ),
-              if (snapshot.connectionState == ConnectionState.waiting)
-                const SliverFillRemaining(
-                    child: Center(child: CircularProgressIndicator()))
-              else if (snapshot.hasError)
-                SliverFillRemaining(
-                  child: _ErrorState(
-                      message: snapshot.error.toString(), onRetry: _refresh),
-                )
-              else if (snapshot.hasData)
-                SliverPadding(
-                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 28),
-                  sliver: SliverList.list(
-                    children: [
-                      _SummaryCard(snapshot.data!),
-                      const SizedBox(height: 16),
-                      _RecommendationIntelligenceStatusCard(snapshot.data!),
-                      const SizedBox(height: 16),
-                      _DiscoverEntryCard(onOpen: _openDiscover),
-                      const SizedBox(height: 16),
-                      _GenerateRecommendationCard(
-                        working: _working,
-                        onGenerate: _createRun,
-                      ),
-                      const SizedBox(height: 16),
-                      _PreferenceContextCard(snapshot.data!.preferenceContext),
-                      const SizedBox(height: 16),
-                      _WatchlistCard(
-                        symbols:
-                            snapshot.data!.preferenceContext.watchlistSymbols,
-                        working: _working,
-                        onAdd: _addWatchlistSymbol,
-                        onRemove: _removeWatchlistSymbol,
-                        onOpen: _openWatchlistSymbol,
-                      ),
-                      if (snapshot.data!.explainer.isNotEmpty) ...[
-                        const SizedBox(height: 16),
-                        const _SectionTitle("策略说明"),
-                        const SizedBox(height: 8),
-                        _TextCard(snapshot.data!.explainer.take(4).join("\n")),
-                      ],
-                      const SizedBox(height: 16),
-                      _SectionTitle("优先事项",
-                          actionLabel: "${snapshot.data!.priorities.length} 条"),
-                      const SizedBox(height: 8),
-                      if (snapshot.data!.priorities.isEmpty)
-                        const _EmptyCard("暂时没有新的推荐。先完成持仓导入，Loo皇会再下达谕令。")
-                      else
-                        ...snapshot.data!.priorities
-                            .take(6)
-                            .map((priority) => _PriorityCard(
-                                  priority: priority,
-                                  onOpenSecurity: _openSecurityDetail,
-                                )),
-                      if (snapshot.data!.scenarios.isNotEmpty) ...[
-                        const SizedBox(height: 16),
-                        const _SectionTitle("情景比较"),
-                        const SizedBox(height: 8),
-                        ...snapshot.data!.scenarios
-                            .take(3)
-                            .map(_ScenarioCard.new),
-                      ],
-                      if (snapshot.data!.notes.isNotEmpty) ...[
-                        const SizedBox(height: 16),
-                        const _SectionTitle("备注"),
-                        const SizedBox(height: 8),
-                        _TextCard(snapshot.data!.notes.take(4).join("\n")),
-                      ],
-                    ],
+        return LooPageGradient(
+          child: RefreshIndicator(
+            onRefresh: () async => _refresh(),
+            child: CustomScrollView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              slivers: [
+                SliverToBoxAdapter(
+                  child: _PageHeader(
+                    title: "Loo皇谕令",
+                    subtitle: snapshot.hasData
+                        ? snapshot.data!.engineLine
+                        : "正在读取 Loo国投资军令...",
                   ),
                 ),
-            ],
+                if (snapshot.connectionState == ConnectionState.waiting)
+                  const SliverFillRemaining(
+                    child: Center(child: CircularProgressIndicator()),
+                  )
+                else if (snapshot.hasError)
+                  SliverFillRemaining(
+                    child: _ErrorState(
+                      message: snapshot.error.toString(),
+                      onRetry: _refresh,
+                    ),
+                  )
+                else if (snapshot.hasData)
+                  SliverPadding(
+                    padding: const EdgeInsets.fromLTRB(20, 0, 20, 28),
+                    sliver: SliverList.list(
+                      children: [
+                        _SummaryCard(snapshot.data!),
+                        const SizedBox(height: 16),
+                        _RecommendationIntelligenceStatusCard(snapshot.data!),
+                        const SizedBox(height: 16),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: _DiscoverEntryCard(onOpen: _openDiscover),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: _GenerateRecommendationCard(
+                                working: _working,
+                                onGenerate: _createRun,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 16),
+                        _PreferenceContextCard(
+                          snapshot.data!.preferenceContext,
+                        ),
+                        const SizedBox(height: 16),
+                        _WatchlistCard(
+                          symbols:
+                              snapshot.data!.preferenceContext.watchlistSymbols,
+                          working: _working,
+                          onAdd: _addWatchlistSymbol,
+                          onRemove: _removeWatchlistSymbol,
+                          onOpen: _openWatchlistSymbol,
+                        ),
+                        if (snapshot.data!.explainer.isNotEmpty) ...[
+                          const SizedBox(height: 16),
+                          const _SectionTitle("策略说明"),
+                          const SizedBox(height: 8),
+                          _TextCard(
+                            snapshot.data!.explainer.take(4).join("\n"),
+                          ),
+                        ],
+                        const SizedBox(height: 16),
+                        _SectionTitle(
+                          "优先事项",
+                          actionLabel: "${snapshot.data!.priorities.length} 条",
+                        ),
+                        const SizedBox(height: 8),
+                        if (snapshot.data!.priorities.isEmpty)
+                          const _EmptyCard("暂时没有新的推荐。先完成持仓导入，Loo皇会再下达谕令。")
+                        else
+                          ...snapshot.data!.priorities.take(6).map(
+                                (priority) => _PriorityCard(
+                                  priority: priority,
+                                  onOpenSecurity: _openSecurityDetail,
+                                ),
+                              ),
+                        if (snapshot.data!.scenarios.isNotEmpty) ...[
+                          const SizedBox(height: 16),
+                          const _SectionTitle("情景比较"),
+                          const SizedBox(height: 8),
+                          ...snapshot.data!.scenarios
+                              .take(3)
+                              .map(_ScenarioCard.new),
+                        ],
+                        if (snapshot.data!.notes.isNotEmpty) ...[
+                          const SizedBox(height: 16),
+                          const _SectionTitle("备注"),
+                          const SizedBox(height: 8),
+                          _TextCard(snapshot.data!.notes.take(4).join("\n")),
+                        ],
+                      ],
+                    ),
+                  ),
+              ],
+            ),
           ),
         );
       },
@@ -251,23 +273,16 @@ class _RecommendationsPageState extends State<RecommendationsPage> {
       return;
     }
 
-    Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (_) => SecurityDetailPage(
-          apiClient: widget.apiClient,
-          securityId:
-              priority.securityId.isNotEmpty ? priority.securityId : null,
-          symbol: priority.securitySymbol,
-          fallbackTitle: priority.security.isNotEmpty
-              ? priority.security
-              : priority.securitySymbol,
-          exchange: priority.securityExchange.isNotEmpty
-              ? priority.securityExchange
-              : null,
-          currency: priority.securityCurrency.isNotEmpty
-              ? priority.securityCurrency
-              : null,
-        ),
+    context.push(
+      MobileRoutes.securityDetail(
+        symbol: priority.securitySymbol,
+        securityId: priority.securityId.isNotEmpty ? priority.securityId : null,
+        exchange: priority.securityExchange.isNotEmpty
+            ? priority.securityExchange
+            : null,
+        currency: priority.securityCurrency.isNotEmpty
+            ? priority.securityCurrency
+            : null,
       ),
     );
   }
@@ -277,15 +292,11 @@ class _RecommendationsPageState extends State<RecommendationsPage> {
     if (identity.symbol.isEmpty) {
       return;
     }
-    Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (_) => SecurityDetailPage(
-          apiClient: widget.apiClient,
-          symbol: identity.symbol,
-          fallbackTitle: identity.label,
-          exchange: identity.exchange,
-          currency: identity.currency,
-        ),
+    context.push(
+      MobileRoutes.securityDetail(
+        symbol: identity.symbol,
+        exchange: identity.exchange,
+        currency: identity.currency,
       ),
     );
   }
@@ -299,15 +310,24 @@ class _PageHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = context.looTokens;
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 22, 20, 18),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(title, style: Theme.of(context).textTheme.headlineMedium),
-          const SizedBox(height: 8),
-          Text(subtitle, style: Theme.of(context).textTheme.bodyLarge),
-        ],
+      child: LooGlassCard(
+        isHero: true,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(title, style: Theme.of(context).textTheme.headlineMedium),
+            const SizedBox(height: 8),
+            Text(
+              subtitle,
+              style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                    color: tokens.mutedText,
+                  ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -320,43 +340,29 @@ class _SummaryCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      clipBehavior: Clip.antiAlias,
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              Theme.of(context).colorScheme.primaryContainer,
-              Theme.of(context).colorScheme.surface,
-            ],
+    return LooGlassCard(
+      isHero: true,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text("本轮可部署资金", style: Theme.of(context).textTheme.bodyLarge),
+          const SizedBox(height: 8),
+          Text(
+            data.contributionAmount,
+            style: Theme.of(context).textTheme.displaySmall,
           ),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.all(18),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text("本轮可部署资金", style: Theme.of(context).textTheme.bodyLarge),
-              const SizedBox(height: 8),
-              Text(data.contributionAmount,
-                  style: Theme.of(context).textTheme.displaySmall),
-              if (data.inputs.isNotEmpty) ...[
-                const SizedBox(height: 12),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: data.inputs
-                      .take(4)
-                      .map((input) =>
-                          _InfoPill("${input.label}: ${input.value}"))
-                      .toList(),
-                ),
-              ],
-            ],
-          ),
-        ),
+          if (data.inputs.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: data.inputs
+                  .take(4)
+                  .map((input) => _InfoPill("${input.label}: ${input.value}"))
+                  .toList(),
+            ),
+          ],
+        ],
       ),
     );
   }
@@ -373,22 +379,89 @@ class _RecommendationIntelligenceStatusCard extends StatelessWidget {
         .expand((priority) => priority.intelligenceRefs)
         .toList();
     final hasRefs = refs.isNotEmpty;
-    final theme = Theme.of(context);
+    return LooGlassCard(
+      padding: const EdgeInsets.all(14),
+      child: Row(
+        children: [
+          Icon(Icons.auto_awesome_outlined, color: context.looTokens.accent),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text("外部资料纳入推荐",
+                    style: Theme.of(context).textTheme.titleMedium),
+                const SizedBox(height: 4),
+                Text(
+                  hasRefs
+                      ? "已引用 ${refs.length} 条缓存资料，完整秘闻在总览页查看。"
+                      : "未命中缓存外部资料，排序仍按持仓和偏好计算。",
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: context.looTokens.mutedText,
+                      ),
+                ),
+              ],
+            ),
+          ),
+          _InfoPill(hasRefs ? "已纳入" : "无缓存"),
+        ],
+      ),
+    );
+  }
+}
 
-    return Card(
-      child: ListTile(
-        leading: const Icon(Icons.auto_awesome_outlined),
-        title: const Text("外部资料纳入推荐"),
-        subtitle: Text(
-          hasRefs
-              ? "本轮推荐已引用 ${refs.length} 条缓存资料。完整 Loo国今日秘闻请在总览页查看。"
-              : "本轮推荐暂未命中缓存外部资料；排序仍按当前持仓和投资偏好计算。",
-        ),
-        trailing: Chip(
-          label: Text(hasRefs ? "已纳入" : "无缓存"),
-          backgroundColor: hasRefs
-              ? theme.colorScheme.tertiaryContainer
-              : theme.colorScheme.surfaceContainerHighest,
+class _CompactActionCard extends StatelessWidget {
+  const _CompactActionCard({
+    required this.icon,
+    required this.title,
+    required this.detail,
+    required this.onTap,
+    this.isBusy = false,
+  });
+
+  final IconData icon;
+  final String title;
+  final String detail;
+  final VoidCallback? onTap;
+  final bool isBusy;
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = context.looTokens;
+    return LooGlassCard(
+      padding: const EdgeInsets.all(14),
+      onTap: onTap,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(minHeight: 112),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(icon, color: tokens.accent),
+                const Spacer(),
+                if (isBusy)
+                  const SizedBox(
+                    height: 18,
+                    width: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                else
+                  Icon(Icons.chevron_right, color: tokens.accent),
+              ],
+            ),
+            const Spacer(),
+            Text(title, style: Theme.of(context).textTheme.titleMedium),
+            const SizedBox(height: 4),
+            Text(
+              detail,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: tokens.mutedText,
+                  ),
+            ),
+          ],
         ),
       ),
     );
@@ -406,20 +479,12 @@ class _GenerateRecommendationCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      child: ListTile(
-        leading: const Icon(Icons.auto_awesome),
-        title: const Text("重新生成推荐"),
-        subtitle: const Text("使用当前投资偏好和持仓，输入本次可投资金额后生成新谕令。"),
-        trailing: working
-            ? const SizedBox(
-                width: 22,
-                height: 22,
-                child: CircularProgressIndicator(strokeWidth: 2),
-              )
-            : const Icon(Icons.chevron_right),
-        onTap: working ? null : onGenerate,
-      ),
+    return _CompactActionCard(
+      icon: Icons.auto_awesome,
+      title: "重新生成推荐",
+      detail: "输入本次可投资金额，基于当前偏好和持仓生成。",
+      isBusy: working,
+      onTap: working ? null : onGenerate,
     );
   }
 }
@@ -431,14 +496,11 @@ class _DiscoverEntryCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      child: ListTile(
-        leading: const Icon(Icons.travel_explore_outlined),
-        title: const Text("搜索标的"),
-        subtitle: const Text("按代码或名称查找股票、ETF、CDR，再加入观察或打开标的详情。"),
-        trailing: const Icon(Icons.chevron_right),
-        onTap: onOpen,
-      ),
+    return _CompactActionCard(
+      icon: Icons.travel_explore_outlined,
+      title: "搜索标的",
+      detail: "查找股票、ETF，再加入观察或打开研究台。",
+      onTap: onOpen,
     );
   }
 }
@@ -450,31 +512,33 @@ class _PreferenceContextCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context_) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text("当前推荐规则", style: Theme.of(context_).textTheme.titleLarge),
-            const SizedBox(height: 8),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                _InfoPill("风险：${context.riskLabel}"),
-                _InfoPill("账户：${context.accountFundingPriority.join(" -> ")}"),
-                _InfoPill("策略：${context.recommendationStrategy}"),
-                _InfoPill("再平衡：${context.rebalancingTolerancePct}%"),
-                _InfoPill(context.taxAwarePlacement ? "税务感知：开" : "税务感知：关"),
-              ],
-            ),
-            if (context.allocationLine.isNotEmpty) ...[
-              const SizedBox(height: 10),
-              Text(context.allocationLine),
+    return LooGlassCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text("当前推荐规则", style: Theme.of(context_).textTheme.titleLarge),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              _InfoPill("风险：${context.riskLabel}"),
+              _InfoPill("账户：${context.accountFundingPriority.join(" -> ")}"),
+              _InfoPill("策略：${context.recommendationStrategy}"),
+              _InfoPill("再平衡：${context.rebalancingTolerancePct}%"),
+              _InfoPill(context.taxAwarePlacement ? "税务感知：开" : "税务感知：关"),
             ],
+          ),
+          if (context.allocationLine.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            Text(
+              context.allocationLine,
+              style: Theme.of(context_).textTheme.bodySmall?.copyWith(
+                    color: context_.looTokens.mutedText,
+                  ),
+            ),
           ],
-        ),
+        ],
       ),
     );
   }
@@ -519,56 +583,57 @@ class _WatchlistCardState extends State<_WatchlistCard> {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text("观察标的", style: Theme.of(context).textTheme.titleLarge),
-            const SizedBox(height: 8),
-            const Text("这里的标的会影响候选评分和后续推荐解释。"),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: _controller,
-                    enabled: !widget.working,
-                    textCapitalization: TextCapitalization.characters,
-                    decoration: const InputDecoration(labelText: "代码，例如 VFV"),
-                    onSubmitted: (_) => _submit(),
-                  ),
+    return LooGlassCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text("观察标的", style: Theme.of(context).textTheme.titleLarge),
+          const SizedBox(height: 6),
+          Text(
+            "这里的标的会影响候选评分和后续推荐解释。",
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: context.looTokens.mutedText,
                 ),
-                const SizedBox(width: 8),
-                FilledButton(
-                  onPressed: widget.working ? null : _submit,
-                  child: const Text("加入"),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: _controller,
+                  enabled: !widget.working,
+                  textCapitalization: TextCapitalization.characters,
+                  decoration: const InputDecoration(labelText: "代码，例如 VFV"),
+                  onSubmitted: (_) => _submit(),
                 ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            if (widget.symbols.isEmpty)
-              const Text("暂时没有观察标的。")
-            else
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: widget.symbols
-                    .map(
-                      (symbol) => InputChip(
-                        avatar: const Icon(Icons.open_in_new, size: 16),
-                        label: Text(_formatWatchlistLabel(symbol)),
-                        onPressed: () => widget.onOpen(symbol),
-                        onDeleted: widget.working
-                            ? null
-                            : () => widget.onRemove(symbol),
-                      ),
-                    )
-                    .toList(),
               ),
-          ],
-        ),
+              const SizedBox(width: 8),
+              FilledButton(
+                onPressed: widget.working ? null : _submit,
+                child: const Text("加入"),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          if (widget.symbols.isEmpty)
+            const Text("暂时没有观察标的。")
+          else
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: widget.symbols
+                  .map(
+                    (symbol) => InputChip(
+                      avatar: const Icon(Icons.open_in_new, size: 16),
+                      label: Text(_formatWatchlistLabel(symbol)),
+                      onPressed: () => widget.onOpen(symbol),
+                      onDeleted:
+                          widget.working ? null : () => widget.onRemove(symbol),
+                    ),
+                  )
+                  .toList(),
+            ),
+        ],
       ),
     );
   }
@@ -620,9 +685,15 @@ class _SectionTitle extends StatelessWidget {
     return Row(
       children: [
         Expanded(
-            child: Text(title, style: Theme.of(context).textTheme.titleLarge)),
+          child: Text(title, style: Theme.of(context).textTheme.titleLarge),
+        ),
         if (actionLabel != null)
-          Text(actionLabel!, style: Theme.of(context).textTheme.bodyMedium),
+          Text(
+            actionLabel!,
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: context.looTokens.mutedText,
+                ),
+          ),
       ],
     );
   }
@@ -639,23 +710,36 @@ class _PriorityCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
+    return LooGlassCard(
       margin: const EdgeInsets.only(bottom: 12),
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: EdgeInsets.zero,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(priority.assetClass,
-                style: Theme.of(context).textTheme.titleLarge),
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    priority.assetClass,
+                    style: Theme.of(context).textTheme.titleLarge,
+                  ),
+                ),
+                if (priority.amount.isNotEmpty) _InfoPill(priority.amount),
+              ],
+            ),
             const SizedBox(height: 6),
-            Text(priority.description),
+            Text(
+              priority.description,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: context.looTokens.mutedText,
+                  ),
+            ),
             const SizedBox(height: 10),
             Wrap(
               spacing: 8,
               runSpacing: 8,
               children: [
-                _InfoPill(priority.amount),
                 if (priority.account.isNotEmpty) _InfoPill(priority.account),
                 if (priority.security.isNotEmpty) _InfoPill(priority.security),
               ],
@@ -672,7 +756,7 @@ class _PriorityCard extends StatelessWidget {
               const SizedBox(height: 12),
               Align(
                 alignment: Alignment.centerLeft,
-                child: OutlinedButton.icon(
+                child: FilledButton.tonalIcon(
                   onPressed: () => onOpenSecurity(priority),
                   icon: const Icon(Icons.open_in_new),
                   label: const Text("查看标的详情"),
@@ -729,9 +813,9 @@ class _PriorityIntelligenceSection extends StatelessWidget {
     final theme = Theme.of(context);
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: theme.colorScheme.tertiaryContainer.withValues(alpha: 0.32),
+        color: context.looTokens.accentSoft,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: theme.colorScheme.outlineVariant),
+        border: Border.all(color: context.looTokens.cardBorder),
       ),
       child: Padding(
         padding: const EdgeInsets.all(12),
@@ -740,8 +824,12 @@ class _PriorityIntelligenceSection extends StatelessWidget {
           children: [
             Text("相关秘闻", style: theme.textTheme.titleMedium),
             const SizedBox(height: 6),
-            const Text(
-                "这些只是缓存情报引用，用来解释背景；底层资产情报可跨 CAD/USD 版本参考，具体价格和刷新状态仍以当前 listing 为准。"),
+            Text(
+              "用于解释背景；价格和刷新状态仍以当前 listing 为准。",
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: context.looTokens.mutedText,
+              ),
+            ),
             ...items.take(2).map((item) {
               return Padding(
                 padding: const EdgeInsets.only(top: 10),
@@ -782,9 +870,9 @@ class _ScorelinePanel extends StatelessWidget {
     final theme = Theme.of(context);
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: theme.colorScheme.primaryContainer.withValues(alpha: 0.52),
+        color: context.looTokens.accentSoft,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: theme.colorScheme.outlineVariant),
+        border: Border.all(color: context.looTokens.cardBorder),
       ),
       child: Padding(
         padding: const EdgeInsets.all(14),
@@ -818,9 +906,9 @@ class _V3OverlayPanel extends StatelessWidget {
 
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: theme.colorScheme.secondaryContainer.withValues(alpha: 0.38),
+        color: theme.colorScheme.surface.withValues(alpha: 0.22),
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: theme.colorScheme.outlineVariant),
+        border: Border.all(color: context.looTokens.cardBorder),
       ),
       child: Padding(
         padding: const EdgeInsets.all(14),
@@ -989,14 +1077,27 @@ class _ScenarioCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
+    return LooGlassCard(
       margin: const EdgeInsets.only(bottom: 10),
-      child: ListTile(
-        title: Text("${scenario.label} · ${scenario.amount}"),
-        subtitle: Text([
-          scenario.summary,
-          ...scenario.diffs.take(2),
-        ].where((item) => item.isNotEmpty).join("\n")),
+      padding: const EdgeInsets.all(14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            "${scenario.label} · ${scenario.amount}",
+            style: Theme.of(context).textTheme.titleMedium,
+          ),
+          const SizedBox(height: 6),
+          Text(
+            [
+              scenario.summary,
+              ...scenario.diffs.take(2),
+            ].where((item) => item.isNotEmpty).join("\n"),
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: context.looTokens.mutedText,
+                ),
+          ),
+        ],
       ),
     );
   }
@@ -1009,11 +1110,8 @@ class _TextCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Text(text),
-      ),
+    return LooGlassCard(
+      child: Text(text),
     );
   }
 }
@@ -1025,11 +1123,8 @@ class _EmptyCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Text(message),
-      ),
+    return LooGlassCard(
+      child: Text(message),
     );
   }
 }
@@ -1043,9 +1138,9 @@ class _InfoPill extends StatelessWidget {
   Widget build(BuildContext context) {
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.72),
+        color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.36),
         borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
+        border: Border.all(color: context.looTokens.cardBorder),
       ),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),

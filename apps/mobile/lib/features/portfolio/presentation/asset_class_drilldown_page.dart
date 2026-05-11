@@ -1,11 +1,14 @@
 import "package:flutter/material.dart";
+import "package:go_router/go_router.dart";
 
+import "../../../app/mobile_routes.dart";
 import "../../../core/api/loo_api_client.dart";
+import "../../../core/presentation/loo_components.dart";
+import "../../../core/theme/loo_theme.dart";
 import "../data/mobile_portfolio_models.dart";
 import "../../shared/data/mobile_chart_models.dart";
 import "../../shared/data/mobile_models.dart";
 import "../../shared/presentation/loo_charts.dart";
-import "holding_detail_page.dart";
 
 class AssetClassDrilldownPage extends StatelessWidget {
   const AssetClassDrilldownPage({
@@ -21,63 +24,49 @@ class AssetClassDrilldownPage extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: Text(item.name)),
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(20, 12, 20, 28),
-        children: [
-          _SummaryCard(item),
-          if (item.valueHistoryChart != null) ...[
+      body: LooPageGradient(
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 28),
+          children: [
+            _SummaryCard(item),
+            if (item.valueHistoryChart != null) ...[
+              const SizedBox(height: 16),
+              _AssetClassTrendCard(item.valueHistoryChart!),
+            ],
             const SizedBox(height: 16),
-            _AssetClassTrendCard(item.valueHistoryChart!),
-          ],
-          const SizedBox(height: 16),
-          const _SectionTitle("目标偏离"),
-          const SizedBox(height: 8),
-          _DriftCard(item),
-          if (item.actions.isNotEmpty) ...[
-            const SizedBox(height: 16),
-            const _SectionTitle("修正行动"),
+            const _SectionTitle("目标偏离"),
             const SizedBox(height: 8),
-            _ActionCard(item.actions),
-          ],
-          const SizedBox(height: 16),
-          _SectionTitle("该类别持仓", actionLabel: "${item.holdings.length} 个"),
-          const SizedBox(height: 8),
-          if (item.holdings.isEmpty)
-            const _EmptyCard("这个资产类别下暂时没有持仓。")
-          else
-            ...item.holdings.map(
-              (holding) => Card(
-                child: ListTile(
+            _DriftCard(item),
+            if (item.actions.isNotEmpty) ...[
+              const SizedBox(height: 16),
+              const _SectionTitle("修正行动"),
+              const SizedBox(height: 8),
+              _ActionCard(item.actions),
+            ],
+            const SizedBox(height: 16),
+            _SectionTitle("该类别持仓", actionLabel: "${item.holdings.length} 个"),
+            const SizedBox(height: 8),
+            if (item.holdings.isEmpty)
+              const _EmptyCard("这个资产类别下暂时没有持仓。")
+            else
+              ...item.holdings.map(
+                (holding) => LooTappableRow(
+                  margin: const EdgeInsets.only(bottom: 10),
                   onTap: () => _openHoldingDetail(context, holding),
-                  title: Text("${holding.symbol} · ${holding.name}"),
-                  subtitle: Text(holding.detail),
-                  trailing: Wrap(
-                    crossAxisAlignment: WrapCrossAlignment.center,
-                    spacing: 8,
-                    children: [
-                      Text(holding.value,
-                          style: Theme.of(context).textTheme.titleMedium),
-                      const Icon(Icons.chevron_right),
-                    ],
-                  ),
+                  title: "${holding.symbol} · ${holding.name}",
+                  subtitle: holding.detail,
+                  value: holding.value,
+                  valueDetail: holding.gainLoss,
                 ),
               ),
-            ),
-        ],
+          ],
+        ),
       ),
     );
   }
 
   void _openHoldingDetail(BuildContext context, MobileHoldingCard holding) {
-    Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (_) => HoldingDetailPage(
-          apiClient: apiClient,
-          holdingId: holding.id,
-          fallbackTitle: holding.symbol,
-        ),
-      ),
-    );
+    context.push(MobileRoutes.holdingDetail(holding.id));
   }
 }
 
@@ -88,33 +77,22 @@ class _SummaryCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      clipBehavior: Clip.antiAlias,
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              Theme.of(context).colorScheme.primaryContainer,
-              Theme.of(context).colorScheme.surface,
-            ],
+    return LooGlassCard(
+      isHero: true,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(item.name, style: Theme.of(context).textTheme.headlineMedium),
+          const SizedBox(height: 10),
+          Text(item.value, style: Theme.of(context).textTheme.displaySmall),
+          const SizedBox(height: 8),
+          Text(
+            item.summary,
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: context.looTokens.mutedText,
+                ),
           ),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.all(18),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(item.name,
-                  style: Theme.of(context).textTheme.headlineMedium),
-              const SizedBox(height: 10),
-              Text(item.value, style: Theme.of(context).textTheme.displaySmall),
-              const SizedBox(height: 8),
-              Text(item.summary),
-            ],
-          ),
-        ),
+        ],
       ),
     );
   }
@@ -135,47 +113,46 @@ class _AssetClassTrendCard extends StatelessWidget {
     final first = points.first;
     final last = points.last;
 
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(chart.title, style: Theme.of(context).textTheme.titleLarge),
-            const SizedBox(height: 12),
-            LooLineChart(
-              points: points
-                  .map(
-                    (point) => LooLineChartPoint(
-                      label: point.label,
-                      value: point.value,
-                    ),
-                  )
-                  .toList(),
-            ),
-            const SizedBox(height: 12),
-            Text(
-              "${first.label} ${first.displayValue} → ${last.label} ${last.displayValue}",
-              style: Theme.of(context).textTheme.bodyMedium,
-            ),
-            const SizedBox(height: 10),
-            Chip(label: Text(chart.freshness.label)),
-            const SizedBox(height: 6),
-            Text(
-              chart.freshness.detail,
-              style: Theme.of(context).textTheme.bodySmall,
-            ),
-            if (chart.notes.isNotEmpty) ...[
-              const SizedBox(height: 8),
-              ...chart.notes.take(2).map(
-                    (note) => Text(
-                      "· $note",
-                      style: Theme.of(context).textTheme.bodySmall,
-                    ),
+    return LooGlassCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(chart.title, style: Theme.of(context).textTheme.titleLarge),
+          const SizedBox(height: 12),
+          LooLineChart(
+            points: points
+                .map(
+                  (point) => LooLineChartPoint(
+                    label: point.label,
+                    value: point.value,
                   ),
-            ],
+                )
+                .toList(),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            "${first.label} ${first.displayValue} → ${last.label} ${last.displayValue}",
+            style: Theme.of(context).textTheme.bodyMedium,
+          ),
+          const SizedBox(height: 10),
+          _InfoPill(chart.freshness.label),
+          const SizedBox(height: 6),
+          Text(
+            chart.freshness.detail,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: context.looTokens.mutedText,
+                ),
+          ),
+          if (chart.notes.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            ...chart.notes.take(2).map(
+                  (note) => Text(
+                    "· $note",
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                ),
           ],
-        ),
+        ],
       ),
     );
   }
@@ -188,26 +165,24 @@ class _DriftCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            LooDistributionBar(
-              segments: [
-                LooDistributionSegment(label: "当前", value: item.currentPct),
-                LooDistributionSegment(
-                    label: "距离目标",
-                    value: (item.targetPct - item.currentPct).abs()),
-              ],
-            ),
-            const SizedBox(height: 14),
-            _MetricRow(label: "目标", value: item.target),
-            _MetricRow(label: "当前", value: item.current),
-            _MetricRow(label: "偏离", value: item.driftLabel),
-          ],
-        ),
+    return LooGlassCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          LooDistributionBar(
+            segments: [
+              LooDistributionSegment(label: "当前", value: item.currentPct),
+              LooDistributionSegment(
+                label: "距离目标",
+                value: (item.targetPct - item.currentPct).abs(),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          _MetricRow(label: "目标", value: item.target),
+          _MetricRow(label: "当前", value: item.current),
+          _MetricRow(label: "偏离", value: item.driftLabel),
+        ],
       ),
     );
   }
@@ -240,21 +215,18 @@ class _ActionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: actions
-              .take(4)
-              .map(
-                (action) => Padding(
-                  padding: const EdgeInsets.only(bottom: 8),
-                  child: Text("• $action"),
-                ),
-              )
-              .toList(),
-        ),
+    return LooGlassCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: actions
+            .take(4)
+            .map(
+              (action) => Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Text("• $action"),
+              ),
+            )
+            .toList(),
       ),
     );
   }
@@ -273,7 +245,12 @@ class _SectionTitle extends StatelessWidget {
         Expanded(
             child: Text(title, style: Theme.of(context).textTheme.titleLarge)),
         if (actionLabel != null)
-          Text(actionLabel!, style: Theme.of(context).textTheme.bodyMedium),
+          Text(
+            actionLabel!,
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: context.looTokens.mutedText,
+                ),
+          ),
       ],
     );
   }
@@ -286,10 +263,28 @@ class _EmptyCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
+    return LooGlassCard(
+      child: Text(message),
+    );
+  }
+}
+
+class _InfoPill extends StatelessWidget {
+  const _InfoPill(this.label);
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.34),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: context.looTokens.cardBorder),
+      ),
       child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Text(message),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        child: Text(label, style: Theme.of(context).textTheme.labelMedium),
       ),
     );
   }
