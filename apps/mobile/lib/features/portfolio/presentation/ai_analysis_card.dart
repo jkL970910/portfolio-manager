@@ -4,6 +4,8 @@ import "package:flutter/material.dart";
 import "package:flutter/foundation.dart";
 
 import "../../../core/api/loo_api_client.dart";
+import "../../../core/presentation/loo_components.dart";
+import "../../../core/theme/loo_theme.dart";
 import "../../shared/data/loo_minister_context_models.dart";
 import "../../shared/presentation/loo_minister_scope.dart";
 
@@ -274,89 +276,89 @@ class _AiAnalysisCardState extends State<AiAnalysisCard> {
   Widget build(BuildContext context) {
     final future = _analysis;
 
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(widget.title,
-                          style: Theme.of(context).textTheme.titleLarge),
-                      const SizedBox(height: 6),
-                      Text(widget.description),
-                    ],
-                  ),
+    return LooGlassCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(Icons.auto_awesome_outlined,
+                  color: context.looTokens.accent),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(widget.title,
+                        style: Theme.of(context).textTheme.titleLarge),
+                    const SizedBox(height: 6),
+                    Text(
+                      widget.description,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: context.looTokens.mutedText,
+                          ),
+                    ),
+                  ],
                 ),
-                if (widget.showGenerateButton) ...[
-                  const SizedBox(width: 12),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      FilledButton.icon(
-                        onPressed: _isLoading
-                            ? null
-                            : future == null
-                                ? () => _runAnalysis()
-                                : _hasResult
-                                    ? () => _runAnalysis(refresh: true)
-                                    : null,
-                        icon: const Icon(Icons.auto_awesome),
-                        label: Text(_hasResult ? "重新生成" : "生成"),
-                      ),
-                    ],
-                  ),
-                ],
-              ],
-            ),
-            if (future != null) ...[
-              const SizedBox(height: 14),
-              FutureBuilder<MobileAiAnalysisResult>(
-                future: future,
-                builder: (context, snapshot) {
-                  if (snapshot.connectionState == ConnectionState.waiting) {
-                    return const Padding(
-                      padding: EdgeInsets.symmetric(vertical: 12),
-                      child: LinearProgressIndicator(),
-                    );
-                  }
-
-                  if (snapshot.hasError) {
-                    return _AnalysisError(
-                      message: _friendlyAnalysisErrorMessage(snapshot.error),
-                      onRetry: () => _runAnalysis(refresh: true),
-                    );
-                  }
-
-                  final data = snapshot.data;
-                  if (data == null) {
-                    return _AnalysisError(
-                      message: "没有拿到智能快扫结果。",
-                      onRetry: () => _runAnalysis(refresh: true),
-                    );
-                  }
-
-                  return _AnalysisResultView(data);
-                },
               ),
-              if (_hasResult) ...[
-                const SizedBox(height: 12),
-                _GptEnhancementPanel(
-                  future: _gptEnhancement,
-                  isLoading: _isEnhancing,
-                  hasResult: _hasGptEnhancementResult,
-                  onRun: _runGptEnhancement,
+              if (widget.showGenerateButton) ...[
+                const SizedBox(width: 12),
+                FilledButton.icon(
+                  onPressed: _isLoading
+                      ? null
+                      : future == null
+                          ? () => _runAnalysis()
+                          : _hasResult
+                              ? () => _runAnalysis(refresh: true)
+                              : null,
+                  icon: const Icon(Icons.auto_awesome),
+                  label: Text(_hasResult ? "重新生成" : "生成"),
                 ),
               ],
             ],
+          ),
+          if (future != null) ...[
+            const SizedBox(height: 14),
+            FutureBuilder<MobileAiAnalysisResult>(
+              future: future,
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 12),
+                    child: LinearProgressIndicator(),
+                  );
+                }
+
+                if (snapshot.hasError) {
+                  return _AnalysisError(
+                    message: _friendlyAnalysisErrorMessage(snapshot.error),
+                    onRetry: () => _runAnalysis(refresh: true),
+                  );
+                }
+
+                final data = snapshot.data;
+                if (data == null) {
+                  return _AnalysisError(
+                    message: "没有拿到智能快扫结果。",
+                    onRetry: () => _runAnalysis(refresh: true),
+                  );
+                }
+
+                return _AnalysisResultView(data);
+              },
+            ),
+            if (_hasResult) ...[
+              const SizedBox(height: 12),
+              _GptEnhancementPanel(
+                future: _gptEnhancement,
+                isLoading: _isEnhancing,
+                hasResult: _hasGptEnhancementResult,
+                onRun: _runGptEnhancement,
+              ),
+            ],
           ],
-        ),
+        ],
       ),
     );
   }
