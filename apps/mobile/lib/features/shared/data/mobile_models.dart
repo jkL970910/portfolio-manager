@@ -98,6 +98,11 @@ class MobileHoldingCard {
     final account = json["account"] as String? ?? "";
     final accountCount = json["accountCount"] as String? ?? "";
     final lotCount = json["lotCount"] as String? ?? "";
+    final accountCountLabel = accountCount.isNotEmpty && accountCount != "1"
+        ? "$accountCount 个账户"
+        : "";
+    final lotCountLabel =
+        lotCount.isNotEmpty && lotCount != "1" ? "$lotCount 笔仓位" : "";
     final weight =
         json["weight"] as String? ?? json["portfolioShare"] as String? ?? "";
     final lastUpdated = json["lastUpdated"] as String? ?? "";
@@ -125,14 +130,12 @@ class MobileHoldingCard {
       weight: weight,
       detail: [
         account,
-        if (accountCount.isNotEmpty && accountCount != "1")
-          "$accountCount 个账户",
-        if (lotCount.isNotEmpty && lotCount != "1") "$lotCount 笔仓位",
+        if (accountCountLabel.isNotEmpty && account != accountCountLabel)
+          accountCountLabel,
+        if (lotCountLabel.isNotEmpty && account != lotCountLabel) lotCountLabel,
         weight,
         quoteStatus,
-      ]
-          .where((item) => item.isNotEmpty)
-          .join(" · "),
+      ].where((item) => item.isNotEmpty).join(" · "),
       accountType: json["accountType"] as String? ?? "",
       accountCount: accountCount,
       lotCount: lotCount,

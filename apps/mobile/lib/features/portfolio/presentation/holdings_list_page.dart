@@ -95,7 +95,7 @@ class _HoldingsListPageState extends State<HoldingsListPage> {
                         ...snapshot.data!.securityHoldings.map(
                           (holding) => LooTappableRow(
                             margin: const EdgeInsets.only(bottom: 10),
-                            title: "${holding.symbol} · ${holding.name}",
+                            title: _holdingTitle(holding),
                             subtitle: holding.detail,
                             value: holding.value,
                             valueDetail: holding.gainLoss,
@@ -112,6 +112,17 @@ class _HoldingsListPageState extends State<HoldingsListPage> {
       },
     );
   }
+}
+
+String _holdingTitle(MobileHoldingCard holding) {
+  final symbol = holding.symbol.trim();
+  final name = holding.name.trim();
+  if (name.isEmpty ||
+      name == "--" ||
+      name.toUpperCase() == symbol.toUpperCase()) {
+    return symbol;
+  }
+  return "$symbol · $name";
 }
 
 class _HoldingsSummaryCard extends StatelessWidget {
