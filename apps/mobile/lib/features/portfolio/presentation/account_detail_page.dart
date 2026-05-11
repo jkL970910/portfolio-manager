@@ -123,8 +123,6 @@ class _AccountDetailPageState extends State<AccountDetailPage> {
                 children: [
                   _SummaryCard(data),
                   const SizedBox(height: 12),
-                  _MetricGrid(data),
-                  const SizedBox(height: 12),
                   if (data.accountValueChart != null ||
                       data.performance.isNotEmpty) ...[
                     _AccountTrendCard(
@@ -142,16 +140,9 @@ class _AccountDetailPageState extends State<AccountDetailPage> {
                     _AllocationChartCard(data.allocation),
                   ],
                   const SizedBox(height: 16),
-                  _SectionTitle(
-                    title: "账户持仓",
-                    actionLabel: "${data.holdings.length} 个",
-                  ),
-                  const SizedBox(height: 8),
-                  ...data.holdings.map(
-                    (holding) => _HoldingTile(
-                      holding,
-                      onTap: () => _openHoldingDetail(holding),
-                    ),
+                  _AccountHoldingsPreview(
+                    holdings: data.holdings,
+                    onOpenHolding: _openHoldingDetail,
                   ),
                   if (data.facts.isNotEmpty) ...[
                     const SizedBox(height: 16),
@@ -455,6 +446,8 @@ class _SummaryCard extends StatelessWidget {
               if (data.room.isNotEmpty) _MiniPill(data.room),
             ],
           ),
+          SizedBox(height: tokens.gapLg),
+          _AccountMetricStrip(data),
         ],
       ),
     );
@@ -626,13 +619,14 @@ String _slug(String value) {
       .replaceAll(RegExp(r"^-+|-+$"), "");
 }
 
-class _MetricGrid extends StatelessWidget {
-  const _MetricGrid(this.data);
+class _AccountMetricStrip extends StatelessWidget {
+  const _AccountMetricStrip(this.data);
 
   final MobileAccountDetailSnapshot data;
 
   @override
   Widget build(BuildContext context) {
+    final tokens = context.looTokens;
     final metrics = [
       _MetricDatum("账户盈亏", data.gainLoss),
       _MetricDatum("组合占比", data.portfolioShare),
@@ -640,19 +634,24 @@ class _MetricGrid extends StatelessWidget {
       _MetricDatum("健康度", data.healthScore.score),
     ].where((item) => item.value.isNotEmpty && item.value != "--").toList();
 
-    return LooGlassCard(
-      padding: const EdgeInsets.all(14),
-      child: Wrap(
-        spacing: 10,
-        runSpacing: 10,
-        children: metrics
-            .map(
-              (metric) => SizedBox(
-                width: (MediaQuery.sizeOf(context).width - 70) / 2,
-                child: _MetricCard(metric),
-              ),
-            )
-            .toList(),
+    if (metrics.isEmpty) return const SizedBox.shrink();
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.28),
+        borderRadius: BorderRadius.circular(tokens.radiusLg),
+        border: Border.all(color: tokens.cardBorder),
+      ),
+      child: Padding(
+        padding: EdgeInsets.all(tokens.gapMd),
+        child: Row(
+          children: [
+            for (var index = 0; index < metrics.take(3).length; index++) ...[
+              if (index > 0) SizedBox(width: tokens.gapSm),
+              Expanded(child: _MetricCard(metrics[index])),
+            ],
+          ],
+        ),
       ),
     );
   }
@@ -673,58 +672,24 @@ class _MetricCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final tokens = context.looTokens;
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.36),
-        borderRadius: BorderRadius.circular(tokens.radiusMd),
-        border: Border.all(color: tokens.cardBorder),
-      ),
-      child: Padding(
-        padding: EdgeInsets.all(tokens.gapMd),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              metric.label,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: tokens.mutedText,
-                  ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              metric.value,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: Theme.of(context).textTheme.titleLarge,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _SectionTitle extends StatelessWidget {
-  const _SectionTitle({required this.title, this.actionLabel});
-
-  final String title;
-  final String? actionLabel;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Expanded(
-          child: Text(title, style: Theme.of(context).textTheme.titleLarge),
+        Text(
+          metric.label,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: tokens.mutedText,
+              ),
         ),
-        if (actionLabel != null)
-          Text(
-            actionLabel!,
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: context.looTokens.mutedText,
-                ),
-          ),
+        const SizedBox(height: 6),
+        Text(
+          metric.value,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: Theme.of(context).textTheme.titleMedium,
+        ),
       ],
     );
   }
@@ -850,6 +815,123 @@ class _CompactFactsCard extends StatelessWidget {
                 ),
               ),
         ],
+      ),
+    );
+  }
+}
+
+class _AccountHoldingsPreview extends StatelessWidget {
+  const _AccountHoldingsPreview({
+    required this.holdings,
+    required this.onOpenHolding,
+  });
+
+  final List<MobileHoldingCard> holdings;
+  final ValueChanged<MobileHoldingCard> onOpenHolding;
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = context.looTokens;
+    final shownHoldings = holdings.take(5).toList();
+
+    return LooGlassCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _SectionHeader(
+            title: "账户内持仓",
+            trailing: "${holdings.length} 个",
+          ),
+          SizedBox(height: tokens.gapSm),
+          Text(
+            "这里只展示该账户内的主要持仓；点击单项查看这笔仓位详情。",
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: tokens.mutedText,
+                ),
+          ),
+          SizedBox(height: tokens.gapMd),
+          if (shownHoldings.isEmpty)
+            Text(
+              "这个账户还没有持仓。",
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: tokens.mutedText,
+                  ),
+            )
+          else
+            ...shownHoldings.map(
+              (holding) => _CompactHoldingRow(
+                holding,
+                onTap: () => onOpenHolding(holding),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CompactHoldingRow extends StatelessWidget {
+  const _CompactHoldingRow(this.holding, {required this.onTap});
+
+  final MobileHoldingCard holding;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = context.looTokens;
+    return InkWell(
+      borderRadius: BorderRadius.circular(tokens.radiusMd),
+      onTap: onTap,
+      child: Padding(
+        padding: EdgeInsets.symmetric(vertical: tokens.gapSm),
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    "${holding.symbol} · ${holding.name}",
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.titleSmall,
+                  ),
+                  if (holding.weight.isNotEmpty) ...[
+                    SizedBox(height: tokens.gapXs),
+                    Text(
+                      holding.weight,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: tokens.mutedText,
+                          ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            SizedBox(width: tokens.gapMd),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Text(holding.value,
+                    style: Theme.of(context).textTheme.titleSmall),
+                if (holding.gainLoss.isNotEmpty) ...[
+                  SizedBox(height: tokens.gapXs),
+                  Text(
+                    holding.gainLoss,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: holding.gainLoss.trim().startsWith("-")
+                              ? tokens.danger
+                              : tokens.success,
+                          fontWeight: FontWeight.w700,
+                        ),
+                  ),
+                ],
+              ],
+            ),
+            SizedBox(width: tokens.gapSm),
+            Icon(Icons.chevron_right_rounded, color: tokens.mutedText),
+          ],
+        ),
       ),
     );
   }
@@ -1084,24 +1166,5 @@ class _EditAccountSheetState extends State<_EditAccountSheet> {
       return "请输入大于等于 0 的数字";
     }
     return null;
-  }
-}
-
-class _HoldingTile extends StatelessWidget {
-  const _HoldingTile(this.holding, {required this.onTap});
-
-  final MobileHoldingCard holding;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return LooTappableRow(
-      margin: const EdgeInsets.only(bottom: 10),
-      title: "${holding.symbol} · ${holding.name}",
-      subtitle: holding.detail,
-      value: holding.value,
-      valueDetail: holding.gainLoss,
-      onTap: onTap,
-    );
   }
 }
