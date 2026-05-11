@@ -263,7 +263,7 @@ class _DraggableMinisterButtonState extends State<_DraggableMinisterButton> {
   static const _buttonWidth = 124.0;
   static const _buttonHeight = 56.0;
   static const _edgeMargin = 14.0;
-  static const _bottomNavigationClearance = 112.0;
+  static const _bottomNavigationClearance = 68.0;
 
   Offset? _offset;
   var _dragging = false;

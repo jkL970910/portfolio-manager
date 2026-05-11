@@ -6,6 +6,7 @@ import "../features/overview/presentation/overview_page.dart";
 import "../features/portfolio/presentation/portfolio_page.dart";
 import "../features/recommendations/presentation/recommendations_page.dart";
 import "../features/settings/presentation/settings_page.dart";
+import "../features/shared/presentation/loo_bottom_nav_bar.dart";
 
 class MobileRootShellController extends ChangeNotifier {
   int _index = 0;
@@ -148,22 +149,35 @@ class _MobileRootShellState extends State<MobileRootShell> {
     ];
 
     return Scaffold(
-      body: SafeArea(child: pages[_index]),
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: _index,
-        onDestinationSelected: _selectTab,
-        destinations: const [
-          NavigationDestination(
-              icon: Icon(Icons.dashboard_outlined), label: "总览"),
-          NavigationDestination(
-              icon: Icon(Icons.account_balance_wallet_outlined), label: "组合"),
-          NavigationDestination(
-              icon: Icon(Icons.auto_awesome_outlined), label: "推荐"),
-          NavigationDestination(
-              icon: Icon(Icons.upload_file_outlined), label: "导入"),
-          NavigationDestination(
-              icon: Icon(Icons.settings_outlined), label: "设置"),
-        ],
+      extendBody: true,
+      body: SafeArea(
+        bottom: false,
+        child: Stack(
+          children: [
+            Positioned.fill(child: pages[_index]),
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: 18,
+              child: LooBottomNavBar(
+                currentIndex: _index,
+                onChanged: _selectTab,
+                items: const [
+                  LooBottomNavItem(icon: Icons.dashboard_rounded, label: "总览"),
+                  LooBottomNavItem(
+                    icon: Icons.account_balance_wallet_rounded,
+                    label: "组合",
+                  ),
+                  LooBottomNavItem(
+                      icon: Icons.auto_awesome_rounded, label: "推荐"),
+                  LooBottomNavItem(
+                      icon: Icons.upload_file_rounded, label: "导入"),
+                  LooBottomNavItem(icon: Icons.settings_rounded, label: "设置"),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
