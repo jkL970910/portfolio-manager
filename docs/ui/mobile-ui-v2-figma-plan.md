@@ -88,6 +88,40 @@ semantic tokens from the Loo theme layer.
 
 ## Page Scope
 
+## Portfolio IA Redesign Decision
+
+Approved direction as of 2026-05-11:
+
+- Keep the bottom nav unchanged: `总览 / 组合 / 推荐 / 导入 / 设置`.
+- Do not add separate bottom-nav tabs for accounts, holdings, or securities.
+- Make `组合` a focused portfolio dashboard, not a mixed long page that also
+  acts as the account list and holding list.
+- Split the portfolio domain into explicit routeable surfaces:
+  - `/portfolio`: overall portfolio dashboard and health/allocation/risk entry
+    points.
+  - `/portfolio/accounts`: all-account list and account-level navigation.
+  - `/portfolio/accounts/:accountId`: one account's summary, account health,
+    allocation, and account-held positions.
+  - `/portfolio/holdings`: all-position list and filters.
+  - `/portfolio/holdings/:holdingId`: one owned position's cost, return, account
+    context, and position health.
+  - `/securities/:symbol?...`: security research cockpit for a listing identity;
+    preserve `securityId`, `exchange`, and `currency` through query parameters.
+- Treat `Security` and `Holding` as separate user concepts:
+  - Security Detail owns listing-level facts: quote/history, key levels,
+    valuation evidence, profile/fundamentals, external intelligence, and
+    candidate-fit research.
+  - Holding Detail owns the user's private position: account, quantity, cost
+    basis, P/L, account share, portfolio share, and position health.
+- Security facts must not be hidden by portfolio/personal guardrails. Portfolio
+  fit can affect "is this suitable for me now?", but it must not suppress key
+  levels, valuation evidence, or listing facts.
+- Overview account/holding entry points should deep-link to the exact list or
+  detail target instead of opening the mixed Portfolio page and scrolling to a
+  section.
+- Implement declarative routing during the first IA split to avoid a second
+  migration from `Navigator.push` to deep links later.
+
 ### Overview
 
 First fold should answer:

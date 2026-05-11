@@ -1,16 +1,16 @@
 import "dart:math" as math;
 
 import "package:flutter/material.dart";
+import "package:go_router/go_router.dart";
 
+import "../../../app/mobile_routes.dart";
 import "../../../core/api/loo_api_client.dart";
 import "../../../core/presentation/loo_components.dart";
 import "../../../core/theme/loo_theme.dart";
 import "../../intelligence/data/daily_intelligence_models.dart";
 import "../../intelligence/presentation/daily_intelligence_card.dart";
 import "../data/mobile_home_models.dart";
-import "../../portfolio/presentation/account_detail_page.dart";
 import "../../portfolio/presentation/health_score_page.dart";
-import "../../portfolio/presentation/security_detail_page.dart";
 import "../../shared/data/mobile_chart_models.dart";
 import "../../shared/data/mobile_models.dart";
 import "../../shared/presentation/loo_charts.dart";
@@ -174,15 +174,7 @@ class _OverviewPageState extends State<OverviewPage> {
   }
 
   void _openAccountDetail(MobileAccountCard account) {
-    Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (_) => AccountDetailPage(
-          apiClient: widget.apiClient,
-          accountId: account.id,
-          fallbackTitle: account.name,
-        ),
-      ),
-    );
+    context.push(MobileRoutes.accountDetail(account.id));
   }
 
   void _showTopHoldingsShare(List<MobileHoldingCard> holdings) {
@@ -194,20 +186,15 @@ class _OverviewPageState extends State<OverviewPage> {
   }
 
   void _openSecurityFromIntelligence(MobileDailyIntelligenceItem item) {
-    Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (_) => SecurityDetailPage(
-          apiClient: widget.apiClient,
-          symbol: item.identity.symbol,
-          fallbackTitle: item.identity.symbol,
-          securityId: item.identity.securityId.isEmpty
-              ? null
-              : item.identity.securityId,
-          exchange:
-              item.identity.exchange.isEmpty ? null : item.identity.exchange,
-          currency:
-              item.identity.currency.isEmpty ? null : item.identity.currency,
-        ),
+    context.push(
+      MobileRoutes.securityDetail(
+        symbol: item.identity.symbol,
+        securityId:
+            item.identity.securityId.isEmpty ? null : item.identity.securityId,
+        exchange:
+            item.identity.exchange.isEmpty ? null : item.identity.exchange,
+        currency:
+            item.identity.currency.isEmpty ? null : item.identity.currency,
       ),
     );
   }

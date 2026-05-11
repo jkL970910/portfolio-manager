@@ -89,6 +89,27 @@ Design direction:
 - The implementation plan and component mapping live in
   `docs/ui/mobile-ui-v2-figma-plan.md`.
 
+### Portfolio / Account / Holding / Security IA
+
+Approved direction as of 2026-05-11:
+
+- The bottom nav remains `总览 / 组合 / 推荐 / 导入 / 设置`.
+- `组合` is the overall portfolio dashboard. It should focus on portfolio-level
+  health, allocation, concentration, risk, and entry points.
+- Account list, holding list, account detail, holding detail, and security
+  detail are explicit second-level routes rather than hidden sections inside one
+  long Portfolio page.
+- `Security Detail` and `Holding Detail` are separate concepts:
+  - `Security Detail` is the public/listing research cockpit for facts, quote
+    history, key levels, valuation evidence, external intelligence, and
+    candidate fit.
+  - `Holding Detail` is the user's private position page for account, quantity,
+    cost, return, portfolio/account share, and position health.
+- Overview links should navigate directly to the intended target: account list,
+  holding list, account detail, holding detail, or security research cockpit.
+- The mobile app should use declarative routes for these surfaces so Flutter Web
+  can eventually support precise URLs.
+
 ## Current Core Features
 
 ### 1. Authentication And Session

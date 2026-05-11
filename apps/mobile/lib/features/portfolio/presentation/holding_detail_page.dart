@@ -1,14 +1,16 @@
 import "package:flutter/material.dart";
+import "package:go_router/go_router.dart";
 
+import "../../../app/mobile_routes.dart";
 import "../../../core/api/loo_api_client.dart";
+import "../../../core/presentation/loo_components.dart";
+import "../../../core/theme/loo_theme.dart";
 import "../../shared/data/mobile_chart_models.dart";
 import "../../shared/data/loo_minister_context_models.dart";
 import "../../shared/data/mobile_models.dart";
 import "../../shared/presentation/loo_charts.dart";
 import "../../shared/presentation/loo_minister_scope.dart";
-import "account_detail_page.dart";
 import "detail_state_widgets.dart";
-import "security_detail_page.dart";
 
 class HoldingDetailPage extends StatefulWidget {
   const HoldingDetailPage({
@@ -86,77 +88,67 @@ class _HoldingDetailPageState extends State<HoldingDetailPage> {
         future: _snapshot,
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
+            return const LooPageGradient(
+              child: Center(child: CircularProgressIndicator()),
+            );
           }
 
           if (snapshot.hasError) {
-            return DetailErrorState(
-              title: "持仓详情暂时打不开",
-              message: snapshot.error.toString(),
-              onRetry: _refresh,
+            return LooPageGradient(
+              child: DetailErrorState(
+                title: "持仓详情暂时打不开",
+                message: snapshot.error.toString(),
+                onRetry: _refresh,
+              ),
             );
           }
 
           if (!snapshot.hasData) {
-            return DetailNotFoundState(
-              title: "没有找到这个持仓",
-              message: "这个持仓可能已被删除、移动到账户外，或当前报价同步尚未完成。",
-              onRetry: _refresh,
+            return LooPageGradient(
+              child: DetailNotFoundState(
+                title: "没有找到这个持仓",
+                message: "这个持仓可能已被删除、移动到账户外，或当前报价同步尚未完成。",
+                onRetry: _refresh,
+              ),
             );
           }
 
           final data = snapshot.data!;
           return RefreshIndicator(
             onRefresh: () async => _refresh(),
-            child: ListView(
-              padding: const EdgeInsets.fromLTRB(20, 12, 20, 28),
-              children: [
-                _SummaryCard(data),
-                const SizedBox(height: 12),
-                if (data.holdingValueChart != null) ...[
-                  _HoldingTrendCard(data.holdingValueChart!),
+            child: LooPageGradient(
+              child: ListView(
+                padding: const EdgeInsets.fromLTRB(20, 12, 20, 28),
+                children: [
+                  _SummaryCard(data),
                   const SizedBox(height: 12),
-                ],
-                _MetricGrid(data),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        onPressed: () => _openAccountDetail(data),
-                        icon: const Icon(Icons.account_balance_wallet_outlined),
-                        label: const Text("查看账户"),
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        onPressed: () => _openSecurityDetail(data),
-                        icon: const Icon(Icons.show_chart),
-                        label: const Text("查看标的"),
-                      ),
+                  _MetricGrid(data),
+                  const SizedBox(height: 12),
+                  _ActionLinksCard(
+                    onOpenAccount: () => _openAccountDetail(data),
+                    onOpenSecurity: () => _openSecurityDetail(data),
+                  ),
+                  if (data.holdingValueChart != null) ...[
+                    const SizedBox(height: 12),
+                    _HoldingTrendCard(data.holdingValueChart!),
+                  ],
+                  const SizedBox(height: 12),
+                  _HealthCard(data.healthSummary),
+                  if (data.portfolioRole.isNotEmpty) ...[
+                    const SizedBox(height: 12),
+                    _PortfolioRoleCard(data.portfolioRole),
+                  ],
+                  const SizedBox(height: 12),
+                  _MarketDataCard(data.marketData),
+                  if (data.facts.isNotEmpty) ...[
+                    const SizedBox(height: 12),
+                    _CompactFactsCard(
+                      title: "持仓档案",
+                      facts: data.facts,
                     ),
                   ],
-                ),
-                const SizedBox(height: 16),
-                const _SectionTitle("持仓档案"),
-                const SizedBox(height: 8),
-                ...data.facts.map(_FactTile.new),
-                const SizedBox(height: 16),
-                const _SectionTitle("行情状态"),
-                const SizedBox(height: 8),
-                _MarketDataCard(data.marketData),
-                if (data.portfolioRole.isNotEmpty) ...[
-                  const SizedBox(height: 16),
-                  const _SectionTitle("组合角色"),
-                  const SizedBox(height: 8),
-                  _TextCard(data.portfolioRole.take(4).join("\n")),
                 ],
-                const SizedBox(height: 16),
-                const _SectionTitle("Loo国健康度"),
-                const SizedBox(height: 8),
-                _HealthCard(data.healthSummary),
-              ],
+              ),
             ),
           );
         },
@@ -165,27 +157,15 @@ class _HoldingDetailPageState extends State<HoldingDetailPage> {
   }
 
   void _openAccountDetail(MobileHoldingDetailSnapshot data) {
-    Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (_) => AccountDetailPage(
-          apiClient: widget.apiClient,
-          accountId: data.accountId,
-          fallbackTitle: data.accountName,
-        ),
-      ),
-    );
+    context.push(MobileRoutes.accountDetail(data.accountId));
   }
 
   void _openSecurityDetail(MobileHoldingDetailSnapshot data) {
-    Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (_) => SecurityDetailPage(
-          apiClient: widget.apiClient,
-          symbol: data.symbol,
-          exchange: data.identityExchange,
-          currency: data.currency,
-          fallbackTitle: data.symbol,
-        ),
+    context.push(
+      MobileRoutes.securityDetail(
+        symbol: data.symbol,
+        exchange: data.identityExchange,
+        currency: data.currency,
       ),
     );
   }
@@ -619,69 +599,63 @@ class _SummaryCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final tokens = context.looTokens;
     final freshnessColor = _freshnessColor(context, data.freshnessVariant);
 
-    return Card(
-      clipBehavior: Clip.antiAlias,
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              theme.colorScheme.primaryContainer,
-              theme.colorScheme.surface,
-            ],
-          ),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.all(18),
-          child: Column(
+    return LooGlassCard(
+      isHero: true,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(
-                    child: Text(
-                      "${data.symbol} · ${data.name}",
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      data.symbol,
                       style: theme.textTheme.headlineMedium,
                     ),
-                  ),
-                  _StatusPill(
-                      label: _freshnessLabel(data.freshnessVariant),
-                      color: freshnessColor),
-                ],
+                    SizedBox(height: tokens.gapXs),
+                    Text(
+                      data.name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: tokens.mutedText,
+                      ),
+                    ),
+                  ],
+                ),
               ),
-              const SizedBox(height: 10),
-              Text(data.value, style: theme.textTheme.displaySmall),
-              const SizedBox(height: 8),
-              Text(data.subtitle),
-              const SizedBox(height: 12),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  if (data.assetClass.isNotEmpty) _InfoPill(data.assetClass),
-                  if (data.sector.isNotEmpty) _InfoPill(data.sector),
-                  if (data.exchange.isNotEmpty) _InfoPill(data.exchange),
-                ],
+              _StatusPill(
+                label: _freshnessLabel(data.freshnessVariant),
+                color: freshnessColor,
               ),
-              if (data.quantityLine.isNotEmpty) ...[
-                const SizedBox(height: 12),
-                Text(data.quantityLine),
-              ],
-              if (data.quoteLine.isNotEmpty) ...[
-                const SizedBox(height: 8),
-                Text(data.quoteLine),
-              ],
-              if (data.fxLine.isNotEmpty) ...[
-                const SizedBox(height: 8),
-                Text(data.fxLine, style: theme.textTheme.bodySmall),
-              ],
             ],
           ),
-        ),
+          SizedBox(height: tokens.gapLg),
+          Text(data.value, style: theme.textTheme.displaySmall),
+          SizedBox(height: tokens.gapSm),
+          Text(data.subtitle, style: theme.textTheme.bodyMedium),
+          SizedBox(height: tokens.gapSm),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              if (data.assetClass.isNotEmpty) _InfoPill(data.assetClass),
+              if (data.sector.isNotEmpty) _InfoPill(data.sector),
+              if (data.exchange.isNotEmpty) _InfoPill(data.exchange),
+              if (data.currency.isNotEmpty) _InfoPill(data.currency),
+            ],
+          ),
+          if (data.quantityLine.isNotEmpty) ...[
+            SizedBox(height: tokens.gapMd),
+            Text(data.quantityLine),
+          ],
+        ],
       ),
     );
   }
@@ -705,17 +679,20 @@ class _MetricGrid extends StatelessWidget {
       return const SizedBox.shrink();
     }
 
-    return GridView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      itemCount: metrics.length,
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2,
-        crossAxisSpacing: 10,
-        mainAxisSpacing: 10,
-        childAspectRatio: 1.8,
+    return LooGlassCard(
+      padding: const EdgeInsets.all(14),
+      child: Wrap(
+        spacing: 10,
+        runSpacing: 10,
+        children: metrics
+            .map(
+              (metric) => SizedBox(
+                width: (MediaQuery.sizeOf(context).width - 70) / 2,
+                child: _MetricCard(metric),
+              ),
+            )
+            .toList(),
       ),
-      itemBuilder: (context, index) => _MetricCard(metrics[index]),
     );
   }
 }
@@ -734,46 +711,34 @@ class _MetricCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
+    final tokens = context.looTokens;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.36),
+        borderRadius: BorderRadius.circular(tokens.radiusMd),
+        border: Border.all(color: tokens.cardBorder),
+      ),
       child: Padding(
-        padding: const EdgeInsets.all(14),
+        padding: EdgeInsets.all(tokens.gapMd),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
           children: [
-            Text(metric.label, style: Theme.of(context).textTheme.bodyMedium),
-            const Spacer(),
-            Text(metric.value, style: Theme.of(context).textTheme.titleLarge),
+            Text(
+              metric.label,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: tokens.mutedText,
+                  ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              metric.value,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
           ],
         ),
-      ),
-    );
-  }
-}
-
-class _SectionTitle extends StatelessWidget {
-  const _SectionTitle(this.title);
-
-  final String title;
-
-  @override
-  Widget build(BuildContext context) {
-    return Text(title, style: Theme.of(context).textTheme.titleLarge);
-  }
-}
-
-class _FactTile extends StatelessWidget {
-  const _FactTile(this.fact);
-
-  final MobileFact fact;
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      child: ListTile(
-        title: Text(fact.label),
-        subtitle: Text(fact.detail),
-        trailing:
-            Text(fact.value, style: Theme.of(context).textTheme.titleLarge),
       ),
     );
   }
@@ -788,9 +753,9 @@ class _InfoPill extends StatelessWidget {
   Widget build(BuildContext context) {
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.72),
+        color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.38),
         borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
+        border: Border.all(color: context.looTokens.cardBorder),
       ),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
@@ -862,47 +827,28 @@ class _HoldingTrendCard extends StatelessWidget {
 
     final first = points.first;
     final last = points.last;
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(chart.title, style: Theme.of(context).textTheme.titleLarge),
-            const SizedBox(height: 12),
-            LooLineChart(
-              points: points
-                  .map(
-                    (point) => LooLineChartPoint(
-                      label: point.label,
-                      value: point.chartValue,
-                    ),
-                  )
-                  .toList(),
-            ),
-            const SizedBox(height: 12),
-            Text(
-              "${first.label} ${first.displayValue} → ${last.label} ${last.displayValue}",
-              style: Theme.of(context).textTheme.bodyMedium,
-            ),
-            const SizedBox(height: 10),
-            Chip(label: Text(chart.freshness.label)),
-            const SizedBox(height: 6),
-            Text(
-              chart.freshness.detail,
-              style: Theme.of(context).textTheme.bodySmall,
-            ),
-            if (chart.notes.isNotEmpty) ...[
-              const SizedBox(height: 8),
-              ...chart.notes.take(2).map(
-                    (note) => Text(
-                      "· $note",
-                      style: Theme.of(context).textTheme.bodySmall,
-                    ),
+    return LooGlassCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _SectionHeader(title: chart.title, trailing: chart.freshness.label),
+          const SizedBox(height: 12),
+          LooLineChart(
+            points: points
+                .map(
+                  (point) => LooLineChartPoint(
+                    label: point.label,
+                    value: point.chartValue,
                   ),
-            ],
-          ],
-        ),
+                )
+                .toList(),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            "${first.label} ${first.displayValue} → ${last.label} ${last.displayValue}",
+            style: Theme.of(context).textTheme.bodyMedium,
+          ),
+        ],
       ),
     );
   }
@@ -915,49 +861,48 @@ class _MarketDataCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(marketData.summary),
-            ...marketData.notes.take(3).map(
-                  (note) => Padding(
-                    padding: const EdgeInsets.only(top: 6),
-                    child: Text("• $note"),
+    return LooGlassCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const _SectionHeader(title: "行情状态"),
+          const SizedBox(height: 8),
+          Text(marketData.summary),
+          ...marketData.facts.take(4).map(
+                (fact) => Padding(
+                  padding: const EdgeInsets.only(top: 10),
+                  child: Row(
+                    children: [
+                      Expanded(child: Text(fact.label)),
+                      Text(
+                        fact.value,
+                        style: Theme.of(context).textTheme.titleMedium,
+                      ),
+                    ],
                   ),
                 ),
-            ...marketData.facts.take(4).map(
-                  (fact) => Padding(
-                    padding: const EdgeInsets.only(top: 10),
-                    child: Row(
-                      children: [
-                        Expanded(child: Text(fact.label)),
-                        Text(fact.value,
-                            style: Theme.of(context).textTheme.titleMedium),
-                      ],
-                    ),
-                  ),
-                ),
-          ],
-        ),
+              ),
+        ],
       ),
     );
   }
 }
 
-class _TextCard extends StatelessWidget {
-  const _TextCard(this.text);
+class _PortfolioRoleCard extends StatelessWidget {
+  const _PortfolioRoleCard(this.items);
 
-  final String text;
+  final List<String> items;
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Text(text),
+    return LooGlassCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const _SectionHeader(title: "组合角色"),
+          const SizedBox(height: 8),
+          ...items.take(3).map(_BulletLine.new),
+        ],
       ),
     );
   }
@@ -970,30 +915,186 @@ class _HealthCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text("${health.score} · ${health.status}",
-                style: Theme.of(context).textTheme.titleLarge),
-            const SizedBox(height: 8),
-            Text(health.summary),
-            ...health.drivers.take(3).map(
-                  (driver) => Padding(
-                    padding: const EdgeInsets.only(top: 6),
-                    child: Text("• $driver"),
-                  ),
+    return LooGlassCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const _SectionHeader(title: "持仓健康度"),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Text(
+                health.score.replaceAll(" 分", ""),
+                style: Theme.of(context).textTheme.displaySmall,
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  health.status,
+                  style: Theme.of(context).textTheme.titleMedium,
                 ),
-            ...health.actions.take(3).map(
-                  (action) => Padding(
-                    padding: const EdgeInsets.only(top: 6),
-                    child: Text("行动：$action"),
-                  ),
-                ),
-          ],
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Text(health.summary),
+          ...[
+            ...health.drivers.take(2),
+            ...health.actions.take(1),
+          ].map(_BulletLine.new),
+        ],
+      ),
+    );
+  }
+}
+
+class _ActionLinksCard extends StatelessWidget {
+  const _ActionLinksCard({
+    required this.onOpenAccount,
+    required this.onOpenSecurity,
+  });
+
+  final VoidCallback onOpenAccount;
+  final VoidCallback onOpenSecurity;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Expanded(
+          child: _ActionLink(
+            title: "所属账户",
+            subtitle: "看账户内配置",
+            icon: Icons.account_balance_wallet_outlined,
+            onTap: onOpenAccount,
+          ),
         ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: _ActionLink(
+            title: "标的研究台",
+            subtitle: "看标的事实",
+            icon: Icons.show_chart_rounded,
+            onTap: onOpenSecurity,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _ActionLink extends StatelessWidget {
+  const _ActionLink({
+    required this.title,
+    required this.subtitle,
+    required this.icon,
+    required this.onTap,
+  });
+
+  final String title;
+  final String subtitle;
+  final IconData icon;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = context.looTokens;
+    return LooGlassCard(
+      onTap: onTap,
+      padding: EdgeInsets.all(tokens.gapMd),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, color: tokens.accent),
+          const SizedBox(height: 10),
+          Text(title, style: Theme.of(context).textTheme.titleMedium),
+          const SizedBox(height: 4),
+          Text(
+            subtitle,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: tokens.mutedText,
+                ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CompactFactsCard extends StatelessWidget {
+  const _CompactFactsCard({required this.title, required this.facts});
+
+  final String title;
+  final List<MobileFact> facts;
+
+  @override
+  Widget build(BuildContext context) {
+    return LooGlassCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _SectionHeader(title: title),
+          const SizedBox(height: 10),
+          ...facts.take(5).map(
+                (fact) => Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: Row(
+                    children: [
+                      Expanded(child: Text(fact.label)),
+                      Text(
+                        fact.value,
+                        style: Theme.of(context).textTheme.titleSmall,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SectionHeader extends StatelessWidget {
+  const _SectionHeader({required this.title, this.trailing});
+
+  final String title;
+  final String? trailing;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Expanded(
+          child: Text(title, style: Theme.of(context).textTheme.titleLarge),
+        ),
+        if (trailing != null && trailing!.isNotEmpty)
+          Text(
+            trailing!,
+            style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                  color: context.looTokens.accent,
+                ),
+          ),
+      ],
+    );
+  }
+}
+
+class _BulletLine extends StatelessWidget {
+  const _BulletLine(this.text);
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 6),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text("• ", style: TextStyle(color: context.looTokens.accent)),
+          Expanded(child: Text(text)),
+        ],
       ),
     );
   }

@@ -1,4 +1,5 @@
 import "package:flutter/material.dart";
+import "package:go_router/go_router.dart";
 
 import "../core/api/loo_api_client.dart";
 import "../core/auth/mobile_auth_session.dart";
@@ -7,12 +8,20 @@ import "../core/theme/loo_theme.dart";
 import "../features/auth/presentation/login_page.dart";
 import "../features/discover/presentation/discover_page.dart";
 import "../features/portfolio/presentation/account_detail_page.dart";
+import "../features/portfolio/presentation/accounts_list_page.dart";
 import "../features/portfolio/presentation/health_score_page.dart";
 import "../features/portfolio/presentation/holding_detail_page.dart";
+import "../features/portfolio/presentation/holdings_list_page.dart";
+import "../features/portfolio/presentation/portfolio_page.dart";
 import "../features/portfolio/presentation/security_detail_page.dart";
+import "../features/import_flow/presentation/import_page.dart";
+import "../features/overview/presentation/overview_page.dart";
+import "../features/recommendations/presentation/recommendations_page.dart";
+import "../features/settings/presentation/settings_page.dart";
 import "../features/shared/data/loo_minister_context_models.dart";
 import "../features/shared/presentation/loo_minister_card.dart";
 import "../features/shared/presentation/loo_minister_scope.dart";
+import "mobile_routes.dart";
 import "router.dart";
 
 class LooWealthApp extends StatefulWidget {
@@ -29,8 +38,8 @@ class LooWealthApp extends StatefulWidget {
 
 class _LooWealthAppState extends State<LooWealthApp> {
   late final MobileAuthStore _authStore;
+  late final GoRouter _router;
   final _navigatorKey = GlobalKey<NavigatorState>();
-  final _rootShellController = MobileRootShellController();
   final _ministerAnalysisAction =
       ValueNotifier<LooMinisterSuggestedAction?>(null);
 
@@ -43,7 +52,6 @@ class _LooWealthAppState extends State<LooWealthApp> {
   @override
   void dispose() {
     _ministerAnalysisAction.dispose();
-    _rootShellController.dispose();
     super.dispose();
   }
 
@@ -51,6 +59,7 @@ class _LooWealthAppState extends State<LooWealthApp> {
   void initState() {
     super.initState();
     _authStore = widget._authStore ?? MobileAuthStore();
+    _router = _createRouter();
     _restoreSession();
   }
 
@@ -236,13 +245,13 @@ class _LooWealthAppState extends State<LooWealthApp> {
     final effectivePage = page ?? _pageForScope(scope);
     switch (effectivePage) {
       case "overview":
-        _rootShellController.openTab(0);
+        _router.go(MobileRoutes.overview);
         return true;
       case "portfolio":
-        _rootShellController.openTab(1);
+        _router.go(MobileRoutes.portfolio);
         return true;
       case "recommendations":
-        _rootShellController.openTab(2);
+        _router.go(MobileRoutes.recommendations);
         return true;
       case "discover":
       case "security-discover":
@@ -250,12 +259,12 @@ class _LooWealthAppState extends State<LooWealthApp> {
           DiscoverPage(apiClient: _currentApiClient),
         );
       case "import":
-        _rootShellController.openTab(3);
+        _router.go(MobileRoutes.importFlow);
         return true;
       case "settings":
       case "preferences":
       case "investment-preferences":
-        _rootShellController.openTab(4);
+        _router.go(MobileRoutes.settings);
         return true;
       case "portfolio-health":
       case "health-score":
@@ -273,44 +282,31 @@ class _LooWealthAppState extends State<LooWealthApp> {
         if (accountId == null || accountId.isEmpty) {
           return false;
         }
-        return _pushMinisterPage(
-          AccountDetailPage(
-            apiClient: _currentApiClient,
-            accountId: accountId,
-            fallbackTitle: "账户详情",
-          ),
-        );
+        _router.push(MobileRoutes.accountDetail(accountId));
+        return true;
       case "holding-detail":
         final holdingId = _targetString(action, "holdingId") ??
             _ministerContext?.subject.holdingId;
         if (holdingId == null || holdingId.isEmpty) {
           return false;
         }
-        return _pushMinisterPage(
-          HoldingDetailPage(
-            apiClient: _currentApiClient,
-            holdingId: holdingId,
-            fallbackTitle: "持仓详情",
-          ),
-        );
+        _router.push(MobileRoutes.holdingDetail(holdingId));
+        return true;
       case "security-detail":
         final security =
             _targetSecurity(action) ?? _ministerContext?.subject.security;
         if (security == null || security.symbol.isEmpty) {
           return false;
         }
-        return _pushMinisterPage(
-          SecurityDetailPage(
-            apiClient: _currentApiClient,
+        _router.push(
+          MobileRoutes.securityDetail(
             symbol: security.symbol,
-            fallbackTitle: security.name?.isNotEmpty == true
-                ? security.name!
-                : security.symbol,
             securityId: security.securityId,
             exchange: security.exchange,
             currency: security.currency,
           ),
         );
+        return true;
       default:
         return false;
     }
@@ -381,6 +377,131 @@ class _LooWealthAppState extends State<LooWealthApp> {
     );
   }
 
+  GoRouter _createRouter() {
+    return GoRouter(
+      navigatorKey: _navigatorKey,
+      initialLocation: MobileRoutes.overview,
+      routes: [
+        GoRoute(
+          path: "/",
+          redirect: (_, __) => MobileRoutes.overview,
+        ),
+        GoRoute(
+          path: MobileRoutes.overview,
+          builder: (context, state) => _buildRootShell(
+            context,
+            currentIndex: 0,
+            child: OverviewPage(
+              apiClient: _currentApiClient,
+              onOpenAccounts: () =>
+                  context.push(MobileRoutes.portfolioAccounts),
+              onOpenHoldings: () =>
+                  context.push(MobileRoutes.portfolioHoldings),
+              onOpenRecommendations: () =>
+                  context.go(MobileRoutes.recommendations),
+            ),
+          ),
+        ),
+        GoRoute(
+          path: MobileRoutes.portfolio,
+          builder: (context, state) => _buildRootShell(
+            context,
+            currentIndex: 1,
+            child: PortfolioPage(apiClient: _currentApiClient),
+          ),
+        ),
+        GoRoute(
+          path: MobileRoutes.portfolioAccounts,
+          builder: (context, state) => _buildRootShell(
+            context,
+            currentIndex: 1,
+            child: AccountsListPage(apiClient: _currentApiClient),
+          ),
+        ),
+        GoRoute(
+          path: "${MobileRoutes.portfolioAccounts}/:accountId",
+          builder: (context, state) => AccountDetailPage(
+            apiClient: _currentApiClient,
+            accountId: decodeRouteParam(state.pathParameters["accountId"]!),
+            fallbackTitle: "账户详情",
+          ),
+        ),
+        GoRoute(
+          path: MobileRoutes.portfolioHoldings,
+          builder: (context, state) => _buildRootShell(
+            context,
+            currentIndex: 1,
+            child: HoldingsListPage(apiClient: _currentApiClient),
+          ),
+        ),
+        GoRoute(
+          path: "${MobileRoutes.portfolioHoldings}/:holdingId",
+          builder: (context, state) => HoldingDetailPage(
+            apiClient: _currentApiClient,
+            holdingId: decodeRouteParam(state.pathParameters["holdingId"]!),
+            fallbackTitle: "持仓详情",
+          ),
+        ),
+        GoRoute(
+          path: "/securities/:symbol",
+          builder: (context, state) {
+            final symbol = decodeRouteParam(state.pathParameters["symbol"]!);
+            return SecurityDetailPage(
+              apiClient: _currentApiClient,
+              symbol: symbol,
+              fallbackTitle: symbol,
+              securityId: state.uri.queryParameters["securityId"],
+              exchange: state.uri.queryParameters["exchange"],
+              currency: state.uri.queryParameters["currency"],
+            );
+          },
+        ),
+        GoRoute(
+          path: MobileRoutes.recommendations,
+          builder: (context, state) => _buildRootShell(
+            context,
+            currentIndex: 2,
+            child: RecommendationsPage(apiClient: _currentApiClient),
+          ),
+        ),
+        GoRoute(
+          path: MobileRoutes.importFlow,
+          builder: (context, state) => _buildRootShell(
+            context,
+            currentIndex: 3,
+            child: ImportPage(apiClient: _currentApiClient),
+          ),
+        ),
+        GoRoute(
+          path: MobileRoutes.settings,
+          builder: (context, state) => _buildRootShell(
+            context,
+            currentIndex: 4,
+            child: SettingsPage(
+              apiClient: _currentApiClient,
+              viewerName: _session?.viewerName ?? "Loo",
+              baseCurrency: _session?.baseCurrency ?? "CAD",
+              onDisplayCurrencyChanged: _setDisplayCurrency,
+              onLogout: _logout,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildRootShell(
+    BuildContext context, {
+    required int currentIndex,
+    required Widget child,
+  }) {
+    return MobileRootShell(
+      currentIndex: currentIndex,
+      onTabSelected: (index) => context.go(mobileRootPathForTab(index)),
+      child: child,
+    );
+  }
+
   void _showMinisterActionMessage(String message) {
     final context = _navigatorKey.currentContext;
     if (context == null) {
@@ -427,49 +548,53 @@ class _LooWealthAppState extends State<LooWealthApp> {
             onUnauthorized: _clearSession,
           );
 
-    return MaterialApp(
-      navigatorKey: _navigatorKey,
+    Widget appBuilder(BuildContext context, Widget? child) {
+      final currentChild = child ?? const SizedBox.shrink();
+      if (_loading || session == null || apiClient == null) {
+        return currentChild;
+      }
+
+      return LooMinisterScope(
+        onContextChanged: _setMinisterContext,
+        analysisActionListenable: _ministerAnalysisAction,
+        child: Stack(
+          children: [
+            Positioned.fill(child: currentChild),
+            LooMinisterFloatingButton(
+              apiClient: apiClient,
+              navigatorKey: _navigatorKey,
+              pageContext: _ministerContext ?? _fallbackMinisterContext,
+              recentSubjects: _recentMinisterSubjects,
+              suggestedQuestion: _suggestedMinisterQuestion,
+              onSuggestedActionConfirmed: _requestMinisterAnalysisAction,
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (_loading || session == null || apiClient == null) {
+      return MaterialApp(
+        title: "Loo国的财富宝库",
+        debugShowCheckedModeBanner: false,
+        theme: buildLooLightTheme(),
+        darkTheme: buildLooDarkTheme(),
+        themeMode: LooThemeMode.dark.materialThemeMode,
+        builder: appBuilder,
+        home: _loading
+            ? const _StartupScreen()
+            : LoginPage(onAuthenticated: _setSession),
+      );
+    }
+
+    return MaterialApp.router(
       title: "Loo国的财富宝库",
       debugShowCheckedModeBanner: false,
       theme: buildLooLightTheme(),
       darkTheme: buildLooDarkTheme(),
       themeMode: LooThemeMode.dark.materialThemeMode,
-      builder: (context, child) {
-        final currentChild = child ?? const SizedBox.shrink();
-        if (_loading || session == null || apiClient == null) {
-          return currentChild;
-        }
-
-        return LooMinisterScope(
-          onContextChanged: _setMinisterContext,
-          analysisActionListenable: _ministerAnalysisAction,
-          child: Stack(
-            children: [
-              Positioned.fill(child: currentChild),
-              LooMinisterFloatingButton(
-                apiClient: apiClient,
-                navigatorKey: _navigatorKey,
-                pageContext: _ministerContext ?? _fallbackMinisterContext,
-                recentSubjects: _recentMinisterSubjects,
-                suggestedQuestion: _suggestedMinisterQuestion,
-                onSuggestedActionConfirmed: _requestMinisterAnalysisAction,
-              ),
-            ],
-          ),
-        );
-      },
-      home: _loading
-          ? const _StartupScreen()
-          : session == null
-              ? LoginPage(onAuthenticated: _setSession)
-              : MobileRootShell(
-                  apiClient: apiClient!,
-                  controller: _rootShellController,
-                  viewerName: session.viewerName,
-                  baseCurrency: session.baseCurrency,
-                  onDisplayCurrencyChanged: _setDisplayCurrency,
-                  onLogout: _logout,
-                ),
+      builder: appBuilder,
+      routerConfig: _router,
     );
   }
 
