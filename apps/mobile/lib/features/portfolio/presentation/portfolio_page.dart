@@ -6,6 +6,7 @@ import "../../../core/api/loo_api_client.dart";
 import "../../../core/presentation/loo_components.dart";
 import "../../../core/theme/loo_theme.dart";
 import "../../shared/data/mobile_chart_models.dart";
+import "../../shared/data/mobile_models.dart";
 import "../../shared/presentation/loo_charts.dart";
 import "../../shared/presentation/loo_minister_scope.dart";
 import "../data/mobile_portfolio_models.dart";
@@ -156,24 +157,18 @@ class _PortfolioPageState extends State<PortfolioPage> {
                           ),
                         ],
                         const SizedBox(height: 18),
-                        _NavigationEntryCard(
+                        _AccountsDropdownCard(
                           key: _accountsKey,
-                          title: "账户列表",
-                          subtitle: "查看全部账户、账户级盈亏与账户内持仓。",
-                          value: "${snapshot.data!.accounts.length} 个",
-                          icon: Icons.account_balance_wallet_outlined,
-                          onTap: () => context.push(
-                            MobileRoutes.portfolioAccounts,
+                          accounts: snapshot.data!.accounts,
+                          onOpenAccount: (account) => context.push(
+                            MobileRoutes.accountDetail(account.id),
                           ),
                         ),
                         const SizedBox(height: 10),
-                        _NavigationEntryCard(
+                        _HoldingsSummaryEntryCard(
                           key: _holdingsKey,
-                          title: "持仓列表",
-                          subtitle: "查看全部持仓、账户归属、盈亏与仓位详情。",
-                          value: "${snapshot.data!.holdings.length} 个",
-                          icon: Icons.view_list_rounded,
-                          onTap: () => context.push(
+                          holdings: snapshot.data!.holdings,
+                          onOpenHoldings: () => context.push(
                             MobileRoutes.portfolioHoldings,
                           ),
                         ),
@@ -593,45 +588,147 @@ class _DistributionTabButton extends StatelessWidget {
   }
 }
 
-class _NavigationEntryCard extends StatelessWidget {
-  const _NavigationEntryCard({
-    required this.title,
-    required this.subtitle,
-    required this.value,
-    required this.icon,
-    required this.onTap,
+class _AccountsDropdownCard extends StatefulWidget {
+  const _AccountsDropdownCard({
+    required this.accounts,
+    required this.onOpenAccount,
     super.key,
   });
 
-  final String title;
-  final String subtitle;
-  final String value;
-  final IconData icon;
-  final VoidCallback onTap;
+  final List<MobileAccountCard> accounts;
+  final ValueChanged<MobileAccountCard> onOpenAccount;
+
+  @override
+  State<_AccountsDropdownCard> createState() => _AccountsDropdownCardState();
+}
+
+class _AccountsDropdownCardState extends State<_AccountsDropdownCard> {
+  var _expanded = false;
 
   @override
   Widget build(BuildContext context) {
     final tokens = context.looTokens;
     return LooGlassCard(
-      onTap: onTap,
+      padding: EdgeInsets.all(tokens.gapMd),
+      child: AnimatedSize(
+        duration: const Duration(milliseconds: 180),
+        curve: Curves.easeOutCubic,
+        alignment: Alignment.topCenter,
+        child: Column(
+          children: [
+            InkWell(
+              borderRadius: BorderRadius.circular(tokens.radiusMd),
+              onTap: () => setState(() => _expanded = !_expanded),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 2),
+                child: Row(
+                  children: [
+                    const _EntryIcon(Icons.account_balance_wallet_outlined),
+                    SizedBox(width: tokens.gapMd),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            "账户总览",
+                            style: Theme.of(context).textTheme.titleMedium,
+                          ),
+                          SizedBox(height: tokens.gapXs),
+                          Text(
+                            "展开查看账户，点击单个账户进入详情。",
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style:
+                                Theme.of(context).textTheme.bodySmall?.copyWith(
+                                      color: tokens.mutedText,
+                                    ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    SizedBox(width: tokens.gapMd),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Text(
+                          "${widget.accounts.length} 个",
+                          style: Theme.of(context).textTheme.titleLarge,
+                        ),
+                        SizedBox(height: tokens.gapXs),
+                        AnimatedRotation(
+                          turns: _expanded ? 0.5 : 0,
+                          duration: const Duration(milliseconds: 180),
+                          curve: Curves.easeOutCubic,
+                          child: Icon(
+                            Icons.keyboard_arrow_down_rounded,
+                            color: tokens.mutedText,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            if (_expanded) ...[
+              SizedBox(height: tokens.gapMd),
+              Divider(height: 1, color: tokens.cardBorder),
+              SizedBox(height: tokens.gapSm),
+              if (widget.accounts.isEmpty)
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    "还没有账户。",
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: tokens.mutedText,
+                        ),
+                  ),
+                )
+              else
+                ...widget.accounts.map(
+                  (account) => _CompactAccountRow(
+                    account: account,
+                    onTap: () => widget.onOpenAccount(account),
+                  ),
+                ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _HoldingsSummaryEntryCard extends StatelessWidget {
+  const _HoldingsSummaryEntryCard({
+    required this.holdings,
+    required this.onOpenHoldings,
+    super.key,
+  });
+
+  final List<MobileHoldingCard> holdings;
+  final VoidCallback onOpenHoldings;
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = context.looTokens;
+    final topHolding = holdings.isEmpty ? null : holdings.first;
+    final subtitle = topHolding == null
+        ? "查看全部持仓、账户归属、盈亏与仓位详情。"
+        : "最大仓位 ${topHolding.symbol} · ${topHolding.weight}";
+
+    return LooGlassCard(
+      onTap: onOpenHoldings,
       padding: EdgeInsets.all(tokens.gapMd),
       child: Row(
         children: [
-          Container(
-            width: 42,
-            height: 42,
-            decoration: BoxDecoration(
-              color: tokens.accent.withValues(alpha: 0.14),
-              borderRadius: BorderRadius.circular(tokens.radiusMd),
-            ),
-            child: Icon(icon, color: tokens.accent),
-          ),
+          const _EntryIcon(Icons.view_list_rounded),
           SizedBox(width: tokens.gapMd),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(title, style: Theme.of(context).textTheme.titleMedium),
+                Text("持仓入口", style: Theme.of(context).textTheme.titleMedium),
                 SizedBox(height: tokens.gapXs),
                 Text(
                   subtitle,
@@ -648,13 +745,103 @@ class _NavigationEntryCard extends StatelessWidget {
           Column(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              Text(value, style: Theme.of(context).textTheme.titleLarge),
+              Text("${holdings.length} 个",
+                  style: Theme.of(context).textTheme.titleLarge),
               SizedBox(height: tokens.gapXs),
               Icon(Icons.arrow_forward_rounded, color: tokens.mutedText),
             ],
           ),
         ],
       ),
+    );
+  }
+}
+
+class _CompactAccountRow extends StatelessWidget {
+  const _CompactAccountRow({required this.account, required this.onTap});
+
+  final MobileAccountCard account;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = context.looTokens;
+    return InkWell(
+      borderRadius: BorderRadius.circular(tokens.radiusMd),
+      onTap: onTap,
+      child: Padding(
+        padding: EdgeInsets.symmetric(vertical: tokens.gapSm),
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    account.name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.titleSmall,
+                  ),
+                  if (account.detail.isNotEmpty) ...[
+                    SizedBox(height: tokens.gapXs),
+                    Text(
+                      account.detail,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: tokens.mutedText,
+                          ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            SizedBox(width: tokens.gapMd),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Text(account.value,
+                    style: Theme.of(context).textTheme.titleSmall),
+                if (account.gainLoss.isNotEmpty) ...[
+                  SizedBox(height: tokens.gapXs),
+                  Text(
+                    account.gainLoss,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: account.gainLoss.trim().startsWith("-")
+                              ? tokens.danger
+                              : tokens.success,
+                          fontWeight: FontWeight.w700,
+                        ),
+                  ),
+                ],
+              ],
+            ),
+            SizedBox(width: tokens.gapSm),
+            Icon(Icons.chevron_right_rounded, color: tokens.mutedText),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _EntryIcon extends StatelessWidget {
+  const _EntryIcon(this.icon);
+
+  final IconData icon;
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = context.looTokens;
+    return Container(
+      width: 42,
+      height: 42,
+      decoration: BoxDecoration(
+        color: tokens.accent.withValues(alpha: 0.14),
+        borderRadius: BorderRadius.circular(tokens.radiusMd),
+      ),
+      child: Icon(icon, color: tokens.accent),
     );
   }
 }
