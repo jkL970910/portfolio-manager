@@ -1,6 +1,7 @@
 import "package:flutter/material.dart";
 
 import "../../../core/api/loo_api_client.dart";
+import "../../../core/presentation/loo_components.dart";
 import "../data/mobile_import_models.dart";
 
 class ImportPage extends StatefulWidget {
@@ -66,7 +67,7 @@ class _ImportPageState extends State<ImportPage> {
                 )
               else if (snapshot.hasData)
                 SliverPadding(
-                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 28),
+                  padding: looPagePadding(context),
                   sliver: SliverList.list(
                     children: [
                       _HeroCard(snapshot.data!),

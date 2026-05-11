@@ -178,7 +178,7 @@ class _RecommendationsPageState extends State<RecommendationsPage> {
                   )
                 else if (snapshot.hasData)
                   SliverPadding(
-                    padding: const EdgeInsets.fromLTRB(20, 0, 20, 28),
+                    padding: looPagePadding(context),
                     sliver: SliverList.list(
                       children: [
                         _SummaryCard(snapshot.data!),

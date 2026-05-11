@@ -26,6 +26,17 @@ class LooBottomNavBar extends StatelessWidget {
   final List<LooBottomNavItem> items;
   final ValueChanged<int> onChanged;
 
+  static const bottomOffset = 18.0;
+  static const visualHeight = 60.0;
+  static const contentGap = 18.0;
+
+  static double contentInset(BuildContext context) {
+    return bottomOffset +
+        visualHeight +
+        contentGap +
+        MediaQuery.paddingOf(context).bottom;
+  }
+
   @override
   Widget build(BuildContext context) {
     final tokens = context.looTokens;

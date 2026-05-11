@@ -75,7 +75,7 @@ class _HoldingsListPageState extends State<HoldingsListPage> {
                   )
                 else if (snapshot.hasData)
                   SliverPadding(
-                    padding: const EdgeInsets.fromLTRB(20, 0, 20, 108),
+                    padding: looPagePadding(context),
                     sliver: SliverList.list(
                       children: [
                         _HoldingsSummaryCard(snapshot.data!),

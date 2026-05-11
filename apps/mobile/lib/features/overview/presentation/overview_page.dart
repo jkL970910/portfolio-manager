@@ -108,7 +108,7 @@ class _OverviewPageState extends State<OverviewPage> {
                   )
                 else if (snapshot.hasData)
                   SliverPadding(
-                    padding: const EdgeInsets.fromLTRB(20, 0, 20, 28),
+                    padding: looPagePadding(context),
                     sliver: SliverList.list(
                       children: [
                         _OverviewSummaryPanel(

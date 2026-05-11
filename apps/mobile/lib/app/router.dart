@@ -17,17 +17,27 @@ class MobileRootShell extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final bottomInset = LooBottomNavBar.contentInset(context);
     return Scaffold(
       extendBody: true,
       body: SafeArea(
         bottom: false,
         child: Stack(
           children: [
-            Positioned.fill(child: child),
+            Positioned.fill(
+              child: MediaQuery(
+                data: MediaQuery.of(context).copyWith(
+                  padding: MediaQuery.paddingOf(context).copyWith(
+                    bottom: bottomInset,
+                  ),
+                ),
+                child: child,
+              ),
+            ),
             Positioned(
               left: 0,
               right: 0,
-              bottom: 18,
+              bottom: LooBottomNavBar.bottomOffset,
               child: LooBottomNavBar(
                 currentIndex: currentIndex,
                 onChanged: onTabSelected,

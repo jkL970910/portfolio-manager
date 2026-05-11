@@ -2,6 +2,22 @@ import "package:flutter/material.dart";
 
 import "../theme/loo_theme.dart";
 
+EdgeInsets looPagePadding(
+  BuildContext context, {
+  double left = 20,
+  double top = 0,
+  double right = 20,
+  double bottom = 28,
+}) {
+  final safeBottom = MediaQuery.paddingOf(context).bottom;
+  return EdgeInsets.fromLTRB(
+    left,
+    top,
+    right,
+    safeBottom > bottom ? safeBottom : bottom,
+  );
+}
+
 class LooPageGradient extends StatelessWidget {
   const LooPageGradient({
     required this.child,

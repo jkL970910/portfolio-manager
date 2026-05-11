@@ -75,7 +75,7 @@ class _AccountsListPageState extends State<AccountsListPage> {
                   )
                 else if (snapshot.hasData)
                   SliverPadding(
-                    padding: const EdgeInsets.fromLTRB(20, 0, 20, 108),
+                    padding: looPagePadding(context),
                     sliver: SliverList.list(
                       children: [
                         _AccountsSummaryCard(snapshot.data!),
