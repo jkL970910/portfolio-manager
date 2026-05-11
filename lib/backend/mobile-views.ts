@@ -26,7 +26,16 @@ import {
   getOrCreateLatestMarketSentiment,
   mapMarketSentimentForMobileWithIndexes,
 } from "@/lib/backend/market-sentiment";
+import {
+  getExternalResearchPolicy,
+  mapExternalResearchPolicyForMobile,
+} from "@/lib/backend/portfolio-external-research";
+import {
+  getMobileExternalResearchUsage,
+  mapExternalResearchJobForMobile,
+} from "@/lib/backend/external-research-jobs";
 import type { Viewer } from "@/lib/auth/session";
+import type { ExternalResearchDocumentRecord } from "@/lib/backend/models";
 
 type MobileHomeData = {
   viewer: Viewer;
@@ -159,6 +168,7 @@ type MobilePortfolioSecurityDetailData = Omit<
   PortfolioSecurityDetailData,
   "relatedHoldings" | "heldPosition"
 > & {
+  researchRefreshActions: MobileResearchRefreshAction[];
   relatedHoldings: Array<
     Omit<PortfolioSecurityDetailData["relatedHoldings"][number], "href">
   >;
@@ -171,6 +181,347 @@ type MobilePortfolioSecurityDetailData = Omit<
         accountViews: MobileSecurityAccountHoldingView[];
       });
 };
+
+type MobileResearchRefreshAction = {
+  id: "quote-history" | "profile" | "institutional";
+  label: string;
+  detail: string;
+  providerLabel: string | null;
+  estimatedCalls: number;
+  quotaLabel: string | null;
+  enabled: boolean;
+  disabledReason: string | null;
+  sourceId: "market-data" | "profile" | "institutional" | null;
+  cache: {
+    status:
+      | "unknown"
+      | "missing"
+      | "fresh"
+      | "stale"
+      | "no-data"
+      | "limited"
+      | "not-applicable";
+    label: string;
+    detail: string;
+    lastUpdatedAt: string | null;
+    ttlLabel: string | null;
+    confirmationRequired: boolean;
+    confirmationMessage: string | null;
+  };
+};
+
+function isFundLikeSecurity(data: PortfolioSecurityDetailData) {
+  const raw = [
+    data.security.securityType,
+    data.security.assetClass,
+    data.security.name,
+    data.security.sector,
+  ]
+    .filter((value): value is string => Boolean(value))
+    .join(" ")
+    .toLowerCase();
+  return raw.includes("etf") || raw.includes("fund");
+}
+
+function parseMobileDate(value: string | null | undefined) {
+  if (!value) {
+    return null;
+  }
+  const date = new Date(value);
+  return Number.isFinite(date.getTime()) ? date : null;
+}
+
+function formatMobileTtl(seconds: number | null | undefined) {
+  if (!seconds || seconds <= 0) {
+    return null;
+  }
+  if (seconds < 3600) {
+    return `${Math.round(seconds / 60)} 分钟`;
+  }
+  if (seconds < 86400) {
+    return `${Math.round(seconds / 3600)} 小时`;
+  }
+  return `${Math.round(seconds / 86400)} 天`;
+}
+
+function getResearchActionCache(input: {
+  latestJob: ReturnType<typeof mapExternalResearchJobForMobile> | null;
+  freshDocument: ExternalResearchDocumentRecord | null;
+  ttlSeconds: number;
+  providerLabel: string;
+  estimatedCalls: number;
+  now: Date;
+}) {
+  const {
+    latestJob,
+    freshDocument,
+    ttlSeconds,
+    providerLabel,
+    estimatedCalls,
+    now,
+  } = input;
+  if (freshDocument) {
+    const remainingSeconds = Math.max(
+      1,
+      Math.ceil((Date.parse(freshDocument.expiresAt) - now.getTime()) / 1000),
+    );
+    const ttlLabel = formatMobileTtl(remainingSeconds);
+    return {
+      status: "fresh" as const,
+      label: "资料仍有效",
+      detail: `已有 ${freshDocument.sourceName} 资料，约 ${ttlLabel ?? "一段时间"} 后过期。`,
+      lastUpdatedAt: freshDocument.capturedAt,
+      ttlLabel,
+      confirmationRequired: true,
+      confirmationMessage: `${providerLabel} 资料仍在有效期内。继续刷新预计消耗 ${estimatedCalls} 次 provider 调用，是否仍继续？`,
+    };
+  }
+
+  if (!latestJob) {
+    return {
+      status: "missing" as const,
+      label: "未见最近刷新",
+      detail: "点击后会提交后台任务。",
+      lastUpdatedAt: null,
+      ttlLabel: formatMobileTtl(ttlSeconds),
+      confirmationRequired: false,
+      confirmationMessage: null,
+    };
+  }
+
+  const lastUpdatedAt =
+    latestJob.finishedAt ?? latestJob.startedAt ?? latestJob.createdAt ?? null;
+  const lastDate = parseMobileDate(lastUpdatedAt);
+  const freshUntil =
+    lastDate && latestJob.status === "succeeded"
+      ? new Date(lastDate.getTime() + ttlSeconds * 1000)
+      : null;
+  const fresh =
+    freshUntil !== null &&
+    Number.isFinite(freshUntil.getTime()) &&
+    freshUntil > now;
+  const resultKind = String(latestJob.resultKind ?? "");
+
+  if (fresh) {
+    const ttlLabel = formatMobileTtl(
+      Math.ceil((freshUntil.getTime() - now.getTime()) / 1000),
+    );
+    return {
+      status: "fresh" as const,
+      label: "资料仍有效",
+      detail: `已有可用缓存，约 ${ttlLabel ?? "一段时间"} 后过期。`,
+      lastUpdatedAt,
+      ttlLabel,
+      confirmationRequired: true,
+      confirmationMessage: `${providerLabel} 资料仍在有效期内。继续刷新预计消耗 ${estimatedCalls} 次 provider 调用，是否仍继续？`,
+    };
+  }
+
+  if (resultKind === "provider_limited") {
+    return {
+      status: "limited" as const,
+      label: "来源额度暂不可用",
+      detail: latestJob.resultDetail ?? "provider 当前限流或额度不可用。",
+      lastUpdatedAt,
+      ttlLabel: formatMobileTtl(ttlSeconds),
+      confirmationRequired: false,
+      confirmationMessage: null,
+    };
+  }
+
+  if (resultKind === "not_applicable") {
+    return {
+      status: "not-applicable" as const,
+      label: "这类资料不适用",
+      detail: latestJob.resultDetail ?? "该资料不适用于这类标的。",
+      lastUpdatedAt,
+      ttlLabel: formatMobileTtl(ttlSeconds),
+      confirmationRequired: false,
+      confirmationMessage: null,
+    };
+  }
+
+  if (resultKind === "no_data" || latestJob.status === "skipped") {
+    return {
+      status: "no-data" as const,
+      label: latestJob.resultLabel ?? "来源暂无资料",
+      detail:
+        latestJob.resultDetail ??
+        latestJob.statusNote ??
+        "本次没有写入新资料。",
+      lastUpdatedAt,
+      ttlLabel: formatMobileTtl(ttlSeconds),
+      confirmationRequired: false,
+      confirmationMessage: null,
+    };
+  }
+
+  return {
+    status: "stale" as const,
+    label: latestJob.resultLabel ?? latestJob.statusLabel ?? "缓存需刷新",
+    detail:
+      latestJob.resultDetail ?? latestJob.statusNote ?? "可以重新刷新资料。",
+    lastUpdatedAt,
+    ttlLabel: formatMobileTtl(ttlSeconds),
+    confirmationRequired: false,
+    confirmationMessage: null,
+  };
+}
+
+export function buildMobileResearchRefreshActions(input: {
+  data: PortfolioSecurityDetailData;
+  jobs: ReturnType<typeof mapExternalResearchJobForMobile>[];
+  freshDocuments?: ExternalResearchDocumentRecord[];
+  policy: ReturnType<typeof getExternalResearchPolicy>;
+  usage: Awaited<
+    ReturnType<typeof getMobileExternalResearchUsage>
+  >["data"]["usage"];
+  now: Date;
+}): MobileResearchRefreshAction[] {
+  const { data, jobs, freshDocuments = [], policy, usage, now } = input;
+  const mobilePolicy = mapExternalResearchPolicyForMobile(policy);
+  const ttlSeconds = policy.defaultTtlSeconds;
+  const quotaLabel = `外部资料额度剩余 ${usage.remainingRuns} / ${usage.dailyRunLimit}`;
+  const canUseExternalResearch =
+    mobilePolicy.canRunLiveResearch &&
+    policy.securityManualRefreshEnabled &&
+    usage.remainingRuns > 0;
+  const symbol = data.security.symbol.trim().toUpperCase();
+  const exchange = data.security.exchange.trim().toUpperCase();
+  const currency = data.security.currency.trim().toUpperCase();
+  const securityId = data.security.securityId?.trim() ?? "";
+
+  function latestFor(sourceId: "profile" | "institutional") {
+    return (
+      jobs.find((job) => {
+        if (!job.sourceIds.includes(sourceId)) {
+          return false;
+        }
+        const identity = job.identity;
+        if (securityId && identity?.securityId) {
+          return identity.securityId === securityId;
+        }
+        return (
+          identity?.symbol?.toUpperCase() === symbol &&
+          (!identity.exchange ||
+            identity.exchange.toUpperCase() === exchange) &&
+          (!identity.currency || identity.currency.toUpperCase() === currency)
+        );
+      }) ?? null
+    );
+  }
+
+  function freshDocumentFor(sourceId: "profile" | "institutional") {
+    const providerIds =
+      sourceId === "profile"
+        ? new Set(["alpha-vantage-profile", "eodhd-profile"])
+        : new Set(["alpha-vantage-earnings"]);
+    return (
+      freshDocuments.find((document) => providerIds.has(document.providerId)) ??
+      null
+    );
+  }
+
+  const fundLike = isFundLikeSecurity(data);
+  const profileProviderLabel = fundLike ? "EODHD（待接入）" : "Alpha Vantage";
+  const profileEnabled =
+    !fundLike &&
+    canUseExternalResearch &&
+    policy.allowedSources.some(
+      (source) => source.id === "profile" && source.enabled,
+    );
+  const institutionalEnabled =
+    !fundLike &&
+    canUseExternalResearch &&
+    policy.allowedSources.some(
+      (source) => source.id === "institutional" && source.enabled,
+    );
+
+  return [
+    {
+      id: "quote-history",
+      label: "刷新报价与走势",
+      detail: "刷新报价、历史走势和图表缓存；不消耗外部资料额度。",
+      providerLabel: "行情 provider",
+      estimatedCalls: 0,
+      quotaLabel: null,
+      enabled: true,
+      disabledReason: null,
+      sourceId: "market-data",
+      cache: {
+        status: "unknown",
+        label: data.security.quoteStatusLabel ?? "报价状态待确认",
+        detail: "报价刷新使用行情链路，和外部研究额度分开计算。",
+        lastUpdatedAt: null,
+        ttlLabel: null,
+        confirmationRequired: false,
+        confirmationMessage: null,
+      },
+    },
+    {
+      id: "profile",
+      label: fundLike ? "刷新 ETF 资料" : "刷新基本资料",
+      detail: fundLike
+        ? "ETF/基金资料优先使用 EODHD；未配置前不会伪装成可用。"
+        : "目标价、PE、Beta、市值、52周区间等估值证据。",
+      providerLabel: profileProviderLabel,
+      estimatedCalls: 1,
+      quotaLabel,
+      enabled: profileEnabled,
+      disabledReason: profileEnabled
+        ? null
+        : fundLike
+          ? "ETF 资料源 EODHD 尚未配置；不会消耗 Alpha Vantage 额度。"
+          : mobilePolicy.canRunLiveResearch
+            ? "基本资料来源当前不可用或今日额度已用完。"
+            : "外部资料来源尚未完整启用。",
+      sourceId: "profile",
+      cache: getResearchActionCache({
+        latestJob: latestFor("profile"),
+        freshDocument: freshDocumentFor("profile"),
+        ttlSeconds,
+        providerLabel: profileProviderLabel,
+        estimatedCalls: 1,
+        now,
+      }),
+    },
+    {
+      id: "institutional",
+      label: "刷新财报资料",
+      detail: "公司 EPS / earnings 披露资料；ETF/基金不适用。",
+      providerLabel: "Alpha Vantage",
+      estimatedCalls: 1,
+      quotaLabel,
+      enabled: institutionalEnabled,
+      disabledReason: fundLike
+        ? "ETF/基金通常没有公司财报或 EPS 披露。"
+        : institutionalEnabled
+          ? null
+          : mobilePolicy.canRunLiveResearch
+            ? "财报资料来源当前不可用或今日额度已用完。"
+            : "外部资料来源尚未完整启用。",
+      sourceId: "institutional",
+      cache: fundLike
+        ? {
+            status: "not-applicable",
+            label: "这类资料不适用",
+            detail: "ETF/基金通常没有公司财报或 EPS 披露。",
+            lastUpdatedAt: null,
+            ttlLabel: formatMobileTtl(ttlSeconds),
+            confirmationRequired: false,
+            confirmationMessage: null,
+          }
+        : getResearchActionCache({
+            latestJob: latestFor("institutional"),
+            freshDocument: freshDocumentFor("institutional"),
+            ttlSeconds,
+            providerLabel: "Alpha Vantage",
+            estimatedCalls: 1,
+            now,
+          }),
+    },
+  ];
+}
 
 type MobileRecommendationPriority = Omit<
   RecommendationsData["priorities"][number],
@@ -392,6 +743,7 @@ function mapMobileSecurityAccountHoldingView(
 
 function mapMobileSecurityDetailData(
   data: PortfolioSecurityDetailData,
+  researchRefreshActions: MobileResearchRefreshAction[] = [],
 ): MobilePortfolioSecurityDetailData {
   const chartIdentity = data.chartSeries?.priceHistory?.identity;
   const securityExchange =
@@ -414,6 +766,7 @@ function mapMobileSecurityDetailData(
     performance: data.performance,
     chartSeries: data.chartSeries,
     summaryPoints: data.summaryPoints,
+    researchRefreshActions,
     relatedHoldings: data.relatedHoldings.map((holding) => {
       const { href: _href, ...rest } = holding;
       return rest;
@@ -930,9 +1283,39 @@ export async function getMobilePortfolioSecurityDetailView(
     symbol,
     identity,
   );
+  const data = payload.data.data;
+  let researchRefreshActions: MobileResearchRefreshAction[] = [];
+  if (data) {
+    const repositories = getRepositories();
+    const policy = getExternalResearchPolicy();
+    const now = new Date();
+    const [usageResponse, recentJobs, freshDocuments] = await Promise.all([
+      getMobileExternalResearchUsage(userId),
+      repositories.externalResearchJobs.listRecentByUserId(userId, 20),
+      repositories.externalResearchDocuments.listFreshByUserId(userId, {
+        now,
+        limit: 20,
+        securityId: data.security.securityId ?? null,
+        symbol: data.security.symbol,
+        exchange: data.security.exchange,
+        currency:
+          data.security.currency === "CAD" || data.security.currency === "USD"
+            ? data.security.currency
+            : null,
+      }),
+    ]);
+    researchRefreshActions = buildMobileResearchRefreshActions({
+      data,
+      jobs: recentJobs.map(mapExternalResearchJobForMobile),
+      freshDocuments,
+      policy,
+      usage: usageResponse.data.usage,
+      now,
+    });
+  }
   return {
-    data: payload.data.data
-      ? mapMobileSecurityDetailData(payload.data.data)
+    data: data
+      ? mapMobileSecurityDetailData(data, researchRefreshActions)
       : null,
     meta: payload.meta,
   };

@@ -662,8 +662,8 @@ class MobileSecurityResearchProfile {
           .map(MobileResearchEvidence.fromJson)
           .toList(),
       sourceMode: dataFreshness["sourceMode"] as String? ?? "local",
-      quoteFreshnessSummary:
-          _friendlyNullableText(dataFreshness["quoteFreshnessSummary"] as String?),
+      quoteFreshnessSummary: _friendlyNullableText(
+          dataFreshness["quoteFreshnessSummary"] as String?),
       limitationSummary:
           _friendlyNullableText(dataFreshness["limitationSummary"] as String?),
     );
@@ -975,7 +975,7 @@ class MobileResearchEvidence {
       source: _friendlyAnalysisText(json["source"] as String? ?? "证据"),
       sourceType: json["sourceType"] as String? ?? "portfolio",
       freshnessLabel:
-          _friendlyAnalysisText(json["freshnessLabel"] as String? ?? "部分可用"),
+          _friendlyAnalysisText(json["freshnessLabel"] as String? ?? "资料待确认"),
       reliabilityLabel: _friendlyAnalysisText(
           json["reliabilityLabel"] as String? ?? "medium"),
     );
@@ -1622,7 +1622,8 @@ class _ValuationEvidenceView extends StatelessWidget {
             tilePadding: EdgeInsets.zero,
             dense: true,
             initiallyExpanded: false,
-            title: Text("更多估值数据", style: Theme.of(context).textTheme.titleSmall),
+            title:
+                Text("更多估值数据", style: Theme.of(context).textTheme.titleSmall),
             childrenPadding: const EdgeInsets.only(bottom: 8),
             children: [
               Align(
@@ -1709,7 +1710,8 @@ class _EntryTimingView extends StatelessWidget {
               Align(
                 alignment: Alignment.centerLeft,
                 child: Column(
-                  children: evidenceLevels.map(_ResearchKeyLevelRow.new).toList(),
+                  children:
+                      evidenceLevels.map(_ResearchKeyLevelRow.new).toList(),
                 ),
               ),
             ],
@@ -2758,7 +2760,7 @@ String _freshnessStatusLabel(String value) {
     "fresh" => "较新",
     "stale" => "可能过期",
     "missing" => "缺失",
-    _ => "部分可用",
+    _ => "资料待确认",
   };
 }
 

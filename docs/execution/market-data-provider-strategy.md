@@ -250,12 +250,41 @@ Market-data is already wired into:
    EODHD/FMP/QuoteMedia-style providers for North America, Alpha Vantage for
    limited fallback/history, and region-specific providers only if licensing and
    symbol coverage fit the portfolio
+   - EODHD is the preferred next validation target for CAD ETF / fund profile
+     coverage because its Fundamental API documents support for stocks, ETFs,
+     funds, indices, ETF general data, expense ratio, AUM, and asset allocation.
+     The free tier is suitable only for a small spike because it is limited to
+     roughly 20 API calls per day; do not use it for broad automatic refresh
+     until quota/cost policy is explicit.
+   - Alpha Vantage remains useful as a fallback for some US common-stock
+     overview/earnings/history data, but it is not reliable enough as the only
+     profile source for Canadian ETFs such as ZQQ. ETF/fund securities should
+     not be routed through earnings-style financial statements.
 5. keep iFinD/Tushare-style sources out of the P0 runtime path unless the
    portfolio scope expands into China A-share/HK-market research, because they
    add access/licensing complexity and do not solve the current US/CAD refresh
    limit directly
 6. introduce security-master persistence if import and recommendation logic start depending on richer security metadata
 7. add a commodity / metals provider or manual-price workflow for physical gold and other non-equity holdings
+
+## Manual refresh action contract
+
+Single-security refresh UX now treats each action as a separate capability:
+
+- quote/history refresh uses the market-data path and must not display or spend
+  external-research quota
+- company profile refresh is one external-research action, currently Alpha
+  Vantage for supported common stocks
+- institutional/earnings refresh is a separate external-research action and is
+  not applicable to ETF/fund securities
+- ETF/fund profile refresh must stay disabled until an ETF-capable provider such
+  as EODHD is configured; do not silently route ETF profile requests through
+  Alpha Vantage if coverage is known to be unreliable
+- if a source has a fresh TTL-valid cache, mobile must ask for confirmation
+  before spending another provider call
+- provider limits, no-data responses, and not-applicable responses must be
+  shown as different user-facing states so users do not repeatedly spend quota
+  on a source that cannot currently return data
 
 ## Important deployment note
 

@@ -206,6 +206,16 @@ function mapExternalResearchResultForMobile(job: ExternalResearchJob) {
     lowerError.includes("payload was available") ||
     lowerError.includes("source returned no") ||
     lowerError.includes("provider returned no");
+  const isProviderLimited =
+    lowerError.includes("rate limit") ||
+    lowerError.includes("frequency") ||
+    lowerError.includes("premium") ||
+    lowerError.includes("25 requests per day") ||
+    lowerError.includes("provider limit");
+  const isNotApplicable =
+    lowerError.includes("not applicable") ||
+    lowerError.includes("not supported") ||
+    lowerError.includes("etf or fund");
   const isUnavailable =
     lowerError.includes("not enabled") ||
     lowerError.includes("provider disabled") ||
@@ -242,6 +252,23 @@ function mapExternalResearchResultForMobile(job: ExternalResearchJob) {
   }
 
   if (job.status === "skipped") {
+    if (isProviderLimited) {
+      return {
+        resultKind: "provider_limited",
+        resultLabel: "来源额度暂不可用",
+        resultDetail:
+          "外部资料来源当前触发免费额度或频率限制；这次尝试已记录，请稍后再刷新，避免重复消耗额度。",
+        resultSeverity: "warning",
+      };
+    }
+    if (isNotApplicable) {
+      return {
+        resultKind: "not_applicable",
+        resultLabel: "这类资料不适用",
+        resultDetail: `${sourceLabel}不适用于这类标的；研究台仍会使用已有行情、基本资料和组合护栏。`,
+        resultSeverity: "neutral",
+      };
+    }
     if (isUnavailable) {
       return {
         resultKind: "unavailable",
@@ -268,6 +295,15 @@ function mapExternalResearchResultForMobile(job: ExternalResearchJob) {
   }
 
   if (job.status === "failed") {
+    if (isProviderLimited) {
+      return {
+        resultKind: "provider_limited",
+        resultLabel: "来源额度暂不可用",
+        resultDetail:
+          "外部资料来源当前触发免费额度或频率限制；这次尝试已记录，请稍后再刷新，避免重复消耗额度。",
+        resultSeverity: "warning",
+      };
+    }
     return {
       resultKind: "failed",
       resultLabel: "刷新失败",

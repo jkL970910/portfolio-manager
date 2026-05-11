@@ -219,6 +219,8 @@ class _SettingsPageState extends State<SettingsPage> {
           const SizedBox(height: 16),
           _ExternalResearchPolicyCard(apiClient: widget.apiClient),
           const SizedBox(height: 16),
+          _DataAiCapabilitiesCard(apiClient: widget.apiClient),
+          const SizedBox(height: 16),
           _AiMinisterSettingsCard(apiClient: widget.apiClient),
           const SizedBox(height: 16),
           InvestmentPreferencesCard(apiClient: widget.apiClient),
@@ -504,6 +506,218 @@ class _AiMinisterSettingsCardState extends State<_AiMinisterSettingsCard> {
           },
         ),
       ),
+    );
+  }
+}
+
+class _DataAiCapabilitiesCard extends StatefulWidget {
+  const _DataAiCapabilitiesCard({required this.apiClient});
+
+  final LooApiClient apiClient;
+
+  @override
+  State<_DataAiCapabilitiesCard> createState() =>
+      _DataAiCapabilitiesCardState();
+}
+
+class _DataAiCapabilitiesCardState extends State<_DataAiCapabilitiesCard> {
+  late Future<_DataAiCapabilities> _capabilities = _loadCapabilities();
+
+  Future<_DataAiCapabilities> _loadCapabilities() async {
+    final responses = await Future.wait([
+      widget.apiClient.getExternalResearchUsage(),
+      widget.apiClient.getAiMinisterSettings(),
+    ]);
+    final externalData = responses[0]["data"];
+    final ministerData = responses[1]["data"];
+    return _DataAiCapabilities.fromJson(
+      externalData is Map<String, dynamic>
+          ? externalData
+          : const <String, dynamic>{},
+      ministerData is Map<String, dynamic>
+          ? ministerData
+          : const <String, dynamic>{},
+    );
+  }
+
+  void _refresh() {
+    setState(() {
+      _capabilities = _loadCapabilities();
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: FutureBuilder<_DataAiCapabilities>(
+          future: _capabilities,
+          builder: (context, snapshot) {
+            final capabilities = snapshot.data;
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    const Icon(Icons.tune_outlined),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        "高级能力总览",
+                        style: Theme.of(context).textTheme.titleLarge,
+                      ),
+                    ),
+                    IconButton(
+                      onPressed:
+                          snapshot.connectionState == ConnectionState.waiting
+                              ? null
+                              : _refresh,
+                      icon: const Icon(Icons.refresh),
+                      tooltip: "刷新能力状态",
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  "这里展示会影响费用、速度或资料覆盖的功能。可保存的个人开关在对应设置卡片中调整；provider 可用性由云端配置决定。",
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+                const SizedBox(height: 12),
+                if (snapshot.connectionState == ConnectionState.waiting)
+                  const LinearProgressIndicator()
+                else if (snapshot.hasError)
+                  Text(
+                    "能力状态暂时读取失败：${snapshot.error}",
+                    style:
+                        TextStyle(color: Theme.of(context).colorScheme.error),
+                  )
+                else if (capabilities != null) ...[
+                  ...capabilities.items.map(_CapabilityTile.new),
+                ],
+              ],
+            );
+          },
+        ),
+      ),
+    );
+  }
+}
+
+class _DataAiCapabilities {
+  const _DataAiCapabilities({required this.items});
+
+  final List<_DataAiCapabilityItem> items;
+
+  factory _DataAiCapabilities.fromJson(
+    Map<String, dynamic> externalJson,
+    Map<String, dynamic> ministerJson,
+  ) {
+    final policy = _ExternalResearchPolicy.fromUsageJson(externalJson);
+    final minister = _AiMinisterSettings.fromJson(ministerJson);
+    _ExternalResearchSource? sourceById(String id) {
+      for (final source in policy.sources) {
+        if (source.id == id) return source;
+      }
+      return null;
+    }
+
+    final profile = sourceById("profile");
+    final institutional = sourceById("institutional");
+    final news = sourceById("news");
+    final marketData = sourceById("market-data");
+    return _DataAiCapabilities(
+      items: [
+        _DataAiCapabilityItem(
+          icon: Icons.auto_awesome,
+          title: "AI 大臣外部 GPT",
+          statusLabel: minister.effectiveModeLabel,
+          enabled: minister.effectiveMode == "gpt-5.5",
+          detail:
+              "${minister.providerLabel} · ${minister.model} · ${minister.apiKeyLabel}",
+          actionLabel: "在 AI 大臣设置里切换",
+        ),
+        _DataAiCapabilityItem(
+          icon: Icons.manage_search,
+          title: "标的基本资料",
+          statusLabel: profile?.enabled == true ? "可刷新" : "未启用",
+          enabled: profile?.enabled == true && policy.canRunLiveResearch,
+          detail:
+              "个股当前走 Alpha Vantage；ETF/基金等待 EODHD 接入后再开放。${profile?.reason ?? ""}",
+          actionLabel:
+              "在标的详情页按单个刷新，额度 ${policy.remainingRuns}/${policy.dailyRunLimit}",
+        ),
+        _DataAiCapabilityItem(
+          icon: Icons.event_note_outlined,
+          title: "财报资料",
+          statusLabel: institutional?.enabled == true ? "可刷新" : "未启用",
+          enabled: institutional?.enabled == true && policy.canRunLiveResearch,
+          detail:
+              "适用于公司 EPS / earnings 资料；ETF/基金会显示不适用。${institutional?.reason ?? ""}",
+          actionLabel: "单次刷新单独计算额度",
+        ),
+        _DataAiCapabilityItem(
+          icon: Icons.newspaper_outlined,
+          title: "每日秘闻 / 新闻",
+          statusLabel: policy.scheduledOverviewEnabled ? "后台缓存" : "未启用",
+          enabled: policy.scheduledOverviewEnabled && news?.enabled == true,
+          detail: "总览级内容只由 worker 缓存；页面打开不会自动抓取新闻。${news?.reason ?? ""}",
+          actionLabel: "后续接入真实新闻源后按日刷新",
+        ),
+        _DataAiCapabilityItem(
+          icon: Icons.show_chart,
+          title: "行情与走势",
+          statusLabel: "独立链路",
+          enabled: true,
+          detail:
+              "报价/走势图刷新不消耗外部研究额度；provider 状态在行情数据卡片中查看。${marketData?.reason ?? ""}",
+          actionLabel: "可在组合或标的详情刷新",
+        ),
+      ],
+    );
+  }
+}
+
+class _DataAiCapabilityItem {
+  const _DataAiCapabilityItem({
+    required this.icon,
+    required this.title,
+    required this.statusLabel,
+    required this.enabled,
+    required this.detail,
+    required this.actionLabel,
+  });
+
+  final IconData icon;
+  final String title;
+  final String statusLabel;
+  final bool enabled;
+  final String detail;
+  final String actionLabel;
+}
+
+class _CapabilityTile extends StatelessWidget {
+  const _CapabilityTile(this.item);
+
+  final _DataAiCapabilityItem item;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = item.enabled
+        ? Theme.of(context).colorScheme.primary
+        : Theme.of(context).colorScheme.outline;
+    return ListTile(
+      contentPadding: EdgeInsets.zero,
+      dense: true,
+      leading: Icon(item.icon, color: color),
+      title: Row(
+        children: [
+          Expanded(child: Text(item.title)),
+          Chip(label: Text(item.statusLabel)),
+        ],
+      ),
+      subtitle: Text("${item.detail}\n${item.actionLabel}"),
+      isThreeLine: true,
     );
   }
 }
@@ -2029,17 +2243,20 @@ class _ExternalResearchPolicy {
 
 class _ExternalResearchSource {
   const _ExternalResearchSource({
+    required this.id,
     required this.label,
     required this.enabled,
     required this.reason,
   });
 
+  final String id;
   final String label;
   final bool enabled;
   final String reason;
 
   factory _ExternalResearchSource.fromJson(Map<String, dynamic> json) {
     return _ExternalResearchSource(
+      id: json["id"] as String? ?? "",
       label: json["label"] as String? ?? "外部来源",
       enabled: json["enabled"] == true,
       reason: json["reason"] as String? ?? "暂未启用。",

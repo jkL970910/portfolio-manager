@@ -46,6 +46,13 @@ export interface AlphaVantageEarningsPayload {
   payload: Record<string, unknown>;
 }
 
+export class AlphaVantageProviderLimitedError extends Error {
+  constructor(message = "Alpha Vantage provider limit reached.") {
+    super(message);
+    this.name = "AlphaVantageProviderLimitedError";
+  }
+}
+
 export function getAlphaVantageCandidateSymbols(
   symbol: string,
   exchange?: string | null,
@@ -86,6 +93,7 @@ async function fetchAlphaVantagePayload(input: {
   fn: string;
   symbol: string;
   apiKey: string;
+  throwOnLimit?: boolean;
 }) {
   const url = new URL("https://www.alphavantage.co/query");
   url.searchParams.set("function", input.fn);
@@ -106,11 +114,19 @@ async function fetchAlphaVantagePayload(input: {
 
   const payload = (await response.json()) as Record<string, unknown>;
   if (isAlphaVantageLimitPayload(payload)) {
+    const reason = String(
+      payload.Note ??
+        payload.Information ??
+        "Alpha Vantage rate limit or endpoint limit reached.",
+    );
     markProviderLimited({
       provider: "alpha-vantage",
-      reason: "Alpha Vantage rate limit or endpoint limit reached.",
+      reason,
       retryAfterSeconds: readRetryAfterSeconds(response.headers),
     });
+    if (input.throwOnLimit) {
+      throw new AlphaVantageProviderLimitedError(reason);
+    }
     return null;
   }
   if (payload["Error Message"]) {
@@ -170,6 +186,7 @@ export async function getAlphaVantageProfile(
         fn,
         symbol: candidateSymbol,
         apiKey: alphaVantageApiKey,
+        throwOnLimit: true,
       });
       if (fn === "ETF_PROFILE" && payload && hasEtfProfile(payload)) {
         return {
@@ -210,6 +227,7 @@ export async function getAlphaVantageEarnings(
       fn: "EARNINGS",
       symbol: candidateSymbol,
       apiKey: alphaVantageApiKey,
+      throwOnLimit: true,
     });
     if (payload && hasEarningsPayload(payload)) {
       return { candidateSymbol, payload };

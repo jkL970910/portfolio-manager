@@ -527,7 +527,7 @@ function getChartFreshness(args: {
 
   return {
     status: "fresh" as const,
-    label: pick(args.language, "缓存可用", "Cached data available"),
+    label: pick(args.language, "走势可用", "Chart data available"),
     latestDate: args.latestDate,
     detail: pick(
       args.language,

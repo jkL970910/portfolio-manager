@@ -353,6 +353,7 @@ void main() {
       facts: [],
       relatedHoldings: [],
       heldPosition: null,
+      researchRefreshActions: [],
     );
 
     final accountContext =

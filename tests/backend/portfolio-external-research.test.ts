@@ -61,6 +61,15 @@ test("external research quota can be adjusted by provider plan env", () => {
   clearExternalResearchEnv();
 });
 
+test("external research default quota matches current Alpha Vantage free-plan guard", () => {
+  clearExternalResearchEnv();
+
+  const policy = getExternalResearchPolicy();
+
+  assert.equal(policy.dailyRunLimit, 25);
+  assert.equal(policy.maxSymbolsPerRun, 12);
+});
+
 test("external research policy summary is safe for mobile display", () => {
   const summary = mapExternalResearchPolicyForMobile();
 
@@ -223,6 +232,44 @@ test("institutional provider is enabled only with source flag and API key", () =
       (provider) => provider.id === "institutional",
     ),
     true,
+  );
+
+  clearExternalResearchEnv();
+});
+
+test("institutional provider skips ETF and fund securities before external API calls", async () => {
+  process.env.PORTFOLIO_ANALYZER_EXTERNAL_RESEARCH = "enabled";
+  process.env.PORTFOLIO_ANALYZER_EXTERNAL_WORKER = "enabled";
+  process.env.PORTFOLIO_ANALYZER_EXTERNAL_PROVIDERS = "enabled";
+  process.env.PORTFOLIO_ANALYZER_EXTERNAL_ADAPTERS = "enabled";
+  process.env.PORTFOLIO_ANALYZER_EXTERNAL_SOURCE_INSTITUTIONAL = "enabled";
+  process.env.ALPHA_VANTAGE_API_KEY = "test-alpha-vantage-key";
+
+  const policy = getExternalResearchPolicy();
+  const enabledSources = getEnabledExternalResearchSources(policy);
+
+  await assert.rejects(
+    () =>
+      fetchCachedExternalResearch({
+        userId: "user_casey",
+        request: {
+          scope: "security",
+          mode: "quick",
+          security: {
+            symbol: "ZQQ",
+            exchange: "TSX",
+            currency: "CAD",
+            securityType: "ETF",
+          },
+          cacheStrategy: "prefer-cache",
+          maxCacheAgeSeconds: 21600,
+          includeExternalResearch: true,
+        },
+        targetKey: "security:ZQQ:TSX:CAD",
+        allowedSources: enabledSources,
+        now: new Date("2026-04-28T12:00:00.000Z"),
+      }),
+    /not applicable to ETF or fund/,
   );
 
   clearExternalResearchEnv();

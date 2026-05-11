@@ -570,16 +570,16 @@ export const alphaVantageProfileResearchProvider: ExternalResearchProvider = {
     const { getAlphaVantageProfile } = await import(
       "@/lib/market-data/alpha-vantage"
     );
+    const securityType = security?.securityType?.toLowerCase() ?? "";
+    const looksLikeFund =
+      securityType.includes("etf") ||
+      securityType.includes("fund");
     const profile = await getAlphaVantageProfile(
       symbol,
       security?.exchange,
       security?.currency,
       {
-        preferredKind:
-          security?.securityType?.toLowerCase().includes("etf") ||
-          security?.securityType?.toLowerCase().includes("fund")
-            ? "etf-profile"
-            : "company-overview",
+        preferredKind: looksLikeFund ? "etf-profile" : "company-overview",
       },
     );
     if (!profile) {
@@ -642,6 +642,15 @@ export const alphaVantageInstitutionalResearchProvider: ExternalResearchProvider
     if (!symbol) {
       throw new ExternalResearchProviderDisabledError(
         "Institutional external research requires a security symbol.",
+      );
+    }
+    const securityType = security?.securityType?.toLowerCase() ?? "";
+    if (
+      securityType.includes("etf") ||
+      securityType.includes("fund")
+    ) {
+      throw new ExternalResearchProviderDisabledError(
+        "Institutional earnings data is not applicable to ETF or fund securities.",
       );
     }
 

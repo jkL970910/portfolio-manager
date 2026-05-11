@@ -320,6 +320,99 @@ test("external research job mobile mapping treats provider no-data as skipped", 
   assert.match(mapped.statusNote, /Alpha Vantage profile/);
 });
 
+test("external research job mobile mapping separates provider limits from no-data", async () => {
+  const now = new Date("2026-04-28T13:10:00.000Z");
+  const job = await mockRepositories.externalResearchJobs.create({
+    userId: "user_mobile_limited_job_test",
+    scope: "security",
+    targetKey: "security:ZQQ:TSX:CAD",
+    request: {
+      scope: "security",
+      mode: "quick",
+      security: { symbol: "ZQQ", exchange: "TSX", currency: "CAD" },
+      cacheStrategy: "prefer-cache",
+      maxCacheAgeSeconds: 21600,
+      includeExternalResearch: true,
+    },
+    status: "failed",
+    sourceMode: "cached-external",
+    sourceAllowlist: [
+      {
+        id: "profile",
+        label: "标的基本资料",
+        enabled: true,
+        reason: "test",
+      },
+    ],
+    priority: 10,
+    attemptCount: 1,
+    maxAttempts: 3,
+    runAfter: now.toISOString(),
+    lockedAt: null,
+    lockedBy: null,
+    startedAt: now.toISOString(),
+    finishedAt: now.toISOString(),
+    errorMessage:
+      "Alpha Vantage provider limit reached: 25 requests per day.",
+    resultRunId: null,
+  });
+
+  const mapped = mapExternalResearchJobForMobile(job);
+  assert.equal(mapped.statusLabel, "已失败");
+  assert.equal(mapped.resultKind, "provider_limited");
+  assert.equal(mapped.resultLabel, "来源额度暂不可用");
+  assert.match(mapped.resultDetail, /稍后再刷新/);
+});
+
+test("external research job mobile mapping explains ETF earnings as not applicable", async () => {
+  const now = new Date("2026-04-28T13:20:00.000Z");
+  const job = await mockRepositories.externalResearchJobs.create({
+    userId: "user_mobile_not_applicable_job_test",
+    scope: "security",
+    targetKey: "security:ZQQ:TSX:CAD",
+    request: {
+      scope: "security",
+      mode: "quick",
+      security: {
+        symbol: "ZQQ",
+        exchange: "TSX",
+        currency: "CAD",
+        securityType: "ETF",
+      },
+      cacheStrategy: "prefer-cache",
+      maxCacheAgeSeconds: 21600,
+      includeExternalResearch: true,
+    },
+    status: "skipped",
+    sourceMode: "cached-external",
+    sourceAllowlist: [
+      {
+        id: "institutional",
+        label: "机构资料",
+        enabled: true,
+        reason: "test",
+      },
+    ],
+    priority: 10,
+    attemptCount: 1,
+    maxAttempts: 3,
+    runAfter: now.toISOString(),
+    lockedAt: null,
+    lockedBy: null,
+    startedAt: now.toISOString(),
+    finishedAt: now.toISOString(),
+    errorMessage:
+      "Institutional earnings data is not applicable to ETF or fund securities.",
+    resultRunId: null,
+  });
+
+  const mapped = mapExternalResearchJobForMobile(job);
+  assert.equal(mapped.statusLabel, "已跳过");
+  assert.equal(mapped.resultKind, "not_applicable");
+  assert.equal(mapped.resultLabel, "这类资料不适用");
+  assert.match(mapped.resultDetail, /财报资料不适用于这类标的/);
+});
+
 test("external research mobile jobs expose summary and retry labels", async () => {
   const now = new Date("2026-04-28T16:00:00.000Z");
   await mockRepositories.externalResearchJobs.create({
