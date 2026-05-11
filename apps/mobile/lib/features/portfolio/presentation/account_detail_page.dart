@@ -985,7 +985,7 @@ class _CompactFactsCard extends StatelessWidget {
   }
 }
 
-class _AccountHoldingsPreview extends StatelessWidget {
+class _AccountHoldingsPreview extends StatefulWidget {
   const _AccountHoldingsPreview({
     required this.holdings,
     required this.onOpenHolding,
@@ -995,9 +995,19 @@ class _AccountHoldingsPreview extends StatelessWidget {
   final ValueChanged<MobileHoldingCard> onOpenHolding;
 
   @override
+  State<_AccountHoldingsPreview> createState() =>
+      _AccountHoldingsPreviewState();
+}
+
+class _AccountHoldingsPreviewState extends State<_AccountHoldingsPreview> {
+  var _expanded = false;
+
+  @override
   Widget build(BuildContext context) {
     final tokens = context.looTokens;
-    final shownHoldings = holdings.take(5).toList();
+    final shownHoldings =
+        _expanded ? widget.holdings : widget.holdings.take(5).toList();
+    final canExpand = widget.holdings.length > 5;
 
     return LooGlassCard(
       child: Column(
@@ -1005,11 +1015,13 @@ class _AccountHoldingsPreview extends StatelessWidget {
         children: [
           _SectionHeader(
             title: "账户内持仓",
-            trailing: "${holdings.length} 个",
+            trailing: "${widget.holdings.length} 个",
           ),
           SizedBox(height: tokens.gapSm),
           Text(
-            "这里只展示该账户内的主要持仓；点击单项查看这笔仓位详情。",
+            canExpand && !_expanded
+                ? "默认展示主要持仓；展开后可查看该账户全部持仓。"
+                : "点击单项查看这笔仓位详情。",
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
                   color: tokens.mutedText,
                 ),
@@ -1026,9 +1038,26 @@ class _AccountHoldingsPreview extends StatelessWidget {
             ...shownHoldings.map(
               (holding) => _CompactHoldingRow(
                 holding,
-                onTap: () => onOpenHolding(holding),
+                onTap: () => widget.onOpenHolding(holding),
               ),
             ),
+          if (canExpand) ...[
+            SizedBox(height: tokens.gapSm),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton.icon(
+                onPressed: () => setState(() => _expanded = !_expanded),
+                icon: AnimatedRotation(
+                  turns: _expanded ? 0.5 : 0,
+                  duration: const Duration(milliseconds: 180),
+                  curve: Curves.easeOutCubic,
+                  child: const Icon(Icons.keyboard_arrow_down_rounded),
+                ),
+                label: Text(
+                    _expanded ? "收起持仓" : "展开全部 ${widget.holdings.length} 个"),
+              ),
+            ),
+          ],
         ],
       ),
     );
