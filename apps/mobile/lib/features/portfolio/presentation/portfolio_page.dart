@@ -9,7 +9,6 @@ import "../../shared/data/mobile_chart_models.dart";
 import "../../shared/presentation/loo_charts.dart";
 import "../../shared/presentation/loo_minister_scope.dart";
 import "../data/mobile_portfolio_models.dart";
-import "asset_class_drilldown_page.dart";
 import "health_score_page.dart";
 
 class PortfolioPage extends StatefulWidget {
@@ -144,29 +143,16 @@ class _PortfolioPageState extends State<PortfolioPage> {
                           ),
                         ],
                         if (!_isFiltered &&
-                            snapshot
-                                .data!.accountTypeAllocation.isNotEmpty) ...[
+                            (snapshot.data!.accountTypeAllocation.isNotEmpty ||
+                                snapshot.data!.accountInstanceAllocation
+                                    .isNotEmpty ||
+                                snapshot
+                                    .data!.assetClassDrilldown.isNotEmpty)) ...[
                           const SizedBox(height: 18),
-                          _AllocationCard(
-                            title: "账户类型分布",
-                            points: snapshot.data!.accountTypeAllocation,
-                          ),
-                        ],
-                        if (!_isFiltered &&
-                            snapshot.data!.accountInstanceAllocation
-                                .isNotEmpty) ...[
-                          const SizedBox(height: 18),
-                          _AllocationCard(
-                            title: "账户实例分布",
-                            points: snapshot.data!.accountInstanceAllocation,
-                          ),
-                        ],
-                        if (!_isFiltered &&
-                            snapshot.data!.assetClassDrilldown.isNotEmpty) ...[
-                          const SizedBox(height: 18),
-                          _AssetClassCard(
-                            items: snapshot.data!.assetClassDrilldown,
-                            onTap: _openAssetClassDrilldown,
+                          _PortfolioDistributionSwitcherCard(
+                            accountTypes: snapshot.data!.accountTypeAllocation,
+                            accounts: snapshot.data!.accountInstanceAllocation,
+                            assetClasses: snapshot.data!.assetClassDrilldown,
                           ),
                         ],
                         const SizedBox(height: 18),
@@ -230,17 +216,6 @@ class _PortfolioPageState extends State<PortfolioPage> {
     Navigator.of(context).push(
       MaterialPageRoute<void>(
         builder: (_) => HealthScorePage(apiClient: widget.apiClient),
-      ),
-    );
-  }
-
-  void _openAssetClassDrilldown(MobileAssetClassDrilldown item) {
-    Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (_) => AssetClassDrilldownPage(
-          apiClient: widget.apiClient,
-          item: item,
-        ),
       ),
     );
   }
@@ -415,91 +390,204 @@ class _PortfolioTrendCard extends StatelessWidget {
   }
 }
 
-class _AllocationCard extends StatelessWidget {
-  const _AllocationCard({required this.title, required this.points});
+class _PortfolioDistributionSwitcherCard extends StatefulWidget {
+  const _PortfolioDistributionSwitcherCard({
+    required this.accountTypes,
+    required this.accounts,
+    required this.assetClasses,
+  });
 
-  final String title;
-  final List<MobilePortfolioAllocationPoint> points;
+  final List<MobilePortfolioAllocationPoint> accountTypes;
+  final List<MobilePortfolioAllocationPoint> accounts;
+  final List<MobileAssetClassDrilldown> assetClasses;
+
+  @override
+  State<_PortfolioDistributionSwitcherCard> createState() =>
+      _PortfolioDistributionSwitcherCardState();
+}
+
+class _PortfolioDistributionSwitcherCardState
+    extends State<_PortfolioDistributionSwitcherCard> {
+  var _selected = 0;
 
   @override
   Widget build(BuildContext context) {
-    final shownPoints =
-        points.where((point) => point.value > 0).take(6).toList();
+    final tabs = <_DistributionTab>[
+      if (widget.accountTypes.any((point) => point.value > 0))
+        _DistributionTab(
+          label: "类型",
+          title: "账户类型分布",
+          segments: widget.accountTypes
+              .where((point) => point.value > 0)
+              .take(6)
+              .map(
+                (point) => LooDistributionSegment(
+                  label: point.name,
+                  value: point.value,
+                ),
+              )
+              .toList(),
+        ),
+      if (widget.accounts.any((point) => point.value > 0))
+        _DistributionTab(
+          label: "账户",
+          title: "账户实例分布",
+          segments: widget.accounts
+              .where((point) => point.value > 0)
+              .take(6)
+              .map(
+                (point) => LooDistributionSegment(
+                  label: point.name,
+                  value: point.value,
+                ),
+              )
+              .toList(),
+        ),
+      if (widget.assetClasses.any((item) => item.currentPct > 0))
+        _DistributionTab(
+          label: "资产",
+          title: "资产类别配置",
+          segments: widget.assetClasses
+              .where((item) => item.currentPct > 0)
+              .take(6)
+              .map(
+                (item) => LooDistributionSegment(
+                  label: item.name,
+                  value: item.currentPct,
+                ),
+              )
+              .toList(),
+        ),
+    ];
+
+    if (tabs.isEmpty) return const SizedBox.shrink();
+    final selectedIndex = _selected.clamp(0, tabs.length - 1);
+    final selected = tabs[selectedIndex];
+    final tokens = context.looTokens;
+
     return LooGlassCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(title, style: Theme.of(context).textTheme.titleLarge),
-          const SizedBox(height: 14),
-          LooDistributionBar(
-            segments: shownPoints
-                .map(
-                  (point) => LooDistributionSegment(
-                    label: point.name,
-                    value: point.value,
+      child: AnimatedSize(
+        duration: const Duration(milliseconds: 180),
+        curve: Curves.easeOutCubic,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Text(
+                    selected.title,
+                    style: Theme.of(context).textTheme.titleLarge,
                   ),
-                )
-                .toList(),
-          ),
-          const SizedBox(height: 12),
-          ...shownPoints.map(
-            (point) => Padding(
-              padding: const EdgeInsets.only(top: 6),
-              child: Row(
-                children: [
-                  Expanded(child: Text(point.name)),
-                  Text(point.displayValue,
-                      style: Theme.of(context).textTheme.titleMedium),
-                ],
+                ),
+                const SizedBox(width: 10),
+                _DistributionTabSwitch(
+                  tabs: tabs,
+                  selectedIndex: selectedIndex,
+                  onSelected: (index) => setState(() => _selected = index),
+                ),
+              ],
+            ),
+            SizedBox(height: tokens.gapMd),
+            AnimatedSwitcher(
+              duration: const Duration(milliseconds: 180),
+              switchInCurve: Curves.easeOutCubic,
+              switchOutCurve: Curves.easeOutCubic,
+              child: KeyedSubtree(
+                key: ValueKey(selected.label),
+                child: LooDistributionBar(segments: selected.segments),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
 }
 
-class _AssetClassCard extends StatelessWidget {
-  const _AssetClassCard({required this.items, required this.onTap});
+class _DistributionTab {
+  const _DistributionTab({
+    required this.label,
+    required this.title,
+    required this.segments,
+  });
 
-  final List<MobileAssetClassDrilldown> items;
-  final ValueChanged<MobileAssetClassDrilldown> onTap;
+  final String label;
+  final String title;
+  final List<LooDistributionSegment> segments;
+}
+
+class _DistributionTabSwitch extends StatelessWidget {
+  const _DistributionTabSwitch({
+    required this.tabs,
+    required this.selectedIndex,
+    required this.onSelected,
+  });
+
+  final List<_DistributionTab> tabs;
+  final int selectedIndex;
+  final ValueChanged<int> onSelected;
 
   @override
   Widget build(BuildContext context) {
-    final shownItems =
-        items.where((item) => item.currentPct > 0).take(6).toList();
     final tokens = context.looTokens;
-    return LooGlassCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text("资产类别配置", style: Theme.of(context).textTheme.titleLarge),
-          const SizedBox(height: 14),
-          LooDistributionBar(
-            segments: shownItems
-                .map(
-                  (item) => LooDistributionSegment(
-                    label: item.name,
-                    value: item.currentPct,
-                  ),
-                )
-                .toList(),
-          ),
-          const SizedBox(height: 12),
-          ...shownItems.map(
-            (item) => Padding(
-              padding: EdgeInsets.only(top: tokens.gapSm),
-              child: LooTappableRow(
-                title: item.name,
-                subtitle: "目标 ${item.target} · 当前 ${item.current}",
-                value: item.driftLabel,
-                onTap: () => onTap(item),
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.28),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: tokens.cardBorder),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(3),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            for (var index = 0; index < tabs.length; index++)
+              _DistributionTabButton(
+                label: tabs[index].label,
+                isSelected: index == selectedIndex,
+                onTap: () => onSelected(index),
               ),
-            ),
-          ),
-        ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _DistributionTabButton extends StatelessWidget {
+  const _DistributionTabButton({
+    required this.label,
+    required this.isSelected,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool isSelected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = context.looTokens;
+    return InkWell(
+      borderRadius: BorderRadius.circular(999),
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 160),
+        curve: Curves.easeOutCubic,
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration: BoxDecoration(
+          color: isSelected ? tokens.accent.withValues(alpha: 0.22) : null,
+          borderRadius: BorderRadius.circular(999),
+        ),
+        child: Text(
+          label,
+          style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                color: isSelected ? tokens.accent : tokens.mutedText,
+                fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
+              ),
+        ),
       ),
     );
   }
