@@ -392,21 +392,37 @@ export function buildMobileResearchRefreshActions(input: {
   const securityId = data.security.securityId?.trim() ?? "";
 
   function latestFor(sourceId: "profile" | "institutional") {
+    function matchesSecurityIdentity(
+      job: ReturnType<typeof mapExternalResearchJobForMobile>,
+    ) {
+      const identity = job.identity;
+      const jobSecurityId = identity?.securityId?.trim() ?? "";
+      const jobSymbol = identity?.symbol?.trim().toUpperCase() ?? "";
+      const jobExchange = identity?.exchange?.trim().toUpperCase() ?? "";
+      const jobCurrency = identity?.currency?.trim().toUpperCase() ?? "";
+      const targetKey = job.targetKey.trim().toUpperCase();
+      const targetSecurityId = securityId.trim().toUpperCase();
+      const securityIdMatches =
+        Boolean(securityId && jobSecurityId && jobSecurityId === securityId) ||
+        Boolean(targetSecurityId && targetKey.includes(targetSecurityId));
+      const listingMatches =
+        jobSymbol === symbol &&
+        (!jobExchange || jobExchange === exchange) &&
+        (!jobCurrency || jobCurrency === currency);
+      const targetListingMatches =
+        targetKey.includes(`:${symbol}:`) &&
+        (!exchange || targetKey.includes(`:${exchange}:`)) &&
+        (!currency || targetKey.includes(`:${currency}`));
+
+      return securityIdMatches || listingMatches || targetListingMatches;
+    }
+
     return (
       jobs.find((job) => {
         if (!job.sourceIds.includes(sourceId)) {
           return false;
         }
-        const identity = job.identity;
-        if (securityId && identity?.securityId) {
-          return identity.securityId === securityId;
-        }
-        return (
-          identity?.symbol?.toUpperCase() === symbol &&
-          (!identity.exchange ||
-            identity.exchange.toUpperCase() === exchange) &&
-          (!identity.currency || identity.currency.toUpperCase() === currency)
-        );
+        return matchesSecurityIdentity(job);
       }) ?? null
     );
   }

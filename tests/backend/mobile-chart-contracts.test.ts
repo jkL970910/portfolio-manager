@@ -189,34 +189,37 @@ test("mobile security refresh actions require confirmation for fresh external ca
         ...holdings[0],
         assetClass: "US Equity",
         sector: "Technology",
-        symbol: "MSFT",
-        name: "Microsoft",
+        symbol: "AMZN",
+        name: "Amazon.com Inc",
         exchangeOverride: "NASDAQ",
         currency: "USD",
+        securityId: "security_amzn_resolved_later",
       },
     ],
     priceHistory,
     profile,
     display,
-    symbol: "MSFT",
+    symbol: "AMZN",
     exchange: "NASDAQ",
     currency: "USD",
   });
   assert.ok(detail);
+  detail.security.securityId = "security_amzn_resolved_later";
 
   const policy = getExternalResearchPolicy();
   const now = new Date("2026-04-28T12:00:00.000Z");
   const job: ExternalResearchJob = {
-    id: "job_profile_msft",
+    id: "job_profile_amzn",
     userId: "user_test",
     scope: "security",
-    targetKey: "security:MSFT:NASDAQ:USD",
+    targetKey: "security:quick:security:AMZN:NASDAQ:USD:_",
     request: {
       scope: "security",
       security: {
-        symbol: "MSFT",
+        symbol: "AMZN",
         exchange: "NASDAQ",
         currency: "USD",
+        name: "Amazon.com Inc",
       },
     },
     status: "succeeded",
@@ -380,6 +383,102 @@ test("mobile security refresh actions prefer fresh persisted documents over late
   assert.equal(profileAction?.cache.status, "fresh");
   assert.equal(profileAction?.cache.confirmationRequired, true);
   assert.match(profileAction?.cache.detail ?? "", /Alpha Vantage 标的资料/);
+
+  delete process.env.PORTFOLIO_ANALYZER_EXTERNAL_RESEARCH;
+  delete process.env.PORTFOLIO_ANALYZER_EXTERNAL_WORKER;
+  delete process.env.PORTFOLIO_ANALYZER_EXTERNAL_PROVIDERS;
+  delete process.env.PORTFOLIO_ANALYZER_EXTERNAL_ADAPTERS;
+  delete process.env.PORTFOLIO_ANALYZER_EXTERNAL_SOURCE_PROFILE;
+});
+
+test("mobile security refresh actions match fresh documents by listing when securityId was resolved later", () => {
+  process.env.PORTFOLIO_ANALYZER_EXTERNAL_RESEARCH = "enabled";
+  process.env.PORTFOLIO_ANALYZER_EXTERNAL_WORKER = "enabled";
+  process.env.PORTFOLIO_ANALYZER_EXTERNAL_PROVIDERS = "enabled";
+  process.env.PORTFOLIO_ANALYZER_EXTERNAL_ADAPTERS = "enabled";
+  process.env.PORTFOLIO_ANALYZER_EXTERNAL_SOURCE_PROFILE = "enabled";
+
+  const detail = buildPortfolioSecurityDetailData({
+    language: "zh",
+    accounts,
+    holdings: [
+      {
+        ...holdings[0],
+        assetClass: "US Equity",
+        sector: "Technology",
+        symbol: "AMZN",
+        name: "Amazon",
+        exchangeOverride: "NASDAQ",
+        currency: "USD",
+        securityId: "security_amzn_resolved_later",
+      },
+    ],
+    priceHistory,
+    profile,
+    display,
+    symbol: "AMZN",
+    exchange: "NASDAQ",
+    currency: "USD",
+  });
+  assert.ok(detail);
+  detail.security.securityId = "security_amzn_resolved_later";
+
+  const now = new Date("2026-04-28T12:00:00.000Z");
+  const document: ExternalResearchDocumentRecord = {
+    id: "document_profile_amzn",
+    userId: "user_test",
+    providerDocumentId: "alpha-vantage-profile:amzn",
+    sourceType: "institutional",
+    providerId: "alpha-vantage-profile",
+    sourceName: "Alpha Vantage 标的资料",
+    title: "AMZN 基本资料快照",
+    summary: "AMZN profile.",
+    url: null,
+    publishedAt: null,
+    capturedAt: "2026-04-28T10:00:00.000Z",
+    expiresAt: "2026-04-28T18:00:00.000Z",
+    language: "zh",
+    security: {
+      securityId: null,
+      symbol: "AMZN",
+      exchange: "NASDAQ",
+      currency: "USD",
+      name: "Amazon",
+      provider: "alpha-vantage-profile",
+      securityType: "Common Stock",
+    },
+    underlyingId: null,
+    confidence: "medium",
+    sentiment: "neutral",
+    relevanceScore: 70,
+    sourceReliability: 75,
+    keyPoints: [],
+    riskFlags: [],
+    tags: ["profile"],
+    rawPayload: {},
+    createdAt: "2026-04-28T10:00:00.000Z",
+    updatedAt: "2026-04-28T10:00:00.000Z",
+  };
+
+  const actions = buildMobileResearchRefreshActions({
+    data: detail,
+    jobs: [],
+    freshDocuments: [document],
+    policy: getExternalResearchPolicy(),
+    usage: {
+      usedRuns: 1,
+      remainingRuns: 24,
+      usedSymbols: 1,
+      dailyRunLimit: 25,
+      maxSymbolsPerRun: 12,
+      counters: [],
+    },
+    now,
+  });
+
+  const profileAction = actions.find((action) => action.id === "profile");
+  assert.equal(profileAction?.cache.status, "fresh");
+  assert.equal(profileAction?.cache.confirmationRequired, true);
 
   delete process.env.PORTFOLIO_ANALYZER_EXTERNAL_RESEARCH;
   delete process.env.PORTFOLIO_ANALYZER_EXTERNAL_WORKER;

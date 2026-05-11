@@ -44,6 +44,7 @@ class _SecurityDetailPageState extends State<SecurityDetailPage> {
   final Map<String, String> _runningResearchTargetKeys = <String, String>{};
   final Set<String> _completedResearchTargetKeys = <String>{};
   Timer? _externalResearchPollTimer;
+  VoidCallback? _refreshResearchUpdateSheet;
   int _externalResearchRefreshRevision = 0;
   String? _externalResearchMessage;
   String? _securityId;
@@ -60,6 +61,7 @@ class _SecurityDetailPageState extends State<SecurityDetailPage> {
   @override
   void dispose() {
     _externalResearchPollTimer?.cancel();
+    _refreshResearchUpdateSheet = null;
     super.dispose();
   }
 
@@ -141,13 +143,17 @@ class _SecurityDetailPageState extends State<SecurityDetailPage> {
   void _showResearchUpdateSheet(MobileSecurityDetailSnapshot data) {
     final trust = _SecurityDataTrust.fromSnapshot(data);
     var refreshStatus = _loadResearchRefreshSnapshot(data);
-    showModalBottomSheet<void>(
+    final sheetFuture = showModalBottomSheet<void>(
       context: context,
       showDragHandle: true,
       builder: (sheetContext) {
         return SafeArea(
           child: StatefulBuilder(
             builder: (sheetContext, setSheetState) {
+              _refreshResearchUpdateSheet = () {
+                refreshStatus = _loadResearchRefreshSnapshot(data);
+                setSheetState(() {});
+              };
               return FutureBuilder<_ResearchRefreshSnapshot>(
                 future: refreshStatus,
                 builder: (context, snapshot) {
@@ -298,6 +304,11 @@ class _SecurityDetailPageState extends State<SecurityDetailPage> {
         );
       },
     );
+    unawaited(sheetFuture.whenComplete(() {
+      if (_refreshResearchUpdateSheet != null) {
+        _refreshResearchUpdateSheet = null;
+      }
+    }));
   }
 
   Future<_ResearchRefreshSnapshot> _loadResearchRefreshSnapshot(
@@ -534,6 +545,7 @@ class _SecurityDetailPageState extends State<SecurityDetailPage> {
       });
       if (completedAny) {
         _refreshDailyIntelligence();
+        _refreshResearchUpdateSheet?.call();
       }
     } catch (_) {
       if (mounted && _externalResearchMessage == null) {
