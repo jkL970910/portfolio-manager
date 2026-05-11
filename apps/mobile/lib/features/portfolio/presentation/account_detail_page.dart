@@ -488,35 +488,118 @@ class _AccountTrendCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final points = chart?.points
-            .map((point) => (
+    final allPoints = chart?.points
+            .map((point) => AccountTrendPoint(
                   label: point.label,
                   displayValue: point.displayValue,
                   chartValue: point.value,
+                  rawDate: DateTime.tryParse(point.rawDate ?? ""),
                 ))
             .toList() ??
         fallbackPoints
-            .map((point) => (
+            .map((point) => AccountTrendPoint(
                   label: point.label,
                   displayValue: point.displayValue,
                   chartValue: point.chartValue,
+                  rawDate: null,
                 ))
             .toList();
+
+    return _AccountTrendRangeCard(
+      title: chart?.title ?? "账户资产走势",
+      trailing: chart?.freshness.label,
+      allPoints: allPoints,
+    );
+  }
+}
+
+class AccountTrendPoint {
+  const AccountTrendPoint({
+    required this.label,
+    required this.displayValue,
+    required this.chartValue,
+    required this.rawDate,
+  });
+
+  final String label;
+  final String displayValue;
+  final double chartValue;
+  final DateTime? rawDate;
+}
+
+class _AccountTrendRangeCard extends StatefulWidget {
+  const _AccountTrendRangeCard({
+    required this.title,
+    required this.trailing,
+    required this.allPoints,
+  });
+
+  final String title;
+  final String? trailing;
+  final List<AccountTrendPoint> allPoints;
+
+  @override
+  State<_AccountTrendRangeCard> createState() => _AccountTrendRangeCardState();
+}
+
+class _AccountTrendRangeCardState extends State<_AccountTrendRangeCard> {
+  _TrendRange _selectedRange = _TrendRange.threeMonths;
+
+  @override
+  Widget build(BuildContext context) {
+    final allPoints = widget.allPoints;
+    final enabledRanges = {
+      for (final range in _TrendRange.values)
+        range: _filteredPoints(allPoints, range).length >= 2,
+    };
+    if (enabledRanges[_selectedRange] != true) {
+      _selectedRange = enabledRanges[_TrendRange.ytd] == true
+          ? _TrendRange.ytd
+          : _TrendRange.values.firstWhere(
+              (range) => enabledRanges[range] == true,
+              orElse: () => _TrendRange.ytd,
+            );
+    }
+    final points = enabledRanges[_selectedRange] == true
+        ? _filteredPoints(allPoints, _selectedRange)
+        : allPoints;
     if (points.length < 2) {
       return const SizedBox.shrink();
     }
 
     final first = points.first;
     final last = points.last;
-    final freshness = chart?.freshness;
+    final delta = last.chartValue - first.chartValue;
+    final percent =
+        first.chartValue == 0 ? 0.0 : delta / first.chartValue * 100;
+    final tokens = context.looTokens;
 
     return LooGlassCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _SectionHeader(
-            title: chart?.title ?? "账户资产走势",
-            trailing: freshness?.label,
+            title: widget.title,
+            trailing: widget.trailing,
+          ),
+          const SizedBox(height: 12),
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: _TrendRange.values.map((range) {
+                final enabled = enabledRanges[range] == true;
+                return Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: ChoiceChip(
+                    label: Text(range.label),
+                    selected: _selectedRange == range,
+                    onSelected: enabled
+                        ? (_) => setState(() => _selectedRange = range)
+                        : null,
+                  ),
+                );
+              }).toList(),
+            ),
           ),
           const SizedBox(height: 12),
           LooLineChart(
@@ -530,14 +613,86 @@ class _AccountTrendCard extends StatelessWidget {
                 .toList(),
           ),
           const SizedBox(height: 12),
-          Text(
-            "${first.label} ${first.displayValue} → ${last.label} ${last.displayValue}",
-            style: Theme.of(context).textTheme.bodyMedium,
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  "${first.label} → ${last.label}",
+                  style: Theme.of(context).textTheme.bodyMedium,
+                ),
+              ),
+              Text(
+                "${_selectedRange.label} ${_formatDelta(delta)} · ${_formatPercent(percent)}",
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: delta >= 0 ? tokens.success : tokens.danger,
+                      fontWeight: FontWeight.w800,
+                    ),
+              ),
+            ],
           ),
         ],
       ),
     );
   }
+
+  List<AccountTrendPoint> _filteredPoints(
+    List<AccountTrendPoint> points,
+    _TrendRange range,
+  ) {
+    if (points.length < 2) return points;
+    final datedPoints = points.where((point) => point.rawDate != null).toList();
+    if (datedPoints.length < 2) {
+      return range == _TrendRange.ytd ? points : const [];
+    }
+
+    final latest = datedPoints
+        .map((point) => point.rawDate!)
+        .reduce((left, right) => left.isAfter(right) ? left : right);
+    final cutoff = switch (range) {
+      _TrendRange.oneDay => latest.subtract(const Duration(days: 1)),
+      _TrendRange.oneWeek => latest.subtract(const Duration(days: 7)),
+      _TrendRange.oneMonth => latest.subtract(const Duration(days: 31)),
+      _TrendRange.threeMonths => latest.subtract(const Duration(days: 93)),
+      _TrendRange.sixMonths => latest.subtract(const Duration(days: 186)),
+      _TrendRange.oneYear => latest.subtract(const Duration(days: 366)),
+      _TrendRange.ytd => DateTime(latest.year),
+    };
+    return points
+        .where((point) =>
+            point.rawDate != null && !point.rawDate!.isBefore(cutoff))
+        .toList();
+  }
+
+  String _formatDelta(double value) {
+    final sign = value >= 0 ? "+" : "-";
+    final absValue = value.abs();
+    if (absValue >= 1000000) {
+      return "$sign\$${(absValue / 1000000).toStringAsFixed(1)}M";
+    }
+    if (absValue >= 1000) {
+      return "$sign\$${(absValue / 1000).toStringAsFixed(1)}k";
+    }
+    return "$sign\$${absValue.toStringAsFixed(0)}";
+  }
+
+  String _formatPercent(double value) {
+    final sign = value >= 0 ? "+" : "";
+    return "$sign${value.toStringAsFixed(1)}%";
+  }
+}
+
+enum _TrendRange {
+  oneDay("1D"),
+  oneWeek("1W"),
+  oneMonth("1M"),
+  threeMonths("3M"),
+  sixMonths("6M"),
+  oneYear("1Y"),
+  ytd("YTD");
+
+  const _TrendRange(this.label);
+
+  final String label;
 }
 
 class MobileAllocationPoint {
@@ -628,8 +783,8 @@ class _AccountMetricStrip extends StatelessWidget {
   Widget build(BuildContext context) {
     final tokens = context.looTokens;
     final metrics = [
-      _MetricDatum("账户盈亏", data.gainLoss),
-      _MetricDatum("组合占比", data.portfolioShare),
+      _MetricDatum("账户盈亏", _shortGainLoss(data.gainLoss)),
+      _MetricDatum("组合占比", _portfolioShareValue(data.portfolioShare)),
       _MetricDatum("持仓数量", "${data.holdings.length} 个"),
       _MetricDatum("健康度", data.healthScore.score),
     ].where((item) => item.value.isNotEmpty && item.value != "--").toList();
@@ -654,6 +809,16 @@ class _AccountMetricStrip extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  String _shortGainLoss(String value) {
+    final parts = value.split(RegExp(r"\s+"));
+    return parts.isEmpty ? value : parts.first.trim();
+  }
+
+  String _portfolioShareValue(String value) {
+    final percent = RegExp(r"[-+]?\d+(?:\.\d+)?%").firstMatch(value);
+    return percent?.group(0) ?? value.replaceAll("大约占整个组合", "").trim();
   }
 }
 
