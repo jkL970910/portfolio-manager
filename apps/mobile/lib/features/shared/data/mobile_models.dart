@@ -114,12 +114,6 @@ class MobileHoldingCard {
           _ => "报价待确认",
         };
     final quoteProvider = json["quoteProvider"] as String?;
-    final quoteStatus = [
-      quoteStatusLabel,
-      if (quoteProvider != null && quoteProvider.isNotEmpty) quoteProvider,
-      if (lastUpdated.isNotEmpty) lastUpdated,
-    ].join(" · ");
-
     return MobileHoldingCard(
       id: json["id"] as String? ?? symbol,
       securityId: json["securityId"] as String? ?? "",
@@ -134,7 +128,6 @@ class MobileHoldingCard {
           accountCountLabel,
         if (lotCountLabel.isNotEmpty && account != lotCountLabel) lotCountLabel,
         weight,
-        quoteStatus,
       ].where((item) => item.isNotEmpty).join(" · "),
       accountType: json["accountType"] as String? ?? "",
       accountCount: accountCount,
