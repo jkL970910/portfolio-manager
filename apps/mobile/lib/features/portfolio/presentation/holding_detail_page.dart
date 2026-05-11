@@ -70,7 +70,7 @@ class _HoldingDetailPageState extends State<HoldingDetailPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.fallbackTitle),
+        title: const Text("账户内持仓"),
         actions: [
           IconButton(
             tooltip: "编辑持仓",
@@ -143,7 +143,7 @@ class _HoldingDetailPageState extends State<HoldingDetailPage> {
                   if (data.facts.isNotEmpty) ...[
                     const SizedBox(height: 12),
                     _CompactFactsCard(
-                      title: "持仓档案",
+                      title: "账户内持仓档案",
                       facts: data.facts,
                     ),
                   ],
@@ -304,7 +304,7 @@ class MobileHoldingDetailSnapshot {
         currency == "CAD" || currency == "USD" ? currency : null;
     return LooMinisterPageContext(
       page: "holding-detail",
-      title: "$symbol持仓详情",
+      title: "$symbol账户内持仓",
       asOf: asOf,
       displayCurrency: currency.isEmpty ? "CAD" : currency,
       subject: LooMinisterSubject(
@@ -327,7 +327,7 @@ class MobileHoldingDetailSnapshot {
         sourceMode: _toMinisterSourceMode(chart?.sourceMode),
       ),
       facts: [
-        LooMinisterFact(id: "holding-value", label: "持仓市值", value: value),
+        LooMinisterFact(id: "holding-value", label: "账户内市值", value: value),
         if (lastPrice.isNotEmpty && lastPrice != "--")
           LooMinisterFact(
             id: "last-price",
@@ -336,17 +336,17 @@ class MobileHoldingDetailSnapshot {
             source: "quote-cache",
           ),
         if (gainLoss.isNotEmpty)
-          LooMinisterFact(id: "gain-loss", label: "持仓盈亏", value: gainLoss),
+          LooMinisterFact(id: "gain-loss", label: "账户内盈亏", value: gainLoss),
         if (portfolioShare.isNotEmpty)
           LooMinisterFact(
             id: "portfolio-share",
-            label: "组合占比",
+            label: "全组合占比",
             value: portfolioShare,
           ),
         if (accountShare.isNotEmpty)
           LooMinisterFact(
             id: "account-share",
-            label: "账户占比",
+            label: "本账户占比",
             value: accountShare,
           ),
         LooMinisterFact(
@@ -358,7 +358,7 @@ class MobileHoldingDetailSnapshot {
         ),
         LooMinisterFact(
           id: "health-score",
-          label: "持仓健康分",
+          label: "账户内持仓健康分",
           value: healthSummary.score,
           detail: healthSummary.status,
           source: "analysis-cache",
@@ -398,7 +398,7 @@ class MobileHoldingDetailSnapshot {
         ),
         LooMinisterSuggestedAction(
           id: "open-security-detail",
-          label: "查看标的详情",
+          label: "查看标的总览",
           actionType: "navigate",
           target: {"page": "security-detail"},
         ),
@@ -620,6 +620,14 @@ class _SummaryCard extends StatelessWidget {
                     ),
                     SizedBox(height: tokens.gapXs),
                     Text(
+                      "${data.accountName} 内仓位",
+                      style: theme.textTheme.labelLarge?.copyWith(
+                        color: tokens.accent,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    SizedBox(height: tokens.gapXs),
+                    Text(
                       data.name,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
@@ -639,7 +647,12 @@ class _SummaryCard extends StatelessWidget {
           SizedBox(height: tokens.gapLg),
           Text(data.value, style: theme.textTheme.displaySmall),
           SizedBox(height: tokens.gapSm),
-          Text(data.subtitle, style: theme.textTheme.bodyMedium),
+          Text(
+            "这里只展示 ${data.accountName} 里的这笔仓位；跨账户总仓位请进入标的总览。",
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: tokens.mutedText,
+            ),
+          ),
           SizedBox(height: tokens.gapSm),
           Wrap(
             spacing: 8,
@@ -670,9 +683,9 @@ class _MetricGrid extends StatelessWidget {
   Widget build(BuildContext context) {
     final metrics = [
       _MetricDatum("最新价格", data.lastPrice),
-      _MetricDatum("持仓盈亏", data.gainLoss),
-      _MetricDatum("组合占比", data.portfolioShare),
-      _MetricDatum("账户占比", data.accountShare),
+      _MetricDatum("账户内盈亏", data.gainLoss),
+      _MetricDatum("全组合占比", data.portfolioShare),
+      _MetricDatum("本账户占比", data.accountShare),
     ].where((item) => item.value.isNotEmpty && item.value != "--").toList();
 
     if (metrics.isEmpty) {
@@ -867,7 +880,16 @@ class _MarketDataCard extends StatelessWidget {
         children: [
           const _SectionHeader(title: "行情状态"),
           const SizedBox(height: 8),
-          Text(marketData.summary),
+          const Text("这部分只辅助判断该账户内仓位的价格状态；更完整资料在标的总览查看。"),
+          if (marketData.summary.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Text(
+              marketData.summary,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: context.looTokens.mutedText,
+                  ),
+            ),
+          ],
           ...marketData.facts.take(4).map(
                 (fact) => Padding(
                   padding: const EdgeInsets.only(top: 10),
@@ -899,7 +921,7 @@ class _PortfolioRoleCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const _SectionHeader(title: "组合角色"),
+          const _SectionHeader(title: "账户内角色"),
           const SizedBox(height: 8),
           ...items.take(3).map(_BulletLine.new),
         ],
@@ -919,7 +941,7 @@ class _HealthCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const _SectionHeader(title: "持仓健康度"),
+          const _SectionHeader(title: "账户内持仓健康度"),
           const SizedBox(height: 12),
           Row(
             children: [
@@ -972,8 +994,8 @@ class _ActionLinksCard extends StatelessWidget {
         const SizedBox(width: 10),
         Expanded(
           child: _ActionLink(
-            title: "标的研究台",
-            subtitle: "看标的事实",
+            title: "标的总览",
+            subtitle: "看跨账户总仓位",
             icon: Icons.show_chart_rounded,
             onTap: onOpenSecurity,
           ),

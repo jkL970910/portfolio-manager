@@ -1219,8 +1219,8 @@ class _PortfolioFitSection extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
             child: _SectionHeader(
-              title: "我的组合适配",
-              trailing: data.heldPosition == null ? "候选标的" : "已持有",
+              title: data.heldPosition == null ? "候选标的适配" : "我的总仓位与组合适配",
+              trailing: data.heldPosition == null ? "未持有" : "跨账户汇总",
             ),
           ),
           Padding(
@@ -1246,7 +1246,7 @@ class _PortfolioFitSection extends StatelessWidget {
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
               child: _SectionHeader(
-                title: "相关持仓",
+                title: "账户内仓位",
                 trailing: "${data.relatedHoldings.length} 个",
               ),
             ),
@@ -2480,7 +2480,7 @@ class _AccountDistributionCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const _SectionHeader(title: "账户分布"),
+          const _SectionHeader(title: "账户拆分", trailing: "点击看账户内仓位"),
           const SizedBox(height: 10),
           LooDistributionBar(
             segments: accounts
@@ -2547,7 +2547,7 @@ class _HeldPositionCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const _SectionHeader(title: "持有汇总"),
+          const _SectionHeader(title: "跨账户持有汇总"),
           const SizedBox(height: 8),
           Text(position.value, style: Theme.of(context).textTheme.titleLarge),
           const SizedBox(height: 8),
