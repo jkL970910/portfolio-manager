@@ -1015,17 +1015,24 @@ class _AccountHoldingsPreviewState extends State<_AccountHoldingsPreview> {
         children: [
           _SectionHeader(
             title: "账户内持仓",
-            trailing: "${widget.holdings.length} 个",
+            trailing: _expanded || !canExpand
+                ? "全部 ${widget.holdings.length} 个"
+                : "预览 5/${widget.holdings.length}",
           ),
           SizedBox(height: tokens.gapSm),
-          Text(
-            canExpand && !_expanded
-                ? "默认展示主要持仓；展开后可查看该账户全部持仓。"
-                : "点击单项查看这笔仓位详情。",
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: tokens.mutedText,
-                ),
-          ),
+          if (canExpand)
+            _HoldingsViewToggle(
+              expanded: _expanded,
+              total: widget.holdings.length,
+              onChanged: (expanded) => setState(() => _expanded = expanded),
+            )
+          else
+            Text(
+              "点击单项查看这笔仓位详情。",
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: tokens.mutedText,
+                  ),
+            ),
           SizedBox(height: tokens.gapMd),
           if (shownHoldings.isEmpty)
             Text(
@@ -1041,24 +1048,95 @@ class _AccountHoldingsPreviewState extends State<_AccountHoldingsPreview> {
                 onTap: () => widget.onOpenHolding(holding),
               ),
             ),
-          if (canExpand) ...[
+          if (canExpand && !_expanded) ...[
             SizedBox(height: tokens.gapSm),
             Align(
               alignment: Alignment.centerLeft,
-              child: TextButton.icon(
-                onPressed: () => setState(() => _expanded = !_expanded),
-                icon: AnimatedRotation(
-                  turns: _expanded ? 0.5 : 0,
-                  duration: const Duration(milliseconds: 180),
-                  curve: Curves.easeOutCubic,
-                  child: const Icon(Icons.keyboard_arrow_down_rounded),
-                ),
-                label: Text(
-                    _expanded ? "收起持仓" : "展开全部 ${widget.holdings.length} 个"),
+              child: TextButton(
+                onPressed: () => setState(() => _expanded = true),
+                child: Text("展开全部 ${widget.holdings.length} 个持仓"),
               ),
             ),
           ],
         ],
+      ),
+    );
+  }
+}
+
+class _HoldingsViewToggle extends StatelessWidget {
+  const _HoldingsViewToggle({
+    required this.expanded,
+    required this.total,
+    required this.onChanged,
+  });
+
+  final bool expanded;
+  final int total;
+  final ValueChanged<bool> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = context.looTokens;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.18),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: tokens.cardBorder),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _TogglePill(
+            label: "预览 5 个",
+            selected: !expanded,
+            onTap: () => onChanged(false),
+          ),
+          _TogglePill(
+            label: "全部 $total 个",
+            selected: expanded,
+            onTap: () => onChanged(true),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _TogglePill extends StatelessWidget {
+  const _TogglePill({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = context.looTokens;
+    return InkWell(
+      borderRadius: BorderRadius.circular(999),
+      onTap: selected ? null : onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 160),
+        curve: Curves.easeOutCubic,
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+        decoration: BoxDecoration(
+          color: selected
+              ? tokens.accent.withValues(alpha: 0.24)
+              : Colors.transparent,
+          borderRadius: BorderRadius.circular(999),
+        ),
+        child: Text(
+          label,
+          style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                color: selected ? tokens.accent : tokens.mutedText,
+                fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
+              ),
+        ),
       ),
     );
   }
