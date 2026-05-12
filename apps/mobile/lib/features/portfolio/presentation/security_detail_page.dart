@@ -1170,16 +1170,7 @@ class _SecurityFactsSection extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const _SectionHeader(title: "标的事实"),
-          const SizedBox(height: 12),
-          _ResearchUpdateStatusBar(
-            data: data,
-            trust: trust,
-            isRefreshingQuote: isRefreshingQuote,
-            isSubmittingExternalResearch: isSubmittingExternalResearch,
-            message: externalResearchMessage,
-            onTap: onOpenUpdateSheet,
-          ),
+          const _SectionHeader(title: "标的事实", trailing: "公域资料"),
           const SizedBox(height: 12),
           _MetricGrid(data),
           if (priceHistoryChart != null) ...[
@@ -1192,6 +1183,15 @@ class _SecurityFactsSection extends StatelessWidget {
             const SizedBox(height: 14),
             _CompactFactsList(facts: data.facts),
           ],
+          const SizedBox(height: 14),
+          _ResearchUpdateStatusBar(
+            data: data,
+            trust: trust,
+            isRefreshingQuote: isRefreshingQuote,
+            isSubmittingExternalResearch: isSubmittingExternalResearch,
+            message: externalResearchMessage,
+            onTap: onOpenUpdateSheet,
+          ),
         ],
       ),
     );
@@ -1220,7 +1220,18 @@ class _PortfolioFitSection extends StatelessWidget {
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
             child: _SectionHeader(
               title: data.heldPosition == null ? "候选标的适配" : "我的总仓位与组合适配",
-              trailing: data.heldPosition == null ? "未持有" : "跨账户汇总",
+              trailing: data.heldPosition == null ? "候选分析" : "私域分析",
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 6, 16, 0),
+            child: Text(
+              data.heldPosition == null
+                  ? "这一层结合你的偏好、组合缺口和护栏判断是否适合加入。"
+                  : "这一层只看你自己的仓位、账户分布和组合约束，不覆盖上方标的事实。",
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: context.looTokens.mutedText,
+                  ),
             ),
           ),
           Padding(
@@ -1246,7 +1257,7 @@ class _PortfolioFitSection extends StatelessWidget {
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
               child: _SectionHeader(
-                title: "账户内仓位",
+                title: "账户内仓位明细",
                 trailing: "${data.relatedHoldings.length} 个",
               ),
             ),
@@ -1263,10 +1274,30 @@ class _PortfolioFitSection extends StatelessWidget {
           ],
           Padding(
             padding: const EdgeInsets.all(12),
-            child: aiAnalysisCard,
+            child: _QuickScanPanel(child: aiAnalysisCard),
           ),
         ],
       ),
+    );
+  }
+}
+
+class _QuickScanPanel extends StatelessWidget {
+  const _QuickScanPanel({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Padding(
+          padding: EdgeInsets.fromLTRB(4, 2, 4, 10),
+          child: _SectionHeader(title: "智能研究结论", trailing: "可增强解释"),
+        ),
+        child,
+      ],
     );
   }
 }
@@ -2214,7 +2245,7 @@ class _MarketDataCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const _SectionHeader(title: "市场状态"),
+          const _SectionHeader(title: "市场状态", trailing: "标的本身"),
           if (marketData.summary.isNotEmpty) ...[
             const SizedBox(height: 8),
             Text(
@@ -2255,7 +2286,7 @@ class _CompactFactsList extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const _SectionHeader(title: "资料摘要"),
+          const _SectionHeader(title: "资料摘要", trailing: "缓存事实"),
           const SizedBox(height: 8),
           ...facts.take(6).map(
                 (fact) => Padding(
@@ -2277,26 +2308,6 @@ class _CompactFactsList extends StatelessWidget {
                   ),
                 ),
               ),
-        ],
-      ),
-    );
-  }
-}
-
-class _BulletLine extends StatelessWidget {
-  const _BulletLine(this.text);
-
-  final String text;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(top: 6),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text("• ", style: TextStyle(color: context.looTokens.accent)),
-          Expanded(child: Text(text)),
         ],
       ),
     );
@@ -2442,14 +2453,6 @@ class _AccountDistributionCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const _SectionHeader(title: "账户拆分", trailing: "按总仓位"),
-          const SizedBox(height: 6),
-          Text(
-            "右侧百分比表示该标的总仓位在各账户间的分布；账户内占比另行展示。",
-            style: Theme.of(context)
-                .textTheme
-                .bodySmall
-                ?.copyWith(color: tokens.mutedText),
-          ),
           const SizedBox(height: 10),
           LooDistributionBar(
             segments: accounts
@@ -2541,22 +2544,32 @@ class _HeldPositionCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const _SectionHeader(title: "跨账户持有汇总"),
+          const _SectionHeader(title: "跨账户持仓", trailing: "我的仓位"),
           const SizedBox(height: 8),
           Text(position.value, style: Theme.of(context).textTheme.titleLarge),
           const SizedBox(height: 8),
-          Text(
-            [
-              position.quantity,
-              position.avgCost,
-              position.costBasis,
-              position.accountCount,
-            ].where((item) => item.isNotEmpty && item != "--").join(" · "),
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: context.looTokens.mutedText,
-                ),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              if (position.gainLoss.isNotEmpty) _InfoChip(position.gainLoss),
+              if (position.quantity.isNotEmpty && position.quantity != "--")
+                _InfoChip(position.quantity),
+              if (position.accountCount.isNotEmpty)
+                _InfoChip(position.accountCount),
+            ],
           ),
-          ...position.summaryPoints.take(2).map(_BulletLine.new),
+          if (position.summaryPoints.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Text(
+              position.summaryPoints.first,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: context.looTokens.mutedText,
+                  ),
+            ),
+          ],
         ],
       ),
     );
