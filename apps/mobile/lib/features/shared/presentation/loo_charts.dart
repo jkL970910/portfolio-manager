@@ -14,6 +14,206 @@ class LooLineChartPoint {
   final String? displayValue;
 }
 
+class LooTrendPoint {
+  const LooTrendPoint({
+    required this.label,
+    required this.displayValue,
+    required this.value,
+    this.rawDate,
+  });
+
+  final String label;
+  final String displayValue;
+  final double value;
+  final DateTime? rawDate;
+}
+
+class LooTrendChart extends StatefulWidget {
+  const LooTrendChart({
+    required this.title,
+    required this.points,
+    this.initialRange = LooTrendRange.threeMonths,
+    super.key,
+  });
+
+  final String title;
+  final List<LooTrendPoint> points;
+  final LooTrendRange initialRange;
+
+  @override
+  State<LooTrendChart> createState() => _LooTrendChartState();
+}
+
+class _LooTrendChartState extends State<LooTrendChart> {
+  late LooTrendRange _selectedRange = widget.initialRange;
+
+  @override
+  void didUpdateWidget(covariant LooTrendChart oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.initialRange != widget.initialRange) {
+      _selectedRange = widget.initialRange;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final allPoints = widget.points;
+    final enabledRanges = {
+      for (final range in LooTrendRange.values)
+        range: _filteredPoints(allPoints, range).length >= 2,
+    };
+    if (enabledRanges[_selectedRange] != true) {
+      _selectedRange = enabledRanges[LooTrendRange.ytd] == true
+          ? LooTrendRange.ytd
+          : LooTrendRange.values.firstWhere(
+              (range) => enabledRanges[range] == true,
+              orElse: () => LooTrendRange.ytd,
+            );
+    }
+    final points = enabledRanges[_selectedRange] == true
+        ? _filteredPoints(allPoints, _selectedRange)
+        : allPoints;
+    if (points.length < 2) {
+      return const SizedBox.shrink();
+    }
+
+    final first = points.first;
+    final last = points.last;
+    final delta = last.value - first.value;
+    final percent = first.value == 0 ? 0.0 : delta / first.value * 100;
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final mutedColor = colorScheme.onSurface.withValues(alpha: 0.64);
+    final positiveColor = colorScheme.tertiary;
+    final negativeColor = colorScheme.error;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: Text(widget.title, style: theme.textTheme.titleLarge),
+            ),
+            Text(
+              last.displayValue,
+              style: theme.textTheme.bodySmall?.copyWith(color: mutedColor),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            children: LooTrendRange.values.map((range) {
+              final enabled = enabledRanges[range] == true;
+              return Padding(
+                padding: const EdgeInsets.only(right: 8),
+                child: ChoiceChip(
+                  label: Text(range.label),
+                  selected: _selectedRange == range,
+                  onSelected: enabled
+                      ? (_) => setState(() => _selectedRange = range)
+                      : null,
+                ),
+              );
+            }).toList(),
+          ),
+        ),
+        const SizedBox(height: 12),
+        LooLineChart(
+          points: points
+              .map(
+                (point) => LooLineChartPoint(
+                  label: point.label,
+                  value: point.value,
+                  displayValue: point.displayValue,
+                ),
+              )
+              .toList(),
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                "${first.label} → ${last.label}",
+                style: theme.textTheme.bodyMedium,
+              ),
+            ),
+            Text(
+              "${_selectedRange.label} ${_formatDelta(delta)} · ${_formatPercent(percent)}",
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: delta >= 0 ? positiveColor : negativeColor,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  List<LooTrendPoint> _filteredPoints(
+    List<LooTrendPoint> points,
+    LooTrendRange range,
+  ) {
+    if (points.length < 2) return points;
+    final datedPoints = points.where((point) => point.rawDate != null).toList();
+    if (datedPoints.length < 2) {
+      return range == LooTrendRange.ytd ? points : const [];
+    }
+
+    final latest = datedPoints
+        .map((point) => point.rawDate!)
+        .reduce((left, right) => left.isAfter(right) ? left : right);
+    final cutoff = switch (range) {
+      LooTrendRange.oneDay => latest.subtract(const Duration(days: 1)),
+      LooTrendRange.oneWeek => latest.subtract(const Duration(days: 7)),
+      LooTrendRange.oneMonth => latest.subtract(const Duration(days: 31)),
+      LooTrendRange.threeMonths => latest.subtract(const Duration(days: 93)),
+      LooTrendRange.sixMonths => latest.subtract(const Duration(days: 186)),
+      LooTrendRange.oneYear => latest.subtract(const Duration(days: 366)),
+      LooTrendRange.ytd => DateTime(latest.year),
+    };
+    return points
+        .where((point) =>
+            point.rawDate != null && !point.rawDate!.isBefore(cutoff))
+        .toList();
+  }
+
+  String _formatDelta(double value) {
+    final sign = value >= 0 ? "+" : "-";
+    final absValue = value.abs();
+    if (absValue >= 1000000) {
+      return "$sign\$${(absValue / 1000000).toStringAsFixed(1)}M";
+    }
+    if (absValue >= 1000) {
+      return "$sign\$${(absValue / 1000).toStringAsFixed(1)}k";
+    }
+    return "$sign\$${absValue.toStringAsFixed(0)}";
+  }
+
+  String _formatPercent(double value) {
+    final sign = value >= 0 ? "+" : "";
+    return "$sign${value.toStringAsFixed(1)}%";
+  }
+}
+
+enum LooTrendRange {
+  oneDay("1D"),
+  oneWeek("1W"),
+  oneMonth("1M"),
+  threeMonths("3M"),
+  sixMonths("6M"),
+  oneYear("1Y"),
+  ytd("YTD");
+
+  const LooTrendRange(this.label);
+
+  final String label;
+}
+
 class LooDistributionSegment {
   const LooDistributionSegment({
     required this.label,

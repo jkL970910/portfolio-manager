@@ -322,6 +322,7 @@ class _PortfolioTrendCard extends StatelessWidget {
                   label: point.label,
                   displayValue: point.displayValue,
                   chartValue: point.value,
+                  rawDate: DateTime.tryParse(point.rawDate ?? ""),
                 ))
             .toList() ??
         fallbackPoints
@@ -329,57 +330,27 @@ class _PortfolioTrendCard extends StatelessWidget {
                   label: point.label,
                   displayValue: point.displayValue,
                   chartValue: point.chartValue,
+                  rawDate: null as DateTime?,
                 ))
             .toList();
     if (points.length < 2) {
       return const SizedBox.shrink();
     }
 
-    final first = points.first;
-    final last = points.last;
-    final freshness = chart?.freshness;
-
     return LooGlassCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(chart?.title ?? "组合价值走势",
-              style: Theme.of(context).textTheme.titleLarge),
-          const SizedBox(height: 12),
-          LooLineChart(
-            points: points
-                .map(
-                  (point) => LooLineChartPoint(
-                    label: point.label,
-                    value: point.chartValue,
-                  ),
-                )
-                .toList(),
-          ),
-          const SizedBox(height: 12),
-          Text(
-            "${first.label} ${first.displayValue} → ${last.label} ${last.displayValue}",
-            style: Theme.of(context).textTheme.bodyMedium,
-          ),
-          if (freshness != null) ...[
-            const SizedBox(height: 10),
-            Chip(label: Text(freshness.label)),
-            const SizedBox(height: 6),
-            Text(
-              freshness.detail,
-              style: Theme.of(context).textTheme.bodySmall,
-            ),
-          ],
-          if (chart != null && chart!.notes.isNotEmpty) ...[
-            const SizedBox(height: 8),
-            ...chart!.notes.take(2).map(
-                  (note) => Text(
-                    "· $note",
-                    style: Theme.of(context).textTheme.bodySmall,
-                  ),
-                ),
-          ],
-        ],
+      child: LooTrendChart(
+        title: chart?.title ?? "组合价值走势",
+        initialRange: LooTrendRange.ytd,
+        points: points
+            .map(
+              (point) => LooTrendPoint(
+                label: point.label,
+                displayValue: point.displayValue,
+                value: point.chartValue,
+                rawDate: point.rawDate,
+              ),
+            )
+            .toList(),
       ),
     );
   }

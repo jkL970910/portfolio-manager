@@ -1950,11 +1950,13 @@ class MobileSecurityPerformancePoint {
     required this.label,
     required this.value,
     required this.chartValue,
+    this.rawDate,
   });
 
   final String label;
   final String value;
   final double chartValue;
+  final String? rawDate;
 
   factory MobileSecurityPerformancePoint.fromJson(Map<String, dynamic> json) {
     final rawValue = json["value"];
@@ -1965,6 +1967,7 @@ class MobileSecurityPerformancePoint {
           ? rawValue.toStringAsFixed(2)
           : rawValue?.toString() ?? "--",
       chartValue: rawValue is num ? rawValue.toDouble() : 0,
+      rawDate: json["rawDate"] as String?,
     );
   }
 
@@ -1977,6 +1980,7 @@ class MobileSecurityPerformancePoint {
           "未知日期",
       value: json["displayValue"] as String? ?? rawValue?.toString() ?? "--",
       chartValue: rawValue is num ? rawValue.toDouble() : 0,
+      rawDate: json["rawDate"] as String?,
     );
   }
 }
@@ -2388,74 +2392,30 @@ class _PerformanceChartCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final freshness = chart.freshness;
-    final isReferenceOnly = freshness.status == "fallback";
-
-    if (isReferenceOnly) {
-      return _InnerPanel(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const _SectionHeader(title: "价格走势"),
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                Icon(Icons.info_outline, color: context.looTokens.accent),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    "真实价格历史不足",
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Text(
-              freshness.detail,
-              style: Theme.of(context).textTheme.bodySmall,
-            ),
-          ],
-        ),
-      );
-    }
-
     final points = chart.points
         .map((point) => (
               label: point.label,
               displayValue: point.displayValue,
               chartValue: point.value,
+              rawDate: DateTime.tryParse(point.rawDate ?? ""),
             ))
         .toList();
     if (points.length < 2) {
-      return const _InnerPanel(
-        child: Text("真实价格历史不足，暂不绘制价格走势。"),
-      );
+      return const SizedBox.shrink();
     }
-    final first = points.first;
-    final last = points.last;
     return _InnerPanel(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _SectionHeader(title: "价格走势", trailing: freshness.label),
-          const SizedBox(height: 12),
-          LooLineChart(
-            points: points
-                .map(
-                  (point) => LooLineChartPoint(
-                    label: point.label,
-                    value: point.chartValue,
-                  ),
-                )
-                .toList(),
-          ),
-          const SizedBox(height: 12),
-          Text(
-            "${first.label} ${first.displayValue} → ${last.label} ${last.displayValue}",
-            style: Theme.of(context).textTheme.bodyMedium,
-          ),
-        ],
+      child: LooTrendChart(
+        title: "价格走势",
+        points: points
+            .map(
+              (point) => LooTrendPoint(
+                label: point.label,
+                displayValue: point.displayValue,
+                value: point.chartValue,
+                rawDate: point.rawDate,
+              ),
+            )
+            .toList(),
       ),
     );
   }

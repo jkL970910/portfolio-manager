@@ -832,36 +832,26 @@ class _HoldingTrendCard extends StatelessWidget {
               label: point.label,
               displayValue: point.displayValue,
               chartValue: point.value,
+              rawDate: DateTime.tryParse(point.rawDate ?? ""),
             ))
         .toList();
     if (points.length < 2) {
       return const SizedBox.shrink();
     }
 
-    final first = points.first;
-    final last = points.last;
     return LooGlassCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _SectionHeader(title: chart.title, trailing: chart.freshness.label),
-          const SizedBox(height: 12),
-          LooLineChart(
-            points: points
-                .map(
-                  (point) => LooLineChartPoint(
-                    label: point.label,
-                    value: point.chartValue,
-                  ),
-                )
-                .toList(),
-          ),
-          const SizedBox(height: 12),
-          Text(
-            "${first.label} ${first.displayValue} → ${last.label} ${last.displayValue}",
-            style: Theme.of(context).textTheme.bodyMedium,
-          ),
-        ],
+      child: LooTrendChart(
+        title: chart.title,
+        points: points
+            .map(
+              (point) => LooTrendPoint(
+                label: point.label,
+                displayValue: point.displayValue,
+                value: point.chartValue,
+                rawDate: point.rawDate,
+              ),
+            )
+            .toList(),
       ),
     );
   }
@@ -1078,10 +1068,9 @@ class _CompactFactsCard extends StatelessWidget {
 }
 
 class _SectionHeader extends StatelessWidget {
-  const _SectionHeader({required this.title, this.trailing});
+  const _SectionHeader({required this.title});
 
   final String title;
-  final String? trailing;
 
   @override
   Widget build(BuildContext context) {
@@ -1090,13 +1079,6 @@ class _SectionHeader extends StatelessWidget {
         Expanded(
           child: Text(title, style: Theme.of(context).textTheme.titleLarge),
         ),
-        if (trailing != null && trailing!.isNotEmpty)
-          Text(
-            trailing!,
-            style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                  color: context.looTokens.accent,
-                ),
-          ),
       ],
     );
   }

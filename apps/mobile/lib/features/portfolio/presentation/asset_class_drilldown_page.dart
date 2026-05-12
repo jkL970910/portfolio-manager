@@ -110,49 +110,19 @@ class _AssetClassTrendCard extends StatelessWidget {
       return const SizedBox.shrink();
     }
 
-    final first = points.first;
-    final last = points.last;
-
     return LooGlassCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(chart.title, style: Theme.of(context).textTheme.titleLarge),
-          const SizedBox(height: 12),
-          LooLineChart(
-            points: points
-                .map(
-                  (point) => LooLineChartPoint(
-                    label: point.label,
-                    value: point.value,
-                  ),
-                )
-                .toList(),
-          ),
-          const SizedBox(height: 12),
-          Text(
-            "${first.label} ${first.displayValue} → ${last.label} ${last.displayValue}",
-            style: Theme.of(context).textTheme.bodyMedium,
-          ),
-          const SizedBox(height: 10),
-          _InfoPill(chart.freshness.label),
-          const SizedBox(height: 6),
-          Text(
-            chart.freshness.detail,
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: context.looTokens.mutedText,
-                ),
-          ),
-          if (chart.notes.isNotEmpty) ...[
-            const SizedBox(height: 8),
-            ...chart.notes.take(2).map(
-                  (note) => Text(
-                    "· $note",
-                    style: Theme.of(context).textTheme.bodySmall,
-                  ),
-                ),
-          ],
-        ],
+      child: LooTrendChart(
+        title: chart.title,
+        points: points
+            .map(
+              (point) => LooTrendPoint(
+                label: point.label,
+                displayValue: point.displayValue,
+                value: point.value,
+                rawDate: DateTime.tryParse(point.rawDate ?? ""),
+              ),
+            )
+            .toList(),
       ),
     );
   }
@@ -265,27 +235,6 @@ class _EmptyCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return LooGlassCard(
       child: Text(message),
-    );
-  }
-}
-
-class _InfoPill extends StatelessWidget {
-  const _InfoPill(this.label);
-
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.34),
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: context.looTokens.cardBorder),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-        child: Text(label, style: Theme.of(context).textTheme.labelMedium),
-      ),
     );
   }
 }
