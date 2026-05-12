@@ -97,6 +97,7 @@ import { resolveCanonicalSecurityIdentity } from "@/lib/market-data/security-ide
 import { inferEconomicAssetClass } from "@/lib/backend/security-economic-exposure";
 import type {
   SecurityQuote,
+  SecurityHistoricalPoint,
   SecurityResolution,
 } from "@/lib/market-data/types";
 import { getProviderLimitSnapshot } from "@/lib/market-data/provider-limits";
@@ -2049,54 +2050,44 @@ export async function getPortfolioSecurityDetailView(
     await repositories.securityPriceHistory.listBySecurityId(
       canonicalSecurity.id,
     );
-  if (
+  const shouldPersistFetchedHistory =
     hydratedPriceHistory.length < 2 ||
-    historyNeedsHigherDensity(hydratedPriceHistory)
-  ) {
-    try {
-      const historyResponse = await getSecurityHistoricalSeries(
-        normalizedSymbol,
-        {
-          exchange: referenceHolding?.exchangeOverride ?? null,
-          currency: referenceHolding?.currency ?? canonicalSecurity.currency,
-        },
+    historyNeedsHigherDensity(hydratedPriceHistory);
+  try {
+    const historyResponse = await getSecurityHistoricalSeries(
+      normalizedSymbol,
+      {
+        exchange: referenceHolding?.exchangeOverride ?? null,
+        currency: referenceHolding?.currency ?? canonicalSecurity.currency,
+      },
+    );
+    if (historyResponse.results.length > 0) {
+      const mappedPoints = mapProviderHistoryPoints({
+        points: historyResponse.results,
+        securityId: canonicalSecurity.id,
+        symbol: canonicalSecurity.symbol,
+        exchange: canonicalSecurity.canonicalExchange,
+        currency: canonicalSecurity.currency,
+      });
+      hydratedPriceHistory = mergeSecurityPriceHistoryPoints(
+        hydratedPriceHistory,
+        mappedPoints,
       );
-      if (historyResponse.results.length > 0) {
-        const mappedPoints: SecurityPriceHistoryPoint[] =
-          historyResponse.results.map((point, index) => ({
-            id: `fetched-${normalizedSymbol}-${point.date}-${index}`,
-            securityId: canonicalSecurity.id,
-            symbol: canonicalSecurity.symbol,
-            exchange: canonicalSecurity.canonicalExchange,
-            priceDate: point.date,
-            priceTime: point.time ?? null,
-            close: point.close,
-            adjustedClose: point.adjustedClose ?? null,
-            currency: canonicalSecurity.currency,
-            source: point.provider,
-            provider: point.provider,
-            sourceMode: point.provider === "fallback" ? "fallback" : "provider",
-            freshness: point.provider === "fallback" ? "fallback" : "fresh",
-            refreshRunId: null,
-            isReference: point.provider === "fallback",
-            fallbackReason:
-              point.provider === "fallback"
-                ? "Provider returned fallback history."
-                : null,
-            createdAt: new Date().toISOString(),
-          }));
-        hydratedPriceHistory = mappedPoints;
+      if (shouldPersistFetchedHistory) {
         try {
-          await upsertSecurityPriceHistoryPoints(mappedPoints);
+          await upsertSecurityPriceHistoryPoints(
+            mappedPoints.filter((point) => !point.priceTime),
+          );
         } catch {
-          hydratedPriceHistory = mappedPoints;
+          // Keep fetched history in memory for this response even if persistence fails.
         }
       }
-    } catch {
+    }
+  } catch {
+    if (hydratedPriceHistory.length === 0) {
       hydratedPriceHistory = [];
     }
   }
-
   const data = buildPortfolioSecurityDetailData({
     language: user.displayLanguage,
     accounts: userAccounts,
@@ -2457,6 +2448,53 @@ function historyNeedsHigherDensity(points: SecurityPriceHistoryPoint[]) {
       new Date(previous.priceDate).getTime()) /
     (1000 * 60 * 60 * 24);
   return dayGap > 7;
+}
+
+function mapProviderHistoryPoints(args: {
+  points: SecurityHistoricalPoint[];
+  securityId: string;
+  symbol: string;
+  exchange: string | null;
+  currency: CurrencyCode;
+}) {
+  return args.points.map<SecurityPriceHistoryPoint>((point, index) => ({
+    id: `fetched-${args.symbol}-${point.time ?? point.date}-${index}`,
+    securityId: args.securityId,
+    symbol: args.symbol,
+    exchange: args.exchange,
+    priceDate: point.date,
+    priceTime: point.time ?? null,
+    close: point.close,
+    adjustedClose: point.adjustedClose ?? null,
+    currency: args.currency,
+    source: point.provider,
+    provider: point.provider,
+    sourceMode: point.provider === "fallback" ? "fallback" : "provider",
+    freshness: point.provider === "fallback" ? "fallback" : "fresh",
+    refreshRunId: null,
+    isReference: point.provider === "fallback",
+    fallbackReason:
+      point.provider === "fallback"
+        ? "Provider returned fallback history."
+        : null,
+    createdAt: new Date().toISOString(),
+  }));
+}
+
+function mergeSecurityPriceHistoryPoints(
+  ...seriesList: SecurityPriceHistoryPoint[][]
+) {
+  const byTimestamp = new Map<string, SecurityPriceHistoryPoint>();
+  for (const series of seriesList) {
+    for (const point of series) {
+      byTimestamp.set(point.priceTime ?? point.priceDate, point);
+    }
+  }
+  return [...byTimestamp.values()].sort((left, right) =>
+    (left.priceTime ?? left.priceDate).localeCompare(
+      right.priceTime ?? right.priceDate,
+    ),
+  );
 }
 
 async function getHydratedSecurityPriceHistoryForHoldings(
