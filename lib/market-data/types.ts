@@ -48,6 +48,7 @@ export interface SecurityQuote {
 export interface SecurityHistoricalPoint {
   symbol: string;
   date: string;
+  time?: string | null;
   close: number;
   adjustedClose?: number | null;
   currency?: string | null;

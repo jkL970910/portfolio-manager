@@ -72,6 +72,51 @@ function toYahooSymbol(
   return normalizedSymbol;
 }
 
+function parseYahooHistoricalPoints(
+  symbol: string,
+  exchange: string | null,
+  expectedCurrency: string | null,
+  payload: YahooChartResponse,
+): SecurityHistoricalPoint[] {
+  const result = payload.chart?.result?.[0];
+  const meta = result?.meta;
+  if (!result || !meta) {
+    return [];
+  }
+
+  const quoteCurrency = meta.currency?.trim().toUpperCase() || null;
+  if (expectedCurrency && quoteCurrency && quoteCurrency !== expectedCurrency) {
+    return [];
+  }
+
+  const timestamps = result.timestamp ?? [];
+  const closes = result.indicators?.quote?.[0]?.close ?? [];
+  const adjustedCloses = result.indicators?.adjclose?.[0]?.adjclose ?? [];
+
+  return timestamps
+    .map<SecurityHistoricalPoint | null>((timestamp, index) => {
+      const close = Number(closes[index]);
+      if (!Number.isFinite(timestamp) || !Number.isFinite(close) || close <= 0) {
+        return null;
+      }
+
+      const adjustedClose = Number(adjustedCloses[index]);
+      const dateTime = new Date(timestamp * 1000).toISOString();
+      return {
+        symbol: symbol.trim().toUpperCase(),
+        date: dateTime.slice(0, 10),
+        time: dateTime,
+        close,
+        adjustedClose: Number.isFinite(adjustedClose) ? adjustedClose : null,
+        currency: quoteCurrency ?? expectedCurrency,
+        exchange:
+          exchange?.trim() || meta.exchangeName || meta.fullExchangeName || null,
+        provider: "yahoo-finance",
+      };
+    })
+    .filter((point): point is SecurityHistoricalPoint => point !== null);
+}
+
 export async function getQuoteFromYahooFinance(
   symbol: string,
   exchange?: string | null,
@@ -145,14 +190,15 @@ export async function getHistoricalSeriesFromYahooFinance(
   symbol: string,
   exchange?: string | null,
   currency?: string | null,
+  options?: { interval?: "1d" | "1m"; range?: string },
 ): Promise<SecurityHistoricalPoint[]> {
   const yahooSymbol = toYahooSymbol(symbol, exchange, currency);
   const expectedCurrency = currency?.trim().toUpperCase() || null;
   const url = new URL(
     `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(yahooSymbol)}`,
   );
-  url.searchParams.set("range", "1y");
-  url.searchParams.set("interval", "1d");
+  url.searchParams.set("range", options?.range ?? "1y");
+  url.searchParams.set("interval", options?.interval ?? "1d");
   url.searchParams.set("includePrePost", "false");
   url.searchParams.set("events", "history");
 
@@ -184,39 +230,5 @@ export async function getHistoricalSeriesFromYahooFinance(
   }
 
   const payload = (await response.json()) as YahooChartResponse;
-  const result = payload.chart?.result?.[0];
-  const meta = result?.meta;
-  if (!result || !meta) {
-    return [];
-  }
-
-  const quoteCurrency = meta.currency?.trim().toUpperCase() || null;
-  if (expectedCurrency && quoteCurrency && quoteCurrency !== expectedCurrency) {
-    return [];
-  }
-
-  const timestamps = result.timestamp ?? [];
-  const closes = result.indicators?.quote?.[0]?.close ?? [];
-  const adjustedCloses = result.indicators?.adjclose?.[0]?.adjclose ?? [];
-
-  return timestamps
-    .map<SecurityHistoricalPoint | null>((timestamp, index) => {
-      const close = Number(closes[index]);
-      if (!Number.isFinite(timestamp) || !Number.isFinite(close) || close <= 0) {
-        return null;
-      }
-
-      const adjustedClose = Number(adjustedCloses[index]);
-      return {
-        symbol: symbol.trim().toUpperCase(),
-        date: new Date(timestamp * 1000).toISOString().slice(0, 10),
-        close,
-        adjustedClose: Number.isFinite(adjustedClose) ? adjustedClose : null,
-        currency: quoteCurrency ?? expectedCurrency,
-        exchange:
-          exchange?.trim() || meta.exchangeName || meta.fullExchangeName || null,
-        provider: "yahoo-finance",
-      };
-    })
-    .filter((point): point is SecurityHistoricalPoint => point !== null);
+  return parseYahooHistoricalPoints(symbol, exchange ?? null, expectedCurrency, payload);
 }

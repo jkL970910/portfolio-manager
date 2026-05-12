@@ -190,7 +190,7 @@ function hasDenseHistory(points: SecurityHistoricalPoint[]) {
   }
 
   const sorted = [...points].sort((left, right) =>
-    left.date.localeCompare(right.date),
+    (left.time ?? left.date).localeCompare(right.time ?? right.date),
   );
   const latest = sorted[sorted.length - 1];
   const previous = sorted[sorted.length - 2];
@@ -198,10 +198,25 @@ function hasDenseHistory(points: SecurityHistoricalPoint[]) {
     return false;
   }
 
-  const dayGap =
-    (new Date(latest.date).getTime() - new Date(previous.date).getTime()) /
-    (1000 * 60 * 60 * 24);
+  const latestDate = new Date(latest.time ?? latest.date).getTime();
+  const previousDate = new Date(previous.time ?? previous.date).getTime();
+  const dayGap = (latestDate - previousDate) / (1000 * 60 * 60 * 24);
   return dayGap <= 7;
+}
+
+function mergeHistoricalSeries(
+  ...seriesList: SecurityHistoricalPoint[][]
+): SecurityHistoricalPoint[] {
+  const byTimestamp = new Map<string, SecurityHistoricalPoint>();
+  for (const series of seriesList) {
+    for (const point of series) {
+      byTimestamp.set(point.time ?? point.date, point);
+    }
+  }
+
+  return [...byTimestamp.values()].sort((left, right) =>
+    (left.time ?? left.date).localeCompare(right.time ?? right.date),
+  );
 }
 
 export async function searchSecurities(
@@ -483,7 +498,7 @@ export async function getSecurityHistoricalSeries(
 
   const { quoteCacheTtlSeconds } = getMarketDataConfig();
   const cacheKey = [
-    "market-data:history:v3",
+    "market-data:history:v4",
     trimmed,
     normalizedExchange?.toLowerCase() ?? "no-exchange",
     normalizedCurrency?.toLowerCase() ?? "no-currency",
@@ -495,6 +510,32 @@ export async function getSecurityHistoricalSeries(
       staleOnErrorMs: 60 * 1000,
     },
     async () => {
+      let intradayResults: SecurityHistoricalPoint[] = [];
+
+      if (isCanadianQuoteRequest(normalizedExchange, normalizedCurrency)) {
+        if (!(await isProviderLimited("yahoo-finance"))) {
+          intradayResults = await getHistoricalSeriesFromYahooFinance(
+            trimmed,
+            normalizedExchange,
+            normalizedCurrency,
+            { interval: "1m", range: "1d" },
+          ).catch((error) => {
+            const message =
+              error instanceof Error ? error.message.toLowerCase() : "";
+            if (message.includes("rate limit")) {
+              throw error;
+            }
+            return [];
+          });
+        }
+      } else {
+        intradayResults = await getHistoricalSeriesFromTwelveData(
+          trimmed,
+          normalizedExchange,
+          { interval: "1min", outputsize: 390 },
+        ).catch(() => []);
+      }
+
       if (
         isCanadianQuoteRequest(normalizedExchange, normalizedCurrency) &&
         !(await isProviderLimited("yahoo-finance"))
@@ -503,6 +544,7 @@ export async function getSecurityHistoricalSeries(
           trimmed,
           normalizedExchange,
           normalizedCurrency,
+          { interval: "1d", range: "1y" },
         ).catch((error) => {
           const message =
             error instanceof Error ? error.message.toLowerCase() : "";
@@ -512,16 +554,17 @@ export async function getSecurityHistoricalSeries(
           return [];
         });
         if (hasDenseHistory(yahooResults)) {
-          return yahooResults;
+          return mergeHistoricalSeries(yahooResults, intradayResults);
         }
       }
 
       const twelveResults = await getHistoricalSeriesFromTwelveData(
         trimmed,
         normalizedExchange,
+        { interval: "1day", outputsize: 365 },
       ).catch(() => []);
       if (hasDenseHistory(twelveResults)) {
-        return twelveResults;
+        return mergeHistoricalSeries(twelveResults, intradayResults);
       }
 
       if (
@@ -532,9 +575,10 @@ export async function getSecurityHistoricalSeries(
           trimmed,
           normalizedExchange,
           normalizedCurrency,
+          { interval: "1d", range: "1y" },
         ).catch(() => []);
         if (hasDenseHistory(yahooResults)) {
-          return yahooResults;
+          return mergeHistoricalSeries(yahooResults, intradayResults);
         }
       }
 
@@ -544,10 +588,10 @@ export async function getSecurityHistoricalSeries(
         normalizedCurrency,
       );
       if (alphaResults.length >= 2) {
-        return alphaResults;
+        return mergeHistoricalSeries(alphaResults, intradayResults);
       }
 
-      return twelveResults;
+      return mergeHistoricalSeries(twelveResults, intradayResults);
     },
   );
 

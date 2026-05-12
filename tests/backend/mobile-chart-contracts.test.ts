@@ -154,6 +154,55 @@ test("security detail chart contract preserves identity and freshness", () => {
   assert.equal(chart.points[0]?.displayValue, "$140");
 });
 
+test("security detail chart contract preserves intraday price timestamps", () => {
+  const intradayHistory: SecurityPriceHistoryPoint[] = [
+    {
+      id: "price_intraday_1",
+      symbol: "VFV",
+      exchange: "TSX",
+      priceDate: "2026-04-26",
+      priceTime: "2026-04-26T13:30:00.000Z",
+      close: 140.5,
+      adjustedClose: null,
+      currency: "CAD",
+      source: "test-cache",
+      createdAt: "2026-04-26T13:30:00.000Z",
+    },
+    {
+      id: "price_intraday_2",
+      symbol: "VFV",
+      exchange: "TSX",
+      priceDate: "2026-04-26",
+      priceTime: "2026-04-26T14:30:00.000Z",
+      close: 141.25,
+      adjustedClose: null,
+      currency: "CAD",
+      source: "test-cache",
+      createdAt: "2026-04-26T14:30:00.000Z",
+    },
+  ];
+
+  const detail = buildPortfolioSecurityDetailData({
+    language: "zh",
+    accounts,
+    holdings,
+    priceHistory: intradayHistory,
+    profile,
+    display,
+    symbol: "VFV",
+    exchange: "TSX",
+    currency: "CAD",
+  });
+
+  const chart = detail?.chartSeries?.priceHistory;
+  assert.ok(chart);
+  assert.equal(chart.points.length, 2);
+  assert.equal(chart.points[0]?.rawDate, "2026-04-26T13:30:00.000Z");
+  assert.equal(chart.points[1]?.rawDate, "2026-04-26T14:30:00.000Z");
+  assert.equal(chart.points[0]?.displayValue, "$140.50");
+  assert.equal(chart.points[1]?.displayValue, "$141.25");
+});
+
 test("security detail chart contract labels shallow history as fallback", () => {
   const detail = buildPortfolioSecurityDetailData({
     language: "zh",

@@ -245,6 +245,7 @@ export async function getQuoteFromTwelveData(
 export async function getHistoricalSeriesFromTwelveData(
   symbol: string,
   exchange?: string | null,
+  options?: { interval?: "1day" | "1min"; outputsize?: number },
 ): Promise<SecurityHistoricalPoint[]> {
   const { twelveDataApiKey } = getMarketDataConfig();
   if (!twelveDataApiKey) {
@@ -253,8 +254,8 @@ export async function getHistoricalSeriesFromTwelveData(
 
   const url = new URL("https://api.twelvedata.com/time_series");
   url.searchParams.set("symbol", symbol);
-  url.searchParams.set("interval", "1day");
-  url.searchParams.set("outputsize", "365");
+  url.searchParams.set("interval", options?.interval ?? "1day");
+  url.searchParams.set("outputsize", String(options?.outputsize ?? 365));
   url.searchParams.set("orderby", "ASC");
   if (exchange?.trim()) {
     url.searchParams.set("exchange", exchange.trim());
@@ -283,7 +284,8 @@ export async function getHistoricalSeriesFromTwelveData(
   return values
     .map<SecurityHistoricalPoint | null>((value) => {
       const close = Number(value.close);
-      const date = value.datetime?.slice(0, 10) ?? "";
+      const dateTime = value.datetime ?? "";
+      const date = dateTime.slice(0, 10);
       if (!date || !Number.isFinite(close)) {
         return null;
       }
@@ -291,6 +293,7 @@ export async function getHistoricalSeriesFromTwelveData(
       return {
         symbol: symbol.trim().toUpperCase(),
         date,
+        time: dateTime.length > 10 ? dateTime : null,
         close,
         adjustedClose: null,
         currency: payload.meta?.currency ?? null,

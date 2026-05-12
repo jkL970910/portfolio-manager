@@ -462,16 +462,41 @@ function formatSnapshotLabel(snapshotDate: string, language: DisplayLanguage) {
   );
 }
 
+function getPriceHistorySortKey(point: SecurityPriceHistoryPoint) {
+  return point.priceTime ?? point.priceDate;
+}
+
+function formatPriceHistoryLabel(
+  point: SecurityPriceHistoryPoint,
+  language: DisplayLanguage,
+) {
+  if (!point.priceTime) {
+    return formatSnapshotLabel(point.priceDate, language);
+  }
+
+  return new Date(point.priceTime).toLocaleString(
+    language === "zh" ? "zh-CN" : "en-CA",
+    {
+      month: "short",
+      day: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+    },
+  );
+}
+
 function buildAbsolutePriceHistorySeries(args: {
   priceHistory?: SecurityPriceHistoryPoint[];
   language: DisplayLanguage;
 }) {
   const { priceHistory = [], language } = args;
   const recent = [...priceHistory]
-    .sort((left, right) => left.priceDate.localeCompare(right.priceDate))
+    .sort((left, right) =>
+      getPriceHistorySortKey(left).localeCompare(getPriceHistorySortKey(right)),
+    )
     .map((point) => ({
-      label: formatSnapshotLabel(point.priceDate, language),
-      rawDate: point.priceDate,
+      label: formatPriceHistoryLabel(point, language),
+      rawDate: point.priceTime ?? point.priceDate,
       value: point.adjustedClose ?? point.close,
     }))
     .filter((point) => Number.isFinite(point.value));

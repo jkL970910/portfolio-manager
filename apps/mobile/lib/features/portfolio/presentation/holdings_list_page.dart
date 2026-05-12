@@ -65,7 +65,13 @@ class _HoldingsListPageState extends State<HoldingsListPage> {
               slivers: [
                 SliverToBoxAdapter(
                   child: snapshot.hasData
-                      ? _HoldingsHero(snapshot.data!)
+                      ? _HoldingsHero(
+                          snapshot.data!,
+                          onOpenAccounts: () =>
+                              context.push(MobileRoutes.portfolioAccounts),
+                          onOpenHealth: () =>
+                              context.push(MobileRoutes.portfolioHealth),
+                        )
                       : const LooHeroHeader(
                           eyebrow: "Holdings",
                           title: "持仓列表",
@@ -124,13 +130,20 @@ String _holdingTitle(MobileHoldingCard holding) {
 }
 
 class _HoldingsHero extends StatelessWidget {
-  const _HoldingsHero(this.snapshot);
+  const _HoldingsHero(
+    this.snapshot, {
+    required this.onOpenAccounts,
+    required this.onOpenHealth,
+  });
 
   final MobilePortfolioSnapshot snapshot;
+  final VoidCallback onOpenAccounts;
+  final VoidCallback onOpenHealth;
 
   @override
   Widget build(BuildContext context) {
     final tokens = context.looTokens;
+    final totalGainLoss = _sumGainLoss(snapshot.accounts);
     return LooHeroHeader(
       eyebrow: "Holdings",
       title: "持仓列表",
@@ -149,10 +162,16 @@ class _HoldingsHero extends StatelessWidget {
             _SummaryMetric(
               label: "账户",
               value: "${snapshot.accounts.length}",
+              onTap: onOpenAccounts,
             ),
             _SummaryMetric(
               label: "健康",
               value: snapshot.healthScore,
+              onTap: onOpenHealth,
+            ),
+            _SummaryMetric(
+              label: "总盈亏",
+              value: totalGainLoss,
             ),
           ],
         ),
@@ -162,19 +181,26 @@ class _HoldingsHero extends StatelessWidget {
 }
 
 class _SummaryMetric extends StatelessWidget {
-  const _SummaryMetric({required this.label, required this.value});
+  const _SummaryMetric({
+    required this.label,
+    required this.value,
+    this.onTap,
+  });
 
   final String label;
   final String value;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
     final tokens = context.looTokens;
-    return DecoratedBox(
+    final content = DecoratedBox(
       decoration: BoxDecoration(
         color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.22),
         borderRadius: BorderRadius.circular(tokens.radiusMd),
-        border: Border.all(color: tokens.cardBorder),
+        border: Border.all(
+          color: onTap == null ? tokens.cardBorder : tokens.accent,
+        ),
       ),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
@@ -183,13 +209,25 @@ class _SummaryMetric extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                label,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: tokens.mutedText,
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: tokens.mutedText,
+                          ),
                     ),
+                  ),
+                  if (onTap != null)
+                    Icon(
+                      Icons.chevron_right_rounded,
+                      size: 14,
+                      color: tokens.accent,
+                    ),
+                ],
               ),
               const SizedBox(height: 4),
               Text(
@@ -203,5 +241,70 @@ class _SummaryMetric extends StatelessWidget {
         ),
       ),
     );
+    if (onTap == null) {
+      return content;
+    }
+    return Material(
+      color: Colors.transparent,
+      borderRadius: BorderRadius.circular(tokens.radiusMd),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(tokens.radiusMd),
+        onTap: onTap,
+        child: content,
+      ),
+    );
   }
+}
+
+String _sumGainLoss(List<MobileAccountCard> accounts) {
+  var total = 0.0;
+  var hasValue = false;
+  for (final account in accounts) {
+    final parsed = _parseMoney(account.gainLoss);
+    if (parsed == null) {
+      continue;
+    }
+    total += parsed;
+    hasValue = true;
+  }
+  if (!hasValue) {
+    return "--";
+  }
+  final sign = total > 0
+      ? "+"
+      : total < 0
+          ? "-"
+          : "";
+  final compact = total.abs() >= 1000
+      ? "${(total.abs() / 1000).toStringAsFixed(1)}k"
+      : total.abs().toStringAsFixed(0);
+  return "$sign\$$compact";
+}
+
+double? _parseMoney(String value) {
+  final trimmed = value.trim();
+  if (trimmed.isEmpty || trimmed == "--") {
+    return null;
+  }
+  final amountMatch = RegExp(
+    r'[-+]?\s*(?:CA\$|C\$|US\$|\$)?\s*[\d,]+(?:\.\d+)?',
+    caseSensitive: false,
+  ).firstMatch(trimmed);
+  if (amountMatch == null) {
+    return null;
+  }
+  final matched = amountMatch.group(0) ?? "";
+  final isNegative =
+      matched.trimLeft().startsWith("-") || trimmed.contains("(");
+  final numeric = matched
+      .replaceAll(RegExp(r'(CA\$|C\$|US\$|\$)', caseSensitive: false), "")
+      .replaceAll(",", "")
+      .replaceAll("+", "")
+      .replaceAll("-", "")
+      .trim();
+  final parsed = double.tryParse(numeric);
+  if (parsed == null) {
+    return null;
+  }
+  return isNegative ? -parsed : parsed;
 }

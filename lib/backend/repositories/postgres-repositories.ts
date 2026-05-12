@@ -277,6 +277,7 @@ function dedupeSecurityPriceHistoryByIdentityDate(
       point.exchange ?? "",
       point.currency,
       point.priceDate,
+      point.priceTime ?? "",
     ].join("::");
     if (!byIdentityDate.has(key)) {
       byIdentityDate.set(key, point);

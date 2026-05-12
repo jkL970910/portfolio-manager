@@ -5,6 +5,7 @@ class MobileRoutes {
   static const portfolio = "/portfolio";
   static const portfolioAccounts = "/portfolio/accounts";
   static const portfolioHoldings = "/portfolio/holdings";
+  static const portfolioHealth = "/portfolio/health";
   static const recommendations = "/recommendations";
   static const importFlow = "/import";
   static const settings = "/settings";

@@ -200,6 +200,7 @@ export interface SecurityPriceHistoryPoint {
   symbol: string;
   exchange?: string | null;
   priceDate: string;
+  priceTime?: string | null;
   close: number;
   adjustedClose: number | null;
   currency: CurrencyCode;

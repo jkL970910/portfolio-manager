@@ -443,6 +443,13 @@ class _LooWealthAppState extends State<LooWealthApp> {
           ),
         ),
         GoRoute(
+          path: MobileRoutes.portfolioHealth,
+          builder: (context, state) => HealthScorePage(
+            apiClient: _currentApiClient,
+            fallbackTitle: "健康巡查",
+          ),
+        ),
+        GoRoute(
           path: "/securities/:symbol",
           builder: (context, state) {
             final symbol = decodeRouteParam(state.pathParameters["symbol"]!);
