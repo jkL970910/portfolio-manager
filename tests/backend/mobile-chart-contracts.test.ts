@@ -663,6 +663,48 @@ test("mobile home overview chart contract exposes net worth freshness", () => {
   assert.equal(chart.sourceMode, "local");
 });
 
+test("mobile home overview chart contract preserves intraday replay points", () => {
+  const dashboard = buildDashboardData({
+    viewer: {
+      id: "user_test",
+      email: "tester@example.com",
+      displayName: "Tester",
+      baseCurrency: "CAD",
+      displayLanguage: "zh",
+    },
+    accounts,
+    holdings,
+    transactions: [],
+    portfolioEvents: [],
+    priceHistory: [
+      {
+        ...priceHistory[0]!,
+        priceDate: "2026-04-26",
+        priceTime: "2026-04-26T13:30:00.000Z",
+        close: 140.5,
+      },
+      {
+        ...priceHistory[1]!,
+        priceDate: "2026-04-26",
+        priceTime: "2026-04-26T14:30:00.000Z",
+        close: 141.25,
+      },
+    ],
+    snapshots: [],
+    profile,
+    latestRun: null,
+    display,
+  });
+
+  const chart = dashboard.chartSeries?.netWorth;
+  assert.ok(chart);
+  assert.equal(chart.points.length, 2);
+  assert.equal(chart.points[0]?.rawDate, "2026-04-26T13:30:00.000Z");
+  assert.equal(chart.points[1]?.rawDate, "2026-04-26T14:30:00.000Z");
+  assert.equal(chart.points[0]?.value, 1405);
+  assert.equal(chart.points[1]?.value, 1412.5);
+});
+
 test("portfolio account context chart contract exposes account freshness", () => {
   const portfolio = buildPortfolioData({
     language: "zh",

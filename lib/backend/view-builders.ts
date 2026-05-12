@@ -950,6 +950,10 @@ function getReplayIdentityKey(
   return `${symbol.trim().toUpperCase()}::${exchange?.trim().toUpperCase() || ""}::${normalizeReplayCurrency(currency)}`;
 }
 
+function getPriceHistoryReplayKey(point: SecurityPriceHistoryPoint) {
+  return point.priceTime ?? point.priceDate;
+}
+
 function convertNativePriceToCad(
   price: number,
   currency: string | null | undefined,
@@ -1016,7 +1020,7 @@ function buildReplayedAggregateValueSeries(args: {
     ...new Set(
       [...historiesBySymbol.values()]
         .flat()
-        .map((point) => point.priceDate)
+        .map((point) => getPriceHistoryReplayKey(point))
         .sort(),
     ),
   ];
@@ -1063,7 +1067,11 @@ function buildReplayedAggregateValueSeries(args: {
       key,
       historiesBySymbol
         .get(key)!
-        .sort((left, right) => left.priceDate.localeCompare(right.priceDate)),
+        .sort((left, right) =>
+          getPriceHistoryReplayKey(left).localeCompare(
+            getPriceHistoryReplayKey(right),
+          ),
+        ),
     );
   }
 
@@ -1072,14 +1080,19 @@ function buildReplayedAggregateValueSeries(args: {
     {
       month: "short",
       day: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
     },
   );
 
   const series = replayDates
-    .map((date) => {
+    .map((replayTime) => {
       for (const [key, points] of historiesBySymbol.entries()) {
         let pointer = pointers.get(key) ?? 0;
-        while (pointer < points.length && points[pointer].priceDate <= date) {
+        while (
+          pointer < points.length &&
+          getPriceHistoryReplayKey(points[pointer]) <= replayTime
+        ) {
           latestSeenPriceBySymbol.set(
             key,
             convertNativePriceToCad(
@@ -1101,15 +1114,19 @@ function buildReplayedAggregateValueSeries(args: {
         }
 
         const futureDelta = (groupedEvents.get(key) ?? [])
-          .filter((event) => event.bookedAt > date)
+          .filter((event) => event.bookedAt > replayTime.slice(0, 10))
           .reduce((sum, event) => sum + getEventQuantityDelta(event), 0);
         const quantityAtDate = currentQuantity - futureDelta;
         totalValueCad += Math.max(quantityAtDate, 0) * latestPrice;
       }
 
       return {
-        label: formatter.format(new Date(date)),
-        rawDate: date,
+        label: formatter.format(
+          new Date(
+            replayTime.includes("T") ? replayTime : `${replayTime}T00:00:00`,
+          ),
+        ),
+        rawDate: replayTime,
         value: round(convertCadToDisplay(totalValueCad, display), 2),
       };
     })

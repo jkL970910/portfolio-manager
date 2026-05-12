@@ -2530,46 +2530,31 @@ async function getHydratedSecurityPriceHistoryForHoldings(
       const existing = await repositories.securityPriceHistory.listBySecurityId(
         identity.securityId,
       );
-      if (!historyNeedsHigherDensity(existing)) {
-        return existing;
-      }
+      const shouldPersistFetchedHistory = historyNeedsHigherDensity(existing);
 
       try {
         const fetched = await getSecurityHistoricalSeries(identity.symbol, {
           exchange: identity.exchange,
           currency: identity.currency,
         });
-        const mappedPoints: SecurityPriceHistoryPoint[] = fetched.results.map(
-          (point, index) => ({
-            id: `fetched-${identity.symbol}-${point.date}-${index}`,
-            securityId: identity.securityId,
-            symbol: identity.symbol,
-            exchange: identity.exchange,
-            priceDate: point.date,
-            priceTime: point.time ?? null,
-            close: point.close,
-            adjustedClose: point.adjustedClose ?? null,
-            currency: identity.currency,
-            source: point.provider,
-            provider: point.provider,
-            sourceMode: point.provider === "fallback" ? "fallback" : "provider",
-            freshness: point.provider === "fallback" ? "fallback" : "fresh",
-            refreshRunId: null,
-            isReference: point.provider === "fallback",
-            fallbackReason:
-              point.provider === "fallback"
-                ? "Provider returned fallback history."
-                : null,
-            createdAt: new Date().toISOString(),
-          }),
-        );
+        const mappedPoints = mapProviderHistoryPoints({
+          points: fetched.results,
+          securityId: identity.securityId,
+          symbol: identity.symbol,
+          exchange: identity.exchange,
+          currency: identity.currency,
+        });
         if (mappedPoints.length > 0) {
-          try {
-            await upsertSecurityPriceHistoryPoints(mappedPoints);
-          } catch {
-            // Keep fetched history in memory for this response even if persistence fails.
+          if (shouldPersistFetchedHistory) {
+            try {
+              await upsertSecurityPriceHistoryPoints(
+                mappedPoints.filter((point) => !point.priceTime),
+              );
+            } catch {
+              // Keep fetched history in memory for this response even if persistence fails.
+            }
           }
-          return mappedPoints;
+          return mergeSecurityPriceHistoryPoints(existing, mappedPoints);
         }
       } catch {
         return existing;
