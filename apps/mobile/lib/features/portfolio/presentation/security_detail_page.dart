@@ -644,45 +644,6 @@ class _SecurityDetailPageState extends State<SecurityDetailPage> {
                   _SecurityFactsSection(
                     data,
                     priceHistoryChart: priceHistoryChart,
-                    onOpenUpdateSheet: () => _showResearchUpdateSheet(data),
-                    isRefreshingQuote: _isRefreshingQuote,
-                    isSubmittingExternalResearch: _isSubmittingExternalResearch,
-                    externalResearchMessage: _externalResearchMessage,
-                  ),
-                  const SizedBox(height: 12),
-                  _PortfolioFitSection(
-                    data,
-                    aiAnalysisCard: AiAnalysisCard(
-                      apiClient: widget.apiClient,
-                      controller: _analysisController,
-                      title: "Loo国研究工作台",
-                      description: "先看确定性结论、护栏和组合适配；GPT 增强只在你手动点击时作为解释层。",
-                      autoRun: true,
-                      showGenerateButton: false,
-                      onCompleted: _refreshDailyIntelligence,
-                      refreshKey: [
-                        data.quoteTimestamp,
-                        data.priceHistoryChart?.freshness.latestDate,
-                        _externalResearchRefreshRevision.toString(),
-                      ]
-                          .where((part) => part != null && part.isNotEmpty)
-                          .join("|"),
-                      payload: {
-                        "scope": "security",
-                        "mode": "quick",
-                        "security": {
-                          if (data.securityId.isNotEmpty)
-                            "securityId": data.securityId,
-                          "symbol": data.symbol,
-                          if (data.exchange.isNotEmpty)
-                            "exchange": data.exchange,
-                          if (data.currency.isNotEmpty)
-                            "currency": data.currency,
-                          "name": data.name,
-                        },
-                      },
-                    ),
-                    onOpenHolding: _openHoldingDetail,
                   ),
                   const SizedBox(height: 12),
                   FutureBuilder<MobileDailyIntelligenceSnapshot>(
@@ -694,13 +655,52 @@ class _SecurityDetailPageState extends State<SecurityDetailPage> {
                               data,
                             )
                           : null;
-                      return DailyIntelligenceCard(
-                        snapshot: filteredSnapshot,
-                        isLoading: intelligenceSnapshot.connectionState ==
-                            ConnectionState.waiting,
-                        errorMessage: intelligenceSnapshot.hasError
+                      return _ResearchWorkbenchSection(
+                        data,
+                        aiAnalysisCard: AiAnalysisCard(
+                          apiClient: widget.apiClient,
+                          controller: _analysisController,
+                          title: "Loo国研究工作台",
+                          description:
+                              "基于标的事实、资料状态、秘闻和你的组合上下文生成结论；GPT 增强只在你手动点击时作为解释层。",
+                          autoRun: true,
+                          showGenerateButton: false,
+                          onCompleted: _refreshDailyIntelligence,
+                          refreshKey: [
+                            data.quoteTimestamp,
+                            data.priceHistoryChart?.freshness.latestDate,
+                            _externalResearchRefreshRevision.toString(),
+                          ]
+                              .where((part) => part != null && part.isNotEmpty)
+                              .join("|"),
+                          payload: {
+                            "scope": "security",
+                            "mode": "quick",
+                            "security": {
+                              if (data.securityId.isNotEmpty)
+                                "securityId": data.securityId,
+                              "symbol": data.symbol,
+                              if (data.exchange.isNotEmpty)
+                                "exchange": data.exchange,
+                              if (data.currency.isNotEmpty)
+                                "currency": data.currency,
+                              "name": data.name,
+                            },
+                          },
+                        ),
+                        dailyIntelligence: filteredSnapshot,
+                        isDailyIntelligenceLoading:
+                            intelligenceSnapshot.connectionState ==
+                                ConnectionState.waiting,
+                        dailyIntelligenceError: intelligenceSnapshot.hasError
                             ? intelligenceSnapshot.error.toString()
                             : null,
+                        onOpenHolding: _openHoldingDetail,
+                        onOpenUpdateSheet: () => _showResearchUpdateSheet(data),
+                        isRefreshingQuote: _isRefreshingQuote,
+                        isSubmittingExternalResearch:
+                            _isSubmittingExternalResearch,
+                        externalResearchMessage: _externalResearchMessage,
                       );
                     },
                   ),
@@ -1150,22 +1150,13 @@ class _SecurityFactsSection extends StatelessWidget {
   const _SecurityFactsSection(
     this.data, {
     required this.priceHistoryChart,
-    required this.onOpenUpdateSheet,
-    required this.isRefreshingQuote,
-    required this.isSubmittingExternalResearch,
-    this.externalResearchMessage,
   });
 
   final MobileSecurityDetailSnapshot data;
   final MobileChartSeries? priceHistoryChart;
-  final VoidCallback onOpenUpdateSheet;
-  final bool isRefreshingQuote;
-  final bool isSubmittingExternalResearch;
-  final String? externalResearchMessage;
 
   @override
   Widget build(BuildContext context) {
-    final trust = _SecurityDataTrust.fromSnapshot(data);
     return LooGlassCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1183,56 +1174,82 @@ class _SecurityFactsSection extends StatelessWidget {
             const SizedBox(height: 14),
             _CompactFactsList(facts: data.facts),
           ],
-          const SizedBox(height: 14),
-          _ResearchUpdateStatusBar(
-            data: data,
-            trust: trust,
-            isRefreshingQuote: isRefreshingQuote,
-            isSubmittingExternalResearch: isSubmittingExternalResearch,
-            message: externalResearchMessage,
-            onTap: onOpenUpdateSheet,
-          ),
         ],
       ),
     );
   }
 }
 
-class _PortfolioFitSection extends StatelessWidget {
-  const _PortfolioFitSection(
+class _ResearchWorkbenchSection extends StatelessWidget {
+  const _ResearchWorkbenchSection(
     this.data, {
     required this.aiAnalysisCard,
+    required this.dailyIntelligence,
+    required this.isDailyIntelligenceLoading,
+    required this.dailyIntelligenceError,
     required this.onOpenHolding,
+    required this.onOpenUpdateSheet,
+    required this.isRefreshingQuote,
+    required this.isSubmittingExternalResearch,
+    this.externalResearchMessage,
   });
 
   final MobileSecurityDetailSnapshot data;
   final Widget aiAnalysisCard;
+  final MobileDailyIntelligenceSnapshot? dailyIntelligence;
+  final bool isDailyIntelligenceLoading;
+  final String? dailyIntelligenceError;
   final ValueChanged<MobileHoldingCard> onOpenHolding;
+  final VoidCallback onOpenUpdateSheet;
+  final bool isRefreshingQuote;
+  final bool isSubmittingExternalResearch;
+  final String? externalResearchMessage;
 
   @override
   Widget build(BuildContext context) {
+    final trust = _SecurityDataTrust.fromSnapshot(data);
     return LooGlassCard(
       padding: EdgeInsets.zero,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-            child: _SectionHeader(
-              title: data.heldPosition == null ? "候选标的适配" : "我的总仓位与组合适配",
-              trailing: data.heldPosition == null ? "候选分析" : "私域分析",
-            ),
+          const Padding(
+            padding: EdgeInsets.fromLTRB(16, 16, 16, 0),
+            child: _SectionHeader(title: "Loo国研究台", trailing: "解释层"),
           ),
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 6, 16, 0),
             child: Text(
               data.heldPosition == null
-                  ? "这一层结合你的偏好、组合缺口和护栏判断是否适合加入。"
-                  : "这一层只看你自己的仓位、账户分布和组合约束，不覆盖上方标的事实。",
+                  ? "根据标的事实、资料状态和你的偏好，判断这个候选标的是否值得继续研究。"
+                  : "根据标的事实、资料状态、秘闻和你的持仓上下文，解释这个标的对你意味着什么。",
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
                     color: context.looTokens.mutedText,
                   ),
             ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+            child: _ResearchUpdateStatusBar(
+              data: data,
+              trust: trust,
+              isRefreshingQuote: isRefreshingQuote,
+              isSubmittingExternalResearch: isSubmittingExternalResearch,
+              message: externalResearchMessage,
+              onTap: onOpenUpdateSheet,
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+            child: DailyIntelligenceCard(
+              snapshot: dailyIntelligence,
+              isLoading: isDailyIntelligenceLoading,
+              errorMessage: dailyIntelligenceError,
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+            child: _QuickScanPanel(child: aiAnalysisCard),
           ),
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
@@ -1272,10 +1289,7 @@ class _PortfolioFitSection extends StatelessWidget {
               ),
             ),
           ],
-          Padding(
-            padding: const EdgeInsets.all(12),
-            child: _QuickScanPanel(child: aiAnalysisCard),
-          ),
+          const SizedBox(height: 16),
         ],
       ),
     );

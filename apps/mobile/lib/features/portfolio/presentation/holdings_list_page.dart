@@ -64,13 +64,13 @@ class _HoldingsListPageState extends State<HoldingsListPage> {
               physics: const AlwaysScrollableScrollPhysics(),
               slivers: [
                 SliverToBoxAdapter(
-                  child: LooHeroHeader(
-                    eyebrow: "Holdings",
-                    title: "持仓列表",
-                    subtitle: snapshot.hasData
-                        ? "共 ${snapshot.data!.securityHoldings.length} 个标的 · 点击查看汇总仓位"
-                        : "正在整理持仓账本...",
-                  ),
+                  child: snapshot.hasData
+                      ? _HoldingsHero(snapshot.data!)
+                      : const LooHeroHeader(
+                          eyebrow: "Holdings",
+                          title: "持仓列表",
+                          subtitle: "正在整理持仓账本...",
+                        ),
                 ),
                 if (snapshot.connectionState == ConnectionState.waiting)
                   const SliverFillRemaining(
@@ -90,8 +90,6 @@ class _HoldingsListPageState extends State<HoldingsListPage> {
                     padding: looPagePadding(context),
                     sliver: SliverList.list(
                       children: [
-                        _HoldingsSummaryCard(snapshot.data!),
-                        const SizedBox(height: 14),
                         ...snapshot.data!.securityHoldings.map(
                           (holding) => LooTappableRow(
                             margin: const EdgeInsets.only(bottom: 10),
@@ -125,38 +123,39 @@ String _holdingTitle(MobileHoldingCard holding) {
   return "$symbol · $name";
 }
 
-class _HoldingsSummaryCard extends StatelessWidget {
-  const _HoldingsSummaryCard(this.snapshot);
+class _HoldingsHero extends StatelessWidget {
+  const _HoldingsHero(this.snapshot);
 
   final MobilePortfolioSnapshot snapshot;
 
   @override
   Widget build(BuildContext context) {
     final tokens = context.looTokens;
-    return LooGlassCard(
-      child: Row(
-        children: [
-          Expanded(
-            child: _SummaryMetric(
-              label: "标的数",
+    return LooHeroHeader(
+      eyebrow: "Holdings",
+      title: "持仓列表",
+      subtitle: "点击标的查看跨账户汇总仓位",
+      trailing: SizedBox(
+        width: 160,
+        child: Wrap(
+          spacing: tokens.gapSm,
+          runSpacing: tokens.gapSm,
+          alignment: WrapAlignment.end,
+          children: [
+            _SummaryMetric(
+              label: "标的",
               value: "${snapshot.securityHoldings.length}",
             ),
-          ),
-          SizedBox(width: tokens.gapMd),
-          Expanded(
-            child: _SummaryMetric(
-              label: "账户数",
+            _SummaryMetric(
+              label: "账户",
               value: "${snapshot.accounts.length}",
             ),
-          ),
-          SizedBox(width: tokens.gapMd),
-          Expanded(
-            child: _SummaryMetric(
-              label: "健康分",
+            _SummaryMetric(
+              label: "健康",
               value: snapshot.healthScore,
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -171,18 +170,38 @@ class _SummaryMetric extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final tokens = context.looTokens;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: tokens.mutedText,
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.22),
+        borderRadius: BorderRadius.circular(tokens.radiusMd),
+        border: Border.all(color: tokens.cardBorder),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+        child: SizedBox(
+          width: 56,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: tokens.mutedText,
+                    ),
               ),
+              const SizedBox(height: 4),
+              Text(
+                value,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+            ],
+          ),
         ),
-        const SizedBox(height: 4),
-        Text(value, style: Theme.of(context).textTheme.titleLarge),
-      ],
+      ),
     );
   }
 }
