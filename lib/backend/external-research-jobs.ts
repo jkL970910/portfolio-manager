@@ -565,6 +565,18 @@ function parseDailyInteger(value: number | undefined, fallback: number) {
   return Math.max(Math.trunc(value), 1);
 }
 
+function readWorkerDelayMs() {
+  const parsed = Number(process.env.EXTERNAL_RESEARCH_WORKER_JOB_DELAY_MS);
+  if (!Number.isFinite(parsed) || parsed < 0) {
+    return 1_200;
+  }
+  return Math.min(Math.trunc(parsed), 10_000);
+}
+
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 function normalizeDailySource(
   source?: string | null,
 ): ExternalResearchPolicy["allowedSources"][number]["id"] {
@@ -672,7 +684,8 @@ export async function enqueueDailyOverviewExternalResearchJobs(
         !symbol ||
         !securityId ||
         !currency ||
-        (currency !== "CAD" && currency !== "USD")
+        (currency !== "CAD" && currency !== "USD") ||
+        (sourceId === "news" && !exchange)
       ) {
         result.skippedInvalidIdentity += 1;
         continue;
@@ -1041,6 +1054,7 @@ export async function runExternalResearchWorkerBatch(args: {
   );
   const startedAt = Date.now();
   const results: ExternalResearchWorkerResult[] = [];
+  const jobDelayMs = readWorkerDelayMs();
 
   for (let index = 0; index < maxJobs; index += 1) {
     if (Date.now() - startedAt >= maxRuntimeMs) {
@@ -1057,6 +1071,12 @@ export async function runExternalResearchWorkerBatch(args: {
       break;
     }
     results.push(result);
+    if (index < maxJobs - 1 && jobDelayMs > 0) {
+      if (Date.now() - startedAt + jobDelayMs >= maxRuntimeMs) {
+        break;
+      }
+      await sleep(jobDelayMs);
+    }
   }
 
   const processedJobs = results.filter((result) => result.job).length;
