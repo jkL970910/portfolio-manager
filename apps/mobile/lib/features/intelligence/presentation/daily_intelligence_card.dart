@@ -165,12 +165,74 @@ class _DailyIntelligenceCarouselState
           )
         else
           LooGlassCard(
-            padding: const EdgeInsets.fromLTRB(10, 6, 10, 10),
-            child: _DailyIntelligenceDropdownList(
+            padding: const EdgeInsets.all(10),
+            child: _DailyIntelligenceCarouselPager(
               items: items,
               onViewSecurity: widget.onViewSecurity,
+              page: _page,
+              controller: _controller,
+              onPageChanged: (value) => setState(() => _page = value),
             ),
           ),
+      ],
+    );
+  }
+}
+
+class _DailyIntelligenceCarouselPager extends StatelessWidget {
+  const _DailyIntelligenceCarouselPager({
+    required this.items,
+    required this.onViewSecurity,
+    required this.page,
+    required this.controller,
+    required this.onPageChanged,
+  });
+
+  final List<MobileDailyIntelligenceItem> items;
+  final ValueChanged<MobileDailyIntelligenceItem>? onViewSecurity;
+  final int page;
+  final PageController controller;
+  final ValueChanged<int> onPageChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        AnimatedSize(
+          duration: const Duration(milliseconds: 180),
+          curve: Curves.easeOut,
+          alignment: Alignment.topCenter,
+          child: SizedBox(
+            height: 252,
+            child: PageView.builder(
+              controller: controller,
+              onPageChanged: onPageChanged,
+              itemCount: items.length,
+              itemBuilder: (context, index) {
+                final item = items[index];
+                return Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 2),
+                  child: SingleChildScrollView(
+                    physics: const BouncingScrollPhysics(),
+                    child: _DailyIntelligenceDropdownTile(
+                      item,
+                      initiallyExpanded: false,
+                      onViewSecurity:
+                          item.canOpenSecurity ? onViewSecurity : null,
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+        ),
+        if (items.length > 1) ...[
+          const SizedBox(height: 10),
+          _DailyCarouselDots(
+            count: items.length,
+            activeIndex: page.clamp(0, items.length - 1),
+          ),
+        ],
       ],
     );
   }
@@ -384,6 +446,38 @@ class _DailyIntelligenceDropdownTile extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+class _DailyCarouselDots extends StatelessWidget {
+  const _DailyCarouselDots({
+    required this.count,
+    required this.activeIndex,
+  });
+
+  final int count;
+  final int activeIndex;
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = context.looTokens;
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: List.generate(count, (index) {
+        final isActive = index == activeIndex;
+        return AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          curve: Curves.easeOut,
+          margin: const EdgeInsets.symmetric(horizontal: 4),
+          width: isActive ? 28 : 9,
+          height: 9,
+          decoration: BoxDecoration(
+            color: isActive ? tokens.accent : tokens.cardBorder,
+            borderRadius: BorderRadius.circular(999),
+          ),
+        );
+      }),
     );
   }
 }
