@@ -2,6 +2,7 @@ import "package:flutter/material.dart";
 
 import "../../../core/api/loo_api_client.dart";
 import "../../../core/auth/mobile_auth_session.dart";
+import "../../../core/theme/loo_theme.dart";
 
 class LoginPage extends StatefulWidget {
   const LoginPage({
@@ -68,6 +69,7 @@ class _LoginPageState extends State<LoginPage> {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = context.looTokens;
     return Scaffold(
       body: SafeArea(
         child: Center(
@@ -84,9 +86,57 @@ class _LoginPageState extends State<LoginPage> {
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Text("进入 Loo国", style: Theme.of(context).textTheme.headlineMedium),
-                        const SizedBox(height: 8),
-                        Text("登录后查看国库总览、组合御览和 Loo皇建议。", style: Theme.of(context).textTheme.bodyLarge),
+                        Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            gradient: tokens.heroGradient,
+                            borderRadius:
+                                BorderRadius.circular(tokens.radiusXl),
+                            border: Border.all(color: tokens.cardBorder),
+                          ),
+                          child: Row(
+                            children: [
+                              ClipRRect(
+                                borderRadius: BorderRadius.circular(24),
+                                child: Image.asset(
+                                  "assets/images/mascot/loo_king.jpg",
+                                  width: 92,
+                                  height: 92,
+                                  fit: BoxFit.cover,
+                                ),
+                              ),
+                              const SizedBox(width: 16),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      "Loo皇准入令",
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .headlineSmall
+                                          ?.copyWith(
+                                            fontWeight: FontWeight.w900,
+                                            height: 1.05,
+                                          ),
+                                    ),
+                                    const SizedBox(height: 8),
+                                    Text(
+                                      "输入公民凭证，进入 Loo国财富宝库。",
+                                      style:
+                                          Theme.of(context).textTheme.bodyMedium,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 18),
+                        Text(
+                          "登录后查看国库总览、组合御览和 Loo皇建议。",
+                          style: Theme.of(context).textTheme.bodyLarge,
+                        ),
                         const SizedBox(height: 24),
                         TextFormField(
                           controller: _emailController,

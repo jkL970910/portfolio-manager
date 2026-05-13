@@ -165,6 +165,60 @@ class MobileDailyIntelligenceItem {
     return sources.first.label;
   }
 
+  String get cleanedTitle {
+    final trimmed = title.trim();
+    final source = primarySourceLabel.trim();
+    if (source.isEmpty) {
+      return trimmed;
+    }
+    return _stripRepeatedPrefix(trimmed, source);
+  }
+
+  String get subtitleLabel {
+    final labels = <String>[
+      displayTypeLabel,
+      identity.symbol,
+    ]
+        .map((value) => value.trim())
+        .where((value) => value.isNotEmpty)
+        .toList();
+    final deduped = <String>[];
+    for (final label in labels) {
+      if (!deduped.any((existing) => _sameLooseLabel(existing, label))) {
+        deduped.add(label);
+      }
+    }
+    return deduped.join(" · ");
+  }
+
+  static String _stripRepeatedPrefix(String value, String prefix) {
+    var result = value;
+    while (true) {
+      final normalizedValue = _normalizeLooseLabel(result);
+      final normalizedPrefix = _normalizeLooseLabel(prefix);
+      if (normalizedPrefix.isEmpty ||
+          !normalizedValue.startsWith(normalizedPrefix)) {
+        break;
+      }
+      result = result.substring(prefix.length).trimLeft();
+      result = result.replaceFirst(RegExp(r"^[-–—:：·\s]+"), "").trimLeft();
+      if (result.isEmpty) {
+        return value;
+      }
+    }
+    return result;
+  }
+
+  static bool _sameLooseLabel(String a, String b) {
+    return _normalizeLooseLabel(a) == _normalizeLooseLabel(b);
+  }
+
+  static String _normalizeLooseLabel(String value) {
+    return value
+        .toLowerCase()
+        .replaceAll(RegExp(r"[^a-z0-9\u4e00-\u9fa5]+"), "");
+  }
+
   factory MobileDailyIntelligenceItem.fromJson(Map<String, dynamic> json) {
     return MobileDailyIntelligenceItem(
       id: json["id"] as String? ?? "",

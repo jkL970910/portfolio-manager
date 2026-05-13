@@ -56,11 +56,6 @@ class DailyIntelligenceCard extends StatelessWidget {
                   )
               ],
             ),
-            const SizedBox(height: 8),
-            Text(
-              snapshot?.disclaimer ?? "这里展示已整理好的资料摘要；刷新资料需要你手动确认。",
-              style: theme.textTheme.bodySmall,
-            ),
             const SizedBox(height: 12),
             if (errorMessage != null)
               _DailyEmptyState(
@@ -215,7 +210,9 @@ class _DailyIntelligenceCarouselPager extends StatelessWidget {
     final activeIndex = page.clamp(0, items.length - 1);
     final activeItem = items[activeIndex];
     final activeExpanded = expandedItemIds.contains(activeItem.id);
-    final pageHeight = activeExpanded ? 430.0 : 244.0;
+    final pageHeight = activeExpanded
+        ? _expandedPageHeight(activeItem)
+        : _previewPageHeight(activeItem);
     return Column(
       children: [
         AnimatedSize(
@@ -257,6 +254,29 @@ class _DailyIntelligenceCarouselPager extends StatelessWidget {
         ],
       ],
     );
+  }
+
+  double _previewPageHeight(MobileDailyIntelligenceItem item) {
+    final titleLines = (item.cleanedTitle.length / 16).ceil().clamp(1, 3);
+    final summaryLines = (item.summary.length / 24).ceil().clamp(2, 4);
+    return (188 + (titleLines - 1) * 24 + (summaryLines - 2) * 21)
+        .toDouble();
+  }
+
+  double _expandedPageHeight(MobileDailyIntelligenceItem item) {
+    final titleLines = (item.cleanedTitle.length / 16).ceil().clamp(1, 4);
+    final summaryLines = (item.summary.length / 22).ceil().clamp(3, 14);
+    final pointLines = item.keyPoints.take(5).fold<int>(
+          0,
+          (sum, point) => sum + (point.length / 28).ceil().clamp(1, 4),
+        );
+    final riskLines = item.visibleRiskFlags.take(3).fold<int>(
+          0,
+          (sum, risk) => sum + (risk.length / 28).ceil().clamp(1, 3),
+        );
+    final estimated =
+        178 + titleLines * 25 + summaryLines * 22 + pointLines * 24 + riskLines * 24;
+    return estimated.clamp(470, 820).toDouble();
   }
 }
 
@@ -300,14 +320,6 @@ class DailyIntelligenceSummaryCard extends StatelessWidget {
             : null,
         childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
         children: [
-          Align(
-            alignment: Alignment.centerLeft,
-            child: Text(
-              snapshot?.disclaimer ?? "这里只展示已保存的研究摘要，不会在页面加载时实时抓新闻或论坛。",
-              style: theme.textTheme.bodySmall,
-            ),
-          ),
-          const SizedBox(height: 10),
           if (errorMessage != null)
             _DailyEmptyState(
               title: "今日秘闻暂不可用",
@@ -373,7 +385,6 @@ class _DailyIntelligenceDropdownTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final tokens = context.looTokens;
     return DecoratedBox(
       decoration: BoxDecoration(
         color:
@@ -386,61 +397,36 @@ class _DailyIntelligenceDropdownTile extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            InkWell(
-              borderRadius: BorderRadius.circular(12),
-              onTap: () => onExpansionChanged(!initiallyExpanded),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(
-                    child: Text(
-                      item.title,
-                      maxLines: initiallyExpanded ? 3 : 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: (initiallyExpanded
-                              ? theme.textTheme.titleMedium
-                              : theme.textTheme.titleLarge)
-                          ?.copyWith(
-                        fontWeight: FontWeight.w900,
-                        height: 1.12,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Icon(
-                    initiallyExpanded
-                        ? Icons.keyboard_arrow_up
-                        : Icons.keyboard_arrow_down,
-                    color: tokens.mutedText,
-                  ),
-                ],
+            Text(
+              item.cleanedTitle,
+              maxLines: initiallyExpanded ? 4 : 3,
+              overflow: TextOverflow.ellipsis,
+              style: (initiallyExpanded
+                      ? theme.textTheme.titleLarge
+                      : theme.textTheme.headlineSmall)
+                  ?.copyWith(
+                fontWeight: FontWeight.w900,
+                height: 1.08,
               ),
             ),
-            const SizedBox(height: 10),
-            Row(
-              children: [
-                _DailyTypePill(item.displayTypeLabel),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    [
-                      item.primarySourceLabel,
-                      item.compactFreshnessLabel,
-                    ].where((value) => value.isNotEmpty).join(" · "),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: tokens.mutedText,
-                    ),
-                  ),
+            if (item.subtitleLabel.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Text(
+                item.subtitleLabel,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: theme.textTheme.labelLarge?.copyWith(
+                  color: theme.colorScheme.primary,
+                  fontWeight: FontWeight.w900,
                 ),
-              ],
-            ),
+              ),
+            ],
             const SizedBox(height: 10),
             Text(
               item.summary,
-              maxLines: initiallyExpanded ? 5 : 2,
-              overflow: TextOverflow.ellipsis,
+              maxLines: initiallyExpanded ? null : 4,
+              overflow:
+                  initiallyExpanded ? TextOverflow.visible : TextOverflow.ellipsis,
               style: theme.textTheme.bodyMedium?.copyWith(
                 height: 1.35,
               ),
@@ -448,11 +434,6 @@ class _DailyIntelligenceDropdownTile extends StatelessWidget {
             if (!initiallyExpanded) ...[
               const SizedBox(height: 12),
               _DailyKeywordWrap(item),
-            ],
-            if (item.reason.isNotEmpty) ...[
-              const SizedBox(height: 8),
-              if (initiallyExpanded)
-                _DailyDetailNote(label: "为什么展示", value: item.reason),
             ],
             if (initiallyExpanded) ...[
               if (item.keyPoints.isNotEmpty) ...[
@@ -470,34 +451,47 @@ class _DailyIntelligenceDropdownTile extends StatelessWidget {
                       ),
                     ),
               ],
-              const SizedBox(height: 10),
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      "来源：${item.primarySourceLabel}",
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: tokens.mutedText,
-                      ),
-                    ),
+              if (item.primarySourceUrl.isNotEmpty) ...[
+                const SizedBox(height: 10),
+                SelectableText(
+                  item.primarySourceUrl,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.primary,
+                    decoration: TextDecoration.underline,
                   ),
-                  if (item.primarySourceUrl.isNotEmpty)
-                    TextButton.icon(
-                      onPressed: () => openExternalLink(item.primarySourceUrl),
-                      icon: const Icon(Icons.open_in_new, size: 16),
-                      label: const Text("原文"),
-                    ),
-                  if (onViewSecurity != null)
-                    TextButton.icon(
-                      onPressed: () => onViewSecurity!(item),
-                      icon: const Icon(Icons.chevron_right, size: 18),
-                      label: const Text("标的"),
-                    ),
-                ],
-              ),
+                ),
+              ],
             ],
+            const Spacer(),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                Expanded(
+                  child: TextButton.icon(
+                    onPressed: () => onExpansionChanged(!initiallyExpanded),
+                    icon: Icon(
+                      initiallyExpanded
+                          ? Icons.keyboard_arrow_up
+                          : Icons.keyboard_arrow_down,
+                      size: 18,
+                    ),
+                    label: Text(initiallyExpanded ? "收起" : "展开阅读"),
+                  ),
+                ),
+                if (initiallyExpanded && item.primarySourceUrl.isNotEmpty)
+                  TextButton.icon(
+                    onPressed: () => openExternalLink(item.primarySourceUrl),
+                    icon: const Icon(Icons.open_in_new, size: 16),
+                    label: const Text("查看原文"),
+                  ),
+                if (initiallyExpanded && onViewSecurity != null)
+                  TextButton.icon(
+                    onPressed: () => onViewSecurity!(item),
+                    icon: const Icon(Icons.chevron_right, size: 18),
+                    label: const Text("标的"),
+                  ),
+              ],
+            ),
           ],
         ),
       ),
@@ -619,39 +613,6 @@ class _DailyCarouselDots extends StatelessWidget {
   }
 }
 
-class _DailyDetailNote extends StatelessWidget {
-  const _DailyDetailNote({required this.label, required this.value});
-
-  final String label;
-  final String value;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surface.withValues(alpha: 0.38),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(10),
-        child: RichText(
-          text: TextSpan(
-            style: theme.textTheme.bodySmall,
-            children: [
-              TextSpan(
-                text: "$label：",
-                style: const TextStyle(fontWeight: FontWeight.w800),
-              ),
-              TextSpan(text: value),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
 class _DailyBullet extends StatelessWidget {
   const _DailyBullet(this.text, {this.color});
 
@@ -675,24 +636,6 @@ class _DailyBullet extends StatelessWidget {
           ),
         ],
       ),
-    );
-  }
-}
-
-class _DailyTypePill extends StatelessWidget {
-  const _DailyTypePill(this.label);
-
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    if (label.isEmpty) {
-      return const SizedBox.shrink();
-    }
-    return Chip(
-      label: Text(label),
-      visualDensity: VisualDensity.compact,
-      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
     );
   }
 }
