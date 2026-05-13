@@ -679,7 +679,7 @@ export async function enqueueDailyOverviewExternalResearchJobs(
               includeExternalResearch: true,
             },
             now,
-            { sourceIds: [sourceId], priority: 4 },
+            { sourceIds: [sourceId], priority: 6 },
           );
           queuedForUser += 1;
           result.queuedJobs += 1;
