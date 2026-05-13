@@ -108,6 +108,7 @@ class _DailyIntelligenceCarouselState
     extends State<_DailyIntelligenceCarousel> {
   late final PageController _controller;
   var _page = 0;
+  final Set<String> _expandedItemIds = <String>{};
 
   @override
   void initState() {
@@ -170,8 +171,18 @@ class _DailyIntelligenceCarouselState
               items: items,
               onViewSecurity: widget.onViewSecurity,
               page: _page,
+              expandedItemIds: _expandedItemIds,
               controller: _controller,
               onPageChanged: (value) => setState(() => _page = value),
+              onExpansionChanged: (item, isExpanded) {
+                setState(() {
+                  if (isExpanded) {
+                    _expandedItemIds.add(item.id);
+                  } else {
+                    _expandedItemIds.remove(item.id);
+                  }
+                });
+              },
             ),
           ),
       ],
@@ -184,26 +195,35 @@ class _DailyIntelligenceCarouselPager extends StatelessWidget {
     required this.items,
     required this.onViewSecurity,
     required this.page,
+    required this.expandedItemIds,
     required this.controller,
     required this.onPageChanged,
+    required this.onExpansionChanged,
   });
 
   final List<MobileDailyIntelligenceItem> items;
   final ValueChanged<MobileDailyIntelligenceItem>? onViewSecurity;
   final int page;
+  final Set<String> expandedItemIds;
   final PageController controller;
   final ValueChanged<int> onPageChanged;
+  final void Function(MobileDailyIntelligenceItem item, bool isExpanded)
+      onExpansionChanged;
 
   @override
   Widget build(BuildContext context) {
+    final activeIndex = page.clamp(0, items.length - 1);
+    final activeItem = items[activeIndex];
+    final activeExpanded = expandedItemIds.contains(activeItem.id);
+    final pageHeight = activeExpanded ? 430.0 : 164.0;
     return Column(
       children: [
         AnimatedSize(
-          duration: const Duration(milliseconds: 180),
+          duration: const Duration(milliseconds: 220),
           curve: Curves.easeOut,
           alignment: Alignment.topCenter,
           child: SizedBox(
-            height: 252,
+            height: pageHeight,
             child: PageView.builder(
               controller: controller,
               onPageChanged: onPageChanged,
@@ -212,11 +232,13 @@ class _DailyIntelligenceCarouselPager extends StatelessWidget {
                 final item = items[index];
                 return Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 2),
-                  child: SingleChildScrollView(
-                    physics: const BouncingScrollPhysics(),
+                  child: Align(
+                    alignment: Alignment.topCenter,
                     child: _DailyIntelligenceDropdownTile(
                       item,
-                      initiallyExpanded: false,
+                      initiallyExpanded: expandedItemIds.contains(item.id),
+                      onExpansionChanged: (isExpanded) =>
+                          onExpansionChanged(item, isExpanded),
                       onViewSecurity:
                           item.canOpenSecurity ? onViewSecurity : null,
                     ),
@@ -324,6 +346,7 @@ class _DailyIntelligenceDropdownList extends StatelessWidget {
           _DailyIntelligenceDropdownTile(
             items[index],
             initiallyExpanded: index == 0,
+            onExpansionChanged: (_) {},
             onViewSecurity:
                 items[index].canOpenSecurity ? onViewSecurity : null,
           ),
@@ -338,11 +361,13 @@ class _DailyIntelligenceDropdownTile extends StatelessWidget {
   const _DailyIntelligenceDropdownTile(
     this.item, {
     required this.initiallyExpanded,
+    required this.onExpansionChanged,
     required this.onViewSecurity,
   });
 
   final MobileDailyIntelligenceItem item;
   final bool initiallyExpanded;
+  final ValueChanged<bool> onExpansionChanged;
   final ValueChanged<MobileDailyIntelligenceItem>? onViewSecurity;
 
   @override
@@ -359,7 +384,9 @@ class _DailyIntelligenceDropdownTile extends StatelessWidget {
       child: Theme(
         data: theme.copyWith(dividerColor: Colors.transparent),
         child: ExpansionTile(
+          key: PageStorageKey<String>("daily-intelligence-${item.id}"),
           initiallyExpanded: initiallyExpanded,
+          onExpansionChanged: onExpansionChanged,
           tilePadding: const EdgeInsets.fromLTRB(12, 6, 10, 6),
           childrenPadding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
           title: Text(
