@@ -1607,7 +1607,9 @@ export function buildSecurityHoldingSummaries(args: {
     _sortValueCad: number;
   };
   const { instanceLabelMap } = buildAccountLabelMaps(accounts, language);
-  const totalPortfolioCad = sum(holdings.map((holding) => holding.marketValueCad));
+  const totalPortfolioCad = sum(
+    holdings.map((holding) => holding.marketValueCad),
+  );
   const groups = new Map<string, HoldingPosition[]>();
 
   for (const holding of holdings) {
@@ -1655,8 +1657,7 @@ export function buildSecurityHoldingSummaries(args: {
           ? sum(
               groupHoldings.map(
                 (holding) =>
-                  (holding.quantity ?? 0) *
-                  (holding.avgCostPerShareCad ?? 0),
+                  (holding.quantity ?? 0) * (holding.avgCostPerShareCad ?? 0),
               ),
             ) / totalQuantity
           : null;
@@ -1685,7 +1686,8 @@ export function buildSecurityHoldingSummaries(args: {
       const exchange =
         reference.exchangeOverride ?? reference.quoteExchange ?? null;
       const securityParams = new URLSearchParams();
-      if (reference.securityId) securityParams.set("securityId", reference.securityId);
+      if (reference.securityId)
+        securityParams.set("securityId", reference.securityId);
       if (exchange) securityParams.set("exchange", exchange);
       if (nativeCurrency) securityParams.set("currency", nativeCurrency);
       const query = securityParams.toString();
@@ -2312,31 +2314,29 @@ export function buildDashboardData(args: {
       name: getAssetClassLabel(name, language),
       value: round(value, 0),
     })),
-    topHoldings: securityHoldings
-      .slice(0, 5)
-      .map((holding) => ({
-        id: holding.id,
-        securityId: holding.securityId,
-        symbol: holding.symbol,
-        name: holding.name,
-        account: holding.account,
-        accountCount: holding.accountCount,
-        lotCount: holding.lotCount,
-        href: holding.securityHref,
-        securityHref: holding.securityHref,
-        currency: holding.currency,
-        exchange: holding.exchange,
-        lastPrice: holding.lastPrice,
-        lastUpdated: holding.lastUpdated,
-        freshnessVariant: holding.freshnessVariant,
-        quoteProvider: holding.quoteProvider,
-        quoteSourceMode: holding.quoteSourceMode,
-        quoteStatus: holding.quoteStatus,
-        quoteStatusLabel: holding.quoteStatusLabel,
-        weight: holding.portfolioShare,
-        value: holding.value,
-        gainLoss: holding.gainLoss,
-      })),
+    topHoldings: securityHoldings.slice(0, 5).map((holding) => ({
+      id: holding.id,
+      securityId: holding.securityId,
+      symbol: holding.symbol,
+      name: holding.name,
+      account: holding.account,
+      accountCount: holding.accountCount,
+      lotCount: holding.lotCount,
+      href: holding.securityHref,
+      securityHref: holding.securityHref,
+      currency: holding.currency,
+      exchange: holding.exchange,
+      lastPrice: holding.lastPrice,
+      lastUpdated: holding.lastUpdated,
+      freshnessVariant: holding.freshnessVariant,
+      quoteProvider: holding.quoteProvider,
+      quoteSourceMode: holding.quoteSourceMode,
+      quoteStatus: holding.quoteStatus,
+      quoteStatusLabel: holding.quoteStatusLabel,
+      weight: holding.portfolioShare,
+      value: holding.value,
+      gainLoss: holding.gainLoss,
+    })),
     trendContext: {
       title: cashBalanceTrend
         ? pick(language, "总净资产走势", "Net worth trend")
@@ -2552,7 +2552,9 @@ export function buildPortfolioData(args: {
   const assetClassDrilldown = [...assetClassIds]
     .map((assetClass) => {
       const classHoldings = holdings
-        .filter((holding) => getHoldingEconomicAssetClass(holding) === assetClass)
+        .filter(
+          (holding) => getHoldingEconomicAssetClass(holding) === assetClass,
+        )
         .sort((left, right) => right.marketValueCad - left.marketValueCad);
       const classValueCad = sum(
         classHoldings.map((holding) => holding.marketValueCad),
@@ -3272,10 +3274,11 @@ export function buildPortfolioHoldingDetailData(args: {
     accountTotalCad > 0
       ? round((rawHolding.marketValueCad / accountTotalCad) * 100, 1)
       : 0;
+  const rawHoldingEconomicAssetClass = getHoldingEconomicAssetClass(rawHolding);
   const assetClassTargetPct =
-    getTargetAllocation(profile).get(rawHolding.assetClass) ?? 0;
+    getTargetAllocation(profile).get(rawHoldingEconomicAssetClass) ?? 0;
   const assetClassCurrentPct =
-    getCurrentAllocation(holdings).get(rawHolding.assetClass) ?? 0;
+    getCurrentAllocation(holdings).get(rawHoldingEconomicAssetClass) ?? 0;
   const holdingHealth = health.holdingDrilldown.find(
     (item) => item.id === holdingId,
   );
@@ -3398,8 +3401,8 @@ export function buildPortfolioHoldingDetailData(args: {
       ),
       pick(
         language,
-        `它属于 ${getAssetClassLabel(rawHolding.assetClass, language)}。你给这类资产设的目标大约是 ${assetClassTargetPct.toFixed(1)}%，现在实际大约是 ${assetClassCurrentPct.toFixed(1)}%。`,
-        `It belongs to ${getAssetClassLabel(rawHolding.assetClass, language)}. Your target for this sleeve is about ${assetClassTargetPct.toFixed(1)}%, and the current mix is about ${assetClassCurrentPct.toFixed(1)}%.`,
+        `它按底层经济暴露归在 ${getAssetClassLabel(rawHoldingEconomicAssetClass, language)}，不是只看上市国家或交易币种。你给这类资产设的目标大约是 ${assetClassTargetPct.toFixed(1)}%，现在实际大约是 ${assetClassCurrentPct.toFixed(1)}%。`,
+        `Its sleeve is based on economic exposure, not just listing country or trading currency: ${getAssetClassLabel(rawHoldingEconomicAssetClass, language)}. Your target for this sleeve is about ${assetClassTargetPct.toFixed(1)}%, and the current mix is about ${assetClassCurrentPct.toFixed(1)}%.`,
       ),
       viewHolding.signal,
     ],
@@ -3617,7 +3620,8 @@ export function buildPortfolioSecurityDetailData(args: {
     ? (getTargetAllocation(profile).get(referenceEconomicAssetClass ?? "") ?? 0)
     : 0;
   const assetClassCurrentPct = referenceHolding
-    ? (getCurrentAllocation(holdings).get(referenceEconomicAssetClass ?? "") ?? 0)
+    ? (getCurrentAllocation(holdings).get(referenceEconomicAssetClass ?? "") ??
+      0)
     : 0;
   const totalQuantity = sum(
     matchingHoldings
@@ -3944,7 +3948,10 @@ export function buildPortfolioSecurityDetailData(args: {
           )
         : pick(language, "未知资产类别", "Unknown sleeve"),
       sector: referenceHolding
-        ? getSectorLabel(referenceEconomicSector ?? referenceHolding.sector, language)
+        ? getSectorLabel(
+            referenceEconomicSector ?? referenceHolding.sector,
+            language,
+          )
         : pick(language, "未知行业", "Unknown sector"),
       currency: referenceHolding?.currency ?? "CAD",
       securityType: pick(language, "正在识别", "Resolving"),
@@ -4126,8 +4133,8 @@ export function buildPortfolioSecurityDetailData(args: {
       referenceHolding
         ? pick(
             language,
-            `它归在 ${getAssetClassLabel(referenceHolding.assetClass, language)}。你给这类资产设的目标大约是 ${assetClassTargetPct.toFixed(1)}%，现在实际大约是 ${assetClassCurrentPct.toFixed(1)}%。`,
-            `It sits inside ${getAssetClassLabel(referenceHolding.assetClass, language)}. Your target for this sleeve is about ${assetClassTargetPct.toFixed(1)}%, and the current portfolio mix is about ${assetClassCurrentPct.toFixed(1)}%.`,
+            `它按底层经济暴露归在 ${getAssetClassLabel(referenceEconomicAssetClass ?? referenceHolding.assetClass, language)}，不是只看交易所或交易币种。你给这类资产设的目标大约是 ${assetClassTargetPct.toFixed(1)}%，现在实际大约是 ${assetClassCurrentPct.toFixed(1)}%。`,
+            `Its sleeve is based on economic exposure, not just exchange or trading currency: ${getAssetClassLabel(referenceEconomicAssetClass ?? referenceHolding.assetClass, language)}. Your target for this sleeve is about ${assetClassTargetPct.toFixed(1)}%, and the current portfolio mix is about ${assetClassCurrentPct.toFixed(1)}%.`,
           )
         : pick(
             language,

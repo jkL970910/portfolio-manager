@@ -675,8 +675,7 @@ class _SecurityDetailPageState extends State<SecurityDetailPage> {
                     ),
                     onOpenUpdateSheet: () => _showResearchUpdateSheet(data),
                     isRefreshingQuote: _isRefreshingQuote,
-                    isSubmittingExternalResearch:
-                        _isSubmittingExternalResearch,
+                    isSubmittingExternalResearch: _isSubmittingExternalResearch,
                     externalResearchMessage: _externalResearchMessage,
                   ),
                 ],
@@ -687,7 +686,6 @@ class _SecurityDetailPageState extends State<SecurityDetailPage> {
       ),
     );
   }
-
 }
 
 class MobileSecurityDetailSnapshot {
@@ -1119,7 +1117,6 @@ class _ResearchWorkbenchSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final trust = _SecurityDataTrust.fromSnapshot(data);
     return LooGlassCard(
       padding: EdgeInsets.zero,
       child: Theme(
@@ -1133,8 +1130,8 @@ class _ResearchWorkbenchSection extends StatelessWidget {
             padding: const EdgeInsets.only(top: 6),
             child: Text(
               data.heldPosition == null
-                  ? "展开查看资料状态、AI快扫和候选适配。"
-                  : "展开查看资料状态、AI快扫和总览/账户视角。",
+                  ? "展开查看 AI 快扫、估值证据、关键价位和候选适配。"
+                  : "展开查看 AI 快扫、估值证据、关键价位和组合适配判断。",
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
@@ -1145,7 +1142,6 @@ class _ResearchWorkbenchSection extends StatelessWidget {
           children: [
             _ResearchUpdateStatusBar(
               data: data,
-              trust: trust,
               isRefreshingQuote: isRefreshingQuote,
               isSubmittingExternalResearch: isSubmittingExternalResearch,
               message: externalResearchMessage,
@@ -1276,51 +1272,200 @@ class _PositionScopeSection extends StatelessWidget {
       return const SizedBox.shrink();
     }
     return LooGlassCard(
-      padding: EdgeInsets.zero,
-      child: Theme(
-        data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
-        child: ExpansionTile(
-          tilePadding: const EdgeInsets.fromLTRB(16, 10, 14, 10),
-          childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-          initiallyExpanded: false,
-          title: const _SectionHeader(title: "我的仓位", trailing: "已持有"),
-          subtitle: Padding(
-            padding: const EdgeInsets.only(top: 6),
-            child: _PositionScopeSummary(
-              data: data,
-              selectedScope: selectedScope,
-            ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const _SectionHeader(title: "我的仓位", trailing: "持仓层"),
+          const SizedBox(height: 6),
+          _PositionScopeSummary(
+            data: data,
+            selectedScope: selectedScope,
           ),
-          children: [
-            _ResearchScopeTabs(
-              scopes: scopes,
-              selectedScopeId: selectedScope.id,
-              onSelected: onSelectScope,
-            ),
+          const SizedBox(height: 12),
+          _ResearchScopeTabs(
+            scopes: scopes,
+            selectedScopeId: selectedScope.id,
+            onSelected: onSelectScope,
+          ),
+          const SizedBox(height: 12),
+          if (!selectedScope.isAggregate && selectedScope.account != null)
+            Column(
+              children: [
+                _AnalysisCard(
+                  data.analysis,
+                  account: selectedScope.account,
+                ),
+                const SizedBox(height: 12),
+                _AccountScopeCard(
+                  selectedScope.account!,
+                  holding: selectedScope.holding,
+                ),
+              ],
+            )
+          else ...[
+            _AnalysisCard(data.analysis),
             const SizedBox(height: 12),
-            if (!selectedScope.isAggregate && selectedScope.account != null)
-              Column(
-                children: [
-                  _AnalysisCard(
-                    data.analysis,
-                    account: selectedScope.account,
+            _HeldPositionBreakdownCard(
+              data.heldPosition!,
+              onOpenHolding: onSelectScope,
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _AnalysisCard extends StatelessWidget {
+  const _AnalysisCard(this.analysis, {this.account});
+
+  final MobileSecurityAnalysis analysis;
+  final MobileHeldAccountSummary? account;
+
+  @override
+  Widget build(BuildContext context) {
+    final isAccountScope = account != null;
+    final currentAllocation = isAccountScope
+        ? (account!.accountAssetClassAllocation.isNotEmpty
+            ? account!.accountAssetClassAllocation
+            : "0%")
+        : analysis.currentAllocation;
+    final currentAllocationPct = isAccountScope
+        ? account!.accountAssetClassAllocationPct
+        : analysis.currentAllocationPct;
+    final shareLabel = isAccountScope ? "本标的账户占比" : "本标的组合占比";
+    final shareValue =
+        isAccountScope ? account!.accountShare : analysis.portfolioShare;
+    final sharePct = isAccountScope
+        ? _parsePercent(account!.accountShare)
+        : analysis.portfolioSharePct;
+    return _InnerPanel(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _SectionHeader(
+            title: "底层暴露配置",
+            trailing: isAccountScope ? "账户视角" : "组合视角",
+          ),
+          const SizedBox(height: 6),
+          Text(
+            isAccountScope
+                ? "${analysis.assetClassLabel} 在当前账户里的占比，不等同于整个组合占比。"
+                : "${analysis.assetClassLabel} 按底层经济暴露计算，不只看上市国家或交易币种。",
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: context.looTokens.mutedText,
+                ),
+          ),
+          const SizedBox(height: 12),
+          _ProgressMetric(
+            label: "目标占比",
+            value: analysis.targetAllocation,
+            progress: analysis.targetAllocationPct / 100,
+          ),
+          _ProgressMetric(
+            label: isAccountScope ? "账户内同类暴露" : "组合内同类暴露",
+            value: currentAllocation,
+            progress: currentAllocationPct / 100,
+          ),
+          _ProgressMetric(
+            label: shareLabel,
+            value: shareValue,
+            progress: sharePct / 100,
+          ),
+          const SizedBox(height: 4),
+          Text(
+            isAccountScope ? "用于判断这个账户是否已经过度集中。" : "偏离：${analysis.driftLabel}",
+            style: Theme.of(context).textTheme.titleMedium,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ResearchUpdateStatusBar extends StatelessWidget {
+  const _ResearchUpdateStatusBar({
+    required this.data,
+    required this.isRefreshingQuote,
+    required this.isSubmittingExternalResearch,
+    required this.onTap,
+    this.message,
+  });
+
+  final MobileSecurityDetailSnapshot data;
+  final bool isRefreshingQuote;
+  final bool isSubmittingExternalResearch;
+  final String? message;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final isBusy = isRefreshingQuote || isSubmittingExternalResearch;
+    final theme = Theme.of(context);
+    final detail = [
+      data.quoteStatusLabel,
+      data.priceHistoryChart?.freshness.label,
+    ].whereType<String>().where((value) => value.isNotEmpty).join(" · ");
+    return InkWell(
+      borderRadius: BorderRadius.circular(16),
+      onTap: onTap,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color:
+              theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.38),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: theme.colorScheme.outlineVariant),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Row(
+            children: [
+              Icon(
+                Icons.cloud_sync_outlined,
+                size: 18,
+                color: theme.colorScheme.primary,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text("资料更新", style: theme.textTheme.titleSmall),
+                    if ((message ?? detail).isNotEmpty) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        message ?? detail,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: context.looTokens.mutedText,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              if (isBusy)
+                const SizedBox(
+                  height: 16,
+                  width: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              else
+                Text(
+                  "更新",
+                  style: theme.textTheme.labelLarge?.copyWith(
+                    color: theme.colorScheme.primary,
+                    fontWeight: FontWeight.w700,
                   ),
-                  const SizedBox(height: 12),
-                  _AccountScopeCard(
-                    selectedScope.account!,
-                    holding: selectedScope.holding,
-                  ),
-                ],
-              )
-            else ...[
-              _AnalysisCard(data.analysis),
-              const SizedBox(height: 12),
-              _HeldPositionBreakdownCard(
-                data.heldPosition!,
-                onOpenHolding: onSelectScope,
+                ),
+              const SizedBox(width: 4),
+              Icon(
+                Icons.chevron_right,
+                color: theme.colorScheme.primary,
               ),
             ],
-          ],
+          ),
         ),
       ),
     );
@@ -1588,108 +1733,6 @@ class _MiniMetric extends StatelessWidget {
                 overflow: TextOverflow.ellipsis,
                 style: Theme.of(context).textTheme.titleSmall,
               ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _ResearchUpdateStatusBar extends StatelessWidget {
-  const _ResearchUpdateStatusBar({
-    required this.data,
-    required this.trust,
-    required this.isRefreshingQuote,
-    required this.isSubmittingExternalResearch,
-    required this.onTap,
-    this.message,
-  });
-
-  final MobileSecurityDetailSnapshot data;
-  final _SecurityDataTrust trust;
-  final bool isRefreshingQuote;
-  final bool isSubmittingExternalResearch;
-  final String? message;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final isBusy = isRefreshingQuote || isSubmittingExternalResearch;
-    final theme = Theme.of(context);
-    return InkWell(
-      borderRadius: BorderRadius.circular(16),
-      onTap: onTap,
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          color:
-              theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.55),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: theme.colorScheme.outlineVariant),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.all(12),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Icon(
-                    Icons.cloud_sync_outlined,
-                    size: 18,
-                    color: theme.colorScheme.primary,
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      "研究资料状态",
-                      style: theme.textTheme.titleSmall,
-                    ),
-                  ),
-                  if (isBusy)
-                    const SizedBox(
-                      height: 16,
-                      width: 16,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  else
-                    Text(
-                      "更新",
-                      style: theme.textTheme.labelLarge?.copyWith(
-                        color: theme.colorScheme.primary,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  const SizedBox(width: 4),
-                  Icon(
-                    Icons.chevron_right,
-                    color: theme.colorScheme.primary,
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  _StatusPill(
-                    label: trust.label,
-                    color: trust.color(context),
-                  ),
-                  _InfoChip(data.quoteStatusLabel),
-                  if (data.priceHistoryChart != null)
-                    _InfoChip(data.priceHistoryChart!.freshness.label),
-                ],
-              ),
-              if (message != null && message!.isNotEmpty) ...[
-                const SizedBox(height: 8),
-                Text(
-                  message!,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: theme.textTheme.bodySmall,
-                ),
-              ],
             ],
           ),
         ),
@@ -2540,75 +2583,6 @@ class _InnerPanel extends StatelessWidget {
       child: Padding(
         padding: EdgeInsets.all(tokens.gapMd),
         child: child,
-      ),
-    );
-  }
-}
-
-class _AnalysisCard extends StatelessWidget {
-  const _AnalysisCard(this.analysis, {this.account});
-
-  final MobileSecurityAnalysis analysis;
-  final MobileHeldAccountSummary? account;
-
-  @override
-  Widget build(BuildContext context) {
-    final isAccountScope = account != null;
-    final currentAllocation = isAccountScope &&
-            account!.accountAssetClassAllocation.isNotEmpty
-        ? account!.accountAssetClassAllocation
-        : analysis.currentAllocation;
-    final currentAllocationPct = isAccountScope &&
-            account!.accountAssetClassAllocationPct > 0
-        ? account!.accountAssetClassAllocationPct
-        : analysis.currentAllocationPct;
-    final shareLabel = isAccountScope ? "本标的账户占比" : "本标的组合占比";
-    final shareValue =
-        isAccountScope ? account!.accountShare : analysis.portfolioShare;
-    final sharePct = isAccountScope
-        ? _parsePercent(account!.accountShare)
-        : analysis.portfolioSharePct;
-    return _InnerPanel(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _SectionHeader(
-            title: "${analysis.assetClassLabel}配置",
-            trailing: isAccountScope ? "账户视角" : "组合视角",
-          ),
-          if (analysis.summary.isNotEmpty) ...[
-            const SizedBox(height: 8),
-            Text(
-              analysis.summary,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: context.looTokens.mutedText,
-                  ),
-            ),
-          ],
-          const SizedBox(height: 14),
-          _ProgressMetric(
-            label: "目标配置",
-            value: analysis.targetAllocation,
-            progress: analysis.targetAllocationPct / 100,
-          ),
-          _ProgressMetric(
-            label: isAccountScope ? "账户内配置" : "组合内配置",
-            value: currentAllocation,
-            progress: currentAllocationPct / 100,
-          ),
-          _ProgressMetric(
-            label: shareLabel,
-            value: shareValue,
-            progress: sharePct / 100,
-          ),
-          const SizedBox(height: 4),
-          Text(
-            isAccountScope
-                ? "账户内配置用于判断单个账户是否过重。"
-                : "偏离：${analysis.driftLabel}",
-            style: Theme.of(context).textTheme.titleMedium,
-          ),
-        ],
       ),
     );
   }
