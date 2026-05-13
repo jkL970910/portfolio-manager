@@ -654,6 +654,50 @@ export async function enqueueDailyOverviewExternalResearchJobs(
   result.usersChecked = userRows.length;
 
   for (const user of userRows) {
+    let queuedForUser = 0;
+    if (sourceId === "news") {
+      const freshNewsDocuments =
+        await repositories.externalResearchDocuments.listFreshByUserId(
+          user.id,
+          {
+            now,
+            limit: 10,
+          },
+        );
+      const hasFreshMacroNews = freshNewsDocuments.some(
+        (document) => document.sourceType === "news" && !document.security,
+      );
+      if (!hasFreshMacroNews) {
+        try {
+          await enqueueExternalResearchJob(
+            user.id,
+            {
+              scope: "portfolio",
+              mode: "quick",
+              cacheStrategy: "prefer-cache",
+              maxCacheAgeSeconds,
+              includeExternalResearch: true,
+            },
+            now,
+            { sourceIds: [sourceId], priority: 4 },
+          );
+          queuedForUser += 1;
+          result.queuedJobs += 1;
+        } catch (error) {
+          const message =
+            error instanceof Error
+              ? error.message
+              : "Failed to enqueue daily overview market news.";
+          result.errors.push(`market-news: ${message}`);
+          if (/daily limit/i.test(message)) {
+            continue;
+          }
+        }
+      } else {
+        result.skippedFresh += 1;
+      }
+    }
+
     const holdings = await db
       .select({
         securityId: holdingPositions.securityId,
@@ -669,7 +713,6 @@ export async function enqueueDailyOverviewExternalResearchJobs(
       .orderBy(desc(holdingPositions.marketValueCad))
       .limit(maxSymbolsPerUser * 3);
 
-    let queuedForUser = 0;
     for (const holding of holdings) {
       if (queuedForUser >= maxSymbolsPerUser) {
         break;

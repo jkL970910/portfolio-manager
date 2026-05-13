@@ -334,6 +334,7 @@ function buildAlphaVantageNewsDocuments(args: {
         "news",
         "alpha-vantage",
         hasSecurityContext ? "security-news" : "market-news",
+        ...(hasSecurityContext ? [] : ["macro"]),
         ...args.candidateTickers.slice(0, 3).map((ticker) => `ticker:${ticker}`),
         ...args.topics.slice(0, 3).map((topic) => `topic:${topic}`),
       ],
