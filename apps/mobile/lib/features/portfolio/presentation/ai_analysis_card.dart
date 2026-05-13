@@ -972,6 +972,15 @@ class MobileResearchEvidence {
   final String freshnessLabel;
   final String reliabilityLabel;
 
+  String get readableSummary {
+    final parts = [
+      _researchSourceTypeLabel(sourceType),
+      _freshnessStatusLabel(freshnessLabel),
+      _confidenceLabel(reliabilityLabel),
+    ].where((part) => part.trim().isNotEmpty).toList();
+    return parts.join(" · ");
+  }
+
   factory MobileResearchEvidence.fromJson(Map<String, dynamic> json) {
     return MobileResearchEvidence(
       source: _friendlyAnalysisText(json["source"] as String? ?? "证据"),
@@ -1328,27 +1337,14 @@ class _AnalysisResultView extends StatelessWidget {
           ExpansionTile(
             tilePadding: EdgeInsets.zero,
             initiallyExpanded: false,
-            title:
-                Text("可信度与依据", style: Theme.of(context).textTheme.titleSmall),
+            title: Text("数据说明", style: Theme.of(context).textTheme.titleSmall),
             childrenPadding: const EdgeInsets.only(bottom: 12),
             children: [
               Align(
                 alignment: Alignment.centerLeft,
-                child: _DataEvidenceView(data),
-              ),
-            ],
-          ),
-        if (data.sources.isNotEmpty)
-          ExpansionTile(
-            tilePadding: EdgeInsets.zero,
-            title: Text("来源详情", style: Theme.of(context).textTheme.titleSmall),
-            childrenPadding: EdgeInsets.zero,
-            children: [
-              Align(
-                alignment: Alignment.centerLeft,
-                child: Text(
-                  data.sources.take(6).join("、"),
-                  style: Theme.of(context).textTheme.bodySmall,
+                child: _DataEvidenceView(
+                  data,
+                  showScorecards: showLegacySecuritySections,
                 ),
               ),
             ],
@@ -1413,20 +1409,12 @@ class _SecurityResearchProfileView extends StatelessWidget {
             ),
           ),
         if (evidence.isNotEmpty)
-          ExpansionTile(
-            tilePadding: EdgeInsets.zero,
-            initiallyExpanded: false,
-            title: Text("标的证据", style: Theme.of(context).textTheme.titleSmall),
-            childrenPadding: const EdgeInsets.only(bottom: 12),
-            children: [
-              Align(
-                alignment: Alignment.centerLeft,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: evidence.map(_ResearchEvidenceRow.new).toList(),
-                ),
-              ),
-            ],
+          _CompactSourceSummary(
+            label: "资料覆盖",
+            items: evidence
+                .map((item) => item.readableSummary)
+                .take(3)
+                .toList(),
           ),
       ],
     );
@@ -1505,23 +1493,12 @@ class _SecurityResearchDecisionView extends StatelessWidget {
             ),
           ),
         if (data.evidence.isNotEmpty)
-          ExpansionTile(
-            tilePadding: EdgeInsets.zero,
-            initiallyExpanded: false,
-            title: Text("研究证据", style: Theme.of(context).textTheme.titleSmall),
-            childrenPadding: const EdgeInsets.only(bottom: 12),
-            children: [
-              Align(
-                alignment: Alignment.centerLeft,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: data.evidence
-                      .take(5)
-                      .map(_ResearchEvidenceRow.new)
-                      .toList(),
-                ),
-              ),
-            ],
+          _CompactSourceSummary(
+            label: "判断参考",
+            items: data.evidence
+                .map((item) => item.readableSummary)
+                .take(3)
+                .toList(),
           ),
       ],
     );
@@ -1650,7 +1627,7 @@ class _ValuationEvidenceView extends StatelessWidget {
             tilePadding: EdgeInsets.zero,
             dense: true,
             initiallyExpanded: false,
-            title: Text("校验依据", style: Theme.of(context).textTheme.titleSmall),
+            title: Text("估值校验", style: Theme.of(context).textTheme.titleSmall),
             childrenPadding: const EdgeInsets.only(bottom: 8),
             children: [
               Align(
@@ -1706,7 +1683,7 @@ class _EntryTimingView extends StatelessWidget {
             tilePadding: EdgeInsets.zero,
             dense: true,
             initiallyExpanded: false,
-            title: Text("数据依据", style: Theme.of(context).textTheme.titleSmall),
+            title: Text("价位明细", style: Theme.of(context).textTheme.titleSmall),
             childrenPadding: const EdgeInsets.only(bottom: 8),
             children: [
               Align(
@@ -2064,32 +2041,6 @@ class _ResearchKeyLevelRow extends StatelessWidget {
   }
 }
 
-class _ResearchEvidenceRow extends StatelessWidget {
-  const _ResearchEvidenceRow(this.item);
-
-  final MobileResearchEvidence item;
-
-  @override
-  Widget build(BuildContext context) {
-    final meta = [
-      _researchSourceTypeLabel(item.sourceType),
-      _freshnessStatusLabel(item.freshnessLabel),
-      _confidenceLabel(item.reliabilityLabel),
-    ].join(" · ");
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(item.source, style: Theme.of(context).textTheme.titleSmall),
-          const SizedBox(height: 3),
-          Text(meta, style: Theme.of(context).textTheme.bodySmall),
-        ],
-      ),
-    );
-  }
-}
-
 class _ResearchValuePill extends StatelessWidget {
   const _ResearchValuePill({required this.label, required this.value});
 
@@ -2437,9 +2388,13 @@ class _AnalysisSection extends StatelessWidget {
 }
 
 class _DataEvidenceView extends StatelessWidget {
-  const _DataEvidenceView(this.data);
+  const _DataEvidenceView(
+    this.data, {
+    required this.showScorecards,
+  });
 
   final MobileAiAnalysisResult data;
+  final bool showScorecards;
 
   @override
   Widget build(BuildContext context) {
@@ -2462,13 +2417,46 @@ class _DataEvidenceView extends StatelessWidget {
           ),
         if (data.evidenceTrail.isNotEmpty) ...[
           const SizedBox(height: 10),
-          ...data.evidenceTrail.take(4).map(_EvidenceRow.new),
+          ...data.evidenceTrail.take(3).map(_EvidenceRow.new),
         ],
-        if (data.scorecards.isNotEmpty) ...[
+        if (showScorecards && data.scorecards.isNotEmpty) ...[
           const SizedBox(height: 10),
-          ...data.scorecards.take(4).map(_ScorecardRow.new),
+          ...data.scorecards.take(3).map(_ScorecardRow.new),
         ],
       ],
+    );
+  }
+}
+
+class _CompactSourceSummary extends StatelessWidget {
+  const _CompactSourceSummary({
+    required this.label,
+    required this.items,
+  });
+
+  final String label;
+  final List<String> items;
+
+  @override
+  Widget build(BuildContext context) {
+    final visibleItems = items
+        .where((item) => item.trim().isNotEmpty)
+        .toSet()
+        .take(3)
+        .toList();
+    if (visibleItems.isEmpty) {
+      return const SizedBox.shrink();
+    }
+    return Padding(
+      padding: const EdgeInsets.only(top: 8),
+      child: Wrap(
+        spacing: 6,
+        runSpacing: 6,
+        children: [
+          _SmallStatusPill(label),
+          ...visibleItems.map(_SmallStatusPill.new),
+        ],
+      ),
     );
   }
 }

@@ -66,11 +66,11 @@ class DailyIntelligenceCard extends StatelessWidget {
                 detail: errorMessage!,
               )
             else if (isLoading && snapshot == null)
-              const Text("正在整理缓存秘闻...")
+              const Text("正在整理已保存资料...")
             else if (items.isEmpty)
               _DailyEmptyState(
                 title: snapshot?.emptyTitle ?? "暂时没有可用秘闻",
-                detail: snapshot?.emptyDetail ?? "先在标的详情运行智能快扫，或手动触发缓存外部研究。",
+                detail: snapshot?.emptyDetail ?? "先在标的详情运行智能快扫，或手动刷新标的资料。",
               )
             else
               ...items.take(3).map(
@@ -325,7 +325,7 @@ class DailyIntelligenceSummaryCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final items = snapshot?.items ?? const <MobileDailyIntelligenceItem>[];
-    final countLabel = items.isEmpty ? "暂无组合秘闻" : "${items.length} 条缓存秘闻";
+    final countLabel = items.isEmpty ? "暂无组合秘闻" : "${items.length} 条已保存秘闻";
 
     return Card(
       child: ExpansionTile(
@@ -335,7 +335,7 @@ class DailyIntelligenceSummaryCard extends StatelessWidget {
           errorMessage != null
               ? "暂不可用"
               : isLoading
-                  ? "正在整理缓存秘闻..."
+                  ? "正在整理已保存资料..."
                   : "$countLabel · 已整理资料摘要",
         ),
         trailing: isLoading
@@ -350,7 +350,7 @@ class DailyIntelligenceSummaryCard extends StatelessWidget {
           Align(
             alignment: Alignment.centerLeft,
             child: Text(
-              snapshot?.disclaimer ?? "这里只展示已缓存的 AI/行情研究，不会在页面加载时实时抓新闻或论坛。",
+              snapshot?.disclaimer ?? "这里只展示已保存的研究摘要，不会在页面加载时实时抓新闻或论坛。",
               style: theme.textTheme.bodySmall,
             ),
           ),
@@ -363,7 +363,7 @@ class DailyIntelligenceSummaryCard extends StatelessWidget {
           else if (items.isEmpty)
             _DailyEmptyState(
               title: snapshot?.emptyTitle ?? "暂时没有可用秘闻",
-              detail: snapshot?.emptyDetail ?? "先在标的详情运行智能快扫，或手动触发缓存外部研究。",
+              detail: snapshot?.emptyDetail ?? "先在标的详情运行智能快扫，或手动刷新标的资料。",
             )
           else
             ...items.take(2).map(

@@ -5,8 +5,6 @@ import "package:flutter/material.dart";
 import "../../../core/api/loo_api_client.dart";
 import "../../../core/presentation/loo_components.dart";
 import "../../../core/theme/loo_theme.dart";
-import "../../intelligence/data/daily_intelligence_models.dart";
-import "../../intelligence/presentation/daily_intelligence_card.dart";
 import "../../shared/data/mobile_chart_models.dart";
 import "../../shared/data/loo_minister_context_models.dart";
 import "../../shared/data/mobile_models.dart";
@@ -39,7 +37,6 @@ class SecurityDetailPage extends StatefulWidget {
 
 class _SecurityDetailPageState extends State<SecurityDetailPage> {
   late Future<MobileSecurityDetailSnapshot?> _snapshot;
-  late Future<MobileDailyIntelligenceSnapshot> _dailyIntelligence;
   bool _isRefreshingQuote = false;
   final Set<String> _runningResearchSources = <String>{};
   final Map<String, String> _runningResearchTargetKeys = <String, String>{};
@@ -56,7 +53,6 @@ class _SecurityDetailPageState extends State<SecurityDetailPage> {
   void initState() {
     super.initState();
     _snapshot = _loadSnapshot();
-    _dailyIntelligence = _loadDailyIntelligence();
     _startExternalResearchPolling();
   }
 
@@ -95,19 +91,9 @@ class _SecurityDetailPageState extends State<SecurityDetailPage> {
     return snapshot;
   }
 
-  Future<MobileDailyIntelligenceSnapshot> _loadDailyIntelligence() async {
-    final response = await widget.apiClient.getDailyIntelligence(limit: 8);
-    final data = response["data"];
-    if (data is! Map<String, dynamic>) {
-      throw const LooApiException("今日秘闻数据格式不正确。");
-    }
-    return MobileDailyIntelligenceSnapshot.fromJson(data);
-  }
-
   void _refresh() {
     setState(() {
       _snapshot = _loadSnapshot();
-      _dailyIntelligence = _loadDailyIntelligence();
     });
   }
 
@@ -363,7 +349,6 @@ class _SecurityDetailPageState extends State<SecurityDetailPage> {
           ? payload["job"] as Map<String, dynamic>?
           : null;
       final targetKey = job?["targetKey"] as String?;
-      _refreshDailyIntelligence();
       if (!mounted) return;
       setState(() {
         _externalResearchMessage = "已提交后台刷新。系统会轮询任务状态，等资料真正写入缓存后再自动更新研究结果。";
@@ -413,7 +398,7 @@ class _SecurityDetailPageState extends State<SecurityDetailPage> {
             title: Text(action.cache.label),
             content: Text(
               action.cache.confirmationMessage ??
-                  "资料仍在有效期内，继续刷新会消耗 provider 额度。是否继续？",
+                  "资料仍在有效期内，继续刷新会消耗这类资料的每日额度。是否继续？",
             ),
             actions: [
               TextButton(
@@ -546,7 +531,6 @@ class _SecurityDetailPageState extends State<SecurityDetailPage> {
         }
       });
       if (completedAny) {
-        _refreshDailyIntelligence();
         _refreshResearchUpdateSheet?.call();
       }
     } catch (_) {
@@ -632,6 +616,11 @@ class _SecurityDetailPageState extends State<SecurityDetailPage> {
 
           final data = snapshot.data!;
           final priceHistoryChart = data.priceHistoryChart;
+          final scopes = _ResearchScope.fromData(data);
+          final selectedScope = scopes.firstWhere(
+            (scope) => scope.id == _selectedResearchScopeId,
+            orElse: () => scopes.first,
+          );
           return RefreshIndicator(
             onRefresh: () async => _refresh(),
             child: LooPageGradient(
@@ -643,66 +632,52 @@ class _SecurityDetailPageState extends State<SecurityDetailPage> {
                     priceHistoryChart: priceHistoryChart,
                   ),
                   const SizedBox(height: 12),
-                  FutureBuilder<MobileDailyIntelligenceSnapshot>(
-                    future: _dailyIntelligence,
-                    builder: (context, intelligenceSnapshot) {
-                      final filteredSnapshot = intelligenceSnapshot.hasData
-                          ? _filterIntelligenceForSecurity(
-                              intelligenceSnapshot.data!,
-                              data,
-                            )
-                          : null;
-                      return _ResearchWorkbenchSection(
-                        data,
-                        aiAnalysisCard: AiAnalysisCard(
-                          apiClient: widget.apiClient,
-                          controller: _analysisController,
-                          title: "Loo国研究工作台",
-                          description:
-                              "基于标的事实、资料状态、秘闻和你的组合上下文生成结论；GPT 增强只在你手动点击时作为解释层。",
-                          autoRun: true,
-                          showGenerateButton: false,
-                          onCompleted: _refreshDailyIntelligence,
-                          refreshKey: [
-                            data.quoteTimestamp,
-                            data.priceHistoryChart?.freshness.latestDate,
-                            _externalResearchRefreshRevision.toString(),
-                          ]
-                              .where((part) => part != null && part.isNotEmpty)
-                              .join("|"),
-                          payload: {
-                            "scope": "security",
-                            "mode": "quick",
-                            "security": {
-                              if (data.securityId.isNotEmpty)
-                                "securityId": data.securityId,
-                              "symbol": data.symbol,
-                              if (data.exchange.isNotEmpty)
-                                "exchange": data.exchange,
-                              if (data.currency.isNotEmpty)
-                                "currency": data.currency,
-                              "name": data.name,
-                            },
-                          },
-                        ),
-                        dailyIntelligence: filteredSnapshot,
-                        isDailyIntelligenceLoading:
-                            intelligenceSnapshot.connectionState ==
-                                ConnectionState.waiting,
-                        dailyIntelligenceError: intelligenceSnapshot.hasError
-                            ? intelligenceSnapshot.error.toString()
-                            : null,
-                        selectedScopeId: _selectedResearchScopeId,
-                        onSelectScope: (scopeId) => setState(
-                          () => _selectedResearchScopeId = scopeId,
-                        ),
-                        onOpenUpdateSheet: () => _showResearchUpdateSheet(data),
-                        isRefreshingQuote: _isRefreshingQuote,
-                        isSubmittingExternalResearch:
-                            _isSubmittingExternalResearch,
-                        externalResearchMessage: _externalResearchMessage,
-                      );
-                    },
+                  _PositionScopeSection(
+                    data: data,
+                    scopes: scopes,
+                    selectedScope: selectedScope,
+                    onSelectScope: (scopeId) => setState(
+                      () => _selectedResearchScopeId = scopeId,
+                    ),
+                  ),
+                  if (data.heldPosition != null) const SizedBox(height: 12),
+                  _ResearchWorkbenchSection(
+                    data,
+                    aiAnalysisCard: AiAnalysisCard(
+                      apiClient: widget.apiClient,
+                      controller: _analysisController,
+                      title: "Loo国研究工作台",
+                      description:
+                          "基于标的事实、资料状态和你的组合上下文生成结论；GPT 增强只在你手动点击时作为解释层。",
+                      autoRun: true,
+                      showGenerateButton: false,
+                      refreshKey: [
+                        data.quoteTimestamp,
+                        data.priceHistoryChart?.freshness.latestDate,
+                        _externalResearchRefreshRevision.toString(),
+                      ]
+                          .where((part) => part != null && part.isNotEmpty)
+                          .join("|"),
+                      payload: {
+                        "scope": "security",
+                        "mode": "quick",
+                        "security": {
+                          if (data.securityId.isNotEmpty)
+                            "securityId": data.securityId,
+                          "symbol": data.symbol,
+                          if (data.exchange.isNotEmpty)
+                            "exchange": data.exchange,
+                          if (data.currency.isNotEmpty)
+                            "currency": data.currency,
+                          "name": data.name,
+                        },
+                      },
+                    ),
+                    onOpenUpdateSheet: () => _showResearchUpdateSheet(data),
+                    isRefreshingQuote: _isRefreshingQuote,
+                    isSubmittingExternalResearch:
+                        _isSubmittingExternalResearch,
+                    externalResearchMessage: _externalResearchMessage,
                   ),
                 ],
               ),
@@ -713,58 +688,6 @@ class _SecurityDetailPageState extends State<SecurityDetailPage> {
     );
   }
 
-  void _refreshDailyIntelligence() {
-    if (!mounted) {
-      return;
-    }
-    setState(() {
-      _dailyIntelligence = _loadDailyIntelligence();
-    });
-  }
-
-  MobileDailyIntelligenceSnapshot _filterIntelligenceForSecurity(
-    MobileDailyIntelligenceSnapshot snapshot,
-    MobileSecurityDetailSnapshot security,
-  ) {
-    final securityId = security.securityId.trim();
-    final symbol = security.symbol.trim().toUpperCase();
-    final exchange = security.exchange.trim().toUpperCase();
-    final currency = security.currency.trim().toUpperCase();
-    final items = snapshot.items.where((item) {
-      final identity = item.identity;
-      final itemSymbol = identity.symbol.trim().toUpperCase();
-      final itemExchange = identity.exchange.trim().toUpperCase();
-      final itemCurrency = identity.currency.trim().toUpperCase();
-      final conflictsWithVisibleIdentity = (itemExchange.isNotEmpty &&
-              exchange.isNotEmpty &&
-              itemExchange != exchange) ||
-          (itemCurrency.isNotEmpty &&
-              currency.isNotEmpty &&
-              itemCurrency != currency);
-      if (securityId.isNotEmpty && identity.securityId == securityId) {
-        return !conflictsWithVisibleIdentity;
-      }
-
-      return symbol.isNotEmpty &&
-          exchange.isNotEmpty &&
-          currency.isNotEmpty &&
-          itemSymbol == symbol &&
-          itemExchange == exchange &&
-          itemCurrency == currency;
-    }).toList();
-
-    return MobileDailyIntelligenceSnapshot(
-      generatedAt: snapshot.generatedAt,
-      disclaimer: snapshot.disclaimer,
-      manualTriggerOnly: snapshot.manualTriggerOnly,
-      scheduledOverviewEnabled: snapshot.scheduledOverviewEnabled,
-      securityManualRefreshEnabled: snapshot.securityManualRefreshEnabled,
-      items: items,
-      emptyTitle: "暂时没有该标的秘闻",
-      emptyDetail:
-          "当前只显示同一标的，或完整 symbol/exchange/currency 匹配的缓存情报；不会把其他版本的资料混入当前标的。",
-    );
-  }
 }
 
 class MobileSecurityDetailSnapshot {
@@ -1105,33 +1028,37 @@ class _SecurityHeroFactsCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
+          Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      data.symbol,
-                      style: theme.textTheme.displaySmall,
-                    ),
-                    if (displayName.isNotEmpty) ...[
-                      const SizedBox(height: 6),
-                      Text(
-                        displayName,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: theme.textTheme.titleMedium?.copyWith(
-                          color: tokens.mutedText,
-                        ),
-                      ),
-                    ],
-                  ],
+              Text(
+                data.symbol,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: theme.textTheme.displaySmall,
+              ),
+              if (displayName.isNotEmpty) ...[
+                const SizedBox(height: 6),
+                Text(
+                  displayName,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    color: tokens.mutedText,
+                  ),
+                ),
+              ],
+              const SizedBox(height: 10),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 320),
+                  child: _StatusPill(
+                    label: quoteStatusText,
+                    color: freshnessColor,
+                  ),
                 ),
               ),
-              const SizedBox(width: 12),
-              _StatusPill(label: quoteStatusText, color: freshnessColor),
             ],
           ),
           const SizedBox(height: 18),
@@ -1155,10 +1082,6 @@ class _SecurityHeroFactsCard extends StatelessWidget {
             const SizedBox(height: 14),
             _PerformanceChartCard(chart: priceHistoryChart!),
           ],
-          if (data.facts.isNotEmpty) ...[
-            const SizedBox(height: 14),
-            _CompactFactsList(facts: data.facts),
-          ],
         ],
       ),
     );
@@ -1181,11 +1104,6 @@ class _ResearchWorkbenchSection extends StatelessWidget {
   const _ResearchWorkbenchSection(
     this.data, {
     required this.aiAnalysisCard,
-    required this.dailyIntelligence,
-    required this.isDailyIntelligenceLoading,
-    required this.dailyIntelligenceError,
-    required this.selectedScopeId,
-    required this.onSelectScope,
     required this.onOpenUpdateSheet,
     required this.isRefreshingQuote,
     required this.isSubmittingExternalResearch,
@@ -1194,11 +1112,6 @@ class _ResearchWorkbenchSection extends StatelessWidget {
 
   final MobileSecurityDetailSnapshot data;
   final Widget aiAnalysisCard;
-  final MobileDailyIntelligenceSnapshot? dailyIntelligence;
-  final bool isDailyIntelligenceLoading;
-  final String? dailyIntelligenceError;
-  final String selectedScopeId;
-  final ValueChanged<String> onSelectScope;
   final VoidCallback onOpenUpdateSheet;
   final bool isRefreshingQuote;
   final bool isSubmittingExternalResearch;
@@ -1207,11 +1120,6 @@ class _ResearchWorkbenchSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final trust = _SecurityDataTrust.fromSnapshot(data);
-    final scopes = _ResearchScope.fromData(data);
-    final selectedScope = scopes.firstWhere(
-      (scope) => scope.id == selectedScopeId,
-      orElse: () => scopes.first,
-    );
     return LooGlassCard(
       padding: EdgeInsets.zero,
       child: Theme(
@@ -1225,8 +1133,8 @@ class _ResearchWorkbenchSection extends StatelessWidget {
             padding: const EdgeInsets.only(top: 6),
             child: Text(
               data.heldPosition == null
-                  ? "展开查看资料状态、秘闻、AI快扫和候选适配。"
-                  : "展开查看资料状态、秘闻、AI快扫和总览/账户视角。",
+                  ? "展开查看资料状态、AI快扫和候选适配。"
+                  : "展开查看资料状态、AI快扫和总览/账户视角。",
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
@@ -1244,27 +1152,7 @@ class _ResearchWorkbenchSection extends StatelessWidget {
               onTap: onOpenUpdateSheet,
             ),
             const SizedBox(height: 12),
-            DailyIntelligenceCard(
-              snapshot: dailyIntelligence,
-              isLoading: isDailyIntelligenceLoading,
-              errorMessage: dailyIntelligenceError,
-            ),
-            const SizedBox(height: 12),
             _QuickScanPanel(child: aiAnalysisCard),
-            const SizedBox(height: 12),
-            _ResearchScopeTabs(
-              scopes: scopes,
-              selectedScopeId: selectedScope.id,
-              onSelected: onSelectScope,
-            ),
-            const SizedBox(height: 12),
-            _AnalysisCard(data.analysis),
-            const SizedBox(height: 12),
-            _ResearchScopeContent(
-              data: data,
-              scope: selectedScope,
-              onSelectScope: onSelectScope,
-            ),
           ],
         ),
       ),
@@ -1369,36 +1257,112 @@ class _ResearchScopeTabs extends StatelessWidget {
   }
 }
 
-class _ResearchScopeContent extends StatelessWidget {
-  const _ResearchScopeContent({
+class _PositionScopeSection extends StatelessWidget {
+  const _PositionScopeSection({
     required this.data,
-    required this.scope,
+    required this.scopes,
+    required this.selectedScope,
     required this.onSelectScope,
   });
 
   final MobileSecurityDetailSnapshot data;
-  final _ResearchScope scope;
+  final List<_ResearchScope> scopes;
+  final _ResearchScope selectedScope;
   final ValueChanged<String> onSelectScope;
 
   @override
   Widget build(BuildContext context) {
-    if (!scope.isAggregate && scope.account != null) {
-      return _AccountScopeCard(scope.account!, holding: scope.holding);
+    if (data.heldPosition == null) {
+      return const SizedBox.shrink();
     }
-
-    return Column(
-      children: [
-        if (data.heldPosition != null) ...[
-          _HeldPositionCard(data.heldPosition!),
-          if (data.heldPosition!.accountSummaries.isNotEmpty) ...[
-            const SizedBox(height: 12),
-            _AccountDistributionCard(
-              data.heldPosition!,
-              onOpenHolding: onSelectScope,
+    return LooGlassCard(
+      padding: EdgeInsets.zero,
+      child: Theme(
+        data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+        child: ExpansionTile(
+          tilePadding: const EdgeInsets.fromLTRB(16, 10, 14, 10),
+          childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+          initiallyExpanded: false,
+          title: const _SectionHeader(title: "我的仓位", trailing: "已持有"),
+          subtitle: Padding(
+            padding: const EdgeInsets.only(top: 6),
+            child: _PositionScopeSummary(
+              data: data,
+              selectedScope: selectedScope,
             ),
+          ),
+          children: [
+            _ResearchScopeTabs(
+              scopes: scopes,
+              selectedScopeId: selectedScope.id,
+              onSelected: onSelectScope,
+            ),
+            const SizedBox(height: 12),
+            if (!selectedScope.isAggregate && selectedScope.account != null)
+              Column(
+                children: [
+                  _AnalysisCard(
+                    data.analysis,
+                    account: selectedScope.account,
+                  ),
+                  const SizedBox(height: 12),
+                  _AccountScopeCard(
+                    selectedScope.account!,
+                    holding: selectedScope.holding,
+                  ),
+                ],
+              )
+            else ...[
+              _AnalysisCard(data.analysis),
+              const SizedBox(height: 12),
+              _HeldPositionBreakdownCard(
+                data.heldPosition!,
+                onOpenHolding: onSelectScope,
+              ),
+            ],
           ],
-        ],
-      ],
+        ),
+      ),
+    );
+  }
+}
+
+class _PositionScopeSummary extends StatelessWidget {
+  const _PositionScopeSummary({
+    required this.data,
+    required this.selectedScope,
+  });
+
+  final MobileSecurityDetailSnapshot data;
+  final _ResearchScope selectedScope;
+
+  @override
+  Widget build(BuildContext context) {
+    final position = data.heldPosition;
+    if (position == null) {
+      return const SizedBox.shrink();
+    }
+    final parts = selectedScope.account == null
+        ? [
+            if (position.value.isNotEmpty) position.value,
+            if (position.gainLoss.isNotEmpty) position.gainLoss,
+            if (position.portfolioShare.isNotEmpty) position.portfolioShare,
+          ]
+        : [
+            if (selectedScope.account!.value.isNotEmpty)
+              selectedScope.account!.value,
+            if (selectedScope.account!.gainLoss.isNotEmpty)
+              selectedScope.account!.gainLoss,
+            if (selectedScope.account!.accountShare.isNotEmpty)
+              "账户内 ${selectedScope.account!.accountShare}",
+          ];
+    return Text(
+      parts.where((part) => part.isNotEmpty).join(" · "),
+      maxLines: 2,
+      overflow: TextOverflow.ellipsis,
+      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+            color: context.looTokens.mutedText,
+          ),
     );
   }
 }
@@ -1451,6 +1415,139 @@ class _AccountScopeCard extends StatelessWidget {
             ),
           ],
         ],
+      ),
+    );
+  }
+}
+
+class _HeldPositionBreakdownCard extends StatelessWidget {
+  const _HeldPositionBreakdownCard(
+    this.position, {
+    required this.onOpenHolding,
+  });
+
+  final MobileHeldPosition position;
+  final ValueChanged<String> onOpenHolding;
+
+  @override
+  Widget build(BuildContext context) {
+    final accounts = position.accountSummaries
+        .where((account) => account.positionSharePct > 0)
+        .take(6)
+        .toList();
+    return _InnerPanel(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const _SectionHeader(title: "持仓拆分", trailing: "我的仓位"),
+          const SizedBox(height: 8),
+          Text(position.value, style: Theme.of(context).textTheme.titleLarge),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              if (position.gainLoss.isNotEmpty) _InfoChip(position.gainLoss),
+              if (position.quantity.isNotEmpty && position.quantity != "--")
+                _InfoChip(position.quantity),
+              if (position.portfolioShare.isNotEmpty)
+                _InfoChip("组合 ${position.portfolioShare}"),
+              if (position.accountCount.isNotEmpty)
+                _InfoChip("${position.accountCount} 个账户"),
+            ],
+          ),
+          if (accounts.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            LooDistributionBar(
+              segments: accounts
+                  .map(
+                    (account) => LooDistributionSegment(
+                      label: account.accountLabel,
+                      value: account.positionSharePct,
+                    ),
+                  )
+                  .toList(),
+            ),
+            const SizedBox(height: 10),
+            ...accounts.map(
+              (account) => _AccountBreakdownRow(
+                account,
+                onTap: account.holdingId.isEmpty
+                    ? null
+                    : () => onOpenHolding(account.holdingId),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _AccountBreakdownRow extends StatelessWidget {
+  const _AccountBreakdownRow(this.account, {required this.onTap});
+
+  final MobileHeldAccountSummary account;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = context.looTokens;
+    final detailParts = [
+      if (account.accountShare.isNotEmpty) "账户内 ${account.accountShare}",
+      if (account.value.isNotEmpty) account.value,
+      if (account.gainLoss.isNotEmpty) "盈亏 ${account.gainLoss}",
+    ];
+    return Padding(
+      padding: const EdgeInsets.only(top: 8),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 6),
+          child: Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      [
+                        account.accountLabel,
+                        account.accountType,
+                      ].where((item) => item.isNotEmpty).join(" · "),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.bodyMedium,
+                    ),
+                    if (detailParts.isNotEmpty) ...[
+                      const SizedBox(height: 3),
+                      Text(
+                        detailParts.join(" · "),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context)
+                            .textTheme
+                            .bodySmall
+                            ?.copyWith(color: tokens.mutedText),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              Text(
+                account.positionShare,
+                style: Theme.of(context).textTheme.titleSmall,
+              ),
+              const SizedBox(width: 6),
+              Icon(
+                Icons.arrow_forward_rounded,
+                size: 16,
+                color: context.looTokens.mutedText,
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -2273,6 +2370,8 @@ class MobileHeldAccountSummary {
     required this.positionShare,
     required this.positionSharePct,
     required this.accountShare,
+    required this.accountAssetClassAllocation,
+    required this.accountAssetClassAllocationPct,
     required this.gainLoss,
   });
 
@@ -2284,6 +2383,8 @@ class MobileHeldAccountSummary {
   final String positionShare;
   final double positionSharePct;
   final String accountShare;
+  final String accountAssetClassAllocation;
+  final double accountAssetClassAllocationPct;
   final String gainLoss;
 
   factory MobileHeldAccountSummary.fromJson(Map<String, dynamic> json) {
@@ -2296,6 +2397,10 @@ class MobileHeldAccountSummary {
       positionShare: json["positionShare"] as String? ?? "--",
       positionSharePct: _readDouble(json["positionSharePct"]),
       accountShare: json["accountShare"] as String? ?? "",
+      accountAssetClassAllocation:
+          json["accountAssetClassAllocation"] as String? ?? "",
+      accountAssetClassAllocationPct:
+          _readDouble(json["accountAssetClassAllocationPct"]),
       gainLoss: json["gainLoss"] as String? ?? "",
     );
   }
@@ -2440,57 +2545,37 @@ class _InnerPanel extends StatelessWidget {
   }
 }
 
-class _CompactFactsList extends StatelessWidget {
-  const _CompactFactsList({required this.facts});
-
-  final List<MobileFact> facts;
-
-  @override
-  Widget build(BuildContext context) {
-    return _InnerPanel(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const _SectionHeader(title: "资料摘要", trailing: "缓存事实"),
-          const SizedBox(height: 8),
-          ...facts.take(6).map(
-                (fact) => Padding(
-                  padding: const EdgeInsets.only(top: 8),
-                  child: Row(
-                    children: [
-                      Expanded(child: Text(fact.label)),
-                      const SizedBox(width: 12),
-                      Flexible(
-                        child: Text(
-                          fact.value,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          textAlign: TextAlign.right,
-                          style: Theme.of(context).textTheme.titleSmall,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-        ],
-      ),
-    );
-  }
-}
-
 class _AnalysisCard extends StatelessWidget {
-  const _AnalysisCard(this.analysis);
+  const _AnalysisCard(this.analysis, {this.account});
 
   final MobileSecurityAnalysis analysis;
+  final MobileHeldAccountSummary? account;
 
   @override
   Widget build(BuildContext context) {
+    final isAccountScope = account != null;
+    final currentAllocation = isAccountScope &&
+            account!.accountAssetClassAllocation.isNotEmpty
+        ? account!.accountAssetClassAllocation
+        : analysis.currentAllocation;
+    final currentAllocationPct = isAccountScope &&
+            account!.accountAssetClassAllocationPct > 0
+        ? account!.accountAssetClassAllocationPct
+        : analysis.currentAllocationPct;
+    final shareLabel = isAccountScope ? "本标的账户占比" : "本标的组合占比";
+    final shareValue =
+        isAccountScope ? account!.accountShare : analysis.portfolioShare;
+    final sharePct = isAccountScope
+        ? _parsePercent(account!.accountShare)
+        : analysis.portfolioSharePct;
     return _InnerPanel(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _SectionHeader(title: analysis.assetClassLabel),
+          _SectionHeader(
+            title: "${analysis.assetClassLabel}配置",
+            trailing: isAccountScope ? "账户视角" : "组合视角",
+          ),
           if (analysis.summary.isNotEmpty) ...[
             const SizedBox(height: 8),
             Text(
@@ -2507,18 +2592,20 @@ class _AnalysisCard extends StatelessWidget {
             progress: analysis.targetAllocationPct / 100,
           ),
           _ProgressMetric(
-            label: "当前配置",
-            value: analysis.currentAllocation,
-            progress: analysis.currentAllocationPct / 100,
+            label: isAccountScope ? "账户内配置" : "组合内配置",
+            value: currentAllocation,
+            progress: currentAllocationPct / 100,
           ),
           _ProgressMetric(
-            label: "本标的组合占比",
-            value: analysis.portfolioShare,
-            progress: analysis.portfolioSharePct / 100,
+            label: shareLabel,
+            value: shareValue,
+            progress: sharePct / 100,
           ),
           const SizedBox(height: 4),
           Text(
-            "偏离：${analysis.driftLabel}",
+            isAccountScope
+                ? "账户内配置用于判断单个账户是否过重。"
+                : "偏离：${analysis.driftLabel}",
             style: Theme.of(context).textTheme.titleMedium,
           ),
         ],
@@ -2597,150 +2684,6 @@ class _PerformanceChartCard extends StatelessWidget {
   }
 }
 
-class _AccountDistributionCard extends StatelessWidget {
-  const _AccountDistributionCard(
-    this.position, {
-    required this.onOpenHolding,
-  });
-
-  final MobileHeldPosition position;
-  final ValueChanged<String> onOpenHolding;
-
-  @override
-  Widget build(BuildContext context) {
-    final tokens = context.looTokens;
-    final accounts = position.accountSummaries
-        .where((account) => account.positionSharePct > 0)
-        .take(6)
-        .toList();
-    return _InnerPanel(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const _SectionHeader(title: "账户拆分", trailing: "按总仓位"),
-          const SizedBox(height: 10),
-          LooDistributionBar(
-            segments: accounts
-                .map(
-                  (account) => LooDistributionSegment(
-                    label: account.accountLabel,
-                    value: account.positionSharePct,
-                  ),
-                )
-                .toList(),
-          ),
-          const SizedBox(height: 10),
-          ...accounts.map((account) {
-            final detailParts = [
-              if (account.accountShare.isNotEmpty)
-                "账户内占比 ${account.accountShare}",
-              if (account.value.isNotEmpty) account.value,
-              if (account.gainLoss.isNotEmpty) "盈亏 ${account.gainLoss}",
-            ];
-            return Padding(
-              padding: const EdgeInsets.only(top: 8),
-              child: InkWell(
-                borderRadius: BorderRadius.circular(12),
-                onTap: account.holdingId.isEmpty
-                    ? null
-                    : () => onOpenHolding(account.holdingId),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 6),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              [
-                                account.accountLabel,
-                                account.accountType,
-                              ].where((item) => item.isNotEmpty).join(" · "),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: Theme.of(context).textTheme.bodyMedium,
-                            ),
-                            if (detailParts.isNotEmpty) ...[
-                              const SizedBox(height: 3),
-                              Text(
-                                detailParts.join(" · "),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: Theme.of(context)
-                                    .textTheme
-                                    .bodySmall
-                                    ?.copyWith(color: tokens.mutedText),
-                              ),
-                            ],
-                          ],
-                        ),
-                      ),
-                      Text(
-                        account.positionShare,
-                        style: Theme.of(context).textTheme.titleSmall,
-                      ),
-                      const SizedBox(width: 6),
-                      Icon(
-                        Icons.arrow_forward_rounded,
-                        size: 16,
-                        color: context.looTokens.mutedText,
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            );
-          }),
-        ],
-      ),
-    );
-  }
-}
-
-class _HeldPositionCard extends StatelessWidget {
-  const _HeldPositionCard(this.position);
-
-  final MobileHeldPosition position;
-
-  @override
-  Widget build(BuildContext context) {
-    return _InnerPanel(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const _SectionHeader(title: "跨账户持仓", trailing: "我的仓位"),
-          const SizedBox(height: 8),
-          Text(position.value, style: Theme.of(context).textTheme.titleLarge),
-          const SizedBox(height: 8),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              if (position.gainLoss.isNotEmpty) _InfoChip(position.gainLoss),
-              if (position.quantity.isNotEmpty && position.quantity != "--")
-                _InfoChip(position.quantity),
-              if (position.accountCount.isNotEmpty)
-                _InfoChip(position.accountCount),
-            ],
-          ),
-          if (position.summaryPoints.isNotEmpty) ...[
-            const SizedBox(height: 8),
-            Text(
-              position.summaryPoints.first,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: context.looTokens.mutedText,
-                  ),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-}
-
 class _StatusPill extends StatelessWidget {
   const _StatusPill({required this.label, required this.color});
 
@@ -2759,6 +2702,8 @@ class _StatusPill extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
         child: Text(
           label,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
           style:
               Theme.of(context).textTheme.labelMedium?.copyWith(color: color),
         ),
@@ -2777,6 +2722,11 @@ Color _freshnessColor(BuildContext context, String variant) {
 
 double _readDouble(Object? value) {
   return value is num ? value.toDouble() : 0.0;
+}
+
+double _parsePercent(String value) {
+  final normalized = value.replaceAll("%", "").replaceAll("+", "").trim();
+  return double.tryParse(normalized) ?? 0;
 }
 
 String _toMinisterChartFreshness(String? value) {

@@ -699,6 +699,8 @@ export interface PortfolioSecurityDetailData {
       gainLoss: string;
       portfolioShare: string;
       accountShare: string;
+      accountAssetClassAllocation: string;
+      accountAssetClassAllocationPct: number;
       positionShare: string;
       positionSharePct: number;
       holdingCount: string;

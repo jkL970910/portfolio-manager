@@ -45,6 +45,15 @@ function enableInstitutionalProvider() {
   process.env.ALPHA_VANTAGE_API_KEY = "test-alpha-vantage-key";
 }
 
+function enableNewsProvider() {
+  process.env.PORTFOLIO_ANALYZER_EXTERNAL_RESEARCH = "enabled";
+  process.env.PORTFOLIO_ANALYZER_EXTERNAL_WORKER = "enabled";
+  process.env.PORTFOLIO_ANALYZER_EXTERNAL_PROVIDERS = "enabled";
+  process.env.PORTFOLIO_ANALYZER_EXTERNAL_ADAPTERS = "enabled";
+  process.env.PORTFOLIO_ANALYZER_EXTERNAL_SOURCE_NEWS = "enabled";
+  process.env.ALPHA_VANTAGE_API_KEY = "test-alpha-vantage-key";
+}
+
 function clearExternalResearchEnv() {
   delete process.env.PORTFOLIO_ANALYZER_EXTERNAL_RESEARCH;
   delete process.env.PORTFOLIO_ANALYZER_EXTERNAL_WORKER;
@@ -53,6 +62,7 @@ function clearExternalResearchEnv() {
   delete process.env.PORTFOLIO_ANALYZER_EXTERNAL_SOURCE_MARKET_DATA;
   delete process.env.PORTFOLIO_ANALYZER_EXTERNAL_SOURCE_PROFILE;
   delete process.env.PORTFOLIO_ANALYZER_EXTERNAL_SOURCE_INSTITUTIONAL;
+  delete process.env.PORTFOLIO_ANALYZER_EXTERNAL_SOURCE_NEWS;
   delete process.env.ALPHA_VANTAGE_API_KEY;
 }
 
@@ -644,6 +654,22 @@ test("external research smoke helper supports institutional source flags", () =>
   clearExternalResearchEnv();
 });
 
+test("external research smoke helper supports news source flags", () => {
+  clearExternalResearchEnv();
+  enableNewsProvider();
+
+  assert.deepEqual(
+    getMissingExternalResearchSmokeFlags(process.env, "news"),
+    [],
+  );
+  assert.deepEqual(
+    getMissingExternalResearchSmokeSecrets(process.env, "news"),
+    [],
+  );
+
+  clearExternalResearchEnv();
+});
+
 test("external research smoke request preserves security identity", () => {
   const request = buildExternalResearchSmokeRequest({
     userId: "user_casey",
@@ -767,6 +793,41 @@ test("external research smoke enqueue creates a queued institutional job", async
   assert.equal(
     result.data.job.sourceAllowlist.some(
       (source) => source.id === "institutional" && source.enabled === true,
+    ),
+    true,
+  );
+  assert.equal(
+    result.data.job.sourceAllowlist.some(
+      (source) => source.id === "profile" && source.enabled === true,
+    ),
+    false,
+  );
+
+  clearExternalResearchEnv();
+});
+
+test("external research smoke enqueue creates a queued news job", async () => {
+  enableNewsProvider();
+
+  const result = await enqueueExternalResearchSmokeJob(
+    {
+      userId: "user_casey",
+      symbol: "AMZN",
+      currency: "USD",
+      exchange: "NASDAQ",
+      name: "Amazon.com Inc.",
+      securityId: "security_amzn_nasdaq_usd",
+      securityType: "Common Stock",
+      source: "news",
+      maxCacheAgeSeconds: 21600,
+    },
+    new Date("2026-05-10T15:00:00.000Z"),
+  );
+
+  assert.equal(result.data.job.status, "queued");
+  assert.equal(
+    result.data.job.sourceAllowlist.some(
+      (source) => source.id === "news" && source.enabled === true,
     ),
     true,
   );

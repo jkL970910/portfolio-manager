@@ -223,6 +223,57 @@ test("security detail chart contract labels shallow history as fallback", () => 
   assert.ok(chart.notes.some((note) => note.includes("不代表真实价格走势")));
 });
 
+test("security detail allocation uses economic exposure rather than CAD listing", () => {
+  const cglHolding: HoldingPosition = {
+    id: "holding_cgl",
+    userId: "user_test",
+    accountId: "acct_tfsa",
+    symbol: "CGL.C",
+    name: "iShares Gold Bullion ETF",
+    assetClass: "Canadian Equity",
+    sector: "Multi-sector",
+    currency: "CAD",
+    exchangeOverride: "TSX",
+    quantity: 10,
+    marketValueCad: 2000,
+    marketValueAmount: 2000,
+    weightPct: 20,
+    gainLossPct: 2,
+    updatedAt: "2026-04-28T00:00:00.000Z",
+  };
+  const equityHolding: HoldingPosition = {
+    ...holdings[0]!,
+    marketValueCad: 8000,
+    marketValueAmount: 8000,
+    weightPct: 80,
+  };
+
+  const detail = buildPortfolioSecurityDetailData({
+    language: "zh",
+    accounts,
+    holdings: [equityHolding, cglHolding],
+    priceHistory: [],
+    profile: {
+      ...profile,
+      targetAllocation: [
+        { assetClass: "US Equity", targetPct: 80 },
+        { assetClass: "Commodity", targetPct: 5 },
+      ],
+    },
+    display,
+    symbol: "CGL.C",
+    exchange: "TSX",
+    currency: "CAD",
+  });
+
+  assert.ok(detail);
+  assert.equal(detail.security.assetClass, "商品/贵金属");
+  assert.equal(detail.security.sector, "贵金属");
+  assert.equal(detail.analysis.assetClassLabel, "商品/贵金属");
+  assert.equal(detail.analysis.currentAllocation, "20.0%");
+  assert.equal(detail.analysis.targetAllocation, "5.0%");
+});
+
 test("mobile security refresh actions require confirmation for fresh external cache", () => {
   process.env.PORTFOLIO_ANALYZER_EXTERNAL_RESEARCH = "enabled";
   process.env.PORTFOLIO_ANALYZER_EXTERNAL_WORKER = "enabled";

@@ -82,6 +82,10 @@ export function getSectorLabel(sector: string, language: DisplayLanguage) {
     Communication: { zh: "通信", en: "Communication" },
     "Communication Services": { zh: "通信服务", en: "Communication Services" },
     "Multi-sector": { zh: "多行业", en: "Multi-sector" },
+    "Broad Market": { zh: "宽基市场", en: "Broad Market" },
+    "Precious Metals": { zh: "贵金属", en: "Precious Metals" },
+    "Fixed Income": { zh: "固定收益", en: "Fixed Income" },
+    Cash: { zh: "现金", en: "Cash" },
     Other: { zh: "其他", en: "Other" }
   };
 

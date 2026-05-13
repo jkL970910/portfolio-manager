@@ -46,6 +46,35 @@ export interface AlphaVantageEarningsPayload {
   payload: Record<string, unknown>;
 }
 
+export interface AlphaVantageNewsArticle {
+  title: string;
+  url: string;
+  source: string;
+  sourceDomain: string | null;
+  summary: string;
+  timePublished: string | null;
+  overallSentimentScore: number | null;
+  overallSentimentLabel: string | null;
+  tickerSentiment: Array<{
+    ticker: string;
+    relevanceScore: number | null;
+    sentimentScore: number | null;
+    sentimentLabel: string | null;
+  }>;
+  topics: Array<{
+    topic: string;
+    relevanceScore: number | null;
+  }>;
+  raw: Record<string, unknown>;
+}
+
+export interface AlphaVantageNewsPayload {
+  candidateTickers: string[];
+  topics: string[];
+  payload: Record<string, unknown>;
+  feed: AlphaVantageNewsArticle[];
+}
+
 export class AlphaVantageProviderLimitedError extends Error {
   constructor(message = "Alpha Vantage provider limit reached.") {
     super(message);
@@ -158,6 +187,58 @@ function hasEarningsPayload(payload: Record<string, unknown>) {
   );
 }
 
+function readString(value: unknown) {
+  return typeof value === "string" && value.trim() ? value.trim() : null;
+}
+
+function readNumber(value: unknown) {
+  const parsed = typeof value === "number" ? value : Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function readObjectArray(value: unknown) {
+  return Array.isArray(value)
+    ? value.filter(
+        (item): item is Record<string, unknown> =>
+          item !== null && typeof item === "object",
+      )
+    : [];
+}
+
+function parseAlphaVantageNewsArticle(
+  article: Record<string, unknown>,
+): AlphaVantageNewsArticle | null {
+  const title = readString(article.title);
+  const url = readString(article.url);
+  const source = readString(article.source) ?? "Alpha Vantage News";
+  const summary = readString(article.summary) ?? title;
+  if (!title || !url || !summary) {
+    return null;
+  }
+
+  return {
+    title,
+    url,
+    source,
+    sourceDomain: readString(article.source_domain),
+    summary,
+    timePublished: readString(article.time_published),
+    overallSentimentScore: readNumber(article.overall_sentiment_score),
+    overallSentimentLabel: readString(article.overall_sentiment_label),
+    tickerSentiment: readObjectArray(article.ticker_sentiment).map((item) => ({
+      ticker: readString(item.ticker)?.toUpperCase() ?? "UNKNOWN",
+      relevanceScore: readNumber(item.relevance_score),
+      sentimentScore: readNumber(item.ticker_sentiment_score),
+      sentimentLabel: readString(item.ticker_sentiment_label),
+    })),
+    topics: readObjectArray(article.topics).map((item) => ({
+      topic: readString(item.topic) ?? "unknown",
+      relevanceScore: readNumber(item.relevance_score),
+    })),
+    raw: article,
+  };
+}
+
 export async function getAlphaVantageProfile(
   symbol: string,
   exchange?: string | null,
@@ -206,6 +287,91 @@ export async function getAlphaVantageProfile(
   }
 
   return null;
+}
+
+export async function getAlphaVantageNewsSentiment(input: {
+  tickers?: string[];
+  topics?: string[];
+  limit?: number;
+} = {}): Promise<AlphaVantageNewsPayload | null> {
+  const { alphaVantageApiKey } = getMarketDataConfig();
+  if (!alphaVantageApiKey) {
+    return null;
+  }
+
+  const tickers = Array.from(
+    new Set(
+      (input.tickers ?? [])
+        .map((ticker) => ticker.trim().toUpperCase())
+        .filter(Boolean),
+    ),
+  ).slice(0, 5);
+  const topics = Array.from(
+    new Set(
+      (input.topics ?? [])
+        .map((topic) => topic.trim().toLowerCase())
+        .filter(Boolean),
+    ),
+  ).slice(0, 5);
+  const limit = Math.min(
+    Math.max(Math.trunc(input.limit ?? 12), 1),
+    50,
+  );
+
+  const url = new URL("https://www.alphavantage.co/query");
+  url.searchParams.set("function", "NEWS_SENTIMENT");
+  if (tickers.length > 0) {
+    url.searchParams.set("tickers", tickers.join(","));
+  }
+  if (topics.length > 0) {
+    url.searchParams.set("topics", topics.join(","));
+  }
+  url.searchParams.set("sort", "LATEST");
+  url.searchParams.set("limit", String(limit));
+  url.searchParams.set("apikey", alphaVantageApiKey);
+
+  const response = await fetch(url, { cache: "no-store" });
+  if (!response.ok) {
+    if (response.status === 429 || response.status === 503) {
+      markProviderLimited({
+        provider: "alpha-vantage",
+        reason: `Alpha Vantage returned HTTP ${response.status}.`,
+        retryAfterSeconds: readRetryAfterSeconds(response.headers),
+      });
+    }
+    return null;
+  }
+
+  const payload = (await response.json()) as Record<string, unknown>;
+  if (isAlphaVantageLimitPayload(payload)) {
+    const reason = String(
+      payload.Note ??
+        payload.Information ??
+        "Alpha Vantage rate limit or endpoint limit reached.",
+    );
+    markProviderLimited({
+      provider: "alpha-vantage",
+      reason,
+      retryAfterSeconds: readRetryAfterSeconds(response.headers),
+    });
+    throw new AlphaVantageProviderLimitedError(reason);
+  }
+  if (payload["Error Message"]) {
+    return null;
+  }
+
+  const feed = readObjectArray(payload.feed)
+    .map(parseAlphaVantageNewsArticle)
+    .filter((item): item is AlphaVantageNewsArticle => Boolean(item));
+
+  return feed.length > 0
+    ? {
+        candidateTickers: tickers,
+        topics,
+        payload,
+        feed,
+      }
+    : null;
 }
 
 export async function getAlphaVantageEarnings(

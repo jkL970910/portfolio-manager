@@ -134,6 +134,12 @@ Approved direction as of 2026-05-11:
 - Security Detail is now the research cockpit surface for a single listing.
 - Watchlist chips and recommendation entries must open Security Detail while
   preserving listing identity.
+- Allocation, Health, recommendation, and Security Detail fit logic must use
+  economic exposure rather than raw listing labels. A CAD/TSX-listed wrapper can
+  still route quotes as CAD/TSX while being counted as US Equity, Global Equity,
+  Fixed Income, or Commodity / Precious Metals based on its underlying exposure.
+  This prevents ZQQ/VFV-style CAD wrappers and CGL.C-style gold products from
+  being incorrectly treated as Canadian Equity.
 
 ### 4. Loo国研究台 And 智能快扫
 
@@ -144,6 +150,8 @@ Security Detail starts with `Loo国研究台`:
 - data trust
 - main reminders
 - listing/economic exposure chips
+- account/portfolio scope tabs for held securities, where listing-level facts
+  stay stable and only the user's holding/account lens changes
 
 The `Loo国研究工作台` smart scan then shows:
 
@@ -199,6 +207,9 @@ Current first pass:
 
 - `SecurityResearchDecision` is an additive backend result block; legacy smart
   scan fields remain populated for mobile compatibility.
+- `SecurityExposureProfile` is the shared exposure model for listing identity
+  vs economic exposure. It includes primary asset class, region, sector, themes,
+  listing label, confidence/source notes, and localized explanation copy.
 - Security-level facts must be separate from user-specific fit decisions.
   `securityResearchProfile` owns listing-level facts such as valuation
   evidence, key levels, quote/history freshness, market pulse, and evidence
@@ -330,10 +341,23 @@ Current placement:
 - Recommendation page shows lightweight external-material status and item-level
   related intelligence.
 - Portfolio page should not duplicate the full card.
-- Security Detail shows strict listing-matched intelligence only.
+- Security Detail does not show the full news card. Single-security research
+  stays in `Loo国研究台`; overview-level news remains on Overview/Recommendation
+  surfaces to avoid repeated provider calls.
 
-Planned next step: daily worker refresh for overview-level intelligence, plus a
-bounded single-security manual refresh with daily quota and TTL reuse.
+Current provider direction:
+
+- Alpha Vantage `NEWS_SENTIMENT` is the first real news adapter.
+- The adapter writes `news` documents into `external_research_documents`.
+- Flutter reads cached daily intelligence only; it must not trigger live news
+  calls while rendering Overview.
+- If Alpha Vantage is used, news calls share the same real provider API key
+  quota as profile/earnings calls. Product copy and Settings should keep daily
+  news cache status separate from manual security profile/earnings refreshes.
+
+Planned next step: cloud-smoke the worker with `source=news`, verify at least
+three cached news/intelligence cards, then decide whether a separate news
+provider such as Finnhub/NewsAPI is needed for better quota isolation.
 
 ### 12. Cloud And Workers
 

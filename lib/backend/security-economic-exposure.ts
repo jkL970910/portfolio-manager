@@ -20,6 +20,23 @@ export type InferredSecurityMetadata = SecurityMetadata & {
   assetClassSource: SecurityMetadataSource;
 };
 
+export type SecurityExposureProfile = {
+  primaryAssetClass: string;
+  primaryRegion: string;
+  primarySector: string | null;
+  themes: string[];
+  listingLabel: string;
+  explanation: {
+    zh: string;
+    en: string;
+  };
+  confidence: {
+    score: number;
+    source: SecurityMetadataSource;
+    notes: string[];
+  };
+};
+
 export function normalizeSecurityMetadataForWrite(
   metadata: SecurityMetadata,
 ): SecurityMetadata {
@@ -382,6 +399,171 @@ export function inferSecurityMetadata(
   };
 }
 
+export function buildSecurityExposureProfile(
+  input: EconomicExposureInput,
+): SecurityExposureProfile {
+  const metadata =
+    input.metadata?.confidence && input.metadata.confidence >= 70
+      ? input.metadata
+      : inferSecurityMetadata({
+          symbol: input.symbol,
+          name: input.name,
+          assetClass: input.assetClass,
+          securityType: input.securityType,
+          currency: input.currency,
+          exchange: input.exchange,
+          micCode: input.micCode,
+          country: input.country,
+        });
+  const primaryAssetClass =
+    metadata.economicAssetClass ?? inferEconomicAssetClass(input);
+  const primaryRegion = metadata.exposureRegion ?? inferExposureRegion({
+    ...input,
+    economicAssetClass: primaryAssetClass,
+  });
+  const primarySector =
+    metadata.economicSector ??
+    inferEconomicSector({
+      ...input,
+      economicAssetClass: primaryAssetClass,
+    });
+  const themes = inferExposureThemes({
+    ...input,
+    economicAssetClass: primaryAssetClass,
+    economicSector: primarySector,
+  });
+  const listingLabel = [
+    input.currency?.trim().toUpperCase(),
+    input.exchange?.trim().toUpperCase(),
+  ]
+    .filter(Boolean)
+    .join(" · ");
+  const listingLooksDifferent =
+    (input.currency?.trim().toUpperCase() === "CAD" ||
+      isSupportedNorthAmericanListing(input)) &&
+    primaryAssetClass !== (input.assetClass?.trim() || primaryAssetClass);
+
+  return {
+    primaryAssetClass,
+    primaryRegion,
+    primarySector,
+    themes,
+    listingLabel,
+    explanation: listingLooksDifferent
+      ? {
+          zh: `${input.symbol.trim().toUpperCase()} 的交易口径是 ${listingLabel || "当前上市身份"}，但组合风险按 ${primaryRegion} / ${primarySector ?? primaryAssetClass} 暴露计算。`,
+          en: `${input.symbol.trim().toUpperCase()}'s listing is ${listingLabel || "the current listing identity"}, but portfolio risk is measured by ${primaryRegion} / ${primarySector ?? primaryAssetClass} exposure.`,
+        }
+      : {
+          zh: `${input.symbol.trim().toUpperCase()} 的组合风险按 ${primaryRegion} / ${primarySector ?? primaryAssetClass} 暴露计算。`,
+          en: `${input.symbol.trim().toUpperCase()}'s portfolio risk is measured by ${primaryRegion} / ${primarySector ?? primaryAssetClass} exposure.`,
+        },
+    confidence: {
+      score: metadata.confidence,
+      source: metadata.source,
+      notes: [metadata.notes].filter((note): note is string => Boolean(note)),
+    },
+  };
+}
+
+function inferExposureRegion(
+  input: EconomicExposureInput & { economicAssetClass: string },
+) {
+  if (input.metadata?.exposureRegion && input.metadata.confidence >= 70) {
+    return input.metadata.exposureRegion;
+  }
+  const symbol = input.symbol.trim().toUpperCase();
+  const name = (input.name ?? "").trim().toLowerCase();
+  if (input.economicAssetClass === "Commodity") return "Commodity-linked";
+  if (input.economicAssetClass === "Fixed Income") return "Canada";
+  if (input.economicAssetClass === "Cash") return "Canada";
+  if (
+    symbolMatches(US_EQUITY_EXPOSURE_SYMBOLS, symbol) ||
+    isCadListedWrapper({
+      symbol,
+      name,
+      type: input.securityType?.trim().toLowerCase() ?? "",
+      currency: input.currency,
+      exchange: input.exchange,
+      micCode: input.micCode,
+      country: input.country,
+    }) ||
+    name.includes("nasdaq") ||
+    name.includes("s&p") ||
+    name.includes("united states")
+  ) {
+    return "United States";
+  }
+  if (
+    symbolMatches(INTERNATIONAL_EQUITY_EXPOSURE_SYMBOLS, symbol) ||
+    name.includes("international") ||
+    name.includes("global") ||
+    name.includes("all-equity") ||
+    name.includes("all equity")
+  ) {
+    return "Global";
+  }
+  return input.currency?.trim().toUpperCase() === "USD"
+    ? "United States"
+    : "Canada";
+}
+
+function inferEconomicSector(
+  input: EconomicExposureInput & { economicAssetClass: string },
+) {
+  if (input.metadata?.economicSector && input.metadata.confidence >= 70) {
+    return input.metadata.economicSector;
+  }
+  const symbol = input.symbol.trim().toUpperCase();
+  const name = (input.name ?? "").trim().toLowerCase();
+  if (input.economicAssetClass === "Commodity") return "Precious Metals";
+  if (input.economicAssetClass === "Fixed Income") return "Fixed Income";
+  if (input.economicAssetClass === "Cash") return "Cash";
+  if (
+    symbolMatches(new Set(["ZQQ", "XQQ", "HXQ", "QQC", "QQQ", "TEC"]), symbol) ||
+    name.includes("nasdaq") ||
+    name.includes("technology") ||
+    name.includes("tech")
+  ) {
+    return "Technology";
+  }
+  if (name.includes("energy") || symbolMatches(new Set(["XEG", "ZEO"]), symbol)) {
+    return "Energy";
+  }
+  if (name.includes("financial")) return "Financials";
+  return input.assetClass === "Canadian Equity" || input.assetClass === "US Equity"
+    ? "Broad Market"
+    : null;
+}
+
+function inferExposureThemes(
+  input: EconomicExposureInput & {
+    economicAssetClass: string;
+    economicSector: string | null;
+  },
+) {
+  const symbol = input.symbol.trim().toUpperCase();
+  const name = (input.name ?? "").trim().toLowerCase();
+  const themes = new Set<string>();
+  if (input.economicSector) themes.add(input.economicSector);
+  if (name.includes("cad hedged") || name.includes("hedged to cad")) {
+    themes.add("CAD Hedged");
+  }
+  if (name.includes("nasdaq") || symbolMatches(new Set(["ZQQ", "XQQ", "HXQ", "QQC", "QQQ"]), symbol)) {
+    themes.add("Nasdaq");
+    themes.add("Growth");
+  }
+  if (name.includes("s&p") || symbolMatches(new Set(["VFV", "ZSP", "HXS", "SPY", "VOO"]), symbol)) {
+    themes.add("S&P 500");
+    themes.add("Broad Market");
+  }
+  if (input.economicAssetClass === "Commodity") {
+    themes.add("Gold");
+    themes.add("Precious Metals");
+  }
+  return [...themes];
+}
+
 export function getHoldingEconomicAssetClass(holding: HoldingPosition) {
   return inferEconomicAssetClass({
     symbol: holding.symbol,
@@ -389,6 +571,19 @@ export function getHoldingEconomicAssetClass(holding: HoldingPosition) {
     assetClass: holding.assetClass,
     securityType: holding.securityTypeOverride,
     currency: holding.currency,
+    exchange: holding.exchangeOverride,
+    metadata: holding.securityMetadata,
+  });
+}
+
+export function getHoldingExposureProfile(holding: HoldingPosition) {
+  return buildSecurityExposureProfile({
+    symbol: holding.symbol,
+    name: holding.name,
+    assetClass: holding.assetClass,
+    securityType: holding.securityTypeOverride,
+    currency: holding.currency,
+    exchange: holding.exchangeOverride,
     metadata: holding.securityMetadata,
   });
 }

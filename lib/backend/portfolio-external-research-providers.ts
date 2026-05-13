@@ -2,6 +2,7 @@ import {
   AnalyzerSecurityIdentity,
   PortfolioAnalyzerRequest,
 } from "@/lib/backend/portfolio-analyzer-contracts";
+import crypto from "node:crypto";
 import {
   ExternalResearchPolicy,
   ExternalResearchSource,
@@ -9,6 +10,7 @@ import {
 } from "@/lib/backend/portfolio-external-research";
 import type { ExternalResearchDocument } from "@/lib/backend/external-research-documents";
 import { getRepositories } from "@/lib/backend/repositories/factory";
+import type { AlphaVantageNewsPayload } from "@/lib/market-data/alpha-vantage";
 
 export type ExternalResearchProviderId = ExternalResearchSource["id"];
 
@@ -193,6 +195,150 @@ function normalizeIsoDate(value: string | null, fallback: string) {
     return fallback;
   }
   return new Date(parsed).toISOString();
+}
+
+function normalizeAlphaVantageNewsTime(value: string | null, fallback: string) {
+  if (!value) {
+    return fallback;
+  }
+  const match = value.match(
+    /^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})$/,
+  );
+  if (!match) {
+    return normalizeIsoDate(value, fallback);
+  }
+  const [, year, month, day, hour, minute, second] = match;
+  return new Date(
+    `${year}-${month}-${day}T${hour}:${minute}:${second}.000Z`,
+  ).toISOString();
+}
+
+function hashStableId(value: string) {
+  return crypto.createHash("sha256").update(value).digest("hex").slice(0, 20);
+}
+
+function mapAlphaVantageSentiment(
+  label: string | null,
+): ExternalResearchDocument["sentiment"] {
+  const normalized = label?.trim().toLowerCase() ?? "";
+  if (normalized.includes("bullish") || normalized.includes("positive")) {
+    return "positive";
+  }
+  if (normalized.includes("bearish") || normalized.includes("negative")) {
+    return "negative";
+  }
+  if (normalized.includes("mixed")) {
+    return "mixed";
+  }
+  return "neutral";
+}
+
+function buildAlphaVantageNewsDocuments(args: {
+  input: ExternalResearchProviderInput;
+  candidateTickers: string[];
+  topics: string[];
+  feed: AlphaVantageNewsPayload["feed"];
+}): ExternalResearchDocument[] {
+  const requestSecurity = args.input.request.security;
+  const ttlSeconds = Math.max(
+    args.input.request.maxCacheAgeSeconds ??
+      getExternalResearchPolicy().defaultTtlSeconds,
+    getExternalResearchPolicy().minTtlSeconds,
+  );
+  const requestSymbol = normalizeNullable(requestSecurity?.symbol);
+  const requestExchange = normalizeNullable(requestSecurity?.exchange);
+  const requestCurrency = normalizeNullable(requestSecurity?.currency);
+  const requestSecurityId = requestSecurity?.securityId?.trim() || null;
+  const hasSecurityContext = Boolean(requestSecurityId || requestSymbol);
+
+  return args.feed.slice(0, 8).map((article) => {
+    const tickerMatch = article.tickerSentiment.find(
+      (item) =>
+        requestSymbol &&
+        normalizeNullable(item.ticker.split(":").pop()) === requestSymbol,
+    );
+    const publishedAt = normalizeAlphaVantageNewsTime(
+      article.timePublished,
+      args.input.now.toISOString(),
+    );
+    const topicLabels = article.topics
+      .map((topic) => topic.topic)
+      .filter(Boolean)
+      .slice(0, 3);
+    const relevanceScore = Math.round(
+      Math.min(
+        95,
+        Math.max(
+          50,
+          (tickerMatch?.relevanceScore ?? 0) * 100 ||
+            (hasSecurityContext ? 72 : 62),
+        ),
+      ),
+    );
+    const sentimentLabel =
+      tickerMatch?.sentimentLabel ?? article.overallSentimentLabel;
+    const sourceName = article.sourceDomain
+      ? `${article.source} · ${article.sourceDomain}`
+      : article.source;
+    const summary = article.summary.slice(0, 900);
+    const identityPart = requestSecurityId ?? requestSymbol ?? "macro";
+
+    return {
+      id: [
+        "alpha-vantage-news",
+        identityPart,
+        hashStableId(article.url),
+      ].join(":"),
+      userId: args.input.userId,
+      sourceType: "news",
+      providerId: "alpha-vantage-news",
+      sourceName,
+      title: article.title.slice(0, 240),
+      summary,
+      url: article.url,
+      publishedAt,
+      capturedAt: args.input.now.toISOString(),
+      expiresAt: addSeconds(args.input.now, ttlSeconds).toISOString(),
+      language: "en",
+      security: hasSecurityContext
+        ? {
+            securityId: requestSecurityId,
+            symbol: requestSymbol,
+            exchange: requestExchange,
+            currency:
+              requestCurrency === "CAD" || requestCurrency === "USD"
+                ? requestCurrency
+                : null,
+            name: requestSecurity?.name ?? null,
+            provider: "alpha-vantage-news",
+            securityType: requestSecurity?.securityType ?? null,
+          }
+        : null,
+      underlyingId: null,
+      confidence: article.url && article.timePublished ? "high" : "medium",
+      sentiment: mapAlphaVantageSentiment(sentimentLabel),
+      relevanceScore,
+      sourceReliability: 74,
+      keyPoints: [
+        `新闻来源：${sourceName}`,
+        `发布时间：${publishedAt.slice(0, 10)}`,
+        sentimentLabel ? `新闻情绪：${sentimentLabel}` : null,
+        topicLabels.length > 0 ? `主题：${topicLabels.join(" / ")}` : null,
+        summary,
+      ].filter((item): item is string => Boolean(item)).slice(0, 5),
+      riskFlags: [
+        "新闻只作为每日信息背景，不代表买卖建议。",
+        "新闻情绪来自 provider 原始字段，需要结合组合护栏和估值证据判断。",
+      ],
+      tags: [
+        "news",
+        "alpha-vantage",
+        hasSecurityContext ? "security-news" : "market-news",
+        ...args.candidateTickers.slice(0, 3).map((ticker) => `ticker:${ticker}`),
+        ...args.topics.slice(0, 3).map((topic) => `topic:${topic}`),
+      ],
+    };
+  });
 }
 
 function buildAlphaVantageProfileDocument(args: {
@@ -694,6 +840,79 @@ export const alphaVantageInstitutionalResearchProvider: ExternalResearchProvider
   },
 };
 
+export const alphaVantageNewsResearchProvider: ExternalResearchProvider = {
+  id: "news",
+  sourceType: "news",
+  enabled(policy) {
+    return (
+      policy.liveProvidersEnabled &&
+      policy.adaptersImplemented &&
+      Boolean(process.env.ALPHA_VANTAGE_API_KEY?.trim()) &&
+      process.env.PORTFOLIO_ANALYZER_EXTERNAL_SOURCE_NEWS === "enabled" &&
+      policy.allowedSources.some(
+        (source) => source.id === "news" && source.enabled,
+      )
+    );
+  },
+  async fetch(input) {
+    if (!isSourceAllowed(input, "news")) {
+      throw new ExternalResearchProviderDisabledError(
+        "News external research source is not allowed for this job.",
+      );
+    }
+
+    const security = input.request.security;
+    const symbol = normalizeNullable(security?.symbol);
+    const { getAlphaVantageNewsSentiment } = await import(
+      "@/lib/market-data/alpha-vantage"
+    );
+    const topics = symbol
+      ? ["earnings", "financial_markets"]
+      : ["financial_markets", "economy_macro", "finance"];
+    const news = await getAlphaVantageNewsSentiment({
+      tickers: symbol ? [symbol] : [],
+      topics,
+      limit: 8,
+    });
+    if (!news || news.feed.length === 0) {
+      throw new ExternalResearchProviderDisabledError(
+        "No Alpha Vantage news payload was available for this request.",
+      );
+    }
+
+    const documents = buildAlphaVantageNewsDocuments({
+      input,
+      candidateTickers: news.candidateTickers,
+      topics: news.topics,
+      feed: news.feed,
+    });
+
+    return {
+      sourceMode: "cached-external",
+      externalResearchAsOf: input.now.toISOString(),
+      targetKey: input.targetKey,
+      security,
+      summaryPoints: documents
+        .flatMap((document) => [
+          `${document.sourceName}：${document.title}`,
+          ...document.keyPoints.slice(0, 1),
+        ])
+        .slice(0, 8),
+      risks: Array.from(
+        new Set(documents.flatMap((document) => document.riskFlags)),
+      ).slice(0, 6),
+      sources: documents.map((document) => ({
+        title: document.title,
+        url: document.url ?? undefined,
+        date: document.publishedAt?.slice(0, 10),
+        sourceType: "news",
+        providerId: "news",
+      })),
+      documents,
+    };
+  },
+};
+
 export const disabledMarketDataResearchProvider: ExternalResearchProvider = {
   id: "market-data",
   sourceType: "market-data",
@@ -711,6 +930,7 @@ export function getExternalResearchProviders() {
   return [
     alphaVantageProfileResearchProvider,
     alphaVantageInstitutionalResearchProvider,
+    alphaVantageNewsResearchProvider,
     cachedMarketDataResearchProvider,
   ];
 }

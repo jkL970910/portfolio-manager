@@ -14,7 +14,8 @@ export const EXTERNAL_RESEARCH_SMOKE_REQUIRED_FLAGS = [
 export type ExternalResearchSmokeSource =
   | "market-data"
   | "profile"
-  | "institutional";
+  | "institutional"
+  | "news";
 
 type ExternalResearchSmokeEnv = Record<string, string | undefined>;
 
@@ -37,11 +38,14 @@ function getRequiredSourceFlag(source: ExternalResearchSmokeSource) {
   if (source === "institutional") {
     return "PORTFOLIO_ANALYZER_EXTERNAL_SOURCE_INSTITUTIONAL";
   }
+  if (source === "news") {
+    return "PORTFOLIO_ANALYZER_EXTERNAL_SOURCE_NEWS";
+  }
   return "PORTFOLIO_ANALYZER_EXTERNAL_SOURCE_MARKET_DATA";
 }
 
 function getRequiredSourceSecrets(source: ExternalResearchSmokeSource) {
-  return source === "profile" || source === "institutional"
+  return source === "profile" || source === "institutional" || source === "news"
     ? (["ALPHA_VANTAGE_API_KEY"] as const)
     : [];
 }

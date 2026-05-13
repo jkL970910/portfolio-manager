@@ -77,7 +77,8 @@ export const DEFAULT_EXTERNAL_RESEARCH_POLICY: ExternalResearchPolicy = {
       id: "news",
       label: "新闻与公告",
       enabled: false,
-      reason: "等待成本上限、去重和过期策略。",
+      reason:
+        "通过后台 worker 拉取真实新闻并写入缓存；页面加载不直接消耗 provider 额度。",
     },
     {
       id: "community",
@@ -160,6 +161,7 @@ export function mapExternalResearchPolicyForMobile(
     guardrails: [
       "总览级秘闻只允许后台 worker 每日缓存；Flutter 页面加载不能自动运行外部来源。",
       "单个标的允许用户显式触发刷新，但必须受每日次数、TTL 和 worker 队列限制。",
+      "新闻 provider 与标的资料共用真实 API key 时，后端需要把每日新闻 worker 视为独立来源并限制频率。",
       `缓存 TTL 不得低于 ${policy.minTtlSeconds} 秒，避免重复付费或重复抓取。`,
       `单次最多分析 ${policy.maxSymbolsPerRun} 个标的；每日默认最多 ${policy.dailyRunLimit} 次。`,
       "未接入 worker、provider 和来源白名单前，移动端不得展示 live research 已启用。",

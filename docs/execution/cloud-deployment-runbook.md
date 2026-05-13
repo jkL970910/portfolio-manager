@@ -307,9 +307,13 @@ EXTERNAL_RESEARCH_WORKER_MAX_RUNTIME_MS=20000
 ALPHA_VANTAGE_API_KEY=...
 ```
 
-Keep `PORTFOLIO_ANALYZER_EXTERNAL_SOURCE_NEWS` and
-`PORTFOLIO_ANALYZER_EXTERNAL_SOURCE_COMMUNITY` disabled until queue, quality
-scoring, and cost controls are mature.
+`PORTFOLIO_ANALYZER_EXTERNAL_SOURCE_NEWS=enabled` can be used with
+`EXTERNAL_RESEARCH_DAILY_SOURCE=news` to populate `Loo国今日秘闻` from
+Alpha Vantage `NEWS_SENTIMENT`. Keep it worker-only: page loads must only read
+`external_research_documents`, and the daily news job should stay small because
+it shares the same Alpha Vantage API key quota as profile/earnings calls.
+Keep `PORTFOLIO_ANALYZER_EXTERNAL_SOURCE_COMMUNITY` disabled until source
+quality and cost controls are mature.
 
 Local smoke result:
 
@@ -321,6 +325,9 @@ Local smoke result:
   relying on Alpha Vantage for Canadian ETF profile data.
 - `source=institutional` can be used for company-style earnings context. Expect
   ETFs/funds to skip safely if no earnings payload exists.
+- `source=news` can be used for daily overview news. It writes `news` documents
+  into the external research cache and should not be exposed as a page-load
+  refresh action.
 
 Cloud smoke result:
 

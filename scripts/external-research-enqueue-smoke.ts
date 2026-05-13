@@ -18,7 +18,7 @@ interface ParsedArgs {
   name?: string;
   securityId?: string;
   securityType?: string;
-  source: "market-data" | "profile" | "institutional";
+  source: "market-data" | "profile" | "institutional" | "news";
   maxCacheAgeSeconds: number;
 }
 
@@ -34,7 +34,7 @@ Options:
   --name <name>                    Optional display name.
   --security-id <uuid>             Optional canonical security_id for strict identity matching.
   --security-type <type>           Optional security type. Example: Common Stock, ETF
-  --source <market-data|profile|institutional>
+  --source <market-data|profile|institutional|news>
                                   External research source. Default: market-data
   --max-cache-age-seconds <int>    Cache TTL. Default: 21600
   --help                           Show this help.
@@ -47,6 +47,7 @@ Required env flags:
   PORTFOLIO_ANALYZER_EXTERNAL_SOURCE_MARKET_DATA=enabled for --source market-data
   PORTFOLIO_ANALYZER_EXTERNAL_SOURCE_PROFILE=enabled and ALPHA_VANTAGE_API_KEY for --source profile
   PORTFOLIO_ANALYZER_EXTERNAL_SOURCE_INSTITUTIONAL=enabled and ALPHA_VANTAGE_API_KEY for --source institutional
+  PORTFOLIO_ANALYZER_EXTERNAL_SOURCE_NEWS=enabled and ALPHA_VANTAGE_API_KEY for --source news
 
 This only enqueues a job. External provider calls happen later when you run npm run worker:external-research:once.`);
 }
@@ -89,14 +90,17 @@ function parsePositiveInteger(value: string | undefined, fallback: number) {
 
 function parseSource(
   value: string | undefined,
-): "market-data" | "profile" | "institutional" {
+): "market-data" | "profile" | "institutional" | "news" {
   const normalized = (value ?? "market-data").trim().toLowerCase();
   if (
     normalized !== "market-data" &&
     normalized !== "profile" &&
-    normalized !== "institutional"
+    normalized !== "institutional" &&
+    normalized !== "news"
   ) {
-    throw new Error("--source must be market-data, profile, or institutional.");
+    throw new Error(
+      "--source must be market-data, profile, institutional, or news.",
+    );
   }
   return normalized;
 }

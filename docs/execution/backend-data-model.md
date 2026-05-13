@@ -262,12 +262,27 @@ Planned controlled vocab lists:
   - `US Equity`
   - `International Equity`
   - `Fixed Income`
+  - `Commodity`
   - `Cash`
 
 Model note:
 - `Unknown securityType` or `Unknown exchange` mainly weakens display quality, market context, and future FX/exchange logic.
-- `Unknown assetClass` is materially more dangerous because recommendation v2 and portfolio health both rely on `assetClass` as a primary input.
-- for that reason, Phase 3 lets users repair `assetClass`, `securityType`, `exchange`, and `marketSector` from the holding detail page.
+- `Unknown assetClass` is materially more dangerous because recommendation,
+  portfolio health, and Security Detail fit all rely on economic exposure as a
+  primary input.
+- `assetClass` remains the raw/listing-era fallback, but current backend logic
+  should call `SecurityExposureProfile` / `getHoldingEconomicAssetClass()` for
+  allocation, health, recommendation, and fit calculations. This separates:
+  - listing identity: `symbol + exchange + currency`, used for quote routing,
+    cache keys, provider identity, and display.
+  - economic exposure: asset class, region, sector, and themes, used for
+    portfolio allocation, guardrails, and user-facing fit analysis.
+- CAD-listed US ETF/CDR wrappers such as ZQQ/VFV may remain CAD/TSX listings
+  while being counted as US Equity exposure. CGL.C/gold instruments should be
+  counted as Commodity / Precious Metals exposure, not Canadian Equity, unless a
+  higher-confidence manual/provider profile says otherwise.
+- for that reason, Phase 3 lets users repair `assetClass`, `securityType`,
+  `exchange`, and `marketSector` from the holding detail page.
 - exchange repair also controls quote routing. A CAD CDR should be marked as a Canadian exchange/listing rather than relying on the company name or bare ticker symbol.
 
 ### Phase 4: real historical performance

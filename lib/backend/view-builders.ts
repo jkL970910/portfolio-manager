@@ -42,6 +42,10 @@ import {
 import { formatMoney, roundAmount } from "@/lib/money/display";
 import type { DisplayLanguage } from "@/lib/i18n/ui";
 import { pick } from "@/lib/i18n/ui";
+import {
+  getHoldingEconomicAssetClass,
+  getHoldingExposureProfile,
+} from "@/lib/backend/security-economic-exposure";
 
 const MONTH_LABELS_EN = ["Oct", "Nov", "Dec", "Jan", "Feb", "Mar"];
 const MONTH_LABELS_ZH = ["10月", "11月", "12月", "1月", "2月", "3月"];
@@ -400,7 +404,7 @@ function getCurrentAllocation(holdings: HoldingPosition[]) {
   }
   const byAssetClass = groupBy(
     holdings,
-    (holding) => holding.assetClass,
+    (holding) => getHoldingEconomicAssetClass(holding),
     (holding) => holding.marketValueCad,
   );
   const allocation = new Map<string, number>();
@@ -2476,7 +2480,8 @@ export function buildPortfolioData(args: {
     ...groupBy(
       holdings,
       (holding) =>
-        holding.sector === "Multi-sector" ? holding.assetClass : holding.sector,
+        getHoldingExposureProfile(holding).primarySector ??
+        getHoldingEconomicAssetClass(holding),
       (holding) => holding.marketValueCad,
     ).entries(),
   ].sort((left, right) => right[1] - left[1]);
@@ -2547,7 +2552,7 @@ export function buildPortfolioData(args: {
   const assetClassDrilldown = [...assetClassIds]
     .map((assetClass) => {
       const classHoldings = holdings
-        .filter((holding) => holding.assetClass === assetClass)
+        .filter((holding) => getHoldingEconomicAssetClass(holding) === assetClass)
         .sort((left, right) => right.marketValueCad - left.marketValueCad);
       const classValueCad = sum(
         classHoldings.map((holding) => holding.marketValueCad),
@@ -2899,8 +2904,9 @@ export function buildPortfolioData(args: {
           id: holding.id,
           symbol: holding.symbol,
           name: holding.name,
-          assetClass: holding.assetClass,
-          sector: holding.sector,
+          assetClass: getHoldingEconomicAssetClass(holding),
+          sector:
+            getHoldingExposureProfile(holding).primarySector ?? holding.sector,
           accountId: holding.accountId,
           accountType:
             accounts.find((account) => account.id === holding.accountId)
@@ -3033,7 +3039,7 @@ export function buildPortfolioAccountDetailData(args: {
   const allocation = [
     ...groupBy(
       rawHoldings,
-      (holding) => holding.assetClass,
+      (holding) => getHoldingEconomicAssetClass(holding),
       (holding) => holding.marketValueCad,
     ).entries(),
   ]
@@ -3601,11 +3607,17 @@ export function buildPortfolioSecurityDetailData(args: {
     .filter((value): value is string => Boolean(value))
     .sort()
     .at(-1);
+  const referenceExposure = referenceHolding
+    ? getHoldingExposureProfile(referenceHolding)
+    : null;
+  const referenceEconomicAssetClass =
+    referenceExposure?.primaryAssetClass ?? null;
+  const referenceEconomicSector = referenceExposure?.primarySector ?? null;
   const assetClassTargetPct = referenceHolding
-    ? (getTargetAllocation(profile).get(referenceHolding.assetClass) ?? 0)
+    ? (getTargetAllocation(profile).get(referenceEconomicAssetClass ?? "") ?? 0)
     : 0;
   const assetClassCurrentPct = referenceHolding
-    ? (getCurrentAllocation(holdings).get(referenceHolding.assetClass) ?? 0)
+    ? (getCurrentAllocation(holdings).get(referenceEconomicAssetClass ?? "") ?? 0)
     : 0;
   const totalQuantity = sum(
     matchingHoldings
@@ -3685,6 +3697,16 @@ export function buildPortfolioSecurityDetailData(args: {
     const accountTotalCad = sum(
       holdings
         .filter((holding) => holding.accountId === accountId)
+        .map((holding) => holding.marketValueCad),
+    );
+    const accountAssetClassTotalCad = sum(
+      holdings
+        .filter(
+          (holding) =>
+            holding.accountId === accountId &&
+            getHoldingEconomicAssetClass(holding) ===
+              referenceEconomicAssetClass,
+        )
         .map((holding) => holding.marketValueCad),
     );
     const accountValueCad = sum(
@@ -3773,6 +3795,17 @@ export function buildPortfolioSecurityDetailData(args: {
         accountTotalCad > 0
           ? formatCompactPercent((accountValueCad / accountTotalCad) * 100, 1)
           : "0%",
+      accountAssetClassAllocation:
+        accountTotalCad > 0
+          ? formatCompactPercent(
+              (accountAssetClassTotalCad / accountTotalCad) * 100,
+              1,
+            )
+          : "0%",
+      accountAssetClassAllocationPct:
+        accountTotalCad > 0
+          ? round((accountAssetClassTotalCad / accountTotalCad) * 100, 1)
+          : 0,
       positionShare:
         totalValueCad > 0
           ? formatCompactPercent((accountValueCad / totalValueCad) * 100, 1)
@@ -3905,10 +3938,13 @@ export function buildPortfolioSecurityDetailData(args: {
       symbol: normalizedSymbol,
       name: referenceHolding?.name ?? normalizedSymbol,
       assetClass: referenceHolding
-        ? getAssetClassLabel(referenceHolding.assetClass, language)
+        ? getAssetClassLabel(
+            referenceEconomicAssetClass ?? referenceHolding.assetClass,
+            language,
+          )
         : pick(language, "未知资产类别", "Unknown sleeve"),
       sector: referenceHolding
-        ? getSectorLabel(referenceHolding.sector, language)
+        ? getSectorLabel(referenceEconomicSector ?? referenceHolding.sector, language)
         : pick(language, "未知行业", "Unknown sector"),
       currency: referenceHolding?.currency ?? "CAD",
       securityType: pick(language, "正在识别", "Resolving"),
@@ -4030,7 +4066,10 @@ export function buildPortfolioSecurityDetailData(args: {
     },
     analysis: {
       assetClassLabel: referenceHolding
-        ? getAssetClassLabel(referenceHolding.assetClass, language)
+        ? getAssetClassLabel(
+            referenceEconomicAssetClass ?? referenceHolding.assetClass,
+            language,
+          )
         : pick(language, "未知资产类别", "Unknown sleeve"),
       targetAllocationPct: round(assetClassTargetPct, 1),
       currentAllocationPct: round(assetClassCurrentPct, 1),
@@ -4052,8 +4091,8 @@ export function buildPortfolioSecurityDetailData(args: {
       summary: referenceHolding
         ? pick(
             language,
-            `${normalizedSymbol} 属于 ${getAssetClassLabel(referenceHolding.assetClass, language)}，这一类资产目标是 ${formatCompactPercent(assetClassTargetPct, 1)}，当前是 ${formatCompactPercent(assetClassCurrentPct, 1)}。`,
-            `${normalizedSymbol} sits in ${getAssetClassLabel(referenceHolding.assetClass, language)}. The target is ${formatCompactPercent(assetClassTargetPct, 1)} and the current allocation is ${formatCompactPercent(assetClassCurrentPct, 1)}.`,
+            `${normalizedSymbol} 的真实暴露按 ${getAssetClassLabel(referenceEconomicAssetClass ?? referenceHolding.assetClass, language)} 计算，目标是 ${formatCompactPercent(assetClassTargetPct, 1)}，当前是 ${formatCompactPercent(assetClassCurrentPct, 1)}。${referenceExposure?.explanation.zh ?? ""}`,
+            `${normalizedSymbol}'s economic exposure is treated as ${getAssetClassLabel(referenceEconomicAssetClass ?? referenceHolding.assetClass, language)}. The target is ${formatCompactPercent(assetClassTargetPct, 1)} and the current allocation is ${formatCompactPercent(assetClassCurrentPct, 1)}. ${referenceExposure?.explanation.en ?? ""}`,
           )
         : pick(
             language,

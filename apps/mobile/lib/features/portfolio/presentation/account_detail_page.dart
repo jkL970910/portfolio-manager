@@ -161,7 +161,14 @@ class _AccountDetailPageState extends State<AccountDetailPage> {
   }
 
   void _openHoldingDetail(MobileHoldingCard holding) {
-    context.push(MobileRoutes.holdingDetail(holding.id));
+    context.push(
+      MobileRoutes.securityDetail(
+        symbol: holding.symbol,
+        securityId: holding.securityId.isEmpty ? null : holding.securityId,
+        exchange: holding.exchange.isEmpty ? null : holding.exchange,
+        currency: holding.currency.isEmpty ? null : holding.currency,
+      ),
+    );
   }
 
   void _openHealthScore(MobileAccountDetailSnapshot data) {

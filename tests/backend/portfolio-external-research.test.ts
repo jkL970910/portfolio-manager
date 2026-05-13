@@ -21,6 +21,7 @@ function clearExternalResearchEnv() {
   delete process.env.PORTFOLIO_ANALYZER_EXTERNAL_SOURCE_MARKET_DATA;
   delete process.env.PORTFOLIO_ANALYZER_EXTERNAL_SOURCE_PROFILE;
   delete process.env.PORTFOLIO_ANALYZER_EXTERNAL_SOURCE_INSTITUTIONAL;
+  delete process.env.PORTFOLIO_ANALYZER_EXTERNAL_SOURCE_NEWS;
   delete process.env.PORTFOLIO_ANALYZER_EXTERNAL_DAILY_RUN_LIMIT;
   delete process.env.PORTFOLIO_ANALYZER_EXTERNAL_MAX_SYMBOLS_PER_RUN;
   delete process.env.ALPHA_VANTAGE_API_KEY;
@@ -273,6 +274,92 @@ test("institutional provider skips ETF and fund securities before external API c
   );
 
   clearExternalResearchEnv();
+});
+
+test("news provider maps Alpha Vantage NEWS_SENTIMENT into cached news documents", async () => {
+  process.env.PORTFOLIO_ANALYZER_EXTERNAL_RESEARCH = "enabled";
+  process.env.PORTFOLIO_ANALYZER_EXTERNAL_WORKER = "enabled";
+  process.env.PORTFOLIO_ANALYZER_EXTERNAL_PROVIDERS = "enabled";
+  process.env.PORTFOLIO_ANALYZER_EXTERNAL_ADAPTERS = "enabled";
+  process.env.PORTFOLIO_ANALYZER_EXTERNAL_SOURCE_NEWS = "enabled";
+  process.env.ALPHA_VANTAGE_API_KEY = "test-alpha-vantage-key";
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (input) => {
+    const url = String(input);
+    assert.match(url, /NEWS_SENTIMENT/);
+    assert.match(url, /tickers=AMZN/);
+    return new Response(
+      JSON.stringify({
+        feed: [
+          {
+            title: "Amazon announces new AI infrastructure plan",
+            url: "https://example.com/amzn-ai",
+            time_published: "20260510T143000",
+            source: "Example Markets",
+            source_domain: "example.com",
+            summary:
+              "Amazon announced a new AI infrastructure plan that could affect capital spending and cloud competition.",
+            overall_sentiment_score: "0.18",
+            overall_sentiment_label: "Somewhat-Bullish",
+            ticker_sentiment: [
+              {
+                ticker: "AMZN",
+                relevance_score: "0.91",
+                ticker_sentiment_score: "0.22",
+                ticker_sentiment_label: "Somewhat-Bullish",
+              },
+            ],
+            topics: [
+              { topic: "technology", relevance_score: "0.8" },
+              { topic: "financial_markets", relevance_score: "0.5" },
+            ],
+          },
+        ],
+      }),
+      { status: 200 },
+    );
+  };
+
+  try {
+    const enabledSources = getEnabledExternalResearchSources(
+      getExternalResearchPolicy(),
+    );
+    const result = await fetchCachedExternalResearch({
+      userId: "user_news",
+      request: {
+        scope: "security",
+        mode: "quick",
+        security: {
+          securityId: "00000000-0000-0000-0000-000000000111",
+          symbol: "AMZN",
+          exchange: "NASDAQ",
+          currency: "USD",
+          name: "Amazon.com Inc.",
+        },
+        cacheStrategy: "prefer-cache",
+        maxCacheAgeSeconds: 21600,
+        includeExternalResearch: true,
+      },
+      targetKey: "security:AMZN:NASDAQ:USD",
+      allowedSources: enabledSources,
+      now: new Date("2026-05-10T15:00:00.000Z"),
+    });
+
+    assert.equal(result.sourceMode, "cached-external");
+    assert.equal(result.sources[0]?.sourceType, "news");
+    assert.equal(result.documents?.[0]?.sourceType, "news");
+    assert.equal(result.documents?.[0]?.providerId, "alpha-vantage-news");
+    assert.equal(result.documents?.[0]?.security?.symbol, "AMZN");
+    assert.equal(result.documents?.[0]?.sentiment, "positive");
+    assert.ok(
+      result.summaryPoints.some((point) =>
+        point.includes("Amazon announces new AI infrastructure plan"),
+      ),
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
+    clearExternalResearchEnv();
+  }
 });
 
 test("external research request is rejected before live adapters exist", () => {

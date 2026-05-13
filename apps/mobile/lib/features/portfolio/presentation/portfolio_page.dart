@@ -230,7 +230,6 @@ class _PageHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return LooHeroHeader(
-      eyebrow: "Portfolio",
       title: title,
       subtitle: subtitle,
     );

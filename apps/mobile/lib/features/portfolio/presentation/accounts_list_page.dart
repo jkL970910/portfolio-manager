@@ -53,7 +53,6 @@ class _AccountsListPageState extends State<AccountsListPage> {
               slivers: [
                 SliverToBoxAdapter(
                   child: LooHeroHeader(
-                    eyebrow: "Accounts",
                     title: "账户列表",
                     subtitle: snapshot.hasData
                         ? "共 ${snapshot.data!.accounts.length} 个账户 · 点击查看账户详情"

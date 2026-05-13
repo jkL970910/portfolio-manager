@@ -73,7 +73,6 @@ class _HoldingsListPageState extends State<HoldingsListPage> {
                               context.push(MobileRoutes.portfolioHealth),
                         )
                       : const LooHeroHeader(
-                          eyebrow: "Holdings",
                           title: "持仓列表",
                           subtitle: "正在整理持仓账本...",
                         ),
@@ -144,34 +143,58 @@ class _HoldingsHero extends StatelessWidget {
   Widget build(BuildContext context) {
     final tokens = context.looTokens;
     final totalGainLoss = _sumGainLoss(snapshot.accounts);
-    return LooHeroHeader(
-      eyebrow: "Holdings",
-      title: "持仓列表",
-      subtitle: "点击标的查看跨账户汇总仓位",
-      trailing: SizedBox(
-        width: 160,
-        child: Wrap(
-          spacing: tokens.gapSm,
-          runSpacing: tokens.gapSm,
-          alignment: WrapAlignment.end,
+    return Padding(
+      padding: EdgeInsets.fromLTRB(
+        tokens.gapLg,
+        tokens.gapLg,
+        tokens.gapLg,
+        tokens.gapMd,
+      ),
+      child: LooGlassCard(
+        isHero: true,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _SummaryMetric(
-              label: "标的",
-              value: "${snapshot.securityHoldings.length}",
+            Text("持仓列表", style: Theme.of(context).textTheme.headlineMedium),
+            SizedBox(height: tokens.gapXs),
+            Text(
+              "点击标的查看跨账户汇总仓位",
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: tokens.mutedText,
+                  ),
             ),
-            _SummaryMetric(
-              label: "账户",
-              value: "${snapshot.accounts.length}",
-              onTap: onOpenAccounts,
-            ),
-            _SummaryMetric(
-              label: "健康",
-              value: snapshot.healthScore,
-              onTap: onOpenHealth,
-            ),
+            SizedBox(height: tokens.gapLg),
             _SummaryMetric(
               label: "总盈亏",
               value: totalGainLoss,
+              expandedValue: true,
+            ),
+            SizedBox(height: tokens.gapSm),
+            Row(
+              children: [
+                Expanded(
+                  child: _SummaryMetric(
+                    label: "标的",
+                    value: "${snapshot.securityHoldings.length}",
+                  ),
+                ),
+                SizedBox(width: tokens.gapSm),
+                Expanded(
+                  child: _SummaryMetric(
+                    label: "账户",
+                    value: "${snapshot.accounts.length}",
+                    onTap: onOpenAccounts,
+                  ),
+                ),
+                SizedBox(width: tokens.gapSm),
+                Expanded(
+                  child: _SummaryMetric(
+                    label: "健康",
+                    value: snapshot.healthScore,
+                    onTap: onOpenHealth,
+                  ),
+                ),
+              ],
             ),
           ],
         ),
@@ -184,11 +207,13 @@ class _SummaryMetric extends StatelessWidget {
   const _SummaryMetric({
     required this.label,
     required this.value,
+    this.expandedValue = false,
     this.onTap,
   });
 
   final String label;
   final String value;
+  final bool expandedValue;
   final VoidCallback? onTap;
 
   @override
@@ -204,40 +229,44 @@ class _SummaryMetric extends StatelessWidget {
       ),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-        child: SizedBox(
-          width: 56,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      label,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: tokens.mutedText,
-                          ),
-                    ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: tokens.mutedText,
+                        ),
                   ),
-                  if (onTap != null)
-                    Icon(
-                      Icons.chevron_right_rounded,
-                      size: 14,
-                      color: tokens.accent,
-                    ),
-                ],
+                ),
+                if (onTap != null)
+                  Icon(
+                    Icons.chevron_right_rounded,
+                    size: 14,
+                    color: tokens.accent,
+                  ),
+              ],
+            ),
+            const SizedBox(height: 4),
+            Text(
+              value,
+              maxLines: expandedValue ? 2 : 1,
+              overflow: TextOverflow.ellipsis,
+              style: (expandedValue
+                      ? Theme.of(context).textTheme.titleLarge
+                      : Theme.of(context).textTheme.titleMedium)
+                  ?.copyWith(
+                color: value.trim().startsWith("-")
+                    ? Theme.of(context).colorScheme.error
+                    : null,
               ),
-              const SizedBox(height: 4),
-              Text(
-                value,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: Theme.of(context).textTheme.titleMedium,
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
@@ -258,6 +287,7 @@ class _SummaryMetric extends StatelessWidget {
 
 String _sumGainLoss(List<MobileAccountCard> accounts) {
   var total = 0.0;
+  var totalValue = 0.0;
   var hasValue = false;
   for (final account in accounts) {
     final parsed = _parseMoney(account.gainLoss);
@@ -265,6 +295,7 @@ String _sumGainLoss(List<MobileAccountCard> accounts) {
       continue;
     }
     total += parsed;
+    totalValue += _parseMoney(account.value) ?? 0;
     hasValue = true;
   }
   if (!hasValue) {
@@ -275,10 +306,24 @@ String _sumGainLoss(List<MobileAccountCard> accounts) {
       : total < 0
           ? "-"
           : "";
-  final compact = total.abs() >= 1000
-      ? "${(total.abs() / 1000).toStringAsFixed(1)}k"
-      : total.abs().toStringAsFixed(0);
-  return "$sign\$$compact";
+  final formattedAmount = _formatMoney(total.abs());
+  final costBasis = totalValue - total;
+  final pct = costBasis > 0 ? total / costBasis * 100 : null;
+  final pctLabel = pct == null ? "" : " · $sign${pct.abs().toStringAsFixed(1)}%";
+  return "$sign\$$formattedAmount$pctLabel";
+}
+
+String _formatMoney(double value) {
+  final fixed = value.toStringAsFixed(0);
+  final buffer = StringBuffer();
+  for (var index = 0; index < fixed.length; index += 1) {
+    final remaining = fixed.length - index;
+    buffer.write(fixed[index]);
+    if (remaining > 1 && remaining % 3 == 1) {
+      buffer.write(",");
+    }
+  }
+  return buffer.toString();
 }
 
 double? _parseMoney(String value) {

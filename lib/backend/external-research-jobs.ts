@@ -683,11 +683,15 @@ export async function enqueueDailyOverviewExternalResearchJobs(
           user.id,
           {
             now,
-            limit: 1,
+            limit: 10,
             securityId,
           },
         );
-      if (freshDocuments.length > 0) {
+      const hasFreshForSource =
+        sourceId === "news"
+          ? freshDocuments.some((document) => document.sourceType === "news")
+          : freshDocuments.length > 0;
+      if (hasFreshForSource) {
         result.skippedFresh += 1;
         continue;
       }
