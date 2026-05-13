@@ -215,7 +215,7 @@ class _DailyIntelligenceCarouselPager extends StatelessWidget {
     final activeIndex = page.clamp(0, items.length - 1);
     final activeItem = items[activeIndex];
     final activeExpanded = expandedItemIds.contains(activeItem.id);
-    final pageHeight = activeExpanded ? 430.0 : 164.0;
+    final pageHeight = activeExpanded ? 430.0 : 244.0;
     return Column(
       children: [
         AnimatedSize(
@@ -381,25 +381,43 @@ class _DailyIntelligenceDropdownTile extends StatelessWidget {
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: theme.colorScheme.outlineVariant),
       ),
-      child: Theme(
-        data: theme.copyWith(dividerColor: Colors.transparent),
-        child: ExpansionTile(
-          key: PageStorageKey<String>("daily-intelligence-${item.id}"),
-          initiallyExpanded: initiallyExpanded,
-          onExpansionChanged: onExpansionChanged,
-          tilePadding: const EdgeInsets.fromLTRB(12, 6, 10, 6),
-          childrenPadding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-          title: Text(
-            item.title,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            style: theme.textTheme.titleSmall?.copyWith(
-              fontWeight: FontWeight.w800,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            InkWell(
+              borderRadius: BorderRadius.circular(12),
+              onTap: () => onExpansionChanged(!initiallyExpanded),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: Text(
+                      item.title,
+                      maxLines: initiallyExpanded ? 3 : 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: (initiallyExpanded
+                              ? theme.textTheme.titleMedium
+                              : theme.textTheme.titleLarge)
+                          ?.copyWith(
+                        fontWeight: FontWeight.w900,
+                        height: 1.12,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Icon(
+                    initiallyExpanded
+                        ? Icons.keyboard_arrow_up
+                        : Icons.keyboard_arrow_down,
+                    color: tokens.mutedText,
+                  ),
+                ],
+              ),
             ),
-          ),
-          subtitle: Padding(
-            padding: const EdgeInsets.only(top: 6),
-            child: Row(
+            const SizedBox(height: 10),
+            Row(
               children: [
                 _DailyTypePill(item.displayTypeLabel),
                 const SizedBox(width: 8),
@@ -418,59 +436,151 @@ class _DailyIntelligenceDropdownTile extends StatelessWidget {
                 ),
               ],
             ),
-          ),
-          children: [
-            Align(
-              alignment: Alignment.centerLeft,
-              child: Text(item.summary, style: theme.textTheme.bodyMedium),
+            const SizedBox(height: 10),
+            Text(
+              item.summary,
+              maxLines: initiallyExpanded ? 5 : 2,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                height: 1.35,
+              ),
             ),
+            if (!initiallyExpanded) ...[
+              const SizedBox(height: 12),
+              _DailyKeywordWrap(item),
+            ],
             if (item.reason.isNotEmpty) ...[
               const SizedBox(height: 8),
-              _DailyDetailNote(label: "为什么展示", value: item.reason),
+              if (initiallyExpanded)
+                _DailyDetailNote(label: "为什么展示", value: item.reason),
             ],
-            if (item.keyPoints.isNotEmpty) ...[
-              const SizedBox(height: 8),
-              ...item.keyPoints.take(4).map(
-                    (point) => _DailyBullet(point),
-                  ),
-            ],
-            if (item.visibleRiskFlags.isNotEmpty) ...[
-              const SizedBox(height: 8),
-              ...item.visibleRiskFlags.take(2).map(
-                    (risk) => _DailyBullet(
-                      "注意：$risk",
-                      color: theme.colorScheme.error,
+            if (initiallyExpanded) ...[
+              if (item.keyPoints.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                ...item.keyPoints.take(4).map(
+                      (point) => _DailyBullet(point),
                     ),
-                  ),
-            ],
-            const SizedBox(height: 10),
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    "来源：${item.primarySourceLabel}",
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: tokens.mutedText,
-                    ),
-                  ),
-                ),
-                if (item.primarySourceUrl.isNotEmpty)
-                  TextButton.icon(
-                    onPressed: () => openExternalLink(item.primarySourceUrl),
-                    icon: const Icon(Icons.open_in_new, size: 16),
-                    label: const Text("原文"),
-                  ),
-                if (onViewSecurity != null)
-                  TextButton.icon(
-                    onPressed: () => onViewSecurity!(item),
-                    icon: const Icon(Icons.chevron_right, size: 18),
-                    label: const Text("标的"),
-                  ),
               ],
-            ),
+              if (item.visibleRiskFlags.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                ...item.visibleRiskFlags.take(2).map(
+                      (risk) => _DailyBullet(
+                        "注意：$risk",
+                        color: theme.colorScheme.error,
+                      ),
+                    ),
+              ],
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      "来源：${item.primarySourceLabel}",
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: tokens.mutedText,
+                      ),
+                    ),
+                  ),
+                  if (item.primarySourceUrl.isNotEmpty)
+                    TextButton.icon(
+                      onPressed: () => openExternalLink(item.primarySourceUrl),
+                      icon: const Icon(Icons.open_in_new, size: 16),
+                      label: const Text("原文"),
+                    ),
+                  if (onViewSecurity != null)
+                    TextButton.icon(
+                      onPressed: () => onViewSecurity!(item),
+                      icon: const Icon(Icons.chevron_right, size: 18),
+                      label: const Text("标的"),
+                    ),
+                ],
+              ),
+            ],
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _DailyKeywordWrap extends StatelessWidget {
+  const _DailyKeywordWrap(this.item);
+
+  final MobileDailyIntelligenceItem item;
+
+  @override
+  Widget build(BuildContext context) {
+    final candidates = <String>[
+      ...item.keyPoints,
+      item.reason,
+      item.relevanceLabel,
+      item.confidenceLabel,
+    ]
+        .map(_normalizeKeyword)
+        .where((value) => value.isNotEmpty)
+        .toSet()
+        .take(4)
+        .toList();
+    if (candidates.isEmpty) {
+      return const SizedBox.shrink();
+    }
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: [
+        for (final keyword in candidates) _DailyKeywordChip(keyword),
+      ],
+    );
+  }
+
+  static String _normalizeKeyword(String value) {
+    final trimmed = value.trim();
+    if (trimmed.isEmpty) {
+      return "";
+    }
+    final separators = ["：", ":", "。", ".", "，", ","];
+    var normalized = trimmed;
+    for (final separator in separators) {
+      final index = normalized.indexOf(separator);
+      if (index > 0) {
+        normalized = normalized.substring(0, index);
+        break;
+      }
+    }
+    normalized = normalized.replaceAll(RegExp(r"\s+"), " ").trim();
+    if (normalized.length > 18) {
+      normalized = "${normalized.substring(0, 18)}...";
+    }
+    return normalized;
+  }
+}
+
+class _DailyKeywordChip extends StatelessWidget {
+  const _DailyKeywordChip(this.label);
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: theme.colorScheme.primary.withValues(alpha: 0.13),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(
+          color: theme.colorScheme.primary.withValues(alpha: 0.34),
+        ),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        child: Text(
+          label,
+          style: theme.textTheme.labelMedium?.copyWith(
+            color: theme.colorScheme.primary,
+            fontWeight: FontWeight.w800,
+          ),
         ),
       ),
     );
