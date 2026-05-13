@@ -14,6 +14,33 @@ enum LooThemeMode {
   }
 }
 
+extension LooThemeModeX on LooThemeMode {
+  String get storageValue {
+    return switch (this) {
+      LooThemeMode.system => "system",
+      LooThemeMode.light => "light",
+      LooThemeMode.dark => "dark",
+    };
+  }
+
+  String get label {
+    return switch (this) {
+      LooThemeMode.system => "跟随系统",
+      LooThemeMode.light => "浅色",
+      LooThemeMode.dark => "深色",
+    };
+  }
+
+  static LooThemeMode fromStorageValue(String? value) {
+    return switch (value) {
+      "system" => LooThemeMode.system,
+      "light" => LooThemeMode.light,
+      "dark" => LooThemeMode.dark,
+      _ => LooThemeMode.dark,
+    };
+  }
+}
+
 @immutable
 class LooThemeTokens extends ThemeExtension<LooThemeTokens> {
   const LooThemeTokens({

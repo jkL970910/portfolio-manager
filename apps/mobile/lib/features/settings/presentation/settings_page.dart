@@ -2,6 +2,7 @@ import "package:flutter/material.dart";
 
 import "../../../core/api/loo_api_client.dart";
 import "../../../core/presentation/loo_components.dart";
+import "../../../core/theme/loo_theme.dart";
 import "../data/market_data_refresh_models.dart";
 import "investment_preferences_card.dart";
 
@@ -10,7 +11,9 @@ class SettingsPage extends StatefulWidget {
     required this.apiClient,
     required this.viewerName,
     required this.baseCurrency,
+    required this.themeMode,
     required this.onDisplayCurrencyChanged,
+    required this.onThemeModeChanged,
     required this.onLogout,
     super.key,
   });
@@ -18,7 +21,9 @@ class SettingsPage extends StatefulWidget {
   final LooApiClient apiClient;
   final String viewerName;
   final String baseCurrency;
+  final LooThemeMode themeMode;
   final Future<void> Function(String currency) onDisplayCurrencyChanged;
+  final Future<void> Function(LooThemeMode mode) onThemeModeChanged;
   final VoidCallback onLogout;
 
   @override
@@ -27,12 +32,19 @@ class SettingsPage extends StatefulWidget {
 
 class _SettingsPageState extends State<SettingsPage> {
   late var _currency = widget.baseCurrency;
+  late var _themeMode = widget.themeMode;
   var _savingCurrency = false;
   var _refreshingQuotes = false;
   var _refreshingFx = false;
   String? _refreshResult;
   String? _fxRefreshResult;
   String? _error;
+
+  Future<void> _changeThemeMode(LooThemeMode mode) async {
+    if (mode == _themeMode) return;
+    setState(() => _themeMode = mode);
+    await widget.onThemeModeChanged(mode);
+  }
 
   Future<void> _changeCurrency(String currency) async {
     if (currency == _currency || _savingCurrency) {
@@ -161,6 +173,13 @@ class _SettingsPageState extends State<SettingsPage> {
             ),
           ),
           const SizedBox(height: 16),
+          _CitizenProfileCard(apiClient: widget.apiClient),
+          const SizedBox(height: 16),
+          _AppearanceModeCard(
+            selected: _themeMode,
+            onChanged: _changeThemeMode,
+          ),
+          const SizedBox(height: 16),
           Text("显示币种", style: Theme.of(context).textTheme.titleLarge),
           const SizedBox(height: 8),
           SegmentedButton<String>(
@@ -234,6 +253,289 @@ class _SettingsPageState extends State<SettingsPage> {
         ],
       ),
     );
+  }
+}
+
+class _AppearanceModeCard extends StatelessWidget {
+  const _AppearanceModeCard({
+    required this.selected,
+    required this.onChanged,
+  });
+
+  final LooThemeMode selected;
+  final ValueChanged<LooThemeMode> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.contrast_rounded),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    "外观模式",
+                    style: Theme.of(context).textTheme.titleLarge,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            SegmentedButton<LooThemeMode>(
+              segments: const [
+                ButtonSegment(
+                  value: LooThemeMode.system,
+                  label: Text("跟随系统"),
+                  icon: Icon(Icons.phone_iphone_rounded),
+                ),
+                ButtonSegment(
+                  value: LooThemeMode.dark,
+                  label: Text("深色"),
+                  icon: Icon(Icons.dark_mode_rounded),
+                ),
+                ButtonSegment(
+                  value: LooThemeMode.light,
+                  label: Text("浅色"),
+                  icon: Icon(Icons.light_mode_rounded),
+                ),
+              ],
+              selected: {selected},
+              onSelectionChanged: (value) => onChanged(value.first),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _CitizenProfileCard extends StatefulWidget {
+  const _CitizenProfileCard({required this.apiClient});
+
+  final LooApiClient apiClient;
+
+  @override
+  State<_CitizenProfileCard> createState() => _CitizenProfileCardState();
+}
+
+class _CitizenProfileCardState extends State<_CitizenProfileCard> {
+  late Future<_CitizenProfileView> _profile = _load();
+
+  Future<_CitizenProfileView> _load() async {
+    final response = await widget.apiClient.getCitizenProfile();
+    final data = response["data"];
+    final payload =
+        data is Map<String, dynamic> ? data : const <String, dynamic>{};
+    final citizen = payload["citizen"];
+    if (citizen is! Map<String, dynamic>) {
+      throw const FormatException("缺少 Loo国身份资料。");
+    }
+    return _CitizenProfileView.fromJson(citizen);
+  }
+
+  void _refresh() {
+    setState(() => _profile = _load());
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = context.looTokens;
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: FutureBuilder<_CitizenProfileView>(
+          future: _profile,
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const LinearProgressIndicator();
+            }
+            if (snapshot.hasError) {
+              return ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.badge_outlined),
+                title: const Text("Loo皇身份"),
+                subtitle: Text(snapshot.error.toString()),
+                trailing: IconButton(
+                  onPressed: _refresh,
+                  icon: const Icon(Icons.refresh),
+                ),
+              );
+            }
+            final profile = snapshot.data!;
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(22),
+                      child: Image.asset(
+                        profile.avatarAsset,
+                        width: 78,
+                        height: 78,
+                        fit: BoxFit.cover,
+                      ),
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            profile.name,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: Theme.of(context).textTheme.titleLarge,
+                          ),
+                          const SizedBox(height: 6),
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
+                            children: [
+                              Chip(label: Text(profile.rankLabel)),
+                              Chip(label: Text(profile.addressLabel)),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                    IconButton(
+                      onPressed: _refresh,
+                      icon: const Icon(Icons.refresh),
+                      tooltip: "刷新身份",
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 14),
+                Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: tokens.accentSoft,
+                    borderRadius: BorderRadius.circular(tokens.radiusMd),
+                    border: Border.all(color: tokens.cardBorder),
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: _CitizenMetric(
+                          label: "公民编号",
+                          value: profile.idCode,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: _CitizenMetric(
+                          label: "财富快照",
+                          value: profile.wealthSnapshotLabel,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            );
+          },
+        ),
+      ),
+    );
+  }
+}
+
+class _CitizenMetric extends StatelessWidget {
+  const _CitizenMetric({
+    required this.label,
+    required this.value,
+  });
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: Theme.of(context).textTheme.labelSmall),
+        const SizedBox(height: 4),
+        Text(
+          value,
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+          style: Theme.of(context).textTheme.titleSmall,
+        ),
+      ],
+    );
+  }
+}
+
+class _CitizenProfileView {
+  const _CitizenProfileView({
+    required this.name,
+    required this.rankLabel,
+    required this.addressLabel,
+    required this.idCode,
+    required this.wealthSnapshotLabel,
+    required this.avatarAsset,
+  });
+
+  final String name;
+  final String rankLabel;
+  final String addressLabel;
+  final String idCode;
+  final String wealthSnapshotLabel;
+  final String avatarAsset;
+
+  factory _CitizenProfileView.fromJson(Map<String, dynamic> json) {
+    final rank = json["effectiveRank"] as String? ?? "citizen";
+    final address = json["effectiveAddressTier"] as String? ?? "city";
+    final avatar = json["avatarType"] as String? ?? "default";
+    final wealth = (json["wealthScoreSnapshotCad"] as num?)?.toDouble() ?? 0;
+    final wealthLabel = wealth
+        .toStringAsFixed(0)
+        .replaceAllMapped(RegExp(r"\B(?=(\d{3})+(?!\d))"), (match) => ",");
+    return _CitizenProfileView(
+      name: json["citizenName"] as String? ?? "Loo国居民",
+      rankLabel: _rankLabel(rank),
+      addressLabel: _addressLabel(address),
+      idCode: json["effectiveIdCode"] as String? ?? "LOO-未颁发",
+      wealthSnapshotLabel: "CAD $wealthLabel",
+      avatarAsset: _avatarAsset(avatar, rank),
+    );
+  }
+
+  static String _rankLabel(String value) {
+    return switch (value) {
+      "lowly-ox" => "低等牛",
+      "base-loo" => "原皮Loo",
+      "general" => "Loo皇大将军",
+      "emperor" => "Loo皇",
+      _ => "Loo国子民",
+    };
+  }
+
+  static String _addressLabel(String value) {
+    return switch (value) {
+      "cowshed" => "牛棚",
+      "suburbs" => "Loo国郊区",
+      "palace-gate" => "Loo皇殿前",
+      "bedchamber" => "Loo皇寝宫",
+      _ => "Loo国城内",
+    };
+  }
+
+  static String _avatarAsset(String avatar, String rank) {
+    if (rank == "emperor") return "assets/images/mascot/loo_king.jpg";
+    return switch (avatar) {
+      "male" => "assets/images/mascot/loo_male.jpg",
+      "female" => "assets/images/mascot/loo_female.jpg",
+      _ => "assets/images/mascot/citizen_default.jpg",
+    };
   }
 }
 

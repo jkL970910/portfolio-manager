@@ -6,10 +6,12 @@ import "../../../core/auth/mobile_auth_session.dart";
 class LoginPage extends StatefulWidget {
   const LoginPage({
     required this.onAuthenticated,
+    required this.onOpenRegister,
     super.key,
   });
 
   final ValueChanged<MobileAuthSession> onAuthenticated;
+  final VoidCallback onOpenRegister;
 
   @override
   State<LoginPage> createState() => _LoginPageState();
@@ -126,6 +128,11 @@ class _LoginPageState extends State<LoginPage> {
                                   child: CircularProgressIndicator(strokeWidth: 2),
                                 )
                               : const Text("召唤 Loo皇"),
+                        ),
+                        const SizedBox(height: 12),
+                        TextButton(
+                          onPressed: _submitting ? null : widget.onOpenRegister,
+                          child: const Text("还没有身份？创建 Loo国账号"),
                         ),
                       ],
                     ),

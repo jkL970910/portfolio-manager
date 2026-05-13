@@ -5,7 +5,9 @@ import "../core/api/loo_api_client.dart";
 import "../core/auth/mobile_auth_session.dart";
 import "../core/auth/mobile_auth_store.dart";
 import "../core/theme/loo_theme.dart";
+import "../core/theme/loo_theme_store.dart";
 import "../features/auth/presentation/login_page.dart";
+import "../features/auth/presentation/register_page.dart";
 import "../features/discover/presentation/discover_page.dart";
 import "../features/portfolio/presentation/account_detail_page.dart";
 import "../features/portfolio/presentation/accounts_list_page.dart";
@@ -38,6 +40,7 @@ class LooWealthApp extends StatefulWidget {
 
 class _LooWealthAppState extends State<LooWealthApp> {
   late final MobileAuthStore _authStore;
+  late final LooThemeStore _themeStore;
   late final GoRouter _router;
   final _navigatorKey = GlobalKey<NavigatorState>();
   final _ministerAnalysisAction =
@@ -47,6 +50,8 @@ class _LooWealthAppState extends State<LooWealthApp> {
   LooMinisterPageContext? _ministerContext;
   List<LooMinisterRecentSubject> _recentMinisterSubjects = const [];
   Future<String?>? _refreshInFlight;
+  var _themeMode = LooThemeMode.dark;
+  var _showRegister = false;
   var _loading = true;
 
   @override
@@ -59,8 +64,16 @@ class _LooWealthAppState extends State<LooWealthApp> {
   void initState() {
     super.initState();
     _authStore = widget._authStore ?? MobileAuthStore();
+    _themeStore = LooThemeStore();
     _router = _createRouter();
     _restoreSession();
+    _restoreThemeMode();
+  }
+
+  Future<void> _restoreThemeMode() async {
+    final mode = await _themeStore.load();
+    if (!mounted) return;
+    setState(() => _themeMode = mode);
   }
 
   Future<void> _restoreSession() async {
@@ -136,9 +149,16 @@ class _LooWealthAppState extends State<LooWealthApp> {
 
     setState(() {
       _session = session;
+      _showRegister = false;
       _ministerContext = null;
       _recentMinisterSubjects = const [];
     });
+  }
+
+  Future<void> _setThemeMode(LooThemeMode mode) async {
+    await _themeStore.save(mode);
+    if (!mounted) return;
+    setState(() => _themeMode = mode);
   }
 
   Future<void> _clearSession() async {
@@ -488,7 +508,9 @@ class _LooWealthAppState extends State<LooWealthApp> {
               apiClient: _currentApiClient,
               viewerName: _session?.viewerName ?? "Loo",
               baseCurrency: _session?.baseCurrency ?? "CAD",
+              themeMode: _themeMode,
               onDisplayCurrencyChanged: _setDisplayCurrency,
+              onThemeModeChanged: _setThemeMode,
               onLogout: _logout,
             ),
           ),
@@ -586,11 +608,23 @@ class _LooWealthAppState extends State<LooWealthApp> {
         debugShowCheckedModeBanner: false,
         theme: buildLooLightTheme(),
         darkTheme: buildLooDarkTheme(),
-        themeMode: LooThemeMode.dark.materialThemeMode,
+        themeMode: _themeMode.materialThemeMode,
         builder: appBuilder,
         home: _loading
             ? const _StartupScreen()
-            : LoginPage(onAuthenticated: _setSession),
+            : (_showRegister
+                ? RegisterPage(
+                    onAuthenticated: _setSession,
+                    onBackToLogin: () => setState(() {
+                      _showRegister = false;
+                    }),
+                  )
+                : LoginPage(
+                    onAuthenticated: _setSession,
+                    onOpenRegister: () => setState(() {
+                      _showRegister = true;
+                    }),
+                  )),
       );
     }
 
@@ -599,7 +633,7 @@ class _LooWealthAppState extends State<LooWealthApp> {
       debugShowCheckedModeBanner: false,
       theme: buildLooLightTheme(),
       darkTheme: buildLooDarkTheme(),
-      themeMode: LooThemeMode.dark.materialThemeMode,
+      themeMode: _themeMode.materialThemeMode,
       builder: appBuilder,
       routerConfig: _router,
     );

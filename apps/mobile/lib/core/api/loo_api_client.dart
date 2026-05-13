@@ -409,6 +409,33 @@ class LooApiClient {
     );
   }
 
+  Future<Map<String, dynamic>> register({
+    required String displayName,
+    required String email,
+    required String password,
+    required String gender,
+    required String birthDate,
+  }) {
+    return _postJson(
+      "/api/mobile/auth/register",
+      body: {
+        "displayName": displayName,
+        "email": email,
+        "password": password,
+        "gender": gender,
+        "birthDate": birthDate,
+        "acceptLooTerms": true,
+        "mode": "loo-zh",
+        "displayLanguage": "zh",
+      },
+      retryOnUnauthorized: false,
+    );
+  }
+
+  Future<Map<String, dynamic>> getCitizenProfile() {
+    return _getJson("/api/mobile/settings/citizen-profile");
+  }
+
   Future<Map<String, dynamic>> refreshSession(String refreshToken) {
     return _postJson(
       "/api/mobile/auth/refresh",
