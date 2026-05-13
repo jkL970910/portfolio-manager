@@ -1,5 +1,7 @@
 import "package:flutter/material.dart";
 
+import "../../../core/platform/external_link_stub.dart"
+    if (dart.library.html) "../../../core/platform/external_link_web.dart";
 import "../../../core/presentation/loo_components.dart";
 import "../../../core/theme/loo_theme.dart";
 import "../data/daily_intelligence_models.dart";
@@ -73,13 +75,10 @@ class DailyIntelligenceCard extends StatelessWidget {
                 detail: snapshot?.emptyDetail ?? "先在标的详情运行智能快扫，或手动刷新标的资料。",
               )
             else
-              ...items.take(3).map(
-                    (item) => _DailyIntelligenceTile(
-                      item,
-                      onViewSecurity:
-                          item.canOpenSecurity ? onViewSecurity : null,
-                    ),
-                  ),
+              _DailyIntelligenceDropdownList(
+                items: items,
+                onViewSecurity: onViewSecurity,
+              ),
           ],
         ),
       ),
@@ -166,143 +165,13 @@ class _DailyIntelligenceCarouselState
           )
         else
           LooGlassCard(
-            padding: const EdgeInsets.all(14),
-            child: Column(
-              children: [
-                SizedBox(
-                  height: 148,
-                  child: PageView.builder(
-                    controller: _controller,
-                    onPageChanged: (value) => setState(() => _page = value),
-                    itemCount: items.length,
-                    itemBuilder: (context, index) {
-                      final item = items[index];
-                      return _DailyIntelligenceCompactPage(
-                        item,
-                        onViewSecurity:
-                            item.canOpenSecurity ? widget.onViewSecurity : null,
-                      );
-                    },
-                  ),
-                ),
-                if (items.length > 1) ...[
-                  const SizedBox(height: 10),
-                  Center(
-                    child: _DailyCarouselDots(
-                      count: items.length,
-                      activeIndex: _page.clamp(0, items.length - 1),
-                    ),
-                  ),
-                ],
-              ],
+            padding: const EdgeInsets.fromLTRB(10, 6, 10, 10),
+            child: _DailyIntelligenceDropdownList(
+              items: items,
+              onViewSecurity: widget.onViewSecurity,
             ),
           ),
       ],
-    );
-  }
-}
-
-class _DailyIntelligenceCompactPage extends StatelessWidget {
-  const _DailyIntelligenceCompactPage(
-    this.item, {
-    required this.onViewSecurity,
-  });
-
-  final MobileDailyIntelligenceItem item;
-  final ValueChanged<MobileDailyIntelligenceItem>? onViewSecurity;
-
-  @override
-  Widget build(BuildContext context) {
-    final tokens = context.looTokens;
-    final theme = Theme.of(context);
-    final content = Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            _DailyTypePill(item.displayTypeLabel),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                item.compactMetaLabel,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: tokens.mutedText,
-                ),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 10),
-        Text(
-          item.title,
-          maxLines: 2,
-          overflow: TextOverflow.ellipsis,
-          style: theme.textTheme.titleMedium,
-        ),
-        const SizedBox(height: 8),
-        Expanded(
-          child: Text(
-            item.summary,
-            maxLines: 3,
-            overflow: TextOverflow.ellipsis,
-            style: theme.textTheme.bodySmall,
-          ),
-        ),
-        if (item.keyPoints.isNotEmpty)
-          Text(
-            item.keyPoints.first,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: tokens.accent,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-      ],
-    );
-
-    if (onViewSecurity == null) {
-      return content;
-    }
-
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: () => onViewSecurity!(item),
-      child: content,
-    );
-  }
-}
-
-class _DailyCarouselDots extends StatelessWidget {
-  const _DailyCarouselDots({
-    required this.count,
-    required this.activeIndex,
-  });
-
-  final int count;
-  final int activeIndex;
-
-  @override
-  Widget build(BuildContext context) {
-    final tokens = context.looTokens;
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: List.generate(count, (index) {
-        final isActive = index == activeIndex;
-        return AnimatedContainer(
-          duration: const Duration(milliseconds: 180),
-          curve: Curves.easeOut,
-          margin: const EdgeInsets.symmetric(horizontal: 4),
-          width: isActive ? 28 : 9,
-          height: 9,
-          decoration: BoxDecoration(
-            color: isActive ? tokens.accent : tokens.cardBorder,
-            borderRadius: BorderRadius.circular(999),
-          ),
-        );
-      }),
     );
   }
 }
@@ -366,117 +235,215 @@ class DailyIntelligenceSummaryCard extends StatelessWidget {
               detail: snapshot?.emptyDetail ?? "先在标的详情运行智能快扫，或手动刷新标的资料。",
             )
           else
-            ...items.take(2).map(
-                  (item) => _DailyIntelligenceTile(
-                    item,
-                    onViewSecurity:
-                        item.canOpenSecurity ? onViewSecurity : null,
-                  ),
-                ),
+            _DailyIntelligenceDropdownList(
+              items: items,
+              onViewSecurity: onViewSecurity,
+            ),
         ],
       ),
     );
   }
 }
 
-class _DailyIntelligenceTile extends StatelessWidget {
-  const _DailyIntelligenceTile(this.item, {required this.onViewSecurity});
+class _DailyIntelligenceDropdownList extends StatelessWidget {
+  const _DailyIntelligenceDropdownList({
+    required this.items,
+    required this.onViewSecurity,
+  });
+
+  final List<MobileDailyIntelligenceItem> items;
+  final ValueChanged<MobileDailyIntelligenceItem>? onViewSecurity;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        for (var index = 0; index < items.length; index++) ...[
+          _DailyIntelligenceDropdownTile(
+            items[index],
+            initiallyExpanded: index == 0,
+            onViewSecurity:
+                items[index].canOpenSecurity ? onViewSecurity : null,
+          ),
+          if (index != items.length - 1) const SizedBox(height: 8),
+        ],
+      ],
+    );
+  }
+}
+
+class _DailyIntelligenceDropdownTile extends StatelessWidget {
+  const _DailyIntelligenceDropdownTile(
+    this.item, {
+    required this.initiallyExpanded,
+    required this.onViewSecurity,
+  });
 
   final MobileDailyIntelligenceItem item;
+  final bool initiallyExpanded;
   final ValueChanged<MobileDailyIntelligenceItem>? onViewSecurity;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Padding(
-      padding: const EdgeInsets.only(top: 12),
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          color:
-              theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.42),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: theme.colorScheme.outlineVariant),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.all(12),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(item.title, style: theme.textTheme.titleMedium),
-              const SizedBox(height: 6),
-              Text(item.summary),
-              finalReason(item, theme),
-              const SizedBox(height: 10),
-              Row(
-                children: [
-                  _DailyTypePill(item.displayTypeLabel),
-                  if (item.compactMetaLabel.isNotEmpty) ...[
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        item.compactMetaLabel,
-                        style: theme.textTheme.bodySmall,
-                        overflow: TextOverflow.ellipsis,
-                      ),
+    final tokens = context.looTokens;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color:
+            theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.32),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: theme.colorScheme.outlineVariant),
+      ),
+      child: Theme(
+        data: theme.copyWith(dividerColor: Colors.transparent),
+        child: ExpansionTile(
+          initiallyExpanded: initiallyExpanded,
+          tilePadding: const EdgeInsets.fromLTRB(12, 6, 10, 6),
+          childrenPadding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+          title: Text(
+            item.title,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: theme.textTheme.titleSmall?.copyWith(
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          subtitle: Padding(
+            padding: const EdgeInsets.only(top: 6),
+            child: Row(
+              children: [
+                _DailyTypePill(item.displayTypeLabel),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    [
+                      item.primarySourceLabel,
+                      item.compactFreshnessLabel,
+                    ].where((value) => value.isNotEmpty).join(" · "),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: tokens.mutedText,
                     ),
-                  ],
-                ],
-              ),
-              if (item.keyPoints.isNotEmpty ||
-                  item.visibleRiskFlags.isNotEmpty) ...[
-                const SizedBox(height: 10),
-                ...item.keyPoints.take(2).map(
-                      (point) => Text(
-                        "· $point",
-                        style: theme.textTheme.bodySmall,
-                      ),
-                    ),
-                ...item.visibleRiskFlags.take(1).map(
-                      (risk) => Text(
-                        "注意：$risk",
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.colorScheme.error,
-                        ),
-                      ),
-                    ),
-              ],
-              if (item.sources.isNotEmpty) ...[
-                const SizedBox(height: 8),
-                Text(
-                  "来源：${item.sources.take(1).map((source) => source.label).join("；")}",
-                  style: theme.textTheme.bodySmall,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ],
-              if (onViewSecurity != null) ...[
-                const SizedBox(height: 10),
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: TextButton.icon(
-                    onPressed: () => onViewSecurity!(item),
-                    icon: const Icon(Icons.chevron_right),
-                    label: const Text("查看标的"),
                   ),
                 ),
               ],
+            ),
+          ),
+          children: [
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Text(item.summary, style: theme.textTheme.bodyMedium),
+            ),
+            if (item.reason.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              _DailyDetailNote(label: "为什么展示", value: item.reason),
+            ],
+            if (item.keyPoints.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              ...item.keyPoints.take(4).map(
+                    (point) => _DailyBullet(point),
+                  ),
+            ],
+            if (item.visibleRiskFlags.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              ...item.visibleRiskFlags.take(2).map(
+                    (risk) => _DailyBullet(
+                      "注意：$risk",
+                      color: theme.colorScheme.error,
+                    ),
+                  ),
+            ],
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    "来源：${item.primarySourceLabel}",
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: tokens.mutedText,
+                    ),
+                  ),
+                ),
+                if (item.primarySourceUrl.isNotEmpty)
+                  TextButton.icon(
+                    onPressed: () => openExternalLink(item.primarySourceUrl),
+                    icon: const Icon(Icons.open_in_new, size: 16),
+                    label: const Text("原文"),
+                  ),
+                if (onViewSecurity != null)
+                  TextButton.icon(
+                    onPressed: () => onViewSecurity!(item),
+                    icon: const Icon(Icons.chevron_right, size: 18),
+                    label: const Text("标的"),
+                  ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _DailyDetailNote extends StatelessWidget {
+  const _DailyDetailNote({required this.label, required this.value});
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surface.withValues(alpha: 0.38),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(10),
+        child: RichText(
+          text: TextSpan(
+            style: theme.textTheme.bodySmall,
+            children: [
+              TextSpan(
+                text: "$label：",
+                style: const TextStyle(fontWeight: FontWeight.w800),
+              ),
+              TextSpan(text: value),
             ],
           ),
         ),
       ),
     );
   }
+}
 
-  Widget finalReason(MobileDailyIntelligenceItem item, ThemeData theme) {
-    if (item.reason.isEmpty) {
-      return const SizedBox.shrink();
-    }
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const SizedBox(height: 6),
-        Text(item.reason, style: theme.textTheme.bodySmall),
-      ],
+class _DailyBullet extends StatelessWidget {
+  const _DailyBullet(this.text, {this.color});
+
+  final String text;
+  final Color? color;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.only(top: 4),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text("· ", style: theme.textTheme.bodySmall?.copyWith(color: color)),
+          Expanded(
+            child: Text(
+              text,
+              style: theme.textTheme.bodySmall?.copyWith(color: color),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

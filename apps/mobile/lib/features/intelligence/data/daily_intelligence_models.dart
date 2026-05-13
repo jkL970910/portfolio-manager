@@ -149,6 +149,22 @@ class MobileDailyIntelligenceItem {
     }).toList();
   }
 
+  String get primarySourceUrl {
+    for (final source in sources) {
+      if (source.url.isNotEmpty) {
+        return source.url;
+      }
+    }
+    return "";
+  }
+
+  String get primarySourceLabel {
+    if (sources.isEmpty) {
+      return sourceLabel;
+    }
+    return sources.first.label;
+  }
+
   factory MobileDailyIntelligenceItem.fromJson(Map<String, dynamic> json) {
     return MobileDailyIntelligenceItem(
       id: json["id"] as String? ?? "",
