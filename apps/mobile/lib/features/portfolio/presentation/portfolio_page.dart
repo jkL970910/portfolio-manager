@@ -168,6 +168,20 @@ class _PortfolioPageState extends State<PortfolioPage> {
                         _HoldingsSummaryEntryCard(
                           key: _holdingsKey,
                           holdings: snapshot.data!.securityHoldings,
+                          onOpenHolding: (holding) => context.push(
+                            MobileRoutes.securityDetail(
+                              symbol: holding.symbol,
+                              securityId: holding.securityId.isEmpty
+                                  ? null
+                                  : holding.securityId,
+                              exchange: holding.exchange.isEmpty
+                                  ? null
+                                  : holding.exchange,
+                              currency: holding.currency.isEmpty
+                                  ? null
+                                  : holding.currency,
+                            ),
+                          ),
                           onOpenHoldings: () => context.push(
                             MobileRoutes.portfolioHoldings,
                           ),
@@ -669,62 +683,222 @@ class _AccountsDropdownCardState extends State<_AccountsDropdownCard> {
   }
 }
 
-class _HoldingsSummaryEntryCard extends StatelessWidget {
+class _HoldingsSummaryEntryCard extends StatefulWidget {
   const _HoldingsSummaryEntryCard({
     required this.holdings,
+    required this.onOpenHolding,
     required this.onOpenHoldings,
     super.key,
   });
 
   final List<MobileHoldingCard> holdings;
+  final ValueChanged<MobileHoldingCard> onOpenHolding;
   final VoidCallback onOpenHoldings;
+
+  @override
+  State<_HoldingsSummaryEntryCard> createState() =>
+      _HoldingsSummaryEntryCardState();
+}
+
+class _HoldingsSummaryEntryCardState extends State<_HoldingsSummaryEntryCard> {
+  var _expanded = false;
 
   @override
   Widget build(BuildContext context) {
     final tokens = context.looTokens;
-    final topHolding = holdings.isEmpty ? null : holdings.first;
+    final topHolding = widget.holdings.isEmpty ? null : widget.holdings.first;
     final subtitle = topHolding == null
-        ? "查看全部持仓、账户归属、盈亏与仓位详情。"
-        : "最大仓位 ${topHolding.symbol} · ${topHolding.weight}";
+        ? "展开查看主要标的，或进入完整持仓列表。"
+        : "展开查看主要标的 · 最大仓位 ${topHolding.symbol} ${topHolding.weight}";
 
     return LooGlassCard(
-      onTap: onOpenHoldings,
       padding: EdgeInsets.all(tokens.gapMd),
-      child: Row(
-        children: [
-          const _EntryIcon(Icons.view_list_rounded),
-          SizedBox(width: tokens.gapMd),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text("持仓入口", style: Theme.of(context).textTheme.titleMedium),
-                SizedBox(height: tokens.gapXs),
-                Text(
-                  subtitle,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: tokens.mutedText,
+      child: AnimatedSize(
+        duration: const Duration(milliseconds: 180),
+        curve: Curves.easeOutCubic,
+        alignment: Alignment.topCenter,
+        child: Column(
+          children: [
+            InkWell(
+              borderRadius: BorderRadius.circular(tokens.radiusMd),
+              onTap: () => setState(() => _expanded = !_expanded),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 2),
+                child: Row(
+                  children: [
+                    const _EntryIcon(Icons.view_list_rounded),
+                    SizedBox(width: tokens.gapMd),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            "持仓总览",
+                            style: Theme.of(context).textTheme.titleMedium,
+                          ),
+                          SizedBox(height: tokens.gapXs),
+                          Text(
+                            subtitle,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style:
+                                Theme.of(context).textTheme.bodySmall?.copyWith(
+                                      color: tokens.mutedText,
+                                    ),
+                          ),
+                        ],
                       ),
+                    ),
+                    SizedBox(width: tokens.gapMd),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Text(
+                          "${widget.holdings.length} 个",
+                          style: Theme.of(context).textTheme.titleLarge,
+                        ),
+                        SizedBox(height: tokens.gapXs),
+                        AnimatedRotation(
+                          turns: _expanded ? 0.5 : 0,
+                          duration: const Duration(milliseconds: 180),
+                          curve: Curves.easeOutCubic,
+                          child: Icon(
+                            Icons.keyboard_arrow_down_rounded,
+                            color: tokens.mutedText,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
-              ],
+              ),
             ),
-          ),
-          SizedBox(width: tokens.gapMd),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Text("${holdings.length} 个",
-                  style: Theme.of(context).textTheme.titleLarge),
-              SizedBox(height: tokens.gapXs),
-              Icon(Icons.arrow_forward_rounded, color: tokens.mutedText),
+            if (_expanded) ...[
+              SizedBox(height: tokens.gapMd),
+              Divider(height: 1, color: tokens.cardBorder),
+              SizedBox(height: tokens.gapSm),
+              if (widget.holdings.isEmpty)
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    "还没有持仓。",
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: tokens.mutedText,
+                        ),
+                  ),
+                )
+              else
+                ...widget.holdings.take(5).map(
+                      (holding) => _CompactHoldingRow(
+                        holding: holding,
+                        onTap: () => widget.onOpenHolding(holding),
+                      ),
+                    ),
+              SizedBox(height: tokens.gapSm),
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton.icon(
+                  onPressed: widget.onOpenHoldings,
+                  icon: const Icon(Icons.arrow_forward_rounded, size: 16),
+                  label: const Text("完整持仓列表"),
+                ),
+              ),
             ],
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
+}
+
+class _CompactHoldingRow extends StatelessWidget {
+  const _CompactHoldingRow({required this.holding, required this.onTap});
+
+  final MobileHoldingCard holding;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = context.looTokens;
+    final subtitle = [
+      if (holding.accountCount.isNotEmpty) "${holding.accountCount} 个账户",
+      if (holding.weight.isNotEmpty) holding.weight,
+      if (holding.exchange.isNotEmpty || holding.currency.isNotEmpty)
+        [holding.exchange, holding.currency]
+            .where((item) => item.isNotEmpty)
+            .join(" · "),
+    ].where((item) => item.isNotEmpty).join(" · ");
+    return InkWell(
+      borderRadius: BorderRadius.circular(tokens.radiusMd),
+      onTap: onTap,
+      child: Padding(
+        padding: EdgeInsets.symmetric(vertical: tokens.gapSm),
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    _holdingTitle(holding),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.titleSmall,
+                  ),
+                  if (subtitle.isNotEmpty) ...[
+                    SizedBox(height: tokens.gapXs),
+                    Text(
+                      subtitle,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: tokens.mutedText,
+                          ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            SizedBox(width: tokens.gapMd),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Text(
+                  holding.value,
+                  style: Theme.of(context).textTheme.titleSmall,
+                ),
+                if (holding.gainLoss.isNotEmpty) ...[
+                  SizedBox(height: tokens.gapXs),
+                  Text(
+                    holding.gainLoss,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: holding.gainLoss.trim().startsWith("-")
+                              ? tokens.danger
+                              : tokens.success,
+                          fontWeight: FontWeight.w700,
+                        ),
+                  ),
+                ],
+              ],
+            ),
+            SizedBox(width: tokens.gapSm),
+            Icon(Icons.chevron_right_rounded, color: tokens.mutedText),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+String _holdingTitle(MobileHoldingCard holding) {
+  final symbol = holding.symbol.trim();
+  final name = holding.name.trim();
+  if (name.isEmpty ||
+      name == "--" ||
+      name.toUpperCase() == symbol.toUpperCase()) {
+    return symbol;
+  }
+  return "$symbol · $name";
 }
 
 class _CompactAccountRow extends StatelessWidget {

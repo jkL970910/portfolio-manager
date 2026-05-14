@@ -138,15 +138,6 @@ class _HoldingDetailPageState extends State<HoldingDetailPage> {
                     const SizedBox(height: 12),
                     _PortfolioRoleCard(data.portfolioRole),
                   ],
-                  const SizedBox(height: 12),
-                  _MarketDataCard(data.marketData),
-                  if (data.facts.isNotEmpty) ...[
-                    const SizedBox(height: 12),
-                    _CompactFactsCard(
-                      title: "账户内持仓档案",
-                      facts: data.facts,
-                    ),
-                  ],
                 ],
               ),
             ),
@@ -648,21 +639,10 @@ class _SummaryCard extends StatelessWidget {
           Text(data.value, style: theme.textTheme.displaySmall),
           SizedBox(height: tokens.gapSm),
           Text(
-            "这里只展示 ${data.accountName} 里的这笔仓位；跨账户总仓位请进入标的总览。",
+            "账户内成本、盈亏和占比；标的资料请进入标的总览。",
             style: theme.textTheme.bodyMedium?.copyWith(
               color: tokens.mutedText,
             ),
-          ),
-          SizedBox(height: tokens.gapSm),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              if (data.assetClass.isNotEmpty) _InfoPill(data.assetClass),
-              if (data.sector.isNotEmpty) _InfoPill(data.sector),
-              if (data.exchange.isNotEmpty) _InfoPill(data.exchange),
-              if (data.currency.isNotEmpty) _InfoPill(data.currency),
-            ],
           ),
           if (data.quantityLine.isNotEmpty) ...[
             SizedBox(height: tokens.gapMd),
@@ -757,27 +737,6 @@ class _MetricCard extends StatelessWidget {
   }
 }
 
-class _InfoPill extends StatelessWidget {
-  const _InfoPill(this.label);
-
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.38),
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: context.looTokens.cardBorder),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-        child: Text(label, style: Theme.of(context).textTheme.labelMedium),
-      ),
-    );
-  }
-}
-
 class _StatusPill extends StatelessWidget {
   const _StatusPill({required this.label, required this.color});
 
@@ -852,49 +811,6 @@ class _HoldingTrendCard extends StatelessWidget {
               ),
             )
             .toList(),
-      ),
-    );
-  }
-}
-
-class _MarketDataCard extends StatelessWidget {
-  const _MarketDataCard(this.marketData);
-
-  final MobileMarketData marketData;
-
-  @override
-  Widget build(BuildContext context) {
-    return LooGlassCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const _SectionHeader(title: "行情状态"),
-          const SizedBox(height: 8),
-          const Text("这部分只辅助判断该账户内仓位的价格状态；更完整资料在标的总览查看。"),
-          if (marketData.summary.isNotEmpty) ...[
-            const SizedBox(height: 8),
-            Text(
-              marketData.summary,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: context.looTokens.mutedText,
-                  ),
-            ),
-          ],
-          ...marketData.facts.take(4).map(
-                (fact) => Padding(
-                  padding: const EdgeInsets.only(top: 10),
-                  child: Row(
-                    children: [
-                      Expanded(child: Text(fact.label)),
-                      Text(
-                        fact.value,
-                        style: Theme.of(context).textTheme.titleMedium,
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-        ],
       ),
     );
   }
@@ -1027,40 +943,6 @@ class _ActionLink extends StatelessWidget {
                   color: tokens.mutedText,
                 ),
           ),
-        ],
-      ),
-    );
-  }
-}
-
-class _CompactFactsCard extends StatelessWidget {
-  const _CompactFactsCard({required this.title, required this.facts});
-
-  final String title;
-  final List<MobileFact> facts;
-
-  @override
-  Widget build(BuildContext context) {
-    return LooGlassCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _SectionHeader(title: title),
-          const SizedBox(height: 10),
-          ...facts.take(5).map(
-                (fact) => Padding(
-                  padding: const EdgeInsets.only(top: 8),
-                  child: Row(
-                    children: [
-                      Expanded(child: Text(fact.label)),
-                      Text(
-                        fact.value,
-                        style: Theme.of(context).textTheme.titleSmall,
-                      ),
-                    ],
-                  ),
-                ),
-              ),
         ],
       ),
     );

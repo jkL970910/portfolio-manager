@@ -632,15 +632,8 @@ class _SecurityDetailPageState extends State<SecurityDetailPage> {
                     priceHistoryChart: priceHistoryChart,
                   ),
                   const SizedBox(height: 12),
-                  _PositionScopeSection(
-                    data: data,
-                    scopes: scopes,
-                    selectedScope: selectedScope,
-                    onSelectScope: (scopeId) => setState(
-                      () => _selectedResearchScopeId = scopeId,
-                    ),
-                  ),
-                  if (data.heldPosition != null) const SizedBox(height: 12),
+                  _SecurityEvidenceCard(data),
+                  const SizedBox(height: 12),
                   _ResearchWorkbenchSection(
                     data,
                     aiAnalysisCard: AiAnalysisCard(
@@ -677,6 +670,15 @@ class _SecurityDetailPageState extends State<SecurityDetailPage> {
                     isRefreshingQuote: _isRefreshingQuote,
                     isSubmittingExternalResearch: _isSubmittingExternalResearch,
                     externalResearchMessage: _externalResearchMessage,
+                  ),
+                  if (data.heldPosition != null) const SizedBox(height: 12),
+                  _PositionScopeSection(
+                    data: data,
+                    scopes: scopes,
+                    selectedScope: selectedScope,
+                    onSelectScope: (scopeId) => setState(
+                      () => _selectedResearchScopeId = scopeId,
+                    ),
                   ),
                 ],
               ),
@@ -1118,39 +1120,100 @@ class _ResearchWorkbenchSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return LooGlassCard(
-      padding: EdgeInsets.zero,
-      child: Theme(
-        data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
-        child: ExpansionTile(
-          tilePadding: const EdgeInsets.fromLTRB(16, 10, 14, 10),
-          childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-          initiallyExpanded: false,
-          title: const _SectionHeader(title: "Loo国研究台", trailing: "高级解读"),
-          subtitle: Padding(
-            padding: const EdgeInsets.only(top: 6),
-            child: Text(
-              data.heldPosition == null
-                  ? "展开查看 AI 快扫、估值证据、关键价位和候选适配。"
-                  : "展开查看 AI 快扫、估值证据、关键价位和组合适配判断。",
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: context.looTokens.mutedText,
-                  ),
-            ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const _SectionHeader(title: "Loo国研究台", trailing: "高级解读"),
+          const SizedBox(height: 6),
+          Text(
+            data.heldPosition == null
+                ? "AI 快扫、估值证据、关键价位和候选适配集中在这里。"
+                : "AI 快扫、估值证据、关键价位和组合适配判断集中在这里。",
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: context.looTokens.mutedText,
+                ),
           ),
-          children: [
-            _ResearchUpdateStatusBar(
-              data: data,
-              isRefreshingQuote: isRefreshingQuote,
-              isSubmittingExternalResearch: isSubmittingExternalResearch,
-              message: externalResearchMessage,
-              onTap: onOpenUpdateSheet,
+          const SizedBox(height: 12),
+          _ResearchUpdateStatusBar(
+            data: data,
+            isRefreshingQuote: isRefreshingQuote,
+            isSubmittingExternalResearch: isSubmittingExternalResearch,
+            message: externalResearchMessage,
+            onTap: onOpenUpdateSheet,
+          ),
+          const SizedBox(height: 12),
+          _QuickScanPanel(child: aiAnalysisCard),
+        ],
+      ),
+    );
+  }
+}
+
+class _SecurityEvidenceCard extends StatelessWidget {
+  const _SecurityEvidenceCard(this.data);
+
+  final MobileSecurityDetailSnapshot data;
+
+  @override
+  Widget build(BuildContext context) {
+    final evidence = <_MetricDatum>[
+      if (data.assetClass.isNotEmpty) _MetricDatum("资产属性", data.assetClass),
+      if (data.sector.isNotEmpty) _MetricDatum("行业", data.sector),
+      if (data.exchange.isNotEmpty) _MetricDatum("交易所", data.exchange),
+      if (data.currency.isNotEmpty) _MetricDatum("交易币种", data.currency),
+      if (data.priceHistoryChart != null)
+        _MetricDatum("价格历史", data.priceHistoryChart!.freshness.label),
+      if (data.facts.isNotEmpty)
+        ...data.facts.take(4).map(
+              (fact) => _MetricDatum(fact.label, fact.value),
             ),
-            const SizedBox(height: 12),
-            _QuickScanPanel(child: aiAnalysisCard),
+    ].where((item) => item.value.isNotEmpty && item.value != "--").toList();
+    final notes = [
+      if (data.marketData.summary.isNotEmpty) data.marketData.summary,
+      ...data.summaryPoints.take(2),
+    ].where((item) => item.trim().isNotEmpty).toList();
+
+    if (evidence.isEmpty && notes.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    return LooGlassCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const _SectionHeader(title: "标的证据", trailing: "事实层"),
+          if (notes.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            ...notes.take(2).map(
+                  (note) => Text(
+                    note,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: context.looTokens.mutedText,
+                        ),
+                  ),
+                ),
           ],
-        ),
+          if (evidence.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final width = (constraints.maxWidth - 8) / 2;
+                return Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: evidence
+                      .map(
+                        (metric) => SizedBox(
+                          width: width,
+                          child: _MetricCard(metric),
+                        ),
+                      )
+                      .toList(),
+                );
+              },
+            ),
+          ],
+        ],
       ),
     );
   }
@@ -2459,9 +2522,8 @@ class _MetricGrid extends StatelessWidget {
     final held = data.heldPosition;
     final metrics = [
       _MetricDatum("最新价格", data.lastPrice),
-      if (held != null) _MetricDatum("持有市值", held.value),
-      if (held != null) _MetricDatum("持仓盈亏", held.gainLoss),
-      if (held != null) _MetricDatum("组合占比", held.portfolioShare),
+      if (data.assetClass.isNotEmpty) _MetricDatum("资产属性", data.assetClass),
+      if (data.sector.isNotEmpty) _MetricDatum("行业", data.sector),
       if (held == null)
         _MetricDatum("相关持仓", "${data.relatedHoldings.length} 个"),
     ].where((item) => item.value.isNotEmpty && item.value != "--").toList();
