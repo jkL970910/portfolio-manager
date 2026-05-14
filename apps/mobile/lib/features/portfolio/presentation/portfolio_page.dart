@@ -129,9 +129,8 @@ class _PortfolioPageState extends State<PortfolioPage> {
                         if (_isFiltered)
                           _FilterSummaryCard(snapshot.data!)
                         else
-                          _HealthCard(
-                            snapshot.data!.healthScore,
-                            snapshot.data!.summaryPoints,
+                          _PortfolioHeroCard(
+                            snapshot.data!,
                             onTap: _openHealthScore,
                           ),
                         if (!_isFiltered &&
@@ -141,19 +140,6 @@ class _PortfolioPageState extends State<PortfolioPage> {
                           _PortfolioTrendCard(
                             chart: snapshot.data!.portfolioValueChart,
                             fallbackPoints: snapshot.data!.performance,
-                          ),
-                        ],
-                        if (!_isFiltered &&
-                            (snapshot.data!.accountTypeAllocation.isNotEmpty ||
-                                snapshot.data!.accountInstanceAllocation
-                                    .isNotEmpty ||
-                                snapshot
-                                    .data!.assetClassDrilldown.isNotEmpty)) ...[
-                          const SizedBox(height: 18),
-                          _PortfolioDistributionSwitcherCard(
-                            accountTypes: snapshot.data!.accountTypeAllocation,
-                            accounts: snapshot.data!.accountInstanceAllocation,
-                            assetClasses: snapshot.data!.assetClassDrilldown,
                           ),
                         ],
                         const SizedBox(height: 18),
@@ -250,43 +236,197 @@ class _PageHeader extends StatelessWidget {
   }
 }
 
-class _HealthCard extends StatelessWidget {
-  const _HealthCard(this.score, this.summaryPoints, {required this.onTap});
+class _PortfolioHeroCard extends StatefulWidget {
+  const _PortfolioHeroCard(this.data, {required this.onTap});
 
-  final String score;
-  final List<String> summaryPoints;
+  final MobilePortfolioSnapshot data;
   final VoidCallback onTap;
+
+  @override
+  State<_PortfolioHeroCard> createState() => _PortfolioHeroCardState();
+}
+
+class _PortfolioHeroCardState extends State<_PortfolioHeroCard> {
+  var _selected = 0;
 
   @override
   Widget build(BuildContext context) {
     final tokens = context.looTokens;
+    final tabs = _distributionTabs(widget.data);
+    final selectedIndex =
+        tabs.isEmpty ? 0 : _selected.clamp(0, tabs.length - 1);
+    final selected = tabs.isEmpty ? null : tabs[selectedIndex];
     return LooGlassCard(
-      onTap: onTap,
+      isHero: true,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Expanded(
-                child: Text("国库健康度",
-                    style: Theme.of(context).textTheme.titleLarge),
-              ),
-              Text(
-                "查看巡查",
-                style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                      color: tokens.accent,
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(tokens.radiusMd),
+                  onTap: widget.onTap,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 2),
+                    child: Row(
+                      children: [
+                        Text(
+                          widget.data.healthScore.replaceAll(" 分", ""),
+                          style: Theme.of(context).textTheme.displaySmall,
+                        ),
+                        SizedBox(width: tokens.gapMd),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                "国库健康度",
+                                style: Theme.of(context).textTheme.titleLarge,
+                              ),
+                              SizedBox(height: tokens.gapXs),
+                              Text(
+                                widget.data.summaryPoints.isEmpty
+                                    ? widget.data.quoteStatus
+                                    : widget.data.summaryPoints.first,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .bodySmall
+                                    ?.copyWith(color: tokens.mutedText),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Icon(
+                          Icons.chevron_right_rounded,
+                          color: tokens.accent,
+                        ),
+                      ],
                     ),
+                  ),
+                ),
               ),
             ],
           ),
-          SizedBox(height: tokens.gapSm),
-          Text(score, style: Theme.of(context).textTheme.headlineMedium),
-          SizedBox(height: tokens.gapSm),
-          ...summaryPoints.take(3).map((point) => Padding(
-                padding: const EdgeInsets.only(top: 4),
-                child: Text("• $point"),
-              )),
+          if (widget.data.summaryPoints.length > 1) ...[
+            SizedBox(height: tokens.gapMd),
+            Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: widget.data.summaryPoints
+                  .skip(1)
+                  .take(2)
+                  .map((point) => _HeroChip(point))
+                  .toList(growable: false),
+            ),
+          ],
+          if (selected != null) ...[
+            SizedBox(height: tokens.gapMd),
+            Divider(height: 1, color: tokens.cardBorder),
+            SizedBox(height: tokens.gapMd),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Expanded(
+                  child: Text(
+                    selected.title,
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                ),
+                _DistributionTabSwitch(
+                  tabs: tabs,
+                  selectedIndex: selectedIndex,
+                  onSelected: (index) => setState(() => _selected = index),
+                ),
+              ],
+            ),
+            SizedBox(height: tokens.gapMd),
+            LooDistributionBar(segments: selected.segments),
+          ],
         ],
+      ),
+    );
+  }
+
+  List<_DistributionTab> _distributionTabs(MobilePortfolioSnapshot data) {
+    return <_DistributionTab>[
+      if (data.accountTypeAllocation.any((point) => point.value > 0))
+        _DistributionTab(
+          label: "类型",
+          title: "账户类型分布",
+          segments: data.accountTypeAllocation
+              .where((point) => point.value > 0)
+              .take(6)
+              .map(
+                (point) => LooDistributionSegment(
+                  label: point.name,
+                  value: point.value,
+                ),
+              )
+              .toList(),
+        ),
+      if (data.accountInstanceAllocation.any((point) => point.value > 0))
+        _DistributionTab(
+          label: "账户",
+          title: "账户实例分布",
+          segments: data.accountInstanceAllocation
+              .where((point) => point.value > 0)
+              .take(6)
+              .map(
+                (point) => LooDistributionSegment(
+                  label: point.name,
+                  value: point.value,
+                ),
+              )
+              .toList(),
+        ),
+      if (data.assetClassDrilldown.any((item) => item.currentPct > 0))
+        _DistributionTab(
+          label: "资产",
+          title: "资产类别配置",
+          segments: data.assetClassDrilldown
+              .where((item) => item.currentPct > 0)
+              .take(6)
+              .map(
+                (item) => LooDistributionSegment(
+                  label: item.name,
+                  value: item.currentPct,
+                ),
+              )
+              .toList(),
+        ),
+    ];
+  }
+}
+
+class _HeroChip extends StatelessWidget {
+  const _HeroChip(this.label);
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = context.looTokens;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.24),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: tokens.cardBorder),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        child: Text(
+          label,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                color: tokens.mutedText,
+                fontWeight: FontWeight.w700,
+              ),
+        ),
       ),
     );
   }
@@ -364,122 +504,6 @@ class _PortfolioTrendCard extends StatelessWidget {
               ),
             )
             .toList(),
-      ),
-    );
-  }
-}
-
-class _PortfolioDistributionSwitcherCard extends StatefulWidget {
-  const _PortfolioDistributionSwitcherCard({
-    required this.accountTypes,
-    required this.accounts,
-    required this.assetClasses,
-  });
-
-  final List<MobilePortfolioAllocationPoint> accountTypes;
-  final List<MobilePortfolioAllocationPoint> accounts;
-  final List<MobileAssetClassDrilldown> assetClasses;
-
-  @override
-  State<_PortfolioDistributionSwitcherCard> createState() =>
-      _PortfolioDistributionSwitcherCardState();
-}
-
-class _PortfolioDistributionSwitcherCardState
-    extends State<_PortfolioDistributionSwitcherCard> {
-  var _selected = 0;
-
-  @override
-  Widget build(BuildContext context) {
-    final tabs = <_DistributionTab>[
-      if (widget.accountTypes.any((point) => point.value > 0))
-        _DistributionTab(
-          label: "类型",
-          title: "账户类型分布",
-          segments: widget.accountTypes
-              .where((point) => point.value > 0)
-              .take(6)
-              .map(
-                (point) => LooDistributionSegment(
-                  label: point.name,
-                  value: point.value,
-                ),
-              )
-              .toList(),
-        ),
-      if (widget.accounts.any((point) => point.value > 0))
-        _DistributionTab(
-          label: "账户",
-          title: "账户实例分布",
-          segments: widget.accounts
-              .where((point) => point.value > 0)
-              .take(6)
-              .map(
-                (point) => LooDistributionSegment(
-                  label: point.name,
-                  value: point.value,
-                ),
-              )
-              .toList(),
-        ),
-      if (widget.assetClasses.any((item) => item.currentPct > 0))
-        _DistributionTab(
-          label: "资产",
-          title: "资产类别配置",
-          segments: widget.assetClasses
-              .where((item) => item.currentPct > 0)
-              .take(6)
-              .map(
-                (item) => LooDistributionSegment(
-                  label: item.name,
-                  value: item.currentPct,
-                ),
-              )
-              .toList(),
-        ),
-    ];
-
-    if (tabs.isEmpty) return const SizedBox.shrink();
-    final selectedIndex = _selected.clamp(0, tabs.length - 1);
-    final selected = tabs[selectedIndex];
-    final tokens = context.looTokens;
-
-    return LooGlassCard(
-      child: AnimatedSize(
-        duration: const Duration(milliseconds: 180),
-        curve: Curves.easeOutCubic,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                  child: Text(
-                    selected.title,
-                    style: Theme.of(context).textTheme.titleLarge,
-                  ),
-                ),
-                const SizedBox(width: 10),
-                _DistributionTabSwitch(
-                  tabs: tabs,
-                  selectedIndex: selectedIndex,
-                  onSelected: (index) => setState(() => _selected = index),
-                ),
-              ],
-            ),
-            SizedBox(height: tokens.gapMd),
-            AnimatedSwitcher(
-              duration: const Duration(milliseconds: 180),
-              switchInCurve: Curves.easeOutCubic,
-              switchOutCurve: Curves.easeOutCubic,
-              child: KeyedSubtree(
-                key: ValueKey(selected.label),
-                child: LooDistributionBar(segments: selected.segments),
-              ),
-            ),
-          ],
-        ),
       ),
     );
   }
