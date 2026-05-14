@@ -35,7 +35,7 @@ function getSourceLabel(
     return "缓存行情情报";
   }
   if (sourceType === "news") {
-    return "缓存新闻/公告";
+    return "真实新闻缓存";
   }
   if (sourceType === "institutional") {
     return "缓存机构资料";

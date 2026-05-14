@@ -299,20 +299,22 @@ PORTFOLIO_ANALYZER_EXTERNAL_DAILY_OVERVIEW=enabled
 PORTFOLIO_ANALYZER_EXTERNAL_SECURITY_MANUAL_REFRESH=enabled
 PORTFOLIO_ANALYZER_EXTERNAL_DAILY_RUN_LIMIT=25
 PORTFOLIO_ANALYZER_EXTERNAL_MAX_SYMBOLS_PER_RUN=12
-EXTERNAL_RESEARCH_DAILY_SOURCE=profile
+EXTERNAL_RESEARCH_DAILY_SOURCE=news
 EXTERNAL_RESEARCH_DAILY_MAX_USERS=1
 EXTERNAL_RESEARCH_DAILY_MAX_SYMBOLS_PER_USER=3
+EXTERNAL_RESEARCH_DAILY_CACHE_TTL_SECONDS=129600
 EXTERNAL_RESEARCH_WORKER_MAX_JOBS=3
 EXTERNAL_RESEARCH_WORKER_MAX_RUNTIME_MS=20000
 EXTERNAL_RESEARCH_WORKER_JOB_DELAY_MS=1200
 ALPHA_VANTAGE_API_KEY=...
 ```
 
-`PORTFOLIO_ANALYZER_EXTERNAL_SOURCE_NEWS=enabled` can be used with
-`EXTERNAL_RESEARCH_DAILY_SOURCE=news` to populate `Loo国今日秘闻` from
-Alpha Vantage `NEWS_SENTIMENT`. Keep it worker-only: page loads must only read
-`external_research_documents`, and the daily news job should stay small because
-it shares the same Alpha Vantage API key quota as profile/earnings calls.
+`PORTFOLIO_ANALYZER_EXTERNAL_SOURCE_NEWS=enabled` with
+`EXTERNAL_RESEARCH_DAILY_SOURCE=news` populates `Loo国今日秘闻` from Alpha
+Vantage `NEWS_SENTIMENT`. Keep it worker-only: page loads must only read
+`external_research_documents`. Daily news uses a longer cache window
+(`EXTERNAL_RESEARCH_DAILY_CACHE_TTL_SECONDS=129600` by default) so morning news
+does not disappear before the next daily worker.
 Keep `EXTERNAL_RESEARCH_WORKER_JOB_DELAY_MS` at or above 1200ms for Alpha
 Vantage free keys so the worker does not violate the 1 request/second burst
 limit while draining multiple queued jobs.

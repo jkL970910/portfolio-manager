@@ -107,6 +107,9 @@ class MobileDailyIntelligenceItem {
     if (sourceType == "market-data") {
       return "行情资料";
     }
+    if (sourceType == "news") {
+      return "新闻公告";
+    }
     return "外部资料";
   }
 

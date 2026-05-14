@@ -1089,7 +1089,13 @@ function buildReplayedAggregateValueSeries(args: {
     },
   );
 
-  const series = replayDates
+  const expectedHoldingCount = groupedCurrentQuantities.size;
+  const minCoveredHoldings = Math.max(
+    1,
+    Math.ceil(expectedHoldingCount * 0.75),
+  );
+
+  const rawSeries = replayDates
     .map((replayTime) => {
       for (const [key, points] of historiesBySymbol.entries()) {
         let pointer = pointers.get(key) ?? 0;
@@ -1111,6 +1117,7 @@ function buildReplayedAggregateValueSeries(args: {
       }
 
       let totalValueCad = 0;
+      let coveredHoldings = 0;
       for (const [key, currentQuantity] of groupedCurrentQuantities.entries()) {
         const latestPrice = latestSeenPriceBySymbol.get(key);
         if (latestPrice == null) {
@@ -1121,7 +1128,10 @@ function buildReplayedAggregateValueSeries(args: {
           .filter((event) => event.bookedAt > replayTime.slice(0, 10))
           .reduce((sum, event) => sum + getEventQuantityDelta(event), 0);
         const quantityAtDate = currentQuantity - futureDelta;
-        totalValueCad += Math.max(quantityAtDate, 0) * latestPrice;
+        if (quantityAtDate > 0) {
+          coveredHoldings += 1;
+          totalValueCad += Math.max(quantityAtDate, 0) * latestPrice;
+        }
       }
 
       return {
@@ -1132,9 +1142,21 @@ function buildReplayedAggregateValueSeries(args: {
         ),
         rawDate: replayTime,
         value: round(convertCadToDisplay(totalValueCad, display), 2),
+        coveredHoldings,
       };
     })
-    .filter((point) => point.value > 0);
+    .filter(
+      (point) =>
+        point.value > 0 && point.coveredHoldings >= minCoveredHoldings,
+    );
+
+  const firstValidIndex = rawSeries.findIndex(
+    (point, index) =>
+      index === rawSeries.length - 1 ||
+      (rawSeries[index + 1]?.coveredHoldings ?? 0) >= point.coveredHoldings,
+  );
+  const series = (firstValidIndex > 0 ? rawSeries.slice(firstValidIndex) : rawSeries)
+    .map(({ coveredHoldings: _coveredHoldings, ...point }) => point);
 
   return series.length >= 2 ? series : null;
 }
@@ -1146,7 +1168,12 @@ function buildAbsoluteSeriesFromSnapshots(args: {
   getValue: (snapshot: PortfolioSnapshot) => number;
 }) {
   const { snapshots = [], language, display, getValue } = args;
-  const recent = [...snapshots]
+  const quoteRefreshSnapshots = snapshots.filter(
+    (snapshot) => snapshot.sourceMode === "quote-refresh" && !snapshot.isReference,
+  );
+  const usableSnapshots =
+    quoteRefreshSnapshots.length >= 2 ? quoteRefreshSnapshots : snapshots;
+  const recent = [...usableSnapshots]
     .sort((left, right) => left.snapshotDate.localeCompare(right.snapshotDate))
     .slice(-183)
     .map((snapshot) => ({

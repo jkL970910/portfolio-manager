@@ -240,10 +240,11 @@ function buildAlphaVantageNewsDocuments(args: {
   feed: AlphaVantageNewsPayload["feed"];
 }): ExternalResearchDocument[] {
   const requestSecurity = args.input.request.security;
+  const policy = getExternalResearchPolicy();
   const ttlSeconds = Math.max(
-    args.input.request.maxCacheAgeSeconds ??
-      getExternalResearchPolicy().defaultTtlSeconds,
-    getExternalResearchPolicy().minTtlSeconds,
+    args.input.request.maxCacheAgeSeconds ?? policy.newsTtlSeconds,
+    policy.newsTtlSeconds,
+    policy.minTtlSeconds,
   );
   const requestSymbol = normalizeNullable(requestSecurity?.symbol);
   const requestExchange = normalizeNullable(requestSecurity?.exchange);

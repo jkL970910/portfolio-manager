@@ -5,6 +5,7 @@ export interface ExternalResearchPolicy {
   sourceMode: "cached-external";
   minTtlSeconds: number;
   defaultTtlSeconds: number;
+  newsTtlSeconds: number;
   requiresWorker: boolean;
   workerEnabled: boolean;
   scheduledOverviewEnabled: boolean;
@@ -45,6 +46,7 @@ export const DEFAULT_EXTERNAL_RESEARCH_POLICY: ExternalResearchPolicy = {
   sourceMode: "cached-external",
   minTtlSeconds: 21600,
   defaultTtlSeconds: 21600,
+  newsTtlSeconds: 129600,
   requiresWorker: true,
   workerEnabled: false,
   scheduledOverviewEnabled: false,
@@ -116,6 +118,10 @@ export function getExternalResearchPolicy(): ExternalResearchPolicy {
     maxSymbolsPerRun: readPositiveIntegerEnv(
       "PORTFOLIO_ANALYZER_EXTERNAL_MAX_SYMBOLS_PER_RUN",
       DEFAULT_EXTERNAL_RESEARCH_POLICY.maxSymbolsPerRun,
+    ),
+    newsTtlSeconds: readPositiveIntegerEnv(
+      "PORTFOLIO_ANALYZER_EXTERNAL_NEWS_TTL_SECONDS",
+      DEFAULT_EXTERNAL_RESEARCH_POLICY.newsTtlSeconds,
     ),
     workerEnabled: process.env.PORTFOLIO_ANALYZER_EXTERNAL_WORKER === "enabled",
     scheduledOverviewEnabled:

@@ -622,7 +622,10 @@ export async function enqueueDailyOverviewExternalResearchJobs(
     12,
   );
   const maxCacheAgeSeconds =
-    args.maxCacheAgeSeconds ?? getExternalResearchPolicy().defaultTtlSeconds;
+    args.maxCacheAgeSeconds ??
+    (sourceId === "news"
+      ? getExternalResearchPolicy().newsTtlSeconds
+      : getExternalResearchPolicy().defaultTtlSeconds);
   const repositories = getRepositories();
   const result: DailyOverviewExternalResearchEnqueueResult = {
     status: "skipped",
