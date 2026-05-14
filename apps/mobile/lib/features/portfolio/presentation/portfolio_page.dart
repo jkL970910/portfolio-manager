@@ -1,3 +1,5 @@
+import "dart:math" as math;
+
 import "package:flutter/material.dart";
 import "package:go_router/go_router.dart";
 
@@ -5,9 +7,7 @@ import "../../../app/mobile_routes.dart";
 import "../../../core/api/loo_api_client.dart";
 import "../../../core/presentation/loo_components.dart";
 import "../../../core/theme/loo_theme.dart";
-import "../../shared/data/mobile_chart_models.dart";
 import "../../shared/data/mobile_models.dart";
-import "../../shared/presentation/loo_charts.dart";
 import "../../shared/presentation/loo_minister_scope.dart";
 import "../data/mobile_portfolio_models.dart";
 import "health_score_page.dart";
@@ -133,15 +133,6 @@ class _PortfolioPageState extends State<PortfolioPage> {
                             snapshot.data!,
                             onTap: _openHealthScore,
                           ),
-                        if (!_isFiltered &&
-                            (snapshot.data!.portfolioValueChart != null ||
-                                snapshot.data!.performance.isNotEmpty)) ...[
-                          const SizedBox(height: 18),
-                          _PortfolioTrendCard(
-                            chart: snapshot.data!.portfolioValueChart,
-                            fallbackPoints: snapshot.data!.performance,
-                          ),
-                        ],
                         const SizedBox(height: 18),
                         _AccountsDropdownCard(
                           key: _accountsKey,
@@ -247,15 +238,9 @@ class _PortfolioHeroCard extends StatefulWidget {
 }
 
 class _PortfolioHeroCardState extends State<_PortfolioHeroCard> {
-  var _selected = 0;
-
   @override
   Widget build(BuildContext context) {
     final tokens = context.looTokens;
-    final tabs = _distributionTabs(widget.data);
-    final selectedIndex =
-        tabs.isEmpty ? 0 : _selected.clamp(0, tabs.length - 1);
-    final selected = tabs.isEmpty ? null : tabs[selectedIndex];
     return LooGlassCard(
       isHero: true,
       child: Column(
@@ -272,10 +257,7 @@ class _PortfolioHeroCardState extends State<_PortfolioHeroCard> {
                     padding: const EdgeInsets.symmetric(vertical: 2),
                     child: Row(
                       children: [
-                        Text(
-                          widget.data.healthScore.replaceAll(" 分", ""),
-                          style: Theme.of(context).textTheme.displaySmall,
-                        ),
+                        _HeroScoreBadge(widget.data.healthScore),
                         SizedBox(width: tokens.gapMd),
                         Expanded(
                           child: Column(
@@ -323,82 +305,44 @@ class _PortfolioHeroCardState extends State<_PortfolioHeroCard> {
                   .toList(growable: false),
             ),
           ],
-          if (selected != null) ...[
-            SizedBox(height: tokens.gapMd),
-            Divider(height: 1, color: tokens.cardBorder),
-            SizedBox(height: tokens.gapMd),
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                Expanded(
-                  child: Text(
-                    selected.title,
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
-                ),
-                _DistributionTabSwitch(
-                  tabs: tabs,
-                  selectedIndex: selectedIndex,
-                  onSelected: (index) => setState(() => _selected = index),
-                ),
-              ],
-            ),
-            SizedBox(height: tokens.gapMd),
-            LooDistributionBar(segments: selected.segments),
-          ],
+          SizedBox(height: tokens.gapMd),
+          _PortfolioHeroMetrics(
+            data: widget.data,
+            onOpenHealth: widget.onTap,
+          ),
         ],
       ),
     );
   }
+}
 
-  List<_DistributionTab> _distributionTabs(MobilePortfolioSnapshot data) {
-    return <_DistributionTab>[
-      if (data.accountTypeAllocation.any((point) => point.value > 0))
-        _DistributionTab(
-          label: "类型",
-          title: "账户类型分布",
-          segments: data.accountTypeAllocation
-              .where((point) => point.value > 0)
-              .take(6)
-              .map(
-                (point) => LooDistributionSegment(
-                  label: point.name,
-                  value: point.value,
-                ),
-              )
-              .toList(),
+class _HeroScoreBadge extends StatelessWidget {
+  const _HeroScoreBadge(this.score);
+
+  final String score;
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = context.looTokens;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.16),
+        borderRadius: BorderRadius.circular(tokens.radiusLg),
+        border: Border.all(color: tokens.accent.withValues(alpha: 0.45)),
+      ),
+      child: Padding(
+        padding: EdgeInsets.symmetric(
+          horizontal: tokens.gapMd,
+          vertical: tokens.gapSm,
         ),
-      if (data.accountInstanceAllocation.any((point) => point.value > 0))
-        _DistributionTab(
-          label: "账户",
-          title: "账户实例分布",
-          segments: data.accountInstanceAllocation
-              .where((point) => point.value > 0)
-              .take(6)
-              .map(
-                (point) => LooDistributionSegment(
-                  label: point.name,
-                  value: point.value,
-                ),
-              )
-              .toList(),
+        child: Text(
+          score.replaceAll(" 分", ""),
+          style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                fontWeight: FontWeight.w800,
+              ),
         ),
-      if (data.assetClassDrilldown.any((item) => item.currentPct > 0))
-        _DistributionTab(
-          label: "资产",
-          title: "资产类别配置",
-          segments: data.assetClassDrilldown
-              .where((item) => item.currentPct > 0)
-              .take(6)
-              .map(
-                (item) => LooDistributionSegment(
-                  label: item.name,
-                  value: item.currentPct,
-                ),
-              )
-              .toList(),
-        ),
-    ];
+      ),
+    );
   }
 }
 
@@ -432,6 +376,387 @@ class _HeroChip extends StatelessWidget {
   }
 }
 
+class _PortfolioHeroMetrics extends StatelessWidget {
+  const _PortfolioHeroMetrics({
+    required this.data,
+    required this.onOpenHealth,
+  });
+
+  final MobilePortfolioSnapshot data;
+  final VoidCallback onOpenHealth;
+
+  @override
+  Widget build(BuildContext context) {
+    final holdingsShare = data.securityHoldings
+        .where((holding) => _parsePercent(holding.weight) > 0)
+        .take(8)
+        .toList();
+    final shareLabel = holdingsShare.isEmpty
+        ? "${data.securityHoldings.length} 个"
+        : "前${holdingsShare.length}项";
+
+    return Row(
+      children: [
+        Expanded(
+          child: _HeroMetricButton(
+            label: "健康分",
+            value: data.healthScore.replaceAll(" 分", ""),
+            icon: Icons.monitor_heart_outlined,
+            onTap: onOpenHealth,
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: _HeroMetricButton(
+            label: "组合占比",
+            value: "100%",
+            icon: Icons.pie_chart_outline_rounded,
+            onTap: () => _showAllocationShareSheet(context, data),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: _HeroMetricButton(
+            label: "持仓比例",
+            value: shareLabel,
+            icon: Icons.donut_large_rounded,
+            onTap: holdingsShare.isEmpty
+                ? null
+                : () => _showHoldingsShareSheet(context, holdingsShare),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _HeroMetricButton extends StatelessWidget {
+  const _HeroMetricButton({
+    required this.label,
+    required this.value,
+    required this.icon,
+    required this.onTap,
+  });
+
+  final String label;
+  final String value;
+  final IconData icon;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = context.looTokens;
+    return InkWell(
+      borderRadius: BorderRadius.circular(tokens.radiusLg),
+      onTap: onTap,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.24),
+          borderRadius: BorderRadius.circular(tokens.radiusLg),
+          border: Border.all(color: tokens.cardBorder),
+        ),
+        child: Padding(
+          padding: EdgeInsets.all(tokens.gapSm),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(icon, size: 15, color: tokens.accent),
+                  const Spacer(),
+                  if (onTap != null)
+                    Icon(
+                      Icons.chevron_right_rounded,
+                      size: 16,
+                      color: tokens.mutedText,
+                    ),
+                ],
+              ),
+              const SizedBox(height: 7),
+              Text(
+                value,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w800,
+                    ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                      color: tokens.mutedText,
+                    ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+void _showAllocationShareSheet(
+  BuildContext context,
+  MobilePortfolioSnapshot data,
+) {
+  final slices = data.assetClassDrilldown
+      .where((item) => item.currentPct > 0)
+      .take(8)
+      .map(
+        (item) => _ShareSlice(
+          label: item.name,
+          value: item.currentPct,
+          displayValue: item.current,
+          amount: item.value,
+        ),
+      )
+      .toList();
+  _showShareSheet(
+    context,
+    title: "组合占比",
+    subtitle: "按当前经济暴露展示资产类别比例。",
+    slices: slices,
+  );
+}
+
+void _showHoldingsShareSheet(
+  BuildContext context,
+  List<MobileHoldingCard> holdings,
+) {
+  final slices = holdings
+      .map(
+        (holding) => _ShareSlice(
+          label: holding.symbol,
+          value: _parsePercent(holding.weight),
+          displayValue: holding.weight,
+          amount: holding.value,
+        ),
+      )
+      .where((slice) => slice.value > 0)
+      .toList();
+  _showShareSheet(
+    context,
+    title: "持仓比例",
+    subtitle: "按当前组合市值占比展示主要标的。",
+    slices: slices,
+  );
+}
+
+void _showShareSheet(
+  BuildContext context, {
+  required String title,
+  required String subtitle,
+  required List<_ShareSlice> slices,
+}) {
+  showModalBottomSheet<void>(
+    context: context,
+    showDragHandle: true,
+    builder: (context) => _ShareSheet(
+      title: title,
+      subtitle: subtitle,
+      slices: slices,
+    ),
+  );
+}
+
+class _ShareSheet extends StatelessWidget {
+  const _ShareSheet({
+    required this.title,
+    required this.subtitle,
+    required this.slices,
+  });
+
+  final String title;
+  final String subtitle;
+  final List<_ShareSlice> slices;
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = context.looTokens;
+    return Padding(
+      padding: EdgeInsets.fromLTRB(
+        tokens.gapLg,
+        0,
+        tokens.gapLg,
+        tokens.gapXl,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(title, style: Theme.of(context).textTheme.titleLarge),
+          SizedBox(height: tokens.gapSm),
+          Text(
+            subtitle,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: tokens.mutedText,
+                ),
+          ),
+          SizedBox(height: tokens.gapLg),
+          Center(child: _ShareDonutChart(slices: slices)),
+          SizedBox(height: tokens.gapLg),
+          ...slices.map(
+            (slice) => Padding(
+              padding: EdgeInsets.only(bottom: tokens.gapSm),
+              child: Row(
+                children: [
+                  Container(
+                    width: 10,
+                    height: 10,
+                    decoration: BoxDecoration(
+                      color: _shareSliceColor(context, slices.indexOf(slice)),
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                  SizedBox(width: tokens.gapSm),
+                  Expanded(
+                    child: Text(
+                      slice.label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            fontWeight: FontWeight.w800,
+                          ),
+                    ),
+                  ),
+                  Text(
+                    [
+                      slice.displayValue,
+                      if (slice.amount.isNotEmpty && slice.amount != "--")
+                        slice.amount,
+                    ].join(" · "),
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: tokens.mutedText,
+                        ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ShareDonutChart extends StatelessWidget {
+  const _ShareDonutChart({required this.slices});
+
+  final List<_ShareSlice> slices;
+
+  @override
+  Widget build(BuildContext context) {
+    final total = slices.fold<double>(0, (sum, slice) => sum + slice.value);
+    final tokens = context.looTokens;
+    return SizedBox(
+      width: 172,
+      height: 172,
+      child: CustomPaint(
+        painter: _ShareDonutPainter(
+          slices: slices,
+          total: total <= 0 ? 1 : total,
+          tokens: tokens,
+        ),
+        child: Center(
+          child: Text(
+            "${total.toStringAsFixed(1)}%",
+            style: Theme.of(context).textTheme.titleLarge,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ShareDonutPainter extends CustomPainter {
+  const _ShareDonutPainter({
+    required this.slices,
+    required this.total,
+    required this.tokens,
+  });
+
+  final List<_ShareSlice> slices;
+  final double total;
+  final LooThemeTokens tokens;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final rect = Offset.zero & size;
+    final strokeWidth = size.shortestSide * 0.14;
+    final paint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round
+      ..strokeWidth = strokeWidth;
+
+    paint.color = tokens.cardBorder;
+    canvas.drawArc(
+      rect.deflate(strokeWidth / 2),
+      -math.pi / 2,
+      math.pi * 2,
+      false,
+      paint,
+    );
+
+    var start = -math.pi / 2;
+    for (var index = 0; index < slices.length; index++) {
+      final sweep = math.pi * 2 * (slices[index].value / total);
+      paint.color = _shareSliceColorFromTokens(tokens, index);
+      canvas.drawArc(
+        rect.deflate(strokeWidth / 2),
+        start,
+        math.max(0.04, sweep - 0.03),
+        false,
+        paint,
+      );
+      start += sweep;
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _ShareDonutPainter oldDelegate) =>
+      oldDelegate.slices != slices ||
+      oldDelegate.total != total ||
+      oldDelegate.tokens != tokens;
+}
+
+class _ShareSlice {
+  const _ShareSlice({
+    required this.label,
+    required this.value,
+    required this.displayValue,
+    required this.amount,
+  });
+
+  final String label;
+  final double value;
+  final String displayValue;
+  final String amount;
+}
+
+Color _shareSliceColor(BuildContext context, int index) {
+  return _shareSliceColorFromTokens(context.looTokens, index);
+}
+
+Color _shareSliceColorFromTokens(LooThemeTokens tokens, int index) {
+  final colors = [
+    tokens.accent,
+    tokens.success,
+    tokens.info,
+    tokens.warning,
+    tokens.danger,
+    tokens.accentSoft,
+  ];
+  return colors[index % colors.length];
+}
+
+double _parsePercent(String value) {
+  final match = RegExp(r"[-+]?\d+(?:\.\d+)?").firstMatch(value);
+  return double.tryParse(match?.group(0) ?? "") ?? 0;
+}
+
 class _FilterSummaryCard extends StatelessWidget {
   const _FilterSummaryCard(this.data);
 
@@ -454,143 +779,6 @@ class _FilterSummaryCard extends StatelessWidget {
             ],
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _PortfolioTrendCard extends StatelessWidget {
-  const _PortfolioTrendCard({
-    required this.chart,
-    required this.fallbackPoints,
-  });
-
-  final MobileChartSeries? chart;
-  final List<MobilePortfolioPerformancePoint> fallbackPoints;
-
-  @override
-  Widget build(BuildContext context) {
-    final points = chart?.points
-            .map((point) => (
-                  label: point.label,
-                  displayValue: point.displayValue,
-                  chartValue: point.value,
-                  rawDate: DateTime.tryParse(point.rawDate ?? ""),
-                ))
-            .toList() ??
-        fallbackPoints
-            .map((point) => (
-                  label: point.label,
-                  displayValue: point.displayValue,
-                  chartValue: point.chartValue,
-                  rawDate: null as DateTime?,
-                ))
-            .toList();
-    if (points.length < 2) {
-      return const SizedBox.shrink();
-    }
-
-    return LooGlassCard(
-      child: LooTrendChart(
-        title: chart?.title ?? "组合价值走势",
-        initialRange: LooTrendRange.ytd,
-        points: points
-            .map(
-              (point) => LooTrendPoint(
-                label: point.label,
-                displayValue: point.displayValue,
-                value: point.chartValue,
-                rawDate: point.rawDate,
-              ),
-            )
-            .toList(),
-      ),
-    );
-  }
-}
-
-class _DistributionTab {
-  const _DistributionTab({
-    required this.label,
-    required this.title,
-    required this.segments,
-  });
-
-  final String label;
-  final String title;
-  final List<LooDistributionSegment> segments;
-}
-
-class _DistributionTabSwitch extends StatelessWidget {
-  const _DistributionTabSwitch({
-    required this.tabs,
-    required this.selectedIndex,
-    required this.onSelected,
-  });
-
-  final List<_DistributionTab> tabs;
-  final int selectedIndex;
-  final ValueChanged<int> onSelected;
-
-  @override
-  Widget build(BuildContext context) {
-    final tokens = context.looTokens;
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.28),
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: tokens.cardBorder),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(3),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            for (var index = 0; index < tabs.length; index++)
-              _DistributionTabButton(
-                label: tabs[index].label,
-                isSelected: index == selectedIndex,
-                onTap: () => onSelected(index),
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _DistributionTabButton extends StatelessWidget {
-  const _DistributionTabButton({
-    required this.label,
-    required this.isSelected,
-    required this.onTap,
-  });
-
-  final String label;
-  final bool isSelected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final tokens = context.looTokens;
-    return InkWell(
-      borderRadius: BorderRadius.circular(999),
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 160),
-        curve: Curves.easeOutCubic,
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-        decoration: BoxDecoration(
-          color: isSelected ? tokens.accent.withValues(alpha: 0.22) : null,
-          borderRadius: BorderRadius.circular(999),
-        ),
-        child: Text(
-          label,
-          style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                color: isSelected ? tokens.accent : tokens.mutedText,
-                fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
-              ),
-        ),
       ),
     );
   }
