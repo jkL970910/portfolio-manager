@@ -123,6 +123,7 @@ class _AccountDetailPageState extends State<AccountDetailPage> {
                 children: [
                   _SummaryCard(
                     data,
+                    onOpenShare: () => _openPortfolioShare(data),
                     onOpenHealth: () => _openHealthScore(data),
                   ),
                   const SizedBox(height: 12),
@@ -161,14 +162,34 @@ class _AccountDetailPageState extends State<AccountDetailPage> {
   }
 
   void _openHealthScore(MobileAccountDetailSnapshot data) {
-    Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (_) => HealthScorePage(
-          apiClient: widget.apiClient,
-          accountId: widget.accountId,
-          fallbackTitle: "${data.name}健康巡查",
-        ),
+    showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      isScrollControlled: true,
+      builder: (_) => _AccountHealthSheet(
+        data: data,
+        onOpenFullHealth: () {
+          Navigator.of(context).pop();
+          Navigator.of(context).push(
+            MaterialPageRoute<void>(
+              builder: (_) => HealthScorePage(
+                apiClient: widget.apiClient,
+                accountId: widget.accountId,
+                fallbackTitle: "${data.name}健康巡查",
+              ),
+            ),
+          );
+        },
       ),
+    );
+  }
+
+  void _openPortfolioShare(MobileAccountDetailSnapshot data) {
+    showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      isScrollControlled: true,
+      builder: (_) => _AccountPortfolioShareSheet(data: data),
     );
   }
 
@@ -368,7 +389,6 @@ class MobileAccountDetailSnapshot {
       subtitle: [
         accountData["typeLabel"] as String? ?? "",
         accountData["institution"] as String? ?? "",
-        accountData["portfolioShare"] as String? ?? "",
       ].where((item) => item.isNotEmpty).join(" · "),
       summaryPoints: (accountData["summaryPoints"] as List?)
               ?.whereType<String>()
@@ -395,9 +415,14 @@ class MobileAccountDetailSnapshot {
 }
 
 class _SummaryCard extends StatelessWidget {
-  const _SummaryCard(this.data, {required this.onOpenHealth});
+  const _SummaryCard(
+    this.data, {
+    required this.onOpenShare,
+    required this.onOpenHealth,
+  });
 
   final MobileAccountDetailSnapshot data;
+  final VoidCallback onOpenShare;
   final VoidCallback onOpenHealth;
 
   @override
@@ -444,10 +469,24 @@ class _SummaryCard extends StatelessWidget {
             ],
           ),
           SizedBox(height: tokens.gapLg),
-          _AccountMetricStrip(data),
-          if (data.facts.isNotEmpty) ...[
-            const SizedBox(height: 12),
-            _AccountHeroFacts(facts: data.facts),
+          _AccountMetricStrip(
+            data,
+            onOpenShare: onOpenShare,
+            onOpenHealth: onOpenHealth,
+          ),
+          if (data.summaryPoints.isNotEmpty) ...[
+            SizedBox(height: tokens.gapSm),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                _MiniPill("持仓 ${data.holdings.length} 个"),
+                _MiniPill(
+                  data.summaryPoints.first,
+                  maxWidth: 280,
+                ),
+              ],
+            ),
           ],
         ],
       ),
@@ -623,17 +662,31 @@ String _slug(String value) {
 }
 
 class _AccountMetricStrip extends StatelessWidget {
-  const _AccountMetricStrip(this.data);
+  const _AccountMetricStrip(
+    this.data, {
+    required this.onOpenShare,
+    required this.onOpenHealth,
+  });
 
   final MobileAccountDetailSnapshot data;
+  final VoidCallback onOpenShare;
+  final VoidCallback onOpenHealth;
 
   @override
   Widget build(BuildContext context) {
     final tokens = context.looTokens;
     final metrics = [
       _MetricDatum("账户盈亏", _shortGainLoss(data.gainLoss)),
-      _MetricDatum("组合占比", _portfolioShareValue(data.portfolioShare)),
-      _MetricDatum("健康分", data.healthScore.score.replaceAll(" 分", "")),
+      _MetricDatum(
+        "组合占比",
+        _portfolioShareValue(data.portfolioShare),
+        onTap: onOpenShare,
+      ),
+      _MetricDatum(
+        "健康分",
+        data.healthScore.score.replaceAll(" 分", ""),
+        onTap: onOpenHealth,
+      ),
     ].where((item) => item.value.isNotEmpty && item.value != "--").toList();
 
     if (metrics.isEmpty) return const SizedBox.shrink();
@@ -670,10 +723,11 @@ class _AccountMetricStrip extends StatelessWidget {
 }
 
 class _MetricDatum {
-  const _MetricDatum(this.label, this.value);
+  const _MetricDatum(this.label, this.value, {this.onTap});
 
   final String label;
   final String value;
+  final VoidCallback? onTap;
 }
 
 class _MetricCard extends StatelessWidget {
@@ -684,16 +738,25 @@ class _MetricCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final tokens = context.looTokens;
-    return Column(
+    final content = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          metric.label,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: tokens.mutedText,
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                metric.label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: tokens.mutedText,
+                    ),
               ),
+            ),
+            if (metric.onTap != null)
+              Icon(Icons.open_in_new_rounded,
+                  size: 14, color: tokens.mutedText),
+          ],
         ),
         const SizedBox(height: 6),
         Text(
@@ -704,42 +767,19 @@ class _MetricCard extends StatelessWidget {
         ),
       ],
     );
-  }
-}
 
-class _AccountHeroFacts extends StatelessWidget {
-  const _AccountHeroFacts({required this.facts});
-
-  final List<MobileFact> facts;
-
-  @override
-  Widget build(BuildContext context) {
-    final tokens = context.looTokens;
-    final shownFacts = facts
-        .where((fact) => fact.value.isNotEmpty && fact.value != "--")
-        .take(4)
-        .toList();
-    if (shownFacts.isEmpty) {
-      return const SizedBox.shrink();
+    if (metric.onTap == null) {
+      return content;
     }
 
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.2),
-        borderRadius: BorderRadius.circular(tokens.radiusLg),
-        border: Border.all(color: tokens.cardBorder),
-      ),
-      child: Padding(
-        padding: EdgeInsets.all(tokens.gapMd),
-        child: Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: [
-            for (final fact in shownFacts)
-              _MiniPill(
-                fact.label.isEmpty ? fact.value : "${fact.label} ${fact.value}",
-              ),
-          ],
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(tokens.radiusMd),
+        onTap: metric.onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 2),
+          child: content,
         ),
       ),
     );
@@ -996,14 +1036,15 @@ class _SectionHeader extends StatelessWidget {
 }
 
 class _MiniPill extends StatelessWidget {
-  const _MiniPill(this.label);
+  const _MiniPill(this.label, {this.maxWidth});
 
   final String label;
+  final double? maxWidth;
 
   @override
   Widget build(BuildContext context) {
     final tokens = context.looTokens;
-    return DecoratedBox(
+    final pill = DecoratedBox(
       decoration: BoxDecoration(
         color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.38),
         borderRadius: BorderRadius.circular(999),
@@ -1011,7 +1052,168 @@ class _MiniPill extends StatelessWidget {
       ),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-        child: Text(label, style: Theme.of(context).textTheme.labelMedium),
+        child: Text(
+          label,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: Theme.of(context).textTheme.labelMedium,
+        ),
+      ),
+    );
+
+    if (maxWidth == null) {
+      return pill;
+    }
+
+    return ConstrainedBox(
+      constraints: BoxConstraints(maxWidth: maxWidth!),
+      child: pill,
+    );
+  }
+}
+
+class _AccountPortfolioShareSheet extends StatelessWidget {
+  const _AccountPortfolioShareSheet({required this.data});
+
+  final MobileAccountDetailSnapshot data;
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = context.looTokens;
+    final theme = Theme.of(context);
+    final allocations = data.allocation.take(5).toList();
+
+    return SafeArea(
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(
+          tokens.gapLg,
+          0,
+          tokens.gapLg,
+          tokens.gapXl,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text("组合占比", style: theme.textTheme.titleLarge),
+            SizedBox(height: tokens.gapSm),
+            Text(
+              data.portfolioShare.isEmpty ? "暂无组合占比" : data.portfolioShare,
+              style: theme.textTheme.displaySmall,
+            ),
+            SizedBox(height: tokens.gapXs),
+            Text(
+              "表示这个账户在整个组合中的权重。",
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: tokens.mutedText,
+              ),
+            ),
+            if (allocations.isNotEmpty) ...[
+              SizedBox(height: tokens.gapLg),
+              Text("账户内配置", style: theme.textTheme.titleMedium),
+              SizedBox(height: tokens.gapSm),
+              ...allocations.map(
+                (item) => Padding(
+                  padding: EdgeInsets.only(bottom: tokens.gapSm),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          item.name,
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                      Text(
+                        item.value,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: tokens.mutedText,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _AccountHealthSheet extends StatelessWidget {
+  const _AccountHealthSheet({
+    required this.data,
+    required this.onOpenFullHealth,
+  });
+
+  final MobileAccountDetailSnapshot data;
+  final VoidCallback onOpenFullHealth;
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = context.looTokens;
+    final theme = Theme.of(context);
+
+    return SafeArea(
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(
+          tokens.gapLg,
+          0,
+          tokens.gapLg,
+          tokens.gapXl,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text("账户健康分", style: theme.textTheme.titleLarge),
+            SizedBox(height: tokens.gapSm),
+            Text(
+              data.healthScore.score,
+              style: theme.textTheme.displaySmall,
+            ),
+            SizedBox(height: tokens.gapXs),
+            Text(
+              data.healthScore.status,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: tokens.mutedText,
+              ),
+            ),
+            if (data.healthScore.highlights.isNotEmpty) ...[
+              SizedBox(height: tokens.gapLg),
+              Text("重点提示", style: theme.textTheme.titleMedium),
+              SizedBox(height: tokens.gapSm),
+              ...data.healthScore.highlights.take(3).map(
+                    (item) => Padding(
+                      padding: EdgeInsets.only(bottom: tokens.gapSm),
+                      child: Text("• $item"),
+                    ),
+                  ),
+            ],
+            if (data.healthScore.actions.isNotEmpty) ...[
+              SizedBox(height: tokens.gapLg),
+              Text("建议动作", style: theme.textTheme.titleMedium),
+              SizedBox(height: tokens.gapSm),
+              ...data.healthScore.actions.take(3).map(
+                    (item) => Padding(
+                      padding: EdgeInsets.only(bottom: tokens.gapSm),
+                      child: Text("• $item"),
+                    ),
+                  ),
+            ],
+            SizedBox(height: tokens.gapLg),
+            Align(
+              alignment: Alignment.centerRight,
+              child: TextButton(
+                onPressed: onOpenFullHealth,
+                child: const Text("查看完整健康巡查"),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

@@ -319,7 +319,6 @@ class _PortfolioHeroCardState extends State<_PortfolioHeroCard> {
           SizedBox(height: tokens.gapMd),
           _PortfolioHeroMetrics(
             data: widget.data,
-            onOpenHealth: widget.onTap,
           ),
         ],
       ),
@@ -388,13 +387,9 @@ class _HeroChip extends StatelessWidget {
 }
 
 class _PortfolioHeroMetrics extends StatelessWidget {
-  const _PortfolioHeroMetrics({
-    required this.data,
-    required this.onOpenHealth,
-  });
+  const _PortfolioHeroMetrics({required this.data});
 
   final MobilePortfolioSnapshot data;
-  final VoidCallback onOpenHealth;
 
   @override
   Widget build(BuildContext context) {
@@ -408,15 +403,6 @@ class _PortfolioHeroMetrics extends StatelessWidget {
 
     return Row(
       children: [
-        Expanded(
-          child: _HeroMetricButton(
-            label: "健康分",
-            value: data.healthScore.replaceAll(" 分", ""),
-            icon: Icons.monitor_heart_outlined,
-            onTap: onOpenHealth,
-          ),
-        ),
-        const SizedBox(width: 8),
         Expanded(
           child: _HeroMetricButton(
             label: "组合占比",
