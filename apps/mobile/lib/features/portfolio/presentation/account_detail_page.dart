@@ -444,7 +444,7 @@ class _SummaryCard extends StatelessWidget {
           ),
           SizedBox(height: tokens.gapLg),
           _AccountMetricStrip(data),
-          const SizedBox(height: 14),
+          const SizedBox(height: 12),
           _AccountHeroInsights(
             health: data.healthScore,
             allocation: data.allocation,
@@ -635,7 +635,6 @@ class _AccountMetricStrip extends StatelessWidget {
       _MetricDatum("账户盈亏", _shortGainLoss(data.gainLoss)),
       _MetricDatum("组合占比", _portfolioShareValue(data.portfolioShare)),
       _MetricDatum("持仓数量", "${data.holdings.length} 个"),
-      _MetricDatum("健康度", data.healthScore.score),
     ].where((item) => item.value.isNotEmpty && item.value != "--").toList();
 
     if (metrics.isEmpty) return const SizedBox.shrink();
@@ -725,87 +724,69 @@ class _AccountHeroInsights extends StatelessWidget {
     final tokens = context.looTokens;
     final shownPoints =
         allocation.where((point) => point.rawValue > 0).take(5).toList();
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.22),
-        borderRadius: BorderRadius.circular(tokens.radiusLg),
-        border: Border.all(color: tokens.cardBorder),
-      ),
-      child: Padding(
-        padding: EdgeInsets.all(tokens.gapMd),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Divider(height: 1, color: tokens.cardBorder),
+        SizedBox(height: tokens.gapMd),
+        InkWell(
+          borderRadius: BorderRadius.circular(tokens.radiusMd),
+          onTap: onOpenHealth,
+          child: Padding(
+            padding: EdgeInsets.symmetric(vertical: tokens.gapXs),
+            child: Row(
               children: [
+                Text(
+                  health.score.replaceAll(" 分", ""),
+                  style: Theme.of(context).textTheme.headlineMedium,
+                ),
+                SizedBox(width: tokens.gapSm),
                 Expanded(
-                  child: InkWell(
-                    borderRadius: BorderRadius.circular(tokens.radiusMd),
-                    onTap: onOpenHealth,
-                    child: Padding(
-                      padding: EdgeInsets.symmetric(vertical: tokens.gapXs),
-                      child: Row(
-                        children: [
-                          Text(
-                            health.score.replaceAll(" 分", ""),
-                            style: Theme.of(context).textTheme.headlineMedium,
-                          ),
-                          SizedBox(width: tokens.gapSm),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  "账户健康度",
-                                  style: Theme.of(context).textTheme.labelLarge,
-                                ),
-                                Text(
-                                  health.status,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: Theme.of(context)
-                                      .textTheme
-                                      .bodySmall
-                                      ?.copyWith(color: tokens.mutedText),
-                                ),
-                              ],
-                            ),
-                          ),
-                          Icon(
-                            Icons.chevron_right_rounded,
-                            color: tokens.accent,
-                          ),
-                        ],
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        "账户健康度",
+                        style: Theme.of(context).textTheme.labelLarge,
                       ),
-                    ),
+                      Text(
+                        health.status,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: tokens.mutedText,
+                            ),
+                      ),
+                    ],
                   ),
                 ),
+                Icon(Icons.chevron_right_rounded, color: tokens.accent),
               ],
             ),
-            if (shownPoints.isNotEmpty) ...[
-              SizedBox(height: tokens.gapSm),
-              LooDistributionBar(
-                segments: shownPoints
-                    .map(
-                      (point) => LooDistributionSegment(
-                        label: point.name,
-                        value: point.rawValue,
-                      ),
-                    )
-                    .toList(),
-              ),
-              SizedBox(height: tokens.gapSm),
-              Wrap(
-                spacing: 6,
-                runSpacing: 6,
-                children: shownPoints
-                    .map((point) => _MiniPill("${point.name} ${point.value}"))
-                    .toList(growable: false),
-              ),
-            ],
-          ],
+          ),
         ),
-      ),
+        if (shownPoints.isNotEmpty) ...[
+          SizedBox(height: tokens.gapMd),
+          LooDistributionBar(
+            segments: shownPoints
+                .map(
+                  (point) => LooDistributionSegment(
+                    label: point.name,
+                    value: point.rawValue,
+                  ),
+                )
+                .toList(),
+          ),
+          SizedBox(height: tokens.gapSm),
+          Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            children: shownPoints
+                .map((point) => _MiniPill("${point.name} ${point.value}"))
+                .toList(growable: false),
+          ),
+        ],
+      ],
     );
   }
 }
