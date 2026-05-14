@@ -7,7 +7,9 @@ import "../../../app/mobile_routes.dart";
 import "../../../core/api/loo_api_client.dart";
 import "../../../core/presentation/loo_components.dart";
 import "../../../core/theme/loo_theme.dart";
+import "../../shared/data/mobile_chart_models.dart";
 import "../../shared/data/mobile_models.dart";
+import "../../shared/presentation/loo_charts.dart";
 import "../../shared/presentation/loo_minister_scope.dart";
 import "../data/mobile_portfolio_models.dart";
 import "health_score_page.dart";
@@ -133,6 +135,15 @@ class _PortfolioPageState extends State<PortfolioPage> {
                             snapshot.data!,
                             onTap: _openHealthScore,
                           ),
+                        if (!_isFiltered &&
+                            (snapshot.data!.portfolioValueChart != null ||
+                                snapshot.data!.performance.isNotEmpty)) ...[
+                          const SizedBox(height: 18),
+                          _PortfolioTrendCard(
+                            chart: snapshot.data!.portfolioValueChart,
+                            fallbackPoints: snapshot.data!.performance,
+                          ),
+                        ],
                         const SizedBox(height: 18),
                         _AccountsDropdownCard(
                           key: _accountsKey,
@@ -779,6 +790,56 @@ class _FilterSummaryCard extends StatelessWidget {
             ],
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _PortfolioTrendCard extends StatelessWidget {
+  const _PortfolioTrendCard({
+    required this.chart,
+    required this.fallbackPoints,
+  });
+
+  final MobileChartSeries? chart;
+  final List<MobilePortfolioPerformancePoint> fallbackPoints;
+
+  @override
+  Widget build(BuildContext context) {
+    final points = chart?.points
+            .map((point) => (
+                  label: point.label,
+                  displayValue: point.displayValue,
+                  chartValue: point.value,
+                  rawDate: DateTime.tryParse(point.rawDate ?? ""),
+                ))
+            .toList() ??
+        fallbackPoints
+            .map((point) => (
+                  label: point.label,
+                  displayValue: point.displayValue,
+                  chartValue: point.chartValue,
+                  rawDate: null as DateTime?,
+                ))
+            .toList();
+    if (points.length < 2) {
+      return const SizedBox.shrink();
+    }
+
+    return LooGlassCard(
+      child: LooTrendChart(
+        title: chart?.title ?? "组合价值走势",
+        initialRange: LooTrendRange.ytd,
+        points: points
+            .map(
+              (point) => LooTrendPoint(
+                label: point.label,
+                displayValue: point.displayValue,
+                value: point.chartValue,
+                rawDate: point.rawDate,
+              ),
+            )
+            .toList(),
       ),
     );
   }

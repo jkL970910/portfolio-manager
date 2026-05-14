@@ -637,6 +637,10 @@ class _SecurityDetailPageState extends State<SecurityDetailPage> {
                     data,
                     priceHistoryChart: priceHistoryChart,
                   ),
+                  if (priceHistoryChart != null) ...[
+                    const SizedBox(height: 12),
+                    _PerformanceChartCard(chart: priceHistoryChart),
+                  ],
                   const SizedBox(height: 12),
                   if (data.heldPosition == null)
                     const _UnheldPositionCard()
@@ -1101,10 +1105,6 @@ class _SecurityHeroFactsCard extends StatelessWidget {
                 color: tokens.mutedText,
               ),
             ),
-          ],
-          if (priceHistoryChart != null) ...[
-            const SizedBox(height: 14),
-            _PerformanceChartCard(chart: priceHistoryChart!),
           ],
         ],
       ),
@@ -2846,7 +2846,7 @@ class _PerformanceChartCard extends StatelessWidget {
     if (points.length < 2) {
       return const SizedBox.shrink();
     }
-    return _InnerPanel(
+    return LooGlassCard(
       child: LooTrendChart(
         title: "价格走势",
         points: points
