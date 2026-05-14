@@ -675,6 +675,10 @@ export function buildPortfolioHealthSummary(args: {
 
       return {
         id: holding.id,
+        securityId: holding.securityId,
+        symbol: holding.symbol,
+        exchange: holding.exchangeOverride ?? holding.quoteExchange ?? null,
+        currency: holding.currency ?? null,
         label: `${holding.symbol} · ${getAccountTypeLabel(account?.type ?? "Taxable", language)}`,
         href: `/portfolio/security/${encodeURIComponent(holding.symbol)}?account=${encodeURIComponent(holding.accountId)}&holding=${encodeURIComponent(holding.id)}`,
         score: round(holdingScore, 0),

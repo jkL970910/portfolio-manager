@@ -726,10 +726,13 @@ function mapMobilePortfolioOverviewData(
     })),
     holdings: payload.data.holdings.map((holding) => ({
       id: holding.id,
+      securityId: holding.securityId,
       symbol: holding.symbol,
       name: holding.name,
       assetClass: holding.assetClass,
       sector: holding.sector,
+      currency: holding.currency,
+      exchange: holding.exchange,
       accountId: holding.accountId,
       accountType: holding.accountType,
       account: holding.account,
@@ -787,10 +790,13 @@ function mapMobilePortfolioHoldingListItem(
 ): MobilePortfolioHoldingListItem {
   return {
     id: holding.id,
+    securityId: holding.securityId,
     symbol: holding.symbol,
     name: holding.name,
     assetClass: holding.assetClass,
     sector: holding.sector,
+    currency: holding.currency,
+    exchange: holding.exchange,
     accountId: holding.accountId,
     accountType: holding.accountType,
     account: holding.account,

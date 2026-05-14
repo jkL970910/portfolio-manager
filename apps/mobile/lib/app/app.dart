@@ -310,6 +310,20 @@ class _LooWealthAppState extends State<LooWealthApp> {
         if (holdingId == null || holdingId.isEmpty) {
           return false;
         }
+        final security =
+            _targetSecurity(action) ?? _ministerContext?.subject.security;
+        if (security != null && security.symbol.isNotEmpty) {
+          _router.push(
+            MobileRoutes.securityDetail(
+              symbol: security.symbol,
+              securityId: security.securityId,
+              exchange: security.exchange,
+              currency: security.currency,
+              holdingId: holdingId,
+            ),
+          );
+          return true;
+        }
         _router.push(MobileRoutes.holdingDetail(holdingId));
         return true;
       case "security-detail":
@@ -480,6 +494,7 @@ class _LooWealthAppState extends State<LooWealthApp> {
               securityId: state.uri.queryParameters["securityId"],
               exchange: state.uri.queryParameters["exchange"],
               currency: state.uri.queryParameters["currency"],
+              initialHoldingId: state.uri.queryParameters["holdingId"],
             );
           },
         ),

@@ -21,6 +21,7 @@ class SecurityDetailPage extends StatefulWidget {
     this.securityId,
     this.exchange,
     this.currency,
+    this.initialHoldingId,
     super.key,
   });
 
@@ -30,6 +31,7 @@ class SecurityDetailPage extends StatefulWidget {
   final String? securityId;
   final String? exchange;
   final String? currency;
+  final String? initialHoldingId;
 
   @override
   State<SecurityDetailPage> createState() => _SecurityDetailPageState();
@@ -52,6 +54,10 @@ class _SecurityDetailPageState extends State<SecurityDetailPage> {
   @override
   void initState() {
     super.initState();
+    final initialHoldingId = widget.initialHoldingId?.trim();
+    if (initialHoldingId != null && initialHoldingId.isNotEmpty) {
+      _selectedResearchScopeId = initialHoldingId;
+    }
     _snapshot = _loadSnapshot();
     _startExternalResearchPolling();
   }

@@ -23,6 +23,7 @@ class MobileRoutes {
     String? securityId,
     String? exchange,
     String? currency,
+    String? holdingId,
   }) {
     final params = <String, String>{
       if (securityId != null && securityId.trim().isNotEmpty)
@@ -31,6 +32,8 @@ class MobileRoutes {
         "exchange": exchange.trim(),
       if (currency != null && currency.trim().isNotEmpty)
         "currency": currency.trim(),
+      if (holdingId != null && holdingId.trim().isNotEmpty)
+        "holdingId": holdingId.trim(),
     };
     final query = params.isEmpty
         ? ""

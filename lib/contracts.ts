@@ -328,6 +328,10 @@ export interface PortfolioData {
       }[];
       holdingDrilldown: {
         id: string;
+        securityId?: string | null;
+        symbol?: string;
+        exchange?: string | null;
+        currency?: string | null;
         label: string;
         href?: string;
         score: number;
@@ -385,6 +389,10 @@ export interface PortfolioData {
     }[];
     holdingDrilldown: {
       id: string;
+      securityId?: string | null;
+      symbol?: string;
+      exchange?: string | null;
+      currency?: string | null;
       label: string;
       href?: string;
       score: number;
@@ -400,10 +408,13 @@ export interface PortfolioData {
   };
   holdings: {
     id: string;
+    securityId?: string | null;
     symbol: string;
     name: string;
     assetClass: string;
     sector: string;
+    currency?: "CAD" | "USD";
+    exchange?: string | null;
     accountId: string;
     accountType: string;
     account: string;

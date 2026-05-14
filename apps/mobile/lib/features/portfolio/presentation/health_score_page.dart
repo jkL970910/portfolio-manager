@@ -178,7 +178,20 @@ class _HealthScorePageState extends State<HealthScorePage> {
     if (item.id.isEmpty) {
       return;
     }
-    context.push(MobileRoutes.holdingDetail(item.id));
+    final symbol = item.symbol?.trim();
+    if (symbol == null || symbol.isEmpty) {
+      context.push(MobileRoutes.holdingDetail(item.id));
+      return;
+    }
+    context.push(
+      MobileRoutes.securityDetail(
+        symbol: symbol,
+        securityId: item.securityId,
+        exchange: item.exchange,
+        currency: item.currency,
+        holdingId: item.id,
+      ),
+    );
   }
 
   void _openAccountTypePortfolio(MobileHealthDrilldownItem item) {
@@ -429,6 +442,10 @@ class MobileHealthDrilldownItem {
     required this.summary,
     required this.drivers,
     required this.actions,
+    this.securityId,
+    this.symbol,
+    this.exchange,
+    this.currency,
   });
 
   final String id;
@@ -438,6 +455,10 @@ class MobileHealthDrilldownItem {
   final String summary;
   final List<String> drivers;
   final List<String> actions;
+  final String? securityId;
+  final String? symbol;
+  final String? exchange;
+  final String? currency;
 
   factory MobileHealthDrilldownItem.fromJson(Map<String, dynamic> json) {
     return MobileHealthDrilldownItem(
@@ -450,6 +471,10 @@ class MobileHealthDrilldownItem {
           (json["drivers"] as List?)?.whereType<String>().toList() ?? const [],
       actions:
           (json["actions"] as List?)?.whereType<String>().toList() ?? const [],
+      securityId: json["securityId"] as String?,
+      symbol: json["symbol"] as String?,
+      exchange: json["exchange"] as String?,
+      currency: json["currency"] as String?,
     );
   }
 }

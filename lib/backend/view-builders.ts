@@ -3041,11 +3041,14 @@ export function buildPortfolioData(args: {
             : 0;
         return {
           id: holding.id,
+          securityId: holding.securityId,
           symbol: holding.symbol,
           name: holding.name,
           assetClass: getHoldingEconomicAssetClass(holding),
           sector:
             getHoldingExposureProfile(holding).primarySector ?? holding.sector,
+          currency: (holding.currency as CurrencyCode | undefined) ?? "CAD",
+          exchange: holding.exchangeOverride ?? holding.quoteExchange ?? null,
           accountId: holding.accountId,
           accountType:
             accounts.find((account) => account.id === holding.accountId)
