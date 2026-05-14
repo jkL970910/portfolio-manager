@@ -954,8 +954,24 @@ function getReplayIdentityKey(
   return `${symbol.trim().toUpperCase()}::${exchange?.trim().toUpperCase() || ""}::${normalizeReplayCurrency(currency)}`;
 }
 
+function getHoldingReplayIdentityKey(holding: HoldingPosition) {
+  return holding.securityId
+    ? `security:${holding.securityId}`
+    : getReplayIdentityKey(
+        holding.symbol,
+        holding.exchangeOverride,
+        holding.currency,
+      );
+}
+
 function getPriceHistoryReplayKey(point: SecurityPriceHistoryPoint) {
   return point.priceTime ?? point.priceDate;
+}
+
+function getPriceHistoryReplayIdentityKey(point: SecurityPriceHistoryPoint) {
+  return point.securityId
+    ? `security:${point.securityId}`
+    : getReplayIdentityKey(point.symbol, point.exchange, point.currency);
 }
 
 function convertNativePriceToCad(
@@ -993,11 +1009,7 @@ function buildReplayedAggregateValueSeries(args: {
 
   const groupedCurrentQuantities = new Map<string, number>();
   for (const holding of relevantHoldings) {
-    const key = getReplayIdentityKey(
-      holding.symbol,
-      holding.exchangeOverride,
-      holding.currency,
-    );
+    const key = getHoldingReplayIdentityKey(holding);
     groupedCurrentQuantities.set(
       key,
       (groupedCurrentQuantities.get(key) ?? 0) +
@@ -1007,11 +1019,7 @@ function buildReplayedAggregateValueSeries(args: {
 
   const historiesBySymbol = new Map<string, SecurityPriceHistoryPoint[]>();
   for (const point of priceHistory) {
-    const key = getReplayIdentityKey(
-      point.symbol,
-      point.exchange,
-      point.currency,
-    );
+    const key = getPriceHistoryReplayIdentityKey(point);
     if (!groupedCurrentQuantities.has(key)) {
       continue;
     }
@@ -1090,10 +1098,19 @@ function buildReplayedAggregateValueSeries(args: {
   );
 
   const expectedHoldingCount = groupedCurrentQuantities.size;
-  const minCoveredHoldings = Math.max(
-    1,
-    Math.ceil(expectedHoldingCount * 0.75),
+  const currentValueByKey = new Map<string, number>();
+  for (const holding of relevantHoldings) {
+    const key = getHoldingReplayIdentityKey(holding);
+    currentValueByKey.set(
+      key,
+      (currentValueByKey.get(key) ?? 0) + Math.max(holding.marketValueCad, 0),
+    );
+  }
+  const totalCurrentValueCad = [...currentValueByKey.values()].reduce(
+    (sum, value) => sum + value,
+    0,
   );
+  const minCoveredValueCad = totalCurrentValueCad * 0.75;
 
   const rawSeries = replayDates
     .map((replayTime) => {
@@ -1118,6 +1135,7 @@ function buildReplayedAggregateValueSeries(args: {
 
       let totalValueCad = 0;
       let coveredHoldings = 0;
+      let coveredCurrentValueCad = 0;
       for (const [key, currentQuantity] of groupedCurrentQuantities.entries()) {
         const latestPrice = latestSeenPriceBySymbol.get(key);
         if (latestPrice == null) {
@@ -1130,6 +1148,7 @@ function buildReplayedAggregateValueSeries(args: {
         const quantityAtDate = currentQuantity - futureDelta;
         if (quantityAtDate > 0) {
           coveredHoldings += 1;
+          coveredCurrentValueCad += currentValueByKey.get(key) ?? 0;
           totalValueCad += Math.max(quantityAtDate, 0) * latestPrice;
         }
       }
@@ -1143,11 +1162,14 @@ function buildReplayedAggregateValueSeries(args: {
         rawDate: replayTime,
         value: round(convertCadToDisplay(totalValueCad, display), 2),
         coveredHoldings,
+        coveredCurrentValueCad,
       };
     })
     .filter(
       (point) =>
-        point.value > 0 && point.coveredHoldings >= minCoveredHoldings,
+        point.value > 0 &&
+        (expectedHoldingCount <= 1 ||
+          point.coveredCurrentValueCad >= minCoveredValueCad),
     );
 
   const firstValidIndex = rawSeries.findIndex(
@@ -1156,7 +1178,7 @@ function buildReplayedAggregateValueSeries(args: {
       (rawSeries[index + 1]?.coveredHoldings ?? 0) >= point.coveredHoldings,
   );
   const series = (firstValidIndex > 0 ? rawSeries.slice(firstValidIndex) : rawSeries)
-    .map(({ coveredHoldings: _coveredHoldings, ...point }) => point);
+    .map(({ coveredHoldings: _coveredHoldings, coveredCurrentValueCad: _coveredCurrentValueCad, ...point }) => point);
 
   return series.length >= 2 ? series : null;
 }
