@@ -139,13 +139,6 @@ class _AccountDetailPageState extends State<AccountDetailPage> {
                     holdings: data.holdings,
                     onOpenHolding: _openHoldingDetail,
                   ),
-                  if (data.facts.isNotEmpty) ...[
-                    const SizedBox(height: 16),
-                    _CompactFactsCard(
-                      title: "账户事实",
-                      facts: data.facts,
-                    ),
-                  ],
                 ],
               ),
             ),
@@ -458,6 +451,10 @@ class _SummaryCard extends StatelessWidget {
             allocation: data.allocation,
             onOpenHealth: onOpenHealth,
           ),
+          if (data.facts.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            _AccountHeroFacts(facts: data.facts),
+          ],
         ],
       ),
     );
@@ -799,35 +796,40 @@ class _AccountHeroInsights extends StatelessWidget {
   }
 }
 
-class _CompactFactsCard extends StatelessWidget {
-  const _CompactFactsCard({required this.title, required this.facts});
+class _AccountHeroFacts extends StatelessWidget {
+  const _AccountHeroFacts({required this.facts});
 
-  final String title;
   final List<MobileFact> facts;
 
   @override
   Widget build(BuildContext context) {
-    return LooGlassCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _SectionHeader(title: title),
-          const SizedBox(height: 10),
-          ...facts.take(5).map(
-                (fact) => Padding(
-                  padding: const EdgeInsets.only(top: 8),
-                  child: Row(
-                    children: [
-                      Expanded(child: Text(fact.label)),
-                      Text(
-                        fact.value,
-                        style: Theme.of(context).textTheme.titleSmall,
-                      ),
-                    ],
-                  ),
-                ),
+    final tokens = context.looTokens;
+    final shownFacts = facts
+        .where((fact) => fact.value.isNotEmpty && fact.value != "--")
+        .take(4)
+        .toList();
+    if (shownFacts.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.2),
+        borderRadius: BorderRadius.circular(tokens.radiusLg),
+        border: Border.all(color: tokens.cardBorder),
+      ),
+      child: Padding(
+        padding: EdgeInsets.all(tokens.gapMd),
+        child: Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            for (final fact in shownFacts)
+              _MiniPill(
+                fact.label.isEmpty ? fact.value : "${fact.label} ${fact.value}",
               ),
-        ],
+          ],
+        ),
       ),
     );
   }

@@ -2602,20 +2602,88 @@ class MobileHeldAccountSummary {
   }
 }
 
-class _MetricGrid extends StatelessWidget {
+class _MetricGrid extends StatefulWidget {
   const _MetricGrid(this.data);
 
   final MobileSecurityDetailSnapshot data;
 
   @override
+  State<_MetricGrid> createState() => _MetricGridState();
+}
+
+class _MetricGridState extends State<_MetricGrid> {
+  bool _expanded = false;
+
+  @override
   Widget build(BuildContext context) {
+    final tokens = context.looTokens;
+    final metrics = _buildMetrics(widget.data);
+
+    if (metrics.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    final visibleMetrics = _expanded ? metrics : metrics.take(4).toList();
+    final hiddenCount = metrics.length - visibleMetrics.length;
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final width = (constraints.maxWidth - 8) / 2;
+        return Column(
+          children: [
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: visibleMetrics
+                  .map(
+                    (metric) => SizedBox(
+                      width: width,
+                      child: _MetricCard(metric),
+                    ),
+                  )
+                  .toList(),
+            ),
+            if (metrics.length > 4) ...[
+              SizedBox(height: tokens.gapSm),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton.icon(
+                  style: TextButton.styleFrom(
+                    visualDensity: VisualDensity.compact,
+                    padding: EdgeInsets.zero,
+                    foregroundColor: tokens.accent,
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                  onPressed: () => setState(() => _expanded = !_expanded),
+                  icon: Icon(
+                    _expanded
+                        ? Icons.keyboard_arrow_up_rounded
+                        : Icons.keyboard_arrow_down_rounded,
+                    size: 18,
+                  ),
+                  label: Text(_expanded ? "收起补充信息" : "展开 $hiddenCount 项补充信息"),
+                ),
+              ),
+            ],
+          ],
+        );
+      },
+    );
+  }
+
+  List<_MetricDatum> _buildMetrics(MobileSecurityDetailSnapshot data) {
     final held = data.heldPosition;
-    final metrics = [
+    return [
       _MetricDatum("最新价格", data.lastPrice),
       if (data.assetClass.isNotEmpty) _MetricDatum("资产属性", data.assetClass),
       if (data.sector.isNotEmpty) _MetricDatum("行业", data.sector),
-      if (data.exchange.isNotEmpty) _MetricDatum("交易所", data.exchange),
-      if (data.currency.isNotEmpty) _MetricDatum("交易币种", data.currency),
+      if (data.exchange.isNotEmpty || data.currency.isNotEmpty)
+        _MetricDatum(
+          "交易市场",
+          [data.exchange, data.currency]
+              .where((item) => item.trim().isNotEmpty)
+              .join(" · "),
+        ),
       if (data.priceHistoryChart != null)
         _MetricDatum("价格历史", data.priceHistoryChart!.freshness.label),
       if (data.facts.isNotEmpty)
@@ -2625,28 +2693,6 @@ class _MetricGrid extends StatelessWidget {
       if (held == null)
         _MetricDatum("相关持仓", "${data.relatedHoldings.length} 个"),
     ].where((item) => item.value.isNotEmpty && item.value != "--").toList();
-
-    if (metrics.isEmpty) {
-      return const SizedBox.shrink();
-    }
-
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final width = (constraints.maxWidth - 8) / 2;
-        return Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: metrics
-              .map(
-                (metric) => SizedBox(
-                  width: width,
-                  child: _MetricCard(metric),
-                ),
-              )
-              .toList(),
-        );
-      },
-    );
   }
 }
 
