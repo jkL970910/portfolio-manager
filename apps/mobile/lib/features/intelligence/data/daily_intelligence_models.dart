@@ -48,6 +48,72 @@ class MobileDailyIntelligenceSnapshot {
   }
 }
 
+class MobileDailyIntelligenceAiSummary {
+  const MobileDailyIntelligenceAiSummary({
+    required this.itemId,
+    required this.generatedAt,
+    required this.headline,
+    required this.coreSummary,
+    required this.relatedFields,
+    required this.affectedHoldings,
+    required this.portfolioImpact,
+    required this.watchPoints,
+    required this.cached,
+    required this.expiresAt,
+  });
+
+  final String itemId;
+  final String generatedAt;
+  final String headline;
+  final String coreSummary;
+  final List<String> relatedFields;
+  final List<MobileDailyIntelligenceAffectedHolding> affectedHoldings;
+  final String portfolioImpact;
+  final List<String> watchPoints;
+  final bool cached;
+  final String expiresAt;
+
+  factory MobileDailyIntelligenceAiSummary.fromJson(
+      Map<String, dynamic> json) {
+    return MobileDailyIntelligenceAiSummary(
+      itemId: json["itemId"] as String? ?? "",
+      generatedAt: json["generatedAt"] as String? ?? "",
+      headline: json["headline"] as String? ?? "AI 摘要",
+      coreSummary: json["coreSummary"] as String? ?? "",
+      relatedFields:
+          (json["relatedFields"] as List?)?.whereType<String>().toList() ??
+              const [],
+      affectedHoldings: readJsonList(json, "affectedHoldings")
+          .map(MobileDailyIntelligenceAffectedHolding.fromJson)
+          .toList(),
+      portfolioImpact: json["portfolioImpact"] as String? ?? "",
+      watchPoints:
+          (json["watchPoints"] as List?)?.whereType<String>().toList() ??
+              const [],
+      cached: json["cached"] as bool? ?? false,
+      expiresAt: json["expiresAt"] as String? ?? "",
+    );
+  }
+}
+
+class MobileDailyIntelligenceAffectedHolding {
+  const MobileDailyIntelligenceAffectedHolding({
+    required this.symbol,
+    required this.reason,
+  });
+
+  final String symbol;
+  final String reason;
+
+  factory MobileDailyIntelligenceAffectedHolding.fromJson(
+      Map<String, dynamic> json) {
+    return MobileDailyIntelligenceAffectedHolding(
+      symbol: json["symbol"] as String? ?? "",
+      reason: json["reason"] as String? ?? "",
+    );
+  }
+}
+
 class MobileDailyIntelligenceItem {
   const MobileDailyIntelligenceItem({
     required this.id,

@@ -122,6 +122,13 @@ class LooApiClient {
     return _getJson("/api/mobile/intelligence/daily?limit=$limit");
   }
 
+  Future<Map<String, dynamic>> createDailyIntelligenceAiSummary(String itemId) {
+    return _postJson(
+      "/api/mobile/intelligence/daily/summary",
+      body: {"itemId": itemId},
+    );
+  }
+
   Future<Map<String, dynamic>> createRecommendationRun(
       double contributionAmountCad) {
     return _postJson(

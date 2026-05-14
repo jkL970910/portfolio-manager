@@ -46,6 +46,15 @@ class LooTrendChart extends StatefulWidget {
 
 class _LooTrendChartState extends State<LooTrendChart> {
   late LooTrendRange _selectedRange = widget.initialRange;
+  late final PageController _pageController;
+  var _selectedMode = _LooTrendChartMode.amount;
+  var _page = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _pageController = PageController();
+  }
 
   @override
   void didUpdateWidget(covariant LooTrendChart oldWidget) {
@@ -53,6 +62,12 @@ class _LooTrendChartState extends State<LooTrendChart> {
     if (oldWidget.initialRange != widget.initialRange) {
       _selectedRange = widget.initialRange;
     }
+  }
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
   }
 
   @override
@@ -86,6 +101,29 @@ class _LooTrendChartState extends State<LooTrendChart> {
     final mutedColor = colorScheme.onSurface.withValues(alpha: 0.64);
     final positiveColor = colorScheme.tertiary;
     final negativeColor = colorScheme.error;
+    final monthlyReturns = _monthlyReturns(allPoints);
+    final pages = <Widget>[
+      _TrendLinePanel(
+        points: points,
+        selectedMode: _selectedMode,
+        selectedRange: _selectedRange,
+        enabledRanges: enabledRanges,
+        first: first,
+        last: last,
+        delta: delta,
+        percent: percent,
+        positiveColor: positiveColor,
+        negativeColor: negativeColor,
+        onModeChanged: (mode) => setState(() => _selectedMode = mode),
+        onRangeChanged: (range) => setState(() => _selectedRange = range),
+      ),
+      _MonthlyReturnPanel(
+        months: monthlyReturns,
+        year: monthlyReturns.isNotEmpty
+            ? monthlyReturns.last.month.year
+            : DateTime.now().year,
+      ),
+    ];
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -102,56 +140,51 @@ class _LooTrendChartState extends State<LooTrendChart> {
           ],
         ),
         const SizedBox(height: 12),
-        SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: Row(
-            children: LooTrendRange.values.map((range) {
-              final enabled = enabledRanges[range] == true;
-              return Padding(
-                padding: const EdgeInsets.only(right: 8),
-                child: ChoiceChip(
-                  label: Text(range.label),
-                  selected: _selectedRange == range,
-                  onSelected: enabled
-                      ? (_) => setState(() => _selectedRange = range)
-                      : null,
-                ),
-              );
-            }).toList(),
+        SizedBox(
+          height: 286,
+          child: PageView(
+            controller: _pageController,
+            onPageChanged: (value) => setState(() => _page = value),
+            children: pages,
           ),
         ),
         const SizedBox(height: 12),
-        LooLineChart(
-          points: points
-              .map(
-                (point) => LooLineChartPoint(
-                  label: point.label,
-                  value: point.value,
-                  displayValue: point.displayValue,
-                ),
-              )
-              .toList(),
-        ),
-        const SizedBox(height: 12),
-        Row(
-          children: [
-            Expanded(
-              child: Text(
-                "${first.label} → ${last.label}",
-                style: theme.textTheme.bodyMedium,
-              ),
-            ),
-            Text(
-              "${_selectedRange.label} ${_formatDelta(delta)} · ${_formatPercent(percent)}",
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: delta >= 0 ? positiveColor : negativeColor,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-          ],
+        Center(
+          child: _TrendCarouselDots(
+            count: pages.length,
+            activeIndex: _page,
+          ),
         ),
       ],
     );
+  }
+
+  List<_MonthlyReturn> _monthlyReturns(List<LooTrendPoint> points) {
+    final datedPoints = points.where((point) => point.rawDate != null).toList();
+    if (datedPoints.length < 2) return const [];
+    final byMonth = <DateTime, List<LooTrendPoint>>{};
+    for (final point in datedPoints) {
+      final rawDate = point.rawDate!;
+      final month = DateTime(rawDate.year, rawDate.month);
+      byMonth.putIfAbsent(month, () => <LooTrendPoint>[]).add(point);
+    }
+
+    final months = byMonth.entries.toList()
+      ..sort((left, right) => left.key.compareTo(right.key));
+    return months.map((entry) {
+      final monthPoints = entry.value
+        ..sort((left, right) => left.rawDate!.compareTo(right.rawDate!));
+      final first = monthPoints.first;
+      final last = monthPoints.last;
+      return _MonthlyReturn(
+        month: entry.key,
+        delta: last.value - first.value,
+        percent: first.value == 0
+            ? 0
+            : (last.value - first.value) / first.value * 100,
+        hasData: monthPoints.length >= 2,
+      );
+    }).toList();
   }
 
   List<LooTrendPoint> _filteredPoints(
@@ -183,18 +216,21 @@ class _LooTrendChartState extends State<LooTrendChart> {
     if (range == LooTrendRange.oneDay) {
       return filtered;
     }
+    if (range == LooTrendRange.oneWeek) {
+      return _compressToHourlyClosingPoints(filtered);
+    }
     return _compressToDailyClosingPoints(filtered);
   }
 
   List<LooTrendPoint> _normalizeSeries(List<LooTrendPoint> points) {
     final sorted = [...points]..sort((left, right) {
-      final leftDate = left.rawDate;
-      final rightDate = right.rawDate;
-      if (leftDate == null && rightDate == null) return 0;
-      if (leftDate == null) return -1;
-      if (rightDate == null) return 1;
-      return leftDate.compareTo(rightDate);
-    });
+        final leftDate = left.rawDate;
+        final rightDate = right.rawDate;
+        if (leftDate == null && rightDate == null) return 0;
+        if (leftDate == null) return -1;
+        if (rightDate == null) return 1;
+        return leftDate.compareTo(rightDate);
+      });
     final byTimestamp = <int, LooTrendPoint>{};
     for (final point in sorted) {
       final key = point.rawDate?.millisecondsSinceEpoch ?? point.label.hashCode;
@@ -211,7 +247,8 @@ class _LooTrendChartState extends State<LooTrendChart> {
       });
   }
 
-  List<LooTrendPoint> _compressToDailyClosingPoints(List<LooTrendPoint> points) {
+  List<LooTrendPoint> _compressToDailyClosingPoints(
+      List<LooTrendPoint> points) {
     if (points.length < 2) return points;
     final byDay = <DateTime, LooTrendPoint>{};
     for (final point in points) {
@@ -229,21 +266,429 @@ class _LooTrendChartState extends State<LooTrendChart> {
     return compressed.map((entry) => entry.value).toList();
   }
 
-  String _formatDelta(double value) {
-    final sign = value >= 0 ? "+" : "-";
-    final absValue = value.abs();
-    if (absValue >= 1000000) {
-      return "$sign\$${(absValue / 1000000).toStringAsFixed(1)}M";
+  List<LooTrendPoint> _compressToHourlyClosingPoints(
+      List<LooTrendPoint> points) {
+    if (points.length < 2) return points;
+    final byHour = <DateTime, LooTrendPoint>{};
+    for (final point in points) {
+      final rawDate = point.rawDate;
+      if (rawDate == null) continue;
+      final hour =
+          DateTime(rawDate.year, rawDate.month, rawDate.day, rawDate.hour);
+      final existing = byHour[hour];
+      if (existing == null ||
+          (existing.rawDate != null && rawDate.isAfter(existing.rawDate!))) {
+        byHour[hour] = point;
+      }
     }
-    if (absValue >= 1000) {
-      return "$sign\$${(absValue / 1000).toStringAsFixed(1)}k";
-    }
-    return "$sign\$${absValue.toStringAsFixed(0)}";
+    final compressed = byHour.entries.toList()
+      ..sort((left, right) => left.key.compareTo(right.key));
+    return compressed.map((entry) => entry.value).toList();
+  }
+}
+
+class _TrendLinePanel extends StatelessWidget {
+  const _TrendLinePanel({
+    required this.points,
+    required this.selectedMode,
+    required this.selectedRange,
+    required this.enabledRanges,
+    required this.first,
+    required this.last,
+    required this.delta,
+    required this.percent,
+    required this.positiveColor,
+    required this.negativeColor,
+    required this.onModeChanged,
+    required this.onRangeChanged,
+  });
+
+  final List<LooTrendPoint> points;
+  final _LooTrendChartMode selectedMode;
+  final LooTrendRange selectedRange;
+  final Map<LooTrendRange, bool> enabledRanges;
+  final LooTrendPoint first;
+  final LooTrendPoint last;
+  final double delta;
+  final double percent;
+  final Color positiveColor;
+  final Color negativeColor;
+  final ValueChanged<_LooTrendChartMode> onModeChanged;
+  final ValueChanged<LooTrendRange> onRangeChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final chartPoints = selectedMode == _LooTrendChartMode.percent
+        ? _asPercentPoints(points)
+        : points
+            .map(
+              (point) => LooLineChartPoint(
+                label: point.label,
+                value: point.value,
+                displayValue: point.displayValue,
+              ),
+            )
+            .toList();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            const Spacer(),
+            _TrendModeSwitch(
+              selectedMode: selectedMode,
+              onChanged: onModeChanged,
+            ),
+          ],
+        ),
+        const SizedBox(height: 10),
+        SizedBox(
+          height: 176,
+          child: LooLineChart(
+            points: chartPoints,
+            axisValueFormatter: selectedMode == _LooTrendChartMode.percent
+                ? _formatAxisPercent
+                : null,
+          ),
+        ),
+        const SizedBox(height: 10),
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            children: LooTrendRange.values.map((range) {
+              final enabled = enabledRanges[range] == true;
+              return Padding(
+                padding: const EdgeInsets.only(right: 8),
+                child: ChoiceChip(
+                  label: Text(range.label),
+                  selected: selectedRange == range,
+                  onSelected: enabled ? (_) => onRangeChanged(range) : null,
+                ),
+              );
+            }).toList(),
+          ),
+        ),
+        const SizedBox(height: 10),
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                "${first.label} → ${last.label}",
+                style: theme.textTheme.bodyMedium,
+              ),
+            ),
+            Text(
+              "${selectedRange.label} ${_formatDelta(delta)} · ${_formatPercent(percent)}",
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: delta >= 0 ? positiveColor : negativeColor,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
   }
 
-  String _formatPercent(double value) {
-    final sign = value >= 0 ? "+" : "";
+  List<LooLineChartPoint> _asPercentPoints(List<LooTrendPoint> points) {
+    final base = points.first.value;
+    if (base == 0) {
+      return points
+          .map(
+            (point) => LooLineChartPoint(
+              label: point.label,
+              value: 0,
+              displayValue: "${point.displayValue} · 0.0%",
+            ),
+          )
+          .toList();
+    }
+
+    return points.map((point) {
+      final value = (point.value - base) / base * 100;
+      return LooLineChartPoint(
+        label: point.label,
+        value: value,
+        displayValue: "${point.displayValue} · ${_formatPercent(value)}",
+      );
+    }).toList();
+  }
+
+  String _formatAxisPercent(double value) {
+    final sign = value > 0 ? "+" : "";
     return "$sign${value.toStringAsFixed(1)}%";
+  }
+}
+
+class _MonthlyReturnPanel extends StatelessWidget {
+  const _MonthlyReturnPanel({
+    required this.months,
+    required this.year,
+  });
+
+  final List<_MonthlyReturn> months;
+  final int year;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final byMonth = {
+      for (final item in months)
+        if (item.month.year == year) item.month.month: item,
+    };
+    final total = months
+        .where((item) => item.month.year == year && item.hasData)
+        .fold<double>(0, (sum, item) => sum + item.delta);
+    final totalColor =
+        total >= 0 ? theme.colorScheme.tertiary : theme.colorScheme.error;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        Row(
+          children: [
+            Icon(Icons.chevron_left, color: theme.colorScheme.onSurfaceVariant),
+            Expanded(
+              child: Column(
+                children: [
+                  Text(
+                    "$year 年",
+                    style: theme.textTheme.headlineSmall?.copyWith(
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  Text(
+                    _formatDelta(total),
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      color: totalColor,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Icon(Icons.chevron_right,
+                color: theme.colorScheme.onSurfaceVariant),
+          ],
+        ),
+        const SizedBox(height: 14),
+        Expanded(
+          child: GridView.builder(
+            physics: const NeverScrollableScrollPhysics(),
+            padding: EdgeInsets.zero,
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 4,
+              childAspectRatio: 1.45,
+              crossAxisSpacing: 8,
+              mainAxisSpacing: 8,
+            ),
+            itemCount: 12,
+            itemBuilder: (context, index) {
+              final month = index + 1;
+              return _MonthlyReturnTile(
+                month: month,
+                item: byMonth[month],
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _MonthlyReturnTile extends StatelessWidget {
+  const _MonthlyReturnTile({
+    required this.month,
+    required this.item,
+  });
+
+  final int month;
+  final _MonthlyReturn? item;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final data = item;
+    final hasData = data != null && data.hasData;
+    final isPositive = (data?.delta ?? 0) >= 0;
+    final isLatest = hasData &&
+        data.month.year == DateTime.now().year &&
+        data.month.month == DateTime.now().month;
+    final foreground = isLatest
+        ? Colors.white
+        : hasData
+            ? (isPositive ? colorScheme.tertiary : colorScheme.error)
+            : colorScheme.onSurfaceVariant.withValues(alpha: 0.56);
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: isLatest
+            ? colorScheme.primary
+            : colorScheme.surfaceContainerHighest.withValues(
+                alpha: hasData ? 0.58 : 0.22,
+              ),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(
+          color: isLatest
+              ? colorScheme.primary
+              : colorScheme.outlineVariant.withValues(alpha: 0.42),
+        ),
+      ),
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              "$month月",
+              style: theme.textTheme.titleSmall?.copyWith(
+                color: foreground,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              hasData ? _formatDelta(data.delta) : "-",
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.labelMedium?.copyWith(
+                color: foreground,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _MonthlyReturn {
+  const _MonthlyReturn({
+    required this.month,
+    required this.delta,
+    required this.percent,
+    required this.hasData,
+  });
+
+  final DateTime month;
+  final double delta;
+  final double percent;
+  final bool hasData;
+}
+
+class _TrendCarouselDots extends StatelessWidget {
+  const _TrendCarouselDots({
+    required this.count,
+    required this.activeIndex,
+  });
+
+  final int count;
+  final int activeIndex;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: List.generate(count, (index) {
+        final active = index == activeIndex;
+        return AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          curve: Curves.easeOut,
+          margin: const EdgeInsets.symmetric(horizontal: 4),
+          width: active ? 28 : 9,
+          height: 9,
+          decoration: BoxDecoration(
+            color: active
+                ? colorScheme.primary
+                : colorScheme.outlineVariant.withValues(alpha: 0.8),
+            borderRadius: BorderRadius.circular(999),
+          ),
+        );
+      }),
+    );
+  }
+}
+
+String _formatDelta(double value) {
+  final sign = value >= 0 ? "+" : "-";
+  final absValue = value.abs();
+  if (absValue >= 1000000) {
+    return "$sign\$${(absValue / 1000000).toStringAsFixed(1)}M";
+  }
+  if (absValue >= 1000) {
+    return "$sign\$${(absValue / 1000).toStringAsFixed(1)}k";
+  }
+  return "$sign\$${absValue.toStringAsFixed(0)}";
+}
+
+String _formatPercent(double value) {
+  final sign = value >= 0 ? "+" : "";
+  return "$sign${value.toStringAsFixed(1)}%";
+}
+
+enum _LooTrendChartMode {
+  amount("金额"),
+  percent("收益率");
+
+  const _LooTrendChartMode(this.label);
+
+  final String label;
+}
+
+class _TrendModeSwitch extends StatelessWidget {
+  const _TrendModeSwitch({
+    required this.selectedMode,
+    required this.onChanged,
+  });
+
+  final _LooTrendChartMode selectedMode;
+  final ValueChanged<_LooTrendChartMode> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.64),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(
+          color: colorScheme.outlineVariant.withValues(alpha: 0.7),
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: _LooTrendChartMode.values.map((mode) {
+          final selected = selectedMode == mode;
+          return InkWell(
+            borderRadius: BorderRadius.circular(16),
+            onTap: () => onChanged(mode),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 180),
+              curve: Curves.easeOutCubic,
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+              decoration: BoxDecoration(
+                color: selected
+                    ? colorScheme.primary.withValues(alpha: 0.22)
+                    : Colors.transparent,
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Text(
+                mode.label,
+                style: theme.textTheme.labelSmall?.copyWith(
+                  color: selected
+                      ? colorScheme.primary
+                      : colorScheme.onSurfaceVariant,
+                  fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
+                ),
+              ),
+            ),
+          );
+        }).toList(),
+      ),
+    );
   }
 }
 
@@ -287,11 +732,13 @@ class LooLineChart extends StatefulWidget {
   const LooLineChart({
     required this.points,
     this.height = 180,
+    this.axisValueFormatter,
     super.key,
   });
 
   final List<LooLineChartPoint> points;
   final double height;
+  final String Function(double value)? axisValueFormatter;
 
   @override
   State<LooLineChart> createState() => _LooLineChartState();
@@ -345,6 +792,7 @@ class _LooLineChartState extends State<LooLineChart> {
               painter: _LineChartPainter(
                 points: widget.points,
                 selectedIndex: _selectedIndex,
+                axisValueFormatter: widget.axisValueFormatter,
                 lineColor: theme.colorScheme.primary,
                 fillColor: theme.colorScheme.primary.withValues(alpha: 0.12),
                 gridColor: theme.colorScheme.outlineVariant,
@@ -390,6 +838,7 @@ class _LineChartPainter extends CustomPainter {
   const _LineChartPainter({
     required this.points,
     required this.selectedIndex,
+    required this.axisValueFormatter,
     required this.lineColor,
     required this.fillColor,
     required this.gridColor,
@@ -400,6 +849,7 @@ class _LineChartPainter extends CustomPainter {
 
   final List<LooLineChartPoint> points;
   final int? selectedIndex;
+  final String Function(double value)? axisValueFormatter;
   final Color lineColor;
   final Color fillColor;
   final Color gridColor;
@@ -547,6 +997,10 @@ class _LineChartPainter extends CustomPainter {
   }
 
   String _formatAxisValue(double value) {
+    final formatter = axisValueFormatter;
+    if (formatter != null) {
+      return formatter(value);
+    }
     final absValue = value.abs();
     final sign = value < 0 ? "-" : "";
     if (absValue >= 1000000) {
@@ -562,6 +1016,7 @@ class _LineChartPainter extends CustomPainter {
   bool shouldRepaint(covariant _LineChartPainter oldDelegate) {
     return oldDelegate.points != points ||
         oldDelegate.selectedIndex != selectedIndex ||
+        oldDelegate.axisValueFormatter != axisValueFormatter ||
         oldDelegate.lineColor != lineColor ||
         oldDelegate.fillColor != fillColor ||
         oldDelegate.gridColor != gridColor ||

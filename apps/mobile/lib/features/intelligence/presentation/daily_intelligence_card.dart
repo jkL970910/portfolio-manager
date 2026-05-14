@@ -6,12 +6,17 @@ import "../../../core/presentation/loo_components.dart";
 import "../../../core/theme/loo_theme.dart";
 import "../data/daily_intelligence_models.dart";
 
+typedef DailyIntelligenceAiSummaryLoader
+    = Future<MobileDailyIntelligenceAiSummary> Function(
+        MobileDailyIntelligenceItem item);
+
 class DailyIntelligenceCard extends StatelessWidget {
   const DailyIntelligenceCard({
     required this.snapshot,
     required this.isLoading,
     this.errorMessage,
     this.onViewSecurity,
+    this.onGenerateAiSummary,
     this.compactCarousel = false,
     super.key,
   });
@@ -20,6 +25,7 @@ class DailyIntelligenceCard extends StatelessWidget {
   final bool isLoading;
   final String? errorMessage;
   final ValueChanged<MobileDailyIntelligenceItem>? onViewSecurity;
+  final DailyIntelligenceAiSummaryLoader? onGenerateAiSummary;
   final bool compactCarousel;
 
   @override
@@ -32,6 +38,7 @@ class DailyIntelligenceCard extends StatelessWidget {
         isLoading: isLoading,
         errorMessage: errorMessage,
         onViewSecurity: onViewSecurity,
+        onGenerateAiSummary: onGenerateAiSummary,
       );
     }
 
@@ -73,6 +80,7 @@ class DailyIntelligenceCard extends StatelessWidget {
               _DailyIntelligenceDropdownList(
                 items: items,
                 onViewSecurity: onViewSecurity,
+                onGenerateAiSummary: onGenerateAiSummary,
               ),
           ],
         ),
@@ -87,12 +95,14 @@ class _DailyIntelligenceCarousel extends StatefulWidget {
     required this.isLoading,
     required this.errorMessage,
     required this.onViewSecurity,
+    required this.onGenerateAiSummary,
   });
 
   final MobileDailyIntelligenceSnapshot? snapshot;
   final bool isLoading;
   final String? errorMessage;
   final ValueChanged<MobileDailyIntelligenceItem>? onViewSecurity;
+  final DailyIntelligenceAiSummaryLoader? onGenerateAiSummary;
 
   @override
   State<_DailyIntelligenceCarousel> createState() =>
@@ -104,6 +114,10 @@ class _DailyIntelligenceCarouselState
   late final PageController _controller;
   var _page = 0;
   final Set<String> _expandedItemIds = <String>{};
+  final Map<String, MobileDailyIntelligenceAiSummary> _aiSummaries =
+      <String, MobileDailyIntelligenceAiSummary>{};
+  final Set<String> _loadingAiSummaryIds = <String>{};
+  final Map<String, String> _aiSummaryErrors = <String, String>{};
 
   @override
   void initState() {
@@ -168,6 +182,12 @@ class _DailyIntelligenceCarouselState
               page: _page,
               expandedItemIds: _expandedItemIds,
               controller: _controller,
+              aiSummaries: _aiSummaries,
+              loadingAiSummaryIds: _loadingAiSummaryIds,
+              aiSummaryErrors: _aiSummaryErrors,
+              onGenerateAiSummary: widget.onGenerateAiSummary == null
+                  ? null
+                  : _generateAiSummary,
               onPageChanged: (value) => setState(() => _page = value),
               onExpansionChanged: (item, isExpanded) {
                 setState(() {
@@ -183,6 +203,33 @@ class _DailyIntelligenceCarouselState
       ],
     );
   }
+
+  Future<void> _generateAiSummary(MobileDailyIntelligenceItem item) async {
+    final loader = widget.onGenerateAiSummary;
+    if (loader == null || _loadingAiSummaryIds.contains(item.id)) {
+      return;
+    }
+    setState(() {
+      _loadingAiSummaryIds.add(item.id);
+      _aiSummaryErrors.remove(item.id);
+    });
+    try {
+      final summary = await loader(item);
+      if (!mounted) return;
+      setState(() {
+        _aiSummaries[item.id] = summary;
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _aiSummaryErrors[item.id] = error.toString();
+      });
+    } finally {
+      if (mounted) {
+        setState(() => _loadingAiSummaryIds.remove(item.id));
+      }
+    }
+  }
 }
 
 class _DailyIntelligenceCarouselPager extends StatelessWidget {
@@ -192,6 +239,10 @@ class _DailyIntelligenceCarouselPager extends StatelessWidget {
     required this.page,
     required this.expandedItemIds,
     required this.controller,
+    required this.aiSummaries,
+    required this.loadingAiSummaryIds,
+    required this.aiSummaryErrors,
+    required this.onGenerateAiSummary,
     required this.onPageChanged,
     required this.onExpansionChanged,
   });
@@ -201,6 +252,10 @@ class _DailyIntelligenceCarouselPager extends StatelessWidget {
   final int page;
   final Set<String> expandedItemIds;
   final PageController controller;
+  final Map<String, MobileDailyIntelligenceAiSummary> aiSummaries;
+  final Set<String> loadingAiSummaryIds;
+  final Map<String, String> aiSummaryErrors;
+  final ValueChanged<MobileDailyIntelligenceItem>? onGenerateAiSummary;
   final ValueChanged<int> onPageChanged;
   final void Function(MobileDailyIntelligenceItem item, bool isExpanded)
       onExpansionChanged;
@@ -211,7 +266,7 @@ class _DailyIntelligenceCarouselPager extends StatelessWidget {
     final activeItem = items[activeIndex];
     final activeExpanded = expandedItemIds.contains(activeItem.id);
     final pageHeight = activeExpanded
-        ? _expandedPageHeight(activeItem)
+        ? _expandedPageHeight(context)
         : _previewPageHeight(activeItem);
     return Column(
       children: [
@@ -234,10 +289,20 @@ class _DailyIntelligenceCarouselPager extends StatelessWidget {
                     child: _DailyIntelligenceDropdownTile(
                       item,
                       initiallyExpanded: expandedItemIds.contains(item.id),
+                      maxContentHeight: expandedItemIds.contains(item.id)
+                          ? pageHeight
+                          : null,
                       onExpansionChanged: (isExpanded) =>
                           onExpansionChanged(item, isExpanded),
                       onViewSecurity:
                           item.canOpenSecurity ? onViewSecurity : null,
+                      aiSummary: aiSummaries[item.id],
+                      isLoadingAiSummary:
+                          loadingAiSummaryIds.contains(item.id),
+                      aiSummaryError: aiSummaryErrors[item.id],
+                      onGenerateAiSummary: onGenerateAiSummary == null
+                          ? null
+                          : () => onGenerateAiSummary!(item),
                     ),
                   ),
                 );
@@ -259,24 +324,13 @@ class _DailyIntelligenceCarouselPager extends StatelessWidget {
   double _previewPageHeight(MobileDailyIntelligenceItem item) {
     final titleLines = (item.cleanedTitle.length / 16).ceil().clamp(1, 3);
     final summaryLines = (item.summary.length / 24).ceil().clamp(2, 4);
-    return (188 + (titleLines - 1) * 24 + (summaryLines - 2) * 21)
+    return (228 + (titleLines - 1) * 28 + (summaryLines - 2) * 22)
         .toDouble();
   }
 
-  double _expandedPageHeight(MobileDailyIntelligenceItem item) {
-    final titleLines = (item.cleanedTitle.length / 16).ceil().clamp(1, 4);
-    final summaryLines = (item.summary.length / 22).ceil().clamp(3, 14);
-    final pointLines = item.keyPoints.take(5).fold<int>(
-          0,
-          (sum, point) => sum + (point.length / 28).ceil().clamp(1, 4),
-        );
-    final riskLines = item.visibleRiskFlags.take(3).fold<int>(
-          0,
-          (sum, risk) => sum + (risk.length / 28).ceil().clamp(1, 3),
-        );
-    final estimated =
-        178 + titleLines * 25 + summaryLines * 22 + pointLines * 24 + riskLines * 24;
-    return estimated.clamp(470, 820).toDouble();
+  double _expandedPageHeight(BuildContext context) {
+    final screenHeight = MediaQuery.sizeOf(context).height;
+    return (screenHeight * 0.72).clamp(600.0, 760.0);
   }
 }
 
@@ -334,6 +388,7 @@ class DailyIntelligenceSummaryCard extends StatelessWidget {
             _DailyIntelligenceDropdownList(
               items: items,
               onViewSecurity: onViewSecurity,
+              onGenerateAiSummary: null,
             ),
         ],
       ),
@@ -345,22 +400,31 @@ class _DailyIntelligenceDropdownList extends StatelessWidget {
   const _DailyIntelligenceDropdownList({
     required this.items,
     required this.onViewSecurity,
+    required this.onGenerateAiSummary,
   });
 
   final List<MobileDailyIntelligenceItem> items;
   final ValueChanged<MobileDailyIntelligenceItem>? onViewSecurity;
+  final DailyIntelligenceAiSummaryLoader? onGenerateAiSummary;
 
   @override
   Widget build(BuildContext context) {
     return Column(
       children: [
         for (var index = 0; index < items.length; index++) ...[
-          _DailyIntelligenceDropdownTile(
+            _DailyIntelligenceDropdownTile(
             items[index],
             initiallyExpanded: index == 0,
+            maxContentHeight: null,
             onExpansionChanged: (_) {},
             onViewSecurity:
                 items[index].canOpenSecurity ? onViewSecurity : null,
+            aiSummary: null,
+            isLoadingAiSummary: false,
+            aiSummaryError: null,
+            onGenerateAiSummary: onGenerateAiSummary == null
+                ? null
+                : () => onGenerateAiSummary!(items[index]),
           ),
           if (index != items.length - 1) const SizedBox(height: 8),
         ],
@@ -373,18 +437,138 @@ class _DailyIntelligenceDropdownTile extends StatelessWidget {
   const _DailyIntelligenceDropdownTile(
     this.item, {
     required this.initiallyExpanded,
+    required this.maxContentHeight,
     required this.onExpansionChanged,
     required this.onViewSecurity,
+    required this.aiSummary,
+    required this.isLoadingAiSummary,
+    required this.aiSummaryError,
+    required this.onGenerateAiSummary,
   });
 
   final MobileDailyIntelligenceItem item;
   final bool initiallyExpanded;
+  final double? maxContentHeight;
   final ValueChanged<bool> onExpansionChanged;
   final ValueChanged<MobileDailyIntelligenceItem>? onViewSecurity;
+  final MobileDailyIntelligenceAiSummary? aiSummary;
+  final bool isLoadingAiSummary;
+  final String? aiSummaryError;
+  final VoidCallback? onGenerateAiSummary;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final content = Padding(
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            item.cleanedTitle,
+            maxLines: initiallyExpanded ? 4 : 3,
+            overflow: TextOverflow.ellipsis,
+            style: (initiallyExpanded
+                    ? theme.textTheme.titleLarge
+                    : theme.textTheme.headlineSmall)
+                ?.copyWith(
+              fontWeight: FontWeight.w900,
+              height: 1.08,
+            ),
+          ),
+          if (item.subtitleLabel.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Text(
+              item.subtitleLabel,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.labelLarge?.copyWith(
+                color: theme.colorScheme.primary,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+          ],
+          const SizedBox(height: 10),
+          Text(
+            item.summary,
+            maxLines: initiallyExpanded ? null : 4,
+            overflow:
+                initiallyExpanded ? TextOverflow.visible : TextOverflow.ellipsis,
+            style: theme.textTheme.bodyMedium?.copyWith(
+              height: 1.35,
+            ),
+          ),
+          if (!initiallyExpanded) ...[
+            const SizedBox(height: 12),
+            _DailyKeywordWrap(item),
+          ],
+          if (initiallyExpanded) ...[
+            if (item.keyPoints.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              ...item.keyPoints.take(4).map(
+                    (point) => _DailyBullet(point),
+                  ),
+            ],
+            if (item.visibleRiskFlags.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              ...item.visibleRiskFlags.take(2).map(
+                    (risk) => _DailyBullet(
+                      "注意：$risk",
+                      color: theme.colorScheme.error,
+                    ),
+                ),
+            ],
+            const SizedBox(height: 12),
+            _DailyAiSummarySection(
+              summary: aiSummary,
+              isLoading: isLoadingAiSummary,
+              errorMessage: aiSummaryError,
+              onGenerate: onGenerateAiSummary,
+            ),
+            if (item.primarySourceUrl.isNotEmpty) ...[
+              const SizedBox(height: 10),
+              SelectableText(
+                item.primarySourceUrl,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.primary,
+                  decoration: TextDecoration.underline,
+                ),
+              ),
+            ],
+          ],
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: TextButton.icon(
+                  onPressed: () => onExpansionChanged(!initiallyExpanded),
+                  icon: Icon(
+                    initiallyExpanded
+                        ? Icons.keyboard_arrow_up
+                        : Icons.keyboard_arrow_down,
+                    size: 18,
+                  ),
+                  label: Text(initiallyExpanded ? "收起" : "展开阅读"),
+                ),
+              ),
+              if (initiallyExpanded && item.primarySourceUrl.isNotEmpty)
+                TextButton.icon(
+                  onPressed: () => openExternalLink(item.primarySourceUrl),
+                  icon: const Icon(Icons.open_in_new, size: 16),
+                  label: const Text("查看原文"),
+                ),
+              if (initiallyExpanded && onViewSecurity != null)
+                TextButton.icon(
+                  onPressed: () => onViewSecurity!(item),
+                  icon: const Icon(Icons.chevron_right, size: 18),
+                  label: const Text("标的"),
+                ),
+            ],
+          ),
+        ],
+      ),
+    );
+
     return DecoratedBox(
       decoration: BoxDecoration(
         color:
@@ -392,109 +576,18 @@ class _DailyIntelligenceDropdownTile extends StatelessWidget {
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: theme.colorScheme.outlineVariant),
       ),
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              item.cleanedTitle,
-              maxLines: initiallyExpanded ? 4 : 3,
-              overflow: TextOverflow.ellipsis,
-              style: (initiallyExpanded
-                      ? theme.textTheme.titleLarge
-                      : theme.textTheme.headlineSmall)
-                  ?.copyWith(
-                fontWeight: FontWeight.w900,
-                height: 1.08,
-              ),
-            ),
-            if (item.subtitleLabel.isNotEmpty) ...[
-              const SizedBox(height: 8),
-              Text(
-                item.subtitleLabel,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: theme.textTheme.labelLarge?.copyWith(
-                  color: theme.colorScheme.primary,
-                  fontWeight: FontWeight.w900,
+      child: initiallyExpanded && maxContentHeight != null
+          ? SizedBox(
+              height: maxContentHeight,
+              child: Scrollbar(
+                thumbVisibility: true,
+                child: SingleChildScrollView(
+                  padding: EdgeInsets.zero,
+                  child: content,
                 ),
               ),
-            ],
-            const SizedBox(height: 10),
-            Text(
-              item.summary,
-              maxLines: initiallyExpanded ? null : 4,
-              overflow:
-                  initiallyExpanded ? TextOverflow.visible : TextOverflow.ellipsis,
-              style: theme.textTheme.bodyMedium?.copyWith(
-                height: 1.35,
-              ),
-            ),
-            if (!initiallyExpanded) ...[
-              const SizedBox(height: 12),
-              _DailyKeywordWrap(item),
-            ],
-            if (initiallyExpanded) ...[
-              if (item.keyPoints.isNotEmpty) ...[
-                const SizedBox(height: 8),
-                ...item.keyPoints.take(4).map(
-                      (point) => _DailyBullet(point),
-                    ),
-              ],
-              if (item.visibleRiskFlags.isNotEmpty) ...[
-                const SizedBox(height: 8),
-                ...item.visibleRiskFlags.take(2).map(
-                      (risk) => _DailyBullet(
-                        "注意：$risk",
-                        color: theme.colorScheme.error,
-                      ),
-                    ),
-              ],
-              if (item.primarySourceUrl.isNotEmpty) ...[
-                const SizedBox(height: 10),
-                SelectableText(
-                  item.primarySourceUrl,
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.primary,
-                    decoration: TextDecoration.underline,
-                  ),
-                ),
-              ],
-            ],
-            const Spacer(),
-            const SizedBox(height: 10),
-            Row(
-              children: [
-                Expanded(
-                  child: TextButton.icon(
-                    onPressed: () => onExpansionChanged(!initiallyExpanded),
-                    icon: Icon(
-                      initiallyExpanded
-                          ? Icons.keyboard_arrow_up
-                          : Icons.keyboard_arrow_down,
-                      size: 18,
-                    ),
-                    label: Text(initiallyExpanded ? "收起" : "展开阅读"),
-                  ),
-                ),
-                if (initiallyExpanded && item.primarySourceUrl.isNotEmpty)
-                  TextButton.icon(
-                    onPressed: () => openExternalLink(item.primarySourceUrl),
-                    icon: const Icon(Icons.open_in_new, size: 16),
-                    label: const Text("查看原文"),
-                  ),
-                if (initiallyExpanded && onViewSecurity != null)
-                  TextButton.icon(
-                    onPressed: () => onViewSecurity!(item),
-                    icon: const Icon(Icons.chevron_right, size: 18),
-                    label: const Text("标的"),
-                  ),
-              ],
-            ),
-          ],
-        ),
-      ),
+            )
+          : content,
     );
   }
 }
@@ -548,6 +641,125 @@ class _DailyKeywordWrap extends StatelessWidget {
       normalized = "${normalized.substring(0, 18)}...";
     }
     return normalized;
+  }
+}
+
+class _DailyAiSummarySection extends StatelessWidget {
+  const _DailyAiSummarySection({
+    required this.summary,
+    required this.isLoading,
+    required this.errorMessage,
+    required this.onGenerate,
+  });
+
+  final MobileDailyIntelligenceAiSummary? summary;
+  final bool isLoading;
+  final String? errorMessage;
+  final VoidCallback? onGenerate;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final tokens = context.looTokens;
+    final summary = this.summary;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: tokens.accent.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: tokens.accent.withValues(alpha: 0.28)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.auto_awesome, size: 16, color: tokens.accent),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    summary?.headline ?? "AI 摘要总结",
+                    style: theme.textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ),
+                if (summary?.cached == true)
+                  Text(
+                    "已缓存",
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      color: tokens.mutedText,
+                    ),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            if (isLoading)
+              const LinearProgressIndicator(minHeight: 3)
+            else if (summary == null) ...[
+              Text(
+                "用你在设置中配置的外部 GPT，总结核心内容、相关领域和可能影响的持仓。",
+                style: theme.textTheme.bodySmall?.copyWith(height: 1.35),
+              ),
+              if (errorMessage != null) ...[
+                const SizedBox(height: 6),
+                Text(
+                  errorMessage!,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.error,
+                  ),
+                ),
+              ],
+              const SizedBox(height: 8),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: FilledButton.tonalIcon(
+                  onPressed: onGenerate,
+                  icon: const Icon(Icons.psychology_alt_outlined, size: 16),
+                  label: const Text("生成 AI 总结"),
+                ),
+              ),
+            ] else ...[
+              Text(summary.coreSummary,
+                  style: theme.textTheme.bodySmall?.copyWith(height: 1.35)),
+              if (summary.relatedFields.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  children: [
+                    for (final field in summary.relatedFields)
+                      _DailyKeywordChip(field),
+                  ],
+                ),
+              ],
+              if (summary.affectedHoldings.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                Text("可能影响的持仓", style: theme.textTheme.labelLarge),
+                const SizedBox(height: 4),
+                for (final holding in summary.affectedHoldings)
+                  _DailyBullet("${holding.symbol}：${holding.reason}"),
+              ],
+              if (summary.portfolioImpact.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                Text("组合影响", style: theme.textTheme.labelLarge),
+                const SizedBox(height: 4),
+                Text(
+                  summary.portfolioImpact,
+                  style: theme.textTheme.bodySmall?.copyWith(height: 1.35),
+                ),
+              ],
+              if (summary.watchPoints.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                Text("后续关注", style: theme.textTheme.labelLarge),
+                ...summary.watchPoints.map((point) => _DailyBullet(point)),
+              ],
+            ],
+          ],
+        ),
+      ),
+    );
   }
 }
 

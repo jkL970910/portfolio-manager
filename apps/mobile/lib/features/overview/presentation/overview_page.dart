@@ -146,6 +146,8 @@ class _OverviewPageState extends State<OverviewPage> {
                                   ? intelligenceSnapshot.error.toString()
                                   : null,
                               onViewSecurity: _openSecurityFromIntelligence,
+                              onGenerateAiSummary:
+                                  _generateDailyIntelligenceAiSummary,
                               compactCarousel: true,
                             );
                           },
@@ -197,6 +199,19 @@ class _OverviewPageState extends State<OverviewPage> {
             item.identity.currency.isEmpty ? null : item.identity.currency,
       ),
     );
+  }
+
+  Future<MobileDailyIntelligenceAiSummary>
+      _generateDailyIntelligenceAiSummary(
+    MobileDailyIntelligenceItem item,
+  ) async {
+    final response =
+        await widget.apiClient.createDailyIntelligenceAiSummary(item.id);
+    final data = response["data"];
+    if (data is! Map<String, dynamic>) {
+      throw const LooApiException("AI 摘要数据格式不正确。");
+    }
+    return MobileDailyIntelligenceAiSummary.fromJson(data);
   }
 
   void _openHealthScore() {
@@ -1218,7 +1233,7 @@ Color _holdingSliceColorFromTokens(LooThemeTokens tokens, int index) {
   return colors[index % colors.length];
 }
 
-class _OverviewTrendCard extends StatefulWidget {
+class _OverviewTrendCard extends StatelessWidget {
   const _OverviewTrendCard({
     required this.chart,
     required this.fallbackPoints,
@@ -1228,15 +1243,8 @@ class _OverviewTrendCard extends StatefulWidget {
   final List<MobileHomeTrendPoint> fallbackPoints;
 
   @override
-  State<_OverviewTrendCard> createState() => _OverviewTrendCardState();
-}
-
-class _OverviewTrendCardState extends State<_OverviewTrendCard> {
-  _TrendRange _selectedRange = _TrendRange.threeMonths;
-
-  @override
   Widget build(BuildContext context) {
-    final allPoints = widget.chart?.points
+    final points = chart?.points
             .map((point) => (
                   label: point.label,
                   displayValue: point.displayValue,
@@ -1244,7 +1252,7 @@ class _OverviewTrendCardState extends State<_OverviewTrendCard> {
                   rawDate: DateTime.tryParse(point.rawDate ?? ""),
                 ))
             .toList() ??
-        widget.fallbackPoints
+        fallbackPoints
             .map((point) => (
                   label: point.label,
                   displayValue: point.displayValue,
@@ -1252,178 +1260,27 @@ class _OverviewTrendCardState extends State<_OverviewTrendCard> {
                   rawDate: null as DateTime?,
                 ))
             .toList();
-    final enabledRanges = {
-      for (final range in _TrendRange.values)
-        range: _filteredPoints(allPoints, range).length >= 2,
-    };
-    if (enabledRanges[_selectedRange] != true) {
-      _selectedRange = enabledRanges[_TrendRange.ytd] == true
-          ? _TrendRange.ytd
-          : _TrendRange.values.firstWhere(
-              (range) => enabledRanges[range] == true,
-              orElse: () => _TrendRange.ytd,
-            );
-    }
-    final points = enabledRanges[_selectedRange] == true
-        ? _filteredPoints(allPoints, _selectedRange)
-        : allPoints;
     if (points.length < 2) {
       return const SizedBox.shrink();
     }
 
-    final first = points.first;
-    final last = points.last;
-    final delta = last.chartValue - first.chartValue;
-    final percent =
-        first.chartValue == 0 ? 0.0 : delta / first.chartValue * 100;
-    final tokens = context.looTokens;
-
     return LooGlassCard(
-      child: Padding(
-        padding: EdgeInsets.zero,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Text(widget.chart?.title ?? "投资资产走势",
-                      style: Theme.of(context).textTheme.titleLarge),
-                ),
-                Text(
-                  last.displayValue,
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: tokens.mutedText,
-                      ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Row(
-                children: _TrendRange.values.map((range) {
-                  final enabled = enabledRanges[range] == true;
-                  return Padding(
-                    padding: const EdgeInsets.only(right: 8),
-                    child: ChoiceChip(
-                      label: Text(range.label),
-                      selected: _selectedRange == range,
-                      onSelected: enabled
-                          ? (_) => setState(() => _selectedRange = range)
-                          : null,
-                    ),
-                  );
-                }).toList(),
+      child: LooTrendChart(
+        title: chart?.title ?? "总资产走势",
+        initialRange: LooTrendRange.threeMonths,
+        points: points
+            .map(
+              (point) => LooTrendPoint(
+                label: point.label,
+                displayValue: point.displayValue,
+                value: point.chartValue,
+                rawDate: point.rawDate,
               ),
-            ),
-            const SizedBox(height: 12),
-            LooLineChart(
-              points: points
-                  .map(
-                    (point) => LooLineChartPoint(
-                      label: point.label,
-                      value: point.chartValue,
-                      displayValue: point.displayValue,
-                    ),
-                  )
-                  .toList(),
-            ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    "${first.label} → ${last.label}",
-                    style: Theme.of(context).textTheme.bodyMedium,
-                  ),
-                ),
-                Text(
-                  "${_selectedRange.label} ${_formatDelta(delta)} · ${_formatPercent(percent)}",
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: delta >= 0 ? tokens.success : tokens.danger,
-                        fontWeight: FontWeight.w800,
-                      ),
-                ),
-              ],
-            ),
-          ],
-        ),
+            )
+            .toList(),
       ),
     );
   }
-
-  List<
-      ({
-        String label,
-        String displayValue,
-        double chartValue,
-        DateTime? rawDate,
-      })> _filteredPoints(
-    List<
-            ({
-              String label,
-              String displayValue,
-              double chartValue,
-              DateTime? rawDate,
-            })>
-        points,
-    _TrendRange range,
-  ) {
-    if (points.length < 2) return points;
-    final datedPoints = points.where((point) => point.rawDate != null).toList();
-    if (datedPoints.length < 2) {
-      return range == _TrendRange.ytd ? points : const [];
-    }
-
-    final latest = datedPoints
-        .map((point) => point.rawDate!)
-        .reduce((left, right) => left.isAfter(right) ? left : right);
-    final cutoff = switch (range) {
-      _TrendRange.oneDay => latest.subtract(const Duration(days: 1)),
-      _TrendRange.oneWeek => latest.subtract(const Duration(days: 7)),
-      _TrendRange.oneMonth => latest.subtract(const Duration(days: 31)),
-      _TrendRange.threeMonths => latest.subtract(const Duration(days: 93)),
-      _TrendRange.sixMonths => latest.subtract(const Duration(days: 186)),
-      _TrendRange.oneYear => latest.subtract(const Duration(days: 366)),
-      _TrendRange.ytd => DateTime(latest.year),
-    };
-    return points
-        .where((point) =>
-            point.rawDate != null && !point.rawDate!.isBefore(cutoff))
-        .toList();
-  }
-
-  String _formatDelta(double value) {
-    final sign = value >= 0 ? "+" : "-";
-    final absValue = value.abs();
-    if (absValue >= 1000000) {
-      return "$sign\$${(absValue / 1000000).toStringAsFixed(1)}M";
-    }
-    if (absValue >= 1000) {
-      return "$sign\$${(absValue / 1000).toStringAsFixed(1)}k";
-    }
-    return "$sign\$${absValue.toStringAsFixed(0)}";
-  }
-
-  String _formatPercent(double value) {
-    final sign = value >= 0 ? "+" : "";
-    return "$sign${value.toStringAsFixed(1)}%";
-  }
-}
-
-enum _TrendRange {
-  oneDay("1D"),
-  oneWeek("1W"),
-  oneMonth("1M"),
-  threeMonths("3M"),
-  sixMonths("6M"),
-  oneYear("1Y"),
-  ytd("YTD");
-
-  const _TrendRange(this.label);
-
-  final String label;
 }
 
 class _MarketSentimentCard extends StatefulWidget {

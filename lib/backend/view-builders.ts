@@ -243,6 +243,34 @@ function formatCompactPercent(value: number, digits = 0) {
   return `${value.toFixed(digits)}%`;
 }
 
+function parseValidDate(value: string | Date | null | undefined) {
+  if (!value) {
+    return null;
+  }
+  const date = value instanceof Date ? value : new Date(value);
+  return Number.isFinite(date.getTime()) ? date : null;
+}
+
+function parseValidDay(value: string | null | undefined) {
+  if (!value) {
+    return null;
+  }
+  return parseValidDate(`${value.slice(0, 10)}T00:00:00.000Z`);
+}
+
+function formatDateSafe(
+  value: string | Date | null | undefined,
+  language: DisplayLanguage,
+  options: Intl.DateTimeFormatOptions,
+  fallback: string,
+) {
+  const date = parseValidDate(value);
+  if (!date) {
+    return fallback;
+  }
+  return date.toLocaleString(language === "zh" ? "zh-CN" : "en-CA", options);
+}
+
 function formatSignedPercent(value: number, digits = 0) {
   return `${value > 0 ? "+" : ""}${value.toFixed(digits)}%`;
 }
@@ -458,11 +486,11 @@ function getSixMonthSeries(
 }
 
 function formatSnapshotLabel(snapshotDate: string, language: DisplayLanguage) {
-  return new Date(`${snapshotDate}T00:00:00`).toLocaleString(
-    language === "zh" ? "zh-CN" : "en-CA",
-    {
-      month: "short",
-    },
+  return formatDateSafe(
+    `${snapshotDate}T00:00:00.000Z`,
+    language,
+    { month: "short" },
+    snapshotDate,
   );
 }
 
@@ -478,14 +506,16 @@ function formatPriceHistoryLabel(
     return formatSnapshotLabel(point.priceDate, language);
   }
 
-  return new Date(point.priceTime).toLocaleString(
-    language === "zh" ? "zh-CN" : "en-CA",
+  return formatDateSafe(
+    point.priceTime,
+    language,
     {
       month: "short",
       day: "numeric",
       hour: "numeric",
       minute: "2-digit",
     },
+    point.priceDate,
   );
 }
 
@@ -538,7 +568,8 @@ function getChartFreshness(args: {
   const ageDays = Math.max(
     0,
     Math.floor(
-      (Date.now() - new Date(`${args.latestDate}T00:00:00.000Z`).getTime()) /
+      (Date.now() -
+        (parseValidDay(args.latestDate)?.getTime() ?? Date.now())) /
         86400000,
     ),
   );
@@ -682,7 +713,8 @@ function buildPortfolioValueChartFreshness(args: {
   const ageDays = Math.max(
     0,
     Math.floor(
-      (Date.now() - new Date(`${args.latestDate}T00:00:00.000Z`).getTime()) /
+      (Date.now() -
+        (parseValidDay(args.latestDate)?.getTime() ?? Date.now())) /
         86400000,
     ),
   );
@@ -812,10 +844,18 @@ function buildHoldingValueHistorySeries(args: {
     return null;
   }
 
-  const sixMonthsAgo = new Date(`${latestDate}T00:00:00.000Z`);
+  const latestDateValue = parseValidDay(latestDate);
+  if (!latestDateValue) {
+    return null;
+  }
+
+  const sixMonthsAgo = new Date(latestDateValue);
   sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
   const recentHistory = relevantHistory.filter(
-    (point) => new Date(`${point.priceDate}T00:00:00.000Z`) >= sixMonthsAgo,
+    (point) => {
+      const priceDate = parseValidDay(point.priceDate);
+      return priceDate ? priceDate >= sixMonthsAgo : false;
+    },
   );
   if (recentHistory.length < 2) {
     return null;
@@ -1040,10 +1080,16 @@ function buildReplayedAggregateValueSeries(args: {
     return null;
   }
 
-  const endDate = new Date(allDates[allDates.length - 1]);
+  const endDate = parseValidDate(allDates[allDates.length - 1]);
+  if (!endDate) {
+    return null;
+  }
   const sixMonthsAgo = new Date(endDate);
   sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
-  const replayDates = allDates.filter((date) => new Date(date) >= sixMonthsAgo);
+  const replayDates = allDates.filter((date) => {
+    const parsedDate = parseValidDate(date);
+    return parsedDate ? parsedDate >= sixMonthsAgo : false;
+  });
   if (replayDates.length < 2) {
     return null;
   }
@@ -1153,32 +1199,50 @@ function buildReplayedAggregateValueSeries(args: {
         }
       }
 
+      const replayDate = parseValidDate(
+        replayTime.includes("T") ? replayTime : `${replayTime}T00:00:00.000Z`,
+      );
       return {
-        label: formatter.format(
-          new Date(
-            replayTime.includes("T") ? replayTime : `${replayTime}T00:00:00`,
-          ),
-        ),
+        label: replayDate ? formatter.format(replayDate) : replayTime,
         rawDate: replayTime,
         value: round(convertCadToDisplay(totalValueCad, display), 2),
         coveredHoldings,
         coveredCurrentValueCad,
       };
     })
-    .filter(
-      (point) =>
-        point.value > 0 &&
-        (expectedHoldingCount <= 1 ||
-          point.coveredCurrentValueCad >= minCoveredValueCad),
-    );
+    .filter((point) => point.value > 0);
 
-  const firstValidIndex = rawSeries.findIndex(
-    (point, index) =>
-      index === rawSeries.length - 1 ||
-      (rawSeries[index + 1]?.coveredHoldings ?? 0) >= point.coveredHoldings,
+  const maxCoveredValueCad = rawSeries.reduce(
+    (max, point) => Math.max(max, point.coveredCurrentValueCad),
+    0,
   );
-  const series = (firstValidIndex > 0 ? rawSeries.slice(firstValidIndex) : rawSeries)
-    .map(({ coveredHoldings: _coveredHoldings, coveredCurrentValueCad: _coveredCurrentValueCad, ...point }) => point);
+  const stableCoverageThresholdCad = Math.max(
+    minCoveredValueCad,
+    maxCoveredValueCad * 0.98,
+  );
+  const stableCoverageSeries = rawSeries.filter(
+    (point) =>
+      expectedHoldingCount <= 1 ||
+      point.coveredCurrentValueCad >= stableCoverageThresholdCad,
+  );
+
+  const firstValidIndex = stableCoverageSeries.findIndex(
+    (point, index) =>
+      index === stableCoverageSeries.length - 1 ||
+      (stableCoverageSeries[index + 1]?.coveredCurrentValueCad ?? 0) >=
+        point.coveredCurrentValueCad * 0.98,
+  );
+  const stableSeries =
+    firstValidIndex > 0
+      ? stableCoverageSeries.slice(firstValidIndex)
+      : stableCoverageSeries;
+  const series = stableSeries.map(
+    ({
+      coveredHoldings: _coveredHoldings,
+      coveredCurrentValueCad: _coveredCurrentValueCad,
+      ...point
+    }) => point,
+  );
 
   return series.length >= 2 ? series : null;
 }
@@ -1300,8 +1364,9 @@ function buildCashBalanceSeries(args: {
       totalBalanceCad += latest?.balanceCad ?? account.currentBalanceCad;
     }
 
+    const parsedDate = parseValidDate(date);
     return {
-      label: formatter.format(new Date(date)),
+      label: parsedDate ? formatter.format(parsedDate) : date,
       rawDate: date,
       value: round(convertCadToDisplay(totalBalanceCad, display), 2),
     };
@@ -1328,9 +1393,11 @@ function getMonthlyTransactionSeries(
 
   if (sortedKeys.length >= 6) {
     return sortedKeys.slice(-6).map((key) => ({
-      label: new Date(`${key}-01T00:00:00`).toLocaleString(
-        language === "zh" ? "zh-CN" : "en-CA",
+      label: formatDateSafe(
+        `${key}-01T00:00:00.000Z`,
+        language,
         { month: "short" },
+        key,
       ),
       value: round(monthlyTotals.get(key) ?? 0, 0),
     }));
@@ -1505,12 +1572,17 @@ function formatHoldingLastUpdated(
     return pick(language, "还没拿到价格", "Not refreshed");
   }
 
-  return new Date(value).toLocaleString(language === "zh" ? "zh-CN" : "en-CA", {
-    month: "short",
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  });
+  return formatDateSafe(
+    value,
+    language,
+    {
+      month: "short",
+      day: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+    },
+    pick(language, "时间待确认", "Time unavailable"),
+  );
 }
 
 function getHoldingFreshnessVariant(
@@ -1520,7 +1592,12 @@ function getHoldingFreshnessVariant(
     return "neutral";
   }
 
-  const ageMs = Date.now() - new Date(value).getTime();
+  const refreshedAt = parseValidDate(value);
+  if (!refreshedAt) {
+    return "neutral";
+  }
+
+  const ageMs = Date.now() - refreshedAt.getTime();
   const ageMinutes = Math.max(0, Math.round(ageMs / 60000));
   if (ageMinutes <= 30) {
     return "success";
@@ -1604,8 +1681,17 @@ function getPortfolioQuoteStatus(
   }
 
   const latestUpdatedAt = quotedHoldings
-    .map((holding) => new Date(getHoldingQuoteTimestamp(holding)!))
+    .map((holding) => parseValidDate(getHoldingQuoteTimestamp(holding)))
+    .filter((date): date is Date => Boolean(date))
     .sort((left, right) => right.getTime() - left.getTime())[0];
+
+  if (!latestUpdatedAt) {
+    return {
+      lastRefreshed: pick(language, "报价时间待确认", "Quote time unavailable"),
+      freshness: pick(language, "暂时未知", "Unknown"),
+      coverage,
+    };
+  }
 
   const ageMs = Date.now() - latestUpdatedAt.getTime();
   const ageMinutes = Math.max(0, Math.round(ageMs / 60000));
@@ -1617,14 +1703,16 @@ function getPortfolioQuoteStatus(
         : pick(language, "建议再刷新一次", "Refresh recommended");
 
   return {
-    lastRefreshed: latestUpdatedAt.toLocaleString(
-      language === "zh" ? "zh-CN" : "en-CA",
+    lastRefreshed: formatDateSafe(
+      latestUpdatedAt,
+      language,
       {
         month: "short",
         day: "numeric",
         hour: "numeric",
         minute: "2-digit",
       },
+      pick(language, "时间待确认", "Time unavailable"),
     ),
     freshness,
     coverage,
@@ -4083,14 +4171,16 @@ export function buildPortfolioSecurityDetailData(args: {
       {
         label: pick(language, "最近一次价格时间", "Latest quote timestamp"),
         value: latestUpdatedAt
-          ? new Date(latestUpdatedAt).toLocaleString(
-              language === "zh" ? "zh-CN" : "en-CA",
+          ? formatDateSafe(
+              latestUpdatedAt,
+              language,
               {
                 month: "short",
                 day: "numeric",
                 hour: "numeric",
                 minute: "2-digit",
               },
+              pick(language, "时间待确认", "Time unavailable"),
             )
           : pick(language, "还没刷新过", "Not refreshed yet"),
         detail: pick(
