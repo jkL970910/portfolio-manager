@@ -121,7 +121,10 @@ class _AccountDetailPageState extends State<AccountDetailPage> {
               child: ListView(
                 padding: const EdgeInsets.fromLTRB(20, 12, 20, 28),
                 children: [
-                  _SummaryCard(data),
+                  _SummaryCard(
+                    data,
+                    onOpenHealth: () => _openHealthScore(data),
+                  ),
                   const SizedBox(height: 12),
                   if (data.accountValueChart != null ||
                       data.performance.isNotEmpty) ...[
@@ -131,15 +134,7 @@ class _AccountDetailPageState extends State<AccountDetailPage> {
                     ),
                     const SizedBox(height: 12),
                   ],
-                  _HealthCard(
-                    data.healthScore,
-                    onTap: () => _openHealthScore(data),
-                  ),
-                  if (data.allocation.isNotEmpty) ...[
-                    const SizedBox(height: 12),
-                    _AllocationChartCard(data.allocation),
-                  ],
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 4),
                   _AccountHoldingsPreview(
                     holdings: data.holdings,
                     onOpenHolding: _openHoldingDetail,
@@ -399,9 +394,10 @@ class MobileAccountDetailSnapshot {
 }
 
 class _SummaryCard extends StatelessWidget {
-  const _SummaryCard(this.data);
+  const _SummaryCard(this.data, {required this.onOpenHealth});
 
   final MobileAccountDetailSnapshot data;
+  final VoidCallback onOpenHealth;
 
   @override
   Widget build(BuildContext context) {
@@ -448,6 +444,12 @@ class _SummaryCard extends StatelessWidget {
           ),
           SizedBox(height: tokens.gapLg),
           _AccountMetricStrip(data),
+          const SizedBox(height: 14),
+          _AccountHeroInsights(
+            health: data.healthScore,
+            allocation: data.allocation,
+            onOpenHealth: onOpenHealth,
+          ),
         ],
       ),
     );
@@ -488,7 +490,7 @@ class _AccountTrendCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final allPoints = chart?.points
+    final points = chart?.points
             .map((point) => AccountTrendPoint(
                   label: point.label,
                   displayValue: point.displayValue,
@@ -505,10 +507,25 @@ class _AccountTrendCard extends StatelessWidget {
                 ))
             .toList();
 
-    return _AccountTrendRangeCard(
-      title: chart?.title ?? "账户资产走势",
-      trailing: chart?.freshness.label,
-      allPoints: allPoints,
+    if (points.length < 2) {
+      return const SizedBox.shrink();
+    }
+
+    return LooGlassCard(
+      child: LooTrendChart(
+        title: chart?.title ?? "账户资产走势",
+        initialRange: LooTrendRange.ytd,
+        points: points
+            .map(
+              (point) => LooTrendPoint(
+                label: point.label,
+                displayValue: point.displayValue,
+                value: point.chartValue,
+                rawDate: point.rawDate,
+              ),
+            )
+            .toList(),
+      ),
     );
   }
 }
@@ -525,174 +542,6 @@ class AccountTrendPoint {
   final String displayValue;
   final double chartValue;
   final DateTime? rawDate;
-}
-
-class _AccountTrendRangeCard extends StatefulWidget {
-  const _AccountTrendRangeCard({
-    required this.title,
-    required this.trailing,
-    required this.allPoints,
-  });
-
-  final String title;
-  final String? trailing;
-  final List<AccountTrendPoint> allPoints;
-
-  @override
-  State<_AccountTrendRangeCard> createState() => _AccountTrendRangeCardState();
-}
-
-class _AccountTrendRangeCardState extends State<_AccountTrendRangeCard> {
-  _TrendRange _selectedRange = _TrendRange.threeMonths;
-
-  @override
-  Widget build(BuildContext context) {
-    final allPoints = widget.allPoints;
-    final enabledRanges = {
-      for (final range in _TrendRange.values)
-        range: _filteredPoints(allPoints, range).length >= 2,
-    };
-    if (enabledRanges[_selectedRange] != true) {
-      _selectedRange = enabledRanges[_TrendRange.ytd] == true
-          ? _TrendRange.ytd
-          : _TrendRange.values.firstWhere(
-              (range) => enabledRanges[range] == true,
-              orElse: () => _TrendRange.ytd,
-            );
-    }
-    final points = enabledRanges[_selectedRange] == true
-        ? _filteredPoints(allPoints, _selectedRange)
-        : allPoints;
-    if (points.length < 2) {
-      return const SizedBox.shrink();
-    }
-
-    final first = points.first;
-    final last = points.last;
-    final delta = last.chartValue - first.chartValue;
-    final percent =
-        first.chartValue == 0 ? 0.0 : delta / first.chartValue * 100;
-    final tokens = context.looTokens;
-
-    return LooGlassCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _SectionHeader(
-            title: widget.title,
-            trailing: widget.trailing,
-          ),
-          const SizedBox(height: 12),
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(
-              children: _TrendRange.values.map((range) {
-                final enabled = enabledRanges[range] == true;
-                return Padding(
-                  padding: const EdgeInsets.only(right: 8),
-                  child: ChoiceChip(
-                    label: Text(range.label),
-                    selected: _selectedRange == range,
-                    onSelected: enabled
-                        ? (_) => setState(() => _selectedRange = range)
-                        : null,
-                  ),
-                );
-              }).toList(),
-            ),
-          ),
-          const SizedBox(height: 12),
-          LooLineChart(
-            points: points
-                .map(
-                  (point) => LooLineChartPoint(
-                    label: point.label,
-                    value: point.chartValue,
-                  ),
-                )
-                .toList(),
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  "${first.label} → ${last.label}",
-                  style: Theme.of(context).textTheme.bodyMedium,
-                ),
-              ),
-              Text(
-                "${_selectedRange.label} ${_formatDelta(delta)} · ${_formatPercent(percent)}",
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: delta >= 0 ? tokens.success : tokens.danger,
-                      fontWeight: FontWeight.w800,
-                    ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  List<AccountTrendPoint> _filteredPoints(
-    List<AccountTrendPoint> points,
-    _TrendRange range,
-  ) {
-    if (points.length < 2) return points;
-    final datedPoints = points.where((point) => point.rawDate != null).toList();
-    if (datedPoints.length < 2) {
-      return range == _TrendRange.ytd ? points : const [];
-    }
-
-    final latest = datedPoints
-        .map((point) => point.rawDate!)
-        .reduce((left, right) => left.isAfter(right) ? left : right);
-    final cutoff = switch (range) {
-      _TrendRange.oneDay => latest.subtract(const Duration(days: 1)),
-      _TrendRange.oneWeek => latest.subtract(const Duration(days: 7)),
-      _TrendRange.oneMonth => latest.subtract(const Duration(days: 31)),
-      _TrendRange.threeMonths => latest.subtract(const Duration(days: 93)),
-      _TrendRange.sixMonths => latest.subtract(const Duration(days: 186)),
-      _TrendRange.oneYear => latest.subtract(const Duration(days: 366)),
-      _TrendRange.ytd => DateTime(latest.year),
-    };
-    return points
-        .where((point) =>
-            point.rawDate != null && !point.rawDate!.isBefore(cutoff))
-        .toList();
-  }
-
-  String _formatDelta(double value) {
-    final sign = value >= 0 ? "+" : "-";
-    final absValue = value.abs();
-    if (absValue >= 1000000) {
-      return "$sign\$${(absValue / 1000000).toStringAsFixed(1)}M";
-    }
-    if (absValue >= 1000) {
-      return "$sign\$${(absValue / 1000).toStringAsFixed(1)}k";
-    }
-    return "$sign\$${absValue.toStringAsFixed(0)}";
-  }
-
-  String _formatPercent(double value) {
-    final sign = value >= 0 ? "+" : "";
-    return "$sign${value.toStringAsFixed(1)}%";
-  }
-}
-
-enum _TrendRange {
-  oneDay("1D"),
-  oneWeek("1W"),
-  oneMonth("1M"),
-  threeMonths("3M"),
-  sixMonths("6M"),
-  oneYear("1Y"),
-  ytd("YTD");
-
-  const _TrendRange(this.label);
-
-  final String label;
 }
 
 class MobileAllocationPoint {
@@ -860,92 +709,102 @@ class _MetricCard extends StatelessWidget {
   }
 }
 
-class _HealthCard extends StatelessWidget {
-  const _HealthCard(this.health, {required this.onTap});
+class _AccountHeroInsights extends StatelessWidget {
+  const _AccountHeroInsights({
+    required this.health,
+    required this.allocation,
+    required this.onOpenHealth,
+  });
 
   final MobileAccountHealthScore health;
-  final VoidCallback onTap;
+  final List<MobileAllocationPoint> allocation;
+  final VoidCallback onOpenHealth;
 
   @override
   Widget build(BuildContext context) {
-    return LooGlassCard(
-      onTap: onTap,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const _SectionHeader(title: "账户健康度", trailing: "健康分析 →"),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Text(health.score.replaceAll(" 分", ""),
-                  style: Theme.of(context).textTheme.displaySmall),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  health.status,
-                  style: Theme.of(context).textTheme.titleMedium,
+    final tokens = context.looTokens;
+    final shownPoints =
+        allocation.where((point) => point.rawValue > 0).take(5).toList();
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.22),
+        borderRadius: BorderRadius.circular(tokens.radiusLg),
+        border: Border.all(color: tokens.cardBorder),
+      ),
+      child: Padding(
+        padding: EdgeInsets.all(tokens.gapMd),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(tokens.radiusMd),
+                    onTap: onOpenHealth,
+                    child: Padding(
+                      padding: EdgeInsets.symmetric(vertical: tokens.gapXs),
+                      child: Row(
+                        children: [
+                          Text(
+                            health.score.replaceAll(" 分", ""),
+                            style: Theme.of(context).textTheme.headlineMedium,
+                          ),
+                          SizedBox(width: tokens.gapSm),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  "账户健康度",
+                                  style: Theme.of(context).textTheme.labelLarge,
+                                ),
+                                Text(
+                                  health.status,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .bodySmall
+                                      ?.copyWith(color: tokens.mutedText),
+                                ),
+                              ],
+                            ),
+                          ),
+                          Icon(
+                            Icons.chevron_right_rounded,
+                            color: tokens.accent,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
                 ),
+              ],
+            ),
+            if (shownPoints.isNotEmpty) ...[
+              SizedBox(height: tokens.gapSm),
+              LooDistributionBar(
+                segments: shownPoints
+                    .map(
+                      (point) => LooDistributionSegment(
+                        label: point.name,
+                        value: point.rawValue,
+                      ),
+                    )
+                    .toList(),
+              ),
+              SizedBox(height: tokens.gapSm),
+              Wrap(
+                spacing: 6,
+                runSpacing: 6,
+                children: shownPoints
+                    .map((point) => _MiniPill("${point.name} ${point.value}"))
+                    .toList(growable: false),
               ),
             ],
-          ),
-          const SizedBox(height: 12),
-          ...[
-            ...health.highlights.take(2),
-            ...health.actions.take(1),
-          ].map((item) => _BulletLine(item)),
-        ],
-      ),
-    );
-  }
-}
-
-class _AllocationTile extends StatelessWidget {
-  const _AllocationTile(this.point);
-
-  final MobileAllocationPoint point;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(top: 8),
-      child: Row(
-        children: [
-          Expanded(child: Text(point.name)),
-          Text(point.value, style: Theme.of(context).textTheme.titleMedium),
-        ],
-      ),
-    );
-  }
-}
-
-class _AllocationChartCard extends StatelessWidget {
-  const _AllocationChartCard(this.points);
-
-  final List<MobileAllocationPoint> points;
-
-  @override
-  Widget build(BuildContext context) {
-    final shownPoints =
-        points.where((point) => point.rawValue > 0).take(6).toList();
-    return LooGlassCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const _SectionHeader(title: "账户配置"),
-          const SizedBox(height: 14),
-          LooDistributionBar(
-            segments: shownPoints
-                .map(
-                  (point) => LooDistributionSegment(
-                    label: point.name,
-                    value: point.rawValue,
-                  ),
-                )
-                .toList(),
-          ),
-          const SizedBox(height: 8),
-          ...shownPoints.map(_AllocationTile.new),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -1230,26 +1089,6 @@ class _SectionHeader extends StatelessWidget {
                 ),
           ),
       ],
-    );
-  }
-}
-
-class _BulletLine extends StatelessWidget {
-  const _BulletLine(this.text);
-
-  final String text;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(top: 6),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text("• ", style: TextStyle(color: context.looTokens.accent)),
-          Expanded(child: Text(text)),
-        ],
-      ),
     );
   }
 }

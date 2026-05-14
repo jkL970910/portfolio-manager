@@ -632,7 +632,17 @@ class _SecurityDetailPageState extends State<SecurityDetailPage> {
                     priceHistoryChart: priceHistoryChart,
                   ),
                   const SizedBox(height: 12),
-                  _SecurityEvidenceCard(data),
+                  if (data.heldPosition == null)
+                    const _UnheldPositionCard()
+                  else
+                    _PositionScopeSection(
+                      data: data,
+                      scopes: scopes,
+                      selectedScope: selectedScope,
+                      onSelectScope: (scopeId) => setState(
+                        () => _selectedResearchScopeId = scopeId,
+                      ),
+                    ),
                   const SizedBox(height: 12),
                   _ResearchWorkbenchSection(
                     data,
@@ -670,15 +680,6 @@ class _SecurityDetailPageState extends State<SecurityDetailPage> {
                     isRefreshingQuote: _isRefreshingQuote,
                     isSubmittingExternalResearch: _isSubmittingExternalResearch,
                     externalResearchMessage: _externalResearchMessage,
-                  ),
-                  if (data.heldPosition != null) const SizedBox(height: 12),
-                  _PositionScopeSection(
-                    data: data,
-                    scopes: scopes,
-                    selectedScope: selectedScope,
-                    onSelectScope: (scopeId) => setState(
-                      () => _selectedResearchScopeId = scopeId,
-                    ),
                   ),
                 ],
               ),
@@ -1078,6 +1079,23 @@ class _SecurityHeroFactsCard extends StatelessWidget {
           ),
           const SizedBox(height: 14),
           _MetricGrid(data),
+          if (data.summaryPoints.isNotEmpty ||
+              data.marketData.summary.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            Text(
+              [
+                if (data.summaryPoints.isNotEmpty) data.summaryPoints.first,
+                if (data.summaryPoints.isEmpty &&
+                    data.marketData.summary.isNotEmpty)
+                  data.marketData.summary,
+              ].first,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: tokens.mutedText,
+              ),
+            ),
+          ],
           if (priceHistoryChart != null) ...[
             const SizedBox(height: 14),
             _PerformanceChartCard(chart: priceHistoryChart!),
@@ -1100,7 +1118,7 @@ String _securityDisplayName(MobileSecurityDetailSnapshot data) {
   return name;
 }
 
-class _ResearchWorkbenchSection extends StatelessWidget {
+class _ResearchWorkbenchSection extends StatefulWidget {
   const _ResearchWorkbenchSection(
     this.data, {
     required this.aiAnalysisCard,
@@ -1118,100 +1136,62 @@ class _ResearchWorkbenchSection extends StatelessWidget {
   final String? externalResearchMessage;
 
   @override
+  State<_ResearchWorkbenchSection> createState() =>
+      _ResearchWorkbenchSectionState();
+}
+
+class _ResearchWorkbenchSectionState extends State<_ResearchWorkbenchSection> {
+  var _expanded = false;
+
+  @override
   Widget build(BuildContext context) {
+    final tokens = context.looTokens;
     return LooGlassCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const _SectionHeader(title: "Loo国研究台", trailing: "高级解读"),
+          InkWell(
+            borderRadius: BorderRadius.circular(tokens.radiusMd),
+            onTap: () => setState(() => _expanded = !_expanded),
+            child: Row(
+              children: [
+                const Expanded(
+                  child: _SectionHeader(title: "Loo国研究台", trailing: "高级"),
+                ),
+                AnimatedRotation(
+                  turns: _expanded ? 0.5 : 0,
+                  duration: const Duration(milliseconds: 180),
+                  curve: Curves.easeOutCubic,
+                  child: Icon(
+                    Icons.keyboard_arrow_down_rounded,
+                    color: tokens.mutedText,
+                  ),
+                ),
+              ],
+            ),
+          ),
           const SizedBox(height: 6),
           Text(
-            data.heldPosition == null
-                ? "AI 快扫、估值证据、关键价位和候选适配集中在这里。"
-                : "AI 快扫、估值证据、关键价位和组合适配判断集中在这里。",
+            widget.data.heldPosition == null
+                ? "候选适配、估值证据和关键价位。"
+                : "组合适配、估值证据和关键价位。",
+            maxLines: _expanded ? 3 : 1,
+            overflow: TextOverflow.ellipsis,
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: context.looTokens.mutedText,
+                  color: tokens.mutedText,
                 ),
           ),
           const SizedBox(height: 12),
           _ResearchUpdateStatusBar(
-            data: data,
-            isRefreshingQuote: isRefreshingQuote,
-            isSubmittingExternalResearch: isSubmittingExternalResearch,
-            message: externalResearchMessage,
-            onTap: onOpenUpdateSheet,
+            data: widget.data,
+            isRefreshingQuote: widget.isRefreshingQuote,
+            isSubmittingExternalResearch: widget.isSubmittingExternalResearch,
+            message: widget.externalResearchMessage,
+            onTap: widget.onOpenUpdateSheet,
           ),
-          const SizedBox(height: 12),
-          _QuickScanPanel(child: aiAnalysisCard),
-        ],
-      ),
-    );
-  }
-}
-
-class _SecurityEvidenceCard extends StatelessWidget {
-  const _SecurityEvidenceCard(this.data);
-
-  final MobileSecurityDetailSnapshot data;
-
-  @override
-  Widget build(BuildContext context) {
-    final evidence = <_MetricDatum>[
-      if (data.assetClass.isNotEmpty) _MetricDatum("资产属性", data.assetClass),
-      if (data.sector.isNotEmpty) _MetricDatum("行业", data.sector),
-      if (data.exchange.isNotEmpty) _MetricDatum("交易所", data.exchange),
-      if (data.currency.isNotEmpty) _MetricDatum("交易币种", data.currency),
-      if (data.priceHistoryChart != null)
-        _MetricDatum("价格历史", data.priceHistoryChart!.freshness.label),
-      if (data.facts.isNotEmpty)
-        ...data.facts.take(4).map(
-              (fact) => _MetricDatum(fact.label, fact.value),
-            ),
-    ].where((item) => item.value.isNotEmpty && item.value != "--").toList();
-    final notes = [
-      if (data.marketData.summary.isNotEmpty) data.marketData.summary,
-      ...data.summaryPoints.take(2),
-    ].where((item) => item.trim().isNotEmpty).toList();
-
-    if (evidence.isEmpty && notes.isEmpty) {
-      return const SizedBox.shrink();
-    }
-
-    return LooGlassCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const _SectionHeader(title: "标的证据", trailing: "事实层"),
-          if (notes.isNotEmpty) ...[
-            const SizedBox(height: 8),
-            ...notes.take(2).map(
-                  (note) => Text(
-                    note,
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: context.looTokens.mutedText,
-                        ),
-                  ),
-                ),
-          ],
-          if (evidence.isNotEmpty) ...[
+          if (_expanded) ...[
             const SizedBox(height: 12),
-            LayoutBuilder(
-              builder: (context, constraints) {
-                final width = (constraints.maxWidth - 8) / 2;
-                return Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: evidence
-                      .map(
-                        (metric) => SizedBox(
-                          width: width,
-                          child: _MetricCard(metric),
-                        ),
-                      )
-                      .toList(),
-                );
-              },
-            ),
+            _QuickScanPanel(child: widget.aiAnalysisCard),
           ],
         ],
       ),
@@ -1331,48 +1311,152 @@ class _PositionScopeSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    return _CollapsiblePositionScopeSection(
+      data: data,
+      scopes: scopes,
+      selectedScope: selectedScope,
+      onSelectScope: onSelectScope,
+    );
+  }
+}
+
+class _CollapsiblePositionScopeSection extends StatefulWidget {
+  const _CollapsiblePositionScopeSection({
+    required this.data,
+    required this.scopes,
+    required this.selectedScope,
+    required this.onSelectScope,
+  });
+
+  final MobileSecurityDetailSnapshot data;
+  final List<_ResearchScope> scopes;
+  final _ResearchScope selectedScope;
+  final ValueChanged<String> onSelectScope;
+
+  @override
+  State<_CollapsiblePositionScopeSection> createState() =>
+      _CollapsiblePositionScopeSectionState();
+}
+
+class _CollapsiblePositionScopeSectionState
+    extends State<_CollapsiblePositionScopeSection> {
+  var _expanded = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final data = widget.data;
     if (data.heldPosition == null) {
       return const SizedBox.shrink();
     }
+    final tokens = context.looTokens;
     return LooGlassCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const _SectionHeader(title: "我的仓位", trailing: "持仓层"),
+          InkWell(
+            borderRadius: BorderRadius.circular(tokens.radiusMd),
+            onTap: () => setState(() => _expanded = !_expanded),
+            child: Row(
+              children: [
+                const Expanded(
+                  child: _SectionHeader(title: "我的仓位", trailing: "持仓层"),
+                ),
+                AnimatedRotation(
+                  turns: _expanded ? 0.5 : 0,
+                  duration: const Duration(milliseconds: 180),
+                  curve: Curves.easeOutCubic,
+                  child: Icon(
+                    Icons.keyboard_arrow_down_rounded,
+                    color: tokens.mutedText,
+                  ),
+                ),
+              ],
+            ),
+          ),
           const SizedBox(height: 6),
           _PositionScopeSummary(
             data: data,
-            selectedScope: selectedScope,
+            selectedScope: widget.selectedScope,
           ),
-          const SizedBox(height: 12),
-          _ResearchScopeTabs(
-            scopes: scopes,
-            selectedScopeId: selectedScope.id,
-            onSelected: onSelectScope,
+          if (_expanded) ...[
+            const SizedBox(height: 12),
+            _ResearchScopeTabs(
+              scopes: widget.scopes,
+              selectedScopeId: widget.selectedScope.id,
+              onSelected: widget.onSelectScope,
+            ),
+            const SizedBox(height: 12),
+            if (!widget.selectedScope.isAggregate &&
+                widget.selectedScope.account != null)
+              Column(
+                children: [
+                  _AnalysisCard(
+                    data.analysis,
+                    account: widget.selectedScope.account,
+                  ),
+                  const SizedBox(height: 12),
+                  _AccountScopeCard(
+                    widget.selectedScope.account!,
+                    holding: widget.selectedScope.holding,
+                  ),
+                ],
+              )
+            else ...[
+              _AnalysisCard(data.analysis),
+              const SizedBox(height: 12),
+              _HeldPositionBreakdownCard(
+                data.heldPosition!,
+                onOpenHolding: widget.onSelectScope,
+              ),
+            ],
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _UnheldPositionCard extends StatelessWidget {
+  const _UnheldPositionCard();
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = context.looTokens;
+    return LooGlassCard(
+      padding: EdgeInsets.all(tokens.gapMd),
+      child: Row(
+        children: [
+          Container(
+            height: 38,
+            width: 38,
+            decoration: BoxDecoration(
+              color: tokens.accent.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(tokens.radiusMd),
+            ),
+            child: Icon(
+              Icons.visibility_outlined,
+              size: 20,
+              color: tokens.accent,
+            ),
           ),
-          const SizedBox(height: 12),
-          if (!selectedScope.isAggregate && selectedScope.account != null)
-            Column(
+          SizedBox(width: tokens.gapMd),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _AnalysisCard(
-                  data.analysis,
-                  account: selectedScope.account,
-                ),
-                const SizedBox(height: 12),
-                _AccountScopeCard(
-                  selectedScope.account!,
-                  holding: selectedScope.holding,
+                Text("未持有", style: Theme.of(context).textTheme.titleMedium),
+                const SizedBox(height: 4),
+                Text(
+                  "当前按候选标的处理；持仓层分析会在加入组合后显示。",
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: tokens.mutedText,
+                      ),
                 ),
               ],
-            )
-          else ...[
-            _AnalysisCard(data.analysis),
-            const SizedBox(height: 12),
-            _HeldPositionBreakdownCard(
-              data.heldPosition!,
-              onOpenHolding: onSelectScope,
             ),
-          ],
+          ),
         ],
       ),
     );
@@ -2524,6 +2608,14 @@ class _MetricGrid extends StatelessWidget {
       _MetricDatum("最新价格", data.lastPrice),
       if (data.assetClass.isNotEmpty) _MetricDatum("资产属性", data.assetClass),
       if (data.sector.isNotEmpty) _MetricDatum("行业", data.sector),
+      if (data.exchange.isNotEmpty) _MetricDatum("交易所", data.exchange),
+      if (data.currency.isNotEmpty) _MetricDatum("交易币种", data.currency),
+      if (data.priceHistoryChart != null)
+        _MetricDatum("价格历史", data.priceHistoryChart!.freshness.label),
+      if (data.facts.isNotEmpty)
+        ...data.facts.take(3).map(
+              (fact) => _MetricDatum(fact.label, fact.value),
+            ),
       if (held == null)
         _MetricDatum("相关持仓", "${data.relatedHoldings.length} 个"),
     ].where((item) => item.value.isNotEmpty && item.value != "--").toList();
