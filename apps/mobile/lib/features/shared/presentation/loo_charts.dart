@@ -57,7 +57,7 @@ class _LooTrendChartState extends State<LooTrendChart> {
 
   @override
   Widget build(BuildContext context) {
-    final allPoints = widget.points;
+    final allPoints = _normalizeSeries(widget.points);
     final enabledRanges = {
       for (final range in LooTrendRange.values)
         range: _filteredPoints(allPoints, range).length >= 2,
@@ -176,10 +176,57 @@ class _LooTrendChartState extends State<LooTrendChart> {
       LooTrendRange.oneYear => latest.subtract(const Duration(days: 366)),
       LooTrendRange.ytd => DateTime(latest.year),
     };
-    return points
+    final filtered = points
         .where((point) =>
             point.rawDate != null && !point.rawDate!.isBefore(cutoff))
         .toList();
+    if (range == LooTrendRange.oneDay) {
+      return filtered;
+    }
+    return _compressToDailyClosingPoints(filtered);
+  }
+
+  List<LooTrendPoint> _normalizeSeries(List<LooTrendPoint> points) {
+    final sorted = [...points]..sort((left, right) {
+      final leftDate = left.rawDate;
+      final rightDate = right.rawDate;
+      if (leftDate == null && rightDate == null) return 0;
+      if (leftDate == null) return -1;
+      if (rightDate == null) return 1;
+      return leftDate.compareTo(rightDate);
+    });
+    final byTimestamp = <int, LooTrendPoint>{};
+    for (final point in sorted) {
+      final key = point.rawDate?.millisecondsSinceEpoch ?? point.label.hashCode;
+      byTimestamp[key] = point;
+    }
+    return byTimestamp.values.toList()
+      ..sort((left, right) {
+        final leftDate = left.rawDate;
+        final rightDate = right.rawDate;
+        if (leftDate == null && rightDate == null) return 0;
+        if (leftDate == null) return -1;
+        if (rightDate == null) return 1;
+        return leftDate.compareTo(rightDate);
+      });
+  }
+
+  List<LooTrendPoint> _compressToDailyClosingPoints(List<LooTrendPoint> points) {
+    if (points.length < 2) return points;
+    final byDay = <DateTime, LooTrendPoint>{};
+    for (final point in points) {
+      final rawDate = point.rawDate;
+      if (rawDate == null) continue;
+      final day = DateTime(rawDate.year, rawDate.month, rawDate.day);
+      final existing = byDay[day];
+      if (existing == null ||
+          (existing.rawDate != null && rawDate.isAfter(existing.rawDate!))) {
+        byDay[day] = point;
+      }
+    }
+    final compressed = byDay.entries.toList()
+      ..sort((left, right) => left.key.compareTo(right.key));
+    return compressed.map((entry) => entry.value).toList();
   }
 
   String _formatDelta(double value) {
