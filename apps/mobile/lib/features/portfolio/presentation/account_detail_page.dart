@@ -430,6 +430,7 @@ class _SummaryCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final tokens = context.looTokens;
+    final theme = Theme.of(context);
     return LooGlassCard(
       isHero: true,
       child: Column(
@@ -454,11 +455,25 @@ class _SummaryCard extends StatelessWidget {
                   ],
                 ),
               ),
+              SizedBox(width: tokens.gapMd),
+              Flexible(
+                flex: 0,
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 190),
+                  child: Text(
+                    data.value,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.right,
+                    style: theme.textTheme.headlineSmall?.copyWith(
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ),
+              ),
             ],
           ),
-          SizedBox(height: tokens.gapLg),
-          Text(data.value, style: Theme.of(context).textTheme.displaySmall),
-          SizedBox(height: tokens.gapSm),
+          SizedBox(height: tokens.gapMd),
           Wrap(
             spacing: 8,
             runSpacing: 8,
