@@ -133,7 +133,7 @@ class _PortfolioPageState extends State<PortfolioPage> {
                         else
                           _PortfolioHeroCard(
                             snapshot.data!,
-                            onTap: _openHealthScore,
+                            onTap: () => _openHealthScore(snapshot.data!),
                           ),
                         if (!_isFiltered &&
                             (snapshot.data!.portfolioValueChart != null ||
@@ -209,10 +209,21 @@ class _PortfolioPageState extends State<PortfolioPage> {
     });
   }
 
-  void _openHealthScore() {
-    Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (_) => HealthScorePage(apiClient: widget.apiClient),
+  void _openHealthScore(MobilePortfolioSnapshot data) {
+    showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      isScrollControlled: true,
+      builder: (_) => _PortfolioHealthSheet(
+        data: data,
+        onOpenFullHealth: () {
+          Navigator.of(context).pop();
+          Navigator.of(context).push(
+            MaterialPageRoute<void>(
+              builder: (_) => HealthScorePage(apiClient: widget.apiClient),
+            ),
+          );
+        },
       ),
     );
   }
@@ -252,73 +263,33 @@ class _PortfolioHeroCardState extends State<_PortfolioHeroCard> {
   @override
   Widget build(BuildContext context) {
     final tokens = context.looTokens;
+    final theme = Theme.of(context);
     return LooGlassCard(
       isHero: true,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: InkWell(
-                  borderRadius: BorderRadius.circular(tokens.radiusMd),
-                  onTap: widget.onTap,
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 2),
-                    child: Row(
-                      children: [
-                        _HeroScoreBadge(widget.data.healthScore),
-                        SizedBox(width: tokens.gapMd),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                "国库健康度",
-                                style: Theme.of(context).textTheme.titleLarge,
-                              ),
-                              SizedBox(height: tokens.gapXs),
-                              Text(
-                                widget.data.summaryPoints.isEmpty
-                                    ? widget.data.quoteStatus
-                                    : widget.data.summaryPoints.first,
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                                style: Theme.of(context)
-                                    .textTheme
-                                    .bodySmall
-                                    ?.copyWith(color: tokens.mutedText),
-                              ),
-                            ],
-                          ),
-                        ),
-                        Icon(
-                          Icons.chevron_right_rounded,
-                          color: tokens.accent,
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-          if (widget.data.summaryPoints.length > 1) ...[
-            SizedBox(height: tokens.gapMd),
-            Wrap(
-              spacing: 6,
-              runSpacing: 6,
-              children: widget.data.summaryPoints
-                  .skip(1)
-                  .take(2)
-                  .map((point) => _HeroChip(point))
-                  .toList(growable: false),
+          Text(
+            "组合预览",
+            style: theme.textTheme.headlineSmall?.copyWith(
+              fontWeight: FontWeight.w900,
             ),
-          ],
+          ),
+          SizedBox(height: tokens.gapXs),
+          Text(
+            widget.data.summaryPoints.isEmpty
+                ? widget.data.quoteStatus
+                : widget.data.summaryPoints.first,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: tokens.mutedText,
+            ),
+          ),
           SizedBox(height: tokens.gapMd),
           _PortfolioHeroMetrics(
             data: widget.data,
+            onOpenHealth: widget.onTap,
           ),
         ],
       ),
@@ -326,70 +297,14 @@ class _PortfolioHeroCardState extends State<_PortfolioHeroCard> {
   }
 }
 
-class _HeroScoreBadge extends StatelessWidget {
-  const _HeroScoreBadge(this.score);
-
-  final String score;
-
-  @override
-  Widget build(BuildContext context) {
-    final tokens = context.looTokens;
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.16),
-        borderRadius: BorderRadius.circular(tokens.radiusLg),
-        border: Border.all(color: tokens.accent.withValues(alpha: 0.45)),
-      ),
-      child: Padding(
-        padding: EdgeInsets.symmetric(
-          horizontal: tokens.gapMd,
-          vertical: tokens.gapSm,
-        ),
-        child: Text(
-          score.replaceAll(" 分", ""),
-          style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                fontWeight: FontWeight.w800,
-              ),
-        ),
-      ),
-    );
-  }
-}
-
-class _HeroChip extends StatelessWidget {
-  const _HeroChip(this.label);
-
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    final tokens = context.looTokens;
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.24),
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: tokens.cardBorder),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-        child: Text(
-          label,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                color: tokens.mutedText,
-                fontWeight: FontWeight.w700,
-              ),
-        ),
-      ),
-    );
-  }
-}
-
 class _PortfolioHeroMetrics extends StatelessWidget {
-  const _PortfolioHeroMetrics({required this.data});
+  const _PortfolioHeroMetrics({
+    required this.data,
+    required this.onOpenHealth,
+  });
 
   final MobilePortfolioSnapshot data;
+  final VoidCallback onOpenHealth;
 
   @override
   Widget build(BuildContext context) {
@@ -420,6 +335,15 @@ class _PortfolioHeroMetrics extends StatelessWidget {
             onTap: holdingsShare.isEmpty
                 ? null
                 : () => _showHoldingsShareSheet(context, holdingsShare),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: _HeroMetricButton(
+            label: "健康分",
+            value: data.healthScore.replaceAll(" 分", ""),
+            icon: Icons.radar_rounded,
+            onTap: onOpenHealth,
           ),
         ),
       ],
@@ -634,6 +558,86 @@ class _ShareSheet extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _PortfolioHealthSheet extends StatelessWidget {
+  const _PortfolioHealthSheet({
+    required this.data,
+    required this.onOpenFullHealth,
+  });
+
+  final MobilePortfolioSnapshot data;
+  final VoidCallback onOpenFullHealth;
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = context.looTokens;
+    final theme = Theme.of(context);
+    final radar = data.healthRadar
+        .map(
+          (point) => LooRadarPoint(
+            label: point.dimension,
+            value: point.value,
+          ),
+        )
+        .toList();
+
+    return SafeArea(
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(
+          tokens.gapLg,
+          0,
+          tokens.gapLg,
+          tokens.gapXl,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text("国库健康度", style: theme.textTheme.titleLarge),
+            SizedBox(height: tokens.gapSm),
+            Text(
+              data.healthScore,
+              style: theme.textTheme.displaySmall,
+            ),
+            if (data.summaryPoints.isNotEmpty) ...[
+              SizedBox(height: tokens.gapXs),
+              Text(
+                data.summaryPoints.first,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: tokens.mutedText,
+                ),
+              ),
+            ],
+            if (radar.isNotEmpty) ...[
+              SizedBox(height: tokens.gapLg),
+              LooRadarChart(points: radar, height: 220),
+            ],
+            if (data.summaryPoints.length > 1) ...[
+              SizedBox(height: tokens.gapLg),
+              Text("重点提示", style: theme.textTheme.titleMedium),
+              SizedBox(height: tokens.gapSm),
+              ...data.summaryPoints.skip(1).take(3).map(
+                    (item) => Padding(
+                      padding: EdgeInsets.only(bottom: tokens.gapSm),
+                      child: Text("• $item"),
+                    ),
+                  ),
+            ],
+            SizedBox(height: tokens.gapLg),
+            Align(
+              alignment: Alignment.centerRight,
+              child: TextButton.icon(
+                onPressed: onOpenFullHealth,
+                icon: const Icon(Icons.chevron_right_rounded),
+                label: const Text("健康分析"),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

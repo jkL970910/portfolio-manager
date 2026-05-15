@@ -9,6 +9,7 @@ class MobilePortfolioSnapshot {
     required this.securityHoldings,
     required this.quoteStatus,
     required this.healthScore,
+    required this.healthRadar,
     required this.summaryPoints,
     required this.performance,
     required this.portfolioValueChart,
@@ -23,6 +24,7 @@ class MobilePortfolioSnapshot {
   final List<MobileHoldingCard> securityHoldings;
   final String quoteStatus;
   final String healthScore;
+  final List<MobilePortfolioHealthRadarPoint> healthRadar;
   final List<String> summaryPoints;
   final List<MobilePortfolioPerformancePoint> performance;
   final MobileChartSeries? portfolioValueChart;
@@ -149,6 +151,11 @@ class MobilePortfolioSnapshot {
       healthScore: healthScore is Map<String, dynamic>
           ? "${healthScore["score"] ?? "--"} 分"
           : "-- 分",
+      healthRadar: healthScore is Map<String, dynamic>
+          ? readJsonList(healthScore, "radar")
+              .map(MobilePortfolioHealthRadarPoint.fromJson)
+              .toList()
+          : const [],
       summaryPoints:
           (json["summaryPoints"] as List?)?.whereType<String>().toList() ??
               const [],
@@ -183,6 +190,7 @@ class MobilePortfolioSnapshot {
       securityHoldings: securityHoldings,
       quoteStatus: "已筛选 $accountType 账户类型 · $quoteStatus",
       healthScore: healthScore,
+      healthRadar: healthRadar,
       summaryPoints: summaryPoints,
       performance: performance,
       portfolioValueChart: portfolioValueChart,
@@ -190,6 +198,24 @@ class MobilePortfolioSnapshot {
       accountTypeAllocation: accountTypeAllocation,
       accountInstanceAllocation: accountInstanceAllocation,
       assetClassDrilldown: assetClassDrilldown,
+    );
+  }
+}
+
+class MobilePortfolioHealthRadarPoint {
+  const MobilePortfolioHealthRadarPoint({
+    required this.dimension,
+    required this.value,
+  });
+
+  final String dimension;
+  final double value;
+
+  factory MobilePortfolioHealthRadarPoint.fromJson(Map<String, dynamic> json) {
+    final value = json["value"];
+    return MobilePortfolioHealthRadarPoint(
+      dimension: json["dimension"] as String? ?? "未知维度",
+      value: value is num ? value.toDouble() : 0,
     );
   }
 }
