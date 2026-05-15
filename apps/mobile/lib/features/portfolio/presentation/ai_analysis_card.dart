@@ -1385,22 +1385,13 @@ class _SecurityResearchProfileView extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _AnalysisSection(
+        _ResearchDisclosureCard(
           title: "标的资料",
+          summaryPills: _securityInfoSummaryPills(data),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  _MetaPill(data.securityLabel),
-                  _MetaPill(_assetTypeLabel(data.assetType)),
-                  _MetaPill(_sourceModeLabel(data.sourceMode)),
-                ],
-              ),
               if (data.quoteFreshnessSummary != null) ...[
-                const SizedBox(height: 10),
                 Text(data.quoteFreshnessSummary!),
               ],
               if (data.limitationSummary != null) ...[
@@ -1410,17 +1401,29 @@ class _SecurityResearchProfileView extends StatelessWidget {
                   style: Theme.of(context).textTheme.bodySmall,
                 ),
               ],
+              if (data.evidence.isNotEmpty) ...[
+                const SizedBox(height: 10),
+                ...data.evidence.take(3).map((item) => Padding(
+                      padding: const EdgeInsets.only(bottom: 6),
+                      child: Text(
+                        "• ${item.readableSummary}",
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                    )),
+              ],
             ],
           ),
         ),
-        _AnalysisSection(
+        _ResearchDisclosureCard(
           title: "估值证据",
+          summaryPills: _valuationSummaryPills(data.valuationEvidence),
           child: _ValuationEvidenceView(data.valuationEvidence),
         ),
         if (data.entryTiming.keyLevels.isNotEmpty ||
             data.entryTiming.marketPulseLabel != null)
-          _AnalysisSection(
+          _ResearchDisclosureCard(
             title: "关键价位",
+            summaryPills: _keyLevelSummaryPills(data.entryTiming),
             child: _EntryTimingView(
               data.entryTiming,
               showPosturePill: false,
@@ -1474,29 +1477,34 @@ class _SecurityResearchDecisionView extends StatelessWidget {
             ),
           ),
         if (showFactSections) ...[
-          _AnalysisSection(
+          _ResearchDisclosureCard(
             title: "估值证据",
+            summaryPills: _valuationSummaryPills(data.valuationEvidence),
             child: _ValuationEvidenceView(data.valuationEvidence),
           ),
           if (data.entryTiming.keyLevels.isNotEmpty ||
               data.entryTiming.marketPulseLabel != null)
-            _AnalysisSection(
+            _ResearchDisclosureCard(
               title: "关键价位",
+              summaryPills: _keyLevelSummaryPills(data.entryTiming),
               child: _EntryTimingView(data.entryTiming),
             ),
         ],
-        if (fitLines.isNotEmpty)
-          _AnalysisSection(
-            title: "组合适配",
-            child: _PortfolioFitVisual(data.portfolioFit),
-          ),
-        if (guardrails.isNotEmpty)
-          _AnalysisSection(
-            title: "主要护栏",
+        if (fitLines.isNotEmpty || guardrails.isNotEmpty)
+          _ResearchDisclosureCard(
+            title: "组合适配与护栏",
+            summaryPills: _fitGuardrailSummaryPills(
+              data.portfolioFit,
+              guardrails,
+            ),
             child: Column(
-              children: guardrails
-                  .map((guardrail) => _ResearchGuardrailRow(guardrail))
-                  .toList(),
+              children: [
+                if (fitLines.isNotEmpty) _PortfolioFitVisual(data.portfolioFit),
+                if (guardrails.isNotEmpty) ...[
+                  if (fitLines.isNotEmpty) const SizedBox(height: 12),
+                  ...guardrails.map(_ResearchGuardrailRow.new),
+                ],
+              ],
             ),
           ),
         _AuditSheetButton(
@@ -2547,6 +2555,65 @@ class _AnalysisSection extends StatelessWidget {
   }
 }
 
+class _ResearchDisclosureCard extends StatelessWidget {
+  const _ResearchDisclosureCard({
+    required this.title,
+    required this.summaryPills,
+    required this.child,
+  });
+
+  final String title;
+  final List<String> summaryPills;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.45),
+          border: Border.all(color: colorScheme.outlineVariant),
+          borderRadius: BorderRadius.circular(18),
+        ),
+        child: Theme(
+          data: Theme.of(context).copyWith(
+            dividerColor: Colors.transparent,
+            splashColor: Colors.transparent,
+            highlightColor: Colors.transparent,
+          ),
+          child: ExpansionTile(
+            tilePadding: const EdgeInsets.fromLTRB(14, 8, 10, 8),
+            childrenPadding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
+            initiallyExpanded: false,
+            title: Text(title, style: Theme.of(context).textTheme.titleSmall),
+            subtitle: summaryPills.isEmpty
+                ? null
+                : Padding(
+                    padding: const EdgeInsets.only(top: 8),
+                    child: Wrap(
+                      spacing: 6,
+                      runSpacing: 6,
+                      children: summaryPills
+                          .take(6)
+                          .map(_SmallStatusPill.new)
+                          .toList(),
+                    ),
+                  ),
+            children: [
+              Align(
+                alignment: Alignment.centerLeft,
+                child: child,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _AuditSheetButton extends StatelessWidget {
   const _AuditSheetButton({
     required this.label,
@@ -2953,6 +3020,84 @@ bool _hasAnalysisAuditData(MobileAiAnalysisResult data) {
       data.reliabilityScore != null ||
       data.limitationSummary != null ||
       data.quotesAsOf != null;
+}
+
+List<String> _securityInfoSummaryPills(MobileSecurityResearchProfile data) {
+  return [
+    data.securityLabel,
+    _assetTypeLabel(data.assetType),
+    if (data.quoteFreshnessSummary != null)
+      _compactResearchStatus(data.quoteFreshnessSummary!),
+    if (data.limitationSummary != null) "资料待补全",
+    if (data.evidence.isNotEmpty) "证据 ${data.evidence.length}",
+  ];
+}
+
+List<String> _valuationSummaryPills(MobileResearchValuationEvidence data) {
+  final primaryAnchors = _primaryValuationAnchors(data.anchors);
+  return [
+    _valuationMethodLabel(data.method),
+    "置信 ${_confidenceLabel(data.confidence)}",
+    if (primaryAnchors.isNotEmpty)
+      "${_valuationAnchorLabel(primaryAnchors.first.label)} ${primaryAnchors.first.value}",
+    if (data.sanityChecks.isNotEmpty) "校验 ${data.sanityChecks.length}",
+  ];
+}
+
+List<String> _keyLevelSummaryPills(MobileResearchEntryTiming data) {
+  final levels = [
+    _pickKeyLevel(data.keyLevels, ["pullback_zone"]),
+    _pickKeyLevel(data.keyLevels, ["resistance"]),
+    _pickKeyLevel(data.keyLevels, ["deep_support"]),
+    _pickKeyLevel(data.keyLevels, ["current_price"]),
+  ].whereType<MobileResearchKeyLevel>().toList();
+  final result = levels
+      .map((level) => "${_keyLevelRoleLabel(level)} ${level.value}")
+      .take(3)
+      .toList();
+  if (data.marketPulseLabel != null) {
+    result.add(_compactResearchStatus(data.marketPulseLabel!));
+  }
+  return result;
+}
+
+List<String> _fitGuardrailSummaryPills(
+  MobileResearchPortfolioFit fit,
+  List<MobileResearchGuardrail> guardrails,
+) {
+  final result = <String>[
+    if (fit.score != null) "适配 ${fit.score!.round()} 分",
+    if (fit.targetGapLabel.isNotEmpty) fit.targetGapLabel,
+    if (fit.accountTaxFitLabel != null) fit.accountTaxFitLabel!,
+    ...guardrails.take(3).map((guardrail) {
+      final marker = guardrail.severity == "blocker"
+          ? "阻断"
+          : guardrail.severity == "warning"
+              ? "注意"
+              : "通过";
+      return "$marker ${guardrail.title}";
+    }),
+  ];
+  return result.map(_compactResearchStatus).toList();
+}
+
+String _compactResearchStatus(String value) {
+  final text = value.trim();
+  if (text.isEmpty) return text;
+  if (text.contains("报价较新")) return "报价较新";
+  if (text.contains("报价偏旧")) return "报价偏旧";
+  if (text.contains("资料不足")) return "资料不足";
+  if (text.contains("资料待补全")) return "资料待补全";
+  if (text.contains("等待价格/数据确认")) return "等待价格/数据确认";
+  if (text.contains("等待确认")) return "等待确认";
+  if (text.contains("等待回撤")) return "等待回撤";
+  if (text.contains("组合护栏")) return "组合护栏优先";
+  final cleaned = text
+      .replaceAll(RegExp(r"\s+"), " ")
+      .replaceAll("；", " · ")
+      .replaceAll("。", "")
+      .trim();
+  return cleaned.length <= 22 ? cleaned : "${cleaned.substring(0, 22)}…";
 }
 
 List<String> _portfolioFitLines(MobileResearchPortfolioFit data) {
