@@ -1039,47 +1039,63 @@ class _SecurityHeroFactsCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Column(
+          Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                data.symbol,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: theme.textTheme.displaySmall,
-              ),
-              if (displayName.isNotEmpty) ...[
-                const SizedBox(height: 6),
-                Text(
-                  displayName,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    color: tokens.mutedText,
-                  ),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      data.symbol,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.displaySmall,
+                    ),
+                    if (displayName.isNotEmpty) ...[
+                      const SizedBox(height: 6),
+                      Text(
+                        displayName,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          color: tokens.mutedText,
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
-              ],
-              const SizedBox(height: 10),
-              Align(
-                alignment: Alignment.centerLeft,
+              ),
+              const SizedBox(width: 14),
+              Flexible(
+                flex: 0,
                 child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 320),
-                  child: _StatusPill(
-                    label: quoteStatusText,
-                    color: freshnessColor,
+                  constraints: const BoxConstraints(maxWidth: 176),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Text(
+                        data.lastPrice,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        textAlign: TextAlign.right,
+                        style: theme.textTheme.headlineSmall?.copyWith(
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      _StatusPill(
+                        label: quoteStatusText,
+                        color: freshnessColor,
+                        compact: true,
+                      ),
+                    ],
                   ),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 18),
-          Text(
-            data.lastPrice,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: theme.textTheme.headlineMedium,
-          ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 14),
           Wrap(
             spacing: 8,
             runSpacing: 8,
@@ -2848,10 +2864,15 @@ class _PerformanceChartCard extends StatelessWidget {
 }
 
 class _StatusPill extends StatelessWidget {
-  const _StatusPill({required this.label, required this.color});
+  const _StatusPill({
+    required this.label,
+    required this.color,
+    this.compact = false,
+  });
 
   final String label;
   final Color color;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
@@ -2862,13 +2883,18 @@ class _StatusPill extends StatelessWidget {
         border: Border.all(color: color.withValues(alpha: 0.45)),
       ),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        padding: EdgeInsets.symmetric(
+          horizontal: compact ? 8 : 10,
+          vertical: compact ? 4 : 6,
+        ),
         child: Text(
           label,
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
-          style:
-              Theme.of(context).textTheme.labelMedium?.copyWith(color: color),
+          style: (compact
+                  ? Theme.of(context).textTheme.labelSmall
+                  : Theme.of(context).textTheme.labelMedium)
+              ?.copyWith(color: color),
         ),
       ),
     );
