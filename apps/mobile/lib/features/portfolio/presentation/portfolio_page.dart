@@ -126,7 +126,10 @@ class _PortfolioPageState extends State<PortfolioPage> {
                   )
                 else if (snapshot.hasData)
                   SliverPadding(
-                    padding: looPagePadding(context),
+                    padding: looPagePadding(
+                      context,
+                      top: _isFiltered ? 0 : 12,
+                    ),
                     sliver: SliverList.list(
                       children: [
                         if (_isFiltered)
