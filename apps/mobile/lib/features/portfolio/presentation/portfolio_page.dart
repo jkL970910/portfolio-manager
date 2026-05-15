@@ -381,9 +381,9 @@ class _HeroMetricButton extends StatelessWidget {
           border: Border.all(color: tokens.cardBorder),
         ),
         child: Padding(
-          padding: EdgeInsets.all(tokens.gapSm),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               Row(
                 children: [
@@ -402,6 +402,7 @@ class _HeroMetricButton extends StatelessWidget {
                 value,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
                 style: Theme.of(context).textTheme.titleMedium?.copyWith(
                       fontWeight: FontWeight.w800,
                     ),
@@ -411,6 +412,7 @@ class _HeroMetricButton extends StatelessWidget {
                 label,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
                 style: Theme.of(context).textTheme.labelSmall?.copyWith(
                       color: tokens.mutedText,
                     ),
