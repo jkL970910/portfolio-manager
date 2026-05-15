@@ -34,6 +34,7 @@ class AiAnalysisCard extends StatefulWidget {
     this.controller,
     this.title = "智能快扫",
     this.description = "先用你的组合、偏好和已保存资料生成确定性判断；外部 GPT 只在你点击增强时调用。",
+    this.collapseDescriptionToInfo = false,
     this.autoRun = false,
     this.refreshKey,
     this.showGenerateButton = true,
@@ -46,6 +47,7 @@ class AiAnalysisCard extends StatefulWidget {
   final AiAnalysisController? controller;
   final String title;
   final String description;
+  final bool collapseDescriptionToInfo;
   final bool autoRun;
   final String? refreshKey;
   final bool showGenerateButton;
@@ -189,6 +191,27 @@ class _AiAnalysisCardState extends State<AiAnalysisCard> {
     return true;
   }
 
+  void _showAnalysisInfoSheet(BuildContext context) {
+    showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (context) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text("研究台说明", style: Theme.of(context).textTheme.titleLarge),
+              const SizedBox(height: 10),
+              Text(widget.description),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   Future<MobileAiAnalysisResult> _loadAnalysis({required bool refresh}) async {
     try {
       final payload = {
@@ -292,16 +315,26 @@ class _AiAnalysisCardState extends State<AiAnalysisCard> {
                   children: [
                     Text(widget.title,
                         style: Theme.of(context).textTheme.titleLarge),
-                    const SizedBox(height: 6),
-                    Text(
-                      widget.description,
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: context.looTokens.mutedText,
-                          ),
-                    ),
+                    if (!widget.collapseDescriptionToInfo &&
+                        widget.description.isNotEmpty) ...[
+                      const SizedBox(height: 6),
+                      Text(
+                        widget.description,
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: context.looTokens.mutedText,
+                            ),
+                      ),
+                    ],
                   ],
                 ),
               ),
+              if (widget.collapseDescriptionToInfo &&
+                  widget.description.isNotEmpty)
+                IconButton(
+                  tooltip: "说明",
+                  onPressed: () => _showAnalysisInfoSheet(context),
+                  icon: const Icon(Icons.info_outline, size: 20),
+                ),
               if (widget.showGenerateButton) ...[
                 const SizedBox(width: 12),
                 FilledButton.icon(
@@ -1487,9 +1520,12 @@ class _ResearchDecisionHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final tone = _researchDecisionTone(colorScheme, data);
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.primaryContainer,
+        color: tone.background,
+        border: Border.all(color: tone.border),
         borderRadius: BorderRadius.circular(16),
       ),
       child: Padding(
@@ -1514,7 +1550,7 @@ class _ResearchDecisionHeader extends StatelessWidget {
               Text(
                 data.primaryReason,
                 style: TextStyle(
-                  color: Theme.of(context).colorScheme.onPrimaryContainer,
+                  color: tone.foreground,
                 ),
               ),
             ],
@@ -1523,6 +1559,41 @@ class _ResearchDecisionHeader extends StatelessWidget {
       ),
     );
   }
+}
+
+class _DecisionTone {
+  const _DecisionTone({
+    required this.background,
+    required this.border,
+    required this.foreground,
+  });
+
+  final Color background;
+  final Color border;
+  final Color foreground;
+}
+
+_DecisionTone _researchDecisionTone(
+  ColorScheme colorScheme,
+  MobileSecurityResearchDecision data,
+) {
+  final label = data.decisionLabel;
+  final hasBlocker = data.vetoedBy.isNotEmpty ||
+      data.guardrails.any((guardrail) => guardrail.severity == "blocker") ||
+      label.contains("暂不") ||
+      label.contains("阻断");
+  final isPositive =
+      label.contains("适合") || label.contains("可考虑") || label.contains("可继续");
+  final base = hasBlocker
+      ? colorScheme.error
+      : isPositive
+          ? colorScheme.primary
+          : colorScheme.tertiary;
+  return _DecisionTone(
+    background: base.withValues(alpha: 0.14),
+    border: base.withValues(alpha: 0.55),
+    foreground: colorScheme.onSurface,
+  );
 }
 
 class _ValuationEvidenceView extends StatelessWidget {

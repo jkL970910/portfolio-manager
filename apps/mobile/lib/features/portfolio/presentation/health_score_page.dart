@@ -667,8 +667,68 @@ class _RadarTile extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 8),
-          LinearProgressIndicator(value: progress),
+          _TargetProgressBar(value: progress),
         ],
+      ),
+    );
+  }
+}
+
+class _TargetProgressBar extends StatelessWidget {
+  const _TargetProgressBar({required this.value});
+
+  final double value;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final clampedValue = value.clamp(0.0, 1.0);
+    const clampedTarget = 0.9;
+    return SizedBox(
+      height: 14,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final width = constraints.maxWidth;
+          return Stack(
+            clipBehavior: Clip.none,
+            children: [
+              Positioned.fill(
+                top: 4,
+                bottom: 4,
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: colorScheme.surfaceContainerHighest,
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                ),
+              ),
+              Positioned(
+                left: 0,
+                top: 4,
+                bottom: 4,
+                width: width * clampedValue,
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: colorScheme.primary,
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                ),
+              ),
+              Positioned(
+                left: (width * clampedTarget - 1).clamp(0.0, width - 2),
+                top: 0,
+                child: Container(
+                  width: 2,
+                  height: 14,
+                  decoration: BoxDecoration(
+                    color: colorScheme.onSurface.withValues(alpha: 0.72),
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                ),
+              ),
+            ],
+          );
+        },
       ),
     );
   }

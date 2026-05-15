@@ -201,8 +201,7 @@ class _OverviewPageState extends State<OverviewPage> {
     );
   }
 
-  Future<MobileDailyIntelligenceAiSummary>
-      _generateDailyIntelligenceAiSummary(
+  Future<MobileDailyIntelligenceAiSummary> _generateDailyIntelligenceAiSummary(
     MobileDailyIntelligenceItem item,
   ) async {
     final response =
@@ -799,28 +798,6 @@ class _MiniRadarPainter extends CustomPainter {
       5,
       (index) => (-90 + index * 72) * 3.141592653589793 / 180,
     );
-    final gridPaint = Paint()
-      ..color = tokens.cardBorder
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1;
-    for (final scale in const [0.36, 0.68, 1.0]) {
-      final path = Path();
-      for (var i = 0; i < angles.length; i++) {
-        final point = center +
-            Offset(
-              radius * scale * _cos(angles[i]),
-              radius * scale * _sin(angles[i]),
-            );
-        if (i == 0) {
-          path.moveTo(point.dx, point.dy);
-        } else {
-          path.lineTo(point.dx, point.dy);
-        }
-      }
-      path.close();
-      canvas.drawPath(path, gridPaint);
-    }
-
     final values = [0.82, 0.58, 0.72, 0.52, 0.68];
     final shape = Path();
     for (var i = 0; i < angles.length; i++) {
@@ -836,6 +813,13 @@ class _MiniRadarPainter extends CustomPainter {
       }
     }
     shape.close();
+    canvas.drawCircle(
+      center,
+      radius * 0.82,
+      Paint()
+        ..color = tokens.accent.withValues(alpha: 0.08)
+        ..style = PaintingStyle.fill,
+    );
     canvas.drawPath(
       shape,
       Paint()
@@ -2619,12 +2603,22 @@ class _RecommendationCard extends StatelessWidget {
           const Spacer(),
           Padding(
             padding: const EdgeInsets.only(left: 6),
-            child: Text(
-              "推荐详情 →",
-              style: appTheme.textTheme.labelSmall?.copyWith(
-                color: tokens.accent,
-                fontWeight: FontWeight.w800,
-              ),
+            child: Row(
+              children: [
+                Icon(Icons.tune_rounded, size: 13, color: tokens.accent),
+                const SizedBox(width: 4),
+                Expanded(
+                  child: Text(
+                    "按谕令查看推荐 →",
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: appTheme.textTheme.labelSmall?.copyWith(
+                      color: tokens.accent,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
         ],

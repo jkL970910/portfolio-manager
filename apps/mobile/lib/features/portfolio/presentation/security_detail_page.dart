@@ -662,6 +662,7 @@ class _SecurityDetailPageState extends State<SecurityDetailPage> {
                       title: "Loo国研究工作台",
                       description:
                           "基于标的事实、资料状态和你的组合上下文生成结论；GPT 增强只在你手动点击时作为解释层。",
+                      collapseDescriptionToInfo: true,
                       autoRun: true,
                       showGenerateButton: false,
                       refreshKey: [
