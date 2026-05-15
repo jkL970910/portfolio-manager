@@ -744,6 +744,76 @@ function normalizeExchangeCode(value: string | null | undefined) {
   return value?.trim().toUpperCase() || "";
 }
 
+function isUsMarketExchange(value: string | null | undefined) {
+  const exchange = normalizeExchangeCode(value);
+  return [
+    "US",
+    "NASDAQ",
+    "NAS",
+    "XNAS",
+    "NYSE",
+    "NYS",
+    "XNYS",
+    "ARCA",
+    "ARCX",
+    "NYSEARCA",
+    "NYSE AMERICAN",
+    "XASE",
+  ].includes(exchange);
+}
+
+async function resolveSecurityIdentityForUnheldListing(input: {
+  symbol: string;
+  exchange?: string | null;
+  currency?: CurrencyCode | null;
+}) {
+  const symbol = input.symbol.trim().toUpperCase();
+  const requestedExchange = normalizeExchangeCode(input.exchange);
+  const broadUsExchange = requestedExchange === "US";
+  const requestedCurrency = input.currency ?? null;
+  const resolution = await resolveSecurity(symbol, {
+    exchange: requestedExchange || null,
+    currency: requestedCurrency,
+  }).catch(() => null);
+  const quote = await getSecurityQuote(symbol, {
+    exchange: broadUsExchange ? null : requestedExchange || null,
+    currency: requestedCurrency,
+  }).catch(() => null);
+  const resolved = resolution?.result;
+  const quoted = quote?.result;
+  const resolvedExchange = normalizeExchangeCode(
+    resolved?.exchange || resolved?.micCode,
+  );
+  const quoteExchange = normalizeExchangeCode(quoted?.exchange);
+  const resolvedCurrency =
+    resolvedExchange && isUsMarketExchange(resolvedExchange) ? "USD" : null;
+  const quoteCurrency =
+    quoted?.currency === "USD" || quoted?.currency === "CAD"
+      ? normalizeCurrencyCode(quoted.currency)
+      : null;
+  const currency =
+    requestedCurrency ?? quoteCurrency ?? resolvedCurrency ?? "USD";
+  const exchange =
+    (broadUsExchange ? "" : requestedExchange) ||
+    quoteExchange ||
+    (resolvedExchange === "US" ? "" : resolvedExchange) ||
+    (currency === "USD" ? "NASDAQ" : "TSX");
+
+  return {
+    security: await resolveCanonicalSecurityIdentity({
+      symbol,
+      exchange,
+      micCode: resolved?.micCode ?? null,
+      currency,
+      name: resolved?.name ?? symbol,
+      securityType: resolved?.securityType ?? null,
+      marketSector: resolved?.marketSector ?? null,
+      provider: resolved?.provider ?? quoted?.provider ?? null,
+    }),
+    quote,
+  };
+}
+
 async function resolveSecurityIdentityForHolding(holding: HoldingPosition) {
   if (holding.securityId) {
     const existing = await getRepositories().securities.getById(
@@ -2036,16 +2106,19 @@ export async function getPortfolioSecurityDetailView(
   const requestedSecurity = identity?.securityId
     ? await repositories.securities.getById(identity.securityId)
     : null;
+  const unheldIdentity =
+    !requestedSecurity && !referenceHolding
+      ? await resolveSecurityIdentityForUnheldListing({
+          symbol: normalizedSymbol,
+          exchange: identity?.exchange ?? null,
+          currency: identity?.currency ?? null,
+        })
+      : null;
   const canonicalSecurity =
     requestedSecurity ??
     (referenceHolding
       ? await resolveSecurityIdentityForHolding(referenceHolding)
-      : await resolveCanonicalSecurityIdentity({
-          symbol: normalizedSymbol,
-          exchange: identity?.exchange ?? null,
-          currency: identity?.currency ?? null,
-          name: normalizedSymbol,
-        }));
+      : unheldIdentity!.security);
   hydratedPriceHistory =
     await repositories.securityPriceHistory.listBySecurityId(
       canonicalSecurity.id,
@@ -4953,30 +5026,23 @@ export async function refreshPortfolioSecurityQuote(
   const usdToCadFx = await refreshFxRate("USD", "CAD");
 
   if (uniqueSymbols.length === 0) {
-    const quote = await getSecurityQuote(normalizedSymbol, {
+    const resolvedUnheld = await resolveSecurityIdentityForUnheldListing({
+      symbol: normalizedSymbol,
       exchange: requestedExchange || null,
       currency: requestedCurrency,
-    }).catch(() => null);
+    });
+    const quote =
+      resolvedUnheld.quote ??
+      (await getSecurityQuote(normalizedSymbol, {
+        exchange: isUsMarketExchange(resolvedUnheld.security.canonicalExchange)
+          ? null
+          : resolvedUnheld.security.canonicalExchange,
+        currency: resolvedUnheld.security.currency,
+      }).catch(() => null));
     const quoteFound = Boolean(quote?.result?.price && quote.result.price > 0);
     const refreshedAt = new Date();
     const refreshedDate = refreshedAt.toISOString().slice(0, 10);
-    const quoteCurrency = normalizeCurrencyCode(
-      quote?.result?.currency || requestedCurrency || "CAD",
-    );
-    const quoteExchange = normalizeExchangeCode(
-      quote?.result?.exchange || requestedExchange,
-    );
-    const requestedSecurity = requestedSecurityId
-      ? await repositories.securities.getById(requestedSecurityId)
-      : null;
-    const canonicalSecurity =
-      requestedSecurity ??
-      (await resolveCanonicalSecurityIdentity({
-        symbol: normalizedSymbol,
-        exchange: quoteExchange || requestedExchange || null,
-        currency: quoteCurrency,
-        provider: quote?.result?.provider ?? null,
-      }));
+    const canonicalSecurity = resolvedUnheld.security;
 
     if (quoteFound) {
       await db.transaction(async (tx) => {
@@ -5014,6 +5080,7 @@ export async function refreshPortfolioSecurityQuote(
       quotePrice: quoteFound ? (quote?.result.price ?? null) : null,
       securityId: canonicalSecurity.id,
       quoteCurrency: quote?.result?.currency ?? canonicalSecurity.currency,
+      quoteExchange: canonicalSecurity.canonicalExchange,
       historyPointCount: quoteFound ? 1 : 0,
       snapshotRecorded: false,
       fxRateLabel: formatFxRefreshLabel(usdToCadFx),

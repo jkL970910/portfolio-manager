@@ -31,6 +31,7 @@ type SecurityQuoteOptions = {
 const SUPPORTED_SEARCH_CURRENCIES = new Set(["CAD", "USD"]);
 
 const EXCHANGE_CURRENCY_HINTS = new Map<string, "CAD" | "USD">([
+  ["US", "USD"],
   ["AMEX", "USD"],
   ["ARCX", "USD"],
   ["ARCA", "USD"],

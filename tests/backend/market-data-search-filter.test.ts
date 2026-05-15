@@ -58,6 +58,12 @@ test("market data search rejects non-North-American USD listings", () => {
 
 test("market data search infers CAD/USD for identity providers without currency", () => {
   const results = filterSupportedSearchResults([
+    candidate("AAOI", {
+      currency: null,
+      exchange: "US",
+      micCode: null,
+      provider: "openfigi",
+    }),
     candidate("AAPL", {
       currency: null,
       exchange: "NASDAQ",
@@ -80,7 +86,7 @@ test("market data search infers CAD/USD for identity providers without currency"
 
   assert.deepEqual(
     results.map((result) => `${result.symbol}:${result.exchange}:${result.currency}`),
-    ["AAPL:NASDAQ:USD", "AAPL:NEO:CAD"],
+    ["AAOI:US:USD", "AAPL:NASDAQ:USD", "AAPL:NEO:CAD"],
   );
 });
 

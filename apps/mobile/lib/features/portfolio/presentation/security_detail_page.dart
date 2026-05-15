@@ -48,6 +48,8 @@ class _SecurityDetailPageState extends State<SecurityDetailPage> {
   int _externalResearchRefreshRevision = 0;
   String? _externalResearchMessage;
   String? _securityId;
+  String? _resolvedExchange;
+  String? _resolvedCurrency;
   String _selectedResearchScopeId = _ResearchScope.aggregateId;
   final AiAnalysisController _analysisController = AiAnalysisController();
 
@@ -73,8 +75,8 @@ class _SecurityDetailPageState extends State<SecurityDetailPage> {
     final response = await widget.apiClient.getPortfolioSecurityDetail(
       widget.symbol,
       securityId: widget.securityId,
-      exchange: widget.exchange,
-      currency: widget.currency,
+      exchange: _resolvedExchange ?? widget.exchange,
+      currency: _resolvedCurrency ?? widget.currency,
     );
     final data = response["data"];
     if (data == null) {
@@ -86,6 +88,8 @@ class _SecurityDetailPageState extends State<SecurityDetailPage> {
 
     final snapshot = MobileSecurityDetailSnapshot.fromJson(data);
     _securityId = snapshot.securityId.isNotEmpty ? snapshot.securityId : null;
+    _resolvedExchange = snapshot.exchange.isNotEmpty ? snapshot.exchange : null;
+    _resolvedCurrency = snapshot.currency.isNotEmpty ? snapshot.currency : null;
     if (mounted) {
       LooMinisterScope.report(
         context,
@@ -109,12 +113,23 @@ class _SecurityDetailPageState extends State<SecurityDetailPage> {
     });
 
     try {
-      await widget.apiClient.refreshPortfolioSecurityQuote(
+      final response = await widget.apiClient.refreshPortfolioSecurityQuote(
         widget.symbol,
         securityId: _securityId ?? widget.securityId,
-        exchange: widget.exchange,
-        currency: widget.currency,
+        exchange: _resolvedExchange ?? widget.exchange,
+        currency: _resolvedCurrency ?? widget.currency,
       );
+      final payload = response["data"];
+      if (payload is Map<String, dynamic>) {
+        final securityId = payload["securityId"] as String?;
+        final exchange = payload["quoteExchange"] as String?;
+        final currency = payload["quoteCurrency"] as String?;
+        _securityId = securityId?.isNotEmpty == true ? securityId : _securityId;
+        _resolvedExchange =
+            exchange?.isNotEmpty == true ? exchange : _resolvedExchange;
+        _resolvedCurrency =
+            currency?.isNotEmpty == true ? currency : _resolvedCurrency;
+      }
       _refresh();
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
