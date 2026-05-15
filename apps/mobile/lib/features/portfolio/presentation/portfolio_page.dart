@@ -107,14 +107,15 @@ class _PortfolioPageState extends State<PortfolioPage> {
               controller: _scrollController,
               physics: const AlwaysScrollableScrollPhysics(),
               slivers: [
-                SliverToBoxAdapter(
-                  child: _PageHeader(
-                    title: widget.title ?? "组合御览",
-                    subtitle: snapshot.hasData
-                        ? snapshot.data!.quoteStatus
-                        : "正在整理 Loo国资产账本...",
+                if (_isFiltered || !snapshot.hasData)
+                  SliverToBoxAdapter(
+                    child: _PageHeader(
+                      title: widget.title ?? "组合御览",
+                      subtitle: snapshot.hasData
+                          ? snapshot.data!.quoteStatus
+                          : "正在整理 Loo国资产账本...",
+                    ),
                   ),
-                ),
                 if (snapshot.connectionState == ConnectionState.waiting)
                   const SliverFillRemaining(
                       child: Center(child: CircularProgressIndicator()))
