@@ -476,19 +476,6 @@ class _SummaryCard extends StatelessWidget {
             onOpenShare: onOpenShare,
             onOpenHealth: onOpenHealth,
           ),
-          if (data.summaryPoints.isNotEmpty) ...[
-            SizedBox(height: tokens.gapSm),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                _MiniPill(
-                  data.summaryPoints.first,
-                  maxWidth: 280,
-                ),
-              ],
-            ),
-          ],
         ],
       ),
     );
@@ -1032,15 +1019,14 @@ class _SectionHeader extends StatelessWidget {
 }
 
 class _MiniPill extends StatelessWidget {
-  const _MiniPill(this.label, {this.maxWidth});
+  const _MiniPill(this.label);
 
   final String label;
-  final double? maxWidth;
 
   @override
   Widget build(BuildContext context) {
     final tokens = context.looTokens;
-    final pill = DecoratedBox(
+    return DecoratedBox(
       decoration: BoxDecoration(
         color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.38),
         borderRadius: BorderRadius.circular(999),
@@ -1055,15 +1041,6 @@ class _MiniPill extends StatelessWidget {
           style: Theme.of(context).textTheme.labelMedium,
         ),
       ),
-    );
-
-    if (maxWidth == null) {
-      return pill;
-    }
-
-    return ConstrainedBox(
-      constraints: BoxConstraints(maxWidth: maxWidth!),
-      child: pill,
     );
   }
 }
