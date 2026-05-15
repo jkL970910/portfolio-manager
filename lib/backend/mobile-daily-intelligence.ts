@@ -503,6 +503,10 @@ function dedupeItems(items: DailyIntelligenceItem[]) {
   });
 }
 
+function isExternalNewsItem(item: DailyIntelligenceItem) {
+  return item.sourceType === "news" && item.sourceMode === "cached-external";
+}
+
 export function mapDailyIntelligenceItemToRecommendationBrief(
   item: DailyIntelligenceItem,
 ): RecommendationsData["intelligenceBriefs"][number] {
@@ -566,13 +570,26 @@ export async function getDailyIntelligenceItemsForUser(
     getOrCreateLatestMarketSentiment(now),
   ]);
 
-  const marketSentimentItems =
-    await mapMarketSentimentSuiteForDailyIntelligence(marketSentiment);
+  const documentItems = documents.map(
+    mapExternalResearchDocumentForDailyIntelligence,
+  );
+  const externalNewsItems = documentItems.filter(isExternalNewsItem);
+  const hasExternalNews = externalNewsItems.length > 0;
+  const externalSupportItems = documentItems.filter(
+    (item) => !isExternalNewsItem(item),
+  );
+  const analysisItems = hasExternalNews
+    ? []
+    : analysisRuns.map(mapAnalysisRunForDailyIntelligence);
+  const marketSentimentItems = hasExternalNews
+    ? []
+    : await mapMarketSentimentSuiteForDailyIntelligence(marketSentiment);
 
   return dedupeItems([
+    ...externalNewsItems,
+    ...externalSupportItems,
     ...marketSentimentItems,
-    ...documents.map(mapExternalResearchDocumentForDailyIntelligence),
-    ...analysisRuns.map(mapAnalysisRunForDailyIntelligence),
+    ...analysisItems,
   ])
     .sort(
       (left, right) =>
@@ -597,7 +614,7 @@ export async function getMobileDailyIntelligenceView(
         securityManualRefreshEnabled: policy.securityManualRefreshEnabled,
         sourceMode: policy.sourceMode,
         disclaimer:
-          "Loo国今日秘闻只展示后台每日缓存资料和已保存分析；页面加载不会触发实时新闻、论坛或付费外部 API。",
+          "Loo国今日秘闻优先展示后台 worker 缓存的真实外部新闻；只有没有外部新闻时才显示市场脉搏或已保存分析作为兜底。页面加载不会触发实时新闻、论坛或付费外部 API。",
       },
       items,
       emptyState: {

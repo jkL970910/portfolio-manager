@@ -195,6 +195,67 @@ test("daily intelligence endpoint combines documents and saved analysis without 
   assert.ok(response.data.items.some((item) => item.title.includes("AMZN")));
 });
 
+test("daily intelligence hides local fallback cards when external news exists", async () => {
+  const now = new Date("2026-05-15T13:00:00.000Z");
+  await mockRepositories.externalResearchDocuments.create({
+    userId: "daily_intel_news_user",
+    providerDocumentId: "alpha-vantage-news:macro:test",
+    sourceType: "news",
+    providerId: "alpha-vantage-news",
+    sourceName: "Alpha Vantage News",
+    title: "Markets digest fresh inflation data",
+    summary: "Major indexes reacted to updated inflation and rate expectations.",
+    url: "https://example.com/markets-inflation",
+    publishedAt: "2026-05-15T12:00:00.000Z",
+    capturedAt: now.toISOString(),
+    expiresAt: "2099-05-16T13:00:00.000Z",
+    language: "en",
+    security: null,
+    underlyingId: null,
+    confidence: "high",
+    sentiment: "neutral",
+    relevanceScore: 76,
+    sourceReliability: 74,
+    keyPoints: ["Inflation data changed rate expectations."],
+    riskFlags: ["News is background information, not a trading signal."],
+    tags: ["news", "alpha-vantage", "macro"],
+    rawPayload: {},
+  });
+  await mockRepositories.analysisRuns.create({
+    userId: "daily_intel_news_user",
+    scope: "security",
+    mode: "quick",
+    targetKey: "security:quick:security:AMZN:NASDAQ:USD:_",
+    request: {
+      scope: "security",
+      security: { symbol: "AMZN", exchange: "NASDAQ", currency: "USD" },
+    },
+    result: {
+      identity: { symbol: "AMZN", exchange: "NASDAQ", currency: "USD" },
+      summary: {
+        title: "AMZN 本地快扫",
+        thesis: "本地分析不应在真实新闻存在时抢占秘闻卡片。",
+      },
+      sources: [{ title: "Portfolio data", sourceType: "portfolio-data" }],
+    },
+    sourceMode: "local",
+    generatedAt: "2026-05-15T12:30:00.000Z",
+    expiresAt: "2099-05-16T12:30:00.000Z",
+  });
+
+  const response = await getMobileDailyIntelligenceView(
+    "daily_intel_news_user",
+    8,
+  );
+
+  assert.ok(response.data.items.length >= 1);
+  assert.ok(response.data.items.every((item) => !item.id.startsWith("sentiment:")));
+  assert.ok(
+    response.data.items.every((item) => !item.id.startsWith("analysis:")),
+  );
+  assert.ok(response.data.items.some((item) => item.sourceType === "news"));
+});
+
 test("daily intelligence returns at least three market pulse cards without research cache", async () => {
   const response = await getMobileDailyIntelligenceView(
     "daily_intel_empty_user",

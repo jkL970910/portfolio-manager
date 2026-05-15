@@ -228,10 +228,13 @@ class MobileHomeCitizenProfile {
   }
 
   static String _avatarAsset(String avatar, String rank) {
+    if (avatar == "male") return "assets/images/mascot/loo_male.jpg";
+    if (avatar == "female") return "assets/images/mascot/loo_female.jpg";
     if (rank == "emperor") return "assets/images/mascot/loo_king.jpg";
-    return switch (avatar) {
-      "male" => "assets/images/mascot/loo_male.jpg",
-      "female" => "assets/images/mascot/loo_female.jpg",
+    return switch (rank) {
+      "lowly-ox" => "assets/images/mascot/rank_lowly_ox.jpg",
+      "base-loo" => "assets/images/mascot/rank_base_loo.jpg",
+      "general" => "assets/images/mascot/rank_general.jpg",
       _ => "assets/images/mascot/citizen_default.jpg",
     };
   }

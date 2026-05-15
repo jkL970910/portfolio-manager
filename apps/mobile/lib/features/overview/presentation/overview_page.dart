@@ -291,17 +291,14 @@ class _PersonaBadge extends StatelessWidget {
               width: 42,
               height: 42,
               decoration: BoxDecoration(
-                color: tokens.accent,
+                color: Theme.of(context).colorScheme.surfaceContainerHighest,
                 shape: BoxShape.circle,
-                border: Border.all(color: tokens.cardBorder),
+                border: Border.all(color: tokens.cardBorder, width: 1.2),
               ),
               clipBehavior: Clip.antiAlias,
-              child: Padding(
-                padding: const EdgeInsets.all(2),
-                child: Image.asset(
-                  profile.avatarAsset,
-                  fit: BoxFit.cover,
-                ),
+              child: Image.asset(
+                profile.avatarAsset,
+                fit: BoxFit.cover,
               ),
             ),
             SizedBox(width: tokens.gapSm),
