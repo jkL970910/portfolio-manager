@@ -561,6 +561,23 @@ function getGptEnhancementTextFormat(provider: string) {
   };
 }
 
+function getOpenRouterChatCompletionsEndpoint(endpoint: string) {
+  const withoutTrailingSlash = endpoint.trim().replace(/\/+$/, "");
+  if (withoutTrailingSlash.endsWith("/chat/completions")) {
+    return withoutTrailingSlash;
+  }
+  if (withoutTrailingSlash.endsWith("/responses")) {
+    return withoutTrailingSlash.replace(/\/responses$/, "/chat/completions");
+  }
+  if (withoutTrailingSlash.endsWith("/api/v1")) {
+    return `${withoutTrailingSlash}/chat/completions`;
+  }
+  if (withoutTrailingSlash.endsWith("/v1")) {
+    return `${withoutTrailingSlash}/chat/completions`;
+  }
+  return `${withoutTrailingSlash}/v1/chat/completions`;
+}
+
 async function callGptEnhancementProvider(
   result: PortfolioAnalyzerResult,
   settings: Awaited<ReturnType<typeof resolveLooMinisterSettings>>,
@@ -569,7 +586,13 @@ async function callGptEnhancementProvider(
     throw new Error("智能快扫 GPT 增强缺少可用 API Key。请先在设置里配置外部 GPT。");
   }
 
-  const response = await fetch(settings.endpoint, {
+  const isOpenRouterCompatible = settings.provider === "openrouter-compatible";
+  const endpoint = isOpenRouterCompatible
+    ? getOpenRouterChatCompletionsEndpoint(settings.endpoint)
+    : settings.endpoint;
+  const instructions = buildGptEnhancementInstructions();
+  const prompt = buildGptEnhancementPrompt(result);
+  const response = await fetch(endpoint, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${settings.apiKey}`,
@@ -577,28 +600,42 @@ async function callGptEnhancementProvider(
       "HTTP-Referer": "http://localhost:3000",
       "X-Title": "Loo Portfolio Manager",
     },
-    body: JSON.stringify({
-      model: settings.model,
-      instructions: buildGptEnhancementInstructions(),
-      store:
-        process.env.LOO_MINISTER_DISABLE_RESPONSE_STORAGE === "true"
-          ? false
-          : undefined,
-      reasoning: { effort: settings.reasoningEffort },
-      text:
-        settings.provider === "openrouter-compatible"
-          ? { format: getGptEnhancementTextFormat(settings.provider) }
-          : {
+    body: JSON.stringify(
+      isOpenRouterCompatible
+        ? {
+            model: settings.model,
+            response_format: { type: "json_object" },
+            messages: [
+              {
+                role: "system",
+                content: instructions,
+              },
+              {
+                role: "user",
+                content: prompt,
+              },
+            ],
+          }
+        : {
+            model: settings.model,
+            instructions,
+            store:
+              process.env.LOO_MINISTER_DISABLE_RESPONSE_STORAGE === "true"
+                ? false
+                : undefined,
+            reasoning: { effort: settings.reasoningEffort },
+            text: {
               verbosity: "low",
               format: getGptEnhancementTextFormat(settings.provider),
             },
-      input: [
-        {
-          role: "user",
-          content: buildGptEnhancementPrompt(result),
-        },
-      ],
-    }),
+            input: [
+              {
+                role: "user",
+                content: prompt,
+              },
+            ],
+          },
+    ),
   });
 
   const responseText = await response.text().catch(() => "");
@@ -625,7 +662,9 @@ async function callGptEnhancementProvider(
 
   const outputText = extractOutputText(payload);
   if (!outputText) {
-    throw new Error("GPT enhancement response did not include output text.");
+    throw new Error(
+      `GPT enhancement response did not include output text. Provider fields: ${Object.keys(payload).slice(0, 12).join(", ") || "empty"}`,
+    );
   }
 
   const parsed = portfolioAnalyzerGptEnhancementSchema.parse(

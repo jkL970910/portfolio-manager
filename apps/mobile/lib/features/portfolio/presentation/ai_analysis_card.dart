@@ -2405,6 +2405,12 @@ String _friendlyGptEnhancementErrorMessage(Object? error) {
       normalized.contains("504")) {
     return "GPT 增强暂时不可用：外部模型响应较慢或服务不稳定，请稍后重试。";
   }
+  if (normalized.contains("output text") ||
+      normalized.contains("可读内容") ||
+      normalized.contains("provider fields") ||
+      normalized.contains("empty")) {
+    return "GPT 增强暂时不可用：外部模型这次没有返回可读内容，请稍后重试。";
+  }
   if (normalized.contains("schema") ||
       normalized.contains("zod") ||
       normalized.contains("too_big") ||
