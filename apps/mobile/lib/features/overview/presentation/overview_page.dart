@@ -96,6 +96,7 @@ class _OverviewPageState extends State<OverviewPage> {
                     subtitle: snapshot.hasData
                         ? "欢迎回来，${snapshot.data!.viewerName}"
                         : "正在召集 Loo 国财政大臣...",
+                    profile: snapshot.data?.citizenProfile,
                   ),
                 ),
                 if (snapshot.connectionState == ConnectionState.waiting)
@@ -223,10 +224,15 @@ class _OverviewPageState extends State<OverviewPage> {
 }
 
 class _PageHeader extends StatelessWidget {
-  const _PageHeader({required this.title, required this.subtitle});
+  const _PageHeader({
+    required this.title,
+    required this.subtitle,
+    required this.profile,
+  });
 
   final String title;
   final String subtitle;
+  final MobileHomeCitizenProfile? profile;
 
   @override
   Widget build(BuildContext context) {
@@ -259,7 +265,7 @@ class _PageHeader extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 12),
-          const _PersonaBadge(),
+          if (profile != null) _PersonaBadge(profile: profile!),
         ],
       ),
     );
@@ -267,7 +273,9 @@ class _PageHeader extends StatelessWidget {
 }
 
 class _PersonaBadge extends StatelessWidget {
-  const _PersonaBadge();
+  const _PersonaBadge({required this.profile});
+
+  final MobileHomeCitizenProfile profile;
 
   @override
   Widget build(BuildContext context) {
@@ -291,7 +299,7 @@ class _PersonaBadge extends StatelessWidget {
               child: Padding(
                 padding: const EdgeInsets.all(2),
                 child: Image.asset(
-                  "assets/images/loo_king_avatar.png",
+                  profile.avatarAsset,
                   fit: BoxFit.cover,
                 ),
               ),
@@ -303,7 +311,7 @@ class _PersonaBadge extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(
-                    "Lv.12 稳健开拓者",
+                    profile.rankLabel,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: theme.textTheme.labelMedium?.copyWith(
@@ -312,7 +320,7 @@ class _PersonaBadge extends StatelessWidget {
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    "财政领主",
+                    profile.addressLabel,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: theme.textTheme.labelSmall?.copyWith(
@@ -322,7 +330,7 @@ class _PersonaBadge extends StatelessWidget {
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    "成长型 · 税务优化",
+                    profile.idCode,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: theme.textTheme.labelSmall?.copyWith(

@@ -104,6 +104,14 @@ void main() {
   test("builds overview minister context from typed home snapshot", () {
     const snapshot = MobileHomeSnapshot(
       viewerName: "Loo国居民",
+      citizenProfile: MobileHomeCitizenProfile(
+        name: "Loo国居民",
+        rankLabel: "Loo国子民",
+        addressLabel: "Loo国城内",
+        idCode: "LOO-未颁发",
+        wealthSnapshotLabel: "CAD 0",
+        avatarAsset: "assets/images/mascot/citizen_default.jpg",
+      ),
       metrics: [
         MobileMetric(label: "总资产", value: "CAD 100,000", detail: "当前净值"),
       ],

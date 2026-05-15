@@ -5,6 +5,7 @@ import "../../shared/data/mobile_models.dart";
 class MobileHomeSnapshot {
   const MobileHomeSnapshot({
     required this.viewerName,
+    required this.citizenProfile,
     required this.metrics,
     required this.health,
     required this.accounts,
@@ -19,6 +20,7 @@ class MobileHomeSnapshot {
   });
 
   final String viewerName;
+  final MobileHomeCitizenProfile citizenProfile;
   final List<MobileMetric> metrics;
   final MobileHomeHealth health;
   final List<MobileAccountCard> accounts;
@@ -133,6 +135,9 @@ class MobileHomeSnapshot {
       viewerName: viewer is Map<String, dynamic>
           ? viewer["displayName"] as String? ?? "Loo国居民"
           : "Loo国居民",
+      citizenProfile: MobileHomeCitizenProfile.fromJson(
+        json["citizenProfile"],
+      ),
       metrics:
           readJsonList(json, "metrics").map(MobileMetric.fromJson).toList(),
       health: MobileHomeHealth.fromJson(json["healthScore"]),
@@ -162,6 +167,73 @@ class MobileHomeSnapshot {
           : "完成数据导入后，Loo国会生成组合建议。",
       marketSentiment: MobileMarketSentiment.tryParse(json["marketSentiment"]),
     );
+  }
+}
+
+class MobileHomeCitizenProfile {
+  const MobileHomeCitizenProfile({
+    required this.name,
+    required this.rankLabel,
+    required this.addressLabel,
+    required this.idCode,
+    required this.wealthSnapshotLabel,
+    required this.avatarAsset,
+  });
+
+  final String name;
+  final String rankLabel;
+  final String addressLabel;
+  final String idCode;
+  final String wealthSnapshotLabel;
+  final String avatarAsset;
+
+  factory MobileHomeCitizenProfile.fromJson(Object? value) {
+    final json =
+        value is Map<String, dynamic> ? value : const <String, dynamic>{};
+    final rank = json["effectiveRank"] as String? ?? "citizen";
+    final address = json["effectiveAddressTier"] as String? ?? "city";
+    final avatar = json["avatarType"] as String? ?? "default";
+    final wealth = (json["wealthScoreSnapshotCad"] as num?)?.toDouble() ?? 0;
+    final wealthLabel = wealth
+        .toStringAsFixed(0)
+        .replaceAllMapped(RegExp(r"\B(?=(\d{3})+(?!\d))"), (match) => ",");
+    return MobileHomeCitizenProfile(
+      name: json["citizenName"] as String? ?? "Loo国居民",
+      rankLabel: _rankLabel(rank),
+      addressLabel: _addressLabel(address),
+      idCode: json["effectiveIdCode"] as String? ?? "LOO-未颁发",
+      wealthSnapshotLabel: "CAD $wealthLabel",
+      avatarAsset: _avatarAsset(avatar, rank),
+    );
+  }
+
+  static String _rankLabel(String value) {
+    return switch (value) {
+      "lowly-ox" => "低等牛",
+      "base-loo" => "原皮Loo",
+      "general" => "Loo皇大将军",
+      "emperor" => "Loo皇",
+      _ => "Loo国子民",
+    };
+  }
+
+  static String _addressLabel(String value) {
+    return switch (value) {
+      "cowshed" => "牛棚",
+      "suburbs" => "Loo国郊区",
+      "palace-gate" => "Loo皇殿前",
+      "bedchamber" => "Loo皇寝宫",
+      _ => "Loo国城内",
+    };
+  }
+
+  static String _avatarAsset(String avatar, String rank) {
+    if (rank == "emperor") return "assets/images/mascot/loo_king.jpg";
+    return switch (avatar) {
+      "male" => "assets/images/mascot/loo_male.jpg",
+      "female" => "assets/images/mascot/loo_female.jpg",
+      _ => "assets/images/mascot/citizen_default.jpg",
+    };
   }
 }
 

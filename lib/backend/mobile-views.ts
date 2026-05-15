@@ -10,6 +10,7 @@ import type {
 } from "@/lib/contracts";
 import {
   getDashboardView,
+  getCitizenProfile,
   getImportView,
   getPortfolioAccountDetailView,
   getPortfolioHoldingDetailView,
@@ -35,10 +36,14 @@ import {
   mapExternalResearchJobForMobile,
 } from "@/lib/backend/external-research-jobs";
 import type { Viewer } from "@/lib/auth/session";
-import type { ExternalResearchDocumentRecord } from "@/lib/backend/models";
+import type {
+  CitizenProfile,
+  ExternalResearchDocumentRecord,
+} from "@/lib/backend/models";
 
 type MobileHomeData = {
   viewer: Viewer;
+  citizenProfile: CitizenProfile;
   displayContext: DashboardData["displayContext"];
   metrics: DashboardData["metrics"];
   accounts: Array<{
@@ -652,8 +657,10 @@ async function mapMobileHomeData(
   payload: ApiSuccess<DashboardData & { context?: MobileHomeData["context"] }>,
 ): Promise<MobileHomeData> {
   const marketSentiment = await getOrCreateLatestMarketSentiment();
+  const citizenProfile = await getCitizenProfile(viewer.id);
   return {
     viewer,
+    citizenProfile,
     displayContext: payload.data.displayContext,
     metrics: payload.data.metrics,
     accounts: payload.data.accounts.map((account) => ({
