@@ -174,6 +174,7 @@ void main() {
       securityHoldings: [],
       quoteStatus: "报价刚刚刷新",
       healthScore: "78 分",
+      healthRadar: [],
       summaryPoints: ["US Equity 超过目标。"],
       performance: [],
       portfolioValueChart: MobileChartSeries(
@@ -268,6 +269,7 @@ void main() {
       healthScore: MobileAccountHealthScore(
         score: "78 分",
         status: "需巡查",
+        radar: [],
         highlights: ["集中度偏高。"],
         actions: ["补充固定收益。"],
       ),

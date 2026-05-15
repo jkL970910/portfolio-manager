@@ -1326,28 +1326,14 @@ class _AnalysisResultView extends StatelessWidget {
               style: Theme.of(context).textTheme.bodySmall,
             ),
           ),
-        if (data.scorecards.isNotEmpty ||
-            data.evidenceTrail.isNotEmpty ||
-            data.quoteSourceSummary != null ||
-            data.quoteFreshnessSummary != null ||
-            data.freshnessLabel != null ||
-            data.reliabilityScore != null ||
-            data.limitationSummary != null ||
-            data.quotesAsOf != null)
-          ExpansionTile(
-            tilePadding: EdgeInsets.zero,
-            initiallyExpanded: false,
-            title: Text("数据说明", style: Theme.of(context).textTheme.titleSmall),
-            childrenPadding: const EdgeInsets.only(bottom: 12),
-            children: [
-              Align(
-                alignment: Alignment.centerLeft,
-                child: _DataEvidenceView(
-                  data,
-                  showScorecards: showLegacySecuritySections,
-                ),
-              ),
-            ],
+        if (_hasAnalysisAuditData(data))
+          _AuditSheetButton(
+            label: "查看数据依据与规则溯源",
+            title: "数据依据",
+            child: _DataEvidenceView(
+              data,
+              showScorecards: showLegacySecuritySections,
+            ),
           ),
         const SizedBox(height: 8),
         Text(data.disclaimerZh, style: Theme.of(context).textTheme.bodySmall),
@@ -1363,7 +1349,6 @@ class _SecurityResearchProfileView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final evidence = data.evidence.take(4).toList();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1408,14 +1393,15 @@ class _SecurityResearchProfileView extends StatelessWidget {
               showPosturePill: false,
             ),
           ),
-        if (evidence.isNotEmpty)
-          _CompactSourceSummary(
-            label: "资料覆盖",
-            items: evidence
-                .map((item) => item.readableSummary)
-                .take(3)
-                .toList(),
+        _AuditSheetButton(
+          label: "查看资料来源",
+          title: "标的资料来源",
+          child: _ResearchEvidenceAuditView(
+            evidence: data.evidence,
+            valuationEvidence: data.valuationEvidence,
+            entryTiming: data.entryTiming,
           ),
+        ),
       ],
     );
   }
@@ -1434,16 +1420,7 @@ class _SecurityResearchDecisionView extends StatelessWidget {
   Widget build(BuildContext context) {
     final guardrails = data.guardrails.take(4).toList();
     final actionPlans = data.actionPlans.take(3).toList();
-    final fitLines = [
-      data.portfolioFit.targetGapLabel,
-      data.portfolioFit.currentExposureLabel,
-      if (data.portfolioFit.duplicateExposureLabel != null)
-        data.portfolioFit.duplicateExposureLabel!,
-      if (data.portfolioFit.accountTaxFitLabel != null)
-        data.portfolioFit.accountTaxFitLabel!,
-      if (data.portfolioFit.liquidityFitLabel != null)
-        data.portfolioFit.liquidityFitLabel!,
-    ].where((item) => item.trim().isNotEmpty).toList();
+    final fitLines = _portfolioFitLines(data.portfolioFit);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1478,10 +1455,7 @@ class _SecurityResearchDecisionView extends StatelessWidget {
         if (fitLines.isNotEmpty)
           _AnalysisSection(
             title: "组合适配",
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: fitLines.take(5).map(_bullet).toList(),
-            ),
+            child: _PortfolioFitVisual(data.portfolioFit),
           ),
         if (guardrails.isNotEmpty)
           _AnalysisSection(
@@ -1492,14 +1466,15 @@ class _SecurityResearchDecisionView extends StatelessWidget {
                   .toList(),
             ),
           ),
-        if (data.evidence.isNotEmpty)
-          _CompactSourceSummary(
-            label: "判断参考",
-            items: data.evidence
-                .map((item) => item.readableSummary)
-                .take(3)
-                .toList(),
+        _AuditSheetButton(
+          label: "查看数据依据与规则溯源",
+          title: "研究台数据依据",
+          child: _ResearchEvidenceAuditView(
+            evidence: data.evidence,
+            valuationEvidence: data.valuationEvidence,
+            entryTiming: data.entryTiming,
           ),
+        ),
       ],
     );
   }
@@ -1562,7 +1537,6 @@ class _ValuationEvidenceView extends StatelessWidget {
         .where((anchor) => !primaryAnchors.contains(anchor))
         .take(6)
         .toList();
-    final checks = data.sanityChecks.take(3).toList();
     final needsCachedProfile = data.method == "unavailable";
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1597,46 +1571,10 @@ class _ValuationEvidenceView extends StatelessWidget {
         ],
         if (remainingAnchors.isNotEmpty) ...[
           const SizedBox(height: 10),
-          ExpansionTile(
-            tilePadding: EdgeInsets.zero,
-            dense: true,
-            initiallyExpanded: false,
-            title:
-                Text("更多估值数据", style: Theme.of(context).textTheme.titleSmall),
-            childrenPadding: const EdgeInsets.only(bottom: 8),
-            children: [
-              Align(
-                alignment: Alignment.centerLeft,
-                child: Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: remainingAnchors
-                      .map((anchor) => _ResearchValuePill(
-                            label: anchor.label,
-                            value: anchor.value,
-                          ))
-                      .toList(),
-                ),
-              ),
-            ],
-          ),
-        ],
-        if (checks.isNotEmpty) ...[
-          const SizedBox(height: 10),
-          ExpansionTile(
-            tilePadding: EdgeInsets.zero,
-            dense: true,
-            initiallyExpanded: false,
-            title: Text("估值校验", style: Theme.of(context).textTheme.titleSmall),
-            childrenPadding: const EdgeInsets.only(bottom: 8),
-            children: [
-              Align(
-                alignment: Alignment.centerLeft,
-                child: Column(
-                  children: checks.map(_ResearchSanityCheckRow.new).toList(),
-                ),
-              ),
-            ],
+          _AuditSheetButton(
+            label: "查看更多估值证据",
+            title: "估值证据明细",
+            child: _ValuationEvidenceAuditView(data),
           ),
         ],
       ],
@@ -1679,21 +1617,12 @@ class _EntryTimingView extends StatelessWidget {
           ),
         if (evidenceLevels.isNotEmpty) ...[
           const SizedBox(height: 10),
-          ExpansionTile(
-            tilePadding: EdgeInsets.zero,
-            dense: true,
-            initiallyExpanded: false,
-            title: Text("价位明细", style: Theme.of(context).textTheme.titleSmall),
-            childrenPadding: const EdgeInsets.only(bottom: 8),
-            children: [
-              Align(
-                alignment: Alignment.centerLeft,
-                child: Column(
-                  children:
-                      evidenceLevels.map(_ResearchKeyLevelRow.new).toList(),
-                ),
-              ),
-            ],
+          _AuditSheetButton(
+            label: "查看全部关键价位",
+            title: "关键价位明细",
+            child: Column(
+              children: evidenceLevels.map(_ResearchKeyLevelRow.new).toList(),
+            ),
           ),
         ],
       ],
@@ -1942,6 +1871,11 @@ class _KeyLevelPriceMapView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final gaugeLevels = _buildPriceGaugeLevels(levels);
+    if (gaugeLevels != null) {
+      return _PriceGaugeView(gaugeLevels);
+    }
+
     final visible = [
       _pickKeyLevel(levels, ["current_price"]),
       _pickKeyLevel(levels, ["pullback_zone", "deep_support"]),
@@ -1967,6 +1901,161 @@ class _KeyLevelPriceMapView extends StatelessWidget {
               .toList(),
         );
       },
+    );
+  }
+}
+
+class _PriceGaugeLevels {
+  const _PriceGaugeLevels({
+    required this.current,
+    required this.low,
+    required this.high,
+    required this.currentLabel,
+    required this.lowLabel,
+    required this.highLabel,
+    this.reference,
+    this.referenceLabel,
+  });
+
+  final double current;
+  final double low;
+  final double high;
+  final String currentLabel;
+  final String lowLabel;
+  final String highLabel;
+  final double? reference;
+  final String? referenceLabel;
+}
+
+class _PriceGaugeView extends StatelessWidget {
+  const _PriceGaugeView(this.levels);
+
+  final _PriceGaugeLevels levels;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final range = (levels.high - levels.low).abs();
+    final currentPosition = range <= 0
+        ? 0.5
+        : ((levels.current - levels.low) / range).clamp(0.0, 1.0);
+    final reference = levels.reference;
+    final referencePosition = reference == null || range <= 0
+        ? null
+        : ((reference - levels.low) / range).clamp(0.0, 1.0);
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.55),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: colorScheme.outlineVariant),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    "价格水位",
+                    style: Theme.of(context).textTheme.titleSmall,
+                  ),
+                ),
+                _SmallStatusPill("当前 ${levels.currentLabel}"),
+              ],
+            ),
+            const SizedBox(height: 16),
+            SizedBox(
+              height: 28,
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final width = constraints.maxWidth;
+                  final currentLeft = (width - 14) * currentPosition;
+                  final referenceLeft = referencePosition == null
+                      ? null
+                      : (width - 10) * referencePosition;
+                  return Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      Positioned.fill(
+                        top: 10,
+                        bottom: 10,
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(999),
+                            gradient: LinearGradient(
+                              colors: [
+                                colorScheme.primary.withValues(alpha: 0.85),
+                                colorScheme.tertiary.withValues(alpha: 0.85),
+                                colorScheme.error.withValues(alpha: 0.82),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                      if (referenceLeft != null)
+                        Positioned(
+                          left: referenceLeft,
+                          top: 4,
+                          child: Container(
+                            width: 3,
+                            height: 20,
+                            decoration: BoxDecoration(
+                              color: colorScheme.onSurface,
+                              borderRadius: BorderRadius.circular(999),
+                            ),
+                          ),
+                        ),
+                      Positioned(
+                        left: currentLeft,
+                        top: 2,
+                        child: Container(
+                          width: 14,
+                          height: 24,
+                          decoration: BoxDecoration(
+                            color: colorScheme.surface,
+                            border: Border.all(
+                              color: colorScheme.primary,
+                              width: 3,
+                            ),
+                            borderRadius: BorderRadius.circular(999),
+                          ),
+                        ),
+                      ),
+                    ],
+                  );
+                },
+              ),
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    "低点 ${levels.lowLabel}",
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                ),
+                if (levels.referenceLabel != null)
+                  Text(
+                    levels.referenceLabel!,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          fontWeight: FontWeight.w800,
+                        ),
+                  ),
+                Expanded(
+                  child: Text(
+                    "高点 ${levels.highLabel}",
+                    textAlign: TextAlign.end,
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -2387,6 +2476,55 @@ class _AnalysisSection extends StatelessWidget {
   }
 }
 
+class _AuditSheetButton extends StatelessWidget {
+  const _AuditSheetButton({
+    required this.label,
+    required this.title,
+    required this.child,
+  });
+
+  final String label;
+  final String title;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: TextButton.icon(
+        onPressed: () {
+          showModalBottomSheet<void>(
+            context: context,
+            isScrollControlled: true,
+            showDragHandle: true,
+            builder: (context) => SafeArea(
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxHeight: MediaQuery.sizeOf(context).height * 0.78,
+                ),
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(title,
+                          style: Theme.of(context).textTheme.titleLarge),
+                      const SizedBox(height: 14),
+                      child,
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          );
+        },
+        icon: const Icon(Icons.info_outline, size: 18),
+        label: Text(label),
+      ),
+    );
+  }
+}
+
 class _DataEvidenceView extends StatelessWidget {
   const _DataEvidenceView(
     this.data, {
@@ -2428,34 +2566,134 @@ class _DataEvidenceView extends StatelessWidget {
   }
 }
 
-class _CompactSourceSummary extends StatelessWidget {
-  const _CompactSourceSummary({
-    required this.label,
-    required this.items,
+class _ResearchEvidenceAuditView extends StatelessWidget {
+  const _ResearchEvidenceAuditView({
+    required this.evidence,
+    required this.valuationEvidence,
+    required this.entryTiming,
   });
 
-  final String label;
-  final List<String> items;
+  final List<MobileResearchEvidence> evidence;
+  final MobileResearchValuationEvidence valuationEvidence;
+  final MobileResearchEntryTiming entryTiming;
 
   @override
   Widget build(BuildContext context) {
-    final visibleItems = items
-        .where((item) => item.trim().isNotEmpty)
-        .toSet()
-        .take(3)
-        .toList();
-    if (visibleItems.isEmpty) {
-      return const SizedBox.shrink();
-    }
-    return Padding(
-      padding: const EdgeInsets.only(top: 8),
-      child: Wrap(
-        spacing: 6,
-        runSpacing: 6,
-        children: [
-          _SmallStatusPill(label),
-          ...visibleItems.map(_SmallStatusPill.new),
+    final anchors = valuationEvidence.anchors;
+    final checks = valuationEvidence.sanityChecks;
+    final levels = entryTiming.keyLevels;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (evidence.isNotEmpty) ...[
+          Text("资料覆盖", style: Theme.of(context).textTheme.titleSmall),
+          const SizedBox(height: 8),
+          ...evidence.map((item) => Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Text("• ${item.readableSummary}"),
+              )),
+          const SizedBox(height: 10),
         ],
+        if (anchors.isNotEmpty) ...[
+          Text("估值证据", style: Theme.of(context).textTheme.titleSmall),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: anchors
+                .map((anchor) => _ResearchValuePill(
+                      label: anchor.label,
+                      value: anchor.value,
+                    ))
+                .toList(),
+          ),
+          const SizedBox(height: 12),
+        ],
+        if (checks.isNotEmpty) ...[
+          Text("估值校验", style: Theme.of(context).textTheme.titleSmall),
+          const SizedBox(height: 8),
+          ...checks.map(_ResearchSanityCheckRow.new),
+          const SizedBox(height: 10),
+        ],
+        if (levels.isNotEmpty) ...[
+          Text("关键价位", style: Theme.of(context).textTheme.titleSmall),
+          const SizedBox(height: 8),
+          ...levels.map(_ResearchKeyLevelRow.new),
+        ],
+      ],
+    );
+  }
+}
+
+class _ValuationEvidenceAuditView extends StatelessWidget {
+  const _ValuationEvidenceAuditView(this.data);
+
+  final MobileResearchValuationEvidence data;
+
+  @override
+  Widget build(BuildContext context) {
+    return _ResearchEvidenceAuditView(
+      evidence: const <MobileResearchEvidence>[],
+      valuationEvidence: data,
+      entryTiming: const MobileResearchEntryTiming(
+        posture: "not_applicable",
+        keyLevels: <MobileResearchKeyLevel>[],
+        marketPulseLabel: null,
+      ),
+    );
+  }
+}
+
+class _PortfolioFitVisual extends StatelessWidget {
+  const _PortfolioFitVisual(this.data);
+
+  final MobileResearchPortfolioFit data;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final lines = _portfolioFitLines(data);
+    final score = data.score;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.52),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: colorScheme.outlineVariant),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    data.sleeve.isEmpty ? "组合适配" : data.sleeve,
+                    style: Theme.of(context).textTheme.titleSmall,
+                  ),
+                ),
+                if (score != null) _SmallStatusPill("${score.round()} 分"),
+              ],
+            ),
+            if (score != null) ...[
+              const SizedBox(height: 10),
+              LinearProgressIndicator(
+                minHeight: 7,
+                borderRadius: BorderRadius.circular(999),
+                value: score / 100,
+              ),
+            ],
+            if (lines.isNotEmpty) ...[
+              const SizedBox(height: 10),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: lines.take(5).map(_SmallStatusPill.new).toList(),
+              ),
+            ],
+          ],
+        ),
       ),
     );
   }
@@ -2633,6 +2871,80 @@ class _SeverityDot extends StatelessWidget {
       child: Icon(Icons.circle, size: 10, color: color),
     );
   }
+}
+
+bool _hasAnalysisAuditData(MobileAiAnalysisResult data) {
+  return data.scorecards.isNotEmpty ||
+      data.evidenceTrail.isNotEmpty ||
+      data.quoteSourceSummary != null ||
+      data.quoteFreshnessSummary != null ||
+      data.freshnessLabel != null ||
+      data.reliabilityScore != null ||
+      data.limitationSummary != null ||
+      data.quotesAsOf != null;
+}
+
+List<String> _portfolioFitLines(MobileResearchPortfolioFit data) {
+  return [
+    data.targetGapLabel,
+    data.currentExposureLabel,
+    if (data.duplicateExposureLabel != null) data.duplicateExposureLabel!,
+    if (data.accountTaxFitLabel != null) data.accountTaxFitLabel!,
+    if (data.liquidityFitLabel != null) data.liquidityFitLabel!,
+  ].where((item) => item.trim().isNotEmpty).toList();
+}
+
+_PriceGaugeLevels? _buildPriceGaugeLevels(
+  List<MobileResearchKeyLevel> levels,
+) {
+  final current = _pickKeyLevel(levels, ["current_price"]);
+  final low = _pickKeyLevel(levels, ["deep_support", "pullback_zone"]);
+  final high = _pickKeyLevel(levels, ["resistance"]);
+  if (current == null || low == null || high == null) {
+    return null;
+  }
+  final currentValue = _extractFirstNumber(current.value);
+  final lowValue = _extractFirstNumber(low.value);
+  final highValue = _extractLastNumber(high.value);
+  if (currentValue == null || lowValue == null || highValue == null) {
+    return null;
+  }
+  final minValue = lowValue < highValue ? lowValue : highValue;
+  final maxValue = lowValue < highValue ? highValue : lowValue;
+  if ((maxValue - minValue).abs() < 0.0001) {
+    return null;
+  }
+
+  final reference =
+      _pickKeyLevel(levels, ["pullback_zone", "valuation_anchor"]);
+  final referenceValue = reference == null
+      ? null
+      : _extractFirstNumber(reference.value) ??
+          _extractLastNumber(reference.value);
+  return _PriceGaugeLevels(
+    current: currentValue,
+    low: minValue,
+    high: maxValue,
+    currentLabel: current.value,
+    lowLabel: low.value,
+    highLabel: high.value,
+    reference: referenceValue,
+    referenceLabel: referenceValue == null
+        ? null
+        : "${_keyLevelRoleLabel(reference!)} ${reference.value}",
+  );
+}
+
+double? _extractFirstNumber(String value) {
+  final match = RegExp(r"-?\d+(?:\.\d+)?").firstMatch(value);
+  if (match == null) return null;
+  return double.tryParse(match.group(0)!);
+}
+
+double? _extractLastNumber(String value) {
+  final matches = RegExp(r"-?\d+(?:\.\d+)?").allMatches(value).toList();
+  if (matches.isEmpty) return null;
+  return double.tryParse(matches.last.group(0)!);
 }
 
 List<String> _dedupeStrings(List<String> values) {
