@@ -1089,23 +1089,6 @@ class _SecurityHeroFactsCard extends StatelessWidget {
           ),
           const SizedBox(height: 14),
           _MetricGrid(data),
-          if (data.summaryPoints.isNotEmpty ||
-              data.marketData.summary.isNotEmpty) ...[
-            const SizedBox(height: 12),
-            Text(
-              [
-                if (data.summaryPoints.isNotEmpty) data.summaryPoints.first,
-                if (data.summaryPoints.isEmpty &&
-                    data.marketData.summary.isNotEmpty)
-                  data.marketData.summary,
-              ].first,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: tokens.mutedText,
-              ),
-            ),
-          ],
         ],
       ),
     );
