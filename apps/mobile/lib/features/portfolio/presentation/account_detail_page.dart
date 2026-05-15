@@ -1,3 +1,5 @@
+import "dart:math" as math;
+
 import "package:flutter/material.dart";
 import "package:go_router/go_router.dart";
 
@@ -452,7 +454,6 @@ class _SummaryCard extends StatelessWidget {
                   ],
                 ),
               ),
-              _MiniPill(data.typeId),
             ],
           ),
           SizedBox(height: tokens.gapLg),
@@ -466,6 +467,7 @@ class _SummaryCard extends StatelessWidget {
               if (data.portfolioShare.isNotEmpty)
                 _MiniPill("组合 ${data.portfolioShare}"),
               if (data.room.isNotEmpty) _MiniPill(data.room),
+              _MiniPill("持仓 ${data.holdings.length} 个"),
             ],
           ),
           SizedBox(height: tokens.gapLg),
@@ -480,7 +482,6 @@ class _SummaryCard extends StatelessWidget {
               spacing: 8,
               runSpacing: 8,
               children: [
-                _MiniPill("持仓 ${data.holdings.length} 个"),
                 _MiniPill(
                   data.summaryPoints.first,
                   maxWidth: 280,
@@ -609,12 +610,14 @@ class MobileAccountHealthScore {
   const MobileAccountHealthScore({
     required this.score,
     required this.status,
+    required this.radar,
     required this.highlights,
     required this.actions,
   });
 
   final String score;
   final String status;
+  final List<MobileHealthRadarPoint> radar;
   final List<String> highlights;
   final List<String> actions;
 
@@ -625,6 +628,9 @@ class MobileAccountHealthScore {
     return MobileAccountHealthScore(
       score: "${json["score"] ?? "--"} 分",
       status: json["status"] as String? ?? "待评估",
+      radar: readJsonList(json, "radar")
+          .map(MobileHealthRadarPoint.fromJson)
+          .toList(),
       highlights: (json["highlights"] as List?)?.whereType<String>().toList() ??
           const [],
       actions: (json["actionQueue"] as List?)?.whereType<String>().toList() ??
@@ -849,16 +855,6 @@ class _AccountHoldingsPreviewState extends State<_AccountHoldingsPreview> {
                 onTap: () => widget.onOpenHolding(holding),
               ),
             ),
-          if (canExpand && !_expanded) ...[
-            SizedBox(height: tokens.gapSm),
-            Align(
-              alignment: Alignment.centerLeft,
-              child: TextButton(
-                onPressed: () => setState(() => _expanded = true),
-                child: Text("展开全部 ${widget.holdings.length} 个持仓"),
-              ),
-            ),
-          ],
         ],
       ),
     );
@@ -1082,6 +1078,21 @@ class _AccountPortfolioShareSheet extends StatelessWidget {
     final tokens = context.looTokens;
     final theme = Theme.of(context);
     final allocations = data.allocation.take(5).toList();
+    final share = _parsePercent(data.portfolioShare);
+    final shareSlices = share > 0
+        ? [
+            _AccountShareSlice(
+              label: data.name,
+              value: share.clamp(0, 100),
+              displayValue: "${share.clamp(0, 100).toStringAsFixed(1)}%",
+            ),
+            _AccountShareSlice(
+              label: "其他账户",
+              value: math.max(0, 100 - share),
+              displayValue: "${math.max(0, 100 - share).toStringAsFixed(1)}%",
+            ),
+          ]
+        : const <_AccountShareSlice>[];
 
     return SafeArea(
       child: Padding(
@@ -1108,6 +1119,17 @@ class _AccountPortfolioShareSheet extends StatelessWidget {
                 color: tokens.mutedText,
               ),
             ),
+            if (shareSlices.isNotEmpty) ...[
+              SizedBox(height: tokens.gapLg),
+              Center(child: _AccountShareDonutChart(slices: shareSlices)),
+              SizedBox(height: tokens.gapMd),
+              ...shareSlices.map(
+                (slice) => Padding(
+                  padding: EdgeInsets.only(bottom: tokens.gapSm),
+                  child: _AccountShareLegendRow(slice),
+                ),
+              ),
+            ],
             if (allocations.isNotEmpty) ...[
               SizedBox(height: tokens.gapLg),
               Text("账户内配置", style: theme.textTheme.titleMedium),
@@ -1141,6 +1163,151 @@ class _AccountPortfolioShareSheet extends StatelessWidget {
       ),
     );
   }
+}
+
+double _parsePercent(String value) {
+  final match = RegExp(r"[-+]?\d+(?:\.\d+)?").firstMatch(value);
+  return double.tryParse(match?.group(0) ?? "") ?? 0;
+}
+
+class _AccountShareSlice {
+  const _AccountShareSlice({
+    required this.label,
+    required this.value,
+    required this.displayValue,
+  });
+
+  final String label;
+  final double value;
+  final String displayValue;
+}
+
+class _AccountShareDonutChart extends StatelessWidget {
+  const _AccountShareDonutChart({required this.slices});
+
+  final List<_AccountShareSlice> slices;
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = context.looTokens;
+    final total = slices.fold<double>(0, (sum, slice) => sum + slice.value);
+    return SizedBox(
+      width: 172,
+      height: 172,
+      child: CustomPaint(
+        painter: _AccountShareDonutPainter(
+          slices: slices,
+          total: total <= 0 ? 1 : total,
+          tokens: tokens,
+        ),
+        child: Center(
+          child: Text(
+            slices.first.displayValue,
+            style: Theme.of(context).textTheme.titleLarge,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _AccountShareDonutPainter extends CustomPainter {
+  const _AccountShareDonutPainter({
+    required this.slices,
+    required this.total,
+    required this.tokens,
+  });
+
+  final List<_AccountShareSlice> slices;
+  final double total;
+  final LooThemeTokens tokens;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final rect = Offset.zero & size;
+    final strokeWidth = size.shortestSide * 0.14;
+    final paint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round
+      ..strokeWidth = strokeWidth;
+
+    paint.color = tokens.cardBorder;
+    canvas.drawArc(
+      rect.deflate(strokeWidth / 2),
+      -math.pi / 2,
+      math.pi * 2,
+      false,
+      paint,
+    );
+
+    var start = -math.pi / 2;
+    for (var index = 0; index < slices.length; index++) {
+      final sweep = math.pi * 2 * (slices[index].value / total);
+      paint.color = _accountShareColor(tokens, index);
+      canvas.drawArc(
+        rect.deflate(strokeWidth / 2),
+        start,
+        math.max(0.04, sweep - 0.03),
+        false,
+        paint,
+      );
+      start += sweep;
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _AccountShareDonutPainter oldDelegate) =>
+      oldDelegate.slices != slices ||
+      oldDelegate.total != total ||
+      oldDelegate.tokens != tokens;
+}
+
+class _AccountShareLegendRow extends StatelessWidget {
+  const _AccountShareLegendRow(this.slice);
+
+  final _AccountShareSlice slice;
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = context.looTokens;
+    return Row(
+      children: [
+        Container(
+          width: 10,
+          height: 10,
+          decoration: BoxDecoration(
+            color: _accountShareColor(tokens, slice.label == "其他账户" ? 1 : 0),
+            shape: BoxShape.circle,
+          ),
+        ),
+        SizedBox(width: tokens.gapSm),
+        Expanded(
+          child: Text(
+            slice.label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  fontWeight: FontWeight.w800,
+                ),
+          ),
+        ),
+        Text(
+          slice.displayValue,
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: tokens.mutedText,
+              ),
+        ),
+      ],
+    );
+  }
+}
+
+Color _accountShareColor(LooThemeTokens tokens, int index) {
+  final colors = [
+    tokens.accent,
+    tokens.cardBorder.withValues(alpha: 0.92),
+  ];
+  return colors[index % colors.length];
 }
 
 class _AccountHealthSheet extends StatelessWidget {
@@ -1182,6 +1349,20 @@ class _AccountHealthSheet extends StatelessWidget {
                 color: tokens.mutedText,
               ),
             ),
+            if (data.healthScore.radar.isNotEmpty) ...[
+              SizedBox(height: tokens.gapLg),
+              LooRadarChart(
+                height: 210,
+                points: data.healthScore.radar
+                    .map(
+                      (point) => LooRadarPoint(
+                        label: point.dimension,
+                        value: point.value,
+                      ),
+                    )
+                    .toList(),
+              ),
+            ],
             if (data.healthScore.highlights.isNotEmpty) ...[
               SizedBox(height: tokens.gapLg),
               Text("重点提示", style: theme.textTheme.titleMedium),
