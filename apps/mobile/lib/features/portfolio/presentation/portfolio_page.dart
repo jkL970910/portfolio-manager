@@ -586,57 +586,67 @@ class _PortfolioHealthSheet extends StatelessWidget {
         .toList();
 
     return SafeArea(
-      child: Padding(
-        padding: EdgeInsets.fromLTRB(
-          tokens.gapLg,
-          0,
-          tokens.gapLg,
-          tokens.gapXl,
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.sizeOf(context).height * 0.82,
         ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text("国库健康度", style: theme.textTheme.titleLarge),
-            SizedBox(height: tokens.gapSm),
-            Text(
-              data.healthScore,
-              style: theme.textTheme.displaySmall,
-            ),
-            if (data.summaryPoints.isNotEmpty) ...[
-              SizedBox(height: tokens.gapXs),
+        child: SingleChildScrollView(
+          padding: EdgeInsets.fromLTRB(
+            tokens.gapLg,
+            0,
+            tokens.gapLg,
+            tokens.gapXl,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text("国库健康度", style: theme.textTheme.titleLarge),
+              SizedBox(height: tokens.gapSm),
               Text(
-                data.summaryPoints.first,
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: tokens.mutedText,
+                data.healthScore,
+                style: theme.textTheme.displaySmall,
+              ),
+              if (data.summaryPoints.isNotEmpty) ...[
+                SizedBox(height: tokens.gapXs),
+                Text(
+                  data.summaryPoints.first,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: tokens.mutedText,
+                  ),
+                ),
+              ],
+              SizedBox(height: tokens.gapMd),
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton.icon(
+                  onPressed: onOpenFullHealth,
+                  icon: const Icon(Icons.chevron_right_rounded),
+                  label: const Text("健康分析"),
                 ),
               ),
-            ],
-            if (radar.isNotEmpty) ...[
-              SizedBox(height: tokens.gapLg),
-              LooRadarChart(points: radar, height: 220),
-            ],
-            if (data.summaryPoints.length > 1) ...[
-              SizedBox(height: tokens.gapLg),
-              Text("重点提示", style: theme.textTheme.titleMedium),
-              SizedBox(height: tokens.gapSm),
-              ...data.summaryPoints.skip(1).take(3).map(
-                    (item) => Padding(
-                      padding: EdgeInsets.only(bottom: tokens.gapSm),
-                      child: Text("• $item"),
-                    ),
+              if (radar.isNotEmpty) ...[
+                SizedBox(height: tokens.gapLg),
+                Center(
+                  child: SizedBox(
+                    width: math.min(MediaQuery.sizeOf(context).width - 48, 320),
+                    child: LooRadarChart(points: radar, height: 230),
                   ),
+                ),
+              ],
+              if (data.summaryPoints.length > 1) ...[
+                SizedBox(height: tokens.gapLg),
+                Text("重点提示", style: theme.textTheme.titleMedium),
+                SizedBox(height: tokens.gapSm),
+                ...data.summaryPoints.skip(1).take(3).map(
+                      (item) => Padding(
+                        padding: EdgeInsets.only(bottom: tokens.gapSm),
+                        child: Text("• $item"),
+                      ),
+                    ),
+              ],
             ],
-            SizedBox(height: tokens.gapLg),
-            Align(
-              alignment: Alignment.centerRight,
-              child: TextButton.icon(
-                onPressed: onOpenFullHealth,
-                icon: const Icon(Icons.chevron_right_rounded),
-                label: const Text("健康分析"),
-              ),
-            ),
-          ],
+          ),
         ),
       ),
     );

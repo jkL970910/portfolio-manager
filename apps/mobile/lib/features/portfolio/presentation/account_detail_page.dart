@@ -1095,70 +1095,75 @@ class _AccountPortfolioShareSheet extends StatelessWidget {
         : const <_AccountShareSlice>[];
 
     return SafeArea(
-      child: Padding(
-        padding: EdgeInsets.fromLTRB(
-          tokens.gapLg,
-          0,
-          tokens.gapLg,
-          tokens.gapXl,
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.sizeOf(context).height * 0.82,
         ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text("组合占比", style: theme.textTheme.titleLarge),
-            SizedBox(height: tokens.gapSm),
-            Text(
-              data.portfolioShare.isEmpty ? "暂无组合占比" : data.portfolioShare,
-              style: theme.textTheme.displaySmall,
-            ),
-            SizedBox(height: tokens.gapXs),
-            Text(
-              "表示这个账户在整个组合中的权重。",
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: tokens.mutedText,
+        child: SingleChildScrollView(
+          padding: EdgeInsets.fromLTRB(
+            tokens.gapLg,
+            0,
+            tokens.gapLg,
+            tokens.gapXl,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text("组合占比", style: theme.textTheme.titleLarge),
+              SizedBox(height: tokens.gapSm),
+              Text(
+                data.portfolioShare.isEmpty ? "暂无组合占比" : data.portfolioShare,
+                style: theme.textTheme.displaySmall,
               ),
-            ),
-            if (shareSlices.isNotEmpty) ...[
-              SizedBox(height: tokens.gapLg),
-              Center(child: _AccountShareDonutChart(slices: shareSlices)),
-              SizedBox(height: tokens.gapMd),
-              ...shareSlices.map(
-                (slice) => Padding(
-                  padding: EdgeInsets.only(bottom: tokens.gapSm),
-                  child: _AccountShareLegendRow(slice),
+              SizedBox(height: tokens.gapXs),
+              Text(
+                "表示这个账户在整个组合中的权重。",
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: tokens.mutedText,
                 ),
               ),
-            ],
-            if (allocations.isNotEmpty) ...[
-              SizedBox(height: tokens.gapLg),
-              Text("账户内配置", style: theme.textTheme.titleMedium),
-              SizedBox(height: tokens.gapSm),
-              ...allocations.map(
-                (item) => Padding(
-                  padding: EdgeInsets.only(bottom: tokens.gapSm),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          item.name,
-                          style: theme.textTheme.bodyMedium?.copyWith(
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ),
-                      Text(
-                        item.value,
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: tokens.mutedText,
-                        ),
-                      ),
-                    ],
+              if (shareSlices.isNotEmpty) ...[
+                SizedBox(height: tokens.gapLg),
+                Center(child: _AccountShareDonutChart(slices: shareSlices)),
+                SizedBox(height: tokens.gapMd),
+                ...shareSlices.map(
+                  (slice) => Padding(
+                    padding: EdgeInsets.only(bottom: tokens.gapSm),
+                    child: _AccountShareLegendRow(slice),
                   ),
                 ),
-              ),
+              ],
+              if (allocations.isNotEmpty) ...[
+                SizedBox(height: tokens.gapLg),
+                Text("账户内配置", style: theme.textTheme.titleMedium),
+                SizedBox(height: tokens.gapSm),
+                ...allocations.map(
+                  (item) => Padding(
+                    padding: EdgeInsets.only(bottom: tokens.gapSm),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            item.name,
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                        Text(
+                          item.value,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: tokens.mutedText,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
             ],
-          ],
+          ),
         ),
       ),
     );
@@ -1325,75 +1330,86 @@ class _AccountHealthSheet extends StatelessWidget {
     final theme = Theme.of(context);
 
     return SafeArea(
-      child: Padding(
-        padding: EdgeInsets.fromLTRB(
-          tokens.gapLg,
-          0,
-          tokens.gapLg,
-          tokens.gapXl,
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.sizeOf(context).height * 0.82,
         ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text("账户健康分", style: theme.textTheme.titleLarge),
-            SizedBox(height: tokens.gapSm),
-            Text(
-              data.healthScore.score,
-              style: theme.textTheme.displaySmall,
-            ),
-            SizedBox(height: tokens.gapXs),
-            Text(
-              data.healthScore.status,
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: tokens.mutedText,
+        child: SingleChildScrollView(
+          padding: EdgeInsets.fromLTRB(
+            tokens.gapLg,
+            0,
+            tokens.gapLg,
+            tokens.gapXl,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text("账户健康分", style: theme.textTheme.titleLarge),
+              SizedBox(height: tokens.gapSm),
+              Text(
+                data.healthScore.score,
+                style: theme.textTheme.displaySmall,
               ),
-            ),
-            if (data.healthScore.radar.isNotEmpty) ...[
-              SizedBox(height: tokens.gapLg),
-              LooRadarChart(
-                height: 210,
-                points: data.healthScore.radar
-                    .map(
-                      (point) => LooRadarPoint(
-                        label: point.dimension,
-                        value: point.value,
+              SizedBox(height: tokens.gapXs),
+              Text(
+                data.healthScore.status,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: tokens.mutedText,
+                ),
+              ),
+              SizedBox(height: tokens.gapMd),
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton.icon(
+                  onPressed: onOpenFullHealth,
+                  icon: const Icon(Icons.chevron_right_rounded),
+                  label: const Text("健康分析"),
+                ),
+              ),
+              if (data.healthScore.radar.isNotEmpty) ...[
+                SizedBox(height: tokens.gapLg),
+                Center(
+                  child: SizedBox(
+                    width: math.min(MediaQuery.sizeOf(context).width - 48, 320),
+                    child: LooRadarChart(
+                      height: 230,
+                      points: data.healthScore.radar
+                          .map(
+                            (point) => LooRadarPoint(
+                              label: point.dimension,
+                              value: point.value,
+                            ),
+                          )
+                          .toList(),
+                    ),
+                  ),
+                ),
+              ],
+              if (data.healthScore.highlights.isNotEmpty) ...[
+                SizedBox(height: tokens.gapLg),
+                Text("重点提示", style: theme.textTheme.titleMedium),
+                SizedBox(height: tokens.gapSm),
+                ...data.healthScore.highlights.take(3).map(
+                      (item) => Padding(
+                        padding: EdgeInsets.only(bottom: tokens.gapSm),
+                        child: Text("• $item"),
                       ),
-                    )
-                    .toList(),
-              ),
-            ],
-            if (data.healthScore.highlights.isNotEmpty) ...[
-              SizedBox(height: tokens.gapLg),
-              Text("重点提示", style: theme.textTheme.titleMedium),
-              SizedBox(height: tokens.gapSm),
-              ...data.healthScore.highlights.take(3).map(
-                    (item) => Padding(
-                      padding: EdgeInsets.only(bottom: tokens.gapSm),
-                      child: Text("• $item"),
                     ),
-                  ),
-            ],
-            if (data.healthScore.actions.isNotEmpty) ...[
-              SizedBox(height: tokens.gapLg),
-              Text("建议动作", style: theme.textTheme.titleMedium),
-              SizedBox(height: tokens.gapSm),
-              ...data.healthScore.actions.take(3).map(
-                    (item) => Padding(
-                      padding: EdgeInsets.only(bottom: tokens.gapSm),
-                      child: Text("• $item"),
+              ],
+              if (data.healthScore.actions.isNotEmpty) ...[
+                SizedBox(height: tokens.gapLg),
+                Text("建议动作", style: theme.textTheme.titleMedium),
+                SizedBox(height: tokens.gapSm),
+                ...data.healthScore.actions.take(3).map(
+                      (item) => Padding(
+                        padding: EdgeInsets.only(bottom: tokens.gapSm),
+                        child: Text("• $item"),
+                      ),
                     ),
-                  ),
+              ],
             ],
-            SizedBox(height: tokens.gapLg),
-            Align(
-              alignment: Alignment.centerRight,
-              child: TextButton(
-                onPressed: onOpenFullHealth,
-                child: const Text("查看完整健康巡查"),
-              ),
-            ),
-          ],
+          ),
         ),
       ),
     );
