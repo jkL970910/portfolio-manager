@@ -730,7 +730,7 @@ test("security research decision routes ETF candidates through macro proxy", () 
   assert.equal(result.securityResearchDecision?.actionPlans[0]?.type, "dca_accumulate");
   assert.ok(
     result.securityResearchDecision?.entryTiming.keyLevels.some((level) =>
-      level.label === "52周/样本高点",
+      level.label === "前高/压力位",
     ),
   );
 });
@@ -907,6 +907,14 @@ test("security research decision keeps key levels visible when portfolio guardra
   assert.ok(
     result.securityResearchProfile?.keyLevels.some(
       (level) => level.role === "resistance" && level.tone === "caution",
+    ),
+  );
+  assert.ok(
+    result.securityResearchProfile?.keyLevels.some(
+      (level) =>
+        level.role === "resistance" &&
+        level.value.includes("179") &&
+        level.note?.includes("前高压力区"),
     ),
   );
   assert.equal(result.securityResearchDecision?.entryTiming.posture, "portfolio_guardrail");

@@ -927,6 +927,25 @@ function formatResearchPrice(value: number, currency: string | null | undefined)
   return `${currency ?? ""} ${round(value, 2)}`.trim();
 }
 
+function parseResearchPrice(value: string) {
+  const match = value.match(/-?\d+(?:\.\d+)?/);
+  return match ? Number(match[0]) : null;
+}
+
+function formatResearchMarketPulseLabel(
+  snapshot: MarketSentimentSnapshot | null | undefined,
+) {
+  if (!snapshot) {
+    return "市场脉搏仅作为低权重 timing 参考，不覆盖组合护栏。";
+  }
+  const posture =
+    snapshot.strategyLabel === "等待确认"
+      ? "等待价格/数据确认"
+      : snapshot.strategyLabel;
+  const quadrant = snapshot.quadrantLabel ?? "市场脉搏";
+  return `${quadrant} · ${posture}；仅作为低权重 timing 参考，不覆盖组合护栏。`;
+}
+
 function buildSecurityResearchEntryTiming(args: {
   priceHistory: SecurityPriceHistoryPoint[];
   currency: string | null | undefined;
@@ -940,6 +959,7 @@ function buildSecurityResearchEntryTiming(args: {
     .map((point) => point.adjustedClose ?? point.close)
     .filter((value) => Number.isFinite(value));
   const latest = closes.at(-1);
+  const previousCloses = closes.slice(0, -1);
   const keyLevels: SecurityResearchDecision["entryTiming"]["keyLevels"] = [];
 
   if (latest !== undefined) {
@@ -955,17 +975,21 @@ function buildSecurityResearchEntryTiming(args: {
   }
 
   if (closes.length >= 2) {
-    const high = Math.max(...closes);
+    const sampleHigh = Math.max(...closes);
+    const priorHigh =
+      previousCloses.length > 0 ? Math.max(...previousCloses) : sampleHigh;
     const low = Math.min(...closes);
+    const nearPriorHigh =
+      latest !== undefined && priorHigh > 0 && latest / priorHigh >= 0.97;
     keyLevels.push({
-      label: "52周/样本高点",
-      value: formatResearchPrice(high, args.currency),
+      label: "前高/压力位",
+      value: formatResearchPrice(priorHigh, args.currency),
       type: closes.length >= 200 ? "52W_HIGH" : "RECENT_HIGH",
       source: "缓存价格历史",
       role: "resistance",
-      tone: latest !== undefined && high > 0 && latest / high >= 0.97 ? "caution" : "neutral",
-      note: latest !== undefined && high > 0 && latest / high >= 0.97
-        ? "当前价已接近上方压力区，更适合作为突破确认位，而不是低吸区。"
+      tone: nearPriorHigh ? "caution" : "neutral",
+      note: nearPriorHigh
+        ? "当前价已接近或突破前高压力区，更适合等待回撤或确认突破质量。"
         : "上方压力参考，接近时需要确认趋势和估值是否仍支持。",
     });
     keyLevels.push({
@@ -1033,6 +1057,15 @@ function buildSecurityResearchEntryTiming(args: {
     });
   }
 
+  const resistance = keyLevels.find((level) => level.role === "resistance");
+  const resistanceValue = resistance ? parseResearchPrice(resistance.value) : null;
+  const nearResistance =
+    latest !== undefined &&
+    resistanceValue !== null &&
+    resistanceValue > 0 &&
+    latest / resistanceValue >= 0.97;
+  const pulseCaution = args.marketSentiment?.buySignal === "caution";
+
   return {
     posture: args.verdict === "needs-more-data"
       ? "not_applicable"
@@ -1040,11 +1073,11 @@ function buildSecurityResearchEntryTiming(args: {
         ? "wait_for_pullback"
         : args.verdict === "weak-fit"
           ? "portfolio_guardrail"
-          : "wait_for_confirmation",
+          : nearResistance || pulseCaution
+            ? "wait_for_pullback"
+            : "wait_for_confirmation",
     keyLevels: keyLevels.slice(0, 10),
-    marketPulseLabel: args.marketSentiment
-      ? `${args.marketSentiment.strategyLabel}；市场脉搏仅作为低权重 timing 参考，不覆盖组合护栏。`
-      : "市场脉搏仅作为低权重 timing 参考，不覆盖组合护栏。",
+    marketPulseLabel: formatResearchMarketPulseLabel(args.marketSentiment),
   };
 }
 
