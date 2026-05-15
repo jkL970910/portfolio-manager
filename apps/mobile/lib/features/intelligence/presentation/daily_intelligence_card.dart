@@ -289,16 +289,14 @@ class _DailyIntelligenceCarouselPager extends StatelessWidget {
                     child: _DailyIntelligenceDropdownTile(
                       item,
                       initiallyExpanded: expandedItemIds.contains(item.id),
-                      maxContentHeight: expandedItemIds.contains(item.id)
-                          ? pageHeight
-                          : null,
+                      maxContentHeight:
+                          expandedItemIds.contains(item.id) ? pageHeight : null,
                       onExpansionChanged: (isExpanded) =>
                           onExpansionChanged(item, isExpanded),
                       onViewSecurity:
                           item.canOpenSecurity ? onViewSecurity : null,
                       aiSummary: aiSummaries[item.id],
-                      isLoadingAiSummary:
-                          loadingAiSummaryIds.contains(item.id),
+                      isLoadingAiSummary: loadingAiSummaryIds.contains(item.id),
                       aiSummaryError: aiSummaryErrors[item.id],
                       onGenerateAiSummary: onGenerateAiSummary == null
                           ? null
@@ -324,8 +322,21 @@ class _DailyIntelligenceCarouselPager extends StatelessWidget {
   double _previewPageHeight(MobileDailyIntelligenceItem item) {
     final titleLines = (item.cleanedTitle.length / 16).ceil().clamp(1, 3);
     final summaryLines = (item.summary.length / 24).ceil().clamp(2, 4);
-    return (228 + (titleLines - 1) * 28 + (summaryLines - 2) * 22)
+    final keywordRows = _previewKeywordCount(item) > 3 ? 2 : 1;
+    return (268 +
+            (titleLines - 1) * 28 +
+            (summaryLines - 2) * 22 +
+            (keywordRows - 1) * 34)
         .toDouble();
+  }
+
+  int _previewKeywordCount(MobileDailyIntelligenceItem item) {
+    return <String>{
+      ...item.keyPoints,
+      item.reason,
+      item.relevanceLabel,
+      item.confidenceLabel,
+    }.where((value) => value.trim().isNotEmpty).take(4).length;
   }
 
   double _expandedPageHeight(BuildContext context) {
@@ -412,7 +423,7 @@ class _DailyIntelligenceDropdownList extends StatelessWidget {
     return Column(
       children: [
         for (var index = 0; index < items.length; index++) ...[
-            _DailyIntelligenceDropdownTile(
+          _DailyIntelligenceDropdownTile(
             items[index],
             initiallyExpanded: index == 0,
             maxContentHeight: null,
@@ -492,8 +503,9 @@ class _DailyIntelligenceDropdownTile extends StatelessWidget {
           Text(
             item.summary,
             maxLines: initiallyExpanded ? null : 4,
-            overflow:
-                initiallyExpanded ? TextOverflow.visible : TextOverflow.ellipsis,
+            overflow: initiallyExpanded
+                ? TextOverflow.visible
+                : TextOverflow.ellipsis,
             style: theme.textTheme.bodyMedium?.copyWith(
               height: 1.35,
             ),
@@ -516,7 +528,7 @@ class _DailyIntelligenceDropdownTile extends StatelessWidget {
                       "注意：$risk",
                       color: theme.colorScheme.error,
                     ),
-                ),
+                  ),
             ],
             const SizedBox(height: 12),
             _DailyAiSummarySection(
