@@ -51,11 +51,11 @@ class _RecommendationsPageState extends State<RecommendationsPage> {
     final amount = await showDialog<double>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text("重新生成推荐"),
+        title: const Text("重算进货清单"),
         content: TextField(
           controller: amountController,
           keyboardType: const TextInputType.numberWithOptions(decimal: true),
-          decoration: const InputDecoration(labelText: "本次可投资金额 CAD"),
+          decoration: const InputDecoration(labelText: "本次可用银两 CAD"),
         ),
         actions: [
           TextButton(
@@ -67,7 +67,7 @@ class _RecommendationsPageState extends State<RecommendationsPage> {
               final parsed = double.tryParse(amountController.text.trim());
               Navigator.of(context).pop(parsed);
             },
-            child: const Text("生成"),
+            child: const Text("重算"),
           ),
         ],
       ),
@@ -82,7 +82,7 @@ class _RecommendationsPageState extends State<RecommendationsPage> {
       await widget.apiClient.createRecommendationRun(amount);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("新推荐已生成。")),
+          const SnackBar(content: Text("进货清单已重算。")),
         );
         setState(() {
           _working = false;
@@ -159,10 +159,10 @@ class _RecommendationsPageState extends State<RecommendationsPage> {
               slivers: [
                 SliverToBoxAdapter(
                   child: _PageHeader(
-                    title: "Loo皇谕令",
+                    title: "进货台",
                     subtitle: snapshot.hasData
-                        ? snapshot.data!.engineLine
-                        : "正在读取 Loo国投资军令...",
+                        ? "先搜货、再看护栏；Loo皇只给候选，不替你下单。"
+                        : "正在清点今日可进货清单...",
                   ),
                 ),
                 if (snapshot.connectionState == ConnectionState.waiting)
@@ -183,8 +183,6 @@ class _RecommendationsPageState extends State<RecommendationsPage> {
                       children: [
                         _SummaryCard(snapshot.data!),
                         const SizedBox(height: 16),
-                        _RecommendationIntelligenceStatusCard(snapshot.data!),
-                        const SizedBox(height: 16),
                         Row(
                           children: [
                             Expanded(
@@ -200,6 +198,8 @@ class _RecommendationsPageState extends State<RecommendationsPage> {
                           ],
                         ),
                         const SizedBox(height: 16),
+                        _RecommendationIntelligenceStatusCard(snapshot.data!),
+                        const SizedBox(height: 16),
                         _PreferenceContextCard(
                           snapshot.data!.preferenceContext,
                         ),
@@ -214,7 +214,7 @@ class _RecommendationsPageState extends State<RecommendationsPage> {
                         ),
                         if (snapshot.data!.explainer.isNotEmpty) ...[
                           const SizedBox(height: 16),
-                          const _SectionTitle("策略说明"),
+                          const _SectionTitle("进货规则"),
                           const SizedBox(height: 8),
                           _TextCard(
                             snapshot.data!.explainer.take(4).join("\n"),
@@ -222,7 +222,7 @@ class _RecommendationsPageState extends State<RecommendationsPage> {
                         ],
                         const SizedBox(height: 16),
                         _SectionTitle(
-                          "优先事项",
+                          "进货优先级",
                           actionLabel: "${snapshot.data!.priorities.length} 条",
                         ),
                         const SizedBox(height: 8),
@@ -237,7 +237,7 @@ class _RecommendationsPageState extends State<RecommendationsPage> {
                               ),
                         if (snapshot.data!.scenarios.isNotEmpty) ...[
                           const SizedBox(height: 16),
-                          const _SectionTitle("情景比较"),
+                          const _SectionTitle("银两分配模拟"),
                           const SizedBox(height: 8),
                           ...snapshot.data!.scenarios
                               .take(3)
@@ -345,7 +345,7 @@ class _SummaryCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text("本轮可部署资金", style: Theme.of(context).textTheme.bodyLarge),
+          Text("本轮可用银两", style: Theme.of(context).textTheme.bodyLarge),
           const SizedBox(height: 8),
           Text(
             data.contributionAmount,
@@ -389,13 +389,13 @@ class _RecommendationIntelligenceStatusCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text("外部资料纳入推荐",
+                Text("秘闻参考",
                     style: Theme.of(context).textTheme.titleMedium),
                 const SizedBox(height: 4),
                 Text(
                   hasRefs
-                      ? "已引用 ${refs.length} 条缓存资料，完整秘闻在总览页查看。"
-                      : "未命中缓存外部资料，排序仍按持仓和偏好计算。",
+                      ? "已引用 ${refs.length} 条外部新闻缓存，完整秘闻在总览页查看。"
+                      : "暂无可用秘闻，排序按国库持仓和偏好计算。",
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
                         color: context.looTokens.mutedText,
                       ),
@@ -481,8 +481,8 @@ class _GenerateRecommendationCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return _CompactActionCard(
       icon: Icons.auto_awesome,
-      title: "重新生成推荐",
-      detail: "输入本次可投资金额，基于当前偏好和持仓生成。",
+      title: "重算清单",
+      detail: "输入本次可用银两，按国库缺口和护栏重新排序。",
       isBusy: working,
       onTap: working ? null : onGenerate,
     );
@@ -498,8 +498,8 @@ class _DiscoverEntryCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return _CompactActionCard(
       icon: Icons.travel_explore_outlined,
-      title: "搜索标的",
-      detail: "查找股票、ETF，再加入观察或打开研究台。",
+      title: "搜货",
+      detail: "查股票、ETF 或 CDR，先打开研究台确认身份。",
       onTap: onOpen,
     );
   }
@@ -516,7 +516,7 @@ class _PreferenceContextCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text("当前推荐规则", style: Theme.of(context_).textTheme.titleLarge),
+          Text("当前进货规矩", style: Theme.of(context_).textTheme.titleLarge),
           const SizedBox(height: 8),
           Wrap(
             spacing: 8,
@@ -587,10 +587,10 @@ class _WatchlistCardState extends State<_WatchlistCard> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text("观察标的", style: Theme.of(context).textTheme.titleLarge),
+          Text("囤货清单", style: Theme.of(context).textTheme.titleLarge),
           const SizedBox(height: 6),
           Text(
-            "这里的标的会影响候选评分和后续推荐解释。",
+            "这些标的会影响候选评分和后续解释；新增前先确认交易所和币种。",
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
                   color: context.looTokens.mutedText,
                 ),
@@ -616,7 +616,7 @@ class _WatchlistCardState extends State<_WatchlistCard> {
           ),
           const SizedBox(height: 12),
           if (widget.symbols.isEmpty)
-            const Text("暂时没有观察标的。")
+            const Text("暂时没有囤货标的。")
           else
             Wrap(
               spacing: 8,
@@ -1171,7 +1171,7 @@ class _ErrorState extends StatelessWidget {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Text("Loo皇谕令暂时打不开", style: Theme.of(context).textTheme.titleLarge),
+          Text("进货台暂时打不开", style: Theme.of(context).textTheme.titleLarge),
           const SizedBox(height: 8),
           Text(message, textAlign: TextAlign.center),
           const SizedBox(height: 16),

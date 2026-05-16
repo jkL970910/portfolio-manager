@@ -155,7 +155,7 @@ class _DiscoverPageState extends State<DiscoverPage> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-                tracked ? "$watchlistKey 已移出观察列表。" : "$watchlistKey 已加入观察列表。"),
+                tracked ? "$watchlistKey 已移出囤货清单。" : "$watchlistKey 已加入囤货清单。"),
           ),
         );
       }
@@ -207,8 +207,8 @@ class _DiscoverPageState extends State<DiscoverPage> {
         padding: const EdgeInsets.fromLTRB(20, 24, 20, 28),
         children: [
           const _PageHeader(
-            title: "标的发现台",
-            subtitle: "搜索股票、ETF 或 CDR，确认交易所和币种后再加入观察或打开详情。",
+            title: "搜货台",
+            subtitle: "搜索股票、ETF 或 CDR，确认交易所和币种后再加入囤货或打开详情。",
           ),
           const SizedBox(height: 16),
           _SearchCard(
@@ -384,7 +384,7 @@ class _WatchlistPreview extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text("当前观察列表", style: Theme.of(context).textTheme.titleMedium),
+            Text("当前囤货清单", style: Theme.of(context).textTheme.titleMedium),
             const SizedBox(height: 10),
             Wrap(
               spacing: 8,
@@ -510,8 +510,8 @@ class _SecurityResultCard extends StatelessWidget {
                   label: Text(working
                       ? "处理中..."
                       : tracked
-                          ? "移出观察"
-                          : "加入观察"),
+                          ? "移出囤货"
+                          : "加入囤货"),
                 ),
                 OutlinedButton.icon(
                   onPressed: onOpenDetail,

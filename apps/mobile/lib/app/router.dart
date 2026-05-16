@@ -45,15 +45,15 @@ class MobileRootShell extends StatelessWidget {
                   LooBottomNavItem(icon: Icons.dashboard_rounded, label: "总览"),
                   LooBottomNavItem(
                     icon: Icons.account_balance_wallet_rounded,
-                    label: "组合",
+                    label: "国库",
                   ),
                   LooBottomNavItem(
                     icon: Icons.auto_awesome_rounded,
-                    label: "推荐",
+                    label: "进货",
                   ),
                   LooBottomNavItem(
                     icon: Icons.upload_file_rounded,
-                    label: "导入",
+                    label: "上贡",
                   ),
                   LooBottomNavItem(icon: Icons.settings_rounded, label: "设置"),
                 ],
