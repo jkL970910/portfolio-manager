@@ -639,6 +639,7 @@ class _LooWealthAppState extends State<LooWealthApp> {
                     onOpenRegister: () => setState(() {
                       _showRegister = true;
                     }),
+                    authStore: _authStore,
                   )),
       );
     }

@@ -2,17 +2,20 @@ import "package:flutter/material.dart";
 
 import "../../../core/api/loo_api_client.dart";
 import "../../../core/auth/mobile_auth_session.dart";
+import "../../../core/auth/mobile_auth_store.dart";
 import "../../../core/theme/loo_theme.dart";
 
 class LoginPage extends StatefulWidget {
   const LoginPage({
     required this.onAuthenticated,
     required this.onOpenRegister,
+    this.authStore,
     super.key,
   });
 
   final ValueChanged<MobileAuthSession> onAuthenticated;
   final VoidCallback onOpenRegister;
+  final MobileAuthStore? authStore;
 
   @override
   State<LoginPage> createState() => _LoginPageState();
@@ -23,9 +26,18 @@ class _LoginPageState extends State<LoginPage> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _apiClient = LooApiClient();
+  late final MobileAuthStore _authStore;
 
   var _submitting = false;
+  var _rememberLogin = true;
   String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _authStore = widget.authStore ?? MobileAuthStore();
+    _restoreLoginPreference();
+  }
 
   @override
   void dispose() {
@@ -50,6 +62,10 @@ class _LoginPageState extends State<LoginPage> {
         password: _passwordController.text,
       );
       final session = MobileAuthSession.fromApiResponse(response);
+      await _authStore.saveLoginPreference(
+        rememberLogin: _rememberLogin,
+        email: _emailController.text.trim(),
+      );
       widget.onAuthenticated(session);
     } catch (error) {
       if (!mounted) {
@@ -65,6 +81,18 @@ class _LoginPageState extends State<LoginPage> {
         });
       }
     }
+  }
+
+  Future<void> _restoreLoginPreference() async {
+    final remember = await _authStore.loadRememberLogin();
+    final email = await _authStore.loadRememberedEmail();
+    if (!mounted) return;
+    setState(() {
+      _rememberLogin = remember;
+      if (remember && email.isNotEmpty) {
+        _emailController.text = email;
+      }
+    });
   }
 
   @override
@@ -164,6 +192,17 @@ class _LoginPageState extends State<LoginPage> {
                             }
                             return null;
                           },
+                        ),
+                        const SizedBox(height: 8),
+                        SwitchListTile.adaptive(
+                          contentPadding: EdgeInsets.zero,
+                          value: _rememberLogin,
+                          onChanged: _submitting
+                              ? null
+                              : (value) =>
+                                  setState(() => _rememberLogin = value),
+                          title: const Text("记住登录"),
+                          subtitle: const Text("保持自动登录，并记住邮箱。"),
                         ),
                         if (_error != null) ...[
                           const SizedBox(height: 16),

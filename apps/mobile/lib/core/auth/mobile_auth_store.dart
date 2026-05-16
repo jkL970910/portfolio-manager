@@ -48,6 +48,8 @@ class MobileAuthStore {
   static const _baseCurrencyKey = "loo.baseCurrency";
   static const _accessTokenKey = "loo.accessToken";
   static const _refreshTokenKey = "loo.refreshToken";
+  static const _rememberLoginKey = "loo.rememberLogin";
+  static const _rememberedEmailKey = "loo.rememberedEmail";
 
   final MobileKeyValueStore _keyValueStore;
 
@@ -83,6 +85,8 @@ class MobileAuthStore {
         _baseCurrencyKey, values["baseCurrency"] ?? "CAD");
     await _keyValueStore.write(_accessTokenKey, values["accessToken"] ?? "");
     await _keyValueStore.write(_refreshTokenKey, values["refreshToken"] ?? "");
+    await _keyValueStore.write(_rememberedEmailKey, session.email);
+    await _keyValueStore.write(_rememberLoginKey, "true");
   }
 
   Future<void> clear() async {
@@ -92,5 +96,28 @@ class MobileAuthStore {
     await _keyValueStore.delete(_baseCurrencyKey);
     await _keyValueStore.delete(_accessTokenKey);
     await _keyValueStore.delete(_refreshTokenKey);
+  }
+
+  Future<void> saveLoginPreference({
+    required bool rememberLogin,
+    required String email,
+  }) async {
+    await _keyValueStore.write(
+      _rememberLoginKey,
+      rememberLogin ? "true" : "false",
+    );
+    if (rememberLogin && email.trim().isNotEmpty) {
+      await _keyValueStore.write(_rememberedEmailKey, email.trim());
+    } else if (!rememberLogin) {
+      await _keyValueStore.delete(_rememberedEmailKey);
+    }
+  }
+
+  Future<bool> loadRememberLogin() async {
+    return (await _keyValueStore.read(_rememberLoginKey)) != "false";
+  }
+
+  Future<String> loadRememberedEmail() async {
+    return await _keyValueStore.read(_rememberedEmailKey) ?? "";
   }
 }
