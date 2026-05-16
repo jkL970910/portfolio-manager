@@ -1,6 +1,8 @@
 import "package:flutter/material.dart";
 
 import "../../../core/api/loo_api_client.dart";
+import "../../../core/presentation/loo_components.dart";
+import "../../../core/theme/loo_theme.dart";
 import "../../portfolio/presentation/security_detail_page.dart";
 
 class DiscoverPage extends StatefulWidget {
@@ -201,57 +203,61 @@ class _DiscoverPageState extends State<DiscoverPage> {
 
   @override
   Widget build(BuildContext context) {
-    return RefreshIndicator(
-      onRefresh: _loadWatchlist,
-      child: ListView(
-        padding: const EdgeInsets.fromLTRB(20, 24, 20, 28),
-        children: [
-          const _PageHeader(
-            title: "搜货台",
-            subtitle: "搜索股票、ETF 或 CDR，确认交易所和币种后再加入囤货或打开详情。",
-          ),
-          const SizedBox(height: 16),
-          _SearchCard(
-            controller: _queryController,
-            searching: _searching,
-            onSearch: _search,
-          ),
-          if (_watchlistSymbols.isNotEmpty) ...[
-            const SizedBox(height: 16),
-            _WatchlistPreview(
-              symbols: _watchlistSymbols.toList()..sort(),
-              onOpen: _openWatchlistSymbol,
+    return LooPageGradient(
+      child: RefreshIndicator(
+        onRefresh: _loadWatchlist,
+        child: ListView(
+          padding: looPagePadding(context, top: 20),
+          children: [
+            const _PageHeader(
+              title: "搜货台",
+              subtitle: "搜索股票、ETF 或 CDR，确认交易所和币种后再加入囤货或打开详情。",
             ),
-          ],
-          if (_error != null) ...[
             const SizedBox(height: 16),
-            _MessageCard(message: _error!, isError: true),
-          ],
-          if (_status != null) ...[
-            const SizedBox(height: 16),
-            _MessageCard(message: _status!),
-          ],
-          if (_providerStatus != null) ...[
-            const SizedBox(height: 8),
-            Text(_providerStatus!,
-                style: Theme.of(context).textTheme.bodySmall),
-          ],
-          const SizedBox(height: 16),
-          if (_searching)
-            const Center(child: CircularProgressIndicator())
-          else if (_searched && _results.isEmpty)
-            const _EmptyState()
-          else
-            ..._results.map(
-              (candidate) => _SecurityResultCard(
-                candidate: candidate,
-                tracked: _watchlistSymbols.contains(candidate.watchlistKey),
-                working: _workingWatchlistKey == candidate.watchlistKey,
-                onToggleWatchlist: () => _toggleWatchlist(candidate),
-                onOpenDetail: () => _openSecurityDetail(candidate),
+            _SearchCard(
+              controller: _queryController,
+              searching: _searching,
+              onSearch: _search,
+            ),
+            if (_watchlistSymbols.isNotEmpty) ...[
+              const SizedBox(height: 16),
+              _WatchlistPreview(
+                symbols: _watchlistSymbols.toList()..sort(),
+                onOpen: _openWatchlistSymbol,
               ),
-            ),
-        ],
+            ],
+            if (_error != null) ...[
+              const SizedBox(height: 16),
+              _MessageCard(message: _error!, isError: true),
+            ],
+            if (_status != null) ...[
+              const SizedBox(height: 16),
+              _MessageCard(message: _status!),
+            ],
+            if (_providerStatus != null) ...[
+              const SizedBox(height: 8),
+              Text(_providerStatus!,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: context.looTokens.mutedText,
+                      )),
+            ],
+            const SizedBox(height: 16),
+            if (_searching)
+              const Center(child: CircularProgressIndicator())
+            else if (_searched && _results.isEmpty)
+              const _EmptyState()
+            else
+              ..._results.map(
+                (candidate) => _SecurityResultCard(
+                  candidate: candidate,
+                  tracked: _watchlistSymbols.contains(candidate.watchlistKey),
+                  working: _workingWatchlistKey == candidate.watchlistKey,
+                  onToggleWatchlist: () => _toggleWatchlist(candidate),
+                  onOpenDetail: () => _openSecurityDetail(candidate),
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }
@@ -317,13 +323,21 @@ class _PageHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(title, style: Theme.of(context).textTheme.headlineMedium),
-        const SizedBox(height: 8),
-        Text(subtitle, style: Theme.of(context).textTheme.bodyLarge),
-      ],
+    return LooGlassCard(
+      isHero: true,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(title, style: Theme.of(context).textTheme.headlineMedium),
+          const SizedBox(height: 8),
+          Text(
+            subtitle,
+            style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                  color: context.looTokens.mutedText,
+                ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -341,9 +355,9 @@ class _SearchCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
+    return LooGlassCard(
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: EdgeInsets.zero,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -378,9 +392,9 @@ class _WatchlistPreview extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
+    return LooGlassCard(
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: EdgeInsets.zero,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -459,10 +473,10 @@ class _SecurityResultCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
+    return LooGlassCard(
       margin: const EdgeInsets.only(bottom: 12),
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: EdgeInsets.zero,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -470,6 +484,7 @@ class _SecurityResultCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 CircleAvatar(
+                  backgroundColor: context.looTokens.accentSoft,
                   child: Text(
                     candidate.normalizedSymbol.length > 3
                         ? candidate.normalizedSymbol.substring(0, 3)
@@ -535,9 +550,9 @@ class _MessageCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
+    return LooGlassCard(
       child: Padding(
-        padding: const EdgeInsets.all(14),
+        padding: EdgeInsets.zero,
         child: Text(
           message,
           style: TextStyle(
@@ -554,9 +569,9 @@ class _EmptyState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Card(
+    return const LooGlassCard(
       child: Padding(
-        padding: EdgeInsets.all(18),
+        padding: EdgeInsets.zero,
         child: Text("还没有可展示的结果。换一个代码或公司名再试。"),
       ),
     );
