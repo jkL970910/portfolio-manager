@@ -22,12 +22,33 @@ class RecommendationsPage extends StatefulWidget {
 
 class _RecommendationsPageState extends State<RecommendationsPage> {
   late Future<MobileRecommendationsSnapshot> _snapshot;
+  final _scrollController = ScrollController();
+  final _watchlistKey = GlobalKey();
+  final _priorityKey = GlobalKey();
+  final _scenariosKey = GlobalKey();
   var _working = false;
 
   @override
   void initState() {
     super.initState();
     _snapshot = _loadSnapshot();
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  void _scrollToSection(GlobalKey key) {
+    final context = key.currentContext;
+    if (context == null) return;
+    Scrollable.ensureVisible(
+      context,
+      duration: const Duration(milliseconds: 360),
+      curve: Curves.easeOutCubic,
+      alignment: 0.08,
+    );
   }
 
   Future<MobileRecommendationsSnapshot> _loadSnapshot() async {
@@ -131,6 +152,7 @@ class _RecommendationsPageState extends State<RecommendationsPage> {
           child: RefreshIndicator(
             onRefresh: () async => _refresh(),
             child: CustomScrollView(
+              controller: _scrollController,
               physics: const AlwaysScrollableScrollPhysics(),
               slivers: [
                 SliverToBoxAdapter(
@@ -157,7 +179,15 @@ class _RecommendationsPageState extends State<RecommendationsPage> {
                     padding: looPagePadding(context),
                     sliver: SliverList.list(
                       children: [
-                        _SummaryCard(snapshot.data!),
+                        _SummaryCard(
+                          snapshot.data!,
+                          onOpenPriorities: () =>
+                              _scrollToSection(_priorityKey),
+                          onOpenWatchlist: () =>
+                              _scrollToSection(_watchlistKey),
+                          onOpenScenarios: () =>
+                              _scrollToSection(_scenariosKey),
+                        ),
                         const SizedBox(height: 16),
                         _ActionDock(
                           working: _working,
@@ -165,17 +195,24 @@ class _RecommendationsPageState extends State<RecommendationsPage> {
                           onGenerate: _createRun,
                         ),
                         const SizedBox(height: 16),
-                        _WatchlistCard(
-                          symbols:
-                              snapshot.data!.preferenceContext.watchlistSymbols,
-                          working: _working,
-                          onRemove: _removeWatchlistSymbol,
-                          onOpen: _openWatchlistSymbol,
+                        KeyedSubtree(
+                          key: _watchlistKey,
+                          child: _WatchlistCard(
+                            symbols:
+                                snapshot.data!.preferenceContext.watchlistSymbols,
+                            working: _working,
+                            onRemove: _removeWatchlistSymbol,
+                            onOpen: _openWatchlistSymbol,
+                          ),
                         ),
                         const SizedBox(height: 16),
-                        _SectionTitle(
-                          "进货优先级",
-                          actionLabel: "${snapshot.data!.priorities.length} 条",
+                        KeyedSubtree(
+                          key: _priorityKey,
+                          child: _SectionTitle(
+                            "进货优先级",
+                            actionLabel:
+                                "${snapshot.data!.priorities.length} 条",
+                          ),
                         ),
                         const SizedBox(height: 8),
                         if (snapshot.data!.priorities.isEmpty)
@@ -203,7 +240,10 @@ class _RecommendationsPageState extends State<RecommendationsPage> {
                         ],
                         if (snapshot.data!.scenarios.isNotEmpty) ...[
                           const SizedBox(height: 16),
-                          const _SectionTitle("银两分配模拟"),
+                          KeyedSubtree(
+                            key: _scenariosKey,
+                            child: const _SectionTitle("银两分配模拟"),
+                          ),
                           const SizedBox(height: 8),
                           ...snapshot.data!.scenarios
                               .take(3)
@@ -297,9 +337,17 @@ class _PageHeader extends StatelessWidget {
 }
 
 class _SummaryCard extends StatelessWidget {
-  const _SummaryCard(this.data);
+  const _SummaryCard(
+    this.data, {
+    required this.onOpenPriorities,
+    required this.onOpenWatchlist,
+    required this.onOpenScenarios,
+  });
 
   final MobileRecommendationsSnapshot data;
+  final VoidCallback onOpenPriorities;
+  final VoidCallback onOpenWatchlist;
+  final VoidCallback onOpenScenarios;
 
   @override
   Widget build(BuildContext context) {
@@ -330,7 +378,11 @@ class _SummaryCard extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 12),
-              _HeroCountPill(label: "候选", value: "$priorityCount"),
+              _HeroCountPill(
+                label: "候选",
+                value: "$priorityCount",
+                onTap: onOpenPriorities,
+              ),
             ],
           ),
           const SizedBox(height: 14),
@@ -341,6 +393,7 @@ class _SummaryCard extends StatelessWidget {
                   label: "囤货",
                   value: "$watchCount",
                   detail: "已确认身份",
+                  onTap: onOpenWatchlist,
                 ),
               ),
               const SizedBox(width: 10),
@@ -349,6 +402,7 @@ class _SummaryCard extends StatelessWidget {
                   label: "模拟",
                   value: "$scenarioCount",
                   detail: "银两分配",
+                  onTap: onOpenScenarios,
                 ),
               ),
             ],
@@ -371,26 +425,47 @@ class _SummaryCard extends StatelessWidget {
 }
 
 class _HeroCountPill extends StatelessWidget {
-  const _HeroCountPill({required this.label, required this.value});
+  const _HeroCountPill({
+    required this.label,
+    required this.value,
+    required this.onTap,
+  });
 
   final String label;
   final String value;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: context.looTokens.accentSoft,
+    final tokens = context.looTokens;
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: context.looTokens.cardBorder),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-        child: Column(
-          children: [
-            Text(value, style: Theme.of(context).textTheme.titleLarge),
-            Text(label, style: Theme.of(context).textTheme.labelSmall),
-          ],
+        onTap: onTap,
+        child: Ink(
+          decoration: BoxDecoration(
+            color: tokens.accentSoft,
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: tokens.cardBorder),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            child: Column(
+              children: [
+                Text(value, style: Theme.of(context).textTheme.titleLarge),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(label, style: Theme.of(context).textTheme.labelSmall),
+                    const SizedBox(width: 2),
+                    Icon(Icons.keyboard_arrow_down_rounded,
+                        size: 14, color: tokens.mutedText),
+                  ],
+                ),
+              ],
+            ),
+          ),
         ),
       ),
     );
@@ -402,44 +477,67 @@ class _HeroMiniStat extends StatelessWidget {
     required this.label,
     required this.value,
     required this.detail,
+    required this.onTap,
   });
 
   final String label;
   final String value;
   final String detail;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     final tokens = context.looTokens;
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.18),
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: tokens.cardBorder),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Row(
-          children: [
-            Text(value, style: Theme.of(context).textTheme.titleLarge),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(label, style: Theme.of(context).textTheme.labelLarge),
-                  Text(
-                    detail,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                          color: tokens.mutedText,
-                        ),
+        onTap: onTap,
+        child: Ink(
+          decoration: BoxDecoration(
+            color:
+                Theme.of(context).colorScheme.surface.withValues(alpha: 0.18),
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: tokens.cardBorder),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Row(
+              children: [
+                Text(value, style: Theme.of(context).textTheme.titleLarge),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Flexible(
+                            child: Text(
+                              label,
+                              style: Theme.of(context).textTheme.labelLarge,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          const SizedBox(width: 2),
+                          Icon(Icons.keyboard_arrow_down_rounded,
+                              size: 14, color: tokens.mutedText),
+                        ],
+                      ),
+                      Text(
+                        detail,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                              color: tokens.mutedText,
+                            ),
+                      ),
+                    ],
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
-          ],
+          ),
         ),
       ),
     );
