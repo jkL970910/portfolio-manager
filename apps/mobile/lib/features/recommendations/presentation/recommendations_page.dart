@@ -42,7 +42,12 @@ class _RecommendationsPageState extends State<RecommendationsPage> {
 
   void _scrollToSection(GlobalKey key) {
     final context = key.currentContext;
-    if (context == null) return;
+    if (context == null) {
+      ScaffoldMessenger.of(this.context).showSnackBar(
+        const SnackBar(content: Text("还没有可查看的模拟。先点“重算清单”生成分配方案。")),
+      );
+      return;
+    }
     Scrollable.ensureVisible(
       context,
       duration: const Duration(milliseconds: 360),
@@ -187,6 +192,7 @@ class _RecommendationsPageState extends State<RecommendationsPage> {
                               _scrollToSection(_watchlistKey),
                           onOpenScenarios: () =>
                               _scrollToSection(_scenariosKey),
+                          canOpenScenarios: snapshot.data!.scenarios.isNotEmpty,
                         ),
                         const SizedBox(height: 16),
                         _ActionDock(
@@ -342,12 +348,14 @@ class _SummaryCard extends StatelessWidget {
     required this.onOpenPriorities,
     required this.onOpenWatchlist,
     required this.onOpenScenarios,
+    required this.canOpenScenarios,
   });
 
   final MobileRecommendationsSnapshot data;
   final VoidCallback onOpenPriorities;
   final VoidCallback onOpenWatchlist;
   final VoidCallback onOpenScenarios;
+  final bool canOpenScenarios;
 
   @override
   Widget build(BuildContext context) {
@@ -401,8 +409,9 @@ class _SummaryCard extends StatelessWidget {
                 child: _HeroMiniStat(
                   label: "模拟",
                   value: "$scenarioCount",
-                  detail: "银两分配",
+                  detail: canOpenScenarios ? "银两分配" : "重算后查看",
                   onTap: onOpenScenarios,
+                  enabled: canOpenScenarios,
                 ),
               ),
             ],
@@ -478,12 +487,14 @@ class _HeroMiniStat extends StatelessWidget {
     required this.value,
     required this.detail,
     required this.onTap,
+    this.enabled = true,
   });
 
   final String label;
   final String value;
   final String detail;
   final VoidCallback onTap;
+  final bool enabled;
 
   @override
   Widget build(BuildContext context) {
@@ -492,11 +503,13 @@ class _HeroMiniStat extends StatelessWidget {
       color: Colors.transparent,
       child: InkWell(
         borderRadius: BorderRadius.circular(18),
-        onTap: onTap,
+        onTap: enabled ? onTap : null,
         child: Ink(
           decoration: BoxDecoration(
             color:
-                Theme.of(context).colorScheme.surface.withValues(alpha: 0.18),
+                Theme.of(context).colorScheme.surface.withValues(
+                      alpha: enabled ? 0.18 : 0.08,
+                    ),
             borderRadius: BorderRadius.circular(18),
             border: Border.all(color: tokens.cardBorder),
           ),
@@ -520,8 +533,13 @@ class _HeroMiniStat extends StatelessWidget {
                             ),
                           ),
                           const SizedBox(width: 2),
-                          Icon(Icons.keyboard_arrow_down_rounded,
-                              size: 14, color: tokens.mutedText),
+                          Icon(
+                            enabled
+                                ? Icons.keyboard_arrow_down_rounded
+                                : Icons.lock_clock_outlined,
+                            size: 14,
+                            color: tokens.mutedText,
+                          ),
                         ],
                       ),
                       Text(
