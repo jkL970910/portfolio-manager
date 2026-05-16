@@ -99,30 +99,6 @@ class _RecommendationsPageState extends State<RecommendationsPage> {
     }
   }
 
-  Future<void> _addWatchlistSymbol(String symbol) async {
-    final normalized = symbol.trim().toUpperCase();
-    if (normalized.isEmpty || _working) {
-      return;
-    }
-    setState(() => _working = true);
-    try {
-      await widget.apiClient.addWatchlistSymbol(normalized);
-      if (mounted) {
-        setState(() {
-          _working = false;
-          _snapshot = _loadSnapshot();
-        });
-      }
-    } catch (error) {
-      if (mounted) {
-        setState(() => _working = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(error.toString())),
-        );
-      }
-    }
-  }
-
   Future<void> _removeWatchlistSymbol(String symbol) async {
     if (_working) {
       return;
@@ -208,7 +184,6 @@ class _RecommendationsPageState extends State<RecommendationsPage> {
                           symbols:
                               snapshot.data!.preferenceContext.watchlistSymbols,
                           working: _working,
-                          onAdd: _addWatchlistSymbol,
                           onRemove: _removeWatchlistSymbol,
                           onOpen: _openWatchlistSymbol,
                         ),
@@ -548,14 +523,12 @@ class _WatchlistCard extends StatefulWidget {
   const _WatchlistCard({
     required this.symbols,
     required this.working,
-    required this.onAdd,
     required this.onRemove,
     required this.onOpen,
   });
 
   final List<String> symbols;
   final bool working;
-  final ValueChanged<String> onAdd;
   final ValueChanged<String> onRemove;
   final ValueChanged<String> onOpen;
 
@@ -564,23 +537,6 @@ class _WatchlistCard extends StatefulWidget {
 }
 
 class _WatchlistCardState extends State<_WatchlistCard> {
-  final _controller = TextEditingController();
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  void _submit() {
-    final symbol = _controller.text.trim().toUpperCase();
-    if (symbol.isEmpty) {
-      return;
-    }
-    widget.onAdd(symbol);
-    _controller.clear();
-  }
-
   @override
   Widget build(BuildContext context) {
     return LooGlassCard(
@@ -590,33 +546,14 @@ class _WatchlistCardState extends State<_WatchlistCard> {
           Text("囤货清单", style: Theme.of(context).textTheme.titleLarge),
           const SizedBox(height: 6),
           Text(
-            "这些标的会影响候选评分和后续解释；新增前先确认交易所和币种。",
+            "这些标的会影响候选评分和后续解释；新增请从搜货台打开研究台后确认。",
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
                   color: context.looTokens.mutedText,
                 ),
           ),
           const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: TextField(
-                  controller: _controller,
-                  enabled: !widget.working,
-                  textCapitalization: TextCapitalization.characters,
-                  decoration: const InputDecoration(labelText: "代码，例如 VFV"),
-                  onSubmitted: (_) => _submit(),
-                ),
-              ),
-              const SizedBox(width: 8),
-              FilledButton(
-                onPressed: widget.working ? null : _submit,
-                child: const Text("加入"),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
           if (widget.symbols.isEmpty)
-            const Text("暂时没有囤货标的。")
+            const Text("暂时没有囤货标的。点上方“搜货”进入研究台后加入。")
           else
             Wrap(
               spacing: 8,

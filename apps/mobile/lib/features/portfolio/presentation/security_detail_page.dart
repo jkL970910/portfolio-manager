@@ -50,6 +50,8 @@ class _SecurityDetailPageState extends State<SecurityDetailPage> {
   String? _securityId;
   String? _resolvedExchange;
   String? _resolvedCurrency;
+  Set<String> _watchlistSymbols = const {};
+  bool _isUpdatingWatchlist = false;
   String _selectedResearchScopeId = _ResearchScope.aggregateId;
   final AiAnalysisController _analysisController = AiAnalysisController();
 
@@ -61,6 +63,7 @@ class _SecurityDetailPageState extends State<SecurityDetailPage> {
       _selectedResearchScopeId = initialHoldingId;
     }
     _snapshot = _loadSnapshot();
+    _loadWatchlist();
     _startExternalResearchPolling();
   }
 
@@ -105,6 +108,64 @@ class _SecurityDetailPageState extends State<SecurityDetailPage> {
     setState(() {
       _snapshot = _loadSnapshot();
     });
+  }
+
+  Future<void> _loadWatchlist() async {
+    try {
+      final response = await widget.apiClient.getInvestmentPreferences();
+      final data = response["data"];
+      final profile = data is Map<String, dynamic> ? data["profile"] : null;
+      final symbols = profile is Map<String, dynamic>
+          ? profile["watchlistSymbols"] as List?
+          : null;
+      if (!mounted) return;
+      setState(() {
+        _watchlistSymbols = _normalizeWatchlistSymbols(symbols);
+      });
+    } catch (_) {
+      // Security research should still load if the preference snapshot fails.
+    }
+  }
+
+  Future<void> _toggleWatchlist(MobileSecurityDetailSnapshot data) async {
+    final key = _watchlistKeyForData(data);
+    if (key == null || _isUpdatingWatchlist) {
+      return;
+    }
+    final tracked = _watchlistSymbols.contains(key);
+    setState(() => _isUpdatingWatchlist = true);
+    try {
+      final response = tracked
+          ? await widget.apiClient.removeWatchlistSymbol(key)
+          : await widget.apiClient.addWatchlistSymbol(key);
+      final payload = response["data"];
+      final symbols = payload is Map<String, dynamic>
+          ? payload["watchlistSymbols"] as List?
+          : null;
+      if (!mounted) return;
+      setState(() {
+        _watchlistSymbols = symbols == null
+            ? (tracked
+                ? ({..._watchlistSymbols}..remove(key))
+                : ({..._watchlistSymbols, key}))
+            : _normalizeWatchlistSymbols(symbols);
+        _isUpdatingWatchlist = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(tracked ? "$key 已移出囤货清单。" : "$key 已加入囤货清单。")),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => _isUpdatingWatchlist = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(error.toString())),
+      );
+    }
+  }
+
+  bool _isWatchlistTracked(MobileSecurityDetailSnapshot data) {
+    final key = _watchlistKeyForData(data);
+    return key != null && _watchlistSymbols.contains(key);
   }
 
   Future<void> _refreshQuote() async {
@@ -658,7 +719,12 @@ class _SecurityDetailPageState extends State<SecurityDetailPage> {
                   ],
                   const SizedBox(height: 12),
                   if (data.heldPosition == null)
-                    const _UnheldPositionCard()
+                    _UnheldPositionCard(
+                      watchlistKey: _watchlistKeyForData(data),
+                      isTracked: _isWatchlistTracked(data),
+                      isBusy: _isUpdatingWatchlist,
+                      onToggle: () => _toggleWatchlist(data),
+                    )
                   else
                     _PositionScopeSection(
                       data: data,
@@ -715,6 +781,36 @@ class _SecurityDetailPageState extends State<SecurityDetailPage> {
       ),
     );
   }
+}
+
+Set<String> _normalizeWatchlistSymbols(List? symbols) {
+  return symbols
+          ?.whereType<String>()
+          .map(_normalizeWatchlistSymbol)
+          .where((symbol) => symbol.isNotEmpty)
+          .toSet() ??
+      const {};
+}
+
+String _normalizeWatchlistSymbol(String value) {
+  return value
+      .trim()
+      .toUpperCase()
+      .split(":")
+      .map((part) => part.trim())
+      .where((part) => part.isNotEmpty)
+      .take(3)
+      .join(":");
+}
+
+String? _watchlistKeyForData(MobileSecurityDetailSnapshot data) {
+  final symbol = data.symbol.trim().toUpperCase();
+  final exchange = data.exchange.trim().toUpperCase();
+  final currency = data.currency.trim().toUpperCase();
+  if (symbol.isEmpty || symbol == "--" || exchange.isEmpty || currency.isEmpty) {
+    return null;
+  }
+  return _normalizeWatchlistSymbol("$symbol:$exchange:$currency");
 }
 
 class MobileSecurityDetailSnapshot {
@@ -1438,44 +1534,81 @@ class _CollapsiblePositionScopeSectionState
 }
 
 class _UnheldPositionCard extends StatelessWidget {
-  const _UnheldPositionCard();
+  const _UnheldPositionCard({
+    required this.watchlistKey,
+    required this.isTracked,
+    required this.isBusy,
+    required this.onToggle,
+  });
+
+  final String? watchlistKey;
+  final bool isTracked;
+  final bool isBusy;
+  final VoidCallback onToggle;
 
   @override
   Widget build(BuildContext context) {
     final tokens = context.looTokens;
     return LooGlassCard(
       padding: EdgeInsets.all(tokens.gapMd),
-      child: Row(
+      child: Column(
         children: [
-          Container(
-            height: 38,
-            width: 38,
-            decoration: BoxDecoration(
-              color: tokens.accent.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(tokens.radiusMd),
-            ),
-            child: Icon(
-              Icons.visibility_outlined,
-              size: 20,
-              color: tokens.accent,
-            ),
-          ),
-          SizedBox(width: tokens.gapMd),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text("未持有", style: Theme.of(context).textTheme.titleMedium),
-                const SizedBox(height: 4),
-                Text(
-                  "当前按候选标的处理；持仓层分析会在加入组合后显示。",
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: tokens.mutedText,
-                      ),
+          Row(
+            children: [
+              Container(
+                height: 38,
+                width: 38,
+                decoration: BoxDecoration(
+                  color: tokens.accent.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(tokens.radiusMd),
                 ),
-              ],
+                child: Icon(
+                  Icons.visibility_outlined,
+                  size: 20,
+                  color: tokens.accent,
+                ),
+              ),
+              SizedBox(width: tokens.gapMd),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text("未持有", style: Theme.of(context).textTheme.titleMedium),
+                    const SizedBox(height: 4),
+                    Text(
+                      watchlistKey == null
+                          ? "当前标的身份还没完整确认，暂不写入囤货清单。"
+                          : "已确认 $watchlistKey；可先囤货观察，持仓层分析会在买入后显示。",
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: tokens.mutedText,
+                          ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          SizedBox(height: tokens.gapMd),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton.tonalIcon(
+              onPressed: watchlistKey == null || isBusy ? null : onToggle,
+              icon: isBusy
+                  ? const SizedBox(
+                      height: 16,
+                      width: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : Icon(isTracked
+                      ? Icons.bookmark_added
+                      : Icons.bookmark_add_outlined),
+              label: Text(isBusy
+                  ? "处理中..."
+                  : isTracked
+                      ? "移出囤货清单"
+                      : "加入囤货清单"),
             ),
           ),
         ],

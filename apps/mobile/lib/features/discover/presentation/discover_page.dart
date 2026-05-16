@@ -20,7 +20,6 @@ class DiscoverPage extends StatefulWidget {
 class _DiscoverPageState extends State<DiscoverPage> {
   final _queryController = TextEditingController();
   var _searching = false;
-  var _workingWatchlistKey = "";
   var _searched = false;
   String? _error;
   String? _status;
@@ -117,60 +116,6 @@ class _DiscoverPageState extends State<DiscoverPage> {
     }
   }
 
-  Future<void> _toggleWatchlist(
-      MobileDiscoverSecurityCandidate candidate) async {
-    final watchlistKey = candidate.watchlistKey;
-    if (watchlistKey.isEmpty || _workingWatchlistKey.isNotEmpty) {
-      return;
-    }
-
-    final tracked = _watchlistSymbols.contains(watchlistKey);
-    setState(() {
-      _workingWatchlistKey = watchlistKey;
-      _error = null;
-    });
-
-    try {
-      final response = tracked
-          ? await widget.apiClient.removeWatchlistSymbol(watchlistKey)
-          : await widget.apiClient.addWatchlistSymbol(watchlistKey);
-      final data = response["data"];
-      final symbols = data is Map<String, dynamic>
-          ? data["watchlistSymbols"] as List?
-          : null;
-
-      if (mounted) {
-        setState(() {
-          if (symbols != null) {
-            _watchlistSymbols = symbols
-                .whereType<String>()
-                .map((entry) => entry.trim().toUpperCase())
-                .where((entry) => entry.isNotEmpty)
-                .toSet();
-          } else if (tracked) {
-            _watchlistSymbols = {..._watchlistSymbols}..remove(watchlistKey);
-          } else {
-            _watchlistSymbols = {..._watchlistSymbols, watchlistKey};
-          }
-          _workingWatchlistKey = "";
-        });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-                tracked ? "$watchlistKey 已移出囤货清单。" : "$watchlistKey 已加入囤货清单。"),
-          ),
-        );
-      }
-    } catch (error) {
-      if (mounted) {
-        setState(() {
-          _error = error.toString();
-          _workingWatchlistKey = "";
-        });
-      }
-    }
-  }
-
   void _openSecurityDetail(MobileDiscoverSecurityCandidate candidate) {
     Navigator.of(context).push(
       MaterialPageRoute<void>(
@@ -251,8 +196,6 @@ class _DiscoverPageState extends State<DiscoverPage> {
                 (candidate) => _SecurityResultCard(
                   candidate: candidate,
                   tracked: _watchlistSymbols.contains(candidate.watchlistKey),
-                  working: _workingWatchlistKey == candidate.watchlistKey,
-                  onToggleWatchlist: () => _toggleWatchlist(candidate),
                   onOpenDetail: () => _openSecurityDetail(candidate),
                 ),
               ),
@@ -460,15 +403,11 @@ class _SecurityResultCard extends StatelessWidget {
   const _SecurityResultCard({
     required this.candidate,
     required this.tracked,
-    required this.working,
-    required this.onToggleWatchlist,
     required this.onOpenDetail,
   });
 
   final MobileDiscoverSecurityCandidate candidate;
   final bool tracked;
-  final bool working;
-  final VoidCallback onToggleWatchlist;
   final VoidCallback onOpenDetail;
 
   @override
@@ -517,24 +456,47 @@ class _SecurityResultCard extends StatelessWidget {
               spacing: 8,
               runSpacing: 8,
               children: [
+                if (tracked)
+                  const _IdentityPill(
+                    icon: Icons.bookmark_added,
+                    label: "已在囤货",
+                  ),
                 FilledButton.tonalIcon(
-                  onPressed: working ? null : onToggleWatchlist,
-                  icon: Icon(tracked
-                      ? Icons.bookmark_added
-                      : Icons.bookmark_add_outlined),
-                  label: Text(working
-                      ? "处理中..."
-                      : tracked
-                          ? "移出囤货"
-                          : "加入囤货"),
-                ),
-                OutlinedButton.icon(
                   onPressed: onOpenDetail,
                   icon: const Icon(Icons.open_in_new),
-                  label: const Text("打开详情"),
+                  label: const Text("打开研究台"),
                 ),
               ],
             ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _IdentityPill extends StatelessWidget {
+  const _IdentityPill({required this.icon, required this.label});
+
+  final IconData icon;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: context.looTokens.accentSoft,
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: context.looTokens.cardBorder),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 16, color: context.looTokens.accent),
+            const SizedBox(width: 6),
+            Text(label, style: Theme.of(context).textTheme.labelMedium),
           ],
         ),
       ),
