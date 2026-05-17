@@ -25,7 +25,6 @@ class _RecommendationsPageState extends State<RecommendationsPage> {
   final _scrollController = ScrollController();
   final _watchlistKey = GlobalKey();
   final _priorityKey = GlobalKey();
-  final _scenariosKey = GlobalKey();
   var _working = false;
 
   @override
@@ -42,12 +41,7 @@ class _RecommendationsPageState extends State<RecommendationsPage> {
 
   void _scrollToSection(GlobalKey key) {
     final context = key.currentContext;
-    if (context == null) {
-      ScaffoldMessenger.of(this.context).showSnackBar(
-        const SnackBar(content: Text("还没有可查看的模拟。先点“重算清单”生成分配方案。")),
-      );
-      return;
-    }
+    if (context == null) return;
     Scrollable.ensureVisible(
       context,
       duration: const Duration(milliseconds: 360),
@@ -190,9 +184,6 @@ class _RecommendationsPageState extends State<RecommendationsPage> {
                               _scrollToSection(_priorityKey),
                           onOpenWatchlist: () =>
                               _scrollToSection(_watchlistKey),
-                          onOpenScenarios: () =>
-                              _scrollToSection(_scenariosKey),
-                          canOpenScenarios: snapshot.data!.scenarios.isNotEmpty,
                         ),
                         const SizedBox(height: 16),
                         _ActionDock(
@@ -246,14 +237,9 @@ class _RecommendationsPageState extends State<RecommendationsPage> {
                         ],
                         if (snapshot.data!.scenarios.isNotEmpty) ...[
                           const SizedBox(height: 16),
-                          KeyedSubtree(
-                            key: _scenariosKey,
-                            child: const _SectionTitle("银两分配模拟"),
+                          _AdvancedScenariosCard(
+                            scenarios: snapshot.data!.scenarios,
                           ),
-                          const SizedBox(height: 8),
-                          ...snapshot.data!.scenarios
-                              .take(3)
-                              .map(_ScenarioCard.new),
                         ],
                         if (snapshot.data!.notes.isNotEmpty) ...[
                           const SizedBox(height: 16),
@@ -347,15 +333,11 @@ class _SummaryCard extends StatelessWidget {
     this.data, {
     required this.onOpenPriorities,
     required this.onOpenWatchlist,
-    required this.onOpenScenarios,
-    required this.canOpenScenarios,
   });
 
   final MobileRecommendationsSnapshot data;
   final VoidCallback onOpenPriorities;
   final VoidCallback onOpenWatchlist;
-  final VoidCallback onOpenScenarios;
-  final bool canOpenScenarios;
 
   @override
   Widget build(BuildContext context) {
@@ -363,7 +345,6 @@ class _SummaryCard extends StatelessWidget {
     final tokens = context.looTokens;
     final watchCount = data.preferenceContext.watchlistSymbols.length;
     final priorityCount = data.priorities.length;
-    final scenarioCount = data.scenarios.length;
     return LooGlassCard(
       isHero: true,
       child: Column(
@@ -385,12 +366,6 @@ class _SummaryCard extends StatelessWidget {
                   ],
                 ),
               ),
-              const SizedBox(width: 12),
-              _HeroCountPill(
-                label: "候选",
-                value: "$priorityCount",
-                onTap: onOpenPriorities,
-              ),
             ],
           ),
           const SizedBox(height: 14),
@@ -398,20 +373,21 @@ class _SummaryCard extends StatelessWidget {
             children: [
               Expanded(
                 child: _HeroMiniStat(
-                  label: "囤货",
-                  value: "$watchCount",
-                  detail: "已确认身份",
-                  onTap: onOpenWatchlist,
+                  icon: Icons.auto_awesome_outlined,
+                  label: "推荐",
+                  value: "$priorityCount",
+                  detail: "Loo皇推荐",
+                  onTap: onOpenPriorities,
                 ),
               ),
               const SizedBox(width: 10),
               Expanded(
                 child: _HeroMiniStat(
-                  label: "模拟",
-                  value: "$scenarioCount",
-                  detail: canOpenScenarios ? "银两分配" : "重算后查看",
-                  onTap: onOpenScenarios,
-                  enabled: canOpenScenarios,
+                  icon: Icons.inventory_2_outlined,
+                  label: "囤货",
+                  value: "$watchCount",
+                  detail: "已确认身份",
+                  onTap: onOpenWatchlist,
                 ),
               ),
             ],
@@ -433,15 +409,19 @@ class _SummaryCard extends StatelessWidget {
   }
 }
 
-class _HeroCountPill extends StatelessWidget {
-  const _HeroCountPill({
+class _HeroMiniStat extends StatelessWidget {
+  const _HeroMiniStat({
+    required this.icon,
     required this.label,
     required this.value,
+    required this.detail,
     required this.onTap,
   });
 
+  final IconData icon;
   final String label;
   final String value;
+  final String detail;
   final VoidCallback onTap;
 
   @override
@@ -454,62 +434,8 @@ class _HeroCountPill extends StatelessWidget {
         onTap: onTap,
         child: Ink(
           decoration: BoxDecoration(
-            color: tokens.accentSoft,
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: tokens.cardBorder),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-            child: Column(
-              children: [
-                Text(value, style: Theme.of(context).textTheme.titleLarge),
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(label, style: Theme.of(context).textTheme.labelSmall),
-                    const SizedBox(width: 2),
-                    Icon(Icons.keyboard_arrow_down_rounded,
-                        size: 14, color: tokens.mutedText),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _HeroMiniStat extends StatelessWidget {
-  const _HeroMiniStat({
-    required this.label,
-    required this.value,
-    required this.detail,
-    required this.onTap,
-    this.enabled = true,
-  });
-
-  final String label;
-  final String value;
-  final String detail;
-  final VoidCallback onTap;
-  final bool enabled;
-
-  @override
-  Widget build(BuildContext context) {
-    final tokens = context.looTokens;
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(18),
-        onTap: enabled ? onTap : null,
-        child: Ink(
-          decoration: BoxDecoration(
             color:
-                Theme.of(context).colorScheme.surface.withValues(
-                      alpha: enabled ? 0.18 : 0.08,
-                    ),
+                Theme.of(context).colorScheme.surface.withValues(alpha: 0.18),
             borderRadius: BorderRadius.circular(18),
             border: Border.all(color: tokens.cardBorder),
           ),
@@ -517,6 +443,8 @@ class _HeroMiniStat extends StatelessWidget {
             padding: const EdgeInsets.all(12),
             child: Row(
               children: [
+                Icon(icon, color: tokens.accent, size: 18),
+                const SizedBox(width: 8),
                 Text(value, style: Theme.of(context).textTheme.titleLarge),
                 const SizedBox(width: 8),
                 Expanded(
@@ -533,13 +461,8 @@ class _HeroMiniStat extends StatelessWidget {
                             ),
                           ),
                           const SizedBox(width: 2),
-                          Icon(
-                            enabled
-                                ? Icons.keyboard_arrow_down_rounded
-                                : Icons.lock_clock_outlined,
-                            size: 14,
-                            color: tokens.mutedText,
-                          ),
+                          Icon(Icons.keyboard_arrow_down_rounded,
+                              size: 14, color: tokens.mutedText),
                         ],
                       ),
                       Text(
@@ -1388,6 +1311,63 @@ class _ScenarioCard extends StatelessWidget {
                   color: context.looTokens.mutedText,
                 ),
           ),
+        ],
+      ),
+    );
+  }
+}
+
+class _AdvancedScenariosCard extends StatefulWidget {
+  const _AdvancedScenariosCard({required this.scenarios});
+
+  final List<MobileRecommendationScenario> scenarios;
+
+  @override
+  State<_AdvancedScenariosCard> createState() => _AdvancedScenariosCardState();
+}
+
+class _AdvancedScenariosCardState extends State<_AdvancedScenariosCard> {
+  var _expanded = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = context.looTokens;
+    return LooGlassCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          InkWell(
+            borderRadius: BorderRadius.circular(tokens.radiusMd),
+            onTap: () => setState(() => _expanded = !_expanded),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    "高级试算",
+                    style: Theme.of(context).textTheme.titleLarge,
+                  ),
+                ),
+                _InfoPill("${widget.scenarios.length} 组"),
+                const SizedBox(width: 6),
+                AnimatedRotation(
+                  turns: _expanded ? 0.5 : 0,
+                  duration: const Duration(milliseconds: 180),
+                  child: const Icon(Icons.keyboard_arrow_down_rounded),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            "对比不同投入金额下，Loo皇推荐是否稳定；不是行情预测。",
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: tokens.mutedText,
+                ),
+          ),
+          if (_expanded) ...[
+            const SizedBox(height: 12),
+            ...widget.scenarios.take(3).map(_ScenarioCard.new),
+          ],
         ],
       ),
     );
