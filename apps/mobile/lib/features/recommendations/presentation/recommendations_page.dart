@@ -191,15 +191,11 @@ class _RecommendationsPageState extends State<RecommendationsPage> {
                           working: _working,
                           onCustomAmount: _createCustomRun,
                           onRunAmount: _createRun,
+                          onDiscover: _openDiscover,
                           onOpenPriorities: () =>
                               _scrollToSection(_priorityKey),
                           onOpenWatchlist: () =>
                               _scrollToSection(_watchlistKey),
-                        ),
-                        const SizedBox(height: 16),
-                        _ActionDock(
-                          working: _working,
-                          onDiscover: _openDiscover,
                         ),
                         const SizedBox(height: 16),
                         _EngineSummaryCard(
@@ -208,6 +204,14 @@ class _RecommendationsPageState extends State<RecommendationsPage> {
                               context.push(MobileRoutes.settings),
                         ),
                         const SizedBox(height: 16),
+                        if (snapshot
+                            .data!.recentObservationItems.isNotEmpty) ...[
+                          _RecentObservationCard(
+                            items: snapshot.data!.recentObservationItems,
+                            onOpen: _openMarketItem,
+                          ),
+                          const SizedBox(height: 16),
+                        ],
                         KeyedSubtree(
                           key: _watchlistKey,
                           child: _WatchlistCard(
@@ -217,33 +221,17 @@ class _RecommendationsPageState extends State<RecommendationsPage> {
                             onOpen: _openMarketItem,
                           ),
                         ),
-                        if (snapshot
-                            .data!.recentObservationItems.isNotEmpty) ...[
-                          const SizedBox(height: 16),
-                          _RecentObservationCard(
-                            items: snapshot.data!.recentObservationItems,
-                            onOpen: _openMarketItem,
-                          ),
-                        ],
                         const SizedBox(height: 16),
-                        KeyedSubtree(
-                          key: _priorityKey,
-                          child: _SectionTitle(
-                            "进货优先级",
-                            actionLabel:
-                                "${snapshot.data!.priorities.length} 条",
-                          ),
-                        ),
-                        const SizedBox(height: 8),
                         if (snapshot.data!.priorities.isEmpty)
                           const _EmptyCard("暂时没有新的推荐。先完成持仓导入，Loo皇会再下达谕令。")
                         else
-                          ...snapshot.data!.priorities.take(6).map(
-                                (priority) => _PriorityCard(
-                                  priority: priority,
-                                  onOpenSecurity: _openSecurityDetail,
-                                ),
-                              ),
+                          KeyedSubtree(
+                            key: _priorityKey,
+                            child: _PriorityWorkbench(
+                              priorities: snapshot.data!.priorities,
+                              onOpenSecurity: _openSecurityDetail,
+                            ),
+                          ),
                       ],
                     ),
                   ),
@@ -331,6 +319,7 @@ class _SummaryCard extends StatelessWidget {
     required this.working,
     required this.onCustomAmount,
     required this.onRunAmount,
+    required this.onDiscover,
     required this.onOpenPriorities,
     required this.onOpenWatchlist,
   });
@@ -339,6 +328,7 @@ class _SummaryCard extends StatelessWidget {
   final bool working;
   final VoidCallback onCustomAmount;
   final ValueChanged<double> onRunAmount;
+  final VoidCallback onDiscover;
   final VoidCallback onOpenPriorities;
   final VoidCallback onOpenWatchlist;
 
@@ -374,15 +364,9 @@ class _SummaryCard extends StatelessWidget {
               ),
               const SizedBox(width: 12),
               FilledButton.tonalIcon(
-                onPressed: working ? null : onCustomAmount,
-                icon: working
-                    ? const SizedBox(
-                        height: 16,
-                        width: 16,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Icon(Icons.edit_rounded, size: 18),
-                label: const Text("改金额"),
+                onPressed: onDiscover,
+                icon: const Icon(Icons.travel_explore_outlined, size: 18),
+                label: const Text("搜货"),
               ),
             ],
           ),
@@ -422,9 +406,9 @@ class _SummaryCard extends StatelessWidget {
               Expanded(
                 child: _HeroMiniStat(
                   icon: Icons.savings_outlined,
-                  label: "本轮银两",
+                  label: "重算",
                   value: _engineInputValue(data.engineSummary, "本轮银两"),
-                  detail: "本次投入",
+                  detail: "自定义银两",
                   onTap: working ? () {} : onCustomAmount,
                 ),
               ),
@@ -633,90 +617,6 @@ class _HeroMiniStat extends StatelessWidget {
           ),
         ),
       ),
-    );
-  }
-}
-
-class _CompactActionCard extends StatelessWidget {
-  const _CompactActionCard({
-    required this.icon,
-    required this.title,
-    required this.detail,
-    required this.onTap,
-  });
-
-  final IconData icon;
-  final String title;
-  final String detail;
-  final VoidCallback? onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final tokens = context.looTokens;
-    return LooGlassCard(
-      padding: const EdgeInsets.all(14),
-      onTap: onTap,
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(minHeight: 112),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(icon, color: tokens.accent),
-                const Spacer(),
-                Icon(Icons.chevron_right, color: tokens.accent),
-              ],
-            ),
-            const Spacer(),
-            Text(title, style: Theme.of(context).textTheme.titleMedium),
-            const SizedBox(height: 4),
-            Text(
-              detail,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: tokens.mutedText,
-                  ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _ActionDock extends StatelessWidget {
-  const _ActionDock({
-    required this.working,
-    required this.onDiscover,
-  });
-
-  final bool working;
-  final VoidCallback onDiscover;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Expanded(child: _DiscoverEntryCard(onOpen: onDiscover)),
-      ],
-    );
-  }
-}
-
-class _DiscoverEntryCard extends StatelessWidget {
-  const _DiscoverEntryCard({required this.onOpen});
-
-  final VoidCallback onOpen;
-
-  @override
-  Widget build(BuildContext context) {
-    return _CompactActionCard(
-      icon: Icons.travel_explore_outlined,
-      title: "搜货",
-      detail: "查股票、ETF 或 CDR，先打开研究台确认身份。",
-      onTap: onOpen,
     );
   }
 }
@@ -978,9 +878,10 @@ class _WatchlistCardState extends State<_WatchlistCard> {
   @override
   Widget build(BuildContext context) {
     final resolved = widget.items.where(_isResolvedMarketItem).toList();
-    final unresolved = widget.items.where((item) => !_isResolvedMarketItem(item)).toList();
+    final unresolved =
+        widget.items.where((item) => !_isResolvedMarketItem(item)).toList();
     return LooGlassCard(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 14),
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -995,16 +896,9 @@ class _WatchlistCardState extends State<_WatchlistCard> {
               _InfoPill("${resolved.length} 已确认"),
             ],
           ),
-          const SizedBox(height: 6),
-          Text(
-            "横向查看今日涨跌；新增请从搜货台进入研究台后确认。",
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: context.looTokens.mutedText,
-                ),
-          ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 10),
           if (widget.items.isEmpty)
-            const Text("暂时没有囤货标的。点上方“搜货”进入研究台后加入。")
+            const Text("暂无囤货标的。")
           else if (resolved.isNotEmpty)
             _MarketItemRail(
               items: resolved,
@@ -1078,7 +972,7 @@ class _UnresolvedWatchlistPanel extends StatelessWidget {
             ),
             const SizedBox(height: 6),
             Text(
-              "这些旧囤货缺少交易所或币种，不会进入进货推荐。建议重新搜货后从研究台加入。",
+              "缺少交易所或币种，不进入推荐。",
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
                     color: tokens.mutedText,
                   ),
@@ -1091,8 +985,7 @@ class _UnresolvedWatchlistPanel extends StatelessWidget {
                 for (final item in items.take(8))
                   InputChip(
                     label: Text(item.symbol.isEmpty ? item.key : item.symbol),
-                    onDeleted:
-                        working ? null : () => onRemove(item.key),
+                    onDeleted: working ? null : () => onRemove(item.key),
                   ),
               ],
             ),
@@ -1115,7 +1008,7 @@ class _RecentObservationCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return LooGlassCard(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 14),
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -1130,14 +1023,7 @@ class _RecentObservationCard extends StatelessWidget {
               _InfoPill("${items.length} 个"),
             ],
           ),
-          const SizedBox(height: 6),
-          Text(
-            "来自本轮 Loo皇推荐候选；点击进入研究台复核。",
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: context.looTokens.mutedText,
-                ),
-          ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 10),
           _MarketItemRail(items: items, onOpen: onOpen),
         ],
       ),
@@ -1193,8 +1079,8 @@ class _MarketItemCard extends StatelessWidget {
     final tokens = context.looTokens;
     final moveColor = _marketMoveColor(context, item.dayChangeVariant);
     return SizedBox(
-      width: 148,
-      height: 132,
+      width: 142,
+      height: 118,
       child: Material(
         color: Colors.transparent,
         child: InkWell(
@@ -1292,39 +1178,194 @@ Color _marketMoveColor(BuildContext context, String variant) {
   };
 }
 
-class _SectionTitle extends StatelessWidget {
-  const _SectionTitle(this.title, {this.actionLabel});
+class _PriorityWorkbench extends StatefulWidget {
+  const _PriorityWorkbench({
+    required this.priorities,
+    required this.onOpenSecurity,
+  });
 
-  final String title;
-  final String? actionLabel;
+  final List<MobileRecommendationPriority> priorities;
+  final ValueChanged<MobileRecommendationPriority> onOpenSecurity;
+
+  @override
+  State<_PriorityWorkbench> createState() => _PriorityWorkbenchState();
+}
+
+class _PriorityWorkbenchState extends State<_PriorityWorkbench> {
+  var _selectedIndex = 0;
+
+  @override
+  void didUpdateWidget(covariant _PriorityWorkbench oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (_selectedIndex >= widget.priorities.length) {
+      _selectedIndex = 0;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Expanded(
-          child: Text(title, style: Theme.of(context).textTheme.titleLarge),
-        ),
-        if (actionLabel != null)
-          Text(
-            actionLabel!,
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: context.looTokens.mutedText,
+    final tokens = context.looTokens;
+    final theme = Theme.of(context);
+    final selected = widget.priorities[_selectedIndex];
+
+    return LooGlassCard(
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.local_mall_outlined, color: tokens.accent),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text("扫货台", style: theme.textTheme.titleLarge),
+              ),
+              Text(
+                "${widget.priorities.length} 条",
+                style: theme.textTheme.labelLarge?.copyWith(
+                  color: tokens.mutedText,
                 ),
+              ),
+            ],
           ),
-      ],
+          const SizedBox(height: 4),
+          Text(
+            "按优先级横向选择标的，下方固定展示当前候选的进货建议。",
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: tokens.mutedText,
+            ),
+          ),
+          const SizedBox(height: 12),
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            physics: const BouncingScrollPhysics(),
+            child: Row(
+              children: [
+                for (var index = 0;
+                    index < widget.priorities.length;
+                    index++) ...[
+                  _PriorityTab(
+                    priority: widget.priorities[index],
+                    rank: index + 1,
+                    selected: index == _selectedIndex,
+                    onTap: () => setState(() => _selectedIndex = index),
+                  ),
+                  if (index != widget.priorities.length - 1)
+                    const SizedBox(width: 8),
+                ],
+              ],
+            ),
+          ),
+          const SizedBox(height: 14),
+          AnimatedSwitcher(
+            duration: const Duration(milliseconds: 220),
+            switchInCurve: Curves.easeOutCubic,
+            switchOutCurve: Curves.easeInCubic,
+            child: _PriorityCard(
+              key: ValueKey(
+                "${selected.securityId}:${selected.securitySymbol}:$_selectedIndex",
+              ),
+              priority: selected,
+              onOpenSecurity: widget.onOpenSecurity,
+              embedded: true,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PriorityTab extends StatelessWidget {
+  const _PriorityTab({
+    required this.priority,
+    required this.rank,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final MobileRecommendationPriority priority;
+  final int rank;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = context.looTokens;
+    final theme = Theme.of(context);
+    final color = selected ? tokens.accent : tokens.mutedText;
+    final symbol = priority.candidateBrief?.identity.symbol.isNotEmpty == true
+        ? priority.candidateBrief!.identity.symbol
+        : priority.securitySymbol;
+    final action = _actionLabel(priority.candidateBrief?.decision.action ?? "");
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(18),
+        onTap: onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          curve: Curves.easeOutCubic,
+          constraints: const BoxConstraints(minWidth: 96),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          decoration: BoxDecoration(
+            color: selected
+                ? tokens.accentSoft.withValues(alpha: 0.88)
+                : Theme.of(context).colorScheme.surface.withValues(alpha: 0.16),
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(
+              color: selected ? tokens.accent : tokens.cardBorder,
+            ),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                "#$rank",
+                style: theme.textTheme.labelSmall?.copyWith(color: color),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                symbol.isEmpty ? priority.assetClass : symbol,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: theme.textTheme.titleSmall?.copyWith(
+                  color:
+                      selected ? Theme.of(context).colorScheme.onSurface : null,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                action,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: theme.textTheme.labelSmall?.copyWith(
+                  color: tokens.mutedText,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
 
 class _PriorityCard extends StatefulWidget {
   const _PriorityCard({
+    super.key,
     required this.priority,
     required this.onOpenSecurity,
+    this.embedded = false,
   });
 
   final MobileRecommendationPriority priority;
   final ValueChanged<MobileRecommendationPriority> onOpenSecurity;
+  final bool embedded;
 
   @override
   State<_PriorityCard> createState() => _PriorityCardState();
@@ -1350,141 +1391,153 @@ class _PriorityCardState extends State<_PriorityCard> {
       ...priority.intelligenceRefs.map((item) => item.title),
     ].where((item) => item.trim().isNotEmpty).length;
 
+    final content = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    _priorityTitle(priority),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.titleLarge,
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    _prioritySubtitle(priority),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: tokens.mutedText,
+                        ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 10),
+            _DecisionBadge(brief: brief, fallbackAmount: priority.amount),
+          ],
+        ),
+        const SizedBox(height: 10),
+        _PriorityImpactRow(priority: priority),
+        const SizedBox(height: 10),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children:
+              _priorityBadges(priority).take(5).map(_InfoPill.new).toList(),
+        ),
+        if (priority.securitySymbol.isNotEmpty) ...[
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: FilledButton.tonalIcon(
+                  onPressed: () => widget.onOpenSecurity(priority),
+                  icon: const Icon(Icons.open_in_new),
+                  label: const Text("打开研究台"),
+                ),
+              ),
+              if (hiddenSections > 0) ...[
+                const SizedBox(width: 10),
+                TextButton.icon(
+                  onPressed: () => setState(() => _expanded = !_expanded),
+                  icon: AnimatedRotation(
+                    turns: _expanded ? 0.5 : 0,
+                    duration: const Duration(milliseconds: 180),
+                    child: const Icon(Icons.keyboard_arrow_down_rounded),
+                  ),
+                  label: Text(_expanded ? "收起" : "证据"),
+                ),
+              ],
+            ],
+          ),
+        ],
+        if (_expanded) ...[
+          const SizedBox(height: 12),
+          DecoratedBox(
+            decoration: BoxDecoration(
+              color:
+                  Theme.of(context).colorScheme.surface.withValues(alpha: 0.16),
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(color: tokens.cardBorder),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (priority.scoreline.isNotEmpty ||
+                      priority.gapSummary.isNotEmpty) ...[
+                    _ScorelinePanel(priority),
+                    const SizedBox(height: 12),
+                  ],
+                  if (priority.v3Overlay != null) ...[
+                    _V3OverlayPanel(priority.v3Overlay!),
+                    const SizedBox(height: 12),
+                  ],
+                  if (priority.intelligenceRefs.isNotEmpty) ...[
+                    _PriorityIntelligenceSection(priority.intelligenceRefs),
+                    const SizedBox(height: 12),
+                  ],
+                  if (priority.whyThis.isNotEmpty) ...[
+                    _ExplanationSection(
+                      title: "为什么它排前面",
+                      items: priority.whyThis,
+                    ),
+                    const SizedBox(height: 12),
+                  ],
+                  if (priority.whyNot.isNotEmpty) ...[
+                    _ExplanationSection(
+                      title: "需要注意什么",
+                      items: priority.whyNot,
+                    ),
+                    const SizedBox(height: 12),
+                  ],
+                  if (priority.constraints.isNotEmpty) ...[
+                    _ConstraintSection(priority.constraints),
+                    const SizedBox(height: 12),
+                  ],
+                  if (priority.execution.isNotEmpty) ...[
+                    _ExecutionSection(priority.execution),
+                    const SizedBox(height: 12),
+                  ],
+                  if (priority.alternatives.isNotEmpty)
+                    _ExplanationSection(
+                      title: "可替代选择",
+                      items: priority.alternatives,
+                    ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ],
+    );
+
+    if (widget.embedded) {
+      return DecoratedBox(
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.12),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: tokens.cardBorder),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(14),
+          child: content,
+        ),
+      );
+    }
+
     return LooGlassCard(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      _priorityTitle(priority),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.titleLarge,
-                    ),
-                    const SizedBox(height: 3),
-                    Text(
-                      _prioritySubtitle(priority),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: tokens.mutedText,
-                          ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 10),
-              _DecisionBadge(brief: brief, fallbackAmount: priority.amount),
-            ],
-          ),
-          const SizedBox(height: 10),
-          _PriorityImpactRow(priority: priority),
-          const SizedBox(height: 10),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: _priorityBadges(priority)
-                .take(5)
-                .map(_InfoPill.new)
-                .toList(),
-          ),
-          if (priority.securitySymbol.isNotEmpty) ...[
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                Expanded(
-                  child: FilledButton.tonalIcon(
-                    onPressed: () => widget.onOpenSecurity(priority),
-                    icon: const Icon(Icons.open_in_new),
-                    label: const Text("打开研究台"),
-                  ),
-                ),
-                if (hiddenSections > 0) ...[
-                  const SizedBox(width: 10),
-                  TextButton.icon(
-                    onPressed: () => setState(() => _expanded = !_expanded),
-                    icon: AnimatedRotation(
-                      turns: _expanded ? 0.5 : 0,
-                      duration: const Duration(milliseconds: 180),
-                      child: const Icon(Icons.keyboard_arrow_down_rounded),
-                    ),
-                    label: Text(_expanded ? "收起" : "证据"),
-                  ),
-                ],
-              ],
-            ),
-          ],
-          if (_expanded) ...[
-            const SizedBox(height: 12),
-            DecoratedBox(
-              decoration: BoxDecoration(
-                color: Theme.of(context)
-                    .colorScheme
-                    .surface
-                    .withValues(alpha: 0.16),
-                borderRadius: BorderRadius.circular(18),
-                border: Border.all(color: tokens.cardBorder),
-              ),
-              child: Padding(
-                padding: const EdgeInsets.all(12),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    if (priority.scoreline.isNotEmpty ||
-                        priority.gapSummary.isNotEmpty) ...[
-                      _ScorelinePanel(priority),
-                      const SizedBox(height: 12),
-                    ],
-                    if (priority.v3Overlay != null) ...[
-                      _V3OverlayPanel(priority.v3Overlay!),
-                      const SizedBox(height: 12),
-                    ],
-                    if (priority.intelligenceRefs.isNotEmpty) ...[
-                      _PriorityIntelligenceSection(priority.intelligenceRefs),
-                      const SizedBox(height: 12),
-                    ],
-                    if (priority.whyThis.isNotEmpty) ...[
-                      _ExplanationSection(
-                        title: "为什么它排前面",
-                        items: priority.whyThis,
-                      ),
-                      const SizedBox(height: 12),
-                    ],
-                    if (priority.whyNot.isNotEmpty) ...[
-                      _ExplanationSection(
-                        title: "需要注意什么",
-                        items: priority.whyNot,
-                      ),
-                      const SizedBox(height: 12),
-                    ],
-                    if (priority.constraints.isNotEmpty) ...[
-                      _ConstraintSection(priority.constraints),
-                      const SizedBox(height: 12),
-                    ],
-                    if (priority.execution.isNotEmpty) ...[
-                      _ExecutionSection(priority.execution),
-                      const SizedBox(height: 12),
-                    ],
-                    if (priority.alternatives.isNotEmpty)
-                      _ExplanationSection(
-                        title: "可替代选择",
-                        items: priority.alternatives,
-                      ),
-                  ],
-                ),
-              ),
-            ),
-          ],
-        ],
-      ),
+      child: content,
     );
   }
 }
