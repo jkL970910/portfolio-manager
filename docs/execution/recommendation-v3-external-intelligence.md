@@ -1,6 +1,140 @@
-# Recommendation V3 External Intelligence Plan
+# Recommendation V3 / 进货工作台 Plan
 
-Last updated: 2026-05-04
+Last updated: 2026-05-18
+
+## 2026-05-18 MDD Signoff Scope
+
+The next build slice is the foundation for the mobile `进货` workbench and the
+future Daily Brief worker. It is intentionally additive.
+
+In scope now:
+
+1. Add a curated `Core ETF Universe` for Canadian-investor routing.
+2. Gate new mobile watchlist additions behind clean `symbol + exchange +
+   currency` identity.
+3. Add a mobile-compatible `CandidateBrief` contract on recommendation
+   priorities while preserving existing V2.1 fields.
+4. Record Daily Brief architecture as deterministic snapshot diffing first.
+5. Let mobile users re-run the workbench with preset contribution amounts from
+   the hero card, while keeping custom amount entry available.
+6. Render recommendation priority cards from `CandidateBrief` first: action,
+   amount, target account, match score, portfolio-impact, and compact badges.
+7. Move scorelines, V3 overlay, intelligence refs, guardrails, and execution
+   detail into an expandable evidence drawer.
+8. Quarantine identity-incomplete watchlist rows as `待鉴定包裹` so they cannot
+   be mistaken for actionable recommendation candidates.
+9. Collapse the recommendation-engine explanation into a compact `囤货规矩`
+   panel with a Settings link for Preference Factor edits.
+
+Out of scope for this slice:
+
+- Full V3 scoring replacement.
+- Real queue infrastructure.
+- GPT-generated daily summaries by default.
+- Automated trading signals.
+
+## Product Boundary
+
+`进货` is a rules-first funding workbench. The backend decides from allocation
+gap, account placement, tax fit, FX friction, economic exposure, concentration,
+and user cash/home-goal guardrails. LLM, AI 大臣, external news, and future Daily
+Briefs are evidence/explanation layers only.
+
+Watchlist items are candidate ideas. They should not bypass guardrails, and
+identity-incomplete entries must be quarantined or resolved before they enter
+the primary recommendation flow.
+
+## Core ETF Universe
+
+The core universe is a high-trust candidate pool for filling allocation gaps.
+It should be maintained as code/registry first, not user-editable DB rows yet.
+
+Required metadata:
+
+- canonical identity: symbol, exchange, currency, security type
+- economic exposure: asset class, region, sector/theme tags
+- role: core / satellite / cash-parking / defensive
+- cost/liquidity hints: expense bps and liquidity score
+- tax routing hints: preferred accounts, avoided accounts, withholding notes
+- execution hints: lump sum / DCA / wait-pullback defaults
+
+Initial examples:
+
+- `CASH.TO`: cash parking / liquidity buffer
+- `XBB.TO`: Canadian aggregate bonds / fixed income
+- `VFV.TO`: CAD-listed US equity core for TFSA/FHSA/Taxable paths
+- `VOO`: USD-listed US equity core, preferentially RRSP when USD path exists
+- `XEF.TO`: developed international equity
+- `VCN.TO` / `XIC.TO`: Canadian equity core
+
+## CandidateBrief Contract
+
+`CandidateBrief` is a compact card-oriented contract for Flutter. It is added
+beside existing recommendation priority fields so older rendering remains
+compatible.
+
+```ts
+type CandidateBrief = {
+  identity: {
+    securityId?: string | null;
+    symbol: string;
+    name: string;
+    exchange?: string | null;
+    currency?: "CAD" | "USD" | null;
+  };
+  source: "core_pool" | "watchlist" | "existing_holding" | "manual";
+  decision: {
+    action: "lump_sum" | "dca" | "wait_pullback" | "avoid";
+    matchScore: number;
+    recommendedAmountCad: number;
+    targetAccount: "TFSA" | "RRSP" | "FHSA" | "Taxable";
+  };
+  portfolioImpact: {
+    gapResolved: { beforePct: number | null; afterPct: number | null };
+  };
+  badges: string[];
+  primaryBlocker: string | null;
+  rejectionReason: string | null;
+  dailyBriefId: string | null;
+};
+```
+
+Action semantics:
+
+- `lump_sum`: amount and context are clean enough for a one-shot contribution.
+- `dca`: candidate is acceptable, but timing/market or size suggests staging.
+- `wait_pullback`: candidate fits structurally, but price/market timing argues
+  for waiting.
+- `avoid`: hard blocker or poor fit; show reason, do not make it the primary
+  purchase path.
+
+## Daily Brief Worker Direction
+
+First version should be deterministic and cheap.
+
+Inputs:
+
+- current holdings
+- clean watchlist identities
+- Core ETF Universe
+- latest security research profile / key levels
+- valuation evidence state
+- market pulse snapshot
+- cached external-research documents
+
+Process:
+
+1. Build a normalized daily snapshot per security.
+2. Compute `guardrailHash`, `valuationHash`, `keyLevelHash`, and
+   `marketContextHash`.
+3. Compare against the previous snapshot.
+4. Write a brief only when material state changes.
+
+GPT is optional:
+
+- default worker writes deterministic Chinese diff summaries
+- GPT summary may run only on material changes or user-triggered enhancement
+- page load never calls GPT or live news providers
 
 ## Current Implementation Status
 

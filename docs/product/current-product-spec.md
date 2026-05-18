@@ -288,6 +288,31 @@ Current recommendation direction:
 Recommendations should expose why a candidate matters, whether it is a watch,
 review, or possible fit, and what data is missing.
 
+The `推荐` tab is being reframed in mobile copy as `进货`: a compact Loo国
+workbench for deciding how the next contribution should enter the treasury.
+The product behavior remains rules-first:
+
+- The backend decides from exposure gaps, account/tax fit, FX friction,
+  concentration, cash/home goals, and clean security identity.
+- Watchlist entries are candidate ideas, not user commands. If a watched
+  security is overweight, identity-incomplete, poor-fit, or price-stretched, the
+  engine should explain why it was not chosen.
+- LLM, AI 大臣, external news, and Daily Briefs are evidence/explanation layers
+  only. They must not override deterministic guardrails.
+
+Accepted V3 foundation:
+
+- `Core ETF Universe`: a curated Canadian-investor core pool with
+  tax/account-routing metadata. It is the high-trust default candidate set for
+  closing allocation gaps.
+- `CandidateBrief`: an additive mobile contract for the `进货` workbench. It
+  carries compact fields for action (`lump_sum`, `dca`, `wait_pullback`,
+  `avoid`), recommended amount, target account, portfolio-impact, badges,
+  blockers, rejection reason, and future Daily Brief references.
+- `Daily Brief Worker`: planned as deterministic snapshot diffing first. It
+  compares guardrail, valuation, key-level, and market-pulse state over time.
+  GPT summaries should be optional or triggered only by material changes.
+
 ### 8. Preferences
 
 Investment preferences support:

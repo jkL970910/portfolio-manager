@@ -785,6 +785,32 @@ export interface RecommendationsData {
     securityMicCode?: string;
     securityCurrency?: "CAD" | "USD";
     securityHref?: string;
+    candidateBrief?: {
+      identity: {
+        securityId?: string | null;
+        symbol: string;
+        name: string;
+        exchange?: string | null;
+        currency?: "CAD" | "USD" | null;
+      };
+      source: "core_pool" | "watchlist" | "existing_holding" | "manual";
+      decision: {
+        action: "lump_sum" | "dca" | "wait_pullback" | "avoid";
+        matchScore: number;
+        recommendedAmountCad: number;
+        targetAccount: "TFSA" | "RRSP" | "FHSA" | "Taxable";
+      };
+      portfolioImpact: {
+        gapResolved: {
+          beforePct: number | null;
+          afterPct: number | null;
+        };
+      };
+      badges: string[];
+      primaryBlocker: string | null;
+      rejectionReason: string | null;
+      dailyBriefId: string | null;
+    };
     tickers: string;
     accountFit: string;
     scoreline: string;

@@ -262,6 +262,7 @@ class MobileRecommendationPriority {
     required this.securitySymbol,
     required this.securityExchange,
     required this.securityCurrency,
+    required this.candidateBrief,
     required this.scoreline,
     required this.gapSummary,
     required this.whyThis,
@@ -282,6 +283,7 @@ class MobileRecommendationPriority {
   final String securitySymbol;
   final String securityExchange;
   final String securityCurrency;
+  final MobileCandidateBrief? candidateBrief;
   final String scoreline;
   final String gapSummary;
   final List<String> whyThis;
@@ -303,6 +305,11 @@ class MobileRecommendationPriority {
       securitySymbol: json["securitySymbol"] as String? ?? "",
       securityExchange: json["securityExchange"] as String? ?? "",
       securityCurrency: json["securityCurrency"] as String? ?? "",
+      candidateBrief: json["candidateBrief"] is Map<String, dynamic>
+          ? MobileCandidateBrief.fromJson(
+              json["candidateBrief"] as Map<String, dynamic>,
+            )
+          : null,
       scoreline: json["scoreline"] as String? ?? "",
       gapSummary: json["gapSummary"] as String? ?? "",
       whyThis:
@@ -326,6 +333,119 @@ class MobileRecommendationPriority {
       execution: readJsonList(json, "execution")
           .map(MobileRecommendationInput.fromJson)
           .toList(),
+    );
+  }
+}
+
+class MobileCandidateBrief {
+  const MobileCandidateBrief({
+    required this.identity,
+    required this.source,
+    required this.decision,
+    required this.portfolioImpact,
+    required this.badges,
+    required this.primaryBlocker,
+    required this.rejectionReason,
+    required this.dailyBriefId,
+  });
+
+  final MobileCandidateBriefIdentity identity;
+  final String source;
+  final MobileCandidateBriefDecision decision;
+  final MobileCandidatePortfolioImpact portfolioImpact;
+  final List<String> badges;
+  final String? primaryBlocker;
+  final String? rejectionReason;
+  final String? dailyBriefId;
+
+  factory MobileCandidateBrief.fromJson(Map<String, dynamic> json) {
+    return MobileCandidateBrief(
+      identity: MobileCandidateBriefIdentity.fromJson(json["identity"]),
+      source: json["source"] as String? ?? "manual",
+      decision: MobileCandidateBriefDecision.fromJson(json["decision"]),
+      portfolioImpact:
+          MobileCandidatePortfolioImpact.fromJson(json["portfolioImpact"]),
+      badges: (json["badges"] as List?)?.whereType<String>().toList() ??
+          const [],
+      primaryBlocker: json["primaryBlocker"] as String?,
+      rejectionReason: json["rejectionReason"] as String?,
+      dailyBriefId: json["dailyBriefId"] as String?,
+    );
+  }
+}
+
+class MobileCandidateBriefIdentity {
+  const MobileCandidateBriefIdentity({
+    required this.securityId,
+    required this.symbol,
+    required this.name,
+    required this.exchange,
+    required this.currency,
+  });
+
+  final String securityId;
+  final String symbol;
+  final String name;
+  final String exchange;
+  final String currency;
+
+  factory MobileCandidateBriefIdentity.fromJson(Object? value) {
+    final json =
+        value is Map<String, dynamic> ? value : const <String, dynamic>{};
+    return MobileCandidateBriefIdentity(
+      securityId: json["securityId"] as String? ?? "",
+      symbol: json["symbol"] as String? ?? "",
+      name: json["name"] as String? ?? "",
+      exchange: json["exchange"] as String? ?? "",
+      currency: json["currency"] as String? ?? "",
+    );
+  }
+}
+
+class MobileCandidateBriefDecision {
+  const MobileCandidateBriefDecision({
+    required this.action,
+    required this.matchScore,
+    required this.recommendedAmountCad,
+    required this.targetAccount,
+  });
+
+  final String action;
+  final int matchScore;
+  final double recommendedAmountCad;
+  final String targetAccount;
+
+  factory MobileCandidateBriefDecision.fromJson(Object? value) {
+    final json =
+        value is Map<String, dynamic> ? value : const <String, dynamic>{};
+    return MobileCandidateBriefDecision(
+      action: json["action"] as String? ?? "dca",
+      matchScore: (json["matchScore"] as num?)?.round() ?? 0,
+      recommendedAmountCad:
+          (json["recommendedAmountCad"] as num?)?.toDouble() ?? 0,
+      targetAccount: json["targetAccount"] as String? ?? "",
+    );
+  }
+}
+
+class MobileCandidatePortfolioImpact {
+  const MobileCandidatePortfolioImpact({
+    required this.gapBeforePct,
+    required this.gapAfterPct,
+  });
+
+  final double? gapBeforePct;
+  final double? gapAfterPct;
+
+  factory MobileCandidatePortfolioImpact.fromJson(Object? value) {
+    final json =
+        value is Map<String, dynamic> ? value : const <String, dynamic>{};
+    final gap = json["gapResolved"];
+    final gapJson =
+        gap is Map<String, dynamic> ? gap : const <String, dynamic>{};
+    return MobileCandidatePortfolioImpact(
+      gapBeforePct: (gapJson["beforePct"] as num?)?.toDouble(),
+      gapAfterPct: (gapJson["afterPct"] as num?)?.toDouble(),
     );
   }
 }

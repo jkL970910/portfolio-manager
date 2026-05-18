@@ -15,6 +15,10 @@ import {
   inferEconomicAssetClass,
   isEconomicExposureDifferent
 } from "@/lib/backend/security-economic-exposure";
+import {
+  getCoreRecommendationUniverse,
+  type CoreRecommendationCandidate,
+} from "@/lib/backend/recommendation-v3/core-universe";
 
 const DEFAULT_TARGETS_BY_RISK = {
   Conservative: [
@@ -40,17 +44,7 @@ const DEFAULT_TARGETS_BY_RISK = {
   ]
 } as const;
 
-type SecurityCandidate = {
-  symbol: string;
-  name: string;
-  assetClass: string;
-  currency: CurrencyCode;
-  exchange?: string | null;
-  securityType?: string;
-  expenseBps: number;
-  liquidityScore: number;
-  tags: string[];
-};
+type SecurityCandidate = CoreRecommendationCandidate;
 
 type FxPolicy = {
   hasUsdFundingPath: boolean;
@@ -135,42 +129,7 @@ function isAccountEligibleForContribution(account: InvestmentAccount) {
   return account.contributionRoomCad > 0;
 }
 
-const SECURITY_UNIVERSE: Record<string, SecurityCandidate[]> = {
-  "Canadian Equity": [
-    { symbol: "VCN", name: "Vanguard FTSE Canada All Cap Index ETF", assetClass: "Canadian Equity", currency: "CAD", expenseBps: 6, liquidityScore: 94, tags: ["broad-market"] },
-    { symbol: "XIC", name: "iShares Core S&P/TSX Capped Composite ETF", assetClass: "Canadian Equity", currency: "CAD", expenseBps: 6, liquidityScore: 95, tags: ["broad-market"] },
-    { symbol: "ZCN", name: "BMO S&P/TSX Capped Composite Index ETF", assetClass: "Canadian Equity", currency: "CAD", expenseBps: 6, liquidityScore: 90, tags: ["broad-market"] },
-    { symbol: "XIT", name: "iShares S&P/TSX Capped Information Technology Index ETF", assetClass: "Canadian Equity", currency: "CAD", expenseBps: 61, liquidityScore: 72, tags: ["sector", "technology", "growth"] },
-    { symbol: "XEG", name: "iShares S&P/TSX Capped Energy Index ETF", assetClass: "Canadian Equity", currency: "CAD", expenseBps: 61, liquidityScore: 82, tags: ["sector", "energy", "cyclical"] }
-  ],
-  "US Equity": [
-    { symbol: "VFV", name: "Vanguard S&P 500 Index ETF", assetClass: "US Equity", currency: "CAD", expenseBps: 9, liquidityScore: 97, tags: ["cad-listed", "core"] },
-    { symbol: "XUU", name: "iShares Core S&P U.S. Total Market Index ETF", assetClass: "US Equity", currency: "CAD", expenseBps: 7, liquidityScore: 92, tags: ["cad-listed", "core"] },
-    { symbol: "VTI", name: "Vanguard Total Stock Market ETF", assetClass: "US Equity", currency: "USD", expenseBps: 3, liquidityScore: 99, tags: ["usd-listed", "core"] },
-    { symbol: "QQC", name: "Invesco NASDAQ 100 Index ETF", assetClass: "US Equity", currency: "CAD", expenseBps: 20, liquidityScore: 78, tags: ["cad-listed", "technology", "growth", "nasdaq-100"] },
-    { symbol: "XUS", name: "iShares Core S&P 500 Index ETF", assetClass: "US Equity", currency: "CAD", expenseBps: 10, liquidityScore: 88, tags: ["cad-listed", "core", "quality"] }
-  ],
-  "International Equity": [
-    { symbol: "XEF", name: "iShares Core MSCI EAFE IMI Index ETF", assetClass: "International Equity", currency: "CAD", expenseBps: 22, liquidityScore: 90, tags: ["developed"] },
-    { symbol: "VIU", name: "Vanguard FTSE Developed All Cap ex North America Index ETF", assetClass: "International Equity", currency: "CAD", expenseBps: 23, liquidityScore: 88, tags: ["developed"] },
-    { symbol: "XAW", name: "iShares Core MSCI All Country World ex Canada Index ETF", assetClass: "International Equity", currency: "CAD", expenseBps: 22, liquidityScore: 91, tags: ["all-world"] }
-  ],
-  "Fixed Income": [
-    { symbol: "XBB", name: "iShares Core Canadian Universe Bond Index ETF", assetClass: "Fixed Income", currency: "CAD", expenseBps: 9, liquidityScore: 95, tags: ["core-bonds"] },
-    { symbol: "ZAG", name: "BMO Aggregate Bond Index ETF", assetClass: "Fixed Income", currency: "CAD", expenseBps: 9, liquidityScore: 92, tags: ["core-bonds"] },
-    { symbol: "VAB", name: "Vanguard Canadian Aggregate Bond Index ETF", assetClass: "Fixed Income", currency: "CAD", expenseBps: 8, liquidityScore: 89, tags: ["core-bonds"] }
-  ],
-  Commodity: [
-    { symbol: "CGL.C", name: "iShares Gold Bullion ETF", assetClass: "Commodity", currency: "CAD", expenseBps: 55, liquidityScore: 78, tags: ["gold", "precious-metals", "commodity", "defensive"] },
-    { symbol: "PHYS", name: "Sprott Physical Gold Trust", assetClass: "Commodity", currency: "USD", expenseBps: 41, liquidityScore: 82, tags: ["gold", "precious-metals", "commodity"] },
-    { symbol: "GLD", name: "SPDR Gold Shares", assetClass: "Commodity", currency: "USD", expenseBps: 40, liquidityScore: 95, tags: ["gold", "precious-metals", "commodity"] }
-  ],
-  Cash: [
-    { symbol: "CASH", name: "Global X High Interest Savings ETF", assetClass: "Cash", currency: "CAD", expenseBps: 11, liquidityScore: 96, tags: ["cash-parking"] },
-    { symbol: "PSA", name: "Purpose High Interest Savings ETF", assetClass: "Cash", currency: "CAD", expenseBps: 15, liquidityScore: 92, tags: ["cash-parking"] },
-    { symbol: "HSAV", name: "Horizons Cash Maximizer ETF", assetClass: "Cash", currency: "CAD", expenseBps: 18, liquidityScore: 88, tags: ["cash-parking"] }
-  ]
-};
+const SECURITY_UNIVERSE = getCoreRecommendationUniverse();
 
 const ACCOUNT_FIT_MATRIX: Record<string, Record<AccountType, number>> = {
   "Canadian Equity": { TFSA: 0.9, RRSP: 0.82, FHSA: 0.9, Taxable: 0.78 },
@@ -418,7 +377,19 @@ function scoreSecurityCandidate(
 
 function buildSecurityUniverse(assetClass: string) {
   return SECURITY_UNIVERSE[assetClass] ?? [
-    { symbol: "VCN", name: "Fallback Core ETF", assetClass, currency: "CAD", expenseBps: 12, liquidityScore: 75, tags: ["fallback"] }
+    {
+      symbol: "VCN",
+      name: "Fallback Core ETF",
+      assetClass,
+      currency: "CAD",
+      exchange: "TSX",
+      securityType: "ETF",
+      expenseBps: 12,
+      liquidityScore: 75,
+      tags: ["fallback"],
+      source: "core_pool",
+      role: "core",
+    }
   ];
 }
 
@@ -610,6 +581,7 @@ export function buildRecommendationV2(args: {
       ),
       securitySymbol: best.security.candidate.symbol,
       securityName: best.security.candidate.name,
+      securityExchange: best.security.candidate.exchange ?? null,
       securityCurrency: best.security.candidate.currency,
       securityScore: best.security.score,
       preferenceFitScore: best.security.preferenceFitScore,
@@ -741,7 +713,9 @@ export function scoreCandidateSecurity(args: {
     securityType: candidate.securityType ?? knownCandidate?.securityType ?? existingHolding?.securityTypeOverride ?? "ETF",
     expenseBps: knownCandidate?.expenseBps ?? 18,
     liquidityScore: knownCandidate?.liquidityScore ?? 72,
-    tags: knownCandidate?.tags ?? ["manual-candidate"]
+    tags: knownCandidate?.tags ?? ["manual-candidate"],
+    source: knownCandidate?.source ?? "core_pool",
+    role: knownCandidate?.role ?? "satellite",
   };
   const fxPolicy = inferFxPolicy(accounts, holdings);
   const placement = scoreAccountPlacement(accounts, profile, assetClass, securityCandidate.currency, fxPolicy);

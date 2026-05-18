@@ -4,6 +4,7 @@ import type { InvestmentAccount, PreferenceProfile } from "@/lib/backend/models"
 import { DEFAULT_PREFERENCE_FACTORS } from "@/lib/backend/preference-factors";
 import { DEFAULT_RECOMMENDATION_CONSTRAINTS } from "@/lib/backend/recommendation-constraints";
 import { buildRecommendationV2, scoreCandidateSecurity } from "@/lib/backend/recommendation-v2";
+import { buildCandidateBrief } from "@/lib/backend/recommendation-v3/candidate-brief";
 
 const accounts: InvestmentAccount[] = [
   {
@@ -71,6 +72,26 @@ test("excluded symbols are removed from lead ticker options when alternatives ex
   const usEquityItem = run.items.find((item) => item.assetClass === "US Equity");
   assert.ok(usEquityItem);
   assert.ok(!usEquityItem.tickerOptions.includes("VTI"));
+});
+
+test("recommendation run exposes candidate brief for the purchase workbench", () => {
+  const run = buildRecommendationV2({
+    accounts,
+    holdings: [],
+    profile: makeProfile(),
+    contributionAmountCad: 2500,
+    language: "zh"
+  });
+  const firstItem = run.items[0];
+  assert.ok(firstItem);
+
+  const brief = buildCandidateBrief(firstItem);
+
+  assert.ok(brief.identity.symbol);
+  assert.ok(brief.decision.recommendedAmountCad > 0);
+  assert.ok(["lump_sum", "dca", "wait_pullback", "avoid"].includes(brief.decision.action));
+  assert.ok(brief.badges.length > 0);
+  assert.equal(brief.dailyBriefId, null);
 });
 
 test("preferred symbols improve candidate scoring without pinning absolute score", () => {

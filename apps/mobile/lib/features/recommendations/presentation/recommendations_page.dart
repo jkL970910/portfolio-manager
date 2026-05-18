@@ -66,7 +66,7 @@ class _RecommendationsPageState extends State<RecommendationsPage> {
     });
   }
 
-  Future<void> _createRun() async {
+  Future<void> _createCustomRun() async {
     final amountController = TextEditingController(text: "2500");
     final amount = await showDialog<double>(
       context: context,
@@ -94,6 +94,14 @@ class _RecommendationsPageState extends State<RecommendationsPage> {
     );
     amountController.dispose();
     if (amount == null || amount <= 0 || _working) {
+      return;
+    }
+
+    await _createRun(amount);
+  }
+
+  Future<void> _createRun(double amount) async {
+    if (amount <= 0 || _working) {
       return;
     }
 
@@ -181,7 +189,8 @@ class _RecommendationsPageState extends State<RecommendationsPage> {
                         _SummaryCard(
                           snapshot.data!,
                           working: _working,
-                          onChangeAmount: _createRun,
+                          onCustomAmount: _createCustomRun,
+                          onRunAmount: _createRun,
                           onOpenPriorities: () =>
                               _scrollToSection(_priorityKey),
                           onOpenWatchlist: () =>
@@ -320,14 +329,16 @@ class _SummaryCard extends StatelessWidget {
   const _SummaryCard(
     this.data, {
     required this.working,
-    required this.onChangeAmount,
+    required this.onCustomAmount,
+    required this.onRunAmount,
     required this.onOpenPriorities,
     required this.onOpenWatchlist,
   });
 
   final MobileRecommendationsSnapshot data;
   final bool working;
-  final VoidCallback onChangeAmount;
+  final VoidCallback onCustomAmount;
+  final ValueChanged<double> onRunAmount;
   final VoidCallback onOpenPriorities;
   final VoidCallback onOpenWatchlist;
 
@@ -363,7 +374,7 @@ class _SummaryCard extends StatelessWidget {
               ),
               const SizedBox(width: 12),
               FilledButton.tonalIcon(
-                onPressed: working ? null : onChangeAmount,
+                onPressed: working ? null : onCustomAmount,
                 icon: working
                     ? const SizedBox(
                         height: 16,
@@ -374,6 +385,12 @@ class _SummaryCard extends StatelessWidget {
                 label: const Text("改金额"),
               ),
             ],
+          ),
+          const SizedBox(height: 12),
+          _BudgetChips(
+            working: working,
+            onRunAmount: onRunAmount,
+            onCustomAmount: onCustomAmount,
           ),
           const SizedBox(height: 12),
           Row(
@@ -405,10 +422,10 @@ class _SummaryCard extends StatelessWidget {
               Expanded(
                 child: _HeroMiniStat(
                   icon: Icons.savings_outlined,
-                  label: "现金缺口",
+                  label: "本轮银两",
                   value: _engineInputValue(data.engineSummary, "本轮银两"),
                   detail: "本次投入",
-                  onTap: working ? () {} : onChangeAmount,
+                  onTap: working ? () {} : onCustomAmount,
                 ),
               ),
               const SizedBox(width: 10),
@@ -450,6 +467,98 @@ String _engineInputValue(
     }
   }
   return "--";
+}
+
+class _BudgetChips extends StatelessWidget {
+  const _BudgetChips({
+    required this.working,
+    required this.onRunAmount,
+    required this.onCustomAmount,
+  });
+
+  final bool working;
+  final ValueChanged<double> onRunAmount;
+  final VoidCallback onCustomAmount;
+
+  @override
+  Widget build(BuildContext context) {
+    final chips = [500.0, 1000.0, 2500.0, 5000.0];
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      physics: const BouncingScrollPhysics(),
+      child: Row(
+        children: [
+          for (final amount in chips) ...[
+            _BudgetChip(
+              label: _formatCadChip(amount),
+              enabled: !working,
+              onTap: () => onRunAmount(amount),
+            ),
+            const SizedBox(width: 8),
+          ],
+          _BudgetChip(
+            label: "自定义",
+            enabled: !working,
+            icon: Icons.edit_rounded,
+            onTap: onCustomAmount,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _BudgetChip extends StatelessWidget {
+  const _BudgetChip({
+    required this.label,
+    required this.enabled,
+    required this.onTap,
+    this.icon,
+  });
+
+  final String label;
+  final bool enabled;
+  final VoidCallback onTap;
+  final IconData? icon;
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = context.looTokens;
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(999),
+        onTap: enabled ? onTap : null,
+        child: Ink(
+          decoration: BoxDecoration(
+            color: tokens.accentSoft.withValues(alpha: enabled ? 0.72 : 0.28),
+            borderRadius: BorderRadius.circular(999),
+            border: Border.all(color: tokens.cardBorder),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (icon != null) ...[
+                  Icon(icon, size: 15, color: tokens.accent),
+                  const SizedBox(width: 5),
+                ],
+                Text(label, style: Theme.of(context).textTheme.labelLarge),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+String _formatCadChip(double amount) {
+  if (amount >= 1000 && amount % 1000 == 0) {
+    return "${(amount / 1000).toStringAsFixed(0)}k";
+  }
+  return amount.toStringAsFixed(0);
 }
 
 class _HeroMiniStat extends StatelessWidget {
@@ -633,7 +742,7 @@ class _EngineSummaryCardState extends State<_EngineSummaryCard> {
     final tokens = context.looTokens;
     final theme = Theme.of(context);
     return LooGlassCard(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 14),
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -648,19 +757,16 @@ class _EngineSummaryCardState extends State<_EngineSummaryCard> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      Text("囤货规矩", style: theme.textTheme.titleMedium),
+                      const SizedBox(height: 2),
                       Text(
-                        widget.summary.title,
-                        style: theme.textTheme.titleLarge,
-                      ),
-                      if (widget.summary.summary.isNotEmpty)
-                        Text(
-                          widget.summary.summary,
-                          maxLines: _expanded ? null : 1,
-                          overflow: _expanded ? null : TextOverflow.ellipsis,
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: tokens.mutedText,
-                          ),
+                        _engineRuleSummary(widget.summary),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: tokens.mutedText,
                         ),
+                      ),
                     ],
                   ),
                 ),
@@ -678,7 +784,7 @@ class _EngineSummaryCardState extends State<_EngineSummaryCard> {
               spacing: 8,
               runSpacing: 8,
               children:
-                  widget.summary.chips.take(5).map(_InfoPill.new).toList(),
+                  widget.summary.chips.take(4).map(_InfoPill.new).toList(),
             ),
           ],
           if (_expanded) ...[
@@ -708,6 +814,30 @@ class _EngineSummaryCardState extends State<_EngineSummaryCard> {
       ),
     );
   }
+}
+
+String _engineRuleSummary(MobileRecommendationEngineSummary summary) {
+  final parts = <String>[];
+  final strategy = _firstInputValueContaining(summary.rankingInputs, "策略");
+  final account = _firstInputValueContaining(summary.rankingInputs, "账户");
+  if (strategy != null) parts.add(strategy);
+  if (account != null) parts.add(account);
+  if (parts.isEmpty && summary.summary.isNotEmpty) {
+    return summary.summary;
+  }
+  return parts.isEmpty ? "按配置缺口、账户、税务和护栏排序" : parts.join(" · ");
+}
+
+String? _firstInputValueContaining(
+  List<MobileRecommendationInput> inputs,
+  String token,
+) {
+  for (final input in inputs) {
+    if (input.label.contains(token) && input.value.isNotEmpty) {
+      return input.value;
+    }
+  }
+  return null;
 }
 
 class _EngineInputGrid extends StatelessWidget {
@@ -847,6 +977,8 @@ class _WatchlistCard extends StatefulWidget {
 class _WatchlistCardState extends State<_WatchlistCard> {
   @override
   Widget build(BuildContext context) {
+    final resolved = widget.items.where(_isResolvedMarketItem).toList();
+    final unresolved = widget.items.where((item) => !_isResolvedMarketItem(item)).toList();
     return LooGlassCard(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 14),
       child: Column(
@@ -860,7 +992,7 @@ class _WatchlistCardState extends State<_WatchlistCard> {
                   style: Theme.of(context).textTheme.titleLarge,
                 ),
               ),
-              _InfoPill("${widget.items.length} 个"),
+              _InfoPill("${resolved.length} 已确认"),
             ],
           ),
           const SizedBox(height: 6),
@@ -873,9 +1005,9 @@ class _WatchlistCardState extends State<_WatchlistCard> {
           const SizedBox(height: 12),
           if (widget.items.isEmpty)
             const Text("暂时没有囤货标的。点上方“搜货”进入研究台后加入。")
-          else
+          else if (resolved.isNotEmpty)
             _MarketItemRail(
-              items: widget.items,
+              items: resolved,
               onOpen: widget.onOpen,
               trailingBuilder: (item) => IconButton(
                 tooltip: "移出囤货",
@@ -885,7 +1017,87 @@ class _WatchlistCardState extends State<_WatchlistCard> {
                 visualDensity: VisualDensity.compact,
               ),
             ),
+          if (unresolved.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            _UnresolvedWatchlistPanel(
+              items: unresolved,
+              working: widget.working,
+              onRemove: widget.onRemove,
+            ),
+          ],
         ],
+      ),
+    );
+  }
+}
+
+bool _isResolvedMarketItem(MobileRecommendationMarketItem item) {
+  return item.symbol.isNotEmpty &&
+      item.exchange.isNotEmpty &&
+      item.currency.isNotEmpty;
+}
+
+class _UnresolvedWatchlistPanel extends StatelessWidget {
+  const _UnresolvedWatchlistPanel({
+    required this.items,
+    required this.working,
+    required this.onRemove,
+  });
+
+  final List<MobileRecommendationMarketItem> items;
+  final bool working;
+  final ValueChanged<String> onRemove;
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = context.looTokens;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: Colors.orange.withValues(alpha: 0.10),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: Colors.orange.withValues(alpha: 0.28)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.warning_amber_rounded,
+                    color: Colors.orange.shade300, size: 18),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    "待鉴定包裹",
+                    style: Theme.of(context).textTheme.titleSmall,
+                  ),
+                ),
+                _InfoPill("${items.length} 个"),
+              ],
+            ),
+            const SizedBox(height: 6),
+            Text(
+              "这些旧囤货缺少交易所或币种，不会进入进货推荐。建议重新搜货后从研究台加入。",
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: tokens.mutedText,
+                  ),
+            ),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                for (final item in items.take(8))
+                  InputChip(
+                    label: Text(item.symbol.isEmpty ? item.key : item.symbol),
+                    onDeleted:
+                        working ? null : () => onRemove(item.key),
+                  ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -1125,6 +1337,7 @@ class _PriorityCardState extends State<_PriorityCard> {
   Widget build(BuildContext context) {
     final priority = widget.priority;
     final tokens = context.looTokens;
+    final brief = priority.candidateBrief;
     final hiddenSections = [
       priority.scoreline,
       priority.gapSummary,
@@ -1144,41 +1357,44 @@ class _PriorityCardState extends State<_PriorityCard> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Expanded(
-                child: Text(
-                  priority.security.isNotEmpty
-                      ? priority.security
-                      : priority.assetClass,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.titleLarge,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      _priorityTitle(priority),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.titleLarge,
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      _prioritySubtitle(priority),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: tokens.mutedText,
+                          ),
+                    ),
+                  ],
                 ),
               ),
-              if (priority.amount.isNotEmpty) _InfoPill(priority.amount),
+              const SizedBox(width: 10),
+              _DecisionBadge(brief: brief, fallbackAmount: priority.amount),
             ],
           ),
-          const SizedBox(height: 6),
-          Text(
-            priority.description.isNotEmpty
-                ? priority.description
-                : priority.assetClass,
-            maxLines: _expanded ? null : 2,
-            overflow: _expanded ? null : TextOverflow.ellipsis,
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: context.looTokens.mutedText,
-                ),
-          ),
+          const SizedBox(height: 10),
+          _PriorityImpactRow(priority: priority),
           const SizedBox(height: 10),
           Wrap(
             spacing: 8,
             runSpacing: 8,
-            children: [
-              _InfoPill(priority.assetClass),
-              if (priority.account.isNotEmpty) _InfoPill(priority.account),
-              if (priority.gapSummary.isNotEmpty && !_expanded)
-                _InfoPill(_compactGapLabel(priority.gapSummary)),
-            ],
+            children: _priorityBadges(priority)
+                .take(5)
+                .map(_InfoPill.new)
+                .toList(),
           ),
           if (priority.securitySymbol.isNotEmpty) ...[
             const SizedBox(height: 12),
@@ -1271,6 +1487,202 @@ class _PriorityCardState extends State<_PriorityCard> {
       ),
     );
   }
+}
+
+class _DecisionBadge extends StatelessWidget {
+  const _DecisionBadge({
+    required this.brief,
+    required this.fallbackAmount,
+  });
+
+  final MobileCandidateBrief? brief;
+  final String fallbackAmount;
+
+  @override
+  Widget build(BuildContext context) {
+    final action = brief?.decision.action ?? "dca";
+    final color = _actionColor(context, action);
+    final label = _actionLabel(action);
+    final amount = brief == null
+        ? fallbackAmount
+        : "CAD ${brief!.decision.recommendedAmountCad.toStringAsFixed(0)}";
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.16),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: color.withValues(alpha: 0.34)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            Text(
+              label,
+              style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                    color: color,
+                    fontWeight: FontWeight.w800,
+                  ),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              amount,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                    color: context.looTokens.mutedText,
+                  ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _PriorityImpactRow extends StatelessWidget {
+  const _PriorityImpactRow({required this.priority});
+
+  final MobileRecommendationPriority priority;
+
+  @override
+  Widget build(BuildContext context) {
+    final brief = priority.candidateBrief;
+    final targetAccount = brief?.decision.targetAccount ?? priority.account;
+    final score = brief?.decision.matchScore;
+    final before = brief?.portfolioImpact.gapBeforePct;
+    final after = brief?.portfolioImpact.gapAfterPct;
+
+    return Row(
+      children: [
+        Expanded(
+          child: _MiniEvidenceTile(
+            label: "目标账户",
+            value: targetAccount.isEmpty ? "--" : targetAccount,
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: _MiniEvidenceTile(
+            label: "匹配度",
+            value: score == null ? "--" : "$score",
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: _MiniEvidenceTile(
+            label: "缺口",
+            value: before == null || after == null
+                ? "--"
+                : "${before.toStringAsFixed(1)}→${after.toStringAsFixed(1)}%",
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _MiniEvidenceTile extends StatelessWidget {
+  const _MiniEvidenceTile({required this.label, required this.value});
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.16),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: context.looTokens.cardBorder),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                    color: context.looTokens.mutedText,
+                  ),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              value,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context).textTheme.titleSmall,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+String _priorityTitle(MobileRecommendationPriority priority) {
+  final brief = priority.candidateBrief;
+  if (brief != null && brief.identity.symbol.isNotEmpty) {
+    return "${brief.identity.symbol} · ${brief.identity.name}";
+  }
+  return priority.security.isNotEmpty ? priority.security : priority.assetClass;
+}
+
+String _prioritySubtitle(MobileRecommendationPriority priority) {
+  final brief = priority.candidateBrief;
+  if (brief == null) {
+    return priority.description.isNotEmpty
+        ? priority.description
+        : priority.assetClass;
+  }
+  return [
+    if (brief.identity.exchange.isNotEmpty) brief.identity.exchange,
+    if (brief.identity.currency.isNotEmpty) brief.identity.currency,
+    _sourceLabel(brief.source),
+  ].join(" · ");
+}
+
+List<String> _priorityBadges(MobileRecommendationPriority priority) {
+  final brief = priority.candidateBrief;
+  final badges = <String>[
+    if (brief != null) ...brief.badges,
+    if (brief?.primaryBlocker != null) "注意：${brief!.primaryBlocker}",
+    if (brief == null) priority.assetClass,
+    if (brief == null && priority.account.isNotEmpty) priority.account,
+    if (brief == null && priority.gapSummary.isNotEmpty)
+      _compactGapLabel(priority.gapSummary),
+  ];
+  return badges.where((badge) => badge.trim().isNotEmpty).toList();
+}
+
+String _sourceLabel(String source) {
+  return switch (source) {
+    "watchlist" => "囤货清单",
+    "existing_holding" => "已有仓位",
+    "core_pool" => "核心池",
+    _ => "手动候选",
+  };
+}
+
+String _actionLabel(String action) {
+  return switch (action) {
+    "lump_sum" => "一次进货",
+    "wait_pullback" => "等回撤",
+    "avoid" => "暂缓",
+    _ => "分批进货",
+  };
+}
+
+Color _actionColor(BuildContext context, String action) {
+  return switch (action) {
+    "lump_sum" => Colors.green.shade300,
+    "wait_pullback" => Colors.orange.shade300,
+    "avoid" => Theme.of(context).colorScheme.error,
+    _ => context.looTokens.accent,
+  };
 }
 
 String _compactGapLabel(String value) {

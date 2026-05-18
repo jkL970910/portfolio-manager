@@ -46,6 +46,7 @@ import {
   getHoldingEconomicAssetClass,
   getHoldingExposureProfile,
 } from "@/lib/backend/security-economic-exposure";
+import { buildCandidateBrief } from "@/lib/backend/recommendation-v3/candidate-brief";
 
 const MONTH_LABELS_EN = ["Oct", "Nov", "Dec", "Jan", "Feb", "Mar"];
 const MONTH_LABELS_ZH = ["10月", "11月", "12月", "1月", "2月", "3月"];
@@ -4711,6 +4712,7 @@ export function buildRecommendationsData(args: {
         securityHref: item.securitySymbol
           ? `/portfolio/security/${encodeURIComponent(item.securitySymbol)}`
           : undefined,
+        candidateBrief: buildCandidateBrief(item),
         tickers: item.tickerOptions.join(", "),
         accountFit:
           item.accountFitScore != null

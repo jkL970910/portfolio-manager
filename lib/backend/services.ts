@@ -3743,6 +3743,22 @@ function normalizeWatchlistSymbol(value: string) {
     .join(":");
 }
 
+function parseWatchlistIdentity(value: string) {
+  const [symbol, exchange, currency] = value
+    .split(":")
+    .map((part) => part.trim().toUpperCase());
+  return { symbol, exchange, currency };
+}
+
+function isCompleteWatchlistIdentity(value: string) {
+  const identity = parseWatchlistIdentity(value);
+  return Boolean(
+    identity.symbol &&
+      identity.exchange &&
+      (identity.currency === "CAD" || identity.currency === "USD"),
+  );
+}
+
 export async function addWatchlistSymbol(
   userId: string,
   symbol: string,
@@ -3750,6 +3766,9 @@ export async function addWatchlistSymbol(
   const normalizedSymbol = normalizeWatchlistSymbol(symbol);
   if (!normalizedSymbol) {
     throw new Error("Watchlist symbol is required.");
+  }
+  if (!isCompleteWatchlistIdentity(normalizedSymbol)) {
+    throw new Error("请先打开标的详情并确认交易所/币种后再加入囤货清单。");
   }
 
   const repositories = getRepositories();
