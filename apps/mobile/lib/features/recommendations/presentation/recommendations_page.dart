@@ -1168,27 +1168,6 @@ class _MarketItemCard extends StatelessWidget {
                                   ),
                         ),
                       ),
-                      if (trailing != null)
-                        SizedBox(width: 24, height: 24, child: trailing!),
-                    ],
-                  ),
-                  const Spacer(),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          item.hasMarketMove
-                              ? "${item.dayChangeLabel} ${item.dayChangePctLabel}"
-                              : item.dayChangeLabel,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style:
-                              Theme.of(context).textTheme.labelSmall?.copyWith(
-                                    color: moveColor,
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                        ),
-                      ),
                       const SizedBox(width: 6),
                       Flexible(
                         child: Text(
@@ -1202,7 +1181,21 @@ class _MarketItemCard extends StatelessWidget {
                                   ),
                         ),
                       ),
+                      if (trailing != null)
+                        SizedBox(width: 24, height: 24, child: trailing!),
                     ],
+                  ),
+                  const Spacer(),
+                  Text(
+                    item.hasMarketMove
+                        ? "${item.dayChangeLabel} ${item.dayChangePctLabel}"
+                        : item.dayChangeLabel,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                          color: moveColor,
+                          fontWeight: FontWeight.w700,
+                        ),
                   ),
                 ],
               ),
