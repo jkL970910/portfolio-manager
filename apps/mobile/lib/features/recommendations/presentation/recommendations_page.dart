@@ -192,16 +192,12 @@ class _RecommendationsPageState extends State<RecommendationsPage> {
                           onCustomAmount: _createCustomRun,
                           onRunAmount: _createRun,
                           onDiscover: _openDiscover,
+                          onOpenSettings: () =>
+                              context.push(MobileRoutes.settings),
                           onOpenPriorities: () =>
                               _scrollToSection(_priorityKey),
                           onOpenWatchlist: () =>
                               _scrollToSection(_watchlistKey),
-                        ),
-                        const SizedBox(height: 16),
-                        _EngineSummaryCard(
-                          summary: snapshot.data!.engineSummary,
-                          onOpenSettings: () =>
-                              context.push(MobileRoutes.settings),
                         ),
                         const SizedBox(height: 16),
                         if (snapshot
@@ -313,13 +309,14 @@ class _PageHeader extends StatelessWidget {
   }
 }
 
-class _SummaryCard extends StatelessWidget {
+class _SummaryCard extends StatefulWidget {
   const _SummaryCard(
     this.data, {
     required this.working,
     required this.onCustomAmount,
     required this.onRunAmount,
     required this.onDiscover,
+    required this.onOpenSettings,
     required this.onOpenPriorities,
     required this.onOpenWatchlist,
   });
@@ -329,17 +326,23 @@ class _SummaryCard extends StatelessWidget {
   final VoidCallback onCustomAmount;
   final ValueChanged<double> onRunAmount;
   final VoidCallback onDiscover;
+  final VoidCallback onOpenSettings;
   final VoidCallback onOpenPriorities;
   final VoidCallback onOpenWatchlist;
 
   @override
+  State<_SummaryCard> createState() => _SummaryCardState();
+}
+
+class _SummaryCardState extends State<_SummaryCard> {
+  var _rulesExpanded = false;
+
+  @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final tokens = context.looTokens;
+    final data = widget.data;
     final watchCount = data.preferenceContext.watchlistSymbols.length;
     final priorityCount = data.priorities.length;
-    final topAsset =
-        data.priorities.isEmpty ? "暂无" : data.priorities.first.assetClass;
     return LooGlassCard(
       isHero: true,
       padding: const EdgeInsets.fromLTRB(18, 18, 18, 16),
@@ -364,7 +367,7 @@ class _SummaryCard extends StatelessWidget {
               ),
               const SizedBox(width: 12),
               FilledButton.tonalIcon(
-                onPressed: onDiscover,
+                onPressed: widget.onDiscover,
                 icon: const Icon(Icons.travel_explore_outlined, size: 18),
                 label: const Text("搜货"),
               ),
@@ -372,9 +375,9 @@ class _SummaryCard extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           _BudgetChips(
-            working: working,
-            onRunAmount: onRunAmount,
-            onCustomAmount: onCustomAmount,
+            working: widget.working,
+            onRunAmount: widget.onRunAmount,
+            onCustomAmount: widget.onCustomAmount,
           ),
           const SizedBox(height: 12),
           Row(
@@ -385,7 +388,7 @@ class _SummaryCard extends StatelessWidget {
                   label: "推荐",
                   value: "$priorityCount",
                   detail: "Loo皇推荐",
-                  onTap: onOpenPriorities,
+                  onTap: widget.onOpenPriorities,
                 ),
               ),
               const SizedBox(width: 10),
@@ -395,62 +398,22 @@ class _SummaryCard extends StatelessWidget {
                   label: "囤货",
                   value: "$watchCount",
                   detail: "已确认身份",
-                  onTap: onOpenWatchlist,
+                  onTap: widget.onOpenWatchlist,
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 10),
-          Row(
-            children: [
-              Expanded(
-                child: _HeroMiniStat(
-                  icon: Icons.savings_outlined,
-                  label: "重算",
-                  value: _engineInputValue(data.engineSummary, "本轮银两"),
-                  detail: "自定义银两",
-                  onTap: working ? () {} : onCustomAmount,
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: _HeroMiniStat(
-                  icon: Icons.category_outlined,
-                  label: "优先资产",
-                  value: topAsset,
-                  detail: "本轮第一候选",
-                  onTap: onOpenPriorities,
-                ),
-              ),
-            ],
+          const SizedBox(height: 12),
+          _HeroRulesDisclosure(
+            summary: data.engineSummary,
+            expanded: _rulesExpanded,
+            onToggle: () => setState(() => _rulesExpanded = !_rulesExpanded),
+            onOpenSettings: widget.onOpenSettings,
           ),
-          if (data.engineLine.isNotEmpty) ...[
-            const SizedBox(height: 12),
-            Text(
-              data.engineLine,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: tokens.mutedText,
-              ),
-            ),
-          ],
         ],
       ),
     );
   }
-}
-
-String _engineInputValue(
-  MobileRecommendationEngineSummary summary,
-  String label,
-) {
-  for (final input in summary.rankingInputs) {
-    if (input.label == label && input.value.isNotEmpty) {
-      return input.value;
-    }
-  }
-  return "--";
 }
 
 class _BudgetChips extends StatelessWidget {
@@ -486,6 +449,94 @@ class _BudgetChips extends StatelessWidget {
             icon: Icons.edit_rounded,
             onTap: onCustomAmount,
           ),
+        ],
+      ),
+    );
+  }
+}
+
+class _HeroRulesDisclosure extends StatelessWidget {
+  const _HeroRulesDisclosure({
+    required this.summary,
+    required this.expanded,
+    required this.onToggle,
+    required this.onOpenSettings,
+  });
+
+  final MobileRecommendationEngineSummary summary;
+  final bool expanded;
+  final VoidCallback onToggle;
+  final VoidCallback onOpenSettings;
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = context.looTokens;
+    final theme = Theme.of(context);
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.14),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: tokens.cardBorder),
+      ),
+      child: Column(
+        children: [
+          InkWell(
+            borderRadius: BorderRadius.circular(18),
+            onTap: onToggle,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              child: Row(
+                children: [
+                  Icon(Icons.tune_rounded, color: tokens.accent, size: 18),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      "囤货规矩 · ${_engineRuleSummary(summary)}",
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.labelLarge,
+                    ),
+                  ),
+                  AnimatedRotation(
+                    turns: expanded ? 0.5 : 0,
+                    duration: const Duration(milliseconds: 180),
+                    child: const Icon(Icons.keyboard_arrow_down_rounded),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          if (expanded) ...[
+            Divider(height: 1, color: tokens.cardBorder),
+            Padding(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (summary.chips.isNotEmpty)
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children:
+                          summary.chips.take(4).map(_InfoPill.new).toList(),
+                    ),
+                  if (summary.rankingInputs.isNotEmpty) ...[
+                    const SizedBox(height: 10),
+                    _EngineInputGrid(summary.rankingInputs),
+                  ],
+                  const SizedBox(height: 10),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: TextButton.icon(
+                      onPressed: onOpenSettings,
+                      icon: const Icon(Icons.settings_outlined, size: 18),
+                      label: const Text("调整偏好因子"),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ],
       ),
     );
@@ -1079,8 +1130,8 @@ class _MarketItemCard extends StatelessWidget {
     final tokens = context.looTokens;
     final moveColor = _marketMoveColor(context, item.dayChangeVariant);
     return SizedBox(
-      width: 142,
-      height: 118,
+      width: 126,
+      height: 86,
       child: Material(
         color: Colors.transparent,
         child: InkWell(
@@ -1099,7 +1150,7 @@ class _MarketItemCard extends StatelessWidget {
               ),
             ),
             child: Padding(
-              padding: const EdgeInsets.all(12),
+              padding: const EdgeInsets.all(10),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -1117,47 +1168,41 @@ class _MarketItemCard extends StatelessWidget {
                                   ),
                         ),
                       ),
-                      if (trailing != null) trailing!,
+                      if (trailing != null)
+                        SizedBox(width: 24, height: 24, child: trailing!),
                     ],
                   ),
-                  Text(
-                    item.identityLine.isEmpty ? "待识别" : item.identityLine,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                          color: tokens.mutedText,
-                        ),
-                  ),
                   const Spacer(),
-                  Text(
-                    item.lastPriceLabel,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
-                  const SizedBox(height: 6),
-                  DecoratedBox(
-                    decoration: BoxDecoration(
-                      color: moveColor.withValues(alpha: 0.18),
-                      borderRadius: BorderRadius.circular(999),
-                    ),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 4,
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          item.hasMarketMove
+                              ? "${item.dayChangeLabel} ${item.dayChangePctLabel}"
+                              : item.dayChangeLabel,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style:
+                              Theme.of(context).textTheme.labelSmall?.copyWith(
+                                    color: moveColor,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                        ),
                       ),
-                      child: Text(
-                        item.hasMarketMove
-                            ? "${item.dayChangeLabel}  ${item.dayChangePctLabel}"
-                            : item.dayChangeLabel,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                              color: moveColor,
-                              fontWeight: FontWeight.w700,
-                            ),
+                      const SizedBox(width: 6),
+                      Flexible(
+                        child: Text(
+                          item.lastPriceLabel,
+                          textAlign: TextAlign.right,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style:
+                              Theme.of(context).textTheme.labelLarge?.copyWith(
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                        ),
                       ),
-                    ),
+                    ],
                   ),
                 ],
               ),
