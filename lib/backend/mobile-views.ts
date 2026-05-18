@@ -39,6 +39,8 @@ import type { Viewer } from "@/lib/auth/session";
 import type {
   CitizenProfile,
   ExternalResearchDocumentRecord,
+  HoldingPosition,
+  SecurityPriceHistoryPoint,
 } from "@/lib/backend/models";
 
 type MobileHomeData = {
@@ -485,10 +487,10 @@ export function buildMobileResearchRefreshActions(input: {
     }
 
     const matchingJobs = jobs.filter((job) => {
-        if (!job.sourceIds.includes(sourceId)) {
-          return false;
-        }
-        return matchesSecurityIdentity(job);
+      if (!job.sourceIds.includes(sourceId)) {
+        return false;
+      }
+      return matchesSecurityIdentity(job);
     });
     return (
       matchingJobs.find((job) => isFreshSucceededJob(job)) ??
@@ -616,6 +618,9 @@ type MobileRecommendationPriority = Omit<
 
 type MobileRecommendationsData = Omit<RecommendationsData, "priorities"> & {
   priorities: MobileRecommendationPriority[];
+  watchlistMarketItems: MobileRecommendationMarketItem[];
+  recentObservationItems: MobileRecommendationMarketItem[];
+  engineSummary: MobileRecommendationEngineSummary;
   preferenceContext: {
     riskProfile: string;
     targetAllocation: { assetClass: string; targetPct: number }[];
@@ -627,6 +632,37 @@ type MobileRecommendationsData = Omit<RecommendationsData, "priorities"> & {
     recommendationConstraints: unknown;
     preferenceFactors: unknown;
   };
+};
+
+type MobileRecommendationEngineSummary = {
+  title: string;
+  summary: string;
+  chips: string[];
+  rankingInputs: { label: string; value: string }[];
+  preferenceFactors: {
+    label: string;
+    value: string;
+    tone?: "neutral" | "warning" | "success";
+  }[];
+  guardrails: {
+    label: string;
+    value: string;
+    tone?: "neutral" | "warning" | "success";
+  }[];
+};
+
+type MobileRecommendationMarketItem = {
+  key: string;
+  symbol: string;
+  name: string;
+  exchange: string | null;
+  currency: "CAD" | "USD" | null;
+  securityId?: string | null;
+  lastPriceLabel: string;
+  dayChangeLabel: string;
+  dayChangePctLabel: string;
+  dayChangeVariant: "positive" | "negative" | "neutral" | "unavailable";
+  freshnessLabel: string;
 };
 
 type MobileImportData = {
@@ -910,14 +946,20 @@ function mapMobileSecurityDetailData(
   };
 }
 
-function mapMobileRecommendationsData(
+async function mapMobileRecommendationsData(
   data: RecommendationsData,
   preferenceContext: MobileRecommendationsData["preferenceContext"],
   intelligenceBriefs: RecommendationsData["intelligenceBriefs"] = [],
-): MobileRecommendationsData {
+  userId: string,
+): Promise<MobileRecommendationsData> {
   const externalBriefCount = intelligenceBriefs.filter(
     (brief) => brief.sourceMode !== "local",
   ).length;
+  const marketItems = await buildMobileRecommendationMarketItems({
+    userId,
+    watchlistSymbols: preferenceContext.watchlistSymbols,
+    priorities: data.priorities,
+  });
   return {
     ...data,
     engine: {
@@ -930,6 +972,13 @@ function mapMobileRecommendationsData(
           : data.engine.objective,
     },
     intelligenceBriefs,
+    watchlistMarketItems: marketItems.watchlistMarketItems,
+    recentObservationItems: marketItems.recentObservationItems,
+    engineSummary: buildMobileRecommendationEngineSummary({
+      data,
+      preferenceContext,
+      externalBriefCount,
+    }),
     preferenceContext,
     priorities: data.priorities.map((priority) => {
       const {
@@ -973,6 +1022,522 @@ function mapMobileRecommendationsData(
       };
     }),
   };
+}
+
+async function buildMobileRecommendationMarketItems(input: {
+  userId: string;
+  watchlistSymbols: string[];
+  priorities: RecommendationsData["priorities"];
+}): Promise<{
+  watchlistMarketItems: MobileRecommendationMarketItem[];
+  recentObservationItems: MobileRecommendationMarketItem[];
+}> {
+  const repositories = getRepositories();
+  const holdings = await repositories.holdings.listByUserId(input.userId);
+  const watchlistMarketItems = await Promise.all(
+    input.watchlistSymbols.slice(0, 12).map((key) =>
+      buildMobileRecommendationMarketItem({
+        key,
+        identity: parseRecommendationMarketIdentity(key),
+        holdings,
+      }),
+    ),
+  );
+  const seen = new Set(watchlistMarketItems.map((item) => item.key));
+  const recentCandidates = input.priorities
+    .filter((priority) => priority.securitySymbol.trim().length > 0)
+    .map((priority) => ({
+      key: [
+        priority.securitySymbol,
+        priority.securityExchange ?? "",
+        priority.securityCurrency ?? "",
+      ]
+        .filter(Boolean)
+        .join(":"),
+      identity: {
+        symbol: priority.securitySymbol,
+        exchange: priority.securityExchange ?? null,
+        currency: priority.securityCurrency ?? null,
+        securityId: priority.securityId ?? null,
+        name: priority.security || priority.description,
+      },
+    }))
+    .filter((candidate) => {
+      if (seen.has(candidate.key)) {
+        return false;
+      }
+      seen.add(candidate.key);
+      return true;
+    })
+    .slice(0, 8);
+  const recentObservationItems = await Promise.all(
+    recentCandidates.map((candidate) =>
+      buildMobileRecommendationMarketItem({
+        key: candidate.key,
+        identity: candidate.identity,
+        holdings,
+      }),
+    ),
+  );
+  return { watchlistMarketItems, recentObservationItems };
+}
+
+function buildMobileRecommendationEngineSummary(input: {
+  data: RecommendationsData;
+  preferenceContext: MobileRecommendationsData["preferenceContext"];
+  externalBriefCount: number;
+}): MobileRecommendationEngineSummary {
+  const factors = input.preferenceContext.preferenceFactors as
+    | Record<string, unknown>
+    | null
+    | undefined;
+  const constraints = input.preferenceContext.recommendationConstraints as
+    | Record<string, unknown>
+    | null
+    | undefined;
+  const targetLine = input.preferenceContext.targetAllocation
+    .map((target) => `${target.assetClass} ${target.targetPct}%`)
+    .join(" · ");
+  return {
+    title: "推荐引擎",
+    summary: "按目标缺口、账户顺序、税务放置、偏好因子和护栏排序。",
+    chips: [
+      riskProfileLabel(input.preferenceContext.riskProfile),
+      input.preferenceContext.taxAwarePlacement ? "税务感知" : "税务中性",
+      `再平衡 ${input.preferenceContext.rebalancingTolerancePct}%`,
+      input.externalBriefCount > 0 ? "外部秘闻参与" : "本地规则",
+    ],
+    rankingInputs: [
+      { label: "本轮银两", value: input.data.contributionAmount },
+      {
+        label: "推荐策略",
+        value: input.preferenceContext.recommendationStrategy,
+      },
+      {
+        label: "账户顺序",
+        value:
+          input.preferenceContext.accountFundingPriority.join(" -> ") ||
+          "未设置",
+      },
+      { label: "目标配置", value: targetLine || "未设置" },
+    ],
+    preferenceFactors: [
+      {
+        label: "风险容量",
+        value: factorLevelLabel(
+          readNestedString(factors, ["behavior", "riskCapacity"]),
+        ),
+      },
+      {
+        label: "波动承受",
+        value: factorLevelLabel(
+          readNestedString(factors, ["behavior", "volatilityComfort"]),
+        ),
+      },
+      {
+        label: "集中度容忍",
+        value: factorLevelLabel(
+          readNestedString(factors, ["behavior", "concentrationTolerance"]),
+        ),
+      },
+      {
+        label: "行业倾向",
+        value:
+          readNestedStringList(factors, ["sectorTilts", "preferredSectors"])
+            .slice(0, 3)
+            .join("、") || "未设置",
+      },
+      {
+        label: "避开行业",
+        value:
+          readNestedStringList(factors, ["sectorTilts", "avoidedSectors"])
+            .slice(0, 3)
+            .join("、") || "未设置",
+        tone: readNestedStringList(factors, ["sectorTilts", "avoidedSectors"])
+          .length
+          ? "warning"
+          : "neutral",
+      },
+      {
+        label: "买房目标",
+        value: readNestedBoolean(factors, [
+          "lifeGoals",
+          "homePurchase",
+          "enabled",
+        ])
+          ? `开启 · ${factorLevelLabel(
+              readNestedString(factors, [
+                "lifeGoals",
+                "homePurchase",
+                "priority",
+              ]),
+            )}`
+          : "未开启",
+      },
+      {
+        label: "流动性需求",
+        value: factorLevelLabel(
+          readNestedString(factors, ["liquidity", "liquidityNeed"]),
+        ),
+      },
+      {
+        label: "外部情报",
+        value:
+          [
+            readNestedBoolean(factors, ["externalInfo", "allowNewsSignals"])
+              ? "新闻"
+              : null,
+            readNestedBoolean(factors, [
+              "externalInfo",
+              "allowInstitutionalSignals",
+            ])
+              ? "机构"
+              : null,
+            readNestedBoolean(factors, [
+              "externalInfo",
+              "allowCommunitySignals",
+            ])
+              ? "社区"
+              : null,
+          ]
+            .filter(Boolean)
+            .join(" / ") || "关闭",
+      },
+    ],
+    guardrails: [
+      {
+        label: "偏好标的",
+        value:
+          readStringList(constraints?.preferredSymbols)
+            .slice(0, 4)
+            .join("、") || "未设置",
+        tone: readStringList(constraints?.preferredSymbols).length
+          ? "success"
+          : "neutral",
+      },
+      {
+        label: "排除标的",
+        value:
+          readStringList(constraints?.excludedSymbols).slice(0, 4).join("、") ||
+          "未设置",
+        tone: readStringList(constraints?.excludedSymbols).length
+          ? "warning"
+          : "neutral",
+      },
+      {
+        label: "偏好账户",
+        value:
+          readStringList(constraints?.preferredAccountTypes).join(" -> ") ||
+          "未设置",
+      },
+      {
+        label: "避开账户",
+        value:
+          readStringList(constraints?.avoidAccountTypes).join("、") || "未设置",
+        tone: readStringList(constraints?.avoidAccountTypes).length
+          ? "warning"
+          : "neutral",
+      },
+      {
+        label: "允许类型",
+        value:
+          readStringList(constraints?.allowedSecurityTypes).join("、") ||
+          "未限制",
+      },
+    ],
+  };
+}
+
+function riskProfileLabel(value: string) {
+  return value === "Conservative"
+    ? "保守"
+    : value === "Growth"
+      ? "成长"
+      : "平衡";
+}
+
+function factorLevelLabel(value: string | null) {
+  return value === "low"
+    ? "低"
+    : value === "high"
+      ? "高"
+      : value === "medium"
+        ? "中"
+        : "未设置";
+}
+
+function readNestedString(
+  object: Record<string, unknown> | null | undefined,
+  path: string[],
+) {
+  const value = readNestedValue(object, path);
+  return typeof value === "string" ? value : null;
+}
+
+function readNestedBoolean(
+  object: Record<string, unknown> | null | undefined,
+  path: string[],
+) {
+  return readNestedValue(object, path) === true;
+}
+
+function readNestedStringList(
+  object: Record<string, unknown> | null | undefined,
+  path: string[],
+) {
+  return readStringList(readNestedValue(object, path));
+}
+
+function readNestedValue(
+  object: Record<string, unknown> | null | undefined,
+  path: string[],
+): unknown {
+  let current: unknown = object;
+  for (const key of path) {
+    if (!current || typeof current !== "object" || !(key in current)) {
+      return null;
+    }
+    current = (current as Record<string, unknown>)[key];
+  }
+  return current;
+}
+
+function readStringList(value: unknown) {
+  return Array.isArray(value)
+    ? value.filter((item): item is string => typeof item === "string")
+    : [];
+}
+
+function parseRecommendationMarketIdentity(key: string): {
+  symbol: string;
+  exchange: string | null;
+  currency: "CAD" | "USD" | null;
+  securityId: null;
+  name: string;
+} {
+  const parts = key
+    .split(":")
+    .map((part) => part.trim().toUpperCase())
+    .filter(Boolean);
+  const currency = parts[2] === "USD" || parts[2] === "CAD" ? parts[2] : null;
+  return {
+    symbol: parts[0] ?? "",
+    exchange: parts[1] ?? null,
+    currency,
+    securityId: null,
+    name: "",
+  };
+}
+
+async function buildMobileRecommendationMarketItem(input: {
+  key: string;
+  identity: {
+    symbol: string;
+    exchange?: string | null;
+    currency?: "CAD" | "USD" | null;
+    securityId?: string | null;
+    name?: string | null;
+  };
+  holdings: HoldingPosition[];
+}): Promise<MobileRecommendationMarketItem> {
+  const identity = normalizeRecommendationMarketIdentity(
+    input.identity,
+    input.holdings,
+  );
+  const history = await getRecommendationMarketHistory(identity);
+  const latestHistory = history[0] ?? null;
+  const previousHistory = history[1] ?? null;
+  const holdingQuote = getRecommendationHoldingQuote(identity, input.holdings);
+  const latestPrice = latestHistory?.close ?? holdingQuote?.price ?? null;
+  const previousPrice = previousHistory?.close ?? null;
+  const dayChange =
+    latestPrice != null && previousPrice != null
+      ? latestPrice - previousPrice
+      : null;
+  const dayChangePct =
+    dayChange != null && previousPrice && previousPrice > 0
+      ? (dayChange / previousPrice) * 100
+      : null;
+  const currency =
+    latestHistory?.currency ??
+    identity.currency ??
+    holdingQuote?.currency ??
+    null;
+  return {
+    key: input.key,
+    symbol: identity.symbol,
+    name: identity.name || identity.symbol,
+    exchange: identity.exchange,
+    currency,
+    securityId: identity.securityId,
+    lastPriceLabel:
+      latestPrice == null
+        ? "--"
+        : formatRecommendationPrice(latestPrice, currency),
+    dayChangeLabel:
+      dayChange == null
+        ? "待刷新"
+        : `${dayChange >= 0 ? "+" : ""}${dayChange.toFixed(2)}`,
+    dayChangePctLabel:
+      dayChangePct == null
+        ? "今日涨跌待刷新"
+        : `${dayChangePct >= 0 ? "+" : ""}${dayChangePct.toFixed(2)}%`,
+    dayChangeVariant:
+      dayChange == null
+        ? "unavailable"
+        : dayChange > 0
+          ? "positive"
+          : dayChange < 0
+            ? "negative"
+            : "neutral",
+    freshnessLabel:
+      latestHistory?.priceDate ?? holdingQuote?.asOf ?? "暂无缓存行情",
+  };
+}
+
+function normalizeRecommendationMarketIdentity(
+  identity: {
+    symbol: string;
+    exchange?: string | null;
+    currency?: "CAD" | "USD" | null;
+    securityId?: string | null;
+    name?: string | null;
+  },
+  holdings: HoldingPosition[],
+) {
+  const symbol = identity.symbol.trim().toUpperCase();
+  const matchingHolding = holdings.find((holding) =>
+    holdingMatchesRecommendationIdentity(holding, {
+      symbol,
+      exchange: identity.exchange ?? null,
+      currency: identity.currency ?? null,
+      securityId: identity.securityId ?? null,
+    }),
+  );
+  return {
+    symbol,
+    exchange:
+      identity.exchange?.trim().toUpperCase() ||
+      matchingHolding?.exchangeOverride ||
+      matchingHolding?.quoteExchange ||
+      null,
+    currency:
+      identity.currency ??
+      matchingHolding?.quoteCurrency ??
+      matchingHolding?.currency ??
+      null,
+    securityId: identity.securityId ?? matchingHolding?.securityId ?? null,
+    name: identity.name || matchingHolding?.name || symbol,
+  };
+}
+
+async function getRecommendationMarketHistory(identity: {
+  symbol: string;
+  exchange: string | null;
+  currency: "CAD" | "USD" | null;
+  securityId: string | null;
+}) {
+  const repository = getRepositories().securityPriceHistory;
+  if (identity.securityId) {
+    const bySecurityId = await repository.listBySecurityId(identity.securityId);
+    if (bySecurityId.length > 0) {
+      return bySecurityId.slice(0, 2);
+    }
+  }
+  if (identity.exchange) {
+    const byIdentity = await repository.listByIdentity({
+      symbol: identity.symbol,
+      exchange: identity.exchange,
+      currency: identity.currency ?? undefined,
+    });
+    if (byIdentity.length > 0) {
+      return byIdentity.slice(0, 2);
+    }
+  }
+  return (await repository.listBySymbol(identity.symbol))
+    .filter((point) =>
+      identity.currency ? point.currency === identity.currency : true,
+    )
+    .slice(0, 2);
+}
+
+function getRecommendationHoldingQuote(
+  identity: {
+    symbol: string;
+    exchange: string | null;
+    currency: "CAD" | "USD" | null;
+    securityId: string | null;
+  },
+  holdings: HoldingPosition[],
+) {
+  const matchingHolding = holdings.find((holding) =>
+    holdingMatchesRecommendationIdentity(holding, identity),
+  );
+  if (!matchingHolding?.lastPriceAmount && !matchingHolding?.lastPriceCad) {
+    return null;
+  }
+  return {
+    price:
+      matchingHolding.lastPriceAmount ?? matchingHolding.lastPriceCad ?? null,
+    currency:
+      matchingHolding.quoteCurrency ??
+      matchingHolding.currency ??
+      identity.currency ??
+      null,
+    asOf:
+      matchingHolding.quoteProviderTimestamp ??
+      matchingHolding.lastQuoteSuccessAt ??
+      matchingHolding.updatedAt ??
+      null,
+  };
+}
+
+function holdingMatchesRecommendationIdentity(
+  holding: HoldingPosition,
+  identity: {
+    symbol: string;
+    exchange: string | null;
+    currency: "CAD" | "USD" | null;
+    securityId: string | null;
+  },
+) {
+  if (identity.securityId && holding.securityId === identity.securityId) {
+    return true;
+  }
+  if (holding.symbol.trim().toUpperCase() !== identity.symbol) {
+    return false;
+  }
+  const holdingExchange = (
+    holding.exchangeOverride ??
+    holding.quoteExchange ??
+    ""
+  )
+    .trim()
+    .toUpperCase();
+  if (
+    identity.exchange &&
+    holdingExchange &&
+    holdingExchange !== identity.exchange
+  ) {
+    return false;
+  }
+  if (
+    identity.currency &&
+    holding.currency &&
+    holding.currency !== identity.currency &&
+    holding.quoteCurrency !== identity.currency
+  ) {
+    return false;
+  }
+  return true;
+}
+
+function formatRecommendationPrice(
+  value: number,
+  currency: SecurityPriceHistoryPoint["currency"] | null,
+) {
+  const prefix = currency === "USD" ? "US$" : currency === "CAD" ? "C$" : "";
+  return `${prefix}${value.toFixed(value >= 100 ? 2 : 2)}`;
 }
 
 export function mapRecommendationIntelligenceRefs(
@@ -1457,7 +2022,7 @@ export async function getMobileRecommendationsView(userId: string) {
     mapDailyIntelligenceItemToRecommendationBrief,
   );
   return {
-    data: mapMobileRecommendationsData(
+    data: await mapMobileRecommendationsData(
       payload.data,
       {
         riskProfile: profile.riskProfile,
@@ -1471,6 +2036,7 @@ export async function getMobileRecommendationsView(userId: string) {
         preferenceFactors: profile.preferenceFactors,
       },
       intelligenceBriefs,
+      userId,
     ),
     meta: payload.meta,
   };

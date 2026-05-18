@@ -8,6 +8,9 @@ class MobileRecommendationsSnapshot {
     required this.preferenceContext,
     required this.explainer,
     required this.priorities,
+    required this.watchlistMarketItems,
+    required this.recentObservationItems,
+    required this.engineSummary,
     required this.scenarios,
     required this.notes,
   });
@@ -18,6 +21,9 @@ class MobileRecommendationsSnapshot {
   final MobilePreferenceContext preferenceContext;
   final List<String> explainer;
   final List<MobileRecommendationPriority> priorities;
+  final List<MobileRecommendationMarketItem> watchlistMarketItems;
+  final List<MobileRecommendationMarketItem> recentObservationItems;
+  final MobileRecommendationEngineSummary engineSummary;
   final List<MobileRecommendationScenario> scenarios;
   final List<String> notes;
 
@@ -43,6 +49,14 @@ class MobileRecommendationsSnapshot {
       priorities: readJsonList(json, "priorities")
           .map(MobileRecommendationPriority.fromJson)
           .toList(),
+      watchlistMarketItems: readJsonList(json, "watchlistMarketItems")
+          .map(MobileRecommendationMarketItem.fromJson)
+          .toList(),
+      recentObservationItems: readJsonList(json, "recentObservationItems")
+          .map(MobileRecommendationMarketItem.fromJson)
+          .toList(),
+      engineSummary:
+          MobileRecommendationEngineSummary.fromJson(json["engineSummary"]),
       scenarios: readJsonList(json, "scenarios")
           .map(MobileRecommendationScenario.fromJson)
           .toList(),
@@ -106,6 +120,116 @@ class MobilePreferenceContext {
       watchlistSymbols:
           (json["watchlistSymbols"] as List?)?.whereType<String>().toList() ??
               const [],
+    );
+  }
+}
+
+class MobileRecommendationMarketItem {
+  const MobileRecommendationMarketItem({
+    required this.key,
+    required this.symbol,
+    required this.name,
+    required this.exchange,
+    required this.currency,
+    required this.securityId,
+    required this.lastPriceLabel,
+    required this.dayChangeLabel,
+    required this.dayChangePctLabel,
+    required this.dayChangeVariant,
+    required this.freshnessLabel,
+  });
+
+  final String key;
+  final String symbol;
+  final String name;
+  final String exchange;
+  final String currency;
+  final String securityId;
+  final String lastPriceLabel;
+  final String dayChangeLabel;
+  final String dayChangePctLabel;
+  final String dayChangeVariant;
+  final String freshnessLabel;
+
+  String get identityLine => [
+        if (exchange.isNotEmpty) exchange,
+        if (currency.isNotEmpty) currency,
+      ].join(" · ");
+
+  bool get hasMarketMove => dayChangeVariant != "unavailable";
+
+  factory MobileRecommendationMarketItem.fromJson(Map<String, dynamic> json) {
+    return MobileRecommendationMarketItem(
+      key: json["key"] as String? ?? "",
+      symbol: json["symbol"] as String? ?? "",
+      name: json["name"] as String? ?? "",
+      exchange: json["exchange"] as String? ?? "",
+      currency: json["currency"] as String? ?? "",
+      securityId: json["securityId"] as String? ?? "",
+      lastPriceLabel: json["lastPriceLabel"] as String? ?? "--",
+      dayChangeLabel: json["dayChangeLabel"] as String? ?? "待刷新",
+      dayChangePctLabel: json["dayChangePctLabel"] as String? ?? "今日涨跌待刷新",
+      dayChangeVariant: json["dayChangeVariant"] as String? ?? "unavailable",
+      freshnessLabel: json["freshnessLabel"] as String? ?? "暂无缓存行情",
+    );
+  }
+}
+
+class MobileRecommendationEngineSummary {
+  const MobileRecommendationEngineSummary({
+    required this.title,
+    required this.summary,
+    required this.chips,
+    required this.rankingInputs,
+    required this.preferenceFactors,
+    required this.guardrails,
+  });
+
+  final String title;
+  final String summary;
+  final List<String> chips;
+  final List<MobileRecommendationInput> rankingInputs;
+  final List<MobileRecommendationEngineFactor> preferenceFactors;
+  final List<MobileRecommendationEngineFactor> guardrails;
+
+  factory MobileRecommendationEngineSummary.fromJson(Object? value) {
+    final json =
+        value is Map<String, dynamic> ? value : const <String, dynamic>{};
+    return MobileRecommendationEngineSummary(
+      title: json["title"] as String? ?? "推荐引擎",
+      summary: json["summary"] as String? ?? "",
+      chips: (json["chips"] as List?)?.whereType<String>().toList() ?? const [],
+      rankingInputs: readJsonList(json, "rankingInputs")
+          .map(MobileRecommendationInput.fromJson)
+          .toList(),
+      preferenceFactors: readJsonList(json, "preferenceFactors")
+          .map(MobileRecommendationEngineFactor.fromJson)
+          .toList(),
+      guardrails: readJsonList(json, "guardrails")
+          .map(MobileRecommendationEngineFactor.fromJson)
+          .toList(),
+    );
+  }
+}
+
+class MobileRecommendationEngineFactor {
+  const MobileRecommendationEngineFactor({
+    required this.label,
+    required this.value,
+    required this.tone,
+  });
+
+  final String label;
+  final String value;
+  final String tone;
+
+  factory MobileRecommendationEngineFactor.fromJson(
+    Map<String, dynamic> json,
+  ) {
+    return MobileRecommendationEngineFactor(
+      label: json["label"] as String? ?? "",
+      value: json["value"] as String? ?? "--",
+      tone: json["tone"] as String? ?? "neutral",
     );
   }
 }

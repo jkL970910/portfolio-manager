@@ -180,6 +180,8 @@ class _RecommendationsPageState extends State<RecommendationsPage> {
                       children: [
                         _SummaryCard(
                           snapshot.data!,
+                          working: _working,
+                          onChangeAmount: _createRun,
                           onOpenPriorities: () =>
                               _scrollToSection(_priorityKey),
                           onOpenWatchlist: () =>
@@ -189,19 +191,31 @@ class _RecommendationsPageState extends State<RecommendationsPage> {
                         _ActionDock(
                           working: _working,
                           onDiscover: _openDiscover,
-                          onGenerate: _createRun,
+                        ),
+                        const SizedBox(height: 16),
+                        _EngineSummaryCard(
+                          summary: snapshot.data!.engineSummary,
+                          onOpenSettings: () =>
+                              context.push(MobileRoutes.settings),
                         ),
                         const SizedBox(height: 16),
                         KeyedSubtree(
                           key: _watchlistKey,
                           child: _WatchlistCard(
-                            symbols:
-                                snapshot.data!.preferenceContext.watchlistSymbols,
+                            items: snapshot.data!.watchlistMarketItems,
                             working: _working,
                             onRemove: _removeWatchlistSymbol,
-                            onOpen: _openWatchlistSymbol,
+                            onOpen: _openMarketItem,
                           ),
                         ),
+                        if (snapshot
+                            .data!.recentObservationItems.isNotEmpty) ...[
+                          const SizedBox(height: 16),
+                          _RecentObservationCard(
+                            items: snapshot.data!.recentObservationItems,
+                            onOpen: _openMarketItem,
+                          ),
+                        ],
                         const SizedBox(height: 16),
                         KeyedSubtree(
                           key: _priorityKey,
@@ -221,32 +235,6 @@ class _RecommendationsPageState extends State<RecommendationsPage> {
                                   onOpenSecurity: _openSecurityDetail,
                                 ),
                               ),
-                        const SizedBox(height: 16),
-                        _RecommendationIntelligenceStatusCard(snapshot.data!),
-                        const SizedBox(height: 16),
-                        _PreferenceContextCard(
-                          snapshot.data!.preferenceContext,
-                        ),
-                        if (snapshot.data!.explainer.isNotEmpty) ...[
-                          const SizedBox(height: 16),
-                          _CollapsibleTextCard(
-                            title: "进货规则",
-                            summary: "风险偏好、账户顺序、税务放置和再平衡阈值会影响排序。",
-                            text: snapshot.data!.explainer.take(4).join("\n"),
-                          ),
-                        ],
-                        if (snapshot.data!.scenarios.isNotEmpty) ...[
-                          const SizedBox(height: 16),
-                          _AdvancedScenariosCard(
-                            scenarios: snapshot.data!.scenarios,
-                          ),
-                        ],
-                        if (snapshot.data!.notes.isNotEmpty) ...[
-                          const SizedBox(height: 16),
-                          const _SectionTitle("备注"),
-                          const SizedBox(height: 8),
-                          _TextCard(snapshot.data!.notes.take(4).join("\n")),
-                        ],
                       ],
                     ),
                   ),
@@ -285,16 +273,16 @@ class _RecommendationsPageState extends State<RecommendationsPage> {
     );
   }
 
-  void _openWatchlistSymbol(String watchlistKey) {
-    final identity = _WatchlistIdentity.parse(watchlistKey);
-    if (identity.symbol.isEmpty) {
+  void _openMarketItem(MobileRecommendationMarketItem item) {
+    if (item.symbol.isEmpty) {
       return;
     }
     context.push(
       MobileRoutes.securityDetail(
-        symbol: identity.symbol,
-        exchange: identity.exchange,
-        currency: identity.currency,
+        symbol: item.symbol,
+        securityId: item.securityId.isNotEmpty ? item.securityId : null,
+        exchange: item.exchange.isNotEmpty ? item.exchange : null,
+        currency: item.currency.isNotEmpty ? item.currency : null,
       ),
     );
   }
@@ -331,11 +319,15 @@ class _PageHeader extends StatelessWidget {
 class _SummaryCard extends StatelessWidget {
   const _SummaryCard(
     this.data, {
+    required this.working,
+    required this.onChangeAmount,
     required this.onOpenPriorities,
     required this.onOpenWatchlist,
   });
 
   final MobileRecommendationsSnapshot data;
+  final bool working;
+  final VoidCallback onChangeAmount;
   final VoidCallback onOpenPriorities;
   final VoidCallback onOpenWatchlist;
 
@@ -345,8 +337,11 @@ class _SummaryCard extends StatelessWidget {
     final tokens = context.looTokens;
     final watchCount = data.preferenceContext.watchlistSymbols.length;
     final priorityCount = data.priorities.length;
+    final topAsset =
+        data.priorities.isEmpty ? "暂无" : data.priorities.first.assetClass;
     return LooGlassCard(
       isHero: true,
+      padding: const EdgeInsets.fromLTRB(18, 18, 18, 16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -366,9 +361,21 @@ class _SummaryCard extends StatelessWidget {
                   ],
                 ),
               ),
+              const SizedBox(width: 12),
+              FilledButton.tonalIcon(
+                onPressed: working ? null : onChangeAmount,
+                icon: working
+                    ? const SizedBox(
+                        height: 16,
+                        width: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.edit_rounded, size: 18),
+                label: const Text("改金额"),
+              ),
             ],
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 12),
           Row(
             children: [
               Expanded(
@@ -392,6 +399,30 @@ class _SummaryCard extends StatelessWidget {
               ),
             ],
           ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Expanded(
+                child: _HeroMiniStat(
+                  icon: Icons.savings_outlined,
+                  label: "现金缺口",
+                  value: _engineInputValue(data.engineSummary, "本轮银两"),
+                  detail: "本次投入",
+                  onTap: working ? () {} : onChangeAmount,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: _HeroMiniStat(
+                  icon: Icons.category_outlined,
+                  label: "优先资产",
+                  value: topAsset,
+                  detail: "本轮第一候选",
+                  onTap: onOpenPriorities,
+                ),
+              ),
+            ],
+          ),
           if (data.engineLine.isNotEmpty) ...[
             const SizedBox(height: 12),
             Text(
@@ -407,6 +438,18 @@ class _SummaryCard extends StatelessWidget {
       ),
     );
   }
+}
+
+String _engineInputValue(
+  MobileRecommendationEngineSummary summary,
+  String label,
+) {
+  for (final input in summary.rankingInputs) {
+    if (input.label == label && input.value.isNotEmpty) {
+      return input.value;
+    }
+  }
+  return "--";
 }
 
 class _HeroMiniStat extends StatelessWidget {
@@ -485,62 +528,18 @@ class _HeroMiniStat extends StatelessWidget {
   }
 }
 
-class _RecommendationIntelligenceStatusCard extends StatelessWidget {
-  const _RecommendationIntelligenceStatusCard(this.data);
-
-  final MobileRecommendationsSnapshot data;
-
-  @override
-  Widget build(BuildContext context) {
-    final refs = data.priorities
-        .expand((priority) => priority.intelligenceRefs)
-        .toList();
-    final hasRefs = refs.isNotEmpty;
-    return LooGlassCard(
-      padding: const EdgeInsets.all(14),
-      child: Row(
-        children: [
-          Icon(Icons.auto_awesome_outlined, color: context.looTokens.accent),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text("秘闻参考",
-                    style: Theme.of(context).textTheme.titleMedium),
-                const SizedBox(height: 4),
-                Text(
-                  hasRefs
-                      ? "已引用 ${refs.length} 条外部新闻缓存，完整秘闻在总览页查看。"
-                      : "暂无可用秘闻，排序按国库持仓和偏好计算。",
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: context.looTokens.mutedText,
-                      ),
-                ),
-              ],
-            ),
-          ),
-          _InfoPill(hasRefs ? "已纳入" : "无缓存"),
-        ],
-      ),
-    );
-  }
-}
-
 class _CompactActionCard extends StatelessWidget {
   const _CompactActionCard({
     required this.icon,
     required this.title,
     required this.detail,
     required this.onTap,
-    this.isBusy = false,
   });
 
   final IconData icon;
   final String title;
   final String detail;
   final VoidCallback? onTap;
-  final bool isBusy;
 
   @override
   Widget build(BuildContext context) {
@@ -557,14 +556,7 @@ class _CompactActionCard extends StatelessWidget {
               children: [
                 Icon(icon, color: tokens.accent),
                 const Spacer(),
-                if (isBusy)
-                  const SizedBox(
-                    height: 18,
-                    width: 18,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                else
-                  Icon(Icons.chevron_right, color: tokens.accent),
+                Icon(Icons.chevron_right, color: tokens.accent),
               ],
             ),
             const Spacer(),
@@ -589,47 +581,17 @@ class _ActionDock extends StatelessWidget {
   const _ActionDock({
     required this.working,
     required this.onDiscover,
-    required this.onGenerate,
   });
 
   final bool working;
   final VoidCallback onDiscover;
-  final VoidCallback onGenerate;
 
   @override
   Widget build(BuildContext context) {
     return Row(
       children: [
         Expanded(child: _DiscoverEntryCard(onOpen: onDiscover)),
-        const SizedBox(width: 12),
-        Expanded(
-          child: _GenerateRecommendationCard(
-            working: working,
-            onGenerate: onGenerate,
-          ),
-        ),
       ],
-    );
-  }
-}
-
-class _GenerateRecommendationCard extends StatelessWidget {
-  const _GenerateRecommendationCard({
-    required this.working,
-    required this.onGenerate,
-  });
-
-  final bool working;
-  final VoidCallback onGenerate;
-
-  @override
-  Widget build(BuildContext context) {
-    return _CompactActionCard(
-      icon: Icons.auto_awesome,
-      title: "重算清单",
-      detail: "输入本次可用银两，按国库缺口和护栏重新排序。",
-      isBusy: working,
-      onTap: working ? null : onGenerate,
     );
   }
 }
@@ -650,37 +612,96 @@ class _DiscoverEntryCard extends StatelessWidget {
   }
 }
 
-class _PreferenceContextCard extends StatelessWidget {
-  const _PreferenceContextCard(this.context);
+class _EngineSummaryCard extends StatefulWidget {
+  const _EngineSummaryCard({
+    required this.summary,
+    required this.onOpenSettings,
+  });
 
-  final MobilePreferenceContext context;
+  final MobileRecommendationEngineSummary summary;
+  final VoidCallback onOpenSettings;
 
   @override
-  Widget build(BuildContext context_) {
+  State<_EngineSummaryCard> createState() => _EngineSummaryCardState();
+}
+
+class _EngineSummaryCardState extends State<_EngineSummaryCard> {
+  var _expanded = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = context.looTokens;
+    final theme = Theme.of(context);
     return LooGlassCard(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 14),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text("当前进货规矩", style: Theme.of(context_).textTheme.titleLarge),
-          const SizedBox(height: 8),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              _InfoPill("风险：${context.riskLabel}"),
-              _InfoPill("账户：${context.accountFundingPriority.join(" -> ")}"),
-              _InfoPill("策略：${context.recommendationStrategy}"),
-              _InfoPill("再平衡：${context.rebalancingTolerancePct}%"),
-              _InfoPill(context.taxAwarePlacement ? "税务感知：开" : "税务感知：关"),
-            ],
-          ),
-          if (context.allocationLine.isNotEmpty) ...[
-            const SizedBox(height: 10),
-            Text(
-              context.allocationLine,
-              style: Theme.of(context_).textTheme.bodySmall?.copyWith(
-                    color: context_.looTokens.mutedText,
+          InkWell(
+            borderRadius: BorderRadius.circular(tokens.radiusMd),
+            onTap: () => setState(() => _expanded = !_expanded),
+            child: Row(
+              children: [
+                Icon(Icons.tune_rounded, color: tokens.accent),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        widget.summary.title,
+                        style: theme.textTheme.titleLarge,
+                      ),
+                      if (widget.summary.summary.isNotEmpty)
+                        Text(
+                          widget.summary.summary,
+                          maxLines: _expanded ? null : 1,
+                          overflow: _expanded ? null : TextOverflow.ellipsis,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: tokens.mutedText,
+                          ),
+                        ),
+                    ],
                   ),
+                ),
+                AnimatedRotation(
+                  turns: _expanded ? 0.5 : 0,
+                  duration: const Duration(milliseconds: 180),
+                  child: const Icon(Icons.keyboard_arrow_down_rounded),
+                ),
+              ],
+            ),
+          ),
+          if (widget.summary.chips.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children:
+                  widget.summary.chips.take(5).map(_InfoPill.new).toList(),
+            ),
+          ],
+          if (_expanded) ...[
+            const SizedBox(height: 14),
+            _EngineInputGrid(widget.summary.rankingInputs),
+            const SizedBox(height: 12),
+            _EngineFactorSection(
+              title: "影响因子",
+              items: widget.summary.preferenceFactors,
+            ),
+            const SizedBox(height: 12),
+            _EngineFactorSection(
+              title: "推荐护栏",
+              items: widget.summary.guardrails,
+            ),
+            const SizedBox(height: 12),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: FilledButton.tonalIcon(
+                onPressed: widget.onOpenSettings,
+                icon: const Icon(Icons.settings_outlined),
+                label: const Text("调整偏好因子"),
+              ),
             ),
           ],
         ],
@@ -689,18 +710,135 @@ class _PreferenceContextCard extends StatelessWidget {
   }
 }
 
+class _EngineInputGrid extends StatelessWidget {
+  const _EngineInputGrid(this.items);
+
+  final List<MobileRecommendationInput> items;
+
+  @override
+  Widget build(BuildContext context) {
+    if (items.isEmpty) {
+      return const SizedBox.shrink();
+    }
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: items.take(6).map((item) {
+        return SizedBox(
+          width: 148,
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              color:
+                  Theme.of(context).colorScheme.surface.withValues(alpha: 0.18),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: context.looTokens.cardBorder),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(10),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    item.label,
+                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                          color: context.looTokens.mutedText,
+                        ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    item.value,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.titleSmall,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      }).toList(),
+    );
+  }
+}
+
+class _EngineFactorSection extends StatelessWidget {
+  const _EngineFactorSection({
+    required this.title,
+    required this.items,
+  });
+
+  final String title;
+  final List<MobileRecommendationEngineFactor> items;
+
+  @override
+  Widget build(BuildContext context) {
+    if (items.isEmpty) {
+      return const SizedBox.shrink();
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(title, style: Theme.of(context).textTheme.titleMedium),
+        const SizedBox(height: 8),
+        ...items.take(8).map((item) => _EngineFactorRow(item)),
+      ],
+    );
+  }
+}
+
+class _EngineFactorRow extends StatelessWidget {
+  const _EngineFactorRow(this.item);
+
+  final MobileRecommendationEngineFactor item;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = switch (item.tone) {
+      "success" => Colors.green.shade300,
+      "warning" => Colors.orange.shade300,
+      _ => context.looTokens.mutedText,
+    };
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 7),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              item.label,
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Flexible(
+            child: Text(
+              item.value,
+              textAlign: TextAlign.right,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: color,
+                    fontWeight: FontWeight.w700,
+                  ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _WatchlistCard extends StatefulWidget {
   const _WatchlistCard({
-    required this.symbols,
+    required this.items,
     required this.working,
     required this.onRemove,
     required this.onOpen,
   });
 
-  final List<String> symbols;
+  final List<MobileRecommendationMarketItem> items;
   final bool working;
   final ValueChanged<String> onRemove;
-  final ValueChanged<String> onOpen;
+  final ValueChanged<MobileRecommendationMarketItem> onOpen;
 
   @override
   State<_WatchlistCard> createState() => _WatchlistCardState();
@@ -709,8 +847,8 @@ class _WatchlistCard extends StatefulWidget {
 class _WatchlistCardState extends State<_WatchlistCard> {
   @override
   Widget build(BuildContext context) {
-    final tokens = context.looTokens;
     return LooGlassCard(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 14),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -722,76 +860,30 @@ class _WatchlistCardState extends State<_WatchlistCard> {
                   style: Theme.of(context).textTheme.titleLarge,
                 ),
               ),
-              _InfoPill("${widget.symbols.length} 个"),
+              _InfoPill("${widget.items.length} 个"),
             ],
           ),
           const SizedBox(height: 6),
           Text(
-            "新增请从搜货台打开研究台后确认。",
+            "横向查看今日涨跌；新增请从搜货台进入研究台后确认。",
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: tokens.mutedText,
+                  color: context.looTokens.mutedText,
                 ),
           ),
           const SizedBox(height: 12),
-          if (widget.symbols.isEmpty)
+          if (widget.items.isEmpty)
             const Text("暂时没有囤货标的。点上方“搜货”进入研究台后加入。")
           else
-            Column(
-              children: widget.symbols.take(6).map((symbol) {
-                final identity = _WatchlistIdentity.parse(symbol);
-                final subtitle = [
-                  if (identity.exchange != null) identity.exchange!,
-                  if (identity.currency != null) identity.currency!,
-                  "已确认",
-                ].join(" · ");
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: 8),
-                  child: DecoratedBox(
-                    decoration: BoxDecoration(
-                      color: Theme.of(context)
-                          .colorScheme
-                          .surface
-                          .withValues(alpha: 0.18),
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: tokens.cardBorder),
-                    ),
-                    child: ListTile(
-                      dense: true,
-                      contentPadding:
-                          const EdgeInsets.symmetric(horizontal: 12),
-                      leading: CircleAvatar(
-                        radius: 18,
-                        backgroundColor: tokens.accentSoft,
-                        child: Text(
-                          identity.symbol.length > 2
-                              ? identity.symbol.substring(0, 2)
-                              : identity.symbol,
-                          style: Theme.of(context).textTheme.labelMedium,
-                        ),
-                      ),
-                      title: Text(_formatWatchlistLabel(symbol)),
-                      subtitle: Text(subtitle),
-                      trailing: Wrap(
-                        spacing: 2,
-                        children: [
-                          IconButton(
-                            tooltip: "打开研究台",
-                            onPressed: () => widget.onOpen(symbol),
-                            icon: const Icon(Icons.open_in_new),
-                          ),
-                          IconButton(
-                            tooltip: "移出囤货",
-                            onPressed: widget.working
-                                ? null
-                                : () => widget.onRemove(symbol),
-                            icon: const Icon(Icons.close),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                );
-              }).toList(),
+            _MarketItemRail(
+              items: widget.items,
+              onOpen: widget.onOpen,
+              trailingBuilder: (item) => IconButton(
+                tooltip: "移出囤货",
+                onPressed:
+                    widget.working ? null : () => widget.onRemove(item.key),
+                icon: const Icon(Icons.close_rounded, size: 18),
+                visualDensity: VisualDensity.compact,
+              ),
             ),
         ],
       ),
@@ -799,39 +891,193 @@ class _WatchlistCardState extends State<_WatchlistCard> {
   }
 }
 
-String _formatWatchlistLabel(String symbol) {
-  return symbol.split(":").where((part) => part.isNotEmpty).join(" · ");
-}
-
-class _WatchlistIdentity {
-  const _WatchlistIdentity({
-    required this.symbol,
-    required this.exchange,
-    required this.currency,
+class _RecentObservationCard extends StatelessWidget {
+  const _RecentObservationCard({
+    required this.items,
+    required this.onOpen,
   });
 
-  final String symbol;
-  final String? exchange;
-  final String? currency;
+  final List<MobileRecommendationMarketItem> items;
+  final ValueChanged<MobileRecommendationMarketItem> onOpen;
 
-  String get label => [
-        symbol,
-        if (exchange != null && exchange!.isNotEmpty) exchange!,
-        if (currency != null && currency!.isNotEmpty) currency!,
-      ].join(" · ");
-
-  static _WatchlistIdentity parse(String value) {
-    final parts = value
-        .split(":")
-        .map((part) => part.trim().toUpperCase())
-        .where((part) => part.isNotEmpty)
-        .toList();
-    return _WatchlistIdentity(
-      symbol: parts.isNotEmpty ? parts[0] : "",
-      exchange: parts.length > 1 ? parts[1] : null,
-      currency: parts.length > 2 ? parts[2] : null,
+  @override
+  Widget build(BuildContext context) {
+    return LooGlassCard(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  "近期观察",
+                  style: Theme.of(context).textTheme.titleLarge,
+                ),
+              ),
+              _InfoPill("${items.length} 个"),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(
+            "来自本轮 Loo皇推荐候选；点击进入研究台复核。",
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: context.looTokens.mutedText,
+                ),
+          ),
+          const SizedBox(height: 12),
+          _MarketItemRail(items: items, onOpen: onOpen),
+        ],
+      ),
     );
   }
+}
+
+class _MarketItemRail extends StatelessWidget {
+  const _MarketItemRail({
+    required this.items,
+    required this.onOpen,
+    this.trailingBuilder,
+  });
+
+  final List<MobileRecommendationMarketItem> items;
+  final ValueChanged<MobileRecommendationMarketItem> onOpen;
+  final Widget Function(MobileRecommendationMarketItem item)? trailingBuilder;
+
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      physics: const BouncingScrollPhysics(),
+      child: Row(
+        children: [
+          for (final item in items.take(12)) ...[
+            _MarketItemCard(
+              item: item,
+              onTap: () => onOpen(item),
+              trailing: trailingBuilder?.call(item),
+            ),
+            const SizedBox(width: 10),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _MarketItemCard extends StatelessWidget {
+  const _MarketItemCard({
+    required this.item,
+    required this.onTap,
+    this.trailing,
+  });
+
+  final MobileRecommendationMarketItem item;
+  final VoidCallback onTap;
+  final Widget? trailing;
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = context.looTokens;
+    final moveColor = _marketMoveColor(context, item.dayChangeVariant);
+    return SizedBox(
+      width: 148,
+      height: 132,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(18),
+          onTap: onTap,
+          child: Ink(
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.surface.withValues(
+                    alpha: item.hasMarketMove ? 0.22 : 0.14,
+                  ),
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(
+                color: item.hasMarketMove
+                    ? moveColor.withValues(alpha: 0.34)
+                    : tokens.cardBorder,
+              ),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: Text(
+                          item.symbol,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style:
+                              Theme.of(context).textTheme.titleMedium?.copyWith(
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                        ),
+                      ),
+                      if (trailing != null) trailing!,
+                    ],
+                  ),
+                  Text(
+                    item.identityLine.isEmpty ? "待识别" : item.identityLine,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                          color: tokens.mutedText,
+                        ),
+                  ),
+                  const Spacer(),
+                  Text(
+                    item.lastPriceLabel,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                  const SizedBox(height: 6),
+                  DecoratedBox(
+                    decoration: BoxDecoration(
+                      color: moveColor.withValues(alpha: 0.18),
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
+                      child: Text(
+                        item.hasMarketMove
+                            ? "${item.dayChangeLabel}  ${item.dayChangePctLabel}"
+                            : item.dayChangeLabel,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                              color: moveColor,
+                              fontWeight: FontWeight.w700,
+                            ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+Color _marketMoveColor(BuildContext context, String variant) {
+  return switch (variant) {
+    "positive" => Colors.green.shade300,
+    "negative" => Colors.red.shade300,
+    "neutral" => context.looTokens.mutedText,
+    _ => context.looTokens.mutedText,
+  };
 }
 
 class _SectionTitle extends StatelessWidget {
@@ -893,128 +1139,146 @@ class _PriorityCardState extends State<_PriorityCard> {
 
     return LooGlassCard(
       margin: const EdgeInsets.only(bottom: 12),
-      child: Padding(
-        padding: EdgeInsets.zero,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  priority.security.isNotEmpty
+                      ? priority.security
+                      : priority.assetClass,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.titleLarge,
+                ),
+              ),
+              if (priority.amount.isNotEmpty) _InfoPill(priority.amount),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(
+            priority.description.isNotEmpty
+                ? priority.description
+                : priority.assetClass,
+            maxLines: _expanded ? null : 2,
+            overflow: _expanded ? null : TextOverflow.ellipsis,
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: context.looTokens.mutedText,
+                ),
+          ),
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              _InfoPill(priority.assetClass),
+              if (priority.account.isNotEmpty) _InfoPill(priority.account),
+              if (priority.gapSummary.isNotEmpty && !_expanded)
+                _InfoPill(_compactGapLabel(priority.gapSummary)),
+            ],
+          ),
+          if (priority.securitySymbol.isNotEmpty) ...[
+            const SizedBox(height: 12),
             Row(
               children: [
                 Expanded(
-                  child: Text(
-                    priority.assetClass,
-                    style: Theme.of(context).textTheme.titleLarge,
+                  child: FilledButton.tonalIcon(
+                    onPressed: () => widget.onOpenSecurity(priority),
+                    icon: const Icon(Icons.open_in_new),
+                    label: const Text("打开研究台"),
                   ),
                 ),
-                if (priority.amount.isNotEmpty) _InfoPill(priority.amount),
-              ],
-            ),
-            const SizedBox(height: 6),
-            Text(
-              priority.description,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: context.looTokens.mutedText,
-                  ),
-            ),
-            const SizedBox(height: 10),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                if (priority.account.isNotEmpty) _InfoPill(priority.account),
-                if (priority.security.isNotEmpty) _InfoPill(priority.security),
-              ],
-            ),
-            if (priority.securitySymbol.isNotEmpty) ...[
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  Expanded(
-                    child: FilledButton.tonalIcon(
-                      onPressed: () => widget.onOpenSecurity(priority),
-                      icon: const Icon(Icons.open_in_new),
-                      label: const Text("打开研究台"),
+                if (hiddenSections > 0) ...[
+                  const SizedBox(width: 10),
+                  TextButton.icon(
+                    onPressed: () => setState(() => _expanded = !_expanded),
+                    icon: AnimatedRotation(
+                      turns: _expanded ? 0.5 : 0,
+                      duration: const Duration(milliseconds: 180),
+                      child: const Icon(Icons.keyboard_arrow_down_rounded),
                     ),
+                    label: Text(_expanded ? "收起" : "证据"),
                   ),
-                  if (hiddenSections > 0) ...[
-                    const SizedBox(width: 10),
-                    TextButton.icon(
-                      onPressed: () => setState(() => _expanded = !_expanded),
-                      icon: AnimatedRotation(
-                        turns: _expanded ? 0.5 : 0,
-                        duration: const Duration(milliseconds: 180),
-                        child: const Icon(Icons.keyboard_arrow_down_rounded),
-                      ),
-                      label: Text(_expanded ? "收起" : "证据"),
-                    ),
-                  ],
                 ],
-              ),
-            ],
-            if (_expanded) ...[
-              const SizedBox(height: 12),
-              DecoratedBox(
-                decoration: BoxDecoration(
-                  color:
-                      Theme.of(context).colorScheme.surface.withValues(alpha: 0.16),
-                  borderRadius: BorderRadius.circular(18),
-                  border: Border.all(color: tokens.cardBorder),
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.all(12),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      if (priority.scoreline.isNotEmpty ||
-                          priority.gapSummary.isNotEmpty) ...[
-                        _ScorelinePanel(priority),
-                        const SizedBox(height: 12),
-                      ],
-                      if (priority.v3Overlay != null) ...[
-                        _V3OverlayPanel(priority.v3Overlay!),
-                        const SizedBox(height: 12),
-                      ],
-                      if (priority.intelligenceRefs.isNotEmpty) ...[
-                        _PriorityIntelligenceSection(priority.intelligenceRefs),
-                        const SizedBox(height: 12),
-                      ],
-                      if (priority.whyThis.isNotEmpty) ...[
-                        _ExplanationSection(
-                          title: "为什么它排前面",
-                          items: priority.whyThis,
-                        ),
-                        const SizedBox(height: 12),
-                      ],
-                      if (priority.whyNot.isNotEmpty) ...[
-                        _ExplanationSection(
-                          title: "需要注意什么",
-                          items: priority.whyNot,
-                        ),
-                        const SizedBox(height: 12),
-                      ],
-                      if (priority.constraints.isNotEmpty) ...[
-                        _ConstraintSection(priority.constraints),
-                        const SizedBox(height: 12),
-                      ],
-                      if (priority.execution.isNotEmpty) ...[
-                        _ExecutionSection(priority.execution),
-                        const SizedBox(height: 12),
-                      ],
-                      if (priority.alternatives.isNotEmpty)
-                        _ExplanationSection(
-                          title: "可替代选择",
-                          items: priority.alternatives,
-                        ),
-                    ],
-                  ),
-                ),
-              ),
-            ],
+              ],
+            ),
           ],
-        ),
+          if (_expanded) ...[
+            const SizedBox(height: 12),
+            DecoratedBox(
+              decoration: BoxDecoration(
+                color: Theme.of(context)
+                    .colorScheme
+                    .surface
+                    .withValues(alpha: 0.16),
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(color: tokens.cardBorder),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (priority.scoreline.isNotEmpty ||
+                        priority.gapSummary.isNotEmpty) ...[
+                      _ScorelinePanel(priority),
+                      const SizedBox(height: 12),
+                    ],
+                    if (priority.v3Overlay != null) ...[
+                      _V3OverlayPanel(priority.v3Overlay!),
+                      const SizedBox(height: 12),
+                    ],
+                    if (priority.intelligenceRefs.isNotEmpty) ...[
+                      _PriorityIntelligenceSection(priority.intelligenceRefs),
+                      const SizedBox(height: 12),
+                    ],
+                    if (priority.whyThis.isNotEmpty) ...[
+                      _ExplanationSection(
+                        title: "为什么它排前面",
+                        items: priority.whyThis,
+                      ),
+                      const SizedBox(height: 12),
+                    ],
+                    if (priority.whyNot.isNotEmpty) ...[
+                      _ExplanationSection(
+                        title: "需要注意什么",
+                        items: priority.whyNot,
+                      ),
+                      const SizedBox(height: 12),
+                    ],
+                    if (priority.constraints.isNotEmpty) ...[
+                      _ConstraintSection(priority.constraints),
+                      const SizedBox(height: 12),
+                    ],
+                    if (priority.execution.isNotEmpty) ...[
+                      _ExecutionSection(priority.execution),
+                      const SizedBox(height: 12),
+                    ],
+                    if (priority.alternatives.isNotEmpty)
+                      _ExplanationSection(
+                        title: "可替代选择",
+                        items: priority.alternatives,
+                      ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ],
       ),
     );
   }
+}
+
+String _compactGapLabel(String value) {
+  final normalized = value.trim();
+  if (normalized.length <= 16) {
+    return normalized;
+  }
+  return "${normalized.substring(0, 16)}...";
 }
 
 class _PriorityIntelligenceSection extends StatelessWidget {
@@ -1280,168 +1544,6 @@ class _ExecutionSection extends StatelessWidget {
               ),
             ),
       ],
-    );
-  }
-}
-
-class _ScenarioCard extends StatelessWidget {
-  const _ScenarioCard(this.scenario);
-
-  final MobileRecommendationScenario scenario;
-
-  @override
-  Widget build(BuildContext context) {
-    return LooGlassCard(
-      margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.all(14),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            "${scenario.label} · ${scenario.amount}",
-            style: Theme.of(context).textTheme.titleMedium,
-          ),
-          const SizedBox(height: 6),
-          Text(
-            [
-              scenario.summary,
-              ...scenario.diffs.take(2),
-            ].where((item) => item.isNotEmpty).join("\n"),
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: context.looTokens.mutedText,
-                ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _AdvancedScenariosCard extends StatefulWidget {
-  const _AdvancedScenariosCard({required this.scenarios});
-
-  final List<MobileRecommendationScenario> scenarios;
-
-  @override
-  State<_AdvancedScenariosCard> createState() => _AdvancedScenariosCardState();
-}
-
-class _AdvancedScenariosCardState extends State<_AdvancedScenariosCard> {
-  var _expanded = false;
-
-  @override
-  Widget build(BuildContext context) {
-    final tokens = context.looTokens;
-    return LooGlassCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          InkWell(
-            borderRadius: BorderRadius.circular(tokens.radiusMd),
-            onTap: () => setState(() => _expanded = !_expanded),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    "高级试算",
-                    style: Theme.of(context).textTheme.titleLarge,
-                  ),
-                ),
-                _InfoPill("${widget.scenarios.length} 组"),
-                const SizedBox(width: 6),
-                AnimatedRotation(
-                  turns: _expanded ? 0.5 : 0,
-                  duration: const Duration(milliseconds: 180),
-                  child: const Icon(Icons.keyboard_arrow_down_rounded),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            "对比不同投入金额下，Loo皇推荐是否稳定；不是行情预测。",
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: tokens.mutedText,
-                ),
-          ),
-          if (_expanded) ...[
-            const SizedBox(height: 12),
-            ...widget.scenarios.take(3).map(_ScenarioCard.new),
-          ],
-        ],
-      ),
-    );
-  }
-}
-
-class _TextCard extends StatelessWidget {
-  const _TextCard(this.text);
-
-  final String text;
-
-  @override
-  Widget build(BuildContext context) {
-    return LooGlassCard(
-      child: Text(text),
-    );
-  }
-}
-
-class _CollapsibleTextCard extends StatefulWidget {
-  const _CollapsibleTextCard({
-    required this.title,
-    required this.summary,
-    required this.text,
-  });
-
-  final String title;
-  final String summary;
-  final String text;
-
-  @override
-  State<_CollapsibleTextCard> createState() => _CollapsibleTextCardState();
-}
-
-class _CollapsibleTextCardState extends State<_CollapsibleTextCard> {
-  var _expanded = false;
-
-  @override
-  Widget build(BuildContext context) {
-    final tokens = context.looTokens;
-    return LooGlassCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          InkWell(
-            borderRadius: BorderRadius.circular(tokens.radiusMd),
-            onTap: () => setState(() => _expanded = !_expanded),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    widget.title,
-                    style: Theme.of(context).textTheme.titleLarge,
-                  ),
-                ),
-                AnimatedRotation(
-                  turns: _expanded ? 0.5 : 0,
-                  duration: const Duration(milliseconds: 180),
-                  child: const Icon(Icons.keyboard_arrow_down_rounded),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            _expanded ? widget.text : widget.summary,
-            maxLines: _expanded ? null : 2,
-            overflow: _expanded ? null : TextOverflow.ellipsis,
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: _expanded ? null : tokens.mutedText,
-                ),
-          ),
-        ],
-      ),
     );
   }
 }
