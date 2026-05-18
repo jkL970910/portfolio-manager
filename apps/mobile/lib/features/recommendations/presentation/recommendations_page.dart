@@ -1130,7 +1130,7 @@ class _MarketItemCard extends StatelessWidget {
     final tokens = context.looTokens;
     final moveColor = _marketMoveColor(context, item.dayChangeVariant);
     return SizedBox(
-      width: 126,
+      width: 154,
       height: 86,
       child: Material(
         color: Colors.transparent,
@@ -1169,7 +1169,8 @@ class _MarketItemCard extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(width: 6),
-                      Flexible(
+                      SizedBox(
+                        width: 72,
                         child: Text(
                           item.lastPriceLabel,
                           textAlign: TextAlign.right,
@@ -1178,18 +1179,18 @@ class _MarketItemCard extends StatelessWidget {
                           style:
                               Theme.of(context).textTheme.labelLarge?.copyWith(
                                     fontWeight: FontWeight.w800,
+                                    fontSize: 12,
                                   ),
                         ),
                       ),
+                      const SizedBox(width: 2),
                       if (trailing != null)
-                        SizedBox(width: 24, height: 24, child: trailing!),
+                        SizedBox(width: 20, height: 20, child: trailing!),
                     ],
                   ),
                   const Spacer(),
                   Text(
-                    item.hasMarketMove
-                        ? "${item.dayChangeLabel} ${item.dayChangePctLabel}"
-                        : item.dayChangeLabel,
+                    _marketMoveLabel(item),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: Theme.of(context).textTheme.labelSmall?.copyWith(
@@ -1205,6 +1206,17 @@ class _MarketItemCard extends StatelessWidget {
       ),
     );
   }
+}
+
+String _marketMoveLabel(MobileRecommendationMarketItem item) {
+  if (!item.hasMarketMove) {
+    return item.dayChangeLabel;
+  }
+  if (item.dayChangePctLabel.isNotEmpty &&
+      item.dayChangePctLabel != "今日涨跌待刷新") {
+    return "${item.dayChangeLabel} · ${item.dayChangePctLabel}";
+  }
+  return item.dayChangeLabel;
 }
 
 Color _marketMoveColor(BuildContext context, String variant) {
