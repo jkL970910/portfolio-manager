@@ -954,13 +954,9 @@ class _WatchlistCardState extends State<_WatchlistCard> {
             _MarketItemRail(
               items: resolved,
               onOpen: widget.onOpen,
-              trailingBuilder: (item) => IconButton(
-                tooltip: "移出囤货",
-                onPressed:
-                    widget.working ? null : () => widget.onRemove(item.key),
-                icon: const Icon(Icons.close_rounded, size: 18),
-                visualDensity: VisualDensity.compact,
-              ),
+              onLongPress: widget.working
+                  ? null
+                  : (item) => _confirmRemoveWatchlistItem(context, item),
             ),
           if (unresolved.isNotEmpty) ...[
             const SizedBox(height: 12),
@@ -973,6 +969,56 @@ class _WatchlistCardState extends State<_WatchlistCard> {
         ],
       ),
     );
+  }
+
+  Future<void> _confirmRemoveWatchlistItem(
+    BuildContext context,
+    MobileRecommendationMarketItem item,
+  ) async {
+    final confirmed = await showModalBottomSheet<bool>(
+      context: context,
+      showDragHandle: true,
+      builder: (context) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  "移出囤货清单？",
+                  style: Theme.of(context).textTheme.titleLarge,
+                ),
+                const SizedBox(height: 8),
+                Text("将 ${item.symbol} 从囤货清单移除。"),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () => Navigator.of(context).pop(false),
+                        child: const Text("取消"),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: FilledButton(
+                        onPressed: () => Navigator.of(context).pop(true),
+                        child: const Text("移除"),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+    if (confirmed == true && context.mounted) {
+      widget.onRemove(item.key);
+    }
   }
 }
 
@@ -1086,12 +1132,12 @@ class _MarketItemRail extends StatelessWidget {
   const _MarketItemRail({
     required this.items,
     required this.onOpen,
-    this.trailingBuilder,
+    this.onLongPress,
   });
 
   final List<MobileRecommendationMarketItem> items;
   final ValueChanged<MobileRecommendationMarketItem> onOpen;
-  final Widget Function(MobileRecommendationMarketItem item)? trailingBuilder;
+  final ValueChanged<MobileRecommendationMarketItem>? onLongPress;
 
   @override
   Widget build(BuildContext context) {
@@ -1104,7 +1150,8 @@ class _MarketItemRail extends StatelessWidget {
             _MarketItemCard(
               item: item,
               onTap: () => onOpen(item),
-              trailing: trailingBuilder?.call(item),
+              onLongPress:
+                  onLongPress == null ? null : () => onLongPress!(item),
             ),
             const SizedBox(width: 10),
           ],
@@ -1118,25 +1165,26 @@ class _MarketItemCard extends StatelessWidget {
   const _MarketItemCard({
     required this.item,
     required this.onTap,
-    this.trailing,
+    this.onLongPress,
   });
 
   final MobileRecommendationMarketItem item;
   final VoidCallback onTap;
-  final Widget? trailing;
+  final VoidCallback? onLongPress;
 
   @override
   Widget build(BuildContext context) {
     final tokens = context.looTokens;
     final moveColor = _marketMoveColor(context, item.dayChangeVariant);
     return SizedBox(
-      width: 154,
-      height: 86,
+      width: 132,
+      height: 112,
       child: Material(
         color: Colors.transparent,
         child: InkWell(
           borderRadius: BorderRadius.circular(18),
           onTap: onTap,
+          onLongPress: onLongPress,
           child: Ink(
             decoration: BoxDecoration(
               color: Theme.of(context).colorScheme.surface.withValues(
@@ -1150,58 +1198,69 @@ class _MarketItemCard extends StatelessWidget {
               ),
             ),
             child: Padding(
-              padding: const EdgeInsets.all(10),
+              padding: const EdgeInsets.all(12),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Expanded(
-                        child: Text(
-                          item.symbol,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style:
-                              Theme.of(context).textTheme.titleMedium?.copyWith(
-                                    fontWeight: FontWeight.w800,
-                                  ),
-                        ),
-                      ),
-                      const SizedBox(width: 6),
-                      SizedBox(
-                        width: 72,
-                        child: Text(
-                          item.lastPriceLabel,
-                          textAlign: TextAlign.right,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style:
-                              Theme.of(context).textTheme.labelLarge?.copyWith(
-                                    fontWeight: FontWeight.w800,
-                                    fontSize: 12,
-                                  ),
-                        ),
-                      ),
-                      const SizedBox(width: 2),
-                      if (trailing != null)
-                        SizedBox(width: 20, height: 20, child: trailing!),
-                    ],
-                  ),
-                  const Spacer(),
                   Text(
-                    _marketMoveLabel(item),
+                    item.symbol,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                          color: moveColor,
-                          fontWeight: FontWeight.w700,
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w900,
                         ),
+                  ),
+                  const SizedBox(height: 7),
+                  Text(
+                    item.lastPriceLabel,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: -0.35,
+                        ),
+                  ),
+                  const Spacer(),
+                  _MarketMoveBadge(
+                    label: _marketMoveLabel(item),
+                    color: moveColor,
                   ),
                 ],
               ),
             ),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _MarketMoveBadge extends StatelessWidget {
+  const _MarketMoveBadge({
+    required this.label,
+    required this.color,
+  });
+
+  final String label;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.16),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        child: Text(
+          label,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                color: color,
+                fontWeight: FontWeight.w800,
+              ),
         ),
       ),
     );
