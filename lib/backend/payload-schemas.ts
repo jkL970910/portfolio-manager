@@ -193,6 +193,17 @@ export const preferenceFactorsDraftRequestSchema = z.object({
   currentPreferenceFactors: preferenceFactorsSchema.optional(),
 });
 
+export const mobileSecurityObservationInputSchema = z.object({
+  securityId: z.string().trim().uuid().nullable().optional(),
+  symbol: z.string().trim().min(1).max(32),
+  exchange: z.string().trim().min(1).max(64).nullable().optional(),
+  currency: z.enum(["CAD", "USD"]).nullable().optional(),
+  name: z.string().trim().min(1).max(240).nullable().optional(),
+  source: z
+    .enum(["search", "security-detail", "recommendation", "watchlist"])
+    .default("security-detail"),
+});
+
 export const displayCurrencyInputSchema = z.object({
   currency: z.enum(["CAD", "USD"]),
 });
@@ -664,6 +675,9 @@ export type DisplayLanguageInputPayload = z.infer<
 export type RegisterUserInputPayload = z.infer<typeof registerUserInputSchema>;
 export type WatchlistSymbolInputPayload = z.infer<
   typeof watchlistSymbolInputSchema
+>;
+export type MobileSecurityObservationInputPayload = z.infer<
+  typeof mobileSecurityObservationInputSchema
 >;
 export type ImportJobCreatePayload = z.infer<typeof importJobCreateSchema>;
 export type ImportMappingPresetCreatePayload = z.infer<

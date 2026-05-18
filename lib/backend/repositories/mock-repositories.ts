@@ -18,6 +18,7 @@ import {
 import {
   ExternalResearchDocumentRecord,
   MarketSentimentSnapshot,
+  MobileSecurityObservation,
   PortfolioAnalysisGptEnhancement,
   PortfolioAnalysisRun,
 } from "@/lib/backend/models";
@@ -35,6 +36,7 @@ const externalResearchJobs: ExternalResearchJob[] = [];
 const externalResearchUsageCounters: ExternalResearchUsageCounter[] = [];
 const externalResearchDocuments: ExternalResearchDocumentRecord[] = [];
 const marketSentimentSnapshots: MarketSentimentSnapshot[] = [];
+const mobileSecurityObservations: MobileSecurityObservation[] = [];
 
 export const mockRepositories: BackendRepositories = {
   users: {
@@ -230,6 +232,60 @@ export const mockRepositories: BackendRepositories = {
       };
       securityAliases.push(alias);
       return alias;
+    },
+  },
+  mobileSecurityObservations: {
+    async upsert(input) {
+      const now = input.observedAt.toISOString();
+      const symbol = input.symbol.trim().toUpperCase();
+      const exchange = input.exchange?.trim().toUpperCase() || null;
+      const currency =
+        input.currency?.trim().toUpperCase() === "USD"
+          ? "USD"
+          : input.currency?.trim().toUpperCase() === "CAD"
+            ? "CAD"
+            : null;
+      const existing = mobileSecurityObservations.find(
+        (item) =>
+          item.userId === input.userId &&
+          item.symbol === symbol &&
+          (item.exchange ?? "") === (exchange ?? "") &&
+          (item.currency ?? "") === (currency ?? ""),
+      );
+      if (existing) {
+        existing.securityId = input.securityId ?? existing.securityId;
+        existing.name = input.name?.trim() || existing.name;
+        existing.source = input.source;
+        existing.observationCount += 1;
+        existing.lastObservedAt = now;
+        existing.updatedAt = now;
+        return existing;
+      }
+      const observation: MobileSecurityObservation = {
+        id: `mobile_security_observation_${mobileSecurityObservations.length + 1}`,
+        userId: input.userId,
+        securityId: input.securityId ?? null,
+        symbol,
+        exchange,
+        currency,
+        name: input.name?.trim() || null,
+        source: input.source,
+        observationCount: 1,
+        lastObservedAt: now,
+        createdAt: now,
+        updatedAt: now,
+      };
+      mobileSecurityObservations.unshift(observation);
+      return observation;
+    },
+    async listRecentByUserId(userId, limit) {
+      return mobileSecurityObservations
+        .filter((item) => item.userId === userId)
+        .sort(
+          (left, right) =>
+            Date.parse(right.lastObservedAt) - Date.parse(left.lastObservedAt),
+        )
+        .slice(0, limit);
     },
   },
   preferences: {

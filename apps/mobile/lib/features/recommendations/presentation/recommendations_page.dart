@@ -1,3 +1,5 @@
+import "dart:async";
+
 import "package:flutter/material.dart";
 import "package:go_router/go_router.dart";
 
@@ -260,6 +262,16 @@ class _RecommendationsPageState extends State<RecommendationsPage> {
       return;
     }
 
+    unawaited(widget.apiClient.recordSecurityObservation(
+      symbol: priority.securitySymbol,
+      securityId: priority.securityId,
+      exchange: priority.securityExchange,
+      currency: priority.securityCurrency,
+      name: priority.security.isNotEmpty
+          ? priority.security
+          : priority.description,
+      source: "recommendation",
+    ).catchError((_) {}));
     context.push(
       MobileRoutes.securityDetail(
         symbol: priority.securitySymbol,
@@ -278,6 +290,14 @@ class _RecommendationsPageState extends State<RecommendationsPage> {
     if (item.symbol.isEmpty) {
       return;
     }
+    unawaited(widget.apiClient.recordSecurityObservation(
+      symbol: item.symbol,
+      securityId: item.securityId,
+      exchange: item.exchange,
+      currency: item.currency,
+      name: item.name,
+      source: item.poolStatus == "eligible" ? "recommendation" : "watchlist",
+    ).catchError((_) {}));
     context.push(
       MobileRoutes.securityDetail(
         symbol: item.symbol,

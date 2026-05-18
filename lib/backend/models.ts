@@ -152,6 +152,27 @@ export interface SecurityRecord {
   updatedAt: string;
 }
 
+export type MobileSecurityObservationSource =
+  | "search"
+  | "security-detail"
+  | "recommendation"
+  | "watchlist";
+
+export interface MobileSecurityObservation {
+  id: EntityId;
+  userId: EntityId;
+  securityId: EntityId | null;
+  symbol: string;
+  exchange: string | null;
+  currency: CurrencyCode | null;
+  name: string | null;
+  source: MobileSecurityObservationSource;
+  observationCount: number;
+  lastObservedAt: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export type SecurityMetadataSource =
   | "manual"
   | "provider"

@@ -4110,6 +4110,39 @@ export function buildPortfolioSecurityDetailData(args: {
       label: point.label,
       value: round((point.value / (series[0]?.value || 1)) * 100, 1),
     }));
+  const priceHistoryChart = buildSecurityPriceHistoryChartSeries({
+    symbol: normalizedSymbol,
+    exchange: normalizedExchange,
+    currency: normalizedCurrency,
+    priceHistory,
+    fallbackPerformance: performance,
+    language,
+  });
+  const latestChartPoint = priceHistoryChart.points.at(-1);
+  const chartBackedStatus =
+    priceHistoryChart.valueType === "money" &&
+    priceHistoryChart.freshness.status !== "fallback";
+  const chartCurrency =
+    priceHistoryChart.currency ?? normalizedCurrency ?? referenceHolding?.currency;
+  const chartQuoteLabel =
+    latestChartPoint && chartCurrency
+      ? formatMoney(latestChartPoint.value, chartCurrency)
+      : null;
+  const chartTimestampLabel =
+    priceHistoryChart.freshness.latestDate ??
+    pick(language, "走势时间待确认", "Chart timestamp pending");
+  const chartQuoteStatusLabel =
+    priceHistoryChart.freshness.status === "fresh"
+      ? priceHistoryChart.freshness.label
+      : priceHistoryChart.freshness.status === "stale"
+        ? pick(language, "走势可能过期", "Chart may be stale")
+        : pick(language, "报价待确认", "Quote unverified");
+  const chartFreshnessVariant =
+    priceHistoryChart.freshness.status === "fresh"
+      ? "success"
+      : priceHistoryChart.freshness.status === "stale"
+        ? "warning"
+        : "neutral";
 
   return {
     displayContext: portfolio.displayContext,
@@ -4137,15 +4170,21 @@ export function buildPortfolioSecurityDetailData(args: {
       marketSector: pick(language, "正在识别", "Resolving"),
       lastPrice:
         referenceViewHolding?.lastPrice ??
+        (chartBackedStatus ? chartQuoteLabel : null) ??
         pick(language, "还没拿到价格", "No quote yet"),
       quoteTimestamp:
         referenceViewHolding?.lastUpdated ??
+        (chartBackedStatus ? chartTimestampLabel : null) ??
         pick(language, "还没刷新过", "Not refreshed yet"),
-      freshnessVariant: referenceViewHolding?.freshnessVariant ?? "neutral",
+      freshnessVariant:
+        referenceViewHolding?.freshnessVariant ??
+        (chartBackedStatus ? chartFreshnessVariant : "neutral"),
       quoteStatus: referenceHolding?.quoteStatus ?? null,
       quoteStatusLabel: referenceHolding
         ? getHoldingQuoteStatusLabel(referenceHolding, language)
-        : pick(language, "报价待确认", "Quote unverified"),
+        : chartBackedStatus
+          ? chartQuoteStatusLabel
+          : pick(language, "报价待确认", "Quote unverified"),
     },
     facts: [
       {
@@ -4286,14 +4325,7 @@ export function buildPortfolioSecurityDetailData(args: {
     },
     performance,
     chartSeries: {
-      priceHistory: buildSecurityPriceHistoryChartSeries({
-        symbol: normalizedSymbol,
-        exchange: normalizedExchange,
-        currency: normalizedCurrency,
-        priceHistory,
-        fallbackPerformance: performance,
-        language,
-      }),
+      priceHistory: priceHistoryChart,
     },
     summaryPoints: [
       totalValueCad > 0

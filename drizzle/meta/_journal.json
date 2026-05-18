@@ -197,6 +197,13 @@
       "when": 1778191200000,
       "tag": "0027_portfolio_analysis_gpt_enhancements",
       "breakpoints": true
+    },
+    {
+      "idx": 28,
+      "version": "7",
+      "when": 1779120000000,
+      "tag": "0028_mobile_security_observations",
+      "breakpoints": true
     }
   ]
 }

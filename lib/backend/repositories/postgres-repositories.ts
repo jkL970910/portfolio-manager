@@ -12,6 +12,7 @@ import {
   importJobs,
   investmentAccounts,
   marketSentimentSnapshots,
+  mobileSecurityObservations,
   portfolioAnalysisGptEnhancements,
   portfolioEvents,
   portfolioAnalysisRuns,
@@ -34,6 +35,7 @@ import {
   ExternalResearchJob,
   ExternalResearchUsageCounter,
   MarketSentimentSnapshot,
+  MobileSecurityObservation,
   PortfolioAnalysisGptEnhancement,
   PortfolioEvent,
   PortfolioAnalysisRun,
@@ -159,6 +161,27 @@ function mapSecurityAlias(
     aliasValue: row.aliasValue,
     provider: row.provider ?? null,
     createdAt: row.createdAt.toISOString(),
+  };
+}
+
+function mapMobileSecurityObservation(
+  row: typeof mobileSecurityObservations.$inferSelect,
+): MobileSecurityObservation {
+  return {
+    id: row.id,
+    userId: row.userId,
+    securityId: row.securityId ?? null,
+    symbol: row.symbol,
+    exchange: row.exchange || null,
+    currency:
+      row.currency === "CAD" || row.currency === "USD" ? row.currency : null,
+    name: row.name ?? null,
+    source:
+      row.source as MobileSecurityObservation["source"],
+    observationCount: row.observationCount,
+    lastObservedAt: row.lastObservedAt.toISOString(),
+    createdAt: row.createdAt.toISOString(),
+    updatedAt: row.updatedAt.toISOString(),
   };
 }
 
@@ -918,6 +941,58 @@ export const postgresRepositories: BackendRepositories = {
         throw new Error("Failed to add security alias.");
       }
       return mapSecurityAlias(insertedByRace);
+    },
+  },
+  mobileSecurityObservations: {
+    async upsert(input) {
+      const db = getDb();
+      const symbol = input.symbol.trim().toUpperCase();
+      const exchange = input.exchange?.trim().toUpperCase() || "";
+      const currency = input.currency?.trim().toUpperCase() || "";
+      const [row] = await db
+        .insert(mobileSecurityObservations)
+        .values({
+          userId: input.userId,
+          securityId: input.securityId ?? null,
+          symbol,
+          exchange,
+          currency,
+          name: input.name?.trim() || null,
+          source: input.source,
+          observationCount: 1,
+          lastObservedAt: input.observedAt,
+          updatedAt: input.observedAt,
+        })
+        .onConflictDoUpdate({
+          target: [
+            mobileSecurityObservations.userId,
+            mobileSecurityObservations.symbol,
+            mobileSecurityObservations.exchange,
+            mobileSecurityObservations.currency,
+          ],
+          set: {
+            securityId: input.securityId ?? undefined,
+            name: input.name?.trim() || undefined,
+            source: input.source,
+            observationCount: sql`${mobileSecurityObservations.observationCount} + 1`,
+            lastObservedAt: input.observedAt,
+            updatedAt: input.observedAt,
+          },
+        })
+        .returning();
+      if (!row) {
+        throw new Error("Failed to record security observation.");
+      }
+      return mapMobileSecurityObservation(row);
+    },
+    async listRecentByUserId(userId, limit) {
+      const db = getDb();
+      const rows = await db.query.mobileSecurityObservations.findMany({
+        where: eq(mobileSecurityObservations.userId, userId),
+        orderBy: desc(mobileSecurityObservations.lastObservedAt),
+        limit,
+      });
+      return rows.map(mapMobileSecurityObservation);
     },
   },
   preferences: {

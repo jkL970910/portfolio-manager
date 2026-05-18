@@ -16,6 +16,7 @@ import {
   SecurityPriceHistoryPoint,
   SecurityRecord,
   MarketSentimentSnapshot,
+  MobileSecurityObservation,
   PortfolioAnalysisGptEnhancement,
   PreferenceProfile,
   RecommendationRun,
@@ -114,6 +115,23 @@ export interface SecurityRepository {
   addAlias(
     input: Omit<SecurityAliasRecord, "id" | "createdAt">,
   ): Promise<SecurityAliasRecord>;
+}
+
+export interface MobileSecurityObservationRepository {
+  upsert(input: {
+    userId: EntityId;
+    securityId?: EntityId | null;
+    symbol: string;
+    exchange?: string | null;
+    currency?: string | null;
+    name?: string | null;
+    source: MobileSecurityObservation["source"];
+    observedAt: Date;
+  }): Promise<MobileSecurityObservation>;
+  listRecentByUserId(
+    userId: EntityId,
+    limit: number,
+  ): Promise<MobileSecurityObservation[]>;
 }
 
 export interface PreferenceRepository {
@@ -243,6 +261,7 @@ export interface BackendRepositories {
   snapshots: PortfolioSnapshotRepository;
   securityPriceHistory: SecurityPriceHistoryRepository;
   securities: SecurityRepository;
+  mobileSecurityObservations: MobileSecurityObservationRepository;
   preferences: PreferenceRepository;
   recommendations: RecommendationRepository;
   analysisRuns: PortfolioAnalysisRunRepository;

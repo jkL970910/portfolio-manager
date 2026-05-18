@@ -1,3 +1,5 @@
+import "dart:async";
+
 import "package:flutter/material.dart";
 
 import "../../../core/api/loo_api_client.dart";
@@ -117,6 +119,13 @@ class _DiscoverPageState extends State<DiscoverPage> {
   }
 
   void _openSecurityDetail(MobileDiscoverSecurityCandidate candidate) {
+    unawaited(_recordObservation(
+      symbol: candidate.symbol,
+      exchange: candidate.exchange,
+      currency: candidate.currency,
+      name: candidate.name,
+      source: "search",
+    ));
     Navigator.of(context).push(
       MaterialPageRoute<void>(
         builder: (_) => SecurityDetailPage(
@@ -133,6 +142,13 @@ class _DiscoverPageState extends State<DiscoverPage> {
   void _openWatchlistSymbol(String watchlistKey) {
     final identity = _WatchlistIdentity.parse(watchlistKey);
     if (identity.symbol.isEmpty) return;
+    unawaited(_recordObservation(
+      symbol: identity.symbol,
+      exchange: identity.exchange,
+      currency: identity.currency,
+      name: identity.label,
+      source: "watchlist",
+    ));
     Navigator.of(context).push(
       MaterialPageRoute<void>(
         builder: (_) => SecurityDetailPage(
@@ -144,6 +160,26 @@ class _DiscoverPageState extends State<DiscoverPage> {
         ),
       ),
     );
+  }
+
+  Future<void> _recordObservation({
+    required String symbol,
+    String? exchange,
+    String? currency,
+    String? name,
+    required String source,
+  }) async {
+    try {
+      await widget.apiClient.recordSecurityObservation(
+        symbol: symbol,
+        exchange: exchange,
+        currency: currency,
+        name: name,
+        source: source,
+      );
+    } catch (_) {
+      // Observation history should not block search navigation.
+    }
   }
 
   @override

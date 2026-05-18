@@ -29,6 +29,7 @@ import {
   RecommendationStrategy,
   AccountType,
   UserProfile,
+  MobileSecurityObservation,
 } from "@/lib/backend/models";
 import {
   buildPortfolioAccountDetailData,
@@ -95,6 +96,7 @@ import {
 } from "@/lib/market-data/service";
 import { resolveCanonicalSecurityIdentity } from "@/lib/market-data/security-identity";
 import { inferEconomicAssetClass } from "@/lib/backend/security-economic-exposure";
+import type { MobileSecurityObservationInputPayload } from "@/lib/backend/payload-schemas";
 import type {
   SecurityQuote,
   SecurityHistoricalPoint,
@@ -2276,6 +2278,53 @@ export async function getPortfolioSecurityDetailView(
   }
 
   return apiSuccess({ data }, "database");
+}
+
+export async function recordMobileSecurityObservation(
+  userId: string,
+  input: MobileSecurityObservationInputPayload,
+): Promise<MobileSecurityObservation> {
+  const repositories = getRepositories();
+  const symbol = input.symbol.trim().toUpperCase();
+  let securityId = input.securityId ?? null;
+  let exchange = input.exchange?.trim().toUpperCase() || null;
+  let currency = input.currency ?? null;
+  let name = input.name?.trim() || null;
+
+  if (securityId) {
+    const security = await repositories.securities.getById(securityId);
+    if (security) {
+      exchange = security.canonicalExchange;
+      currency = security.currency;
+      name = name || security.name;
+    } else {
+      securityId = null;
+    }
+  }
+
+  if (!securityId && exchange && currency) {
+    const security = await resolveCanonicalSecurityIdentity({
+      symbol,
+      exchange,
+      currency,
+      name,
+    });
+    securityId = security.id;
+    exchange = security.canonicalExchange;
+    currency = security.currency;
+    name = name || security.name;
+  }
+
+  return repositories.mobileSecurityObservations.upsert({
+    userId,
+    securityId,
+    symbol,
+    exchange,
+    currency,
+    name,
+    source: input.source,
+    observedAt: new Date(),
+  });
 }
 
 export async function updateHoldingPosition(

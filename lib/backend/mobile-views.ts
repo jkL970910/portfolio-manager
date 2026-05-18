@@ -40,6 +40,7 @@ import type {
   CitizenProfile,
   ExternalResearchDocumentRecord,
   HoldingPosition,
+  MobileSecurityObservation,
   SecurityPriceHistoryPoint,
 } from "@/lib/backend/models";
 
@@ -959,6 +960,7 @@ async function mapMobileRecommendationsData(
   preferenceContext: MobileRecommendationsData["preferenceContext"],
   intelligenceBriefs: RecommendationsData["intelligenceBriefs"] = [],
   userId: string,
+  observations: MobileSecurityObservation[] = [],
 ): Promise<MobileRecommendationsData> {
   const externalBriefCount = intelligenceBriefs.filter(
     (brief) => brief.sourceMode !== "local",
@@ -967,6 +969,7 @@ async function mapMobileRecommendationsData(
     userId,
     watchlistSymbols: preferenceContext.watchlistSymbols,
     priorities: data.priorities,
+    observations,
   });
   return {
     ...data,
@@ -1036,6 +1039,7 @@ async function buildMobileRecommendationMarketItems(input: {
   userId: string;
   watchlistSymbols: string[];
   priorities: RecommendationsData["priorities"];
+  observations: MobileSecurityObservation[];
 }): Promise<{
   watchlistMarketItems: MobileRecommendationMarketItem[];
   recentObservationItems: MobileRecommendationMarketItem[];
@@ -1052,22 +1056,22 @@ async function buildMobileRecommendationMarketItems(input: {
     ),
   );
   const seen = new Set(watchlistMarketItems.map((item) => item.key));
-  const recentCandidates = input.priorities
-    .filter((priority) => priority.securitySymbol.trim().length > 0)
-    .map((priority) => ({
+  const recentCandidates = input.observations
+    .filter((observation) => observation.symbol.trim().length > 0)
+    .map((observation) => ({
       key: [
-        priority.securitySymbol,
-        priority.securityExchange ?? "",
-        priority.securityCurrency ?? "",
+        observation.symbol,
+        observation.exchange ?? "",
+        observation.currency ?? "",
       ]
         .filter(Boolean)
         .join(":"),
       identity: {
-        symbol: priority.securitySymbol,
-        exchange: priority.securityExchange ?? null,
-        currency: priority.securityCurrency ?? null,
-        securityId: priority.securityId ?? null,
-        name: priority.security || priority.description,
+        symbol: observation.symbol,
+        exchange: observation.exchange ?? null,
+        currency: observation.currency ?? null,
+        securityId: observation.securityId ?? null,
+        name: observation.name ?? observation.symbol,
       },
     }))
     .filter((candidate) => {
@@ -2071,11 +2075,14 @@ export async function getMobilePortfolioSecurityDetailView(
 }
 
 export async function getMobileRecommendationsView(userId: string) {
-  const [payload, profile, dailyIntelligenceItems] = await Promise.all([
-    getRecommendationView(userId),
-    getRepositories().preferences.getByUserId(userId),
-    getDailyIntelligenceItemsForUser(userId, 8),
-  ]);
+  const repositories = getRepositories();
+  const [payload, profile, dailyIntelligenceItems, observations] =
+    await Promise.all([
+      getRecommendationView(userId),
+      repositories.preferences.getByUserId(userId),
+      getDailyIntelligenceItemsForUser(userId, 8),
+      repositories.mobileSecurityObservations.listRecentByUserId(userId, 12),
+    ]);
   const intelligenceBriefs = dailyIntelligenceItems.map(
     mapDailyIntelligenceItemToRecommendationBrief,
   );
@@ -2095,6 +2102,7 @@ export async function getMobileRecommendationsView(userId: string) {
       },
       intelligenceBriefs,
       userId,
+      observations,
     ),
     meta: payload.meta,
   };

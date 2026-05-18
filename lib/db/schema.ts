@@ -360,6 +360,47 @@ export const securityAliases = pgTable(
   }),
 );
 
+export const mobileSecurityObservations = pgTable(
+  "mobile_security_observations",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id),
+    securityId: uuid("security_id").references(() => securities.id),
+    symbol: varchar("symbol", { length: 32 }).notNull(),
+    exchange: varchar("exchange", { length: 64 }).notNull().default(""),
+    currency: varchar("currency", { length: 3 }).notNull().default(""),
+    name: varchar("name", { length: 240 }),
+    source: varchar("source", { length: 32 }).notNull().default("security-detail"),
+    observationCount: integer("observation_count").notNull().default(1),
+    lastObservedAt: timestamp("last_observed_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => ({
+    userIdentityIdx: uniqueIndex("mobile_security_observations_user_identity_idx").on(
+      table.userId,
+      table.symbol,
+      table.exchange,
+      table.currency,
+    ),
+    userRecentIdx: index("mobile_security_observations_user_recent_idx").on(
+      table.userId,
+      table.lastObservedAt,
+    ),
+    securityIdx: index("mobile_security_observations_security_idx").on(
+      table.securityId,
+    ),
+  }),
+);
+
 export const preferenceProfiles = pgTable(
   "preference_profiles",
   {

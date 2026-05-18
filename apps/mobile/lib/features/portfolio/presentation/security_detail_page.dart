@@ -93,6 +93,7 @@ class _SecurityDetailPageState extends State<SecurityDetailPage> {
     _securityId = snapshot.securityId.isNotEmpty ? snapshot.securityId : null;
     _resolvedExchange = snapshot.exchange.isNotEmpty ? snapshot.exchange : null;
     _resolvedCurrency = snapshot.currency.isNotEmpty ? snapshot.currency : null;
+    unawaited(_recordObservation(snapshot));
     if (mounted) {
       LooMinisterScope.report(
         context,
@@ -102,6 +103,24 @@ class _SecurityDetailPageState extends State<SecurityDetailPage> {
       );
     }
     return snapshot;
+  }
+
+  Future<void> _recordObservation(
+    MobileSecurityDetailSnapshot snapshot, {
+    String source = "security-detail",
+  }) async {
+    try {
+      await widget.apiClient.recordSecurityObservation(
+        symbol: snapshot.symbol,
+        securityId: snapshot.securityId,
+        exchange: snapshot.exchange,
+        currency: snapshot.currency,
+        name: snapshot.name,
+        source: source,
+      );
+    } catch (_) {
+      // Observation history should not block the security page.
+    }
   }
 
   void _refresh() {
@@ -151,6 +170,9 @@ class _SecurityDetailPageState extends State<SecurityDetailPage> {
             : _normalizeWatchlistSymbols(symbols);
         _isUpdatingWatchlist = false;
       });
+      if (!tracked) {
+        unawaited(_recordObservation(data, source: "watchlist"));
+      }
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(tracked ? "$key 已移出囤货清单。" : "$key 已加入囤货清单。")),
       );

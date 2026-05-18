@@ -151,6 +151,28 @@ class LooApiClient {
         "/api/mobile/market-data/search?query=${Uri.encodeQueryComponent(query)}");
   }
 
+  Future<void> recordSecurityObservation({
+    required String symbol,
+    String? securityId,
+    String? exchange,
+    String? currency,
+    String? name,
+    String source = "security-detail",
+  }) async {
+    await _postJson(
+      "/api/mobile/observations/securities",
+      body: {
+        "symbol": symbol,
+        if (securityId != null && securityId.isNotEmpty)
+          "securityId": securityId,
+        if (exchange != null && exchange.isNotEmpty) "exchange": exchange,
+        if (currency != null && currency.isNotEmpty) "currency": currency,
+        if (name != null && name.isNotEmpty) "name": name,
+        "source": source,
+      },
+    );
+  }
+
   Future<Map<String, dynamic>> createManualAccount({
     required String accountType,
     required String institution,
