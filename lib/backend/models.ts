@@ -456,6 +456,16 @@ export interface RecommendationRun {
   engineVersion?: string | null;
   objective?: string | null;
   confidenceScore?: number | null;
+  poolStatus?: {
+    status: "ok" | "needs_policy_relaxation";
+    reason?: string;
+    blockers?: string[];
+    suggestedRelaxations?: {
+      type: "allow_role" | "allow_asset_class" | "lower_threshold";
+      value: string;
+      label: string;
+    }[];
+  };
   items: RecommendationItem[];
   assumptions: string[];
   notes?: string[];

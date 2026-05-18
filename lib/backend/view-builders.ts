@@ -1652,6 +1652,40 @@ function sanitizeRecommendationNotes(notes: string[] | null | undefined) {
   });
 }
 
+function deriveRecommendationPoolStatus(
+  run: RecommendationRun | null,
+): RecommendationsData["poolStatus"] {
+  if (run?.poolStatus) {
+    return run.poolStatus;
+  }
+  const notes = sanitizeRecommendationNotes(run?.notes);
+  const policyNote = notes.find(
+    (note) =>
+      note.includes("进货规矩过严") ||
+      note.toLowerCase().includes("pool policy is too strict"),
+  );
+  if (!policyNote) {
+    return { status: "ok" };
+  }
+  return {
+    status: "needs_policy_relaxation",
+    reason: "当前进货规矩排除了所有可推荐标的。",
+    blockers: [policyNote],
+    suggestedRelaxations: [
+      {
+        type: "allow_role",
+        value: "core",
+        label: "允许核心池标的",
+      },
+      {
+        type: "lower_threshold",
+        value: "liquidity",
+        label: "降低流动性门槛",
+      },
+    ],
+  };
+}
+
 function getPortfolioQuoteStatus(
   holdings: HoldingPosition[],
   language: DisplayLanguage,
@@ -5058,6 +5092,7 @@ export function buildRecommendationsData(args: {
         account: getAccountTypeLabel(item.targetAccountType, language),
       })),
     })),
+    poolStatus: deriveRecommendationPoolStatus(latestRun),
     notes: [
       profile.taxAwarePlacement
         ? pick(

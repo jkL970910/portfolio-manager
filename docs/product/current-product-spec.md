@@ -313,6 +313,23 @@ Accepted V3 foundation:
   compares guardrail, valuation, key-level, and market-pulse state over time.
   GPT summaries should be optional or triggered only by material changes.
 
+Next V3 engine rule:
+
+- `CandidatePoolPolicy` is the hard eligibility gate before scoring. It uses
+  Preference Factors V2, recommendation constraints, account availability,
+  clean identity, economic exposure, concentration, liquidity/cash goals, and
+  provider confidence to decide which candidates may enter the ranking.
+- If the user's hard filters are too strict and remove every candidate, the app
+  should not fabricate or force a default recommendation. It should show
+  `进货规矩过严，暂无可推荐标的`, list the blockers, and let the user explicitly
+  relax the rule set.
+- Fallback is allowed only after user confirmation, should be limited to
+  high-confidence core-pool candidates, and must be visibly labeled as
+  `放宽规则后的核心池候选`.
+- Dynamic provider discovery belongs to workers and a reviewed candidate
+  registry. Low-confidence or identity-incomplete rows belong in `待鉴定包裹`,
+  not the main recommendation list.
+
 ### 8. Preferences
 
 Investment preferences support:

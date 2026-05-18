@@ -16,9 +16,16 @@ import {
   isEconomicExposureDifferent
 } from "@/lib/backend/security-economic-exposure";
 import {
-  getCoreRecommendationUniverse,
-  type CoreRecommendationCandidate,
-} from "@/lib/backend/recommendation-v3/core-universe";
+  candidateIdentityKey,
+  listRecommendationCandidates,
+  type RecommendationCandidate,
+} from "@/lib/backend/recommendation-v3/candidate-provider";
+import {
+  buildCandidatePoolPolicy,
+  evaluateCandidatePool,
+  type RecommendationPoolStatus,
+} from "@/lib/backend/recommendation-v3/candidate-pool-policy";
+import { getCoreRecommendationUniverse } from "@/lib/backend/recommendation-v3/core-universe";
 
 const DEFAULT_TARGETS_BY_RISK = {
   Conservative: [
@@ -44,7 +51,7 @@ const DEFAULT_TARGETS_BY_RISK = {
   ]
 } as const;
 
-type SecurityCandidate = CoreRecommendationCandidate;
+type SecurityCandidate = RecommendationCandidate;
 
 type FxPolicy = {
   hasUsdFundingPath: boolean;
@@ -128,8 +135,6 @@ function isAccountEligibleForContribution(account: InvestmentAccount) {
 
   return account.contributionRoomCad > 0;
 }
-
-const SECURITY_UNIVERSE = getCoreRecommendationUniverse();
 
 const ACCOUNT_FIT_MATRIX: Record<string, Record<AccountType, number>> = {
   "Canadian Equity": { TFSA: 0.9, RRSP: 0.82, FHSA: 0.9, Taxable: 0.78 },
@@ -375,38 +380,25 @@ function scoreSecurityCandidate(
   };
 }
 
-function buildSecurityUniverse(assetClass: string) {
-  return SECURITY_UNIVERSE[assetClass] ?? [
-    {
-      symbol: "VCN",
-      name: "Fallback Core ETF",
-      assetClass,
-      currency: "CAD",
-      exchange: "TSX",
-      securityType: "ETF",
-      expenseBps: 12,
-      liquidityScore: 75,
-      tags: ["fallback"],
-      source: "core_pool",
-      role: "core",
-    }
-  ];
-}
-
-function getAllowedSecurityUniverse(assetClass: string, profile: PreferenceProfile) {
-  const excludedSymbols = new Set(profile.recommendationConstraints.excludedSymbols);
-  const candidates = buildSecurityUniverse(assetClass).filter(
-    (candidate) => !excludedSymbols.has(candidate.symbol.toUpperCase())
-  );
-  const typeFiltered = candidates.filter((candidate) =>
-    isSecurityTypeAllowed(profile, candidate.securityType ?? "ETF")
-  );
-
-  return typeFiltered.length > 0
-    ? typeFiltered
-    : candidates.length > 0
-      ? candidates
-      : buildSecurityUniverse(assetClass);
+function getAllowedSecurityUniverse(input: {
+  assetClass: string;
+  profile: PreferenceProfile;
+  portfolioCashPct: number;
+}) {
+  const policy = buildCandidatePoolPolicy({
+    profile: input.profile,
+    assetClass: input.assetClass,
+    portfolioCashPct: input.portfolioCashPct,
+  });
+  return evaluateCandidatePool({
+    candidates: listRecommendationCandidates({
+      assetClass: input.assetClass,
+      watchlistSymbols: input.profile.watchlistSymbols,
+    }),
+    policy,
+    constraints: input.profile.recommendationConstraints,
+    assetClass: input.assetClass,
+  });
 }
 
 function getPreferredSymbolBoost(profile: PreferenceProfile, symbol: string) {
@@ -436,7 +428,7 @@ function getConstrainedTargetPct(profile: PreferenceProfile, assetClass: string,
 }
 
 function buildKnownUniverseLookup() {
-  return Object.values(SECURITY_UNIVERSE)
+  return Object.values(getCoreRecommendationUniverse())
     .flat()
     .reduce<Map<string, SecurityCandidate>>((map, candidate) => {
       map.set(candidate.symbol.toUpperCase(), candidate);
@@ -499,13 +491,30 @@ function buildRunNotes(profile: PreferenceProfile, fxPolicy: FxPolicy, language:
   ];
 }
 
+function formatPoolStatusNote(
+  poolStatus: RecommendationPoolStatus,
+  language: DisplayLanguage,
+) {
+  if (poolStatus.status === "ok") {
+    return null;
+  }
+  const blockers = poolStatus.blockers.slice(0, 3).join("；");
+  return pick(
+    language,
+    `进货规矩过严：${blockers || poolStatus.reason}。本轮没有静默塞入默认标的。`,
+    `Pool policy is too strict: ${blockers || poolStatus.reason}. This run did not silently force a default candidate.`,
+  );
+}
+
 export function buildRecommendationV2(args: {
   accounts: InvestmentAccount[];
   holdings: HoldingPosition[];
   profile: PreferenceProfile;
   contributionAmountCad: number;
   language: DisplayLanguage;
-}): Pick<RecommendationRun, "assumptions" | "items" | "notes" | "engineVersion" | "objective" | "confidenceScore"> {
+}): Pick<RecommendationRun, "assumptions" | "items" | "notes" | "engineVersion" | "objective" | "confidenceScore"> & {
+  poolStatus?: RecommendationPoolStatus;
+} {
   const { accounts, holdings, profile, contributionAmountCad, language } = args;
   const { total, allocation } = getCurrentAllocationFromHoldings(holdings);
   const targetAllocation = getTargetAllocation(profile);
@@ -538,17 +547,27 @@ export function buildRecommendationV2(args: {
     .sort((left, right) => right.gapPct - left.gapPct);
 
   const priorities = targetGaps.slice(0, 3);
+  const poolStatuses: RecommendationPoolStatus[] = [];
 
   const totalGap = priorities.reduce((sum, item) => sum + item.gapPct, 0) || 1;
   let allocatedSoFar = 0;
-  const items: RecommendationRun["items"] = priorities.map((priority, index) => {
+  const items: RecommendationRun["items"] = priorities.flatMap((priority, index) => {
     const share = priority.gapPct / totalGap;
     const rawAmount = index === priorities.length - 1
       ? Math.max(0, contributionAmountCad - allocatedSoFar)
       : Math.max(0, Math.round((contributionAmountCad * share) / 100) * 100);
     allocatedSoFar += rawAmount;
 
-    const candidates = getAllowedSecurityUniverse(priority.assetClass, profile);
+    const candidatePool = getAllowedSecurityUniverse({
+      assetClass: priority.assetClass,
+      profile,
+      portfolioCashPct: allocation.get("Cash") ?? 0,
+    });
+    poolStatuses.push(candidatePool.poolStatus);
+    const candidates = candidatePool.eligibleCandidates;
+    if (candidates.length === 0) {
+      return [];
+    }
     const accountPlacements = candidates.map((candidate) => {
       const placement = scoreAccountPlacement(accounts, profile, priority.assetClass, candidate.currency, fxPolicy);
       const security = scoreSecurityCandidate(candidate, priority.assetClass, placement.account, holdings, profile, fxPolicy);
@@ -569,7 +588,7 @@ export function buildRecommendationV2(args: {
     const existingHolding = holdings
       .filter((holding) => getHoldingEconomicAssetClass(holding) === priority.assetClass)
       .sort((left, right) => right.weightPct - left.weightPct)[0];
-    return {
+    return [{
       assetClass: priority.assetClass,
       amountCad: rawAmount,
       targetAccountType: best.placement.account.type,
@@ -615,7 +634,7 @@ export function buildRecommendationV2(args: {
         existingHoldingWeightPct: existingHolding?.weightPct,
         existingHoldingRiskContributionPct: existingHolding ? holdingRiskContribution.get(existingHolding.symbol.toUpperCase()) ?? undefined : undefined
       }
-    };
+    }];
   });
 
   const confidenceScore = round(
@@ -638,6 +657,13 @@ export function buildRecommendationV2(args: {
           ),
         ]
       : [];
+  const poolStatusNotes = poolStatuses
+    .map((status) => formatPoolStatusNote(status, language))
+    .filter((note): note is string => Boolean(note));
+  const firstBlockedPool = poolStatuses.find(
+    (status): status is Extract<RecommendationPoolStatus, { status: "needs_policy_relaxation" }> =>
+      status.status === "needs_policy_relaxation",
+  );
 
   return {
     engineVersion: "v2.1",
@@ -646,13 +672,15 @@ export function buildRecommendationV2(args: {
     assumptions: buildRunNotes(profile, fxPolicy, language),
     notes: [
       ...noPositiveGapNotes,
+      ...poolStatusNotes,
       pick(language, "这一版只帮你安排新增的钱，不会主动建议你先卖出旧持仓。", "This version only plans new money and does not ask you to sell old holdings first."),
       pick(language, "V2.1 已开始读取进阶偏好，但账户匹配、税务放置和标的 universe 仍然是规则型判断。", "V2.1 now reads advanced preferences, but account fit, tax placement, and the security universe remain rule-based."),
       fxPolicy.hasUsdFundingPath
         ? pick(language, "因为你有 USD 入金路径，系统不会自动回避美股，只会轻度考虑换汇成本。", "Because a USD funding path is available, the engine does not automatically avoid USD securities.")
         : pick(language, "因为系统没看到稳定的 USD 入金路径，美股方案会更容易被换汇成本压低。", "Because no stable USD funding path was detected, USD ideas are pushed down more by FX drag.")
     ],
-    items
+    items,
+    poolStatus: firstBlockedPool ?? { status: "ok" },
   };
 }
 
@@ -714,8 +742,12 @@ export function scoreCandidateSecurity(args: {
     expenseBps: knownCandidate?.expenseBps ?? 18,
     liquidityScore: knownCandidate?.liquidityScore ?? 72,
     tags: knownCandidate?.tags ?? ["manual-candidate"],
-    source: knownCandidate?.source ?? "core_pool",
+    source: knownCandidate?.source ?? "watchlist",
     role: knownCandidate?.role ?? "satellite",
+    providerConfidence: knownCandidate ? "high" : "medium",
+    sourceNote: knownCandidate
+      ? "Known universe candidate."
+      : "Manual candidate.",
   };
   const fxPolicy = inferFxPolicy(accounts, holdings);
   const placement = scoreAccountPlacement(accounts, profile, assetClass, securityCandidate.currency, fxPolicy);

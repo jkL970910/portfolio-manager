@@ -5,6 +5,11 @@ import { DEFAULT_PREFERENCE_FACTORS } from "@/lib/backend/preference-factors";
 import { DEFAULT_RECOMMENDATION_CONSTRAINTS } from "@/lib/backend/recommendation-constraints";
 import { buildRecommendationV2, scoreCandidateSecurity } from "@/lib/backend/recommendation-v2";
 import { buildCandidateBrief } from "@/lib/backend/recommendation-v3/candidate-brief";
+import {
+  buildCandidatePoolPolicy,
+  evaluateCandidatePool,
+} from "@/lib/backend/recommendation-v3/candidate-pool-policy";
+import { listRecommendationCandidates } from "@/lib/backend/recommendation-v3/candidate-provider";
 
 const accounts: InvestmentAccount[] = [
   {
@@ -72,6 +77,87 @@ test("excluded symbols are removed from lead ticker options when alternatives ex
   const usEquityItem = run.items.find((item) => item.assetClass === "US Equity");
   assert.ok(usEquityItem);
   assert.ok(!usEquityItem.tickerOptions.includes("VTI"));
+});
+
+test("over-strict policy returns relaxation status instead of forcing a default candidate", () => {
+  const run = buildRecommendationV2({
+    accounts,
+    holdings: [],
+    profile: makeProfile({
+      recommendationConstraints: {
+        ...DEFAULT_RECOMMENDATION_CONSTRAINTS,
+        excludedSymbols: ["VFV", "XUU", "VOO", "VTI", "QQC", "XUS"],
+      },
+    }),
+    contributionAmountCad: 5000,
+    language: "zh",
+  });
+
+  const usEquityItem = run.items.find((item) => item.assetClass === "US Equity");
+
+  assert.equal(usEquityItem, undefined);
+  assert.equal(run.poolStatus?.status, "needs_policy_relaxation");
+  assert.ok(
+    run.notes?.some((note) => note.includes("进货规矩过严")),
+  );
+});
+
+test("candidate pool policy can hide routine cash for high-risk profiles", () => {
+  const profile = makeProfile({
+    preferenceFactors: {
+      ...DEFAULT_PREFERENCE_FACTORS,
+      behavior: {
+        ...DEFAULT_PREFERENCE_FACTORS.behavior,
+        riskCapacity: "high",
+      },
+      liquidity: {
+        ...DEFAULT_PREFERENCE_FACTORS.liquidity,
+        liquidityNeed: "low",
+      },
+    },
+  });
+  const policy = buildCandidatePoolPolicy({
+    profile,
+    assetClass: "US Equity",
+    portfolioCashPct: 10,
+  });
+
+  assert.equal(policy.allowCashParking, false);
+  assert.ok(policy.excludeRoles.includes("cash_parking"));
+});
+
+test("cash candidates re-enter when cash sleeve itself has a target gap", () => {
+  const profile = makeProfile({
+    preferenceFactors: {
+      ...DEFAULT_PREFERENCE_FACTORS,
+      behavior: {
+        ...DEFAULT_PREFERENCE_FACTORS.behavior,
+        riskCapacity: "high",
+      },
+      liquidity: {
+        ...DEFAULT_PREFERENCE_FACTORS.liquidity,
+        liquidityNeed: "low",
+      },
+    },
+  });
+  const policy = buildCandidatePoolPolicy({
+    profile,
+    assetClass: "Cash",
+    portfolioCashPct: 10,
+  });
+  const pool = evaluateCandidatePool({
+    candidates: listRecommendationCandidates({
+      assetClass: "Cash",
+      watchlistSymbols: [],
+    }),
+    policy,
+    constraints: profile.recommendationConstraints,
+    assetClass: "Cash",
+  });
+
+  assert.equal(policy.allowCashParking, true);
+  assert.equal(pool.poolStatus.status, "ok");
+  assert.ok(pool.eligibleCandidates.some((candidate) => candidate.role === "cash_parking"));
 });
 
 test("recommendation run exposes candidate brief for the purchase workbench", () => {

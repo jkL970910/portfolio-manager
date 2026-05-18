@@ -5393,6 +5393,7 @@ export async function createRecommendationRun(
       confidenceScore: recommendation.confidenceScore,
       assumptions: recommendation.assumptions,
       notes: recommendation.notes,
+      poolStatus: recommendation.poolStatus,
       items,
     };
   });

@@ -2,6 +2,209 @@
 
 Last updated: 2026-05-18
 
+## 2026-05-18 Dynamic Pool / CandidatePoolPolicy Decision
+
+The next recommendation-engine slice should move from a static curated pool
+toward a governed dynamic pool, but it must stay rules-first and auditable.
+
+Final decisions from product review:
+
+1. `CandidatePoolPolicy` is a hard eligibility layer, not just a score boost.
+2. Hard filters must never be silently bypassed to make the page look non-empty.
+3. If strict user rules produce zero eligible candidates, the API should return
+   a structured `needs_policy_relaxation` result instead of forcing a default
+   symbol.
+4. Any fallback must be user-confirmed and limited to high-confidence core-pool
+   candidates.
+5. External workers provide candidate facts and evidence. They do not own the
+   final recommendation decision.
+6. Cash/cash-parking candidates should be policy-controlled. High-risk users can
+   hide routine cash recommendations, but cash can still re-enter when there is
+   a near-term liability, reserve gap, all risk assets are blocked, or the
+   execution modifier says `wait_pullback`.
+
+Recommended empty-result contract:
+
+```ts
+type RecommendationPoolStatus =
+  | { status: "ok" }
+  | {
+      status: "needs_policy_relaxation";
+      reason: string;
+      blockers: string[];
+      suggestedRelaxations: Array<{
+        type: "allow_role" | "allow_asset_class" | "lower_threshold";
+        value: string;
+        label: string;
+      }>;
+    };
+```
+
+User-facing behavior:
+
+- Show `进货规矩过严，暂无可推荐标的`.
+- Show the main blockers, such as `固定收益被禁用` or `美股已超配`.
+- Offer explicit actions:
+  - `放宽核心池`
+  - `去设置调整规则`
+  - `查看被排除原因`
+- If the user confirms fallback, the request should carry
+  `fallbackMode: "core_only_relaxed"` and the resulting cards must label the
+  source as `放宽规则后的核心池候选`.
+
+## User-Visible Pool Model
+
+Do not expose internal terms such as `raw pool`, `eligible pool`, or
+`rejectedCandidates` in the mobile UI. The user should still have enough
+visibility to understand where their watched securities went.
+
+User-facing mapping:
+
+1. `进货优先级`
+   - The primary recommended pool.
+   - Contains candidates that passed policy filtering and entered ranking.
+   - These are the only cards that should look like actionable recommendations.
+2. `囤货清单`
+   - User watchlist.
+   - Shows watched securities even when they are not recommended today.
+   - Each card should carry a compact status:
+     - `已进推荐池`
+     - `暂不推荐`
+     - `待刷新资料`
+     - `资料待确认`
+     - `规则已排除`
+3. `待鉴定包裹`
+   - Quarantine for identity-incomplete or low-confidence candidates.
+   - These must not enter ranking until the user or worker resolves identity /
+     profile quality.
+4. `为什么没进货`
+   - Optional expanded explanation on a watched candidate.
+   - Should explain the largest blocker in plain Chinese, such as overexposure,
+     missing identity, stale data, excluded role, or cash/liability guardrail.
+
+This keeps the recommendation page explainable without turning it into an
+engineering audit table.
+
+## CandidatePoolPolicy
+
+`CandidatePoolPolicy` should be built from Preference Factors V2, recommendation
+constraints, account availability, portfolio state, and current cash/liability
+context.
+
+It should run before scoring:
+
+1. Build the raw candidate set from `core_pool + dynamic_pool + watchlist`.
+2. Resolve identity and economic exposure.
+3. Apply hard eligibility rules.
+4. If empty, return `needs_policy_relaxation`.
+5. Score eligible candidates.
+6. Apply guardrails and execution modifiers.
+7. Return `CandidateBrief` cards plus rejection / exclusion evidence.
+
+Policy inputs:
+
+- risk capacity and risk appetite
+- concentration tolerance
+- preferred / avoided sectors and themes
+- allowed asset classes and security types
+- account/tax routing constraints
+- home-purchase, emergency-cash, and near-term liquidity goals
+- watchlist source and candidate identity confidence
+- provider confidence / freshness from worker-maintained data
+
+Example policy shape:
+
+```ts
+type CandidatePoolPolicy = {
+  includeRoles: Array<"core" | "satellite" | "defensive" | "cash_parking">;
+  excludeRoles: Array<"core" | "satellite" | "defensive" | "cash_parking">;
+  allowedAssetClasses: string[];
+  avoidedAssetClasses: string[];
+  preferredSectors: string[];
+  avoidedSectors: string[];
+  maxExpenseBps: number | null;
+  minLiquidityScore: number;
+  allowSingleStocks: boolean;
+  allowSectorEtfs: boolean;
+  allowCommodity: boolean;
+  allowCashParking: boolean;
+  requireCleanIdentity: boolean;
+  minProviderConfidence: "low" | "medium" | "high";
+};
+```
+
+Implementation rule:
+
+- `excludeRoles` and explicit user exclusions are hard filters.
+- Preference tilts can boost/penalize score only after a candidate passes hard
+  eligibility.
+- High-risk preference can remove routine `cash_parking`, but cannot override
+  short-term liability and reserve guardrails.
+
+## Dynamic Candidate Pool
+
+The dynamic pool should be implemented as a registry, not direct provider search
+inside the recommendation request path.
+
+Target architecture:
+
+1. `Core ETF Universe`
+   - code/seeded high-trust Canadian-investor ETF list
+   - source of truth for first production V3 decisions
+2. `Dynamic Candidate Registry`
+   - DB-backed table populated by workers
+   - stores identity, profile, exposure, liquidity, expense, confidence, source,
+     TTL, and eligibility notes
+3. `Watchlist Candidate Feed`
+   - user ideas
+   - must pass identity resolution and policy eligibility before becoming
+     recommendable
+4. `CandidateProvider`
+   - backend abstraction that returns normalized candidates from all three
+     sources
+
+Provider data must be treated as confidence-rated evidence:
+
+- High confidence: clean identity, reliable quote/profile, known exposure.
+- Medium confidence: identity clean but exposure/profile partial.
+- Low confidence: missing exchange/currency/security id, weak ETF profile,
+  ticker-only match, or stale provider result.
+
+Low-confidence candidates should appear under `待鉴定包裹`, not the main
+recommendation list.
+
+## External Worker Accuracy Boundary
+
+The external worker should improve recall and freshness, not become the
+decision-maker.
+
+Expected precision by data type:
+
+- Identity (`symbol + exchange + currency + security_id`): high only when
+  OpenFIGI/provider/registry agree; otherwise quarantine.
+- Quotes and price history: medium-high if provider-backed and fresh.
+- ETF profile / expense / category: medium, because free providers often have
+  incomplete TSX ETF coverage.
+- ETF holdings / sector / region look-through: medium to low unless sourced
+  from a specialized ETF provider or curated registry.
+- News / sentiment: low to medium; usable for evidence and warnings, not
+  hard recommendations.
+
+Provider and cost boundary:
+
+- Free APIs are enough for a small curated/core-pool worker and watchlist smoke.
+- Broad dynamic discovery and ETF look-through will likely need a paid provider
+  later.
+- Page load must not call provider discovery APIs.
+- Worker writes should be quota-ledgered and cache/TTL controlled.
+
+The first implementation should therefore keep provider scope small:
+
+1. Refresh held securities, watchlist, and core-pool candidates only.
+2. Upsert dynamic candidates only when identity and basic profile are clean.
+3. Store uncertainty explicitly.
+4. Keep low-confidence rows out of primary recommendations.
+
 ## 2026-05-18 MDD Signoff Scope
 
 The next build slice is the foundation for the mobile `进货` workbench and the

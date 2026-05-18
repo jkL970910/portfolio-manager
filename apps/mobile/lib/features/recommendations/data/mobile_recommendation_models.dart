@@ -12,6 +12,7 @@ class MobileRecommendationsSnapshot {
     required this.recentObservationItems,
     required this.engineSummary,
     required this.scenarios,
+    required this.poolStatus,
     required this.notes,
   });
 
@@ -25,6 +26,7 @@ class MobileRecommendationsSnapshot {
   final List<MobileRecommendationMarketItem> recentObservationItems;
   final MobileRecommendationEngineSummary engineSummary;
   final List<MobileRecommendationScenario> scenarios;
+  final MobileRecommendationPoolStatus poolStatus;
   final List<String> notes;
 
   factory MobileRecommendationsSnapshot.fromJson(Map<String, dynamic> json) {
@@ -60,7 +62,60 @@ class MobileRecommendationsSnapshot {
       scenarios: readJsonList(json, "scenarios")
           .map(MobileRecommendationScenario.fromJson)
           .toList(),
+      poolStatus: MobileRecommendationPoolStatus.fromJson(json["poolStatus"]),
       notes: (json["notes"] as List?)?.whereType<String>().toList() ?? const [],
+    );
+  }
+}
+
+class MobileRecommendationPoolStatus {
+  const MobileRecommendationPoolStatus({
+    required this.status,
+    required this.reason,
+    required this.blockers,
+    required this.suggestedRelaxations,
+  });
+
+  final String status;
+  final String reason;
+  final List<String> blockers;
+  final List<MobileRecommendationPoolRelaxation> suggestedRelaxations;
+
+  bool get needsPolicyRelaxation => status == "needs_policy_relaxation";
+
+  factory MobileRecommendationPoolStatus.fromJson(Object? value) {
+    final json =
+        value is Map<String, dynamic> ? value : const <String, dynamic>{};
+    return MobileRecommendationPoolStatus(
+      status: json["status"] as String? ?? "ok",
+      reason: json["reason"] as String? ?? "",
+      blockers:
+          (json["blockers"] as List?)?.whereType<String>().toList() ?? const [],
+      suggestedRelaxations: readJsonList(json, "suggestedRelaxations")
+          .map(MobileRecommendationPoolRelaxation.fromJson)
+          .toList(),
+    );
+  }
+}
+
+class MobileRecommendationPoolRelaxation {
+  const MobileRecommendationPoolRelaxation({
+    required this.type,
+    required this.value,
+    required this.label,
+  });
+
+  final String type;
+  final String value;
+  final String label;
+
+  factory MobileRecommendationPoolRelaxation.fromJson(
+    Map<String, dynamic> json,
+  ) {
+    return MobileRecommendationPoolRelaxation(
+      type: json["type"] as String? ?? "",
+      value: json["value"] as String? ?? "",
+      label: json["label"] as String? ?? "",
     );
   }
 }
@@ -132,6 +187,9 @@ class MobileRecommendationMarketItem {
     required this.exchange,
     required this.currency,
     required this.securityId,
+    required this.poolStatus,
+    required this.poolStatusLabel,
+    required this.poolStatusDetail,
     required this.lastPriceLabel,
     required this.dayChangeLabel,
     required this.dayChangePctLabel,
@@ -145,6 +203,9 @@ class MobileRecommendationMarketItem {
   final String exchange;
   final String currency;
   final String securityId;
+  final String poolStatus;
+  final String poolStatusLabel;
+  final String poolStatusDetail;
   final String lastPriceLabel;
   final String dayChangeLabel;
   final String dayChangePctLabel;
@@ -166,6 +227,9 @@ class MobileRecommendationMarketItem {
       exchange: json["exchange"] as String? ?? "",
       currency: json["currency"] as String? ?? "",
       securityId: json["securityId"] as String? ?? "",
+      poolStatus: json["poolStatus"] as String? ?? "watch_only",
+      poolStatusLabel: json["poolStatusLabel"] as String? ?? "暂不推荐",
+      poolStatusDetail: json["poolStatusDetail"] as String? ?? "",
       lastPriceLabel: json["lastPriceLabel"] as String? ?? "--",
       dayChangeLabel: json["dayChangeLabel"] as String? ?? "待刷新",
       dayChangePctLabel: json["dayChangePctLabel"] as String? ?? "今日涨跌待刷新",

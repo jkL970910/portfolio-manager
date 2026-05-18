@@ -658,6 +658,14 @@ type MobileRecommendationMarketItem = {
   exchange: string | null;
   currency: "CAD" | "USD" | null;
   securityId?: string | null;
+  poolStatus:
+    | "eligible"
+    | "watch_only"
+    | "needs_identity"
+    | "needs_data"
+    | "excluded";
+  poolStatusLabel: string;
+  poolStatusDetail: string;
   lastPriceLabel: string;
   dayChangeLabel: string;
   dayChangePctLabel: string;
@@ -1076,6 +1084,7 @@ async function buildMobileRecommendationMarketItems(input: {
         key: candidate.key,
         identity: candidate.identity,
         holdings,
+        recommended: true,
       }),
     ),
   );
@@ -1339,6 +1348,7 @@ async function buildMobileRecommendationMarketItem(input: {
     name?: string | null;
   };
   holdings: HoldingPosition[];
+  recommended?: boolean;
 }): Promise<MobileRecommendationMarketItem> {
   const identity = normalizeRecommendationMarketIdentity(
     input.identity,
@@ -1363,6 +1373,19 @@ async function buildMobileRecommendationMarketItem(input: {
     identity.currency ??
     holdingQuote?.currency ??
     null;
+  const hasCleanIdentity = Boolean(
+    identity.symbol && identity.exchange && currency,
+  );
+  const hasMarketData = latestPrice != null;
+  const poolStatus =
+    input.recommended
+      ? "eligible"
+      : !hasCleanIdentity
+        ? "needs_identity"
+        : !hasMarketData
+          ? "needs_data"
+          : "watch_only";
+  const poolCopy = recommendationPoolStatusCopy(poolStatus);
   return {
     key: input.key,
     symbol: identity.symbol,
@@ -1370,6 +1393,9 @@ async function buildMobileRecommendationMarketItem(input: {
     exchange: identity.exchange,
     currency,
     securityId: identity.securityId,
+    poolStatus,
+    poolStatusLabel: poolCopy.label,
+    poolStatusDetail: poolCopy.detail,
     lastPriceLabel:
       latestPrice == null
         ? "--"
@@ -1393,6 +1419,38 @@ async function buildMobileRecommendationMarketItem(input: {
     freshnessLabel:
       latestHistory?.priceDate ?? holdingQuote?.asOf ?? "暂无缓存行情",
   };
+}
+
+function recommendationPoolStatusCopy(
+  status: MobileRecommendationMarketItem["poolStatus"],
+) {
+  switch (status) {
+    case "eligible":
+      return {
+        label: "已进推荐池",
+        detail: "已通过本轮进货规则筛选，参与优先级排序。",
+      };
+    case "watch_only":
+      return {
+        label: "暂不推荐",
+        detail: "已在囤货清单，可进入研究台；是否进货仍由护栏和缺口决定。",
+      };
+    case "needs_identity":
+      return {
+        label: "资料待确认",
+        detail: "缺少交易所或币种，暂不进入推荐池。",
+      };
+    case "needs_data":
+      return {
+        label: "待刷新资料",
+        detail: "身份已确认，但缺少可用行情或资料，暂不参与排序。",
+      };
+    case "excluded":
+      return {
+        label: "规则已排除",
+        detail: "被当前进货规矩排除，不参与本轮推荐。",
+      };
+  }
 }
 
 function normalizeRecommendationMarketIdentity(

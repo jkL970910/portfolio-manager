@@ -699,6 +699,12 @@ export async function enqueueDailyOverviewExternalResearchJobs(
       } else {
         result.skippedFresh += 1;
       }
+
+      // Overview news is a portfolio-level feed. Do not fan out news jobs to
+      // individual holdings: TSX ETFs/CDRs often return empty provider payloads
+      // and they waste the shared Alpha Vantage quota without improving the
+      // user-facing "Loo国今日秘闻" card.
+      continue;
     }
 
     const holdings = await db
@@ -730,8 +736,7 @@ export async function enqueueDailyOverviewExternalResearchJobs(
         !symbol ||
         !securityId ||
         !currency ||
-        (currency !== "CAD" && currency !== "USD") ||
-        (sourceId === "news" && !exchange)
+        (currency !== "CAD" && currency !== "USD")
       ) {
         result.skippedInvalidIdentity += 1;
         continue;
@@ -746,11 +751,7 @@ export async function enqueueDailyOverviewExternalResearchJobs(
             securityId,
           },
         );
-      const hasFreshForSource =
-        sourceId === "news"
-          ? freshDocuments.some((document) => document.sourceType === "news")
-          : freshDocuments.length > 0;
-      if (hasFreshForSource) {
+      if (freshDocuments.length > 0) {
         result.skippedFresh += 1;
         continue;
       }

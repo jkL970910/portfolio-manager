@@ -219,7 +219,15 @@ class _RecommendationsPageState extends State<RecommendationsPage> {
                         ),
                         const SizedBox(height: 16),
                         if (snapshot.data!.priorities.isEmpty)
-                          const _EmptyCard("暂时没有新的推荐。先完成持仓导入，Loo皇会再下达谕令。")
+                          snapshot.data!.poolStatus.needsPolicyRelaxation
+                              ? _PoolPolicyEmptyCard(
+                                  status: snapshot.data!.poolStatus,
+                                  onOpenSettings: () =>
+                                      context.push(MobileRoutes.settings),
+                                )
+                              : const _EmptyCard(
+                                  "暂时没有新的推荐。先完成持仓导入，Loo皇会再下达谕令。",
+                                )
                         else
                           KeyedSubtree(
                             key: _priorityKey,
@@ -928,9 +936,18 @@ class _WatchlistCard extends StatefulWidget {
 class _WatchlistCardState extends State<_WatchlistCard> {
   @override
   Widget build(BuildContext context) {
-    final resolved = widget.items.where(_isResolvedMarketItem).toList();
-    final unresolved =
-        widget.items.where((item) => !_isResolvedMarketItem(item)).toList();
+    final resolved = widget.items
+        .where(
+          (item) =>
+              _isResolvedMarketItem(item) && item.poolStatus != "needs_data",
+        )
+        .toList();
+    final unresolved = widget.items
+        .where(
+          (item) =>
+              !_isResolvedMarketItem(item) || item.poolStatus == "needs_data",
+        )
+        .toList();
     return LooGlassCard(
       padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
       child: Column(
@@ -944,7 +961,7 @@ class _WatchlistCardState extends State<_WatchlistCard> {
                   style: Theme.of(context).textTheme.titleLarge,
                 ),
               ),
-              _InfoPill("${resolved.length} 已确认"),
+              _InfoPill("${resolved.length} 可查看"),
             ],
           ),
           const SizedBox(height: 10),
@@ -1069,7 +1086,7 @@ class _UnresolvedWatchlistPanel extends StatelessWidget {
             ),
             const SizedBox(height: 6),
             Text(
-              "缺少交易所或币种，不进入推荐。",
+              "身份或资料不足，不进入推荐池。",
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
                     color: tokens.mutedText,
                   ),
@@ -1081,7 +1098,12 @@ class _UnresolvedWatchlistPanel extends StatelessWidget {
               children: [
                 for (final item in items.take(8))
                   InputChip(
-                    label: Text(item.symbol.isEmpty ? item.key : item.symbol),
+                    label: Text(
+                      [
+                        item.symbol.isEmpty ? item.key : item.symbol,
+                        item.poolStatusLabel,
+                      ].join(" · "),
+                    ),
                     onDeleted: working ? null : () => onRemove(item.key),
                   ),
               ],
@@ -1176,9 +1198,10 @@ class _MarketItemCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final tokens = context.looTokens;
     final moveColor = _marketMoveColor(context, item.dayChangeVariant);
+    final statusColor = _poolStatusColor(context, item.poolStatus);
     return SizedBox(
       width: 132,
-      height: 112,
+      height: 124,
       child: Material(
         color: Colors.transparent,
         child: InkWell(
@@ -1202,13 +1225,22 @@ class _MarketItemCard extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    item.symbol,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.w900,
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          item.symbol,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style:
+                              Theme.of(context).textTheme.titleMedium?.copyWith(
+                                    fontWeight: FontWeight.w900,
+                                  ),
                         ),
+                      ),
+                      const SizedBox(width: 6),
+                      _TinyStatusDot(color: statusColor),
+                    ],
                   ),
                   const SizedBox(height: 7),
                   Text(
@@ -1218,6 +1250,16 @@ class _MarketItemCard extends StatelessWidget {
                     style: Theme.of(context).textTheme.titleLarge?.copyWith(
                           fontWeight: FontWeight.w900,
                           letterSpacing: -0.35,
+                        ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    item.poolStatusLabel,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                          color: statusColor,
+                          fontWeight: FontWeight.w800,
                         ),
                   ),
                   const Spacer(),
@@ -1231,6 +1273,24 @@ class _MarketItemCard extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+class _TinyStatusDot extends StatelessWidget {
+  const _TinyStatusDot({required this.color});
+
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.18),
+        shape: BoxShape.circle,
+        border: Border.all(color: color.withValues(alpha: 0.45)),
+      ),
+      child: const SizedBox(width: 10, height: 10),
     );
   }
 }
@@ -1287,6 +1347,15 @@ Color _marketMoveColor(BuildContext context, String variant) {
   };
 }
 
+Color _poolStatusColor(BuildContext context, String status) {
+  return switch (status) {
+    "eligible" => Colors.green.shade300,
+    "needs_identity" || "needs_data" => Colors.orange.shade300,
+    "excluded" => Theme.of(context).colorScheme.error,
+    _ => context.looTokens.accent,
+  };
+}
+
 class _PriorityWorkbench extends StatefulWidget {
   const _PriorityWorkbench({
     required this.priorities,
@@ -1327,7 +1396,7 @@ class _PriorityWorkbenchState extends State<_PriorityWorkbench> {
               Icon(Icons.local_mall_outlined, color: tokens.accent),
               const SizedBox(width: 8),
               Expanded(
-                child: Text("扫货台", style: theme.textTheme.titleLarge),
+                child: Text("进货优先级", style: theme.textTheme.titleLarge),
               ),
               Text(
                 "${widget.priorities.length} 条",
@@ -1339,7 +1408,7 @@ class _PriorityWorkbenchState extends State<_PriorityWorkbench> {
           ),
           const SizedBox(height: 4),
           Text(
-            "按优先级横向选择标的，下方固定展示当前候选的进货建议。",
+            "已通过进货规矩筛选的推荐池；囤货清单里未入选的标的可展开查看原因。",
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
             style: theme.textTheme.bodySmall?.copyWith(
@@ -2131,6 +2200,98 @@ class _EmptyCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return LooGlassCard(
       child: Text(message),
+    );
+  }
+}
+
+class _PoolPolicyEmptyCard extends StatelessWidget {
+  const _PoolPolicyEmptyCard({
+    required this.status,
+    required this.onOpenSettings,
+  });
+
+  final MobileRecommendationPoolStatus status;
+  final VoidCallback onOpenSettings;
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = context.looTokens;
+    final blockers = status.blockers.take(3).toList();
+    final relaxations = status.suggestedRelaxations.take(3).toList();
+    return LooGlassCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.rule_folder_outlined, color: Colors.orange.shade300),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  "进货规矩过严",
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w900,
+                      ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            status.reason.isNotEmpty
+                ? status.reason
+                : "本轮没有符合规则的候选标的，系统没有强塞默认 ETF。",
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: tokens.mutedText,
+                ),
+          ),
+          if (blockers.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            ...blockers.map(
+              (blocker) => Padding(
+                padding: const EdgeInsets.only(bottom: 6),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      "· ",
+                      style: TextStyle(
+                        color: Colors.orange.shade300,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    Expanded(
+                      child: Text(
+                        blocker,
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+          if (relaxations.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: relaxations
+                  .map((relaxation) => _InfoPill(relaxation.label))
+                  .toList(),
+            ),
+          ],
+          const SizedBox(height: 12),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: TextButton.icon(
+              onPressed: onOpenSettings,
+              icon: const Icon(Icons.tune_rounded, size: 16),
+              label: const Text("去设置调整规矩"),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
