@@ -52,6 +52,7 @@ class _SecurityDetailPageState extends State<SecurityDetailPage> {
   String? _resolvedCurrency;
   Set<String> _watchlistSymbols = const {};
   bool _isUpdatingWatchlist = false;
+  bool _observationFailureNotified = false;
   String _selectedResearchScopeId = _ResearchScope.aggregateId;
   final AiAnalysisController _analysisController = AiAnalysisController();
 
@@ -119,7 +120,15 @@ class _SecurityDetailPageState extends State<SecurityDetailPage> {
         source: source,
       );
     } catch (_) {
-      // Observation history should not block the security page.
+      if (mounted && !_observationFailureNotified) {
+        _observationFailureNotified = true;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("近期观察记录失败，不影响查看标的。"),
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
     }
   }
 

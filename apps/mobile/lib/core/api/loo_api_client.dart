@@ -157,7 +157,7 @@ class LooApiClient {
         "/api/mobile/market-data/search?query=${Uri.encodeQueryComponent(query)}");
   }
 
-  Future<void> recordSecurityObservation({
+  Future<Map<String, dynamic>> recordSecurityObservation({
     required String symbol,
     String? securityId,
     String? exchange,
@@ -165,7 +165,7 @@ class LooApiClient {
     String? name,
     String source = "security-detail",
   }) async {
-    await _postJson(
+    return _postJson(
       "/api/mobile/observations/securities",
       body: {
         "symbol": symbol,

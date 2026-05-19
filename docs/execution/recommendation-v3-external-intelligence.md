@@ -1102,3 +1102,42 @@ Design constraints:
 - Raw pool and recommendation pool are visible to the user at a product level:
   source counts, policy status, and rejected reasons are shown; implementation
   fields stay hidden.
+
+## Recommendation V4 QA Checklist
+
+Before signing off the V4 recommendation flow, test these paths on the mobile
+URL:
+
+1. Baseline generation:
+   - Open `进货`.
+   - Recalculate with CAD 500 / 2500 / custom amount.
+   - Expected: `Loo皇推荐` changes only from deterministic inputs; no silent
+     default ETF is inserted when the pool is empty.
+2. Watchlist visibility:
+   - Add a clean listing identity to `囤货清单`.
+   - Reopen `进货`.
+   - Expected: the symbol appears in raw-pool transparency. It is recommended
+     only if it passes identity/data/policy rules.
+3. Recent observation persistence:
+   - Open a symbol from `搜货台` or Security Detail.
+   - Return to `进货`.
+   - Expected: `近期观察` is visible even when empty, and newly opened symbols
+     appear after the observation API succeeds.
+4. Candidate role rules:
+   - Settings -> investment preferences -> recommendation constraints.
+   - Exclude `现金停泊`, then regenerate.
+   - Expected: routine cash candidates disappear unless the cash sleeve itself
+     is the target gap.
+5. Empty-pool behavior:
+   - Make rules intentionally strict enough to empty the pool.
+   - Expected: the page shows a policy-relaxation state and does not auto-force
+     a default candidate.
+6. Explicit fallback:
+   - Enable relaxed core fallback in Settings.
+   - Trigger fallback from the empty-pool state.
+   - Expected: a separate run is created using relaxed core candidates, and the
+     action is user-initiated.
+7. Dynamic pool worker:
+   - Call `/api/workers/recommendation-dynamic-pool/run` with worker auth.
+   - Expected: clean watchlist/recent-observation identities refresh into the DB
+     dynamic candidate table with TTL/confidence metadata.

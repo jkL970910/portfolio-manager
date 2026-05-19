@@ -1,5 +1,3 @@
-import "dart:async";
-
 import "package:flutter/material.dart";
 
 import "../../../core/api/loo_api_client.dart";
@@ -118,14 +116,27 @@ class _DiscoverPageState extends State<DiscoverPage> {
     }
   }
 
-  void _openSecurityDetail(MobileDiscoverSecurityCandidate candidate) {
-    unawaited(_recordObservation(
+  Future<void> _openSecurityDetail(
+    MobileDiscoverSecurityCandidate candidate,
+  ) async {
+    final recorded = await _recordObservation(
       symbol: candidate.symbol,
       exchange: candidate.exchange,
       currency: candidate.currency,
       name: candidate.name,
       source: "search",
-    ));
+    );
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            recorded ? "已保存到近期观察。" : "近期观察记录失败，但仍可打开标的。",
+          ),
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    }
+    if (!mounted) return;
     Navigator.of(context).push(
       MaterialPageRoute<void>(
         builder: (_) => SecurityDetailPage(
@@ -139,16 +150,25 @@ class _DiscoverPageState extends State<DiscoverPage> {
     );
   }
 
-  void _openWatchlistSymbol(String watchlistKey) {
+  Future<void> _openWatchlistSymbol(String watchlistKey) async {
     final identity = _WatchlistIdentity.parse(watchlistKey);
     if (identity.symbol.isEmpty) return;
-    unawaited(_recordObservation(
+    final recorded = await _recordObservation(
       symbol: identity.symbol,
       exchange: identity.exchange,
       currency: identity.currency,
       name: identity.label,
       source: "watchlist",
-    ));
+    );
+    if (mounted && !recorded) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("近期观察记录失败，但仍可打开标的。"),
+          duration: Duration(seconds: 2),
+        ),
+      );
+    }
+    if (!mounted) return;
     Navigator.of(context).push(
       MaterialPageRoute<void>(
         builder: (_) => SecurityDetailPage(
@@ -162,7 +182,7 @@ class _DiscoverPageState extends State<DiscoverPage> {
     );
   }
 
-  Future<void> _recordObservation({
+  Future<bool> _recordObservation({
     required String symbol,
     String? exchange,
     String? currency,
@@ -177,8 +197,9 @@ class _DiscoverPageState extends State<DiscoverPage> {
         name: name,
         source: source,
       );
+      return true;
     } catch (_) {
-      // Observation history should not block search navigation.
+      return false;
     }
   }
 

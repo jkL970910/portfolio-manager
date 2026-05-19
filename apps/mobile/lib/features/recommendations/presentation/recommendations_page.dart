@@ -242,14 +242,11 @@ class _RecommendationsPageState extends State<RecommendationsPage> {
                               _scrollToSection(_watchlistKey),
                         ),
                         const SizedBox(height: 16),
-                        if (snapshot
-                            .data!.recentObservationItems.isNotEmpty) ...[
-                          _RecentObservationCard(
-                            items: snapshot.data!.recentObservationItems,
-                            onOpen: _openMarketItem,
-                          ),
-                          const SizedBox(height: 16),
-                        ],
+                        _RecentObservationCard(
+                          items: snapshot.data!.recentObservationItems,
+                          onOpen: _openMarketItem,
+                        ),
+                        const SizedBox(height: 16),
                         KeyedSubtree(
                           key: _watchlistKey,
                           child: _WatchlistCard(
@@ -319,7 +316,7 @@ class _RecommendationsPageState extends State<RecommendationsPage> {
           ? priority.security
           : priority.description,
       source: "recommendation",
-    ).catchError((_) {}));
+    ).catchError((_) => <String, dynamic>{}));
     context.push(
       MobileRoutes.securityDetail(
         symbol: priority.securitySymbol,
@@ -345,7 +342,7 @@ class _RecommendationsPageState extends State<RecommendationsPage> {
       currency: item.currency,
       name: item.name,
       source: item.poolStatus == "eligible" ? "recommendation" : "watchlist",
-    ).catchError((_) {}));
+    ).catchError((_) => <String, dynamic>{}));
     context.push(
       MobileRoutes.securityDetail(
         symbol: item.symbol,
@@ -1211,7 +1208,16 @@ class _RecentObservationCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 10),
-          _MarketItemRail(items: items, onOpen: onOpen),
+          if (items.isEmpty)
+            Text(
+              "暂无近期观察。你从搜货台或标的详情打开标的后，会保存到云端并出现在这里。",
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: context.looTokens.mutedText,
+                    height: 1.35,
+                  ),
+            )
+          else
+            _MarketItemRail(items: items, onOpen: onOpen),
         ],
       ),
     );
