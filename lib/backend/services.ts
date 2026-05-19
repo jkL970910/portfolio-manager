@@ -47,6 +47,7 @@ import {
   buildRecommendationV2,
   scoreCandidateSecurity,
 } from "@/lib/backend/recommendation-v2";
+import { refreshRecommendationDynamicPoolForUser } from "@/lib/backend/recommendation-v4/dynamic-pool-worker";
 import {
   DEFAULT_RECOMMENDATION_CONSTRAINTS,
   normalizeRecommendationConstraints,
@@ -270,6 +271,7 @@ export interface RefreshPortfolioQuotesResult {
 
 export interface CreateRecommendationRunInput {
   contributionAmountCad: number;
+  fallbackMode?: "core_only_relaxed";
 }
 
 export interface ScoreCandidateSecurityInput {
@@ -2129,10 +2131,15 @@ export async function getPortfolioSecurityDetailView(
     hydratedPriceHistory.length < 2 ||
     historyNeedsHigherDensity(hydratedPriceHistory);
   try {
+    const historyExchange =
+      referenceHolding?.exchangeOverride ??
+      (isUsMarketExchange(canonicalSecurity.canonicalExchange)
+        ? null
+        : canonicalSecurity.canonicalExchange);
     const historyResponse = await getSecurityHistoricalSeries(
       normalizedSymbol,
       {
-        exchange: referenceHolding?.exchangeOverride ?? null,
+        exchange: historyExchange,
         currency: referenceHolding?.currency ?? canonicalSecurity.currency,
       },
     );
@@ -2151,7 +2158,7 @@ export async function getPortfolioSecurityDetailView(
       if (shouldPersistFetchedHistory) {
         try {
           await upsertSecurityPriceHistoryPoints(
-            mappedPoints.filter((point) => !point.priceTime),
+            collapseSecurityHistoryToDailyPoints(mappedPoints),
           );
         } catch {
           // Keep fetched history in memory for this response even if persistence fails.
@@ -2603,6 +2610,52 @@ function mapProviderHistoryPoints(args: {
   }));
 }
 
+function collapseSecurityHistoryToDailyPoints(points: SecurityPriceHistoryPoint[]) {
+  const byDate = new Map<string, SecurityPriceHistoryPoint>();
+  for (const point of points) {
+    const key = [
+      point.securityId ?? point.symbol.trim().toUpperCase(),
+      normalizeExchangeCode(point.exchange),
+      point.currency,
+      point.priceDate,
+    ].join("::");
+    const existing = byDate.get(key);
+    if (!existing) {
+      byDate.set(key, point);
+      continue;
+    }
+
+    const existingRank = [
+      existing.freshness === "fresh" ? 2 : 0,
+      existing.sourceMode === "provider" ? 1 : 0,
+      existing.priceTime ? new Date(existing.priceTime).getTime() : 0,
+    ];
+    const candidateRank = [
+      point.freshness === "fresh" ? 2 : 0,
+      point.sourceMode === "provider" ? 1 : 0,
+      point.priceTime ? new Date(point.priceTime).getTime() : 0,
+    ];
+    if (
+      candidateRank[0] > existingRank[0] ||
+      (candidateRank[0] === existingRank[0] &&
+        candidateRank[1] > existingRank[1]) ||
+      (candidateRank[0] === existingRank[0] &&
+        candidateRank[1] === existingRank[1] &&
+        candidateRank[2] > existingRank[2])
+    ) {
+      byDate.set(key, point);
+    }
+  }
+
+  return [...byDate.values()]
+    .map<SecurityPriceHistoryPoint>((point) => ({
+      ...point,
+      id: `daily-${point.securityId ?? point.symbol}-${point.priceDate}`,
+      priceTime: null,
+    }))
+    .sort((left, right) => left.priceDate.localeCompare(right.priceDate));
+}
+
 function mergeSecurityPriceHistoryPoints(
   ...seriesList: SecurityPriceHistoryPoint[][]
 ) {
@@ -2670,7 +2723,7 @@ async function getHydratedSecurityPriceHistoryForHoldings(
           if (shouldPersistFetchedHistory) {
             try {
               await upsertSecurityPriceHistoryPoints(
-                mappedPoints.filter((point) => !point.priceTime),
+                collapseSecurityHistoryToDailyPoints(mappedPoints),
               );
             } catch {
               // Keep fetched history in memory for this response even if persistence fails.
@@ -3214,12 +3267,29 @@ export async function mergeAccounts(
 
 export async function getRecommendationView(userId: string) {
   const repositories = getRepositories();
-  const [user, profile, accounts, holdings] = await Promise.all([
+  const [user, profile, accounts, holdings, observations] = await Promise.all([
     repositories.users.getById(userId),
     repositories.preferences.getByUserId(userId),
     repositories.accounts.listByUserId(userId),
     repositories.holdings.listByUserId(userId),
+    repositories.mobileSecurityObservations.listRecentByUserId(userId, 20),
   ]);
+  const recommendationSecurities = await repositories.securities.listByIds([
+    ...holdings
+      .map((holding) => holding.securityId)
+      .filter((id): id is string => Boolean(id)),
+    ...observations
+      .map((observation) => observation.securityId)
+      .filter((id): id is string => Boolean(id)),
+  ]);
+  const dynamicCandidates =
+    await repositories.recommendationDynamicCandidates.listFreshByUserId(
+      userId,
+      {
+        now: new Date(),
+        limit: 100,
+      },
+    );
   let latestRun: RecommendationRun | null = null;
   try {
     latestRun = await repositories.recommendations.getLatestByUserId(userId);
@@ -3253,6 +3323,9 @@ export async function getRecommendationView(userId: string) {
             profile,
             contributionAmountCad: amountCad,
             language: user.displayLanguage,
+            securities: recommendationSecurities,
+            observations,
+            dynamicCandidates,
           });
 
           return {
@@ -5111,29 +5184,56 @@ export async function refreshPortfolioSecurityQuote(
     const refreshedAt = new Date();
     const refreshedDate = refreshedAt.toISOString().slice(0, 10);
     const canonicalSecurity = resolvedUnheld.security;
-
-    if (quoteFound) {
-      await db.transaction(async (tx) => {
-        await upsertSecurityPriceHistoryPointsInTransaction(tx, [
-          {
-            id: `quote-refresh-${canonicalSecurity.id}-${refreshedDate}`,
+    const historyExchange = isUsMarketExchange(canonicalSecurity.canonicalExchange)
+      ? null
+      : canonicalSecurity.canonicalExchange;
+    const historyResponse = await getSecurityHistoricalSeries(
+      canonicalSecurity.symbol,
+      {
+        exchange: historyExchange,
+        currency: canonicalSecurity.currency,
+      },
+    ).catch(() => ({ results: [] }));
+    const providerHistoryPoints =
+      historyResponse.results.length > 0
+        ? mapProviderHistoryPoints({
+            points: historyResponse.results,
             securityId: canonicalSecurity.id,
             symbol: canonicalSecurity.symbol,
             exchange: canonicalSecurity.canonicalExchange,
-            priceDate: refreshedDate,
-            close: quote!.result.price,
-            adjustedClose: null,
             currency: canonicalSecurity.currency,
-            source: `quote-refresh-${quote!.result.provider}`,
-            provider: quote!.result.provider,
-            sourceMode: getQuoteSourceMode(quote!.result),
-            freshness: getQuoteStatus(quote!.result),
-            refreshRunId: null,
-            isReference: false,
-            fallbackReason: null,
-            createdAt: refreshedAt.toISOString(),
-          },
-        ]);
+          })
+        : [];
+    const quoteHistoryPoint: SecurityPriceHistoryPoint | null = quoteFound
+      ? {
+          id: `quote-refresh-${canonicalSecurity.id}-${refreshedDate}`,
+          securityId: canonicalSecurity.id,
+          symbol: canonicalSecurity.symbol,
+          exchange: canonicalSecurity.canonicalExchange,
+          priceDate: refreshedDate,
+          close: quote!.result.price,
+          adjustedClose: null,
+          currency: canonicalSecurity.currency,
+          source: `quote-refresh-${quote!.result.provider}`,
+          provider: quote!.result.provider,
+          sourceMode: getQuoteSourceMode(quote!.result),
+          freshness: getQuoteStatus(quote!.result),
+          refreshRunId: null,
+          isReference: false,
+          fallbackReason: null,
+          createdAt: refreshedAt.toISOString(),
+        }
+      : null;
+    const historyPoints = collapseSecurityHistoryToDailyPoints(
+      mergeSecurityPriceHistoryPoints(
+        providerHistoryPoints,
+        quoteHistoryPoint ? [quoteHistoryPoint] : [],
+      ),
+    );
+
+    if (historyPoints.length > 0) {
+      await db.transaction(async (tx) => {
+        await upsertSecurityPriceHistoryPointsInTransaction(tx, historyPoints);
       });
     }
 
@@ -5149,7 +5249,7 @@ export async function refreshPortfolioSecurityQuote(
       securityId: canonicalSecurity.id,
       quoteCurrency: quote?.result?.currency ?? canonicalSecurity.currency,
       quoteExchange: canonicalSecurity.canonicalExchange,
-      historyPointCount: quoteFound ? 1 : 0,
+      historyPointCount: historyPoints.length,
       snapshotRecorded: false,
       fxRateLabel: formatFxRefreshLabel(usdToCadFx),
       fxAsOf: usdToCadFx.rateDate,
@@ -5340,11 +5440,13 @@ export async function createRecommendationRun(
   input: CreateRecommendationRunInput,
 ): Promise<RecommendationRun> {
   const repositories = getRepositories();
-  const [user, accounts, holdings, profile] = await Promise.all([
+  await refreshRecommendationDynamicPoolForUser(userId);
+  const [user, accounts, holdings, profile, observations] = await Promise.all([
     repositories.users.getById(userId),
     repositories.accounts.listByUserId(userId),
     repositories.holdings.listByUserId(userId),
     repositories.preferences.getByUserId(userId),
+    repositories.mobileSecurityObservations.listRecentByUserId(userId, 20),
   ]);
 
   if (accounts.length === 0 || holdings.length === 0) {
@@ -5353,12 +5455,36 @@ export async function createRecommendationRun(
     );
   }
 
+  const recommendationSecurities = await repositories.securities.listByIds([
+    ...holdings
+      .map((holding) => holding.securityId)
+      .filter((id): id is string => Boolean(id)),
+    ...observations
+      .map((observation) => observation.securityId)
+      .filter((id): id is string => Boolean(id)),
+  ]);
+
   const recommendation = buildRecommendationV2({
     accounts,
     holdings,
     profile,
     contributionAmountCad: input.contributionAmountCad,
     language: user.displayLanguage,
+    securities: recommendationSecurities,
+    observations,
+    dynamicCandidates:
+      await repositories.recommendationDynamicCandidates.listFreshByUserId(
+        userId,
+        {
+          now: new Date(),
+          limit: 100,
+        },
+      ),
+    fallbackMode:
+      input.fallbackMode === "core_only_relaxed" &&
+      profile.recommendationConstraints.allowRelaxedCoreFallback
+        ? input.fallbackMode
+        : null,
   });
 
   const db = getDb();
@@ -5373,6 +5499,7 @@ export async function createRecommendationRun(
         confidenceScore: recommendation.confidenceScore?.toFixed(2) ?? null,
         assumptions: recommendation.assumptions,
         notes: recommendation.notes ?? [],
+        poolEvaluation: recommendation.poolEvaluation ?? null,
       })
       .returning();
 
@@ -5443,6 +5570,7 @@ export async function createRecommendationRun(
       assumptions: recommendation.assumptions,
       notes: recommendation.notes,
       poolStatus: recommendation.poolStatus,
+      poolEvaluation: recommendation.poolEvaluation,
       items,
     };
   });

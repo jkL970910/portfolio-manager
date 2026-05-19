@@ -28,6 +28,7 @@ class _RecommendationsPageState extends State<RecommendationsPage> {
   final _watchlistKey = GlobalKey();
   final _priorityKey = GlobalKey();
   var _working = false;
+  double _lastContributionAmount = 2500;
 
   @override
   void initState() {
@@ -102,20 +103,33 @@ class _RecommendationsPageState extends State<RecommendationsPage> {
     await _createRun(amount);
   }
 
-  Future<void> _createRun(double amount) async {
+  Future<void> _createRun(
+    double amount, {
+    String? fallbackMode,
+  }) async {
     if (amount <= 0 || _working) {
       return;
     }
 
     setState(() => _working = true);
     try {
-      await widget.apiClient.createRecommendationRun(amount);
+      await widget.apiClient.createRecommendationRun(
+        amount,
+        fallbackMode: fallbackMode,
+      );
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("进货清单已重算。")),
+          SnackBar(
+            content: Text(
+              fallbackMode == "core_only_relaxed"
+                  ? "已按放宽核心池重算。"
+                  : "进货清单已重算。",
+            ),
+          ),
         );
         setState(() {
           _working = false;
+          _lastContributionAmount = amount;
           _snapshot = _loadSnapshot();
         });
       }
@@ -150,6 +164,32 @@ class _RecommendationsPageState extends State<RecommendationsPage> {
         );
       }
     }
+  }
+
+  Future<void> _createRelaxedCoreFallbackRun() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text("放宽核心池重算？"),
+        content: const Text(
+          "这会只放宽到高置信核心池候选，不会把被你明确排除的标的强行推荐。适合当前规矩过严、没有可进货候选时使用。",
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text("取消"),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text("确认重算"),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) {
+      return;
+    }
+    await _createRun(_lastContributionAmount, fallbackMode: "core_only_relaxed");
   }
 
   @override
@@ -238,6 +278,14 @@ class _RecommendationsPageState extends State<RecommendationsPage> {
                               onOpenSecurity: _openSecurityDetail,
                             ),
                           ),
+                        const SizedBox(height: 16),
+                        _RecommendationPoolVisibilityCard(
+                          visibility: snapshot.data!.recommendationV4,
+                          onOpenSettings: () =>
+                              context.push(MobileRoutes.settings),
+                          onRunRelaxedCoreFallback:
+                              _createRelaxedCoreFallbackRun,
+                        ),
                       ],
                     ),
                   ),
@@ -1416,7 +1464,7 @@ class _PriorityWorkbenchState extends State<_PriorityWorkbench> {
               Icon(Icons.local_mall_outlined, color: tokens.accent),
               const SizedBox(width: 8),
               Expanded(
-                child: Text("进货优先级", style: theme.textTheme.titleLarge),
+                child: Text("Loo皇推荐", style: theme.textTheme.titleLarge),
               ),
               Text(
                 "${widget.priorities.length} 条",
@@ -2311,6 +2359,332 @@ class _PoolPolicyEmptyCard extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _RecommendationPoolVisibilityCard extends StatefulWidget {
+  const _RecommendationPoolVisibilityCard({
+    required this.visibility,
+    required this.onOpenSettings,
+    required this.onRunRelaxedCoreFallback,
+  });
+
+  final MobileRecommendationV4 visibility;
+  final VoidCallback onOpenSettings;
+  final VoidCallback onRunRelaxedCoreFallback;
+
+  @override
+  State<_RecommendationPoolVisibilityCard> createState() =>
+      _RecommendationPoolVisibilityCardState();
+}
+
+class _RecommendationPoolVisibilityCardState
+    extends State<_RecommendationPoolVisibilityCard> {
+  var _expanded = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final visibility = widget.visibility;
+    final snapshot = visibility.poolSnapshot;
+    final tokens = context.looTokens;
+    final theme = Theme.of(context);
+    final rejected = visibility.rejectedCandidates.take(6).toList();
+    final rejectedCount = snapshot.rawCount - snapshot.eligibleCount;
+
+    return LooGlassCard(
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          InkWell(
+            borderRadius: BorderRadius.circular(18),
+            onTap: () => setState(() => _expanded = !_expanded),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 2),
+              child: Row(
+                children: [
+                  Icon(Icons.visibility_outlined, color: tokens.accent),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      "推荐池透明度",
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ),
+                  _InfoPill("入池 ${snapshot.eligibleCount}/${snapshot.rawCount}"),
+                  const SizedBox(width: 6),
+                  AnimatedRotation(
+                    turns: _expanded ? 0.5 : 0,
+                    duration: const Duration(milliseconds: 180),
+                    child: const Icon(Icons.keyboard_arrow_down_rounded),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              for (final item in snapshot.statusBreakdown.take(4))
+                _InfoPill("${item.label} ${item.count}"),
+              if (snapshot.statusBreakdown.length > 4)
+                _InfoPill("+${snapshot.statusBreakdown.length - 4}"),
+            ],
+          ),
+          if (visibility.emptyState != null) ...[
+            const SizedBox(height: 10),
+            _V4EmptyStateBanner(
+              emptyState: visibility.emptyState!,
+              onOpenSettings: widget.onOpenSettings,
+              onRunRelaxedCoreFallback: widget.onRunRelaxedCoreFallback,
+            ),
+          ],
+          if (_expanded) ...[
+            const SizedBox(height: 12),
+            Divider(height: 1, color: tokens.cardBorder),
+            const SizedBox(height: 12),
+            _V4BreakdownBlock(
+              title: "来源构成",
+              items: snapshot.sourceBreakdown,
+            ),
+            if (snapshot.candidateEvidence.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              Text(
+                "动态候选状态",
+                style: theme.textTheme.labelLarge?.copyWith(
+                  color: tokens.mutedText,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: snapshot.candidateEvidence
+                    .take(6)
+                    .map(
+                      (item) => _InfoPill(
+                        "${item.symbol} · ${item.sourceLabel} · ${item.confidenceLabel} · ${item.freshnessLabel}",
+                      ),
+                    )
+                    .toList(),
+              ),
+            ],
+            const SizedBox(height: 12),
+            Text(
+              "过滤与观察",
+              style: theme.textTheme.labelLarge?.copyWith(
+                color: tokens.mutedText,
+              ),
+            ),
+            const SizedBox(height: 8),
+            if (rejected.isEmpty)
+              Text(
+                rejectedCount > 0 ? "有候选被过滤，但当前无需用户处理。" : "没有被过滤的候选。",
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: tokens.mutedText,
+                ),
+              )
+            else
+              ...rejected.map(_V4RejectedCandidateTile.new),
+            const SizedBox(height: 10),
+            Text(
+              "硬规则",
+              style: theme.textTheme.labelLarge?.copyWith(
+                color: tokens.mutedText,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: visibility.policy.hardRules
+                  .take(5)
+                  .map(_InfoPill.new)
+                  .toList(),
+            ),
+            if (visibility.policy.excludeRoles.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: visibility.policy.excludeRoles
+                    .map((role) => _InfoPill("排除 $role"))
+                    .toList(),
+              ),
+            ],
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _V4BreakdownBlock extends StatelessWidget {
+  const _V4BreakdownBlock({
+    required this.title,
+    required this.items,
+  });
+
+  final String title;
+  final List<MobileRecommendationV4Breakdown> items;
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = context.looTokens;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                color: tokens.mutedText,
+              ),
+        ),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children:
+              items.map((item) => _InfoPill("${item.label} ${item.count}")).toList(),
+        ),
+      ],
+    );
+  }
+}
+
+class _V4RejectedCandidateTile extends StatelessWidget {
+  const _V4RejectedCandidateTile(this.candidate);
+
+  final MobileRecommendationV4RejectedCandidate candidate;
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = context.looTokens;
+    final reason = candidate.reasons.isNotEmpty ? candidate.reasons.first : null;
+    final color = switch (reason?.severity) {
+      "blocker" => Theme.of(context).colorScheme.error,
+      "warning" => Colors.orange.shade300,
+      _ => tokens.mutedText,
+    };
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.16),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: tokens.cardBorder),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(10),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      candidate.symbol.isEmpty ? candidate.name : candidate.symbol,
+                      style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                            fontWeight: FontWeight.w900,
+                          ),
+                    ),
+                    if (reason != null) ...[
+                      const SizedBox(height: 3),
+                      Text(
+                        reason.label,
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: color,
+                              fontWeight: FontWeight.w800,
+                            ),
+                      ),
+                      if (reason.detail.isNotEmpty) ...[
+                        const SizedBox(height: 2),
+                        Text(
+                          reason.detail,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                color: tokens.mutedText,
+                              ),
+                        ),
+                      ],
+                    ],
+                  ],
+                ),
+              ),
+              if (candidate.repairLabel.isNotEmpty) ...[
+                const SizedBox(width: 8),
+                _InfoPill(candidate.repairLabel),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _V4EmptyStateBanner extends StatelessWidget {
+  const _V4EmptyStateBanner({
+    required this.emptyState,
+    required this.onOpenSettings,
+    required this.onRunRelaxedCoreFallback,
+  });
+
+  final MobileRecommendationV4EmptyState emptyState;
+  final VoidCallback onOpenSettings;
+  final VoidCallback onRunRelaxedCoreFallback;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: Colors.orange.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: Colors.orange.withValues(alpha: 0.28)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              emptyState.title,
+              style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w900,
+                  ),
+            ),
+            if (emptyState.detail.isNotEmpty) ...[
+              const SizedBox(height: 6),
+              Text(emptyState.detail),
+            ],
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                ...emptyState.repairActions.take(3).map(_InfoPill.new),
+                ActionChip(
+                  avatar: const Icon(Icons.tune_rounded, size: 16),
+                  label: const Text("调整规矩"),
+                  onPressed: onOpenSettings,
+                ),
+                ActionChip(
+                  avatar: const Icon(Icons.security_outlined, size: 16),
+                  label: const Text("放宽核心池"),
+                  onPressed: onRunRelaxedCoreFallback,
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }

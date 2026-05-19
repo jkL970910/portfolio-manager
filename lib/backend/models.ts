@@ -322,6 +322,9 @@ export interface RecommendationConstraints {
   avoidAccountTypes: AccountType[];
   preferredAccountTypes: AccountType[];
   allowedSecurityTypes: string[];
+  includedCandidateRoles: string[];
+  excludedCandidateRoles: string[];
+  allowRelaxedCoreFallback: boolean;
 }
 
 export interface PreferenceFactors {
@@ -487,9 +490,72 @@ export interface RecommendationRun {
       label: string;
     }[];
   };
+  poolEvaluation?: {
+    version: "v4-pool-evaluation";
+    generatedAt: string;
+    rawCount: number;
+    eligibleCount: number;
+    rejectedCount: number;
+    evaluations: Array<{
+      assetClass: string;
+      policy: {
+        includeRoles: string[];
+        excludeRoles: string[];
+        minProviderConfidence: "low" | "medium" | "high";
+        minLiquidityScore: number;
+      };
+      eligibleCandidates: Array<{
+        symbol: string;
+        name: string;
+        exchange: string | null;
+        currency: CurrencyCode | null;
+        source: string;
+        role: string;
+        providerConfidence?: "low" | "medium" | "high";
+        lastRefreshedAt?: string | null;
+        expiresAt?: string | null;
+      }>;
+      rejectedCandidates: Array<{
+        symbol: string;
+        name: string;
+        exchange: string | null;
+        currency: CurrencyCode | null;
+        source: string;
+        role: string;
+        providerConfidence?: "low" | "medium" | "high";
+        lastRefreshedAt?: string | null;
+        expiresAt?: string | null;
+        reasons: string[];
+      }>;
+      poolStatus: RecommendationRun["poolStatus"];
+    }>;
+  };
   items: RecommendationItem[];
   assumptions: string[];
   notes?: string[];
+}
+
+export interface RecommendationDynamicCandidateRecord {
+  id: EntityId;
+  userId: EntityId;
+  securityId: EntityId | null;
+  symbol: string;
+  name: string;
+  exchange: string | null;
+  currency: CurrencyCode | null;
+  assetClass: string;
+  role: string;
+  source: "core_pool" | "watchlist" | "recent_observation" | "worker";
+  providerConfidence: "low" | "medium" | "high";
+  liquidityScore: number;
+  expenseBps: number;
+  securityType: string | null;
+  tags: string[];
+  sourceMetadata: Record<string, unknown>;
+  lastRefreshedAt: string;
+  expiresAt: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface PortfolioAnalysisRun {

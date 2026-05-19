@@ -11,6 +11,7 @@ class MobileRecommendationsSnapshot {
     required this.watchlistMarketItems,
     required this.recentObservationItems,
     required this.engineSummary,
+    required this.recommendationV4,
     required this.scenarios,
     required this.poolStatus,
     required this.notes,
@@ -25,6 +26,7 @@ class MobileRecommendationsSnapshot {
   final List<MobileRecommendationMarketItem> watchlistMarketItems;
   final List<MobileRecommendationMarketItem> recentObservationItems;
   final MobileRecommendationEngineSummary engineSummary;
+  final MobileRecommendationV4 recommendationV4;
   final List<MobileRecommendationScenario> scenarios;
   final MobileRecommendationPoolStatus poolStatus;
   final List<String> notes;
@@ -59,6 +61,8 @@ class MobileRecommendationsSnapshot {
           .toList(),
       engineSummary:
           MobileRecommendationEngineSummary.fromJson(json["engineSummary"]),
+      recommendationV4:
+          MobileRecommendationV4.fromJson(json["recommendationV4"]),
       scenarios: readJsonList(json, "scenarios")
           .map(MobileRecommendationScenario.fromJson)
           .toList(),
@@ -294,6 +298,259 @@ class MobileRecommendationEngineFactor {
       label: json["label"] as String? ?? "",
       value: json["value"] as String? ?? "--",
       tone: json["tone"] as String? ?? "neutral",
+    );
+  }
+}
+
+class MobileRecommendationV4 {
+  const MobileRecommendationV4({
+    required this.version,
+    required this.policy,
+    required this.poolSnapshot,
+    required this.rejectedCandidates,
+    required this.emptyState,
+  });
+
+  final String version;
+  final MobileRecommendationV4Policy policy;
+  final MobileRecommendationV4PoolSnapshot poolSnapshot;
+  final List<MobileRecommendationV4RejectedCandidate> rejectedCandidates;
+  final MobileRecommendationV4EmptyState? emptyState;
+
+  bool get hasVisibility => version.isNotEmpty && poolSnapshot.rawCount > 0;
+
+  factory MobileRecommendationV4.fromJson(Object? value) {
+    final json =
+        value is Map<String, dynamic> ? value : const <String, dynamic>{};
+    return MobileRecommendationV4(
+      version: json["version"] as String? ?? "",
+      policy: MobileRecommendationV4Policy.fromJson(json["policy"]),
+      poolSnapshot:
+          MobileRecommendationV4PoolSnapshot.fromJson(json["poolSnapshot"]),
+      rejectedCandidates: readJsonList(json, "rejectedCandidates")
+          .map(MobileRecommendationV4RejectedCandidate.fromJson)
+          .toList(),
+      emptyState: json["emptyState"] is Map<String, dynamic>
+          ? MobileRecommendationV4EmptyState.fromJson(
+              json["emptyState"] as Map<String, dynamic>,
+            )
+          : null,
+    );
+  }
+}
+
+class MobileRecommendationV4Policy {
+  const MobileRecommendationV4Policy({
+    required this.riskMode,
+    required this.includeRoles,
+    required this.excludeRoles,
+    required this.hardRules,
+    required this.contributionAmountLabel,
+    required this.noSilentFallback,
+  });
+
+  final String riskMode;
+  final List<String> includeRoles;
+  final List<String> excludeRoles;
+  final List<String> hardRules;
+  final String contributionAmountLabel;
+  final bool noSilentFallback;
+
+  factory MobileRecommendationV4Policy.fromJson(Object? value) {
+    final json =
+        value is Map<String, dynamic> ? value : const <String, dynamic>{};
+    return MobileRecommendationV4Policy(
+      riskMode: json["riskMode"] as String? ?? "--",
+      includeRoles:
+          (json["includeRoles"] as List?)?.whereType<String>().toList() ??
+              const [],
+      excludeRoles:
+          (json["excludeRoles"] as List?)?.whereType<String>().toList() ??
+              const [],
+      hardRules:
+          (json["hardRules"] as List?)?.whereType<String>().toList() ??
+              const [],
+      contributionAmountLabel:
+          json["contributionAmountLabel"] as String? ?? "--",
+      noSilentFallback: json["noSilentFallback"] as bool? ?? true,
+    );
+  }
+}
+
+class MobileRecommendationV4PoolSnapshot {
+  const MobileRecommendationV4PoolSnapshot({
+    required this.rawCount,
+    required this.eligibleCount,
+    required this.excludedCount,
+    required this.watchOnlyCount,
+    required this.needsDataCount,
+    required this.needsIdentityCount,
+    required this.sourceBreakdown,
+    required this.statusBreakdown,
+    required this.candidateEvidence,
+  });
+
+  final int rawCount;
+  final int eligibleCount;
+  final int excludedCount;
+  final int watchOnlyCount;
+  final int needsDataCount;
+  final int needsIdentityCount;
+  final List<MobileRecommendationV4Breakdown> sourceBreakdown;
+  final List<MobileRecommendationV4Breakdown> statusBreakdown;
+  final List<MobileRecommendationV4CandidateEvidence> candidateEvidence;
+
+  factory MobileRecommendationV4PoolSnapshot.fromJson(Object? value) {
+    final json =
+        value is Map<String, dynamic> ? value : const <String, dynamic>{};
+    return MobileRecommendationV4PoolSnapshot(
+      rawCount: (json["rawCount"] as num?)?.toInt() ?? 0,
+      eligibleCount: (json["eligibleCount"] as num?)?.toInt() ?? 0,
+      excludedCount: (json["excludedCount"] as num?)?.toInt() ?? 0,
+      watchOnlyCount: (json["watchOnlyCount"] as num?)?.toInt() ?? 0,
+      needsDataCount: (json["needsDataCount"] as num?)?.toInt() ?? 0,
+      needsIdentityCount: (json["needsIdentityCount"] as num?)?.toInt() ?? 0,
+      sourceBreakdown: readJsonList(json, "sourceBreakdown")
+          .map(MobileRecommendationV4Breakdown.fromJson)
+          .toList(),
+      statusBreakdown: readJsonList(json, "statusBreakdown")
+          .map(MobileRecommendationV4Breakdown.fromJson)
+          .toList(),
+      candidateEvidence: readJsonList(json, "candidateEvidence")
+          .map(MobileRecommendationV4CandidateEvidence.fromJson)
+          .toList(),
+    );
+  }
+}
+
+class MobileRecommendationV4CandidateEvidence {
+  const MobileRecommendationV4CandidateEvidence({
+    required this.symbol,
+    required this.sourceLabel,
+    required this.confidenceLabel,
+    required this.freshnessLabel,
+  });
+
+  final String symbol;
+  final String sourceLabel;
+  final String confidenceLabel;
+  final String freshnessLabel;
+
+  factory MobileRecommendationV4CandidateEvidence.fromJson(
+    Map<String, dynamic> json,
+  ) {
+    return MobileRecommendationV4CandidateEvidence(
+      symbol: json["symbol"] as String? ?? "",
+      sourceLabel: json["sourceLabel"] as String? ?? "",
+      confidenceLabel: json["confidenceLabel"] as String? ?? "",
+      freshnessLabel: json["freshnessLabel"] as String? ?? "",
+    );
+  }
+}
+
+class MobileRecommendationV4Breakdown {
+  const MobileRecommendationV4Breakdown({
+    required this.label,
+    required this.count,
+  });
+
+  final String label;
+  final int count;
+
+  factory MobileRecommendationV4Breakdown.fromJson(Map<String, dynamic> json) {
+    return MobileRecommendationV4Breakdown(
+      label: (json["label"] as String?) ??
+          (json["source"] as String?) ??
+          (json["status"] as String?) ??
+          "--",
+      count: (json["count"] as num?)?.toInt() ?? 0,
+    );
+  }
+}
+
+class MobileRecommendationV4RejectedCandidate {
+  const MobileRecommendationV4RejectedCandidate({
+    required this.symbol,
+    required this.name,
+    required this.source,
+    required this.status,
+    required this.reasons,
+    required this.repairLabel,
+  });
+
+  final String symbol;
+  final String name;
+  final String source;
+  final String status;
+  final List<MobileRecommendationV4Reason> reasons;
+  final String repairLabel;
+
+  factory MobileRecommendationV4RejectedCandidate.fromJson(
+    Map<String, dynamic> json,
+  ) {
+    final identity = json["identity"];
+    final identityJson =
+        identity is Map<String, dynamic> ? identity : const <String, dynamic>{};
+    final repair = json["repairAction"];
+    final repairJson =
+        repair is Map<String, dynamic> ? repair : const <String, dynamic>{};
+    return MobileRecommendationV4RejectedCandidate(
+      symbol: identityJson["symbol"] as String? ?? "",
+      name: identityJson["name"] as String? ?? "",
+      source: json["source"] as String? ?? "",
+      status: json["status"] as String? ?? "",
+      reasons: readJsonList(json, "reasons")
+          .map(MobileRecommendationV4Reason.fromJson)
+          .toList(),
+      repairLabel: repairJson["label"] as String? ?? "",
+    );
+  }
+}
+
+class MobileRecommendationV4Reason {
+  const MobileRecommendationV4Reason({
+    required this.code,
+    required this.label,
+    required this.detail,
+    required this.severity,
+  });
+
+  final String code;
+  final String label;
+  final String detail;
+  final String severity;
+
+  factory MobileRecommendationV4Reason.fromJson(Map<String, dynamic> json) {
+    return MobileRecommendationV4Reason(
+      code: json["code"] as String? ?? "",
+      label: json["label"] as String? ?? "",
+      detail: json["detail"] as String? ?? "",
+      severity: json["severity"] as String? ?? "info",
+    );
+  }
+}
+
+class MobileRecommendationV4EmptyState {
+  const MobileRecommendationV4EmptyState({
+    required this.title,
+    required this.detail,
+    required this.repairActions,
+  });
+
+  final String title;
+  final String detail;
+  final List<String> repairActions;
+
+  factory MobileRecommendationV4EmptyState.fromJson(
+    Map<String, dynamic> json,
+  ) {
+    return MobileRecommendationV4EmptyState(
+      title: json["title"] as String? ?? "",
+      detail: json["detail"] as String? ?? "",
+      repairActions: readJsonList(json, "repairActions")
+          .map((item) => item["label"] as String? ?? "")
+          .where((item) => item.isNotEmpty)
+          .toList(),
     );
   }
 }

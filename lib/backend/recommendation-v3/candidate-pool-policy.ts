@@ -70,32 +70,75 @@ export function buildCandidatePoolPolicy(input: {
   profile: PreferenceProfile;
   assetClass: string;
   portfolioCashPct: number;
+  fallbackMode?: "core_only_relaxed" | null;
 }): CandidatePoolPolicy {
   const factors = input.profile.preferenceFactors;
   const constraints = input.profile.recommendationConstraints;
-  const includeRoles = buildIncludedRoles(factors, input.assetClass);
+  const baseIncludeRoles = buildIncludedRoles(factors, input.assetClass);
   const allowCashParking = shouldAllowCashParking({
     factors,
     assetClass: input.assetClass,
     portfolioCashPct: input.portfolioCashPct,
   });
+  const includeRoles =
+    input.fallbackMode === "core_only_relaxed"
+      ? (["core"] as CoreRecommendationCandidateRole[])
+      : applyRoleInclusions(baseIncludeRoles, constraints.includedCandidateRoles);
+  const excludeRoles =
+    input.fallbackMode === "core_only_relaxed"
+      ? []
+      : applyRoleExclusions(
+          allowCashParking ? [] : ["cash_parking"],
+          constraints.excludedCandidateRoles,
+        );
   return {
     includeRoles,
-    excludeRoles: allowCashParking ? [] : ["cash_parking"],
+    excludeRoles,
     allowedAssetClasses: [input.assetClass],
     avoidedAssetClasses: [],
     preferredSectors: factors.sectorTilts.preferredSectors,
     avoidedSectors: factors.sectorTilts.avoidedSectors,
-    maxExpenseBps: getMaxExpenseBps(factors),
-    minLiquidityScore: getMinLiquidityScore(factors),
+    maxExpenseBps:
+      input.fallbackMode === "core_only_relaxed"
+        ? null
+        : getMaxExpenseBps(factors),
+    minLiquidityScore:
+      input.fallbackMode === "core_only_relaxed"
+        ? 0
+        : getMinLiquidityScore(factors),
     allowSingleStocks: factors.behavior.riskCapacity === "high",
     allowSectorEtfs: factors.behavior.riskCapacity !== "low",
     allowCommodity:
       input.assetClass === "Commodity" || factors.behavior.riskCapacity !== "low",
     allowCashParking,
     requireCleanIdentity: true,
-    minProviderConfidence: "medium",
+    minProviderConfidence:
+      input.fallbackMode === "core_only_relaxed" ? "low" : "medium",
   };
+}
+
+function applyRoleInclusions(
+  baseRoles: CoreRecommendationCandidateRole[],
+  configuredRoles: string[],
+) {
+  if (configuredRoles.length === 0) {
+    return baseRoles;
+  }
+  const configured = new Set(configuredRoles);
+  return ALL_ROLES.filter((role) => configured.has(role));
+}
+
+function applyRoleExclusions(
+  baseRoles: CoreRecommendationCandidateRole[],
+  configuredRoles: string[],
+) {
+  const roles = new Set<CoreRecommendationCandidateRole>(baseRoles);
+  for (const role of configuredRoles) {
+    if (ALL_ROLES.includes(role as CoreRecommendationCandidateRole)) {
+      roles.add(role as CoreRecommendationCandidateRole);
+    }
+  }
+  return ALL_ROLES.filter((role) => roles.has(role));
 }
 
 export function evaluateCandidatePool(input: {

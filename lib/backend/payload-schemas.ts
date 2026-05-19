@@ -49,6 +49,15 @@ const recommendationConstraintsSchema = z
       .array(z.string().trim().min(1).max(64))
       .max(20)
       .default([]),
+    includedCandidateRoles: z
+      .array(z.enum(["core", "satellite", "cash_parking", "defensive"]))
+      .max(4)
+      .default([]),
+    excludedCandidateRoles: z
+      .array(z.enum(["core", "satellite", "cash_parking", "defensive"]))
+      .max(4)
+      .default([]),
+    allowRelaxedCoreFallback: z.boolean().default(false),
   })
   .superRefine((value, context) => {
     for (const [index, band] of value.assetClassBands.entries()) {
@@ -461,6 +470,7 @@ export const mobileManualAccountCreateSchema = z.object({
 
 export const recommendationRunCreateSchema = z.object({
   contributionAmountCad: z.number().positive().max(1000000),
+  fallbackMode: z.enum(["core_only_relaxed"]).optional(),
 });
 
 export const candidateScoreCreateSchema = z.object({

@@ -3,8 +3,11 @@
   CurrencyCode,
   HoldingPosition,
   InvestmentAccount,
+  MobileSecurityObservation,
   PreferenceProfile,
+  RecommendationDynamicCandidateRecord,
   RecommendationRun,
+  SecurityRecord,
   SecurityMetadata
 } from "@/lib/backend/models";
 import { getAssetClassLabel, getAccountTypeLabel, getRiskProfileLabel } from "@/lib/i18n/finance";
@@ -19,9 +22,11 @@ import {
   candidateIdentityKey,
   listRecommendationCandidates,
   type RecommendationCandidate,
+  type RecommendationCandidateProvider,
 } from "@/lib/backend/recommendation-v3/candidate-provider";
 import {
   buildCandidatePoolPolicy,
+  type CandidatePoolEvaluation,
   evaluateCandidatePool,
   type RecommendationPoolStatus,
 } from "@/lib/backend/recommendation-v3/candidate-pool-policy";
@@ -384,16 +389,28 @@ function getAllowedSecurityUniverse(input: {
   assetClass: string;
   profile: PreferenceProfile;
   portfolioCashPct: number;
+  holdings?: HoldingPosition[];
+  securities?: SecurityRecord[];
+  observations?: MobileSecurityObservation[];
+  dynamicCandidates?: RecommendationDynamicCandidateRecord[];
+  providers?: RecommendationCandidateProvider[];
+  fallbackMode?: "core_only_relaxed" | null;
 }) {
   const policy = buildCandidatePoolPolicy({
     profile: input.profile,
     assetClass: input.assetClass,
     portfolioCashPct: input.portfolioCashPct,
+    fallbackMode: input.fallbackMode,
   });
   return evaluateCandidatePool({
     candidates: listRecommendationCandidates({
       assetClass: input.assetClass,
       watchlistSymbols: input.profile.watchlistSymbols,
+      holdings: input.holdings,
+      securities: input.securities,
+      observations: input.observations,
+      dynamicCandidates: input.dynamicCandidates,
+      providers: input.providers,
     }),
     policy,
     constraints: input.profile.recommendationConstraints,
@@ -512,10 +529,27 @@ export function buildRecommendationV2(args: {
   profile: PreferenceProfile;
   contributionAmountCad: number;
   language: DisplayLanguage;
+  securities?: SecurityRecord[];
+  observations?: MobileSecurityObservation[];
+  dynamicCandidates?: RecommendationDynamicCandidateRecord[];
+  candidateProviders?: RecommendationCandidateProvider[];
+  fallbackMode?: "core_only_relaxed" | null;
 }): Pick<RecommendationRun, "assumptions" | "items" | "notes" | "engineVersion" | "objective" | "confidenceScore"> & {
   poolStatus?: RecommendationPoolStatus;
+  poolEvaluation?: RecommendationRun["poolEvaluation"];
 } {
-  const { accounts, holdings, profile, contributionAmountCad, language } = args;
+  const {
+    accounts,
+    holdings,
+    profile,
+    contributionAmountCad,
+    language,
+    securities = [],
+    observations = [],
+    dynamicCandidates = [],
+    candidateProviders,
+    fallbackMode = null,
+  } = args;
   const { total, allocation } = getCurrentAllocationFromHoldings(holdings);
   const targetAllocation = getTargetAllocation(profile);
   const fxPolicy = inferFxPolicy(accounts, holdings);
@@ -548,6 +582,10 @@ export function buildRecommendationV2(args: {
 
   const priorities = targetGaps.slice(0, 3);
   const poolStatuses: RecommendationPoolStatus[] = [];
+  const poolEvaluations: Array<{
+    assetClass: string;
+    evaluation: CandidatePoolEvaluation;
+  }> = [];
 
   const totalGap = priorities.reduce((sum, item) => sum + item.gapPct, 0) || 1;
   let allocatedSoFar = 0;
@@ -562,8 +600,18 @@ export function buildRecommendationV2(args: {
       assetClass: priority.assetClass,
       profile,
       portfolioCashPct: allocation.get("Cash") ?? 0,
+      holdings,
+      securities,
+      observations,
+      dynamicCandidates,
+      providers: candidateProviders,
+      fallbackMode,
     });
     poolStatuses.push(candidatePool.poolStatus);
+    poolEvaluations.push({
+      assetClass: priority.assetClass,
+      evaluation: candidatePool,
+    });
     const candidates = candidatePool.eligibleCandidates;
     if (candidates.length === 0) {
       return [];
@@ -681,6 +729,71 @@ export function buildRecommendationV2(args: {
     ],
     items,
     poolStatus: firstBlockedPool ?? { status: "ok" },
+    poolEvaluation: buildRecommendationPoolEvaluationSnapshot(poolEvaluations),
+  };
+}
+
+function buildRecommendationPoolEvaluationSnapshot(
+  poolEvaluations: Array<{
+    assetClass: string;
+    evaluation: CandidatePoolEvaluation;
+  }>,
+): RecommendationRun["poolEvaluation"] {
+  const evaluations = poolEvaluations.map(({ assetClass, evaluation }) => ({
+    assetClass,
+    policy: {
+      includeRoles: evaluation.policy.includeRoles,
+      excludeRoles: evaluation.policy.excludeRoles,
+      minProviderConfidence: evaluation.policy.minProviderConfidence,
+      minLiquidityScore: evaluation.policy.minLiquidityScore,
+    },
+    eligibleCandidates: evaluation.eligibleCandidates.map((candidate) => ({
+      symbol: candidate.symbol,
+      name: candidate.name,
+      exchange: candidate.exchange ?? null,
+      currency: candidate.currency ?? null,
+      source: candidate.source,
+      role: candidate.role,
+      providerConfidence: candidate.providerConfidence,
+      lastRefreshedAt: candidate.lastRefreshedAt ?? null,
+      expiresAt: candidate.expiresAt ?? null,
+    })),
+    rejectedCandidates: evaluation.rejectedCandidates.map((item) => ({
+      symbol: item.candidate.symbol,
+      name: item.candidate.name,
+      exchange: item.candidate.exchange ?? null,
+      currency: item.candidate.currency ?? null,
+      source: item.candidate.source,
+      role: item.candidate.role,
+      providerConfidence: item.candidate.providerConfidence,
+      lastRefreshedAt: item.candidate.lastRefreshedAt ?? null,
+      expiresAt: item.candidate.expiresAt ?? null,
+      reasons: item.reasons,
+    })),
+    poolStatus: evaluation.poolStatus,
+  }));
+  const rawCount = evaluations.reduce(
+    (sum, evaluation) =>
+      sum +
+      evaluation.eligibleCandidates.length +
+      evaluation.rejectedCandidates.length,
+    0,
+  );
+  const eligibleCount = evaluations.reduce(
+    (sum, evaluation) => sum + evaluation.eligibleCandidates.length,
+    0,
+  );
+  const rejectedCount = evaluations.reduce(
+    (sum, evaluation) => sum + evaluation.rejectedCandidates.length,
+    0,
+  );
+  return {
+    version: "v4-pool-evaluation",
+    generatedAt: new Date().toISOString(),
+    rawCount,
+    eligibleCount,
+    rejectedCount,
+    evaluations,
   };
 }
 

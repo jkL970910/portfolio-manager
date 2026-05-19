@@ -3029,14 +3029,36 @@ bool _hasAnalysisAuditData(MobileAiAnalysisResult data) {
 }
 
 List<String> _securityInfoSummaryPills(MobileSecurityResearchProfile data) {
+  final limitationPill =
+      data.limitationSummary == null
+          ? null
+          : _researchLimitationPill(data.limitationSummary!);
   return [
     data.securityLabel,
     _assetTypeLabel(data.assetType),
     if (data.quoteFreshnessSummary != null)
       _compactResearchStatus(data.quoteFreshnessSummary!),
-    if (data.limitationSummary != null) "资料待补全",
+    if (limitationPill != null) limitationPill,
     if (data.evidence.isNotEmpty) "证据 ${data.evidence.length}",
   ];
+}
+
+String? _researchLimitationPill(String value) {
+  final normalized = value.trim();
+  if (normalized.isEmpty) {
+    return null;
+  }
+  final hasInsufficientSignal =
+      normalized.contains("不足") ||
+      normalized.contains("缺") ||
+      normalized.contains("不能支撑") ||
+      normalized.contains("低置信") ||
+      normalized.contains("过期") ||
+      normalized.contains("兜底");
+  if (hasInsufficientSignal) {
+    return "资料待补全";
+  }
+  return "可用于快扫";
 }
 
 List<String> _valuationSummaryPills(MobileResearchValuationEvidence data) {

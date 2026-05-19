@@ -341,6 +341,202 @@ GPT is optional:
 
 ## Current Implementation Status
 
+### 2026-05-18 V4 Pool Visibility Slice
+
+Completed in this slice:
+
+- Added backend `recommendation-v4` visibility DTOs for the mobile workbench.
+- Added a `buildRecommendationV4Visibility` summarizer that builds a
+  user-visible candidate-pool audit from:
+  - existing recommendation priorities
+  - saved watchlist symbols
+  - recent observed/search securities
+- Preserved the existing V2.1/V3 recommendation result shape. V4 currently adds
+  transparency and repair guidance; it does not replace the deterministic
+  scoring core yet.
+- Implemented no-silent-fallback behavior at the visibility layer:
+  - zero eligible candidates returns an explicit empty state
+  - the system does not inject a default ETF just to avoid an empty UI
+- Mobile `进货台` now parses and renders:
+  - raw candidate count vs entered recommendation-pool count
+  - source breakdown such as core pool / 囤货清单 / 近期观察
+  - status breakdown such as 已进推荐池 / 仅观察 / 身份待确认 / 资料待补
+  - first-pass reasons for watched or observed securities that did not become
+    actionable recommendations
+- Added backend tests for:
+  - watchlist candidate not selected by policy
+  - missing watchlist identity quarantine
+  - recent observations entering raw pool
+  - selected recommendation deduping against watchlist
+
+Still pending for full V4:
+
+1. Replace the current static/core candidate construction with a real
+   `CandidateProvider` that merges `core_pool + dynamic_pool + watchlist`.
+2. Persist dynamic-pool candidates in DB with provider confidence, TTL, and
+   source metadata.
+3. Move hard filtering into a first-class `CandidatePoolPolicy` module consumed
+   before scoring, not only a visibility summarizer.
+4. Add user-facing controls for allowed/excluded roles and asset classes in
+   Settings.
+5. Add explicit fallback confirmation flow (`core_only_relaxed`) rather than
+   automatic fallback.
+6. Feed daily snapshot diff / Daily Brief IDs into candidate cards once the
+   worker pipeline exists.
+
+### 2026-05-18 V4 CandidateProvider / Policy Slice
+
+Completed in this slice:
+
+- Extended `RecommendationCandidateProvider` beyond the static core ETF
+  universe.
+- Added watchlist and recent-observation providers into the candidate pipeline.
+  These candidates now enter the same raw candidate set as core-pool candidates.
+- `buildRecommendationV2` can now receive holdings, security metadata records,
+  and recent mobile observations, then pass them into candidate construction.
+- `createRecommendationRun` and scenario runs now provide recent observations
+  and security metadata to the recommendation engine.
+- V4 mobile visibility now reuses real `CandidatePoolPolicy` evaluations rather
+  than only summarizing the final recommendation list after the fact.
+- Added repository support for batched security metadata loading by id.
+- Added a persisted `poolEvaluation` snapshot on `recommendation_runs`. This
+  stores the exact raw / eligible / rejected candidate pool used by a run, so
+  mobile visibility can explain that run without silently recomputing against a
+  later watchlist or preference state.
+- Added a Drizzle migration:
+  - `drizzle/0029_recommendation_pool_evaluation.sql`
+  - column: `recommendation_runs.pool_evaluation jsonb`
+- Added tests proving:
+  - watchlist candidates can enter the candidate pool when identity and asset
+    sleeve match
+  - recent observations can enter the candidate pool when identity and asset
+    sleeve match
+  - V4 visibility reflects the broader policy-evaluated pool, not just the
+    final selected recommendation rows
+  - V4 visibility prefers persisted `poolEvaluation` when present, avoiding a
+    mismatch between the historical recommendation run and current watchlist /
+    observation state
+
+Important product boundary:
+
+- Watchlist and recent-observation candidates are allowed into the raw candidate
+  pool, not directly into actionable recommendation output.
+- They still must pass identity, provider-confidence, role, asset-class,
+  liquidity, fee, security-type, and user-exclusion rules before ranking.
+- Incomplete or low-confidence items remain visible as repairable / rejected
+  candidates instead of becoming `Loo皇推荐`.
+- A recommendation run is now auditable as a snapshot. Current watchlist or
+  recent-observation changes can affect the next run, but they should not
+  rewrite the explanation for an already-created run.
+
+Still pending for full V4:
+
+1. Persist a DB-backed `dynamic_pool` populated by workers, instead of relying
+   only on recent observations.
+2. Store provider confidence, TTL, source metadata, and last-refresh state for
+   DB-backed dynamic candidates.
+3. Add Settings controls for role/asset-class exclusions and fallback approval.
+4. Add explicit fallback confirmation request shape such as
+   `fallbackMode: "core_only_relaxed"`.
+5. Add worker-generated daily snapshot diff references into `CandidateBrief`.
+6. Replace remaining product-facing `V2.1 Core` naming with a cleaner
+   `Rules Core + V4 Pool` naming once the core scoring module is fully renamed.
+
+### 2026-05-18 V4 Policy Controls / Explicit Fallback Slice
+
+Completed in this slice:
+
+- Extended saved `recommendationConstraints` with V4 candidate-pool controls:
+  - `includedCandidateRoles`
+  - `excludedCandidateRoles`
+  - `allowRelaxedCoreFallback`
+- `CandidatePoolPolicy` now applies these role controls before scoring. This
+  lets user preference rules hide or allow candidate classes such as
+  `core`, `satellite`, `cash_parking`, and `defensive` without changing the
+  scoring formula itself.
+- Added an explicit `fallbackMode: "core_only_relaxed"` request contract for
+  recommendation-run creation.
+- Relaxed fallback is not automatic. It only runs when:
+  1. the client explicitly sends `fallbackMode: "core_only_relaxed"`, and
+  2. the saved profile has `allowRelaxedCoreFallback: true`.
+- Mobile now has a user-confirmed `放宽核心池` action from the empty-pool
+  state. The fallback path still does not override explicit excluded symbols;
+  it only relaxes role/liquidity/confidence thresholds toward core-pool
+  candidates.
+- Settings mobile models preserve the new V4 fields so preference saves do not
+  accidentally erase them.
+- Added tests proving:
+  - role exclusions can remove satellite candidates before scoring
+  - strict rules still return `needs_policy_relaxation` by default
+  - explicit relaxed-core fallback can recover a core recommendation when
+    invoked intentionally
+
+Product boundary:
+
+- Fallback is a user action, not a hidden system behavior.
+- The UI can offer `放宽核心池`, but the backend remains the authority on whether
+  relaxed fallback is allowed for that profile.
+- This is still not a trading signal. It only relaxes candidate-pool eligibility
+  so the deterministic rules engine can produce a conservative core-pool option.
+
+Still pending after this slice:
+
+1. Add the polished Advanced Settings UI controls for candidate roles and
+   fallback approval.
+2. Expand dynamic-pool workers from clean watchlist/recent observations to
+   scheduled provider-backed discovery.
+3. Surface dynamic candidate TTL/confidence/source metadata in a compact
+   user-facing repair/audit sheet.
+4. Render `dailyBriefId` in the recommendation card as a clickable “宝库晨报”
+   reference.
+
+### 2026-05-18 V4 Dynamic Pool / Daily Brief Wiring Slice
+
+Completed in this slice:
+
+- Added DB-backed `recommendation_dynamic_candidates`.
+- Added repository methods:
+  - `recommendationDynamicCandidates.upsert`
+  - `recommendationDynamicCandidates.listFreshByUserId`
+- Added a deterministic dynamic-pool worker helper:
+  - `refreshRecommendationDynamicPoolForUser(userId)`
+- The worker currently upserts only clean-identity watchlist and recent
+  observation candidates that already have known economic exposure. It does not
+  call external search providers from page load.
+- Dynamic candidate records persist:
+  - canonical listing identity
+  - asset class
+  - role
+  - provider confidence
+  - liquidity score
+  - expense estimate
+  - source metadata
+  - `lastRefreshedAt`
+  - `expiresAt`
+- `RecommendationCandidateProvider` now includes a DB-backed dynamic provider.
+- `createRecommendationRun` refreshes the dynamic pool before scoring and then
+  passes fresh dynamic candidates into V4 pool evaluation.
+- `CandidateBrief.dailyBriefId` now links to matching cached daily intelligence
+  when an existing brief matches the recommended listing.
+
+Important boundary:
+
+- The dynamic pool is still an eligibility source, not a recommendation by
+  itself.
+- Items from dynamic pool still must pass `CandidatePoolPolicy`, identity,
+  confidence, role, asset-class, liquidity, fee, and user exclusion checks.
+- Page load reads cached DB state only. It does not fan out to external
+  discovery APIs.
+
+Next implementation targets:
+
+1. Add Settings UI controls for V4 role rules and fallback approval.
+2. Add a scheduled dynamic-pool refresh endpoint/worker for held securities,
+   clean watchlist entries, recent observations, and core-pool candidates.
+3. Add compact mobile visibility for dynamic candidate confidence/TTL/source
+   without exposing raw engineering logs.
+4. Render clickable Daily Brief references inside recommendation cards.
+
 The V3 shape exists, but raw live news/forum information is not enabled yet.
 
 - Completed: V2.1 Core remains the deterministic baseline; V3 Overlay can read
@@ -867,3 +1063,42 @@ P2:
 1. Add institutional/fundamentals source.
 2. Add community sentiment with low-confidence labels.
 3. Add cost dashboard and per-source opt-in controls.
+
+## Recommendation V4 Candidate Pool Status
+
+Current implementation status:
+
+1. Complete: CandidateProvider pipeline now builds a raw pool from the curated
+   core universe, watchlist identities, recent observations, and DB-backed
+   dynamic candidates.
+2. Complete: CandidatePoolPolicy runs before account/security scoring. It
+   supports role inclusion/exclusion, minimum confidence/liquidity, and explicit
+   no-silent-fallback behavior.
+3. Complete: strict fallback semantics. If rules empty the pool, the engine
+   returns a policy-relaxation state instead of forcing a default ETF. A relaxed
+   core-pool fallback only runs when the user enabled it in settings and taps the
+   fallback action.
+4. Complete: pool evaluation snapshots persist on recommendation runs. Mobile
+   visibility reads the persisted snapshot first, so later watchlist changes do
+   not rewrite the historical explanation.
+5. Complete: dynamic pool storage and worker. The
+   `/api/workers/recommendation-dynamic-pool/run` endpoint refreshes dynamic
+   candidates from clean watchlist/recent-observation identities with TTL and
+   confidence metadata. It uses the existing worker secret auth.
+6. Complete: Settings exposes user-facing V4 controls without leaking raw env or
+   implementation flag names: allowed/excluded candidate roles and manual
+   relaxed-core fallback.
+7. Complete: mobile recommendations expose raw-pool visibility, rejected
+   candidates, dynamic-candidate freshness/confidence, and policy empty states.
+
+Design constraints:
+
+- Watchlist can enter the raw pool, but it is not automatically recommended.
+  It must have clean identity and pass CandidatePoolPolicy.
+- Recent observations can enter the raw pool for visibility/review, then policy
+  decides whether they are eligible.
+- Dynamic candidates are acceleration/cache records, not the source of truth.
+  Their TTL prevents stale watched symbols from silently living in the pool.
+- Raw pool and recommendation pool are visible to the user at a product level:
+  source counts, policy status, and rejected reasons are shown; implementation
+  fields stay hidden.

@@ -630,7 +630,10 @@ export const preferenceProfiles: PreferenceProfile[] = [
       assetClassBands: [],
       avoidAccountTypes: [],
       preferredAccountTypes: [],
-      allowedSecurityTypes: []
+      allowedSecurityTypes: [],
+      includedCandidateRoles: [],
+      excludedCandidateRoles: [],
+      allowRelaxedCoreFallback: false
     },
     preferenceFactors: DEFAULT_PREFERENCE_FACTORS
   },
@@ -664,7 +667,10 @@ export const preferenceProfiles: PreferenceProfile[] = [
       assetClassBands: [],
       avoidAccountTypes: [],
       preferredAccountTypes: [],
-      allowedSecurityTypes: []
+      allowedSecurityTypes: [],
+      includedCandidateRoles: [],
+      excludedCandidateRoles: [],
+      allowRelaxedCoreFallback: false
     },
     preferenceFactors: {
       ...DEFAULT_PREFERENCE_FACTORS,

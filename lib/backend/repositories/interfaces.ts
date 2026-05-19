@@ -19,6 +19,7 @@ import {
   MobileSecurityObservation,
   PortfolioAnalysisGptEnhancement,
   PreferenceProfile,
+  RecommendationDynamicCandidateRecord,
   RecommendationRun,
   UserProfile,
 } from "@/lib/backend/models";
@@ -30,6 +31,7 @@ export interface AuthUserRecord {
 
 export interface UserRepository {
   getById(userId: EntityId): Promise<UserProfile>;
+  listAll(params?: { limit?: number }): Promise<UserProfile[]>;
   findByEmail(email: string): Promise<AuthUserRecord | null>;
   updateBaseCurrency(
     userId: EntityId,
@@ -81,6 +83,7 @@ export interface SecurityPriceHistoryRepository {
 
 export interface SecurityRepository {
   getById(securityId: EntityId): Promise<SecurityRecord | null>;
+  listByIds(securityIds: EntityId[]): Promise<SecurityRecord[]>;
   listNeedingMetadataRefresh(params: {
     limit: number;
     staleBefore: string;
@@ -140,6 +143,23 @@ export interface PreferenceRepository {
 
 export interface RecommendationRepository {
   getLatestByUserId(userId: EntityId): Promise<RecommendationRun>;
+}
+
+export interface RecommendationDynamicCandidateRepository {
+  upsert(
+    input: Omit<
+      RecommendationDynamicCandidateRecord,
+      "id" | "createdAt" | "updatedAt"
+    >,
+  ): Promise<RecommendationDynamicCandidateRecord>;
+  listFreshByUserId(
+    userId: EntityId,
+    params: {
+      now: Date;
+      assetClass?: string | null;
+      limit: number;
+    },
+  ): Promise<RecommendationDynamicCandidateRecord[]>;
 }
 
 export interface PortfolioAnalysisRunRepository {
@@ -264,6 +284,7 @@ export interface BackendRepositories {
   mobileSecurityObservations: MobileSecurityObservationRepository;
   preferences: PreferenceRepository;
   recommendations: RecommendationRepository;
+  recommendationDynamicCandidates: RecommendationDynamicCandidateRepository;
   analysisRuns: PortfolioAnalysisRunRepository;
   analysisGptEnhancements: PortfolioAnalysisGptEnhancementRepository;
   externalResearchJobs: ExternalResearchJobRepository;

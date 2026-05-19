@@ -13,6 +13,12 @@ const _assetClasses = [
 
 const _accountTypes = ["TFSA", "RRSP", "FHSA", "Taxable"];
 const _securityTypes = ["ETF", "Common Stock", "Commodity ETF"];
+const _candidateRoles = {
+  "core": "核心池",
+  "satellite": "卫星标的",
+  "cash_parking": "现金停泊",
+  "defensive": "防守候选",
+};
 
 String _formatNullableNumber(double? value) {
   if (value == null) {
@@ -343,6 +349,14 @@ class _ConstraintEditorSheetState extends State<_ConstraintEditorSheet> {
   late final _allowedSecurityTypesController = TextEditingController(
       text: widget.profile.recommendationConstraints.allowedSecurityTypes
           .join(", "));
+  late final List<String> _includedCandidateRoles =
+      _normalizeCandidateRoles(widget
+          .profile.recommendationConstraints.includedCandidateRoles);
+  late final List<String> _excludedCandidateRoles =
+      _normalizeCandidateRoles(widget
+          .profile.recommendationConstraints.excludedCandidateRoles);
+  late var _allowRelaxedCoreFallback =
+      widget.profile.recommendationConstraints.allowRelaxedCoreFallback;
   var _saving = false;
   String? _error;
 
@@ -417,6 +431,9 @@ class _ConstraintEditorSheetState extends State<_ConstraintEditorSheet> {
           "avoidAccountTypes": avoidAccountTypes,
           "preferredAccountTypes": preferredAccountTypes,
           "allowedSecurityTypes": allowedSecurityTypes,
+          "includedCandidateRoles": _includedCandidateRoles,
+          "excludedCandidateRoles": _excludedCandidateRoles,
+          "allowRelaxedCoreFallback": _allowRelaxedCoreFallback,
         },
       });
       if (mounted) {
@@ -553,6 +570,8 @@ class _ConstraintEditorSheetState extends State<_ConstraintEditorSheet> {
               ),
             ),
             const SizedBox(height: 12),
+            _buildCandidateRoleControls(context),
+            const SizedBox(height: 12),
             DropdownButtonFormField<String>(
               initialValue: _recommendationStrategy,
               decoration: const InputDecoration(labelText: "推荐策略"),
@@ -575,6 +594,16 @@ class _ConstraintEditorSheetState extends State<_ConstraintEditorSheet> {
               onChanged: _saving
                   ? null
                   : (value) => setState(() => _taxAwarePlacement = value),
+            ),
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              title: const Text("允许手动启用核心池兜底"),
+              subtitle: const Text("候选池为空时不会自动强塞；开启后你可以在进货页手动跑一次核心池兜底。"),
+              value: _allowRelaxedCoreFallback,
+              onChanged: _saving
+                  ? null
+                  : (value) =>
+                      setState(() => _allowRelaxedCoreFallback = value),
             ),
             const SizedBox(height: 8),
             Text("账户优先级", style: Theme.of(context).textTheme.titleLarge),
@@ -632,6 +661,91 @@ class _ConstraintEditorSheetState extends State<_ConstraintEditorSheet> {
         .toSet()
         .take(max)
         .toList();
+  }
+
+  List<String> _normalizeCandidateRoles(List<String> roles) {
+    return roles
+        .where(_candidateRoles.containsKey)
+        .toSet()
+        .toList(growable: true);
+  }
+
+  void _toggleIncludedRole(String role, bool selected) {
+    setState(() {
+      if (selected) {
+        if (!_includedCandidateRoles.contains(role)) {
+          _includedCandidateRoles.add(role);
+        }
+        _excludedCandidateRoles.remove(role);
+      } else {
+        _includedCandidateRoles.remove(role);
+      }
+    });
+  }
+
+  void _toggleExcludedRole(String role, bool selected) {
+    setState(() {
+      if (selected) {
+        if (!_excludedCandidateRoles.contains(role)) {
+          _excludedCandidateRoles.add(role);
+        }
+        _includedCandidateRoles.remove(role);
+      } else {
+        _excludedCandidateRoles.remove(role);
+      }
+    });
+  }
+
+  Widget _buildCandidateRoleControls(BuildContext context) {
+    return InputDecorator(
+      decoration: const InputDecoration(
+        labelText: "进货候选角色",
+        helperText: "留空表示按风险偏好自动决定；排除优先于纳入。",
+        border: OutlineInputBorder(),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text("只允许这些角色", style: Theme.of(context).textTheme.labelLarge),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: _candidateRoles.entries
+                .map(
+                  (entry) => FilterChip(
+                    label: Text(entry.value),
+                    selected: _includedCandidateRoles.contains(entry.key),
+                    onSelected: _saving
+                        ? null
+                        : (selected) =>
+                            _toggleIncludedRole(entry.key, selected),
+                  ),
+                )
+                .toList(),
+          ),
+          const SizedBox(height: 12),
+          Text("明确排除", style: Theme.of(context).textTheme.labelLarge),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: _candidateRoles.entries
+                .map(
+                  (entry) => FilterChip(
+                    label: Text(entry.value),
+                    selected: _excludedCandidateRoles.contains(entry.key),
+                    onSelected: _saving
+                        ? null
+                        : (selected) =>
+                            _toggleExcludedRole(entry.key, selected),
+                  ),
+                )
+                .toList(),
+          ),
+        ],
+      ),
+    );
   }
 
   List<Map<String, dynamic>> _initialSecurityIdentities(

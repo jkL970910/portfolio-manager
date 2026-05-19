@@ -204,6 +204,20 @@
       "when": 1779120000000,
       "tag": "0028_mobile_security_observations",
       "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "7",
+      "when": 1779123600000,
+      "tag": "0029_recommendation_pool_evaluation",
+      "breakpoints": true
+    },
+    {
+      "idx": 30,
+      "version": "7",
+      "when": 1779127200000,
+      "tag": "0030_recommendation_dynamic_candidates",
+      "breakpoints": true
     }
   ]
 }

@@ -117,6 +117,9 @@ class MobileRecommendationConstraints {
     required this.avoidAccountTypes,
     required this.preferredAccountTypes,
     required this.allowedSecurityTypes,
+    required this.includedCandidateRoles,
+    required this.excludedCandidateRoles,
+    required this.allowRelaxedCoreFallback,
   });
 
   final List<String> excludedSymbols;
@@ -127,6 +130,9 @@ class MobileRecommendationConstraints {
   final List<String> avoidAccountTypes;
   final List<String> preferredAccountTypes;
   final List<String> allowedSecurityTypes;
+  final List<String> includedCandidateRoles;
+  final List<String> excludedCandidateRoles;
+  final bool allowRelaxedCoreFallback;
 
   factory MobileRecommendationConstraints.fromJson(Object? value) {
     final json =
@@ -161,6 +167,16 @@ class MobileRecommendationConstraints {
               ?.whereType<String>()
               .toList() ??
           const [],
+      includedCandidateRoles: (json["includedCandidateRoles"] as List?)
+              ?.whereType<String>()
+              .toList() ??
+          const [],
+      excludedCandidateRoles: (json["excludedCandidateRoles"] as List?)
+              ?.whereType<String>()
+              .toList() ??
+          const [],
+      allowRelaxedCoreFallback:
+          json["allowRelaxedCoreFallback"] as bool? ?? false,
     );
   }
 }

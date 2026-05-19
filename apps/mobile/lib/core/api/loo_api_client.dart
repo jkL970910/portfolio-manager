@@ -130,10 +130,16 @@ class LooApiClient {
   }
 
   Future<Map<String, dynamic>> createRecommendationRun(
-      double contributionAmountCad) {
+    double contributionAmountCad, {
+    String? fallbackMode,
+  }) {
     return _postJson(
       "/api/mobile/recommendations/runs",
-      body: {"contributionAmountCad": contributionAmountCad},
+      body: {
+        "contributionAmountCad": contributionAmountCad,
+        if (fallbackMode != null && fallbackMode.isNotEmpty)
+          "fallbackMode": fallbackMode,
+      },
     );
   }
 

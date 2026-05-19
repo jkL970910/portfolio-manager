@@ -38,8 +38,21 @@ export type CandidateBrief = {
   dailyBriefId: string | null;
 };
 
+type CandidateBriefDailyDocument = {
+  id: string;
+  identity?: {
+    securityId?: string | null;
+    symbol?: string | null;
+    exchange?: string | null;
+    currency?: string | null;
+  } | null;
+};
+
 export function buildCandidateBrief(
   item: RecommendationRun["items"][number],
+  options: {
+    dailyBriefDocuments?: CandidateBriefDailyDocument[];
+  } = {},
 ): CandidateBrief {
   const matchScore = Math.round(
     ((item.securityScore ?? 0) * 0.45 +
@@ -103,6 +116,31 @@ export function buildCandidateBrief(
     badges,
     primaryBlocker,
     rejectionReason: primaryBlocker,
-    dailyBriefId: null,
+    dailyBriefId: findDailyBriefId(item, options.dailyBriefDocuments ?? []),
   };
+}
+
+function findDailyBriefId(
+  item: RecommendationRun["items"][number],
+  documents: CandidateBriefDailyDocument[],
+) {
+  const symbol = item.securitySymbol?.trim().toUpperCase();
+  if (!symbol) {
+    return null;
+  }
+  const exchange = item.securityExchange?.trim().toUpperCase() ?? null;
+  const currency = item.securityCurrency ?? null;
+  return (
+    documents.find((document) => {
+      if (item.securityId && document.identity?.securityId === item.securityId) {
+        return true;
+      }
+      return (
+        document.identity?.symbol?.trim().toUpperCase() === symbol &&
+        (!exchange ||
+          document.identity?.exchange?.trim().toUpperCase() === exchange) &&
+        (!currency || document.identity?.currency === currency)
+      );
+    })?.id ?? null
+  );
 }

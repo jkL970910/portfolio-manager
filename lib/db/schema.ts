@@ -493,10 +493,60 @@ export const recommendationRuns = pgTable("recommendation_runs", {
   confidenceScore: numeric("confidence_score", { precision: 6, scale: 2 }),
   assumptions: jsonb("assumptions").notNull(),
   notes: jsonb("notes"),
+  poolEvaluation: jsonb("pool_evaluation"),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),
 });
+
+export const recommendationDynamicCandidates = pgTable(
+  "recommendation_dynamic_candidates",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id),
+    securityId: uuid("security_id").references(() => securities.id),
+    symbol: varchar("symbol", { length: 32 }).notNull(),
+    name: varchar("name", { length: 160 }).notNull(),
+    exchange: varchar("exchange", { length: 64 }),
+    currency: varchar("currency", { length: 3 }),
+    assetClass: varchar("asset_class", { length: 64 }).notNull(),
+    role: varchar("role", { length: 32 }).notNull(),
+    source: varchar("source", { length: 32 }).notNull(),
+    providerConfidence: varchar("provider_confidence", { length: 16 })
+      .notNull()
+      .default("medium"),
+    liquidityScore: integer("liquidity_score").notNull().default(65),
+    expenseBps: integer("expense_bps").notNull().default(75),
+    securityType: varchar("security_type", { length: 64 }),
+    tags: jsonb("tags").notNull().default([]),
+    sourceMetadata: jsonb("source_metadata").notNull().default({}),
+    lastRefreshedAt: timestamp("last_refreshed_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => ({
+    userAssetClassIdx: index("recommendation_dynamic_candidates_user_asset_idx").on(
+      table.userId,
+      table.assetClass,
+      table.expiresAt,
+    ),
+    identityUniqueIdx: uniqueIndex(
+      "recommendation_dynamic_candidates_identity_idx",
+    ).on(table.userId, table.symbol, table.exchange, table.currency),
+    securityIdx: index("recommendation_dynamic_candidates_security_idx").on(
+      table.securityId,
+    ),
+  }),
+);
 
 export const recommendationItems = pgTable("recommendation_items", {
   id: uuid("id").defaultRandom().primaryKey(),

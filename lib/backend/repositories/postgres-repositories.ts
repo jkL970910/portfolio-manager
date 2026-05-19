@@ -1,4 +1,4 @@
-import { and, desc, eq, gt, isNull, lte, or, sql } from "drizzle-orm";
+import { and, desc, eq, gt, inArray, isNull, lte, or, sql } from "drizzle-orm";
 import { getDb } from "@/lib/db/client";
 import {
   allocationTargets,
@@ -18,6 +18,7 @@ import {
   portfolioAnalysisRuns,
   portfolioSnapshots,
   preferenceProfiles,
+  recommendationDynamicCandidates,
   recommendationItems,
   recommendationRuns,
   securities,
@@ -44,6 +45,7 @@ import {
   SecurityPriceHistoryPoint,
   SecurityRecord,
   PreferenceProfile,
+  RecommendationDynamicCandidateRecord,
   RecommendationRun,
   UserProfile,
 } from "@/lib/backend/models";
@@ -458,6 +460,34 @@ function mapExternalResearchDocument(
   };
 }
 
+function mapRecommendationDynamicCandidate(
+  row: typeof recommendationDynamicCandidates.$inferSelect,
+): RecommendationDynamicCandidateRecord {
+  return {
+    id: row.id,
+    userId: row.userId,
+    securityId: row.securityId ?? null,
+    symbol: row.symbol,
+    name: row.name,
+    exchange: row.exchange ?? null,
+    currency: (row.currency as RecommendationDynamicCandidateRecord["currency"]) ?? null,
+    assetClass: row.assetClass,
+    role: row.role,
+    source: row.source as RecommendationDynamicCandidateRecord["source"],
+    providerConfidence:
+      row.providerConfidence as RecommendationDynamicCandidateRecord["providerConfidence"],
+    liquidityScore: row.liquidityScore,
+    expenseBps: row.expenseBps,
+    securityType: row.securityType ?? null,
+    tags: row.tags as string[],
+    sourceMetadata: row.sourceMetadata as Record<string, unknown>,
+    lastRefreshedAt: row.lastRefreshedAt.toISOString(),
+    expiresAt: row.expiresAt.toISOString(),
+    createdAt: row.createdAt.toISOString(),
+    updatedAt: row.updatedAt.toISOString(),
+  };
+}
+
 function mapMarketSentimentSnapshot(
   row: typeof marketSentimentSnapshots.$inferSelect,
 ): MarketSentimentSnapshot {
@@ -500,6 +530,14 @@ export const postgresRepositories: BackendRepositories = {
         throw new Error(`User not found for id ${userId}.`);
       }
       return mapUser(row);
+    },
+    async listAll(params) {
+      const limit = Math.min(Math.max(Math.trunc(params?.limit ?? 100), 1), 500);
+      const rows = await getDb().query.users.findMany({
+        orderBy: [desc(users.updatedAt)],
+        limit,
+      });
+      return rows.map(mapUser);
     },
     async findByEmail(email) {
       const db = getDb();
@@ -768,6 +806,17 @@ export const postgresRepositories: BackendRepositories = {
         where: eq(securities.id, securityId),
       });
       return row ? mapSecurity(row) : null;
+    },
+    async listByIds(securityIds) {
+      const uniqueIds = [...new Set(securityIds.filter(Boolean))];
+      if (uniqueIds.length === 0) {
+        return [];
+      }
+      const db = getDb();
+      const rows = await db.query.securities.findMany({
+        where: inArray(securities.id, uniqueIds),
+      });
+      return rows.map(mapSecurity);
     },
     async listNeedingMetadataRefresh(input) {
       const db = getDb();
@@ -1060,6 +1109,9 @@ export const postgresRepositories: BackendRepositories = {
           run.confidenceScore == null ? null : toNumber(run.confidenceScore),
         assumptions: run.assumptions as string[],
         notes: (run.notes as string[] | null) ?? [],
+        poolEvaluation:
+          (run.poolEvaluation as RecommendationRun["poolEvaluation"] | null) ??
+          undefined,
         items: items.map((item) => ({
           assetClass: item.assetClass,
           amountCad: toNumber(item.amountCad),
@@ -1108,6 +1160,78 @@ export const postgresRepositories: BackendRepositories = {
               | null) ?? undefined,
         })),
       };
+    },
+  },
+  recommendationDynamicCandidates: {
+    async upsert(input) {
+      const db = getDb();
+      const [row] = await db
+        .insert(recommendationDynamicCandidates)
+        .values({
+          userId: input.userId,
+          securityId: input.securityId,
+          symbol: input.symbol.trim().toUpperCase(),
+          name: input.name,
+          exchange: input.exchange?.trim().toUpperCase() ?? null,
+          currency: input.currency,
+          assetClass: input.assetClass,
+          role: input.role,
+          source: input.source,
+          providerConfidence: input.providerConfidence,
+          liquidityScore: input.liquidityScore,
+          expenseBps: input.expenseBps,
+          securityType: input.securityType,
+          tags: input.tags,
+          sourceMetadata: input.sourceMetadata,
+          lastRefreshedAt: new Date(input.lastRefreshedAt),
+          expiresAt: new Date(input.expiresAt),
+        })
+        .onConflictDoUpdate({
+          target: [
+            recommendationDynamicCandidates.userId,
+            recommendationDynamicCandidates.symbol,
+            recommendationDynamicCandidates.exchange,
+            recommendationDynamicCandidates.currency,
+          ],
+          set: {
+            securityId: input.securityId,
+            name: input.name,
+            assetClass: input.assetClass,
+            role: input.role,
+            source: input.source,
+            providerConfidence: input.providerConfidence,
+            liquidityScore: input.liquidityScore,
+            expenseBps: input.expenseBps,
+            securityType: input.securityType,
+            tags: input.tags,
+            sourceMetadata: input.sourceMetadata,
+            lastRefreshedAt: new Date(input.lastRefreshedAt),
+            expiresAt: new Date(input.expiresAt),
+            updatedAt: new Date(),
+          },
+        })
+        .returning();
+      if (!row) {
+        throw new Error("Failed to persist recommendation dynamic candidate.");
+      }
+      return mapRecommendationDynamicCandidate(row);
+    },
+    async listFreshByUserId(userId, params) {
+      const rows = await getDb().query.recommendationDynamicCandidates.findMany({
+        where: and(
+          eq(recommendationDynamicCandidates.userId, userId),
+          gt(recommendationDynamicCandidates.expiresAt, params.now),
+          params.assetClass
+            ? eq(recommendationDynamicCandidates.assetClass, params.assetClass)
+            : undefined,
+        ),
+        orderBy: [
+          desc(recommendationDynamicCandidates.providerConfidence),
+          desc(recommendationDynamicCandidates.lastRefreshedAt),
+        ],
+        limit: Math.min(Math.max(Math.trunc(params.limit), 1), 100),
+      });
+      return rows.map(mapRecommendationDynamicCandidate);
     },
   },
   analysisRuns: {

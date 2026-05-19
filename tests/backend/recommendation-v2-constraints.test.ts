@@ -102,6 +102,91 @@ test("over-strict policy returns relaxation status instead of forcing a default 
   );
 });
 
+test("candidate role constraints can exclude satellite candidates before scoring", () => {
+  const pool = evaluateCandidatePool({
+    candidates: listRecommendationCandidates({
+      assetClass: "US Equity",
+      watchlistSymbols: ["AAPL:NASDAQ:USD"],
+      securities: [
+        {
+          id: "sec_aapl",
+          symbol: "AAPL",
+          name: "Apple Inc.",
+          currency: "USD",
+          canonicalExchange: "NASDAQ",
+          micCode: "XNAS",
+          securityType: "Common Stock",
+          marketSector: "Technology",
+          country: "US",
+          underlyingId: null,
+          economicAssetClass: "US Equity",
+          economicSector: "Technology",
+          exposureRegion: "US",
+          metadataSource: "manual",
+          metadataConfidence: 90,
+          metadataAsOf: null,
+          metadataConfirmedAt: null,
+          metadataNotes: null,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        },
+      ],
+    }),
+    policy: buildCandidatePoolPolicy({
+      profile: makeProfile({
+        recommendationConstraints: {
+          ...DEFAULT_RECOMMENDATION_CONSTRAINTS,
+          excludedCandidateRoles: ["satellite"],
+        },
+      }),
+      assetClass: "US Equity",
+      portfolioCashPct: 10,
+    }),
+    constraints: {
+      ...DEFAULT_RECOMMENDATION_CONSTRAINTS,
+      excludedCandidateRoles: ["satellite"],
+    },
+    assetClass: "US Equity",
+  });
+
+  assert.ok(
+    pool.rejectedCandidates.some(
+      (item) =>
+        item.candidate.symbol === "AAPL" &&
+        item.reasons.some((reason) => reason.includes("卫星标的")),
+    ),
+  );
+});
+
+test("relaxed core fallback is explicit and does not run by default", () => {
+  const strictProfile = makeProfile({
+    recommendationConstraints: {
+      ...DEFAULT_RECOMMENDATION_CONSTRAINTS,
+      includedCandidateRoles: ["satellite"],
+      excludedCandidateRoles: ["core"],
+    },
+  });
+  const strictRun = buildRecommendationV2({
+    accounts,
+    holdings: [],
+    profile: strictProfile,
+    contributionAmountCad: 5000,
+    language: "zh",
+  });
+  const relaxedRun = buildRecommendationV2({
+    accounts,
+    holdings: [],
+    profile: strictProfile,
+    contributionAmountCad: 5000,
+    language: "zh",
+    fallbackMode: "core_only_relaxed",
+  });
+
+  assert.equal(strictRun.poolStatus?.status, "needs_policy_relaxation");
+  assert.equal(relaxedRun.poolStatus?.status, "ok");
+  assert.ok(relaxedRun.items.some((item) => item.assetClass === "US Equity"));
+});
+
 test("candidate pool policy can hide routine cash for high-risk profiles", () => {
   const profile = makeProfile({
     preferenceFactors: {
@@ -241,6 +326,56 @@ test("watchlist identity keys match exact listing before ticker fallback", () =>
 
   assert.equal(usListing.watchlistMatched, true);
   assert.equal(cadListing.watchlistMatched, false);
+});
+
+test("watchlist candidates can enter the recommendation pool when identity and sleeve match", () => {
+  const candidates = listRecommendationCandidates({
+    assetClass: "US Equity",
+    watchlistSymbols: ["AMZN:NASDAQ:USD"],
+  });
+
+  assert.ok(
+    candidates.some(
+      (candidate) =>
+        candidate.symbol === "AMZN" &&
+        candidate.exchange === "NASDAQ" &&
+        candidate.currency === "USD" &&
+        candidate.source === "watchlist",
+    ),
+  );
+});
+
+test("recent observations can enter the recommendation pool when identity and sleeve match", () => {
+  const candidates = listRecommendationCandidates({
+    assetClass: "US Equity",
+    watchlistSymbols: [],
+    observations: [
+      {
+        id: "obs_gev",
+        userId: "user_test",
+        securityId: null,
+        symbol: "GEV",
+        exchange: "NYSE",
+        currency: "USD",
+        name: "GE Vernova",
+        source: "search",
+        observationCount: 1,
+        lastObservedAt: new Date().toISOString(),
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      },
+    ],
+  });
+
+  assert.ok(
+    candidates.some(
+      (candidate) =>
+        candidate.symbol === "GEV" &&
+        candidate.exchange === "NYSE" &&
+        candidate.currency === "USD" &&
+        candidate.source === "recent_observation",
+    ),
+  );
 });
 
 test("advanced preference factors improve matching sector and style candidates", () => {

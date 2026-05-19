@@ -31,6 +31,8 @@ import {
   getExternalResearchPolicy,
   mapExternalResearchPolicyForMobile,
 } from "@/lib/backend/portfolio-external-research";
+import { buildRecommendationV4Visibility } from "@/lib/backend/recommendation-v4/visibility";
+import type { RecommendationV4Visibility } from "@/lib/backend/recommendation-v4/types";
 import {
   getMobileExternalResearchUsage,
   mapExternalResearchJobForMobile,
@@ -41,6 +43,8 @@ import type {
   ExternalResearchDocumentRecord,
   HoldingPosition,
   MobileSecurityObservation,
+  PreferenceProfile,
+  RecommendationRun,
   SecurityPriceHistoryPoint,
 } from "@/lib/backend/models";
 
@@ -622,6 +626,7 @@ type MobileRecommendationsData = Omit<RecommendationsData, "priorities"> & {
   watchlistMarketItems: MobileRecommendationMarketItem[];
   recentObservationItems: MobileRecommendationMarketItem[];
   engineSummary: MobileRecommendationEngineSummary;
+  recommendationV4: RecommendationV4Visibility;
   preferenceContext: {
     riskProfile: string;
     targetAllocation: { assetClass: string; targetPct: number }[];
@@ -957,11 +962,22 @@ function mapMobileSecurityDetailData(
 
 async function mapMobileRecommendationsData(
   data: RecommendationsData,
-  preferenceContext: MobileRecommendationsData["preferenceContext"],
+  profile: PreferenceProfile,
   intelligenceBriefs: RecommendationsData["intelligenceBriefs"] = [],
   userId: string,
   observations: MobileSecurityObservation[] = [],
 ): Promise<MobileRecommendationsData> {
+  const preferenceContext: MobileRecommendationsData["preferenceContext"] = {
+    riskProfile: profile.riskProfile,
+    targetAllocation: profile.targetAllocation,
+    accountFundingPriority: profile.accountFundingPriority,
+    taxAwarePlacement: profile.taxAwarePlacement,
+    recommendationStrategy: profile.recommendationStrategy,
+    rebalancingTolerancePct: profile.rebalancingTolerancePct,
+    watchlistSymbols: profile.watchlistSymbols,
+    recommendationConstraints: profile.recommendationConstraints,
+    preferenceFactors: profile.preferenceFactors,
+  };
   const externalBriefCount = intelligenceBriefs.filter(
     (brief) => brief.sourceMode !== "local",
   ).length;
@@ -969,6 +985,10 @@ async function mapMobileRecommendationsData(
     userId,
     watchlistSymbols: preferenceContext.watchlistSymbols,
     priorities: data.priorities,
+    observations,
+  });
+  const recommendationContext = await loadRecommendationV4Context({
+    userId,
     observations,
   });
   return {
@@ -985,6 +1005,12 @@ async function mapMobileRecommendationsData(
     intelligenceBriefs,
     watchlistMarketItems: marketItems.watchlistMarketItems,
     recentObservationItems: marketItems.recentObservationItems,
+    recommendationV4: buildRecommendationV4Visibility({
+      data,
+      profile,
+      observations,
+      ...recommendationContext,
+    }),
     engineSummary: buildMobileRecommendationEngineSummary({
       data,
       preferenceContext,
@@ -1030,8 +1056,40 @@ async function mapMobileRecommendationsData(
               ]),
         ],
         intelligenceRefs,
+        candidateBrief: attachDailyBriefToCandidateBrief(
+          rest.candidateBrief,
+          intelligenceBriefs,
+        ),
       };
     }),
+  };
+}
+
+function attachDailyBriefToCandidateBrief(
+  brief: RecommendationsData["priorities"][number]["candidateBrief"],
+  intelligenceBriefs: RecommendationsData["intelligenceBriefs"],
+) {
+  if (!brief || brief.dailyBriefId) {
+    return brief;
+  }
+  const match = intelligenceBriefs.find((document) => {
+    if (
+      brief.identity.securityId &&
+      document.identity.securityId === brief.identity.securityId
+    ) {
+      return true;
+    }
+    return (
+      document.identity.symbol?.trim().toUpperCase() ===
+        brief.identity.symbol.trim().toUpperCase() &&
+      document.identity.exchange?.trim().toUpperCase() ===
+        brief.identity.exchange?.trim().toUpperCase() &&
+      document.identity.currency === brief.identity.currency
+    );
+  });
+  return {
+    ...brief,
+    dailyBriefId: match?.id ?? null,
   };
 }
 
@@ -1093,6 +1151,23 @@ async function buildMobileRecommendationMarketItems(input: {
     ),
   );
   return { watchlistMarketItems, recentObservationItems };
+}
+
+async function loadRecommendationV4Context(input: {
+  userId: string;
+  observations: MobileSecurityObservation[];
+}) {
+  const repositories = getRepositories();
+  const holdings = await repositories.holdings.listByUserId(input.userId);
+  const securities = await repositories.securities.listByIds([
+    ...holdings
+      .map((holding) => holding.securityId)
+      .filter((id): id is string => Boolean(id)),
+    ...input.observations
+      .map((observation) => observation.securityId)
+      .filter((id): id is string => Boolean(id)),
+  ]);
+  return { holdings, securities };
 }
 
 function buildMobileRecommendationEngineSummary(input: {
@@ -2089,17 +2164,7 @@ export async function getMobileRecommendationsView(userId: string) {
   return {
     data: await mapMobileRecommendationsData(
       payload.data,
-      {
-        riskProfile: profile.riskProfile,
-        targetAllocation: profile.targetAllocation,
-        accountFundingPriority: profile.accountFundingPriority,
-        taxAwarePlacement: profile.taxAwarePlacement,
-        recommendationStrategy: profile.recommendationStrategy,
-        rebalancingTolerancePct: profile.rebalancingTolerancePct,
-        watchlistSymbols: profile.watchlistSymbols,
-        recommendationConstraints: profile.recommendationConstraints,
-        preferenceFactors: profile.preferenceFactors,
-      },
+      profile,
       intelligenceBriefs,
       userId,
       observations,

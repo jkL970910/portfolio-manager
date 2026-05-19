@@ -363,20 +363,9 @@ class _SecurityDetailPageState extends State<SecurityDetailPage> {
                                 },
                         ),
                         const SizedBox(height: 8),
-                        Wrap(
-                          spacing: 8,
-                          runSpacing: 8,
-                          children: [
-                            _StatusPill(
-                              label: trust.label,
-                              color: trust.color(sheetContext),
-                            ),
-                            _InfoChip(data.quoteStatusLabel),
-                            if (data.priceHistoryChart != null)
-                              _InfoChip(
-                                data.priceHistoryChart!.freshness.label,
-                              ),
-                          ],
+                        _ResearchUpdateStatusChips(
+                          trust: trust,
+                          data: data,
                         ),
                         if (_externalResearchMessage != null &&
                             _externalResearchMessage!.isNotEmpty) ...[
@@ -2217,6 +2206,46 @@ class _ResearchUpdateActionTile extends StatelessWidget {
           : const Icon(Icons.chevron_right),
       enabled: onTap != null,
       onTap: onTap,
+    );
+  }
+}
+
+class _ResearchUpdateStatusChips extends StatelessWidget {
+  const _ResearchUpdateStatusChips({
+    required this.trust,
+    required this.data,
+  });
+
+  final _SecurityDataTrust trust;
+  final MobileSecurityDetailSnapshot data;
+
+  @override
+  Widget build(BuildContext context) {
+    final seen = <String>{trust.label.trim()};
+    final labels = <String>[];
+    for (final label in [
+      data.quoteStatusLabel,
+      if (data.priceHistoryChart != null)
+        data.priceHistoryChart!.freshness.label,
+    ]) {
+      final normalized = label.trim();
+      if (normalized.isEmpty || seen.contains(normalized)) {
+        continue;
+      }
+      seen.add(normalized);
+      labels.add(normalized);
+    }
+
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: [
+        _StatusPill(
+          label: trust.label,
+          color: trust.color(context),
+        ),
+        for (final label in labels) _InfoChip(label),
+      ],
     );
   }
 }

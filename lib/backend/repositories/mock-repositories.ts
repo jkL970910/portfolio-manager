@@ -14,6 +14,7 @@ import {
   preferenceProfiles,
   recommendationRuns,
   transactions,
+  users,
 } from "@/lib/backend/mock-store";
 import {
   ExternalResearchDocumentRecord,
@@ -21,6 +22,7 @@ import {
   MobileSecurityObservation,
   PortfolioAnalysisGptEnhancement,
   PortfolioAnalysisRun,
+  RecommendationDynamicCandidateRecord,
 } from "@/lib/backend/models";
 import {
   ExternalResearchJob,
@@ -37,6 +39,7 @@ const externalResearchUsageCounters: ExternalResearchUsageCounter[] = [];
 const externalResearchDocuments: ExternalResearchDocumentRecord[] = [];
 const marketSentimentSnapshots: MarketSentimentSnapshot[] = [];
 const mobileSecurityObservations: MobileSecurityObservation[] = [];
+const recommendationDynamicCandidates: RecommendationDynamicCandidateRecord[] = [];
 
 export const mockRepositories: BackendRepositories = {
   users: {
@@ -46,6 +49,10 @@ export const mockRepositories: BackendRepositories = {
         throw new Error(`User not found for id ${userId}.`);
       }
       return user;
+    },
+    async listAll(params) {
+      const limit = Math.min(Math.max(Math.trunc(params?.limit ?? users.length), 1), 500);
+      return users.slice(0, limit);
     },
     async findByEmail(email) {
       return findAuthUserByEmail(email.toLowerCase());
@@ -138,6 +145,10 @@ export const mockRepositories: BackendRepositories = {
   securities: {
     async getById(securityId) {
       return securities.find((security) => security.id === securityId) ?? null;
+    },
+    async listByIds(securityIds) {
+      const idSet = new Set(securityIds);
+      return securities.filter((security) => idSet.has(security.id));
     },
     async listNeedingMetadataRefresh(input) {
       const staleBeforeTime = Date.parse(input.staleBefore);
@@ -310,6 +321,53 @@ export const mockRepositories: BackendRepositories = {
         throw new Error(`Recommendation run not found for user ${userId}.`);
       }
       return run;
+    },
+  },
+  recommendationDynamicCandidates: {
+    async upsert(input) {
+      const now = new Date().toISOString();
+      const normalizedSymbol = input.symbol.trim().toUpperCase();
+      const normalizedExchange = input.exchange?.trim().toUpperCase() ?? null;
+      const existingIndex = recommendationDynamicCandidates.findIndex(
+        (candidate) =>
+          candidate.userId === input.userId &&
+          candidate.symbol === normalizedSymbol &&
+          candidate.exchange === normalizedExchange &&
+          candidate.currency === input.currency,
+      );
+      const existing = existingIndex >= 0
+        ? recommendationDynamicCandidates[existingIndex]
+        : null;
+      const record: RecommendationDynamicCandidateRecord = {
+        ...input,
+        symbol: normalizedSymbol,
+        exchange: normalizedExchange,
+        id:
+          existing?.id ??
+          `dynamic_candidate_${recommendationDynamicCandidates.length + 1}`,
+        createdAt: existing?.createdAt ?? now,
+        updatedAt: now,
+      };
+      if (existingIndex >= 0) {
+        recommendationDynamicCandidates[existingIndex] = record;
+      } else {
+        recommendationDynamicCandidates.unshift(record);
+      }
+      return record;
+    },
+    async listFreshByUserId(userId, params) {
+      return recommendationDynamicCandidates
+        .filter((candidate) => candidate.userId === userId)
+        .filter((candidate) => Date.parse(candidate.expiresAt) > params.now.getTime())
+        .filter((candidate) =>
+          params.assetClass ? candidate.assetClass === params.assetClass : true,
+        )
+        .sort(
+          (left, right) =>
+            Date.parse(right.lastRefreshedAt) -
+            Date.parse(left.lastRefreshedAt),
+        )
+        .slice(0, Math.min(Math.max(Math.trunc(params.limit), 1), 100));
     },
   },
   analysisRuns: {

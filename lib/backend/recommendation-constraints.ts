@@ -10,7 +10,10 @@ export const DEFAULT_RECOMMENDATION_CONSTRAINTS: RecommendationConstraints = {
   assetClassBands: [],
   avoidAccountTypes: [],
   preferredAccountTypes: [],
-  allowedSecurityTypes: []
+  allowedSecurityTypes: [],
+  includedCandidateRoles: [],
+  excludedCandidateRoles: [],
+  allowRelaxedCoreFallback: false
 };
 
 function normalizeSymbols(value: unknown, max = 50) {
@@ -94,6 +97,22 @@ function normalizeSecurityTypes(value: unknown) {
   ).slice(0, 20);
 }
 
+function normalizeCandidateRoles(value: unknown) {
+  const allowed = new Set(["core", "satellite", "cash_parking", "defensive"]);
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return Array.from(
+    new Set(
+      value
+        .filter((item): item is string => typeof item === "string")
+        .map((item) => item.trim())
+        .filter((item) => allowed.has(item))
+    )
+  );
+}
+
 export function normalizeRecommendationConstraints(value: unknown): RecommendationConstraints {
   const input = value != null && typeof value === "object" ? value as Record<string, unknown> : {};
   const excludedSecurities = normalizeSecurityIdentities(input.excludedSecurities);
@@ -118,6 +137,9 @@ export function normalizeRecommendationConstraints(value: unknown): Recommendati
     assetClassBands: normalizeAssetClassBands(input.assetClassBands),
     avoidAccountTypes: normalizeAccountTypes(input.avoidAccountTypes),
     preferredAccountTypes: normalizeAccountTypes(input.preferredAccountTypes),
-    allowedSecurityTypes: normalizeSecurityTypes(input.allowedSecurityTypes)
+    allowedSecurityTypes: normalizeSecurityTypes(input.allowedSecurityTypes),
+    includedCandidateRoles: normalizeCandidateRoles(input.includedCandidateRoles),
+    excludedCandidateRoles: normalizeCandidateRoles(input.excludedCandidateRoles),
+    allowRelaxedCoreFallback: input.allowRelaxedCoreFallback === true
   };
 }
