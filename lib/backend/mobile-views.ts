@@ -1113,7 +1113,7 @@ async function buildMobileRecommendationMarketItems(input: {
       }),
     ),
   );
-  const seen = new Set(watchlistMarketItems.map((item) => item.key));
+  const seenRecent = new Set<string>();
   const recentCandidates = input.observations
     .filter((observation) => observation.symbol.trim().length > 0)
     .map((observation) => ({
@@ -1133,10 +1133,10 @@ async function buildMobileRecommendationMarketItems(input: {
       },
     }))
     .filter((candidate) => {
-      if (seen.has(candidate.key)) {
+      if (seenRecent.has(candidate.key)) {
         return false;
       }
-      seen.add(candidate.key);
+      seenRecent.add(candidate.key);
       return true;
     })
     .slice(0, 8);

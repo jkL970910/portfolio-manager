@@ -294,12 +294,16 @@ class _RecommendationsPageState extends State<RecommendationsPage> {
     );
   }
 
-  void _openDiscover() {
-    Navigator.of(context).push(
+  Future<void> _openDiscover() async {
+    await Navigator.of(context).push(
       MaterialPageRoute<void>(
         builder: (_) => DiscoverPage(apiClient: widget.apiClient),
       ),
     );
+    if (!mounted) {
+      return;
+    }
+    _refresh();
   }
 
   void _openSecurityDetail(MobileRecommendationPriority priority) {
@@ -307,17 +311,28 @@ class _RecommendationsPageState extends State<RecommendationsPage> {
       return;
     }
 
-    unawaited(widget.apiClient.recordSecurityObservation(
-      symbol: priority.securitySymbol,
-      securityId: priority.securityId,
-      exchange: priority.securityExchange,
-      currency: priority.securityCurrency,
-      name: priority.security.isNotEmpty
-          ? priority.security
-          : priority.description,
-      source: "recommendation",
-    ).catchError((_) => <String, dynamic>{}));
-    context.push(
+    unawaited(_openSecurityDetailAndRefresh(priority));
+  }
+
+  Future<void> _openSecurityDetailAndRefresh(
+    MobileRecommendationPriority priority,
+  ) async {
+    await widget.apiClient
+        .recordSecurityObservation(
+          symbol: priority.securitySymbol,
+          securityId: priority.securityId,
+          exchange: priority.securityExchange,
+          currency: priority.securityCurrency,
+          name: priority.security.isNotEmpty
+              ? priority.security
+              : priority.description,
+          source: "recommendation",
+        )
+        .catchError((_) => <String, dynamic>{});
+    if (!mounted) {
+      return;
+    }
+    await context.push(
       MobileRoutes.securityDetail(
         symbol: priority.securitySymbol,
         securityId: priority.securityId.isNotEmpty ? priority.securityId : null,
@@ -329,21 +344,36 @@ class _RecommendationsPageState extends State<RecommendationsPage> {
             : null,
       ),
     );
+    if (!mounted) {
+      return;
+    }
+    _refresh();
   }
 
   void _openMarketItem(MobileRecommendationMarketItem item) {
     if (item.symbol.isEmpty) {
       return;
     }
-    unawaited(widget.apiClient.recordSecurityObservation(
-      symbol: item.symbol,
-      securityId: item.securityId,
-      exchange: item.exchange,
-      currency: item.currency,
-      name: item.name,
-      source: item.poolStatus == "eligible" ? "recommendation" : "watchlist",
-    ).catchError((_) => <String, dynamic>{}));
-    context.push(
+    unawaited(_openMarketItemAndRefresh(item));
+  }
+
+  Future<void> _openMarketItemAndRefresh(
+    MobileRecommendationMarketItem item,
+  ) async {
+    await widget.apiClient
+        .recordSecurityObservation(
+          symbol: item.symbol,
+          securityId: item.securityId,
+          exchange: item.exchange,
+          currency: item.currency,
+          name: item.name,
+          source: item.poolStatus == "eligible" ? "recommendation" : "watchlist",
+        )
+        .catchError((_) => <String, dynamic>{});
+    if (!mounted) {
+      return;
+    }
+    await context.push(
       MobileRoutes.securityDetail(
         symbol: item.symbol,
         securityId: item.securityId.isNotEmpty ? item.securityId : null,
@@ -351,6 +381,10 @@ class _RecommendationsPageState extends State<RecommendationsPage> {
         currency: item.currency.isNotEmpty ? item.currency : null,
       ),
     );
+    if (!mounted) {
+      return;
+    }
+    _refresh();
   }
 }
 
