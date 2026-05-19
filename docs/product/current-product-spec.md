@@ -478,13 +478,17 @@ Monarch-like transaction visibility, but this is not current P0.
    backend DTO, valuation evidence, ETF macro proxy, entry key levels,
    action-plan orchestration, and Flutter research UI first passes are
    implemented; next work is manual QA, visual polish, and deeper provider data.
-3. AlphaPick screenshot ingestion as a reviewed OCR/import pipeline.
-4. IBKR Flex Query import and Wealthsimple/SnapTrade feasibility spike under the
+3. Recommendation V4+ algorithm deepening:
+   calibrate CandidatePoolPolicy factors, expand the curated ETF universe,
+   improve worker-backed dynamic pool precision, tune execution modifiers, add
+   counterfactual rejection explanations, and build a replay/backtest harness.
+4. AlphaPick screenshot ingestion as a reviewed OCR/import pipeline.
+5. IBKR Flex Query import and Wealthsimple/SnapTrade feasibility spike under the
    unified `券商同步` flow.
-5. Per-account AI 大臣 opt-in.
-6. Minister usage/cost dashboard.
-7. Persist draggable 大臣 button position.
-8. Spending/cash-account monitoring.
+6. Per-account AI 大臣 opt-in.
+7. Minister usage/cost dashboard.
+8. Persist draggable 大臣 button position.
+9. Spending/cash-account monitoring.
 
 ## Related Execution Docs
 

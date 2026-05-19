@@ -205,6 +205,64 @@ The first implementation should therefore keep provider scope small:
 3. Store uncertainty explicitly.
 4. Keep low-confidence rows out of primary recommendations.
 
+## P1 Deep Recommendation Algorithm Backlog
+
+Recommendation V4 is complete as the first production-grade pool and policy
+layer. The next algorithm work should not be treated as hotfixes; it belongs in
+P1 because it changes recommendation quality, provider dependencies, and user
+preference semantics.
+
+P1 algorithm tasks:
+
+1. `CandidatePoolPolicy` factor calibration
+   - tune how risk appetite, risk capacity, preferred/avoided sectors, allowed
+     security types, concentration tolerance, and liquidity needs affect hard
+     filters versus score boosts
+   - keep explicit exclusions as hard filters
+   - add fixture-based regression tests for conservative, balanced, and
+     high-risk profiles
+2. Dynamic pool precision upgrade
+   - expand the worker-backed dynamic pool beyond current watchlist/recent/core
+     coverage only when identity, exchange, currency, liquidity, expense, and
+     economic exposure confidence are sufficient
+   - keep broad external discovery behind TTL, quota ledger, and provider
+     confidence labels
+   - do not run provider discovery during page load
+3. Core ETF universe expansion
+   - add a richer Canadian-investor core matrix for cash, short-term fixed
+     income, aggregate bonds, Canadian equity, US equity, international equity,
+     global all-in-one ETFs, commodities / gold, and USD-listed tax-efficient
+     RRSP candidates
+   - encode role, sleeve, tax-routing hints, currency, hedging, expense, and
+     economic exposure in the universe
+4. Execution modifier calibration
+   - connect valuation evidence, key levels, market pulse, and stale-data state
+     to action modifiers such as `lump_sum`, `dca`, `wait_pullback`, and
+     `watch_only`
+   - keep portfolio guardrails higher priority than valuation/timing
+5. Counterfactual and rejection explanation quality
+   - for each watched/recent candidate, expose the largest blocker in plain
+     Chinese without dumping audit logs
+   - persist enough rejected-candidate context on the recommendation run so old
+     runs remain explainable after watchlist/preferences change
+6. Backtest / replay harness
+   - replay recommendation runs against fixed portfolio/profile fixtures and
+     historical candidate pools
+   - compare V4/V5 output stability, turnover, concentration, and sleeve-gap
+     improvement before changing production weights
+7. Provider cost and confidence dashboard
+   - show whether dynamic-pool evidence came from curated registry, free
+     provider, paid provider, or heuristic fallback
+   - separate user-facing capability labels from raw env flags
+
+Non-goals for P1:
+
+- no LLM-generated buy/sell decision
+- no silent fallback candidate when hard filters remove everything
+- no ticker-only automatic promotion into the recommendation pool
+- no paid-provider dependency before the free/curated pipeline proves the UX
+  value
+
 ## 2026-05-18 MDD Signoff Scope
 
 The next build slice is the foundation for the mobile `进货` workbench and the

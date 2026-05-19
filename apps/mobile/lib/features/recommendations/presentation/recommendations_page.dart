@@ -1332,6 +1332,7 @@ class _MarketItemCard extends StatelessWidget {
               padding: const EdgeInsets.all(12),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Row(
                     children: [
@@ -1360,17 +1361,12 @@ class _MarketItemCard extends StatelessWidget {
                           letterSpacing: -0.35,
                         ),
                   ),
-                  const SizedBox(height: 6),
-                  Text(
-                    item.poolStatusLabel,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                          color: statusColor,
-                          fontWeight: FontWeight.w800,
-                        ),
+                  const SizedBox(height: 9),
+                  _MarketStatusPill(
+                    label: item.poolStatusLabel,
+                    color: statusColor,
                   ),
-                  const Spacer(),
+                  const SizedBox(height: 8),
                   _MarketMoveBadge(
                     label: _marketMoveLabel(item),
                     color: moveColor,
@@ -1379,6 +1375,39 @@ class _MarketItemCard extends StatelessWidget {
               ),
             ),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _MarketStatusPill extends StatelessWidget {
+  const _MarketStatusPill({
+    required this.label,
+    required this.color,
+  });
+
+  final String label;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.10),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+        child: Text(
+          label,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                color: color,
+                fontWeight: FontWeight.w800,
+                height: 1.0,
+              ),
         ),
       ),
     );
