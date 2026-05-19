@@ -2392,6 +2392,9 @@ class _RecommendationPoolVisibilityCardState
     final theme = Theme.of(context);
     final rejected = visibility.rejectedCandidates.take(6).toList();
     final rejectedCount = snapshot.rawCount - snapshot.eligibleCount;
+    final summary = snapshot.rawCount <= 0
+        ? "本轮还没有可检查的候选标的。"
+        : "本轮检查 ${snapshot.rawCount} 个候选，${snapshot.eligibleCount} 个可推荐，$rejectedCount 个暂不推荐。";
 
     return LooGlassCard(
       padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
@@ -2427,15 +2430,12 @@ class _RecommendationPoolVisibilityCardState
             ),
           ),
           const SizedBox(height: 10),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              for (final item in snapshot.statusBreakdown.take(4))
-                _InfoPill("${item.label} ${item.count}"),
-              if (snapshot.statusBreakdown.length > 4)
-                _InfoPill("+${snapshot.statusBreakdown.length - 4}"),
-            ],
+          Text(
+            summary,
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: tokens.mutedText,
+              height: 1.35,
+            ),
           ),
           if (visibility.emptyState != null) ...[
             const SizedBox(height: 10),
