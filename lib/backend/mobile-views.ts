@@ -1457,14 +1457,13 @@ async function buildMobileRecommendationMarketItem(input: {
     identity.symbol && identity.exchange && currency,
   );
   const hasMarketData = latestPrice != null;
-  const poolStatus =
-    input.recommended
-      ? "eligible"
-      : !hasCleanIdentity
-        ? "needs_identity"
-        : !hasMarketData
-          ? "needs_data"
-          : "watch_only";
+  const poolStatus = input.recommended
+    ? "eligible"
+    : !hasCleanIdentity
+      ? "needs_identity"
+      : !hasMarketData
+        ? "needs_data"
+        : "watch_only";
   const poolCopy = recommendationPoolStatusCopy(poolStatus);
   return {
     key: input.key,
@@ -2000,13 +1999,12 @@ function mapMobileImportData(data: ImportData): MobileImportData {
         name: "IBKR Flex Query",
         status: "ready-to-build",
         statusLabel: "优先接入",
-        description:
-          "适合从 IBKR 导入账户、持仓、现金、交易、股息和费用；不作为实时行情源。",
+        description: "适合从 IBKR 导入账户、持仓和现金；不作为实时行情源。",
         primaryUse: "IBKR 真实账户导入",
         setupItems: [
-          "在 IBKR Client Portal 创建 Activity Flex Query",
-          "准备 Flex Token 和 Query ID",
-          "导入前先预览账户、持仓、现金和交易差异",
+          "报告 → Flex Queries → Flex Web Service Configuration，启用服务并复制 Token",
+          "Flex Queries → 新建 Activity Flex Query，勾选 Account Information / Open Positions / Cash Report / Equity Summary",
+          "保存 Query 后复制 Query ID，再回到 Loo国读取预览",
         ],
         limitations: [
           "只覆盖 IBKR，不覆盖 Wealthsimple",

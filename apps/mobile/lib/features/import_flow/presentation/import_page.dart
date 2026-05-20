@@ -489,7 +489,7 @@ class _BrokerageImportSheet extends StatelessWidget {
             children: [
               Text("券商同步", style: Theme.of(context).textTheme.headlineMedium),
               const SizedBox(height: 8),
-              const Text("统一入口会先导入到预览区，确认账户、持仓、现金和交易后再写入 Loo国账本。"),
+              const Text("统一入口会先导入到预览区，确认账户、持仓和现金后再写入 Loo国账本。"),
               const SizedBox(height: 14),
               ...providers.map(
                 (provider) => _BrokerageProviderCard(
@@ -738,7 +738,7 @@ class _BrokerageProviderCard extends StatelessWidget {
             ],
             if (provider.setupItems.isNotEmpty) ...[
               const SizedBox(height: 10),
-              ...provider.setupItems.take(3).map(
+              ...provider.setupItems.take(5).map(
                     (item) => _BrokerageBullet(text: item),
                   ),
             ],
@@ -752,7 +752,7 @@ class _BrokerageProviderCard extends StatelessWidget {
               Row(
                 children: [
                   Text(
-                    "打开预览",
+                    "输入 Token / Query ID",
                     style: Theme.of(context).textTheme.labelLarge?.copyWith(
                           color: context.looTokens.accent,
                         ),
@@ -904,18 +904,20 @@ class _IbkrFlexPreviewSheetState extends State<_IbkrFlexPreviewSheet> {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  "填入 IBKR Flex Token 和 Query ID，只拉取预览；当前不会保存 token，也不会写入账本。",
+                  "先在 IBKR Client Portal 生成 Token 和 Query ID。Loo国只用它读取一次预览，不保存 Token；确认后才写入账本。",
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                         color: context.looTokens.mutedText,
                       ),
                 ),
+                const SizedBox(height: 12),
+                const _IbkrSetupGuideCard(),
                 const SizedBox(height: 16),
                 TextFormField(
                   controller: _tokenController,
                   decoration: const InputDecoration(
                     labelText: "Flex Token",
                     helperText:
-                        "来自 IBKR Client Portal 的 Flex Web Service token",
+                        "报告 → Flex Queries → Flex Web Service Configuration",
                   ),
                   obscureText: true,
                   validator: (value) => value == null || value.trim().length < 8
@@ -927,7 +929,7 @@ class _IbkrFlexPreviewSheetState extends State<_IbkrFlexPreviewSheet> {
                   controller: _queryIdController,
                   decoration: const InputDecoration(
                     labelText: "Query ID",
-                    helperText: "Activity Flex Query 的 Query ID",
+                    helperText: "保存 Activity Flex Query 后显示的数字 ID",
                   ),
                   keyboardType: TextInputType.number,
                   validator: (value) => value == null || value.trim().isEmpty
@@ -968,6 +970,88 @@ class _IbkrFlexPreviewSheetState extends State<_IbkrFlexPreviewSheet> {
               ],
             ),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _IbkrSetupGuideCard extends StatelessWidget {
+  const _IbkrSetupGuideCard();
+
+  @override
+  Widget build(BuildContext context) {
+    const steps = [
+      (
+        title: "1. 生成 Flex Token",
+        body:
+            "IBKR Client Portal → Performance & Reports / 报告 → Flex Queries → Flex Web Service Configuration，开启服务后复制 Current Token。",
+      ),
+      (
+        title: "2. 创建 Activity Flex Query",
+        body:
+            "新建 Activity Flex Query，并至少勾选 Account Information、Open Positions、Cash Report、Equity Summary in Base。",
+      ),
+      (
+        title: "3. 复制 Query ID",
+        body: "保存 Query 后复制数字 Query ID。不要填账户号，也不要填 Report 名称。",
+      ),
+    ];
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.18),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: context.looTokens.cardBorder),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(
+                  Icons.key_rounded,
+                  size: 18,
+                  color: context.looTokens.accent,
+                ),
+                const SizedBox(width: 7),
+                Text(
+                  "IBKR 需要两个值",
+                  style: Theme.of(context).textTheme.titleSmall,
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            ...steps.map(
+              (step) => Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      step.title,
+                      style: Theme.of(context).textTheme.labelLarge,
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      step.body,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: context.looTokens.mutedText,
+                          ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            Text(
+              "如果预览没有持仓，请确认 Query 里启用了 Open Positions。",
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: context.looTokens.accent,
+                  ),
+            ),
+          ],
         ),
       ),
     );
