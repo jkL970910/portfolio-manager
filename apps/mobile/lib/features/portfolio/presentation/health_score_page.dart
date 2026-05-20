@@ -100,9 +100,16 @@ class _HealthScorePageState extends State<HealthScorePage> {
                 padding: const EdgeInsets.fromLTRB(20, 12, 20, 28),
                 children: [
                   _SummaryCard(data),
-                  if (data.isAccountScope) ...[
+                  if (data.actionQueue.isNotEmpty) ...[
                     const SizedBox(height: 12),
-                    const _AccountScopeExplanationCard(),
+                    _ActionQueueCard(data.actionQueue),
+                  ],
+                  if (data.recommendationBridge != null) ...[
+                    const SizedBox(height: 12),
+                    _RecommendationBridgeCard(
+                      data.recommendationBridge!,
+                      onTap: () => context.push(MobileRoutes.recommendations),
+                    ),
                   ],
                   const SizedBox(height: 12),
                   AiAnalysisCard(
@@ -124,18 +131,6 @@ class _HealthScorePageState extends State<HealthScorePage> {
                     const _SectionTitle("Loo皇批注"),
                     const SizedBox(height: 8),
                     _BulletCard(data.highlights),
-                  ],
-                  if (data.actionQueue.isNotEmpty) ...[
-                    const SizedBox(height: 16),
-                    const _SectionTitle("优先行动"),
-                    const SizedBox(height: 8),
-                    _BulletCard(data.actionQueue, prefix: "行动"),
-                  ],
-                  if (data.radar.isNotEmpty) ...[
-                    const SizedBox(height: 16),
-                    const _SectionTitle("雷达维度"),
-                    const SizedBox(height: 8),
-                    _RadarCard(data.radar),
                   ],
                   if (data.dimensions.isNotEmpty) ...[
                     const SizedBox(height: 16),
@@ -226,6 +221,7 @@ class MobileHealthSnapshot {
     required this.dimensions,
     required this.accountDrilldown,
     required this.holdingDrilldown,
+    this.recommendationBridge,
   });
 
   final String scopeName;
@@ -242,6 +238,7 @@ class MobileHealthSnapshot {
   final List<MobileHealthDimension> dimensions;
   final List<MobileHealthDrilldownItem> accountDrilldown;
   final List<MobileHealthDrilldownItem> holdingDrilldown;
+  final MobileHealthRecommendationBridge? recommendationBridge;
 
   LooMinisterPageContext toMinisterContext({
     required String? accountId,
@@ -361,6 +358,57 @@ class MobileHealthSnapshot {
       holdingDrilldown: readJsonList(healthData, "holdingDrilldown")
           .map(MobileHealthDrilldownItem.fromJson)
           .toList(),
+      recommendationBridge:
+          MobileHealthRecommendationBridge.fromJson(json["recommendationBridge"]),
+    );
+  }
+}
+
+class MobileHealthRecommendationBridge {
+  const MobileHealthRecommendationBridge({
+    required this.title,
+    required this.status,
+    required this.detail,
+    required this.actionLabel,
+    this.targetAssetClass,
+    this.securitySymbol,
+    this.targetAccount,
+    this.gapBeforePct,
+    this.gapAfterPct,
+  });
+
+  final String title;
+  final String status;
+  final String detail;
+  final String actionLabel;
+  final String? targetAssetClass;
+  final String? securitySymbol;
+  final String? targetAccount;
+  final double? gapBeforePct;
+  final double? gapAfterPct;
+
+  bool get isBlocked => status == "blocked";
+  bool get isReady => status == "ready";
+
+  static MobileHealthRecommendationBridge? fromJson(Object? value) {
+    if (value is! Map<String, dynamic>) {
+      return null;
+    }
+    double? readPct(String key) {
+      final raw = value[key];
+      return raw is num ? raw.toDouble() : null;
+    }
+
+    return MobileHealthRecommendationBridge(
+      title: value["title"] as String? ?? "下一笔进货",
+      status: value["status"] as String? ?? "needs-run",
+      detail: value["detail"] as String? ?? "",
+      actionLabel: value["actionLabel"] as String? ?? "查看进货清单",
+      targetAssetClass: value["targetAssetClass"] as String?,
+      securitySymbol: value["securitySymbol"] as String?,
+      targetAccount: value["targetAccount"] as String?,
+      gapBeforePct: readPct("gapBeforePct"),
+      gapAfterPct: readPct("gapAfterPct"),
     );
   }
 }
@@ -415,6 +463,11 @@ class MobileHealthDimension {
   final List<String> drivers;
   final List<String> consequences;
   final List<String> actions;
+
+  double get scoreValue {
+    final match = RegExp(r"\d+(\.\d+)?").firstMatch(score);
+    return double.tryParse(match?.group(0) ?? "")?.clamp(0, 100) ?? 0;
+  }
 
   factory MobileHealthDimension.fromJson(Map<String, dynamic> json) {
     return MobileHealthDimension(
@@ -501,66 +554,212 @@ class _SummaryCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(data.scopeName, style: theme.textTheme.headlineMedium),
-          const SizedBox(height: 10),
-          _ScopePill(data.scopeLabel),
-          const SizedBox(height: 8),
-          Text(
-            data.scopeDetail,
-            style: theme.textTheme.bodyMedium?.copyWith(
-              color: tokens.mutedText,
-            ),
-          ),
-          const SizedBox(height: 14),
           Row(
-            crossAxisAlignment: CrossAxisAlignment.end,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(data.score, style: theme.textTheme.displaySmall),
-              const Spacer(),
-              Text(data.status, style: theme.textTheme.titleMedium),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(data.scopeName, style: theme.textTheme.headlineMedium),
+                    const SizedBox(height: 8),
+                    _ScopePill(data.scopeLabel),
+                    const SizedBox(height: 12),
+                    Text(
+                      data.score.replaceAll(" 分", ""),
+                      style: theme.textTheme.displaySmall?.copyWith(
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: -1.0,
+                      ),
+                    ),
+                    Text(data.status, style: theme.textTheme.titleMedium),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 14),
+              if (data.radar.isNotEmpty)
+                GestureDetector(
+                  onTap: () => _showRadarSheet(context, data),
+                  child: SizedBox(
+                    width: 132,
+                    height: 132,
+                    child: LooRadarChart(
+                      height: 132,
+                      points: data.radar
+                          .map((point) => LooRadarPoint(
+                                label: point.dimension,
+                                value: point.value,
+                              ))
+                          .toList(),
+                    ),
+                  ),
+                ),
             ],
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 16),
           Wrap(
             spacing: 8,
             runSpacing: 8,
             children: [
               _InfoPill(
-                "最强：${data.strongestDimension.label} · ${data.strongestDimension.value}",
+                "最强 ${data.strongestDimension.label} ${data.strongestDimension.value}",
               ),
               _InfoPill(
-                "最弱：${data.weakestDimension.label} · ${data.weakestDimension.value}",
+                "最弱 ${data.weakestDimension.label} ${data.weakestDimension.value}",
               ),
+              if (data.recommendationBridge != null)
+                _InfoPill(
+                  data.recommendationBridge!.isReady ? "可修复" : "待进货",
+                ),
             ],
           ),
+          if (data.isAccountScope && data.scopeDetail.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            Text(
+              data.scopeDetail,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: tokens.mutedText,
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  void _showRadarSheet(BuildContext context, MobileHealthSnapshot data) {
+    showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      builder: (context) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text("健康雷达", style: Theme.of(context).textTheme.titleLarge),
+              const SizedBox(height: 12),
+              LooRadarChart(
+                height: 240,
+                points: data.radar
+                    .map((point) => LooRadarPoint(
+                          label: point.dimension,
+                          value: point.value,
+                        ))
+                    .toList(),
+              ),
+              const SizedBox(height: 10),
+              ...data.radar.map(_RadarTile.new),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ActionQueueCard extends StatelessWidget {
+  const _ActionQueueCard(this.items);
+
+  final List<String> items;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final tokens = context.looTokens;
+    return LooGlassCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text("优先行动", style: theme.textTheme.titleLarge),
+          const SizedBox(height: 10),
+          ...items.take(3).map(
+                (item) => Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Icon(Icons.task_alt, size: 18, color: tokens.accent),
+                      const SizedBox(width: 8),
+                      Expanded(child: Text(item)),
+                    ],
+                  ),
+                ),
+              ),
         ],
       ),
     );
   }
 }
 
-class _AccountScopeExplanationCard extends StatelessWidget {
-  const _AccountScopeExplanationCard();
+class _RecommendationBridgeCard extends StatelessWidget {
+  const _RecommendationBridgeCard(this.bridge, {required this.onTap});
+
+  final MobileHealthRecommendationBridge bridge;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final tokens = context.looTokens;
+    final color = bridge.isBlocked
+        ? Theme.of(context).colorScheme.error
+        : bridge.isReady
+            ? Colors.green.shade300
+            : tokens.accent;
     return LooGlassCard(
+      onTap: onTap,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text("评分口径", style: theme.textTheme.titleLarge),
+          Row(
+            children: [
+              Expanded(
+                child: Text(bridge.title, style: theme.textTheme.titleLarge),
+              ),
+              Icon(Icons.arrow_forward_ios, size: 16, color: tokens.mutedText),
+            ],
+          ),
           const SizedBox(height: 8),
           Text(
-            "账户 Health 分成两个层级，不要求单个账户复制全组合目标。",
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: context.looTokens.mutedText,
+            bridge.detail,
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: tokens.mutedText,
             ),
           ),
           const SizedBox(height: 10),
-          const Text("• 账户内适配：看账户类型、税务和持仓是否放得顺。"),
-          const SizedBox(height: 6),
-          const Text("• 全组合目标参考：看这个账户对总组合目标的贡献。"),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              if (bridge.securitySymbol != null)
+                _InfoPill(bridge.securitySymbol!),
+              if (bridge.targetAssetClass != null)
+                _InfoPill(bridge.targetAssetClass!),
+              if (bridge.targetAccount != null) _InfoPill(bridge.targetAccount!),
+              DecoratedBox(
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: Padding(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  child: Text(
+                    bridge.actionLabel,
+                    style: theme.textTheme.labelMedium?.copyWith(
+                      color: color,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
         ],
       ),
     );
@@ -621,10 +820,9 @@ class _InfoPill extends StatelessWidget {
 }
 
 class _BulletCard extends StatelessWidget {
-  const _BulletCard(this.items, {this.prefix});
+  const _BulletCard(this.items);
 
   final List<String> items;
-  final String? prefix;
 
   @override
   Widget build(BuildContext context) {
@@ -636,7 +834,7 @@ class _BulletCard extends StatelessWidget {
             .map(
               (item) => Padding(
                 padding: const EdgeInsets.only(bottom: 8),
-                child: Text(prefix == null ? "• $item" : "$prefix：$item"),
+                child: Text("• $item"),
               ),
             )
             .toList(),
@@ -734,32 +932,6 @@ class _TargetProgressBar extends StatelessWidget {
   }
 }
 
-class _RadarCard extends StatelessWidget {
-  const _RadarCard(this.points);
-
-  final List<MobileHealthRadarPoint> points;
-
-  @override
-  Widget build(BuildContext context) {
-    return LooGlassCard(
-      child: Column(
-        children: [
-          LooRadarChart(
-            points: points
-                .map((point) => LooRadarPoint(
-                      label: point.dimension,
-                      value: point.value,
-                    ))
-                .toList(),
-          ),
-          const SizedBox(height: 8),
-          ...points.map(_RadarTile.new),
-        ],
-      ),
-    );
-  }
-}
-
 class _DimensionCard extends StatelessWidget {
   const _DimensionCard(this.dimension);
 
@@ -769,35 +941,48 @@ class _DimensionCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return LooGlassCard(
       margin: const EdgeInsets.only(bottom: 10),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text("${dimension.label} · ${dimension.score}",
-              style: Theme.of(context).textTheme.titleLarge),
-          const SizedBox(height: 6),
-          Text(dimension.status),
-          if (dimension.summary.isNotEmpty) ...[
-            const SizedBox(height: 8),
-            Text(
-              dimension.summary,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: context.looTokens.mutedText,
+      child: ExpansionTile(
+        tilePadding: EdgeInsets.zero,
+        childrenPadding: EdgeInsets.zero,
+        shape: const Border(),
+        collapsedShape: const Border(),
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    dimension.label,
+                    style: Theme.of(context).textTheme.titleMedium,
                   ),
+                ),
+                Text(
+                  dimension.score.replaceAll(" 分", ""),
+                  style: Theme.of(context).textTheme.titleLarge,
+                ),
+              ],
             ),
+            const SizedBox(height: 8),
+            _TargetProgressBar(value: dimension.scoreValue / 100),
+            if (dimension.summary.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Text(
+                dimension.summary,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: context.looTokens.mutedText,
+                    ),
+              ),
+            ],
           ],
+        ),
+        subtitle: Text(dimension.status),
+        children: [
           ...dimension.drivers.take(3).map(_smallBullet),
-          ...dimension.consequences.take(2).map(
-                (item) => Padding(
-                  padding: const EdgeInsets.only(top: 6),
-                  child: Text("影响：$item"),
-                ),
-              ),
-          ...dimension.actions.take(3).map(
-                (item) => Padding(
-                  padding: const EdgeInsets.only(top: 6),
-                  child: Text("行动：$item"),
-                ),
-              ),
+          ...dimension.consequences.take(2).map(_impactBullet),
+          ...dimension.actions.take(3).map(_actionBullet),
         ],
       ),
     );
@@ -831,5 +1016,19 @@ Widget _smallBullet(String item) {
   return Padding(
     padding: const EdgeInsets.only(top: 6),
     child: Text("• $item"),
+  );
+}
+
+Widget _impactBullet(String item) {
+  return Padding(
+    padding: const EdgeInsets.only(top: 6),
+    child: Text("影响：$item"),
+  );
+}
+
+Widget _actionBullet(String item) {
+  return Padding(
+    padding: const EdgeInsets.only(top: 6),
+    child: Text("行动：$item"),
   );
 }

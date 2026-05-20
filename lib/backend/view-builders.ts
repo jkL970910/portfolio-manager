@@ -2158,6 +2158,84 @@ function getRecommendationItemExplanation(
   );
 }
 
+function buildHealthRecommendationBridge(
+  run: RecommendationRun | null,
+  display: DisplayContext,
+  language: DisplayLanguage,
+): PortfolioData["recommendationBridge"] {
+  const lead = run?.items[0];
+  if (!lead) {
+    return {
+      title: pick(language, "下一笔进货还没生成", "No next funding route yet"),
+      status: "needs-run",
+      detail: pick(
+        language,
+        "健康分已经能看出短板；重新生成进货清单后，这里会显示下一笔钱能先修哪里。",
+        "Health can already identify the weak spots; generate a recommendation run to see what the next contribution can fix first.",
+      ),
+      actionLabel: pick(language, "去进货台", "Open recommendations"),
+      targetAssetClass: null,
+      securitySymbol: null,
+      targetAccount: null,
+      gapBeforePct: null,
+      gapAfterPct: null,
+      poolStatus: run?.poolStatus?.status ?? null,
+    };
+  }
+
+  const gapBefore = lead.allocationGapBeforePct ?? null;
+  const gapAfter = lead.allocationGapAfterPct ?? null;
+  const hasGapImprovement =
+    typeof gapBefore === "number" &&
+    typeof gapAfter === "number" &&
+    gapAfter < gapBefore;
+  const assetClassLabel = getAssetClassLabel(lead.assetClass, language);
+  const targetAccountLabel = getAccountTypeLabel(
+    lead.targetAccountType,
+    language,
+  );
+  const status =
+    run?.poolStatus?.status === "needs_policy_relaxation"
+      ? "blocked"
+      : "ready";
+
+  return {
+    title: pick(
+      language,
+      status === "blocked" ? "进货规矩挡住修复" : "下一笔钱能修哪里",
+      status === "blocked"
+        ? "Rules are blocking the fix"
+        : "What the next contribution can fix",
+    ),
+    status,
+    detail:
+      status === "blocked"
+        ? pick(
+            language,
+            "当前进货规矩把可用候选都挡住了；健康短板仍然存在，但本轮不会静默塞入默认标的。",
+            "Current recommendation rules block the available candidates; the weak spot remains, but the engine will not silently force a default security.",
+          )
+        : hasGapImprovement
+          ? pick(
+              language,
+              `按当前 Loo皇推荐，优先补 ${assetClassLabel} 到 ${targetAccountLabel}，缺口预计从 ${gapBefore.toFixed(1)}% 收窄到 ${gapAfter.toFixed(1)}%。`,
+              `The current route adds ${assetClassLabel} in ${targetAccountLabel}; the gap narrows from ${gapBefore.toFixed(1)}% to ${gapAfter.toFixed(1)}%.`,
+            )
+          : pick(
+              language,
+              `当前推荐优先看 ${assetClassLabel} / ${targetAccountLabel}，但这条路对健康分的改善幅度需要在进货台继续确认。`,
+              `The current route focuses on ${assetClassLabel} / ${targetAccountLabel}; confirm its health impact in recommendations.`,
+            ),
+    actionLabel: pick(language, "查看进货清单", "View recommendations"),
+    targetAssetClass: assetClassLabel,
+    securitySymbol: lead.securitySymbol ?? lead.tickerOptions[0] ?? null,
+    targetAccount: targetAccountLabel,
+    gapBeforePct: gapBefore,
+    gapAfterPct: gapAfter,
+    poolStatus: run?.poolStatus?.status ?? null,
+  };
+}
+
 function getGuidedQuestions(
   profile: PreferenceProfile,
   language: DisplayLanguage,
@@ -2582,6 +2660,7 @@ export function buildPortfolioData(args: {
   portfolioEvents?: PortfolioEvent[];
   priceHistory?: SecurityPriceHistoryPoint[];
   snapshots?: PortfolioSnapshot[];
+  latestRun?: RecommendationRun | null;
   profile: PreferenceProfile;
   display: DisplayContext;
 }): PortfolioData {
@@ -2592,6 +2671,7 @@ export function buildPortfolioData(args: {
     portfolioEvents = [],
     priceHistory = [],
     snapshots = [],
+    latestRun = null,
     profile,
     display,
   } = args;
@@ -3060,6 +3140,11 @@ export function buildPortfolioData(args: {
       accountDrilldown: health.accountDrilldown,
       holdingDrilldown: health.holdingDrilldown,
     },
+    recommendationBridge: buildHealthRecommendationBridge(
+      latestRun,
+      display,
+      language,
+    ),
     securityHoldings,
     holdings: [...holdings]
       .sort((left, right) => right.marketValueCad - left.marketValueCad)

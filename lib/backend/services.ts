@@ -1592,6 +1592,12 @@ export async function getPortfolioView(userId: string) {
       repositories.snapshots.listByUserId(userId),
       repositories.preferences.getByUserId(userId),
     ]);
+  let latestRun: RecommendationRun | null = null;
+  try {
+    latestRun = await repositories.recommendations.getLatestByUserId(userId);
+  } catch {
+    latestRun = null;
+  }
   const userPriceHistory =
     await getHydratedSecurityPriceHistoryForHoldings(userHoldings);
 
@@ -1607,6 +1613,7 @@ export async function getPortfolioView(userId: string) {
         priceHistory: userPriceHistory,
         snapshots: userSnapshots,
         profile,
+        latestRun,
         display,
       }),
       context: {

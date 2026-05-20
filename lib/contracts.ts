@@ -406,6 +406,18 @@ export interface PortfolioData {
       actions: string[];
     }[];
   };
+  recommendationBridge?: {
+    title: string;
+    status: "ready" | "needs-run" | "blocked";
+    detail: string;
+    actionLabel: string;
+    targetAssetClass?: string | null;
+    securitySymbol?: string | null;
+    targetAccount?: string | null;
+    gapBeforePct?: number | null;
+    gapAfterPct?: number | null;
+    poolStatus?: string | null;
+  };
   holdings: {
     id: string;
     securityId?: string | null;
