@@ -160,6 +160,13 @@ class LooApiClient {
     );
   }
 
+  Future<Map<String, dynamic>> confirmBrokerageImportDraft(String draftId) {
+    return _postJson(
+      "/api/mobile/import/brokerage/drafts/confirm",
+      body: {"draftId": draftId},
+    );
+  }
+
   Future<Map<String, dynamic>> resolveSecurity(String symbol) {
     return _getJson(
         "/api/mobile/market-data/resolve?symbol=${Uri.encodeQueryComponent(symbol)}");

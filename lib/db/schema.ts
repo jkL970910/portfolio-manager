@@ -372,7 +372,9 @@ export const mobileSecurityObservations = pgTable(
     exchange: varchar("exchange", { length: 64 }).notNull().default(""),
     currency: varchar("currency", { length: 3 }).notNull().default(""),
     name: varchar("name", { length: 240 }),
-    source: varchar("source", { length: 32 }).notNull().default("security-detail"),
+    source: varchar("source", { length: 32 })
+      .notNull()
+      .default("security-detail"),
     observationCount: integer("observation_count").notNull().default(1),
     lastObservedAt: timestamp("last_observed_at", { withTimezone: true })
       .notNull()
@@ -385,12 +387,9 @@ export const mobileSecurityObservations = pgTable(
       .defaultNow(),
   },
   (table) => ({
-    userIdentityIdx: uniqueIndex("mobile_security_observations_user_identity_idx").on(
-      table.userId,
-      table.symbol,
-      table.exchange,
-      table.currency,
-    ),
+    userIdentityIdx: uniqueIndex(
+      "mobile_security_observations_user_identity_idx",
+    ).on(table.userId, table.symbol, table.exchange, table.currency),
     userRecentIdx: index("mobile_security_observations_user_recent_idx").on(
       table.userId,
       table.lastObservedAt,
@@ -534,11 +533,9 @@ export const recommendationDynamicCandidates = pgTable(
       .defaultNow(),
   },
   (table) => ({
-    userAssetClassIdx: index("recommendation_dynamic_candidates_user_asset_idx").on(
-      table.userId,
-      table.assetClass,
-      table.expiresAt,
-    ),
+    userAssetClassIdx: index(
+      "recommendation_dynamic_candidates_user_asset_idx",
+    ).on(table.userId, table.assetClass, table.expiresAt),
     identityUniqueIdx: uniqueIndex(
       "recommendation_dynamic_candidates_identity_idx",
     ).on(table.userId, table.symbol, table.exchange, table.currency),
@@ -634,10 +631,9 @@ export const securityPriceHistory = pgTable(
       table.currency,
       table.priceDate,
     ),
-    securityDateIdx: index("security_price_history_security_date_idx").on(
-      table.securityId,
-      table.priceDate,
-    ).where(sql`${table.securityId} IS NOT NULL`),
+    securityDateIdx: index("security_price_history_security_date_idx")
+      .on(table.securityId, table.priceDate)
+      .where(sql`${table.securityId} IS NOT NULL`),
     securityIdx: index("security_price_history_security_idx").on(
       table.securityId,
     ),
@@ -744,9 +740,10 @@ export const portfolioAnalysisGptEnhancements = pgTable(
       table.enhancementKey,
       table.expiresAt,
     ),
-    uniqueKeyIdx: uniqueIndex(
-      "portfolio_analysis_gpt_enhancements_key_idx",
-    ).on(table.userId, table.enhancementKey),
+    uniqueKeyIdx: uniqueIndex("portfolio_analysis_gpt_enhancements_key_idx").on(
+      table.userId,
+      table.enhancementKey,
+    ),
   }),
 );
 
@@ -830,8 +827,9 @@ export const externalResearchDocuments = pgTable(
     userId: uuid("user_id")
       .notNull()
       .references(() => users.id),
-    providerDocumentId: varchar("provider_document_id", { length: 160 })
-      .notNull(),
+    providerDocumentId: varchar("provider_document_id", {
+      length: 160,
+    }).notNull(),
     sourceType: varchar("source_type", { length: 32 }).notNull(),
     providerId: varchar("provider_id", { length: 64 }).notNull(),
     sourceName: varchar("source_name", { length: 120 }).notNull(),
@@ -904,7 +902,9 @@ export const marketSentimentSnapshots = pgTable(
     strategyLabel: varchar("strategy_label", { length: 120 })
       .notNull()
       .default("中性定投"),
-    strategyDetail: text("strategy_detail").notNull().default("按计划执行，市场情绪只作为节奏参考。"),
+    strategyDetail: text("strategy_detail")
+      .notNull()
+      .default("按计划执行，市场情绪只作为节奏参考。"),
     asOf: timestamp("as_of", { withTimezone: true }).notNull(),
     sourceMode: varchar("source_mode", { length: 32 }).notNull(),
     sourceUrl: text("source_url"),
@@ -922,9 +922,11 @@ export const marketSentimentSnapshots = pgTable(
       .defaultNow(),
   },
   (table) => ({
-    providerIndexAsOfIdx: index(
-      "market_sentiment_provider_index_asof_idx",
-    ).on(table.provider, table.indexName, table.asOf),
+    providerIndexAsOfIdx: index("market_sentiment_provider_index_asof_idx").on(
+      table.provider,
+      table.indexName,
+      table.asOf,
+    ),
     expiresIdx: index("market_sentiment_expires_idx").on(table.expiresAt),
   }),
 );
@@ -1044,10 +1046,9 @@ export const looMinisterChatMessages = pgTable(
       .defaultNow(),
   },
   (table) => ({
-    sessionCreatedIdx: index("loo_minister_chat_messages_session_created_idx").on(
-      table.sessionId,
-      table.createdAt,
-    ),
+    sessionCreatedIdx: index(
+      "loo_minister_chat_messages_session_created_idx",
+    ).on(table.sessionId, table.createdAt),
     userCreatedIdx: index("loo_minister_chat_messages_user_created_idx").on(
       table.userId,
       table.createdAt,
@@ -1073,9 +1074,7 @@ export const looMinisterContextPacks = pgTable(
       .defaultNow(),
   },
   (table) => ({
-    keyIdx: uniqueIndex("loo_minister_context_packs_key_idx").on(
-      table.packKey,
-    ),
+    keyIdx: uniqueIndex("loo_minister_context_packs_key_idx").on(table.packKey),
     kindExpiresIdx: index("loo_minister_context_packs_kind_expires_idx").on(
       table.packKind,
       table.expiresAt,
@@ -1236,6 +1235,40 @@ export const importJobs = pgTable("import_jobs", {
     .notNull()
     .defaultNow(),
 });
+
+export const brokerageImportDrafts = pgTable(
+  "brokerage_import_drafts",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id),
+    provider: varchar("provider", { length: 32 }).notNull(),
+    status: varchar("status", { length: 24 }).notNull().default("preview"),
+    sourceAccountCount: integer("source_account_count").notNull().default(0),
+    sourceHoldingCount: integer("source_holding_count").notNull().default(0),
+    previewJson: jsonb("preview_json").notNull(),
+    sourceMetadataJson: jsonb("source_metadata_json").notNull().default({}),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    confirmedAt: timestamp("confirmed_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => ({
+    userStatusIdx: index("brokerage_import_drafts_user_status_idx").on(
+      table.userId,
+      table.status,
+      table.expiresAt,
+    ),
+    expiryIdx: index("brokerage_import_drafts_expires_at_idx").on(
+      table.expiresAt,
+    ),
+  }),
+);
 
 export const importMappingPresets = pgTable(
   "import_mapping_presets",

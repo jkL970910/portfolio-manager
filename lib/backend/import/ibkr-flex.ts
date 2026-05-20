@@ -15,6 +15,8 @@ export type IbkrFlexPreviewHolding = {
   marketValue: number | null;
   assetCategory: string;
   exchange: string | null;
+  identityStatus: "ready" | "needs_review";
+  warnings: string[];
 };
 
 export type IbkrFlexPreviewAccount = {
@@ -27,6 +29,7 @@ export type IbkrFlexPreviewAccount = {
 };
 
 export type IbkrFlexPreview = {
+  draftId?: string;
   provider: "ibkr-flex";
   generatedAt: string;
   referenceCode: string;
@@ -142,6 +145,7 @@ export function parseIbkrFlexStatement(
 
   return {
     provider: "ibkr-flex",
+    draftId: undefined,
     generatedAt: new Date().toISOString(),
     referenceCode,
     accountCount: normalizedAccounts.length,
@@ -222,6 +226,19 @@ function parseOpenPositions(xml: string): IbkrFlexPreviewHolding[] {
         return null;
       }
 
+      const exchange =
+        getAttribute(element, "listingExchange") ??
+        getAttribute(element, "exchange") ??
+        null;
+      const warnings = buildHoldingWarnings({
+        assetCategory: getAttribute(element, "assetCategory") ?? "Unknown",
+        exchange,
+        price:
+          parseFlexNumber(getAttribute(element, "markPrice")) ??
+          parseFlexNumber(getAttribute(element, "costPrice")),
+        marketValue: parseFlexNumber(getAttribute(element, "positionValue")),
+      });
+
       return {
         symbol: symbol.toUpperCase(),
         description:
@@ -235,13 +252,38 @@ function parseOpenPositions(xml: string): IbkrFlexPreviewHolding[] {
           parseFlexNumber(getAttribute(element, "costPrice")),
         marketValue: parseFlexNumber(getAttribute(element, "positionValue")),
         assetCategory: getAttribute(element, "assetCategory") ?? "Unknown",
-        exchange:
-          getAttribute(element, "listingExchange") ??
-          getAttribute(element, "exchange") ??
-          null,
+        exchange,
+        identityStatus: warnings.length > 0 ? "needs_review" : "ready",
+        warnings,
       } satisfies IbkrFlexPreviewHolding;
     })
     .filter((holding): holding is IbkrFlexPreviewHolding => holding != null);
+}
+
+function buildHoldingWarnings(input: {
+  assetCategory: string;
+  exchange: string | null;
+  price: number | null;
+  marketValue: number | null;
+}) {
+  const warnings: string[] = [];
+  const exchange = input.exchange?.trim().toUpperCase() ?? "";
+  if (!exchange) {
+    warnings.push("缺少交易所，确认写入前需要先补齐标的映射。");
+  }
+  if (exchange === "SMART") {
+    warnings.push("IBKR 返回 SMART 路由，不是实际上市交易所。");
+  }
+  if (input.marketValue == null) {
+    warnings.push("缺少市值。");
+  }
+  if (input.price == null) {
+    warnings.push("缺少最新价格。");
+  }
+  if (!/^(STK|ETF|FUND)$/i.test(input.assetCategory)) {
+    warnings.push(`资产类型 ${input.assetCategory} 可能需要人工确认。`);
+  }
+  return warnings;
 }
 
 function buildPreviewWarnings(accounts: IbkrFlexPreviewAccount[]) {

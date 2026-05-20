@@ -28,6 +28,7 @@ test("parses IBKR Flex open positions into preview accounts", () => {
   assert.equal(preview.accounts[0]?.netLiquidation, 12345.67);
   assert.equal(preview.accounts[0]?.holdings[0]?.symbol, "AAPL");
   assert.equal(preview.accounts[0]?.holdings[0]?.currency, "USD");
+  assert.equal(preview.accounts[0]?.holdings[0]?.identityStatus, "ready");
   assert.equal(
     preview.accounts[0]?.holdings[1]?.description,
     "VANGUARD S&P 500 INDEX ETF",
@@ -45,4 +46,36 @@ test("ignores zero-quantity IBKR Flex positions", () => {
 
   assert.equal(preview.holdingCount, 1);
   assert.equal(preview.accounts[0]?.holdings[0]?.symbol, "VOO");
+});
+
+test("marks IBKR Flex positions without exchange as needing review", () => {
+  const xml = `
+    <FlexStatement accountId="U7654321" currency="USD">
+      <OpenPosition symbol="QQQ" assetCategory="ETF" currency="USD" position="4" markPrice="450" positionValue="1800" />
+    </FlexStatement>`;
+
+  const preview = parseIbkrFlexStatement(xml);
+
+  assert.equal(preview.holdingCount, 1);
+  assert.equal(
+    preview.accounts[0]?.holdings[0]?.identityStatus,
+    "needs_review",
+  );
+  assert.match(preview.accounts[0]?.holdings[0]?.warnings[0] ?? "", /交易所/);
+});
+
+test("marks IBKR Flex SMART routed positions as needing review", () => {
+  const xml = `
+    <FlexStatement accountId="U7654321" currency="USD">
+      <OpenPosition symbol="AAPL" assetCategory="STK" currency="USD" position="4" markPrice="180" positionValue="720" listingExchange="SMART" />
+    </FlexStatement>`;
+
+  const preview = parseIbkrFlexStatement(xml);
+
+  assert.equal(preview.holdingCount, 1);
+  assert.equal(
+    preview.accounts[0]?.holdings[0]?.identityStatus,
+    "needs_review",
+  );
+  assert.match(preview.accounts[0]?.holdings[0]?.warnings[0] ?? "", /SMART/);
 });

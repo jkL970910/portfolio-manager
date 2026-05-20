@@ -2,6 +2,7 @@
 import { and, desc, eq, sql } from "drizzle-orm";
 import { apiSuccess } from "@/lib/backend/contracts";
 import type { PortfolioHoldingDetailData } from "@/lib/contracts";
+import type { IbkrFlexPreview } from "@/lib/backend/import/ibkr-flex";
 import {
   ImportFieldMapping,
   ImportValidationError,
@@ -65,6 +66,7 @@ import {
   holdingPositions,
   importJobs,
   importMappingPresets,
+  brokerageImportDrafts,
   investmentAccounts,
   cashAccounts,
   cashAccountBalanceEvents,
@@ -79,6 +81,7 @@ import {
 } from "@/lib/db/schema";
 import type {
   HoldingPosition,
+  BrokerageImportDraft,
   ImportJob,
   ImportMappingPreset,
   InvestmentAccount,
@@ -742,6 +745,22 @@ function toNumber(value: string | number | null | undefined) {
 
 function normalizeCurrencyCode(value: string): CurrencyCode {
   return value === "USD" ? "USD" : "CAD";
+}
+
+function inferBrokerageAccountType(
+  value: string | null | undefined,
+): AccountType {
+  const normalized = value?.trim().toUpperCase() ?? "";
+  if (normalized.includes("TFSA")) {
+    return "TFSA";
+  }
+  if (normalized.includes("RRSP") || normalized.includes("RSP")) {
+    return "RRSP";
+  }
+  if (normalized.includes("FHSA")) {
+    return "FHSA";
+  }
+  return "Taxable";
 }
 
 function normalizeExchangeCode(value: string | null | undefined) {
@@ -2617,7 +2636,9 @@ function mapProviderHistoryPoints(args: {
   }));
 }
 
-function collapseSecurityHistoryToDailyPoints(points: SecurityPriceHistoryPoint[]) {
+function collapseSecurityHistoryToDailyPoints(
+  points: SecurityPriceHistoryPoint[],
+) {
   const byDate = new Map<string, SecurityPriceHistoryPoint>();
   for (const point of points) {
     const key = [
@@ -3487,6 +3508,268 @@ export async function getImportView(userId: string) {
   );
 }
 
+function mapBrokerageImportDraft(
+  row: typeof brokerageImportDrafts.$inferSelect,
+): BrokerageImportDraft {
+  return {
+    id: row.id,
+    userId: row.userId,
+    provider: row.provider,
+    status: row.status as BrokerageImportDraft["status"],
+    sourceAccountCount: row.sourceAccountCount,
+    sourceHoldingCount: row.sourceHoldingCount,
+    preview: row.previewJson as Record<string, unknown>,
+    sourceMetadata: row.sourceMetadataJson as Record<string, unknown>,
+    expiresAt: row.expiresAt.toISOString(),
+    confirmedAt: row.confirmedAt?.toISOString() ?? null,
+    createdAt: row.createdAt.toISOString(),
+    updatedAt: row.updatedAt.toISOString(),
+  };
+}
+
+export async function createBrokerageImportDraft(
+  userId: string,
+  preview: IbkrFlexPreview,
+) {
+  const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+  const [row] = await getDb()
+    .insert(brokerageImportDrafts)
+    .values({
+      userId,
+      provider: preview.provider,
+      status: "preview",
+      sourceAccountCount: preview.accountCount,
+      sourceHoldingCount: preview.holdingCount,
+      previewJson: preview,
+      sourceMetadataJson: {
+        source: "ibkr-flex",
+        generatedAt: preview.generatedAt,
+        referenceCode: preview.referenceCode,
+      },
+      expiresAt,
+    })
+    .returning();
+
+  const draft = mapBrokerageImportDraft(row);
+  return {
+    draft,
+    preview: {
+      ...preview,
+      draftId: draft.id,
+      summary: {
+        ...preview.summary,
+        subtitle: `${preview.holdingCount} 个持仓已进入草稿；确认后才会写入主账本。`,
+      },
+    },
+  };
+}
+
+export async function confirmBrokerageImportDraft(
+  userId: string,
+  draftId: string,
+) {
+  const db = getDb();
+
+  return db.transaction(async (tx) => {
+    const draftRow = await tx.query.brokerageImportDrafts.findFirst({
+      where: and(
+        eq(brokerageImportDrafts.userId, userId),
+        eq(brokerageImportDrafts.id, draftId),
+      ),
+    });
+    if (!draftRow) {
+      throw new Error("Brokerage import draft was not found.");
+    }
+    if (draftRow.status !== "preview") {
+      throw new Error("Brokerage import draft is not confirmable.");
+    }
+    if (draftRow.expiresAt.getTime() < Date.now()) {
+      await tx
+        .update(brokerageImportDrafts)
+        .set({ status: "expired", updatedAt: new Date() })
+        .where(eq(brokerageImportDrafts.id, draftRow.id));
+      throw new Error("Brokerage import draft has expired.");
+    }
+
+    const preview = draftRow.previewJson as IbkrFlexPreview;
+    const accounts = Array.isArray(preview.accounts) ? preview.accounts : [];
+    const holdingsNeedingReview = accounts
+      .flatMap((account) => account.holdings)
+      .filter((holding) => holding.identityStatus !== "ready");
+    if (holdingsNeedingReview.length > 0) {
+      throw new Error(
+        `Brokerage import draft has ${holdingsNeedingReview.length} holdings that need identity review.`,
+      );
+    }
+    let accountsCreated = 0;
+    let holdingsCreated = 0;
+    let holdingsUpdated = 0;
+
+    for (const sourceAccount of accounts) {
+      const currency = normalizeCurrencyCode(sourceAccount.currency);
+      const nickname = `IBKR ${sourceAccount.accountId}`;
+      const accountType = inferBrokerageAccountType(
+        `${sourceAccount.accountType} ${sourceAccount.accountId}`,
+      );
+      const accountMarketValueAmount =
+        sourceAccount.netLiquidation ??
+        sourceAccount.holdings.reduce(
+          (sum, holding) => sum + (holding.marketValue ?? 0),
+          0,
+        );
+      const accountMarketValueCad =
+        (await toCadAmount(accountMarketValueAmount, currency)) ?? 0;
+
+      const existingAccount = await tx.query.investmentAccounts.findFirst({
+        where: and(
+          eq(investmentAccounts.userId, userId),
+          eq(investmentAccounts.institution, "Interactive Brokers"),
+          eq(investmentAccounts.nickname, nickname),
+        ),
+      });
+      const accountRow =
+        existingAccount ??
+        (
+          await tx
+            .insert(investmentAccounts)
+            .values({
+              userId,
+              institution: "Interactive Brokers",
+              type: accountType,
+              nickname,
+              currency,
+              marketValueAmount: accountMarketValueAmount.toFixed(2),
+              marketValueCad: accountMarketValueCad.toFixed(2),
+              contributionRoomCad: null,
+            })
+            .returning()
+        )[0];
+      if (!existingAccount) {
+        accountsCreated += 1;
+      }
+
+      for (const sourceHolding of sourceAccount.holdings) {
+        const holdingCurrency = normalizeCurrencyCode(sourceHolding.currency);
+        const quantity = sourceHolding.quantity;
+        const holdingMarketValueAmount = sourceHolding.marketValue ?? 0;
+        const holdingMarketValueCad =
+          (await toCadAmount(holdingMarketValueAmount, holdingCurrency)) ?? 0;
+        const lastPriceAmount =
+          sourceHolding.price ??
+          (quantity > 0 && holdingMarketValueAmount > 0
+            ? round(holdingMarketValueAmount / quantity, 4)
+            : null);
+        const lastPriceCad = await toCadAmount(
+          lastPriceAmount,
+          holdingCurrency,
+        );
+        const security = await resolveCanonicalSecurityIdentity({
+          symbol: sourceHolding.symbol,
+          exchange: sourceHolding.exchange ?? null,
+          currency: holdingCurrency,
+          name: sourceHolding.description || sourceHolding.symbol,
+          securityType: sourceHolding.assetCategory,
+        });
+
+        const existingHolding = await tx.query.holdingPositions.findFirst({
+          where: and(
+            eq(holdingPositions.userId, userId),
+            eq(holdingPositions.accountId, accountRow.id),
+            eq(holdingPositions.securityId, security.id),
+          ),
+        });
+        const holdingValues = {
+          userId,
+          accountId: accountRow.id,
+          securityId: security.id,
+          symbol: sourceHolding.symbol.trim().toUpperCase(),
+          name:
+            sourceHolding.description?.trim() ||
+            sourceHolding.symbol.trim().toUpperCase(),
+          assetClass: security.economicAssetClass ?? "Other",
+          sector: security.economicSector ?? "Multi-sector",
+          currency: holdingCurrency,
+          quantity: quantity.toFixed(6),
+          avgCostPerShareAmount: existingHolding?.avgCostPerShareAmount ?? null,
+          costBasisAmount: existingHolding?.costBasisAmount ?? null,
+          lastPriceAmount:
+            lastPriceAmount == null ? null : lastPriceAmount.toFixed(4),
+          marketValueAmount: holdingMarketValueAmount.toFixed(2),
+          avgCostPerShareCad: existingHolding?.avgCostPerShareCad ?? null,
+          costBasisCad: existingHolding?.costBasisCad ?? null,
+          lastPriceCad: lastPriceCad == null ? null : lastPriceCad.toFixed(4),
+          marketValueCad: holdingMarketValueCad.toFixed(2),
+          gainLossPct: existingHolding?.gainLossPct ?? "0.00",
+          weightPct: "0.00",
+          assetClassOverride: existingHolding?.assetClassOverride ?? null,
+          sectorOverride: existingHolding?.sectorOverride ?? null,
+          securityTypeOverride: sourceHolding.assetCategory,
+          exchangeOverride: security.canonicalExchange,
+          marketSectorOverride: security.marketSector,
+        };
+
+        const savedHolding = existingHolding
+          ? (
+              await tx
+                .update(holdingPositions)
+                .set(holdingValues)
+                .where(eq(holdingPositions.id, existingHolding.id))
+                .returning()
+            )[0]
+          : (
+              await tx
+                .insert(holdingPositions)
+                .values({
+                  ...holdingValues,
+                  userId,
+                  accountId: accountRow.id,
+                  securityId: security.id,
+                })
+                .returning()
+            )[0];
+
+        if (existingHolding) {
+          holdingsUpdated += 1;
+        } else {
+          holdingsCreated += 1;
+        }
+
+        if (quantity > 0 && savedHolding) {
+          await createPortfolioEvent(tx, {
+            userId,
+            accountId: accountRow.id,
+            symbol: savedHolding.symbol,
+            eventType: "import",
+            quantity,
+            priceAmount: lastPriceAmount,
+            currency: holdingCurrency,
+            source: "ibkr-flex-import",
+          });
+        }
+      }
+    }
+
+    await recalculatePortfolioState(tx, userId, {
+      sourceMode: "brokerage-import",
+    });
+    await tx
+      .update(brokerageImportDrafts)
+      .set({
+        status: "confirmed",
+        confirmedAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .where(eq(brokerageImportDrafts.id, draftRow.id));
+
+    return {
+      draftId,
+      accountsCreated,
+      holdingsCreated,
+      holdingsUpdated,
+    };
+  });
+}
+
 export async function getPreferenceView(userId: string) {
   const repositories = getRepositories();
   const [user, profile] = await Promise.all([
@@ -3895,8 +4178,8 @@ function isCompleteWatchlistIdentity(value: string) {
   const identity = parseWatchlistIdentity(value);
   return Boolean(
     identity.symbol &&
-      identity.exchange &&
-      (identity.currency === "CAD" || identity.currency === "USD"),
+    identity.exchange &&
+    (identity.currency === "CAD" || identity.currency === "USD"),
   );
 }
 
@@ -5203,7 +5486,9 @@ export async function refreshPortfolioSecurityQuote(
     const refreshedAt = new Date();
     const refreshedDate = refreshedAt.toISOString().slice(0, 10);
     const canonicalSecurity = resolvedUnheld.security;
-    const historyExchange = isUsMarketExchange(canonicalSecurity.canonicalExchange)
+    const historyExchange = isUsMarketExchange(
+      canonicalSecurity.canonicalExchange,
+    )
       ? null
       : canonicalSecurity.canonicalExchange;
     const historyResponse = await getSecurityHistoricalSeries(

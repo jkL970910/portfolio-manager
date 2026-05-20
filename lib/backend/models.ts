@@ -731,6 +731,21 @@ export interface ImportJob {
   createdAt: string;
 }
 
+export interface BrokerageImportDraft {
+  id: EntityId;
+  userId: EntityId;
+  provider: "ibkr-flex" | string;
+  status: "preview" | "confirmed" | "expired" | "cancelled";
+  sourceAccountCount: number;
+  sourceHoldingCount: number;
+  preview: Record<string, unknown>;
+  sourceMetadata: Record<string, unknown>;
+  expiresAt: string;
+  confirmedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface ImportMappingPreset {
   id: EntityId;
   userId: EntityId;

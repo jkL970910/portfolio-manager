@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getMobileViewerFromRequest } from "@/lib/auth/mobile-tokens";
 import { ibkrFlexPreviewInputSchema } from "@/lib/backend/payload-schemas";
 import { fetchIbkrFlexPreview } from "@/lib/backend/import/ibkr-flex";
+import { createBrokerageImportDraft } from "@/lib/backend/services";
 
 export async function POST(request: NextRequest) {
   const viewer = await getMobileViewerFromRequest(request);
@@ -24,7 +25,8 @@ export async function POST(request: NextRequest) {
 
   try {
     const preview = await fetchIbkrFlexPreview(parsed.data);
-    return NextResponse.json({ data: { preview } }, { status: 200 });
+    const draft = await createBrokerageImportDraft(viewer.id, preview);
+    return NextResponse.json({ data: draft }, { status: 200 });
   } catch (error) {
     const message =
       error instanceof Error ? error.message : "IBKR Flex 预览失败。";

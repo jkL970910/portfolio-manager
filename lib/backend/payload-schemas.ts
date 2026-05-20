@@ -222,6 +222,10 @@ export const ibkrFlexPreviewInputSchema = z.object({
   queryId: z.string().trim().min(1).max(64),
 });
 
+export const brokerageImportDraftConfirmInputSchema = z.object({
+  draftId: z.string().trim().uuid(),
+});
+
 export const looMinisterSettingsInputSchema = z
   .object({
     mode: z.enum(["local", "gpt-5.5"]),

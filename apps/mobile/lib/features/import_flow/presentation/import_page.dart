@@ -787,6 +787,7 @@ class _IbkrFlexPreviewSheetState extends State<_IbkrFlexPreviewSheet> {
   final _tokenController = TextEditingController();
   final _queryIdController = TextEditingController();
   var _loading = false;
+  var _confirming = false;
   String? _error;
   MobileIbkrFlexPreview? _preview;
 
@@ -795,6 +796,57 @@ class _IbkrFlexPreviewSheetState extends State<_IbkrFlexPreviewSheet> {
     _tokenController.dispose();
     _queryIdController.dispose();
     super.dispose();
+  }
+
+  Future<void> _confirmDraft() async {
+    final preview = _preview;
+    if (preview == null || preview.draftId.isEmpty) {
+      return;
+    }
+    setState(() {
+      _confirming = true;
+      _error = null;
+    });
+
+    try {
+      final response =
+          await widget.apiClient.confirmBrokerageImportDraft(preview.draftId);
+      final data = response["data"];
+      final accountsCreated = data is Map<String, dynamic>
+          ? data["accountsCreated"] as int? ?? 0
+          : 0;
+      final holdingsCreated = data is Map<String, dynamic>
+          ? data["holdingsCreated"] as int? ?? 0
+          : 0;
+      final holdingsUpdated = data is Map<String, dynamic>
+          ? data["holdingsUpdated"] as int? ?? 0
+          : 0;
+      if (mounted) {
+        Navigator.of(context).pop();
+        await showDialog<void>(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text("IBKR 草稿已写入"),
+            content: Text(
+              "新增 $accountsCreated 个账户，新增 $holdingsCreated 个持仓，更新 $holdingsUpdated 个持仓。回到国库后可继续检查账户和标的详情。",
+            ),
+            actions: [
+              FilledButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text("知道了"),
+              ),
+            ],
+          ),
+        );
+      }
+    } catch (error) {
+      if (mounted) {
+        setState(() {
+          _error = error.toString();
+          _confirming = false;
+        });
+      }
+    }
   }
 
   Future<void> _previewFlex() async {
@@ -907,7 +959,11 @@ class _IbkrFlexPreviewSheetState extends State<_IbkrFlexPreviewSheet> {
                 ),
                 if (_preview != null) ...[
                   const SizedBox(height: 16),
-                  _IbkrPreviewResultCard(_preview!),
+                  _IbkrPreviewResultCard(
+                    _preview!,
+                    confirming: _confirming,
+                    onConfirm: _confirming ? null : _confirmDraft,
+                  ),
                 ],
               ],
             ),
@@ -919,12 +975,21 @@ class _IbkrFlexPreviewSheetState extends State<_IbkrFlexPreviewSheet> {
 }
 
 class _IbkrPreviewResultCard extends StatelessWidget {
-  const _IbkrPreviewResultCard(this.preview);
+  const _IbkrPreviewResultCard(
+    this.preview, {
+    required this.confirming,
+    required this.onConfirm,
+  });
 
   final MobileIbkrFlexPreview preview;
+  final bool confirming;
+  final VoidCallback? onConfirm;
 
   @override
   Widget build(BuildContext context) {
+    final hasReviewItems = preview.accounts
+        .expand((account) => account.holdings)
+        .any((holding) => holding.identityStatus != "ready");
     return LooGlassCard(
       padding: const EdgeInsets.all(14),
       child: Column(
@@ -968,6 +1033,30 @@ class _IbkrPreviewResultCard extends StatelessWidget {
                   ),
                 ),
           ],
+          const SizedBox(height: 14),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton.icon(
+              onPressed: hasReviewItems ? null : onConfirm,
+              icon: confirming
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.check_circle_rounded),
+              label: Text(confirming ? "写入中..." : "确认写入 Loo国账本"),
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            hasReviewItems
+                ? "有持仓仍待身份确认，暂不能写入主账本。"
+                : "当前使用安全快照合并：同账户同标的会更新，不会重复新增。",
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: context.looTokens.mutedText,
+                ),
+          ),
         ],
       ),
     );
@@ -1056,7 +1145,11 @@ class _IbkrPreviewHoldingRow extends StatelessWidget {
             ),
           ),
           Text(
-            "${_formatNumber(holding.quantity)} · ${holding.currency}",
+            [
+              _formatNumber(holding.quantity),
+              holding.currency,
+              if (holding.identityStatus != "ready") "待确认",
+            ].join(" · "),
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
                   color: context.looTokens.mutedText,
                 ),

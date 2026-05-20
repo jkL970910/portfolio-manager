@@ -168,6 +168,7 @@ class MobileSecurityCandidate {
 
 class MobileIbkrFlexPreview {
   const MobileIbkrFlexPreview({
+    required this.draftId,
     required this.accountCount,
     required this.holdingCount,
     required this.title,
@@ -176,6 +177,7 @@ class MobileIbkrFlexPreview {
     required this.accounts,
   });
 
+  final String draftId;
   final int accountCount;
   final int holdingCount;
   final String title;
@@ -188,6 +190,7 @@ class MobileIbkrFlexPreview {
         ? json["summary"] as Map<String, dynamic>
         : const <String, dynamic>{};
     return MobileIbkrFlexPreview(
+      draftId: json["draftId"] as String? ?? "",
       accountCount: (json["accountCount"] as num?)?.toInt() ?? 0,
       holdingCount: (json["holdingCount"] as num?)?.toInt() ?? 0,
       title: summary["title"] as String? ?? "IBKR 预览",
@@ -242,6 +245,8 @@ class MobileIbkrFlexHolding {
     required this.marketValue,
     required this.assetCategory,
     required this.exchange,
+    required this.identityStatus,
+    required this.warnings,
   });
 
   final String symbol;
@@ -252,6 +257,8 @@ class MobileIbkrFlexHolding {
   final num? marketValue;
   final String assetCategory;
   final String? exchange;
+  final String identityStatus;
+  final List<String> warnings;
 
   factory MobileIbkrFlexHolding.fromJson(Map<String, dynamic> json) {
     return MobileIbkrFlexHolding(
@@ -263,6 +270,9 @@ class MobileIbkrFlexHolding {
       marketValue: json["marketValue"] as num?,
       assetCategory: json["assetCategory"] as String? ?? "Unknown",
       exchange: json["exchange"] as String?,
+      identityStatus: json["identityStatus"] as String? ?? "needs_review",
+      warnings:
+          (json["warnings"] as List?)?.whereType<String>().toList() ?? const [],
     );
   }
 }

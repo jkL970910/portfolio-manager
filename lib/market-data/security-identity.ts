@@ -27,6 +27,7 @@ const EXCHANGE_ALIASES: Record<
 > = {
   TSX: { canonicalExchange: "TSX", micCode: "XTSE", country: "Canada" },
   TOR: { canonicalExchange: "TSX", micCode: "XTSE", country: "Canada" },
+  TSE: { canonicalExchange: "TSX", micCode: "XTSE", country: "Canada" },
   XTSE: { canonicalExchange: "TSX", micCode: "XTSE", country: "Canada" },
   "TORONTO STOCK EXCHANGE": {
     canonicalExchange: "TSX",
@@ -53,27 +54,51 @@ const EXCHANGE_ALIASES: Record<
     micCode: "NEOE",
     country: "Canada",
   },
-  NASDAQ: { canonicalExchange: "NASDAQ", micCode: "XNAS", country: "United States" },
-  XNAS: { canonicalExchange: "NASDAQ", micCode: "XNAS", country: "United States" },
+  NASDAQ: {
+    canonicalExchange: "NASDAQ",
+    micCode: "XNAS",
+    country: "United States",
+  },
+  XNAS: {
+    canonicalExchange: "NASDAQ",
+    micCode: "XNAS",
+    country: "United States",
+  },
   "NASDAQ GLOBAL SELECT": {
     canonicalExchange: "NASDAQ",
     micCode: "XNAS",
     country: "United States",
   },
-  NYSE: { canonicalExchange: "NYSE", micCode: "XNYS", country: "United States" },
-  XNYS: { canonicalExchange: "NYSE", micCode: "XNYS", country: "United States" },
+  NYSE: {
+    canonicalExchange: "NYSE",
+    micCode: "XNYS",
+    country: "United States",
+  },
+  XNYS: {
+    canonicalExchange: "NYSE",
+    micCode: "XNYS",
+    country: "United States",
+  },
   "NEW YORK STOCK EXCHANGE": {
     canonicalExchange: "NYSE",
     micCode: "XNYS",
     country: "United States",
   },
-  ARCA: { canonicalExchange: "NYSEARCA", micCode: "ARCX", country: "United States" },
+  ARCA: {
+    canonicalExchange: "NYSEARCA",
+    micCode: "ARCX",
+    country: "United States",
+  },
   NYSEARCA: {
     canonicalExchange: "NYSEARCA",
     micCode: "ARCX",
     country: "United States",
   },
-  ARCX: { canonicalExchange: "NYSEARCA", micCode: "ARCX", country: "United States" },
+  ARCX: {
+    canonicalExchange: "NYSEARCA",
+    micCode: "ARCX",
+    country: "United States",
+  },
 };
 
 function normalizeText(value: string | null | undefined) {
@@ -89,7 +114,9 @@ export function normalizeSecuritySymbol(value: string) {
     .replace(/-/gu, ".");
 }
 
-export function normalizeSecurityCurrency(value: string | null | undefined): CurrencyCode {
+export function normalizeSecurityCurrency(
+  value: string | null | undefined,
+): CurrencyCode {
   return value?.trim().toUpperCase() === "USD" ? "USD" : "CAD";
 }
 
@@ -110,7 +137,11 @@ export function canonicalizeExchange(input: {
     return { canonicalExchange: "TSX", micCode: "XTSE", country: "Canada" };
   }
   if (!exchange && currency === "USD") {
-    return { canonicalExchange: "NASDAQ", micCode: "XNAS", country: "United States" };
+    return {
+      canonicalExchange: "NASDAQ",
+      micCode: "XNAS",
+      country: "United States",
+    };
   }
 
   return {
@@ -132,9 +163,7 @@ export function buildUnderlyingId(input: {
   return normalizedName || normalizeSecuritySymbol(input.symbol);
 }
 
-function aliasValuesForInput(
-  input: CanonicalSecurityIdentityInput,
-): Array<{
+function aliasValuesForInput(input: CanonicalSecurityIdentityInput): Array<{
   aliasType: SecurityAliasRecord["aliasType"];
   aliasValue: string;
   provider: string | null;
@@ -200,7 +229,11 @@ export async function resolveCanonicalSecurityIdentity(
     (item) => item.aliasType === "provider-symbol",
   )) {
     const existing = await repositories.securities.findByAlias(alias);
-    if (existing && existing.symbol === symbol && existing.currency === currency) {
+    if (
+      existing &&
+      existing.symbol === symbol &&
+      existing.currency === currency
+    ) {
       return existing;
     }
   }
