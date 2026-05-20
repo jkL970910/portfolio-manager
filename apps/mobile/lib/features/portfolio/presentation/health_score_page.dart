@@ -121,19 +121,15 @@ class _HealthScorePageState extends State<HealthScorePage> {
                   ],
                   if (data.accountDrilldown.isNotEmpty) ...[
                     const SizedBox(height: 16),
-                    _DrilldownSection(
-                      title: "账户巡查",
+                    _AccountDrilldownCarousel(
                       items: data.accountDrilldown,
-                      initiallyVisibleCount: 3,
-                      onTap: _openAccountTypePortfolio,
+                      onOpenDetail: _openAccountTypePortfolio,
                     ),
                   ],
                   if (data.holdingDrilldown.isNotEmpty) ...[
                     const SizedBox(height: 16),
-                    _DrilldownSection(
-                      title: "持仓巡查",
+                    _HoldingDragSection(
                       items: data.holdingDrilldown,
-                      initiallyVisibleCount: 5,
                       onTap: _openHoldingDetail,
                     ),
                   ],
@@ -620,29 +616,39 @@ class _SummaryCard extends StatelessWidget {
   void _showRadarSheet(BuildContext context, MobileHealthSnapshot data) {
     showModalBottomSheet<void>(
       context: context,
+      isScrollControlled: true,
       showDragHandle: true,
       backgroundColor: Theme.of(context).colorScheme.surface,
-      builder: (context) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text("健康雷达", style: Theme.of(context).textTheme.titleLarge),
-              const SizedBox(height: 12),
-              LooRadarChart(
-                height: 280,
-                points: data.radar
-                    .map((point) => LooRadarPoint(
-                          label: point.dimension,
-                          value: point.value,
-                        ))
-                    .toList(),
-              ),
-              const SizedBox(height: 10),
-              ...data.radar.map(_RadarTile.new),
-            ],
+      builder: (context) => DraggableScrollableSheet(
+        expand: false,
+        initialChildSize: 0.76,
+        minChildSize: 0.48,
+        maxChildSize: 0.92,
+        builder: (context, scrollController) => SafeArea(
+          child: SingleChildScrollView(
+            controller: scrollController,
+            padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text("健康雷达", style: Theme.of(context).textTheme.titleLarge),
+                const SizedBox(height: 12),
+                SizedBox(
+                  width: double.infinity,
+                  child: LooRadarChart(
+                    height: 300,
+                    points: data.radar
+                        .map((point) => LooRadarPoint(
+                              label: point.dimension,
+                              value: point.value,
+                            ))
+                        .toList(),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                ...data.radar.map(_RadarTile.new),
+              ],
+            ),
           ),
         ),
       ),
@@ -1079,31 +1085,271 @@ class _DimensionCard extends StatelessWidget {
   }
 }
 
-class _DrilldownSection extends StatefulWidget {
-  const _DrilldownSection({
-    required this.title,
+class _AccountDrilldownCarousel extends StatefulWidget {
+  const _AccountDrilldownCarousel({
     required this.items,
-    required this.initiallyVisibleCount,
+    required this.onOpenDetail,
+  });
+
+  final List<MobileHealthDrilldownItem> items;
+  final ValueChanged<MobileHealthDrilldownItem> onOpenDetail;
+
+  @override
+  State<_AccountDrilldownCarousel> createState() =>
+      _AccountDrilldownCarouselState();
+}
+
+class _AccountDrilldownCarouselState extends State<_AccountDrilldownCarousel> {
+  final PageController _pageController = PageController();
+  int _selectedIndex = 0;
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
+  }
+
+  void _select(int index) {
+    setState(() => _selectedIndex = index);
+    _pageController.animateToPage(
+      1,
+      duration: const Duration(milliseconds: 260),
+      curve: Curves.easeOutCubic,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final selected =
+        widget.items[_selectedIndex.clamp(0, widget.items.length - 1)];
+    return LooGlassCard(
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  "账户巡查",
+                  style: Theme.of(context).textTheme.titleLarge,
+                ),
+              ),
+              _InfoPill("${widget.items.length} 项"),
+            ],
+          ),
+          const SizedBox(height: 10),
+          SizedBox(
+            height: 260,
+            child: PageView(
+              controller: _pageController,
+              children: [
+                _AccountDrilldownList(
+                  items: widget.items,
+                  selectedIndex: _selectedIndex,
+                  onSelect: _select,
+                ),
+                _AccountDrilldownDetail(
+                  item: selected,
+                  onBack: () => _pageController.animateToPage(
+                    0,
+                    duration: const Duration(milliseconds: 240),
+                    curve: Curves.easeOutCubic,
+                  ),
+                  onOpenDetail: () => widget.onOpenDetail(selected),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 8),
+          const Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              _CarouselDot(active: true),
+              SizedBox(width: 6),
+              _CarouselDot(active: false),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _AccountDrilldownList extends StatelessWidget {
+  const _AccountDrilldownList({
+    required this.items,
+    required this.selectedIndex,
+    required this.onSelect,
+  });
+
+  final List<MobileHealthDrilldownItem> items;
+  final int selectedIndex;
+  final ValueChanged<int> onSelect;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView.separated(
+      padding: EdgeInsets.zero,
+      itemCount: items.length,
+      separatorBuilder: (_, __) => const SizedBox(height: 8),
+      itemBuilder: (context, index) {
+        final item = items[index];
+        final selected = index == selectedIndex;
+        return InkWell(
+          borderRadius: BorderRadius.circular(16),
+          onTap: () => onSelect(index),
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              color: Theme.of(context)
+                  .colorScheme
+                  .surface
+                  .withValues(alpha: selected ? 0.34 : 0.18),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: selected
+                    ? context.looTokens.accent.withValues(alpha: 0.45)
+                    : context.looTokens.cardBorder,
+              ),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          item.label,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: Theme.of(context).textTheme.titleMedium,
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          item.status,
+                          style:
+                              Theme.of(context).textTheme.bodySmall?.copyWith(
+                                    color: context.looTokens.mutedText,
+                                  ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  _InfoPill("${item.score} 分"),
+                  const Icon(Icons.chevron_right_rounded),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _AccountDrilldownDetail extends StatelessWidget {
+  const _AccountDrilldownDetail({
+    required this.item,
+    required this.onBack,
+    required this.onOpenDetail,
+  });
+
+  final MobileHealthDrilldownItem item;
+  final VoidCallback onBack;
+  final VoidCallback onOpenDetail;
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = context.looTokens;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            IconButton(
+              visualDensity: VisualDensity.compact,
+              onPressed: onBack,
+              icon: const Icon(Icons.chevron_left_rounded),
+            ),
+            Expanded(
+              child: Text(
+                item.label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.titleLarge,
+              ),
+            ),
+            _InfoPill("${item.score} 分"),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Text(
+          item.summary,
+          maxLines: 3,
+          overflow: TextOverflow.ellipsis,
+          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: tokens.mutedText,
+              ),
+        ),
+        const SizedBox(height: 10),
+        ...item.drivers.take(2).map(_smallBullet),
+        ...item.actions.take(2).map(_actionBullet),
+        const Spacer(),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: TextButton.icon(
+            onPressed: onOpenDetail,
+            icon: const Icon(Icons.open_in_new_rounded),
+            label: const Text("查看账户详情"),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _CarouselDot extends StatelessWidget {
+  const _CarouselDot({required this.active});
+
+  final bool active;
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 180),
+      width: active ? 18 : 6,
+      height: 6,
+      decoration: BoxDecoration(
+        color: context.looTokens.accent.withValues(alpha: active ? 0.9 : 0.28),
+        borderRadius: BorderRadius.circular(999),
+      ),
+    );
+  }
+}
+
+class _HoldingDragSection extends StatefulWidget {
+  const _HoldingDragSection({
+    required this.items,
     required this.onTap,
   });
 
-  final String title;
   final List<MobileHealthDrilldownItem> items;
-  final int initiallyVisibleCount;
   final ValueChanged<MobileHealthDrilldownItem> onTap;
 
   @override
-  State<_DrilldownSection> createState() => _DrilldownSectionState();
+  State<_HoldingDragSection> createState() => _HoldingDragSectionState();
 }
 
-class _DrilldownSectionState extends State<_DrilldownSection> {
+class _HoldingDragSectionState extends State<_HoldingDragSection> {
   bool _expanded = false;
 
   @override
   Widget build(BuildContext context) {
-    final visibleItems = _expanded
-        ? widget.items
-        : widget.items.take(widget.initiallyVisibleCount).toList();
+    final visibleItems =
+        _expanded ? widget.items : widget.items.take(3).toList();
     final hiddenCount = widget.items.length - visibleItems.length;
     return LooGlassCard(
       padding: const EdgeInsets.fromLTRB(16, 14, 16, 6),
@@ -1112,19 +1358,19 @@ class _DrilldownSectionState extends State<_DrilldownSection> {
         children: [
           InkWell(
             borderRadius: BorderRadius.circular(16),
-            onTap: widget.items.length > widget.initiallyVisibleCount
+            onTap: widget.items.length > 3
                 ? () => setState(() => _expanded = !_expanded)
                 : null,
             child: Row(
               children: [
                 Expanded(
                   child: Text(
-                    widget.title,
+                    "主要拖累持仓",
                     style: Theme.of(context).textTheme.titleLarge,
                   ),
                 ),
                 _InfoPill("${widget.items.length} 项"),
-                if (widget.items.length > widget.initiallyVisibleCount) ...[
+                if (widget.items.length > 3) ...[
                   const SizedBox(width: 6),
                   AnimatedRotation(
                     turns: _expanded ? 0.5 : 0,
@@ -1135,9 +1381,16 @@ class _DrilldownSectionState extends State<_DrilldownSection> {
               ],
             ),
           ),
+          const SizedBox(height: 6),
+          Text(
+            "默认只看最需要处理的持仓；展开后查看完整诊断。",
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: context.looTokens.mutedText,
+                ),
+          ),
           const SizedBox(height: 10),
           ...visibleItems.map(
-            (item) => _DrilldownCard(
+            (item) => _HoldingDragCard(
               item,
               onTap: () => widget.onTap(item),
             ),
@@ -1157,8 +1410,8 @@ class _DrilldownSectionState extends State<_DrilldownSection> {
   }
 }
 
-class _DrilldownCard extends StatelessWidget {
-  const _DrilldownCard(this.item, {this.onTap});
+class _HoldingDragCard extends StatelessWidget {
+  const _HoldingDragCard(this.item, {this.onTap});
 
   final MobileHealthDrilldownItem item;
   final VoidCallback? onTap;
@@ -1172,9 +1425,9 @@ class _DrilldownCard extends StatelessWidget {
         item.status,
         if (item.summary.isNotEmpty) item.summary,
         ...item.drivers.take(1),
-        ...item.actions.take(1).map((action) => "行动：$action"),
+        ...item.actions.take(1).map((action) => "建议：$action"),
       ].join("\n"),
-      value: item.score,
+      value: item.drivers.isNotEmpty ? "影响项" : "${item.score} 分",
       onTap: onTap,
     );
   }
