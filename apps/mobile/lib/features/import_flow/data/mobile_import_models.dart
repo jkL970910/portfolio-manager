@@ -165,3 +165,104 @@ class MobileSecurityCandidate {
     );
   }
 }
+
+class MobileIbkrFlexPreview {
+  const MobileIbkrFlexPreview({
+    required this.accountCount,
+    required this.holdingCount,
+    required this.title,
+    required this.subtitle,
+    required this.warnings,
+    required this.accounts,
+  });
+
+  final int accountCount;
+  final int holdingCount;
+  final String title;
+  final String subtitle;
+  final List<String> warnings;
+  final List<MobileIbkrFlexAccount> accounts;
+
+  factory MobileIbkrFlexPreview.fromJson(Map<String, dynamic> json) {
+    final summary = json["summary"] is Map<String, dynamic>
+        ? json["summary"] as Map<String, dynamic>
+        : const <String, dynamic>{};
+    return MobileIbkrFlexPreview(
+      accountCount: (json["accountCount"] as num?)?.toInt() ?? 0,
+      holdingCount: (json["holdingCount"] as num?)?.toInt() ?? 0,
+      title: summary["title"] as String? ?? "IBKR 预览",
+      subtitle: summary["subtitle"] as String? ?? "",
+      warnings: (summary["warnings"] as List?)?.whereType<String>().toList() ??
+          const [],
+      accounts: readJsonList(json, "accounts")
+          .map(MobileIbkrFlexAccount.fromJson)
+          .toList(),
+    );
+  }
+}
+
+class MobileIbkrFlexAccount {
+  const MobileIbkrFlexAccount({
+    required this.accountId,
+    required this.accountType,
+    required this.currency,
+    required this.netLiquidation,
+    required this.cash,
+    required this.holdings,
+  });
+
+  final String accountId;
+  final String accountType;
+  final String currency;
+  final num? netLiquidation;
+  final num? cash;
+  final List<MobileIbkrFlexHolding> holdings;
+
+  factory MobileIbkrFlexAccount.fromJson(Map<String, dynamic> json) {
+    return MobileIbkrFlexAccount(
+      accountId: json["accountId"] as String? ?? "IBKR",
+      accountType: json["accountType"] as String? ?? "IBKR",
+      currency: json["currency"] as String? ?? "CAD",
+      netLiquidation: json["netLiquidation"] as num?,
+      cash: json["cash"] as num?,
+      holdings: readJsonList(json, "holdings")
+          .map(MobileIbkrFlexHolding.fromJson)
+          .toList(),
+    );
+  }
+}
+
+class MobileIbkrFlexHolding {
+  const MobileIbkrFlexHolding({
+    required this.symbol,
+    required this.description,
+    required this.currency,
+    required this.quantity,
+    required this.price,
+    required this.marketValue,
+    required this.assetCategory,
+    required this.exchange,
+  });
+
+  final String symbol;
+  final String description;
+  final String currency;
+  final num quantity;
+  final num? price;
+  final num? marketValue;
+  final String assetCategory;
+  final String? exchange;
+
+  factory MobileIbkrFlexHolding.fromJson(Map<String, dynamic> json) {
+    return MobileIbkrFlexHolding(
+      symbol: json["symbol"] as String? ?? "--",
+      description: json["description"] as String? ?? "",
+      currency: json["currency"] as String? ?? "CAD",
+      quantity: json["quantity"] as num? ?? 0,
+      price: json["price"] as num?,
+      marketValue: json["marketValue"] as num?,
+      assetCategory: json["assetCategory"] as String? ?? "Unknown",
+      exchange: json["exchange"] as String?,
+    );
+  }
+}

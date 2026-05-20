@@ -137,7 +137,10 @@ class _ImportPageState extends State<ImportPage> {
     return showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
-      builder: (context) => _BrokerageImportSheet(providers: providers),
+      builder: (context) => _BrokerageImportSheet(
+        apiClient: widget.apiClient,
+        providers: providers,
+      ),
     );
   }
 
@@ -464,8 +467,12 @@ class _ManualActionRow extends StatelessWidget {
 }
 
 class _BrokerageImportSheet extends StatelessWidget {
-  const _BrokerageImportSheet({required this.providers});
+  const _BrokerageImportSheet({
+    required this.apiClient,
+    required this.providers,
+  });
 
+  final LooApiClient apiClient;
   final List<MobileBrokerageProvider> providers;
 
   @override
@@ -484,7 +491,14 @@ class _BrokerageImportSheet extends StatelessWidget {
               const SizedBox(height: 8),
               const Text("统一入口会先导入到预览区，确认账户、持仓、现金和交易后再写入 Loo国账本。"),
               const SizedBox(height: 14),
-              ...providers.map(_BrokerageProviderCard.new),
+              ...providers.map(
+                (provider) => _BrokerageProviderCard(
+                  provider,
+                  onTap: provider.id == "ibkr-flex"
+                      ? () => _openIbkrFlexPreview(context)
+                      : null,
+                ),
+              ),
               const SizedBox(height: 12),
               const _BrokerageFlowCard(),
               const SizedBox(height: 16),
@@ -499,6 +513,15 @@ class _BrokerageImportSheet extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+
+  Future<void> _openIbkrFlexPreview(BuildContext context) {
+    return showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (context) => _IbkrFlexPreviewSheet(apiClient: apiClient),
     );
   }
 }
@@ -667,19 +690,21 @@ class _RulesAccordionState extends State<_RulesAccordion> {
 }
 
 class _BrokerageProviderCard extends StatelessWidget {
-  const _BrokerageProviderCard(this.provider);
+  const _BrokerageProviderCard(this.provider, {this.onTap});
 
   final MobileBrokerageProvider provider;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
     final isReady = provider.status == "ready-to-build";
     final colorScheme = Theme.of(context).colorScheme;
 
-    return Card(
-      margin: const EdgeInsets.only(bottom: 10),
-      child: Padding(
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: LooGlassCard(
         padding: const EdgeInsets.all(14),
+        onTap: onTap,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -722,11 +747,331 @@ class _BrokerageProviderCard extends StatelessWidget {
               Text("注意：${provider.limitations.first}",
                   style: Theme.of(context).textTheme.bodySmall),
             ],
+            if (onTap != null) ...[
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  Text(
+                    "打开预览",
+                    style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                          color: context.looTokens.accent,
+                        ),
+                  ),
+                  const SizedBox(width: 4),
+                  Icon(
+                    Icons.arrow_forward_rounded,
+                    size: 17,
+                    color: context.looTokens.accent,
+                  ),
+                ],
+              ),
+            ],
           ],
         ),
       ),
     );
   }
+}
+
+class _IbkrFlexPreviewSheet extends StatefulWidget {
+  const _IbkrFlexPreviewSheet({required this.apiClient});
+
+  final LooApiClient apiClient;
+
+  @override
+  State<_IbkrFlexPreviewSheet> createState() => _IbkrFlexPreviewSheetState();
+}
+
+class _IbkrFlexPreviewSheetState extends State<_IbkrFlexPreviewSheet> {
+  final _formKey = GlobalKey<FormState>();
+  final _tokenController = TextEditingController();
+  final _queryIdController = TextEditingController();
+  var _loading = false;
+  String? _error;
+  MobileIbkrFlexPreview? _preview;
+
+  @override
+  void dispose() {
+    _tokenController.dispose();
+    _queryIdController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _previewFlex() async {
+    if (!_formKey.currentState!.validate()) {
+      return;
+    }
+    setState(() {
+      _loading = true;
+      _error = null;
+      _preview = null;
+    });
+
+    try {
+      final response = await widget.apiClient.previewIbkrFlexImport(
+        token: _tokenController.text.trim(),
+        queryId: _queryIdController.text.trim(),
+      );
+      final data = response["data"];
+      final previewJson = data is Map<String, dynamic> ? data["preview"] : null;
+      if (previewJson is! Map<String, dynamic>) {
+        throw const LooApiException("IBKR 预览返回格式不正确。");
+      }
+      if (mounted) {
+        setState(() {
+          _preview = MobileIbkrFlexPreview.fromJson(previewJson);
+          _loading = false;
+        });
+      }
+    } catch (error) {
+      if (mounted) {
+        setState(() {
+          _error = error.toString();
+          _loading = false;
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
+    return SafeArea(
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(20, 4, 20, bottomInset + 20),
+        child: SingleChildScrollView(
+          child: Form(
+            key: _formKey,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  "IBKR Flex 预览",
+                  style: Theme.of(context).textTheme.headlineMedium,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  "填入 IBKR Flex Token 和 Query ID，只拉取预览；当前不会保存 token，也不会写入账本。",
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: context.looTokens.mutedText,
+                      ),
+                ),
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: _tokenController,
+                  decoration: const InputDecoration(
+                    labelText: "Flex Token",
+                    helperText:
+                        "来自 IBKR Client Portal 的 Flex Web Service token",
+                  ),
+                  obscureText: true,
+                  validator: (value) => value == null || value.trim().length < 8
+                      ? "请输入有效的 Flex Token"
+                      : null,
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: _queryIdController,
+                  decoration: const InputDecoration(
+                    labelText: "Query ID",
+                    helperText: "Activity Flex Query 的 Query ID",
+                  ),
+                  keyboardType: TextInputType.number,
+                  validator: (value) => value == null || value.trim().isEmpty
+                      ? "请输入 Query ID"
+                      : null,
+                ),
+                if (_error != null) ...[
+                  const SizedBox(height: 12),
+                  Text(
+                    _error!,
+                    style:
+                        TextStyle(color: Theme.of(context).colorScheme.error),
+                  ),
+                ],
+                const SizedBox(height: 14),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton.icon(
+                    onPressed: _loading ? null : _previewFlex,
+                    icon: _loading
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.search_rounded),
+                    label: Text(_loading ? "读取 IBKR..." : "读取预览"),
+                  ),
+                ),
+                if (_preview != null) ...[
+                  const SizedBox(height: 16),
+                  _IbkrPreviewResultCard(_preview!),
+                ],
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _IbkrPreviewResultCard extends StatelessWidget {
+  const _IbkrPreviewResultCard(this.preview);
+
+  final MobileIbkrFlexPreview preview;
+
+  @override
+  Widget build(BuildContext context) {
+    return LooGlassCard(
+      padding: const EdgeInsets.all(14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(preview.title, style: Theme.of(context).textTheme.titleLarge),
+          const SizedBox(height: 4),
+          Text(
+            preview.subtitle,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: context.looTokens.mutedText,
+                ),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: _ImportPill("${preview.accountCount} 个账户"),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _ImportPill("${preview.holdingCount} 个持仓"),
+              ),
+            ],
+          ),
+          if (preview.accounts.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            ...preview.accounts.map(_IbkrPreviewAccountCard.new),
+          ],
+          if (preview.warnings.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            ...preview.warnings.take(3).map(
+                  (warning) => Padding(
+                    padding: const EdgeInsets.only(bottom: 6),
+                    child: Text(
+                      "• $warning",
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: context.looTokens.mutedText,
+                          ),
+                    ),
+                  ),
+                ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _IbkrPreviewAccountCard extends StatelessWidget {
+  const _IbkrPreviewAccountCard(this.account);
+
+  final MobileIbkrFlexAccount account;
+
+  @override
+  Widget build(BuildContext context) {
+    final holdings = account.holdings.take(5).toList();
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.16),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: context.looTokens.cardBorder),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    account.accountId,
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                ),
+                _ImportPill("${account.holdings.length} 持仓"),
+              ],
+            ),
+            const SizedBox(height: 4),
+            Text(
+              [
+                account.accountType,
+                account.currency,
+                if (account.netLiquidation != null)
+                  "净值 ${_formatNumber(account.netLiquidation!)}",
+                if (account.cash != null) "现金 ${_formatNumber(account.cash!)}",
+              ].join(" · "),
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: context.looTokens.mutedText,
+                  ),
+            ),
+            if (holdings.isNotEmpty) ...[
+              const SizedBox(height: 10),
+              ...holdings.map(_IbkrPreviewHoldingRow.new),
+              if (account.holdings.length > holdings.length)
+                Padding(
+                  padding: const EdgeInsets.only(top: 6),
+                  child: Text(
+                    "还有 ${account.holdings.length - holdings.length} 个持仓未展开",
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: context.looTokens.mutedText,
+                        ),
+                  ),
+                ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _IbkrPreviewHoldingRow extends StatelessWidget {
+  const _IbkrPreviewHoldingRow(this.holding);
+
+  final MobileIbkrFlexHolding holding;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 7),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              holding.symbol,
+              style: Theme.of(context).textTheme.labelLarge,
+            ),
+          ),
+          Text(
+            "${_formatNumber(holding.quantity)} · ${holding.currency}",
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: context.looTokens.mutedText,
+                ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+String _formatNumber(num value) {
+  final number = value.toDouble();
+  return number % 1 == 0
+      ? number.toStringAsFixed(0)
+      : number.toStringAsFixed(2);
 }
 
 class _BrokerageFlowCard extends StatelessWidget {

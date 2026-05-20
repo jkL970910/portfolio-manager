@@ -217,6 +217,11 @@ export const displayCurrencyInputSchema = z.object({
   currency: z.enum(["CAD", "USD"]),
 });
 
+export const ibkrFlexPreviewInputSchema = z.object({
+  token: z.string().trim().min(8).max(512),
+  queryId: z.string().trim().min(1).max(64),
+});
+
 export const looMinisterSettingsInputSchema = z
   .object({
     mode: z.enum(["local", "gpt-5.5"]),

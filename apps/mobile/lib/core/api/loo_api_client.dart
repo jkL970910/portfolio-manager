@@ -147,6 +147,19 @@ class LooApiClient {
     return _getJson("/api/mobile/import");
   }
 
+  Future<Map<String, dynamic>> previewIbkrFlexImport({
+    required String token,
+    required String queryId,
+  }) {
+    return _postJson(
+      "/api/mobile/import/brokerage/ibkr/flex-preview",
+      body: {
+        "token": token,
+        "queryId": queryId,
+      },
+    );
+  }
+
   Future<Map<String, dynamic>> resolveSecurity(String symbol) {
     return _getJson(
         "/api/mobile/market-data/resolve?symbol=${Uri.encodeQueryComponent(symbol)}");
