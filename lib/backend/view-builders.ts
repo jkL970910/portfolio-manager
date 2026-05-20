@@ -5314,7 +5314,7 @@ export function buildSpendingData(args: {
 export function buildImportData(args: {
   latestPortfolioJob: ImportJob | null;
   latestSpendingJob: ImportJob | null;
-  accounts: InvestmentAccount[];
+  accounts: Array<InvestmentAccount & { holdingCount?: number }>;
   language: DisplayLanguage;
 }): ImportData {
   const { latestPortfolioJob, latestSpendingJob, accounts, language } = args;
@@ -5513,6 +5513,7 @@ export function buildImportData(args: {
       contributionRoomCad: account.contributionRoomCad,
       marketValueAmount: account.marketValueAmount ?? account.marketValueCad,
       marketValueCad: account.marketValueCad,
+      holdingCount: account.holdingCount ?? 0,
     })),
   };
 }

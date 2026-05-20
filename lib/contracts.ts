@@ -988,6 +988,7 @@ export interface ImportData {
     contributionRoomCad: number | null;
     marketValueAmount: number;
     marketValueCad: number;
+    holdingCount?: number;
   }[];
 }
 

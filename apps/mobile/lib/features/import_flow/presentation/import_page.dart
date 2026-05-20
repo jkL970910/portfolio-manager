@@ -181,7 +181,7 @@ class _HeroCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final holdingsCount = data.accounts.fold<int>(
       0,
-      (sum, account) => sum + _extractFirstNumber(account.detail),
+      (sum, account) => sum + account.holdingCount,
     );
     return LooGlassCard(
       isHero: true,
@@ -211,8 +211,8 @@ class _HeroCard extends StatelessWidget {
               Expanded(
                 child: _HeroMetric(
                   label: "持仓",
-                  value: holdingsCount == 0 ? "--" : "$holdingsCount",
-                  detail: "估算",
+                  value: "$holdingsCount",
+                  detail: "已入账",
                 ),
               ),
             ],
@@ -221,11 +221,6 @@ class _HeroCard extends StatelessWidget {
       ),
     );
   }
-}
-
-int _extractFirstNumber(String value) {
-  final match = RegExp(r"\d+").firstMatch(value);
-  return int.tryParse(match?.group(0) ?? "") ?? 0;
 }
 
 class _HeroMetric extends StatelessWidget {
@@ -508,34 +503,75 @@ class _BrokerageImportSheet extends StatelessWidget {
   }
 }
 
-class _AccountVaultCard extends StatelessWidget {
+class _AccountVaultCard extends StatefulWidget {
   const _AccountVaultCard(this.accounts);
 
   final List<MobileImportAccount> accounts;
 
   @override
+  State<_AccountVaultCard> createState() => _AccountVaultCardState();
+}
+
+class _AccountVaultCardState extends State<_AccountVaultCard> {
+  bool _expanded = false;
+
+  @override
   Widget build(BuildContext context) {
+    final accounts = widget.accounts;
+    final holdingCount = accounts.fold<int>(
+      0,
+      (sum, account) => sum + account.holdingCount,
+    );
+
     return LooGlassCard(
       padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  "已入国库",
-                  style: Theme.of(context).textTheme.titleLarge,
+          InkWell(
+            borderRadius: BorderRadius.circular(18),
+            onTap: accounts.isEmpty
+                ? null
+                : () => setState(() => _expanded = !_expanded),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        "已入国库",
+                        style: Theme.of(context).textTheme.titleLarge,
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        accounts.isEmpty
+                            ? "还没有账户"
+                            : "${accounts.length} 个账户 · $holdingCount 个持仓",
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: context.looTokens.mutedText,
+                            ),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-              _ImportPill("${accounts.length} 个账户"),
-            ],
+                _ImportPill("${accounts.length} 个账户"),
+                const SizedBox(width: 8),
+                AnimatedRotation(
+                  turns: _expanded ? 0.5 : 0,
+                  duration: const Duration(milliseconds: 180),
+                  child: const Icon(Icons.keyboard_arrow_down_rounded),
+                ),
+              ],
+            ),
           ),
-          const SizedBox(height: 10),
-          if (accounts.isEmpty)
-            const _EmptyVaultMessage()
-          else
+          if (accounts.isEmpty) ...[
+            const SizedBox(height: 10),
+            const _EmptyVaultMessage(),
+          ] else if (_expanded) ...[
+            const SizedBox(height: 10),
             ...accounts.map(_AccountCard.new),
+          ],
         ],
       ),
     );
@@ -1453,7 +1489,10 @@ class _AccountCard extends StatelessWidget {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      account.detail,
+                      [
+                        account.detail,
+                        "${account.holdingCount} 个持仓",
+                      ].where((item) => item.isNotEmpty).join(" · "),
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(

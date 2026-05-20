@@ -697,6 +697,7 @@ type MobileImportData = {
       displayName: string;
       value: string;
       detail: string;
+      holdingCount: number;
     }
   >;
   notes: string[];
@@ -2042,6 +2043,7 @@ function mapMobileImportData(data: ImportData): MobileImportData {
       detail: [account.type, account.institution, account.currency]
         .filter(Boolean)
         .join(" · "),
+      holdingCount: account.holdingCount ?? 0,
     })),
     notes: [
       "移动端 MVP 只保留手动/引导式导入，不迁移 CSV 上传和字段映射。",

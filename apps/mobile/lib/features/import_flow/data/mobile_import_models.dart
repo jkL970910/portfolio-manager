@@ -115,12 +115,14 @@ class MobileImportAccount {
     required this.displayName,
     required this.value,
     required this.detail,
+    required this.holdingCount,
   });
 
   final String id;
   final String displayName;
   final String value;
   final String detail;
+  final int holdingCount;
 
   factory MobileImportAccount.fromJson(Map<String, dynamic> json) {
     return MobileImportAccount(
@@ -130,6 +132,7 @@ class MobileImportAccount {
           "未知账户",
       value: json["value"] as String? ?? "--",
       detail: json["detail"] as String? ?? "",
+      holdingCount: (json["holdingCount"] as num?)?.toInt() ?? 0,
     );
   }
 }

@@ -3414,10 +3414,22 @@ export async function updateDisplayLanguage(
 
 export async function getImportView(userId: string) {
   const repositories = getRepositories();
-  const [user, userAccounts] = await Promise.all([
+  const [user, userAccounts, userHoldings] = await Promise.all([
     repositories.users.getById(userId),
     repositories.accounts.listByUserId(userId),
+    repositories.holdings.listByUserId(userId),
   ]);
+  const holdingCountsByAccount = new Map<string, number>();
+  for (const holding of userHoldings) {
+    holdingCountsByAccount.set(
+      holding.accountId,
+      (holdingCountsByAccount.get(holding.accountId) ?? 0) + 1,
+    );
+  }
+  const accountsWithHoldingCounts = userAccounts.map((account) => ({
+    ...account,
+    holdingCount: holdingCountsByAccount.get(account.id) ?? 0,
+  }));
   const db = getDb();
   const [latestPortfolioRow, latestSpendingRow] = await Promise.all([
     db.query.importJobs.findFirst({
@@ -3465,7 +3477,7 @@ export async function getImportView(userId: string) {
       ...buildImportData({
         latestPortfolioJob,
         latestSpendingJob,
-        accounts: userAccounts,
+        accounts: accountsWithHoldingCounts,
         language: user.displayLanguage,
       }),
       latestPortfolioJob,
