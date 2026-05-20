@@ -588,77 +588,79 @@ export function buildPortfolioHealthSummary(args: {
     efficiencyDimension.actions[0]
   ];
 
-  const accountDrilldown = [...new Set(accounts.map((account) => account.type))]
-    .map((accountType) => {
-      const accountsOfType = accounts.filter((account) => account.type === accountType);
-      const accountIds = new Set(accountsOfType.map((account) => account.id));
-      const groupedHoldings = holdings.filter((holding) => accountIds.has(holding.accountId));
-      const groupedValue = sum(groupedHoldings.map((holding) => holding.marketValueCad));
+  const accountDrilldown = [...accounts]
+    .map((account) => {
+      const groupedHoldings = holdings.filter((holding) => holding.accountId === account.id);
+      const groupedValue = account.marketValueCad > 0
+        ? account.marketValueCad
+        : sum(groupedHoldings.map((holding) => holding.marketValueCad));
       const sharePct = total > 0 ? (groupedValue / total) * 100 : 0;
       const weightedFit = groupedHoldings.length > 0 && groupedValue > 0
         ? sum(groupedHoldings.map((holding) => {
-          const fit = placementMatrix[getHoldingEconomicAssetClass(holding)]?.[accountType] ?? 0.45;
+          const fit = placementMatrix[getHoldingEconomicAssetClass(holding)]?.[account.type] ?? 0.45;
           return fit * (holding.marketValueCad / groupedValue) * 100;
         }))
         : 45;
-      const groupedScore = clamp(weightedFit - Math.max(0, sharePct - 45) * 0.9 + (accountType === "Taxable" ? -4 : 3), 22, 95);
+      const groupedScore = clamp(weightedFit - Math.max(0, sharePct - 45) * 0.9 + (account.type === "Taxable" ? -4 : 3), 22, 95);
       const topHoldingInGroup = [...groupedHoldings].sort((left, right) => right.marketValueCad - left.marketValueCad)[0];
+      const nickname = account.nickname.trim();
+      const accountLabel = nickname || getAccountTypeLabel(account.type, language);
 
       return {
-        id: accountType,
-        label: getAccountTypeLabel(accountType, language),
-        href: `/portfolio?accountType=${accountType}`,
+        id: account.id,
+        label: accountLabel,
+        href: `/portfolio/accounts/${encodeURIComponent(account.id)}`,
         score: round(groupedScore, 0),
         status: getDimensionStatus(groupedScore, language),
         summary: pick(
           language,
-          `${getAccountTypeLabel(accountType, language)} 这一类账户里，现在大约放了你 ${sharePct.toFixed(1)}% 的钱。`,
-          `${getAccountTypeLabel(accountType, language)} currently holds about ${sharePct.toFixed(1)}% of the portfolio.`
+          `${accountLabel} 是 ${getAccountTypeLabel(account.type, language)} 账户，现在大约放了你 ${sharePct.toFixed(1)}% 的钱。`,
+          `${accountLabel} is a ${getAccountTypeLabel(account.type, language)} account holding about ${sharePct.toFixed(1)}% of the portfolio.`
         ),
         impactHints: buildImpactHints(
           language,
           (_amount, amountLabel) => weightedFit < 70
             ? pick(
               language,
-              `如果下一笔 ${amountLabel} 先别继续放进 ${getAccountTypeLabel(accountType, language)}，而是换到更合适的账户类型，通常最先改善的是“钱放错地方”的问题。`,
-              `If the next ${amountLabel} is redirected away from ${getAccountTypeLabel(accountType, language)} into a better-fitting account type, account efficiency should improve first.`
+              `如果下一笔 ${amountLabel} 先别继续放进 ${accountLabel}，而是换到更合适的账户，通常最先改善的是“钱放错地方”的问题。`,
+              `If the next ${amountLabel} is redirected away from ${accountLabel} into a better-fitting account, account efficiency should improve first.`
             )
             : pick(
               language,
-              `如果下一笔 ${amountLabel} 还继续往 ${getAccountTypeLabel(accountType, language)} 里放，这一类账户会更拥挤。`,
-              `If the next ${amountLabel} keeps landing in ${getAccountTypeLabel(accountType, language)}, crowding inside that account type is likely to worsen first.`
+              `如果下一笔 ${amountLabel} 还继续往 ${accountLabel} 里放，这个账户会更拥挤。`,
+              `If the next ${amountLabel} keeps landing in ${accountLabel}, crowding inside this account is likely to worsen first.`
             )
         ),
         drivers: [
           pick(
             language,
-            `你现在一共有 ${accountsOfType.length} 个这类账户，里面放着 ${groupedHoldings.length} 笔持仓。`,
-            `This account type includes ${accountsOfType.length} accounts and ${groupedHoldings.length} holdings.`
+            `这个账户里现在有 ${groupedHoldings.length} 笔持仓。`,
+            `This account currently includes ${groupedHoldings.length} holdings.`
           ),
           pick(
             language,
-            `如果按“放得顺不顺手”粗略看，这一类账户大约是 ${weightedFit.toFixed(0)}/100，属于 ${weightedFit < 70 ? "偏不顺手" : "还算顺手"}。`,
-            `This account type scores about ${weightedFit.toFixed(0)}/100 on rough fit.`
+            `如果按“放得顺不顺手”粗略看，这个账户大约是 ${weightedFit.toFixed(0)}/100，属于 ${weightedFit < 70 ? "偏不顺手" : "还算顺手"}。`,
+            `This account scores about ${weightedFit.toFixed(0)}/100 on rough fit.`
           ),
           topHoldingInGroup
             ? pick(
               language,
               `这里面最大的一笔是 ${topHoldingInGroup.symbol}，大约占你全部资产的 ${topHoldingInGroup.weightPct.toFixed(1)}%。`,
-              `The largest holding inside this account type is ${topHoldingInGroup.symbol}, representing about ${topHoldingInGroup.weightPct.toFixed(1)}% of the total portfolio.`
+              `The largest holding inside this account is ${topHoldingInGroup.symbol}, representing about ${topHoldingInGroup.weightPct.toFixed(1)}% of the total portfolio.`
             )
-            : pick(language, "这一类账户目前还没有足够的持仓明细。", "This account type does not yet have enough holding detail.")
+            : pick(language, "这个账户目前还没有足够的持仓明细。", "This account does not yet have enough holding detail.")
         ],
         actions: [
           weightedFit < 70
             ? pick(
               language,
-              `后续新增资金先别默认放进 ${getAccountTypeLabel(accountType, language)}，先看看别的账户类型是不是更合适。`,
-              `Do not prioritize ${getAccountTypeLabel(accountType, language)} for the next contribution; check whether another account type fits better.`
+              `后续新增资金先别默认放进 ${accountLabel}，先看看别的账户是不是更合适。`,
+              `Do not prioritize ${accountLabel} for the next contribution; check whether another account fits better.`
             )
             : pick(
               language,
-              `这类账户整体还算合理，后面主要注意别把太多新钱一直往这里堆。`,
-              `${getAccountTypeLabel(accountType, language)} is broadly fine overall; the main risk is adding too much more money into it.`
+              `这个账户整体还算合理，后面主要注意别把太多新钱一直往这里堆。`,
+              `${accountLabel} is broadly fine overall; the main risk is adding too much more money into it.`
             )
         ]
       };

@@ -9,7 +9,6 @@ import "../../shared/data/loo_minister_context_models.dart";
 import "../../shared/data/mobile_models.dart";
 import "../../shared/presentation/loo_charts.dart";
 import "../../shared/presentation/loo_minister_scope.dart";
-import "account_type_portfolio_page.dart";
 import "ai_analysis_card.dart";
 import "detail_state_widgets.dart";
 
@@ -166,15 +165,7 @@ class _HealthScorePageState extends State<HealthScorePage> {
     if (item.id.isEmpty) {
       return;
     }
-    Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (_) => AccountTypePortfolioPage(
-          apiClient: widget.apiClient,
-          accountType: item.id,
-          title: "${item.label}巡查",
-        ),
-      ),
-    );
+    context.push(MobileRoutes.accountDetail(item.id));
   }
 }
 
