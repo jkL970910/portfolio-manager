@@ -2645,8 +2645,8 @@ export function buildDashboardData(args: {
     healthScore: {
       score: health.score,
       status: health.status,
-      strongestDimension: `${health.strongestDimension.label} ${health.strongestDimension.value}`,
-      weakestDimension: `${health.weakestDimension.label} ${health.weakestDimension.value}`,
+      strongestDimension: health.strongestDimension,
+      weakestDimension: health.weakestDimension,
       highlights: health.highlights,
     },
     recommendation,

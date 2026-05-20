@@ -133,8 +133,8 @@ export interface DashboardData {
   healthScore: {
     score: number;
     status: string;
-    strongestDimension: string;
-    weakestDimension: string;
+    strongestDimension: { label: string; value: number };
+    weakestDimension: { label: string; value: number };
     highlights: string[];
   };
   recommendation: {

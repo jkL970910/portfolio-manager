@@ -420,6 +420,17 @@ class MobileHealthDimensionPair {
   final String value;
 
   factory MobileHealthDimensionPair.fromJson(Object? value) {
+    if (value is String && value.trim().isNotEmpty) {
+      final match = RegExp(r"(-?\d+(?:\.\d+)?)").firstMatch(value);
+      final numeric = double.tryParse(match?.group(1) ?? "");
+      final label = value
+          .replaceFirst(RegExp(r"\s*-?\d+(?:\.\d+)?\s*$"), "")
+          .trim();
+      return MobileHealthDimensionPair(
+        label: label.isEmpty ? value : label,
+        value: numeric == null ? "--" : "${numeric.round()} 分",
+      );
+    }
     final json =
         value is Map<String, dynamic> ? value : const <String, dynamic>{};
     final rawValue = json["value"];
