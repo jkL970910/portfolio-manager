@@ -1100,11 +1100,13 @@ class LooRadarChart extends StatelessWidget {
   const LooRadarChart({
     required this.points,
     this.height = 220,
+    this.showLabels = true,
     super.key,
   });
 
   final List<LooRadarPoint> points;
   final double height;
+  final bool showLabels;
 
   @override
   Widget build(BuildContext context) {
@@ -1122,6 +1124,7 @@ class LooRadarChart extends StatelessWidget {
           fillColor: theme.colorScheme.primary.withValues(alpha: 0.16),
           strokeColor: theme.colorScheme.primary,
           labelColor: theme.colorScheme.onSurfaceVariant,
+          showLabels: showLabels,
         ),
       ),
     );
@@ -1135,6 +1138,7 @@ class _RadarChartPainter extends CustomPainter {
     required this.fillColor,
     required this.strokeColor,
     required this.labelColor,
+    required this.showLabels,
   });
 
   final List<LooRadarPoint> points;
@@ -1142,11 +1146,14 @@ class _RadarChartPainter extends CustomPainter {
   final Color fillColor;
   final Color strokeColor;
   final Color labelColor;
+  final bool showLabels;
 
   @override
   void paint(Canvas canvas, Size size) {
     final center = Offset(size.width / 2, size.height / 2);
-    final radius = math.min(size.width, size.height) / 2 - 38;
+    final edgePadding = showLabels ? 38.0 : 12.0;
+    final radius =
+        math.max(0.0, math.min(size.width, size.height) / 2 - edgePadding);
     final axisPaint = Paint()
       ..color = axisColor
       ..strokeWidth = 1
@@ -1173,10 +1180,12 @@ class _RadarChartPainter extends CustomPainter {
         dataPath.lineTo(dataPoint.dx, dataPoint.dy);
       }
 
-      final labelPoint =
-          center + Offset(math.cos(angle), math.sin(angle)) * (radius + 22);
-      _paintText(canvas, points[index].label, labelPoint, labelColor,
-          centered: true);
+      if (showLabels) {
+        final labelPoint =
+            center + Offset(math.cos(angle), math.sin(angle)) * (radius + 22);
+        _paintText(canvas, points[index].label, labelPoint, labelColor,
+            centered: true);
+      }
     }
     dataPath.close();
 
@@ -1211,7 +1220,8 @@ class _RadarChartPainter extends CustomPainter {
         oldDelegate.axisColor != axisColor ||
         oldDelegate.fillColor != fillColor ||
         oldDelegate.strokeColor != strokeColor ||
-        oldDelegate.labelColor != labelColor;
+        oldDelegate.labelColor != labelColor ||
+        oldDelegate.showLabels != showLabels;
   }
 }
 

@@ -121,9 +121,7 @@ class _RecommendationsPageState extends State<RecommendationsPage> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              fallbackMode == "core_only_relaxed"
-                  ? "已按放宽核心池重算。"
-                  : "进货清单已重算。",
+              fallbackMode == "core_only_relaxed" ? "已按放宽核心池重算。" : "进货清单已重算。",
             ),
           ),
         );
@@ -189,7 +187,8 @@ class _RecommendationsPageState extends State<RecommendationsPage> {
     if (confirmed != true) {
       return;
     }
-    await _createRun(_lastContributionAmount, fallbackMode: "core_only_relaxed");
+    await _createRun(_lastContributionAmount,
+        fallbackMode: "core_only_relaxed");
   }
 
   @override
@@ -367,7 +366,8 @@ class _RecommendationsPageState extends State<RecommendationsPage> {
           exchange: item.exchange,
           currency: item.currency,
           name: item.name,
-          source: item.poolStatus == "eligible" ? "recommendation" : "watchlist",
+          source:
+              item.poolStatus == "eligible" ? "recommendation" : "watchlist",
         )
         .catchError((_) => <String, dynamic>{});
     if (!mounted) {
@@ -1352,24 +1352,33 @@ class _MarketItemCard extends StatelessWidget {
                     ],
                   ),
                   const SizedBox(height: 7),
-                  Text(
-                    item.lastPriceLabel,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                          fontWeight: FontWeight.w900,
-                          letterSpacing: -0.35,
-                        ),
+                  SizedBox(
+                    width: double.infinity,
+                    child: Text(
+                      item.lastPriceLabel,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: -0.35,
+                          ),
+                    ),
                   ),
                   const SizedBox(height: 9),
-                  _MarketStatusPill(
-                    label: item.poolStatusLabel,
-                    color: statusColor,
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: _MarketStatusPill(
+                      label: item.poolStatusLabel,
+                      color: statusColor,
+                    ),
                   ),
                   const SizedBox(height: 8),
-                  _MarketMoveBadge(
-                    label: _marketMoveLabel(item),
-                    color: moveColor,
+                  SizedBox(
+                    width: double.infinity,
+                    child: _MarketMoveBadge(
+                      label: _marketMoveLabel(item),
+                      color: moveColor,
+                    ),
                   ),
                 ],
               ),
@@ -1392,22 +1401,25 @@ class _MarketStatusPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.10),
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-        child: Text(
-          label,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                color: color,
-                fontWeight: FontWeight.w800,
-                height: 1.0,
-              ),
+    return ConstrainedBox(
+      constraints: const BoxConstraints(maxWidth: 108),
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.10),
+          borderRadius: BorderRadius.circular(999),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+          child: Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                  color: color,
+                  fontWeight: FontWeight.w800,
+                  height: 1.0,
+                ),
+          ),
         ),
       ),
     );
@@ -1443,21 +1455,27 @@ class _MarketMoveBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.16),
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-        child: Text(
-          label,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                color: color,
-                fontWeight: FontWeight.w800,
-              ),
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 108),
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: 0.16),
+            borderRadius: BorderRadius.circular(999),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                    color: color,
+                    fontWeight: FontWeight.w800,
+                  ),
+            ),
+          ),
         ),
       ),
     );
@@ -1470,7 +1488,7 @@ String _marketMoveLabel(MobileRecommendationMarketItem item) {
   }
   if (item.dayChangePctLabel.isNotEmpty &&
       item.dayChangePctLabel != "今日涨跌待刷新") {
-    return "${item.dayChangeLabel} · ${item.dayChangePctLabel}";
+    return item.dayChangePctLabel;
   }
   return item.dayChangeLabel;
 }
@@ -2487,7 +2505,8 @@ class _RecommendationPoolVisibilityCardState
                       ),
                     ),
                   ),
-                  _InfoPill("入池 ${snapshot.eligibleCount}/${snapshot.rawCount}"),
+                  _InfoPill(
+                      "入池 ${snapshot.eligibleCount}/${snapshot.rawCount}"),
                   const SizedBox(width: 6),
                   AnimatedRotation(
                     turns: _expanded ? 0.5 : 0,
@@ -2619,8 +2638,9 @@ class _V4BreakdownBlock extends StatelessWidget {
         Wrap(
           spacing: 8,
           runSpacing: 8,
-          children:
-              items.map((item) => _InfoPill("${item.label} ${item.count}")).toList(),
+          children: items
+              .map((item) => _InfoPill("${item.label} ${item.count}"))
+              .toList(),
         ),
       ],
     );
@@ -2635,7 +2655,8 @@ class _V4RejectedCandidateTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final tokens = context.looTokens;
-    final reason = candidate.reasons.isNotEmpty ? candidate.reasons.first : null;
+    final reason =
+        candidate.reasons.isNotEmpty ? candidate.reasons.first : null;
     final color = switch (reason?.severity) {
       "blocker" => Theme.of(context).colorScheme.error,
       "warning" => Colors.orange.shade300,
@@ -2659,7 +2680,9 @@ class _V4RejectedCandidateTile extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      candidate.symbol.isEmpty ? candidate.name : candidate.symbol,
+                      candidate.symbol.isEmpty
+                          ? candidate.name
+                          : candidate.symbol,
                       style: Theme.of(context).textTheme.labelLarge?.copyWith(
                             fontWeight: FontWeight.w900,
                           ),
@@ -2679,9 +2702,10 @@ class _V4RejectedCandidateTile extends StatelessWidget {
                           reason.detail,
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
-                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                color: tokens.mutedText,
-                              ),
+                          style:
+                              Theme.of(context).textTheme.bodySmall?.copyWith(
+                                    color: tokens.mutedText,
+                                  ),
                         ),
                       ],
                     ],

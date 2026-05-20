@@ -757,8 +757,7 @@ export function buildPortfolioHealthSummary(args: {
         ]
       };
     })
-    .sort((left, right) => left.score - right.score)
-    .slice(0, 5);
+    .sort((left, right) => left.score - right.score);
 
   return {
     scopeLevel,
@@ -828,7 +827,7 @@ export function buildPortfolioHealthSummary(args: {
     },
     dimensions,
     actionQueue,
-    accountDrilldown: accountDrilldown.slice(0, 4),
+    accountDrilldown,
     holdingDrilldown
   };
 }

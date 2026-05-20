@@ -100,10 +100,6 @@ class _HealthScorePageState extends State<HealthScorePage> {
                 padding: const EdgeInsets.fromLTRB(20, 12, 20, 28),
                 children: [
                   _SummaryCard(data),
-                  if (data.actionQueue.isNotEmpty) ...[
-                    const SizedBox(height: 12),
-                    _ActionQueueCard(data.actionQueue),
-                  ],
                   if (data.recommendationBridge != null) ...[
                     const SizedBox(height: 12),
                     _RecommendationBridgeCard(
@@ -112,26 +108,11 @@ class _HealthScorePageState extends State<HealthScorePage> {
                     ),
                   ],
                   const SizedBox(height: 12),
-                  AiAnalysisCard(
+                  _LooHealthBriefingCard(
+                    data: data,
                     apiClient: widget.apiClient,
-                    title: widget.accountId == null ? "智能组合快扫" : "智能账户快扫",
-                    description: widget.accountId == null
-                        ? "先用组合健康、投资偏好和已保存资料生成确定性判断；GPT 增强需手动点击。"
-                        : "先用当前账户持仓、账户类型和偏好生成确定性判断；GPT 增强需手动点击。",
-                    payload: {
-                      "scope":
-                          widget.accountId == null ? "portfolio" : "account",
-                      "mode": "quick",
-                      if (widget.accountId != null)
-                        "accountId": widget.accountId,
-                    },
+                    accountId: widget.accountId,
                   ),
-                  if (data.highlights.isNotEmpty) ...[
-                    const SizedBox(height: 16),
-                    const _SectionTitle("Loo皇批注"),
-                    const SizedBox(height: 8),
-                    _BulletCard(data.highlights),
-                  ],
                   if (data.dimensions.isNotEmpty) ...[
                     const SizedBox(height: 16),
                     const _SectionTitle("健康维度"),
@@ -140,24 +121,20 @@ class _HealthScorePageState extends State<HealthScorePage> {
                   ],
                   if (data.accountDrilldown.isNotEmpty) ...[
                     const SizedBox(height: 16),
-                    const _SectionTitle("账户巡查"),
-                    const SizedBox(height: 8),
-                    ...data.accountDrilldown.map(
-                      (item) => _DrilldownCard(
-                        item,
-                        onTap: () => _openAccountTypePortfolio(item),
-                      ),
+                    _DrilldownSection(
+                      title: "账户巡查",
+                      items: data.accountDrilldown,
+                      initiallyVisibleCount: 3,
+                      onTap: _openAccountTypePortfolio,
                     ),
                   ],
                   if (data.holdingDrilldown.isNotEmpty) ...[
                     const SizedBox(height: 16),
-                    const _SectionTitle("持仓巡查"),
-                    const SizedBox(height: 8),
-                    ...data.holdingDrilldown.map(
-                      (item) => _DrilldownCard(
-                        item,
-                        onTap: () => _openHoldingDetail(item),
-                      ),
+                    _DrilldownSection(
+                      title: "持仓巡查",
+                      items: data.holdingDrilldown,
+                      initiallyVisibleCount: 5,
+                      onTap: _openHoldingDetail,
                     ),
                   ],
                 ],
@@ -358,8 +335,8 @@ class MobileHealthSnapshot {
       holdingDrilldown: readJsonList(healthData, "holdingDrilldown")
           .map(MobileHealthDrilldownItem.fromJson)
           .toList(),
-      recommendationBridge:
-          MobileHealthRecommendationBridge.fromJson(json["recommendationBridge"]),
+      recommendationBridge: MobileHealthRecommendationBridge.fromJson(
+          json["recommendationBridge"]),
     );
   }
 }
@@ -423,9 +400,8 @@ class MobileHealthDimensionPair {
     if (value is String && value.trim().isNotEmpty) {
       final match = RegExp(r"(-?\d+(?:\.\d+)?)").firstMatch(value);
       final numeric = double.tryParse(match?.group(1) ?? "");
-      final label = value
-          .replaceFirst(RegExp(r"\s*-?\d+(?:\.\d+)?\s*$"), "")
-          .trim();
+      final label =
+          value.replaceFirst(RegExp(r"\s*-?\d+(?:\.\d+)?\s*$"), "").trim();
       return MobileHealthDimensionPair(
         label: label.isEmpty ? value : label,
         value: numeric == null ? "--" : "${numeric.round()} 分",
@@ -592,10 +568,11 @@ class _SummaryCard extends StatelessWidget {
                 GestureDetector(
                   onTap: () => _showRadarSheet(context, data),
                   child: SizedBox(
-                    width: 132,
-                    height: 132,
+                    width: 150,
+                    height: 150,
                     child: LooRadarChart(
-                      height: 132,
+                      height: 150,
+                      showLabels: false,
                       points: data.radar
                           .map((point) => LooRadarPoint(
                                 label: point.dimension,
@@ -655,7 +632,7 @@ class _SummaryCard extends StatelessWidget {
               Text("健康雷达", style: Theme.of(context).textTheme.titleLarge),
               const SizedBox(height: 12),
               LooRadarChart(
-                height: 240,
+                height: 280,
                 points: data.radar
                     .map((point) => LooRadarPoint(
                           label: point.dimension,
@@ -673,36 +650,161 @@ class _SummaryCard extends StatelessWidget {
   }
 }
 
-class _ActionQueueCard extends StatelessWidget {
-  const _ActionQueueCard(this.items);
+class _LooHealthBriefingCard extends StatefulWidget {
+  const _LooHealthBriefingCard({
+    required this.data,
+    required this.apiClient,
+    required this.accountId,
+  });
 
-  final List<String> items;
+  final MobileHealthSnapshot data;
+  final LooApiClient apiClient;
+  final String? accountId;
+
+  @override
+  State<_LooHealthBriefingCard> createState() => _LooHealthBriefingCardState();
+}
+
+class _LooHealthBriefingCardState extends State<_LooHealthBriefingCard> {
+  bool _expanded = false;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final tokens = context.looTokens;
+    final summary = _briefingSummary(widget.data);
     return LooGlassCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text("优先行动", style: theme.textTheme.titleLarge),
-          const SizedBox(height: 10),
-          ...items.take(3).map(
-                (item) => Padding(
-                  padding: const EdgeInsets.only(bottom: 8),
-                  child: Row(
+          InkWell(
+            borderRadius: BorderRadius.circular(18),
+            onTap: () => setState(() => _expanded = !_expanded),
+            child: Row(
+              children: [
+                Icon(Icons.auto_awesome_outlined, color: tokens.accent),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Icon(Icons.task_alt, size: 18, color: tokens.accent),
-                      const SizedBox(width: 8),
-                      Expanded(child: Text(item)),
+                      Text("Loo皇批注", style: theme.textTheme.titleLarge),
+                      const SizedBox(height: 4),
+                      Text(
+                        summary,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: tokens.mutedText,
+                        ),
+                      ),
                     ],
                   ),
                 ),
+                const SizedBox(width: 8),
+                Wrap(
+                  spacing: 6,
+                  children: [
+                    if (widget.data.actionQueue.isNotEmpty)
+                      _InfoPill("${widget.data.actionQueue.length} 行动"),
+                    const _InfoPill("快扫"),
+                  ],
+                ),
+                AnimatedRotation(
+                  turns: _expanded ? 0.5 : 0,
+                  duration: const Duration(milliseconds: 180),
+                  child: const Icon(Icons.keyboard_arrow_down_rounded),
+                ),
+              ],
+            ),
+          ),
+          if (_expanded) ...[
+            if (widget.data.highlights.isNotEmpty) ...[
+              const SizedBox(height: 14),
+              _InlineBriefSection(
+                title: "批注",
+                icon: Icons.format_quote_rounded,
+                items: widget.data.highlights,
               ),
+            ],
+            if (widget.data.actionQueue.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              _InlineBriefSection(
+                title: "优先行动",
+                icon: Icons.task_alt,
+                items: widget.data.actionQueue,
+              ),
+            ],
+            const SizedBox(height: 12),
+            AiAnalysisCard(
+              apiClient: widget.apiClient,
+              title: widget.accountId == null ? "智能组合快扫" : "智能账户快扫",
+              description: widget.accountId == null
+                  ? "先用组合健康、投资偏好和已保存资料生成确定性判断；GPT 增强需手动点击。"
+                  : "先用当前账户持仓、账户类型和偏好生成确定性判断；GPT 增强需手动点击。",
+              collapseDescriptionToInfo: true,
+              payload: {
+                "scope": widget.accountId == null ? "portfolio" : "account",
+                "mode": "quick",
+                if (widget.accountId != null) "accountId": widget.accountId,
+              },
+            ),
+          ],
         ],
       ),
+    );
+  }
+
+  String _briefingSummary(MobileHealthSnapshot data) {
+    if (data.highlights.isNotEmpty) {
+      return data.highlights.first;
+    }
+    if (data.actionQueue.isNotEmpty) {
+      return data.actionQueue.first;
+    }
+    return "展开查看批注、优先行动和智能快扫。";
+  }
+}
+
+class _InlineBriefSection extends StatelessWidget {
+  const _InlineBriefSection({
+    required this.title,
+    required this.icon,
+    required this.items,
+  });
+
+  final String title;
+  final IconData icon;
+  final List<String> items;
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = context.looTokens;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(icon, size: 18, color: tokens.accent),
+            const SizedBox(width: 8),
+            Text(title, style: Theme.of(context).textTheme.titleMedium),
+          ],
+        ),
+        const SizedBox(height: 8),
+        ...items.take(3).map(
+              (item) => Padding(
+                padding: const EdgeInsets.only(bottom: 7),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text("•", style: TextStyle(color: tokens.accent)),
+                    const SizedBox(width: 8),
+                    Expanded(child: Text(item)),
+                  ],
+                ),
+              ),
+            ),
+      ],
     );
   }
 }
@@ -751,7 +853,8 @@ class _RecommendationBridgeCard extends StatelessWidget {
                 _InfoPill(bridge.securitySymbol!),
               if (bridge.targetAssetClass != null)
                 _InfoPill(bridge.targetAssetClass!),
-              if (bridge.targetAccount != null) _InfoPill(bridge.targetAccount!),
+              if (bridge.targetAccount != null)
+                _InfoPill(bridge.targetAccount!),
               DecoratedBox(
                 decoration: BoxDecoration(
                   color: color.withValues(alpha: 0.12),
@@ -825,30 +928,6 @@ class _InfoPill extends StatelessWidget {
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
         child: Text(label, style: Theme.of(context).textTheme.labelMedium),
-      ),
-    );
-  }
-}
-
-class _BulletCard extends StatelessWidget {
-  const _BulletCard(this.items);
-
-  final List<String> items;
-
-  @override
-  Widget build(BuildContext context) {
-    return LooGlassCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: items
-            .take(6)
-            .map(
-              (item) => Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: Text("• $item"),
-              ),
-            )
-            .toList(),
       ),
     );
   }
@@ -994,6 +1073,84 @@ class _DimensionCard extends StatelessWidget {
           ...dimension.drivers.take(3).map(_smallBullet),
           ...dimension.consequences.take(2).map(_impactBullet),
           ...dimension.actions.take(3).map(_actionBullet),
+        ],
+      ),
+    );
+  }
+}
+
+class _DrilldownSection extends StatefulWidget {
+  const _DrilldownSection({
+    required this.title,
+    required this.items,
+    required this.initiallyVisibleCount,
+    required this.onTap,
+  });
+
+  final String title;
+  final List<MobileHealthDrilldownItem> items;
+  final int initiallyVisibleCount;
+  final ValueChanged<MobileHealthDrilldownItem> onTap;
+
+  @override
+  State<_DrilldownSection> createState() => _DrilldownSectionState();
+}
+
+class _DrilldownSectionState extends State<_DrilldownSection> {
+  bool _expanded = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final visibleItems = _expanded
+        ? widget.items
+        : widget.items.take(widget.initiallyVisibleCount).toList();
+    final hiddenCount = widget.items.length - visibleItems.length;
+    return LooGlassCard(
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 6),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          InkWell(
+            borderRadius: BorderRadius.circular(16),
+            onTap: widget.items.length > widget.initiallyVisibleCount
+                ? () => setState(() => _expanded = !_expanded)
+                : null,
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    widget.title,
+                    style: Theme.of(context).textTheme.titleLarge,
+                  ),
+                ),
+                _InfoPill("${widget.items.length} 项"),
+                if (widget.items.length > widget.initiallyVisibleCount) ...[
+                  const SizedBox(width: 6),
+                  AnimatedRotation(
+                    turns: _expanded ? 0.5 : 0,
+                    duration: const Duration(milliseconds: 180),
+                    child: const Icon(Icons.keyboard_arrow_down_rounded),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          const SizedBox(height: 10),
+          ...visibleItems.map(
+            (item) => _DrilldownCard(
+              item,
+              onTap: () => widget.onTap(item),
+            ),
+          ),
+          if (!_expanded && hiddenCount > 0)
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton.icon(
+                onPressed: () => setState(() => _expanded = true),
+                icon: const Icon(Icons.expand_more_rounded),
+                label: Text("展开剩余 $hiddenCount 项"),
+              ),
+            ),
         ],
       ),
     );
