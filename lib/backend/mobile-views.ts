@@ -2002,9 +2002,9 @@ function mapMobileImportData(data: ImportData): MobileImportData {
         description: "适合从 IBKR 导入账户、持仓和现金；不作为实时行情源。",
         primaryUse: "IBKR 真实账户导入",
         setupItems: [
-          "报告 → Flex Queries → Flex Web Service Configuration，启用服务并复制 Token",
-          "Flex Queries → 新建 Activity Flex Query，勾选 Account Information / Open Positions / Cash Report / Equity Summary",
-          "保存 Query 后复制 Query ID，再回到 Loo国读取预览",
+          "报告 → Flex 查询 → Flex 网页服务设置，启用服务并复制“当前授权口令（Token）”",
+          "Flex 查询 → 新建“活动 Flex 查询”，勾选账户资料、当前持仓、现金报表和基础币种权益汇总",
+          "保存查询后复制“查询编号（Query ID）”，再回到 Loo国读取预览",
         ],
         limitations: [
           "只覆盖 IBKR，不覆盖 Wealthsimple",

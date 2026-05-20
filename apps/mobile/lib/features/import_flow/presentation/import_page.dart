@@ -752,7 +752,7 @@ class _BrokerageProviderCard extends StatelessWidget {
               Row(
                 children: [
                   Text(
-                    "输入 Token / Query ID",
+                    "输入授权口令 / 查询编号",
                     style: Theme.of(context).textTheme.labelLarge?.copyWith(
                           color: context.looTokens.accent,
                         ),
@@ -904,7 +904,7 @@ class _IbkrFlexPreviewSheetState extends State<_IbkrFlexPreviewSheet> {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  "先在 IBKR Client Portal 生成 Token 和 Query ID。Loo国只用它读取一次预览，不保存 Token；确认后才写入账本。",
+                  "先在 IBKR 客户端门户生成授权口令和查询编号。Loo国只用它读取一次预览，不保存授权口令；确认后才写入账本。",
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                         color: context.looTokens.mutedText,
                       ),
@@ -915,26 +915,24 @@ class _IbkrFlexPreviewSheetState extends State<_IbkrFlexPreviewSheet> {
                 TextFormField(
                   controller: _tokenController,
                   decoration: const InputDecoration(
-                    labelText: "Flex Token",
-                    helperText:
-                        "报告 → Flex Queries → Flex Web Service Configuration",
+                    labelText: "授权口令（Flex Token）",
+                    helperText: "报告 → Flex 查询 → Flex 网页服务设置",
                   ),
                   obscureText: true,
                   validator: (value) => value == null || value.trim().length < 8
-                      ? "请输入有效的 Flex Token"
+                      ? "请输入有效的授权口令"
                       : null,
                 ),
                 const SizedBox(height: 12),
                 TextFormField(
                   controller: _queryIdController,
                   decoration: const InputDecoration(
-                    labelText: "Query ID",
-                    helperText: "保存 Activity Flex Query 后显示的数字 ID",
+                    labelText: "查询编号（Query ID）",
+                    helperText: "保存活动 Flex 查询后显示的数字编号",
                   ),
                   keyboardType: TextInputType.number,
-                  validator: (value) => value == null || value.trim().isEmpty
-                      ? "请输入 Query ID"
-                      : null,
+                  validator: (value) =>
+                      value == null || value.trim().isEmpty ? "请输入查询编号" : null,
                 ),
                 if (_error != null) ...[
                   const SizedBox(height: 12),
@@ -983,18 +981,18 @@ class _IbkrSetupGuideCard extends StatelessWidget {
   Widget build(BuildContext context) {
     const steps = [
       (
-        title: "1. 生成 Flex Token",
+        title: "1. 生成授权口令",
         body:
-            "IBKR Client Portal → Performance & Reports / 报告 → Flex Queries → Flex Web Service Configuration，开启服务后复制 Current Token。",
+            "IBKR 客户端门户 → 报告 → Flex 查询 → Flex 网页服务设置，开启服务后复制“当前授权口令（Current Token）”。",
       ),
       (
-        title: "2. 创建 Activity Flex Query",
+        title: "2. 创建活动 Flex 查询",
         body:
-            "新建 Activity Flex Query，并至少勾选 Account Information、Open Positions、Cash Report、Equity Summary in Base。",
+            "新建“活动 Flex 查询（Activity Flex Query）”，并至少勾选账户资料、当前持仓、现金报表、基础币种权益汇总。",
       ),
       (
-        title: "3. 复制 Query ID",
-        body: "保存 Query 后复制数字 Query ID。不要填账户号，也不要填 Report 名称。",
+        title: "3. 复制查询编号",
+        body: "保存查询后复制数字“查询编号（Query ID）”。不要填账户号，也不要填报表名称。",
       ),
     ];
 
@@ -1046,7 +1044,7 @@ class _IbkrSetupGuideCard extends StatelessWidget {
               ),
             ),
             Text(
-              "如果预览没有持仓，请确认 Query 里启用了 Open Positions。",
+              "如果预览没有持仓，请确认活动 Flex 查询里启用了“当前持仓”。",
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
                     color: context.looTokens.accent,
                   ),
