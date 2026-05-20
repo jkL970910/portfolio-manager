@@ -2,6 +2,7 @@ import "package:flutter/material.dart";
 
 import "../../../core/api/loo_api_client.dart";
 import "../../../core/presentation/loo_components.dart";
+import "../../../core/theme/loo_theme.dart";
 import "../data/mobile_import_models.dart";
 
 class ImportPage extends StatefulWidget {
@@ -43,71 +44,56 @@ class _ImportPageState extends State<ImportPage> {
 
   @override
   Widget build(BuildContext context) {
-    return FutureBuilder<MobileImportSnapshot>(
-      future: _snapshot,
-      builder: (context, snapshot) {
-        return RefreshIndicator(
-          onRefresh: () async => _refresh(),
-          child: CustomScrollView(
-            physics: const AlwaysScrollableScrollPhysics(),
-            slivers: [
-              const SliverToBoxAdapter(
-                child: _PageHeader(
-                  title: "手动导入",
-                  subtitle: "移动端只保留手动/引导式导入，CSV 暂不迁移。",
-                ),
-              ),
-              if (snapshot.connectionState == ConnectionState.waiting)
-                const SliverFillRemaining(
-                    child: Center(child: CircularProgressIndicator()))
-              else if (snapshot.hasError)
-                SliverFillRemaining(
-                  child: _ErrorState(
-                      message: snapshot.error.toString(), onRetry: _refresh),
-                )
-              else if (snapshot.hasData)
-                SliverPadding(
-                  padding: looPagePadding(context),
-                  sliver: SliverList.list(
-                    children: [
-                      _HeroCard(snapshot.data!),
-                      const SizedBox(height: 16),
-                      const _SectionTitle("导入入口"),
-                      const SizedBox(height: 8),
-                      ...snapshot.data!.actionCards.map(
-                        (action) => _ActionCard(
-                          action,
-                          onTap: switch (action.title) {
-                            "添加账户" => _openCreateAccountSheet,
-                            "添加持仓" => () => _openCreateHoldingSheet(
-                                snapshot.data!.accounts),
-                            "券商同步" => () => _openBrokerageImportSheet(
-                                snapshot.data!.brokerageProviders),
-                            _ => null,
-                          },
+    return LooPageGradient(
+      child: FutureBuilder<MobileImportSnapshot>(
+        future: _snapshot,
+        builder: (context, snapshot) {
+          return RefreshIndicator(
+            onRefresh: () async => _refresh(),
+            child: CustomScrollView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              slivers: [
+                if (snapshot.connectionState == ConnectionState.waiting)
+                  const SliverFillRemaining(
+                    child: Center(child: CircularProgressIndicator()),
+                  )
+                else if (snapshot.hasError)
+                  SliverFillRemaining(
+                    child: _ErrorState(
+                      message: snapshot.error.toString(),
+                      onRetry: _refresh,
+                    ),
+                  )
+                else if (snapshot.hasData)
+                  SliverPadding(
+                    padding: looPagePadding(context, top: 14),
+                    sliver: SliverList.list(
+                      children: [
+                        _HeroCard(snapshot.data!),
+                        const SizedBox(height: 14),
+                        _EntryWorkbench(
+                          data: snapshot.data!,
+                          onCreateAccount: _openCreateAccountSheet,
+                          onCreateHolding: () =>
+                              _openCreateHoldingSheet(snapshot.data!.accounts),
+                          onBrokerageSync: () => _openBrokerageImportSheet(
+                            snapshot.data!.brokerageProviders,
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 16),
-                      _SectionTitle("现有账户",
-                          actionLabel: "${snapshot.data!.accounts.length} 个"),
-                      const SizedBox(height: 8),
-                      if (snapshot.data!.accounts.isEmpty)
-                        const _EmptyCard("还没有账户。先从“添加账户”开始建立 Loo国资产账本。")
-                      else
-                        ...snapshot.data!.accounts.map(_AccountCard.new),
-                      if (snapshot.data!.notes.isNotEmpty) ...[
-                        const SizedBox(height: 16),
-                        const _SectionTitle("导入规则"),
-                        const SizedBox(height: 8),
-                        _TextCard(snapshot.data!.notes.take(4).join("\n")),
+                        const SizedBox(height: 14),
+                        _AccountVaultCard(snapshot.data!.accounts),
+                        if (snapshot.data!.notes.isNotEmpty) ...[
+                          const SizedBox(height: 14),
+                          _RulesAccordion(snapshot.data!.notes),
+                        ],
                       ],
-                    ],
-                  ),
-                ),
-            ],
-          ),
-        );
-      },
+                    ),
+                  )
+              ],
+            ),
+          );
+        },
+      ),
     );
   }
 
@@ -186,28 +172,6 @@ class _ImportResult {
   final String message;
 }
 
-class _PageHeader extends StatelessWidget {
-  const _PageHeader({required this.title, required this.subtitle});
-
-  final String title;
-  final String subtitle;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 22, 20, 18),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(title, style: Theme.of(context).textTheme.headlineMedium),
-          const SizedBox(height: 8),
-          Text(subtitle, style: Theme.of(context).textTheme.bodyLarge),
-        ],
-      ),
-    );
-  }
-}
-
 class _HeroCard extends StatelessWidget {
   const _HeroCard(this.data);
 
@@ -215,52 +179,194 @@ class _HeroCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      clipBehavior: Clip.antiAlias,
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              Theme.of(context).colorScheme.primaryContainer,
-              Theme.of(context).colorScheme.surface,
+    final holdingsCount = data.accounts.fold<int>(
+      0,
+      (sum, account) => sum + _extractFirstNumber(account.detail),
+    );
+    return LooGlassCard(
+      isHero: true,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text("进贡", style: Theme.of(context).textTheme.headlineMedium),
+          const SizedBox(height: 6),
+          Text(
+            "把账户、持仓和券商同步先放进预览区；确认身份后再写入 Loo国账本。",
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: context.looTokens.mutedText,
+                  height: 1.35,
+                ),
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              Expanded(
+                child: _HeroMetric(
+                  label: "账户",
+                  value: "${data.accounts.length}",
+                  detail: "已入账",
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: _HeroMetric(
+                  label: "持仓",
+                  value: holdingsCount == 0 ? "--" : "$holdingsCount",
+                  detail: "估算",
+                ),
+              ),
             ],
           ),
+        ],
+      ),
+    );
+  }
+}
+
+int _extractFirstNumber(String value) {
+  final match = RegExp(r"\d+").firstMatch(value);
+  return int.tryParse(match?.group(0) ?? "") ?? 0;
+}
+
+class _HeroMetric extends StatelessWidget {
+  const _HeroMetric({
+    required this.label,
+    required this.value,
+    required this.detail,
+  });
+
+  final String label;
+  final String value;
+  final String detail;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.20),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: context.looTokens.cardBorder),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(label, style: Theme.of(context).textTheme.labelMedium),
+            const SizedBox(height: 6),
+            Text(
+              value,
+              style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                    fontWeight: FontWeight.w900,
+                  ),
+            ),
+            Text(
+              detail,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: context.looTokens.mutedText,
+                  ),
+            ),
+          ],
         ),
+      ),
+    );
+  }
+}
+
+class _EntryWorkbench extends StatelessWidget {
+  const _EntryWorkbench({
+    required this.data,
+    required this.onCreateAccount,
+    required this.onCreateHolding,
+    required this.onBrokerageSync,
+  });
+
+  final MobileImportSnapshot data;
+  final VoidCallback onCreateAccount;
+  final VoidCallback onCreateHolding;
+  final VoidCallback onBrokerageSync;
+
+  @override
+  Widget build(BuildContext context) {
+    return LooGlassCard(
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text("上贡入口", style: Theme.of(context).textTheme.titleLarge),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Expanded(
+                child: _EntryTile(
+                  icon: Icons.edit_note_rounded,
+                  title: "手动上贡",
+                  subtitle: "添加账户 / 添加持仓",
+                  onTap: () => _showManualSheet(context),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: _EntryTile(
+                  icon: Icons.sync_alt_rounded,
+                  title: "券商同步",
+                  subtitle: _brokerageSummary(data.brokerageProviders),
+                  onTap: onBrokerageSync,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _brokerageSummary(List<MobileBrokerageProvider> providers) {
+    final ready = providers
+        .where((provider) => provider.status == "ready-to-build")
+        .length;
+    return ready > 0 ? "$ready 个可规划" : "IBKR / WS 预留";
+  }
+
+  void _showManualSheet(BuildContext context) {
+    showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (context) => SafeArea(
         child: Padding(
-          padding: const EdgeInsets.all(18),
+          padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
           child: Column(
+            mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text("Loo国资产入口", style: Theme.of(context).textTheme.titleLarge),
+              Text("手动上贡", style: Theme.of(context).textTheme.titleLarge),
               const SizedBox(height: 8),
-              const Text("先用手机完成账户和持仓的手动维护；CSV 批量导入留给桌面高级流程。"),
-              const SizedBox(height: 14),
-              ...data.manualSteps.take(4).map(
-                    (step) => Padding(
-                      padding: const EdgeInsets.only(top: 8),
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Icon(Icons.check_circle_outline, size: 18),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(step.title,
-                                    style: Theme.of(context)
-                                        .textTheme
-                                        .titleMedium),
-                                Text(step.description),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
+              Text(
+                "先建账户，再补持仓；标的必须确认交易所和币种。",
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: context.looTokens.mutedText,
                     ),
-                  ),
+              ),
+              const SizedBox(height: 14),
+              _ManualActionRow(
+                title: "添加账户",
+                subtitle: "TFSA / RRSP / FHSA / 应税账户",
+                icon: Icons.account_balance_wallet_outlined,
+                onTap: () {
+                  Navigator.of(context).pop();
+                  onCreateAccount();
+                },
+              ),
+              const SizedBox(height: 10),
+              _ManualActionRow(
+                title: "添加持仓",
+                subtitle: "搜索标的并确认 symbol + exchange + currency",
+                icon: Icons.add_chart_rounded,
+                onTap: () {
+                  Navigator.of(context).pop();
+                  onCreateHolding();
+                },
+              ),
             ],
           ),
         ),
@@ -269,45 +375,94 @@ class _HeroCard extends StatelessWidget {
   }
 }
 
-class _SectionTitle extends StatelessWidget {
-  const _SectionTitle(this.title, {this.actionLabel});
+class _EntryTile extends StatelessWidget {
+  const _EntryTile({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+  });
 
+  final IconData icon;
   final String title;
-  final String? actionLabel;
+  final String subtitle;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Expanded(
-            child: Text(title, style: Theme.of(context).textTheme.titleLarge)),
-        if (actionLabel != null)
-          Text(actionLabel!, style: Theme.of(context).textTheme.bodyMedium),
-      ],
+    return InkWell(
+      borderRadius: BorderRadius.circular(20),
+      onTap: onTap,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.18),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: context.looTokens.cardBorder),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(14),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(icon, color: context.looTokens.accent),
+              const SizedBox(height: 12),
+              Text(title, style: Theme.of(context).textTheme.titleMedium),
+              const SizedBox(height: 4),
+              Text(
+                subtitle,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: context.looTokens.mutedText,
+                    ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
 
-class _ActionCard extends StatelessWidget {
-  const _ActionCard(this.action, {this.onTap});
+class _ManualActionRow extends StatelessWidget {
+  const _ManualActionRow({
+    required this.title,
+    required this.subtitle,
+    required this.icon,
+    required this.onTap,
+  });
 
-  final MobileImportAction action;
-  final VoidCallback? onTap;
+  final String title;
+  final String subtitle;
+  final IconData icon;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 10),
-      child: ListTile(
-        onTap: onTap,
-        leading: CircleAvatar(
-            child: Text(
-                action.label.isEmpty ? "入" : action.label.substring(0, 1))),
-        title: Text(action.title),
-        subtitle: Text(action.description),
-        trailing: onTap == null
-            ? const Icon(Icons.lock_outline)
-            : const Icon(Icons.chevron_right),
+    return LooGlassCard(
+      padding: const EdgeInsets.all(14),
+      onTap: onTap,
+      child: Row(
+        children: [
+          Icon(icon, color: context.looTokens.accent),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title, style: Theme.of(context).textTheme.titleMedium),
+                const SizedBox(height: 3),
+                Text(
+                  subtitle,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: context.looTokens.mutedText,
+                      ),
+                ),
+              ],
+            ),
+          ),
+          const Icon(Icons.chevron_right_rounded),
+        ],
       ),
     );
   }
@@ -348,6 +503,128 @@ class _BrokerageImportSheet extends StatelessWidget {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _AccountVaultCard extends StatelessWidget {
+  const _AccountVaultCard(this.accounts);
+
+  final List<MobileImportAccount> accounts;
+
+  @override
+  Widget build(BuildContext context) {
+    return LooGlassCard(
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  "已入国库",
+                  style: Theme.of(context).textTheme.titleLarge,
+                ),
+              ),
+              _ImportPill("${accounts.length} 个账户"),
+            ],
+          ),
+          const SizedBox(height: 10),
+          if (accounts.isEmpty)
+            const _EmptyVaultMessage()
+          else
+            ...accounts.map(_AccountCard.new),
+        ],
+      ),
+    );
+  }
+}
+
+class _EmptyVaultMessage extends StatelessWidget {
+  const _EmptyVaultMessage();
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      "还没有账户。先从“手动上贡”建立第一个账户桶。",
+      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+            color: context.looTokens.mutedText,
+          ),
+    );
+  }
+}
+
+class _ImportPill extends StatelessWidget {
+  const _ImportPill(this.label);
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.28),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: context.looTokens.cardBorder),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        child: Text(label, style: Theme.of(context).textTheme.labelMedium),
+      ),
+    );
+  }
+}
+
+class _RulesAccordion extends StatefulWidget {
+  const _RulesAccordion(this.notes);
+
+  final List<String> notes;
+
+  @override
+  State<_RulesAccordion> createState() => _RulesAccordionState();
+}
+
+class _RulesAccordionState extends State<_RulesAccordion> {
+  bool _expanded = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return LooGlassCard(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          InkWell(
+            borderRadius: BorderRadius.circular(16),
+            onTap: () => setState(() => _expanded = !_expanded),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    "上贡规矩",
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                ),
+                AnimatedRotation(
+                  turns: _expanded ? 0.5 : 0,
+                  duration: const Duration(milliseconds: 180),
+                  child: const Icon(Icons.keyboard_arrow_down_rounded),
+                ),
+              ],
+            ),
+          ),
+          if (_expanded) ...[
+            const SizedBox(height: 10),
+            ...widget.notes.take(5).map(
+                  (note) => Padding(
+                    padding: const EdgeInsets.only(bottom: 7),
+                    child: Text("• $note"),
+                  ),
+                ),
+          ],
+        ],
       ),
     );
   }
@@ -421,13 +698,22 @@ class _BrokerageFlowCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const _TextCard(
-      "计划流程\n"
-      "1. 连接券商或填写同步凭证\n"
-      "2. 拉取账户、持仓、现金和交易\n"
-      "3. 进入导入预览，检查 symbol + exchange + currency\n"
-      "4. 用户确认后才写入账本\n\n"
-      "当前阶段先展示入口和方案；真实连接会在下一步接入。",
+    return const LooGlassCard(
+      padding: EdgeInsets.all(14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text("计划流程"),
+          SizedBox(height: 8),
+          Text(
+            "1. 连接券商或填写同步凭证\n"
+            "2. 拉取账户、持仓、现金和交易\n"
+            "3. 进入导入预览，检查 symbol + exchange + currency\n"
+            "4. 用户确认后才写入账本\n\n"
+            "当前阶段先展示入口和方案；真实连接会在下一步接入。",
+          ),
+        ],
+      ),
     );
   }
 }
@@ -1145,45 +1431,46 @@ class _AccountCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 10),
-      child: ListTile(
-        title: Text(account.displayName),
-        subtitle: Text(account.detail),
-        trailing:
-            Text(account.value, style: Theme.of(context).textTheme.titleLarge),
-      ),
-    );
-  }
-}
-
-class _TextCard extends StatelessWidget {
-  const _TextCard(this.text);
-
-  final String text;
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Text(text),
-      ),
-    );
-  }
-}
-
-class _EmptyCard extends StatelessWidget {
-  const _EmptyCard(this.message);
-
-  final String message;
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Text(message),
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.16),
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: context.looTokens.cardBorder),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(14),
+          child: Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      account.displayName,
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      account.detail,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: context.looTokens.mutedText,
+                          ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 10),
+              Text(
+                account.value,
+                style: Theme.of(context).textTheme.titleLarge,
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
