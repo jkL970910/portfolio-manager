@@ -34,6 +34,31 @@ Inputs:
 - Activity Query ID
 - optional Trade Confirmation Query ID
 
+Mobile P3 connection behavior:
+
+- Users may save `Flex Token + Activity Query ID` as an encrypted
+  `brokerage_connections` record.
+- Default token TTL is 90 days. Expired tokens require the user to paste a new
+  token.
+- Manual sync uses the saved connection to create a new
+  `brokerage_import_drafts` row.
+- Manual sync never writes directly to `investment_accounts` or
+  `holding_positions`; confirmation remains a separate explicit action.
+- Deleting the connection revokes the saved token and disables future auto sync.
+
+IBKR setup copy exposed in mobile:
+
+- `业绩与报告 → 自主查询 → 自主网络服务配置` to enable web service and copy
+  `授权口令 / Token`.
+- `活动自主查询 → +` to create the Activity Flex Query. Use XML.
+- Required sections: `账户信息`, `未平仓仓位`, `现金报告`,
+  `以基础货币计的实现和未实现业绩总结`.
+- Optional for later evidence: `交易`.
+- Not required for the current snapshot MVP: dividends, interest, taxes,
+  corporate actions, closed positions, securities lending, IPO/rights activity.
+- The app requires the numeric `查询编号 / Query ID`, not the query name and not
+  the IBKR account number.
+
 Expected data:
 
 - accounts
@@ -49,8 +74,8 @@ Limits:
 - Flex Query is an account statement/report source, not a realtime quote source.
 - Imported securities still need the existing metadata, quote, history, and
   external-research workers after confirmation.
-- First version should support one-time/manual sync. Do not store IBKR tokens by
-  default.
+- Token storage is allowed only through the encrypted brokerage connection
+  table. Drafts and main ledger rows must never store raw tokens.
 
 ### Wealthsimple Via SnapTrade
 
@@ -127,30 +152,30 @@ external data. The main ledger must remain clean.
 Recommended persistence:
 
 ```ts
-brokerage_import_runs
-- id
-- userId
-- provider
-- status
-- startedAt
-- finishedAt
-- errorMessage
-- sourceMetadataJson
+brokerage_import_runs -
+  id -
+  userId -
+  provider -
+  status -
+  startedAt -
+  finishedAt -
+  errorMessage -
+  sourceMetadataJson;
 
-brokerage_import_drafts
-- id
-- runId
-- userId
-- provider
-- accountsJson
-- holdingsJson
-- cashBalancesJson
-- transactionsJson
-- unresolvedSecuritiesJson
-- conflictsJson
-- summaryJson
-- createdAt
-- expiresAt
+brokerage_import_drafts -
+  id -
+  runId -
+  userId -
+  provider -
+  accountsJson -
+  holdingsJson -
+  cashBalancesJson -
+  transactionsJson -
+  unresolvedSecuritiesJson -
+  conflictsJson -
+  summaryJson -
+  createdAt -
+  expiresAt;
 ```
 
 Draft rows must have TTL cleanup. Use the existing worker/cron pattern to delete
@@ -333,7 +358,11 @@ Target mobile endpoints:
 
 ```text
 GET  /api/mobile/import
-POST /api/mobile/import/brokerage/ibkr-flex/preview
+GET  /api/mobile/import/brokerage/ibkr/connection
+POST /api/mobile/import/brokerage/ibkr/connection
+DELETE /api/mobile/import/brokerage/ibkr/connection
+POST /api/mobile/import/brokerage/ibkr/sync
+POST /api/mobile/import/brokerage/ibkr/flex-preview
 POST /api/mobile/import/brokerage/snaptrade/session
 GET  /api/mobile/import/brokerage/drafts/[draftId]
 POST /api/mobile/import/brokerage/drafts/[draftId]/resolve

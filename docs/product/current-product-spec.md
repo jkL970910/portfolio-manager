@@ -235,7 +235,7 @@ Current first pass:
   veto precedence over attractive valuation evidence.
 - Flutter Security Detail now parses and renders this research decision as
   dedicated `研究结论 / 行动计划 / 估值证据 / 关键价位 / 组合适配 / 主要护栏 /
-  研究证据` sections. Portfolio/account/recommendation smart scans keep the
+研究证据` sections. Portfolio/account/recommendation smart scans keep the
   legacy renderer until their own contracts are upgraded.
 - `估值证据` should render as a compact evidence dashboard first: target price,
   PE/Forward PE, 52-week range, Beta, market cap, and one extra valuation anchor
@@ -436,6 +436,17 @@ IBKR / Wealthsimple tabs. The unified flow is:
 3. resolve every security by `symbol + exchange + currency`
 4. show an import preview/diff
 5. write to the ledger only after explicit user confirmation
+
+IBKR is no longer limited to a one-time preview form. The mobile `上贡` page now
+supports an `IBKR Flex` connection record:
+
+- save `Flex Token + Activity Query ID` as an encrypted brokerage connection
+- default credential TTL is 90 days
+- manual refresh creates a brokerage import draft; it does not write to the
+  ledger automatically
+- users can delete/revoke the connection from the same IBKR sheet
+- future scheduled sync must reuse the same draft-first, user-confirmed write
+  boundary
 
 Provider priority:
 

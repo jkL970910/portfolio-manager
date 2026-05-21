@@ -746,6 +746,24 @@ export interface BrokerageImportDraft {
   updatedAt: string;
 }
 
+export interface BrokerageConnection {
+  id: EntityId;
+  userId: EntityId;
+  provider: "ibkr-flex" | string;
+  displayName: string;
+  status: "active" | "expired" | "revoked" | "error";
+  queryId: string;
+  tokenLast4: string | null;
+  tokenExpiresAt: string;
+  autoSyncEnabled: boolean;
+  lastSyncedAt: string | null;
+  lastSyncStatus: "succeeded" | "failed" | "pending" | "no_data" | null;
+  lastSyncError: string | null;
+  lastDraftId: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface ImportMappingPreset {
   id: EntityId;
   userId: EntityId;

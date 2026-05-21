@@ -160,6 +160,35 @@ class LooApiClient {
     );
   }
 
+  Future<Map<String, dynamic>> getIbkrBrokerageConnection() {
+    return _getJson("/api/mobile/import/brokerage/ibkr/connection");
+  }
+
+  Future<Map<String, dynamic>> saveIbkrBrokerageConnection({
+    required String token,
+    required String queryId,
+    int ttlDays = 90,
+    bool autoSyncEnabled = false,
+  }) {
+    return _postJson(
+      "/api/mobile/import/brokerage/ibkr/connection",
+      body: {
+        "token": token,
+        "queryId": queryId,
+        "ttlDays": ttlDays,
+        "autoSyncEnabled": autoSyncEnabled,
+      },
+    );
+  }
+
+  Future<Map<String, dynamic>> syncIbkrBrokerageConnection() {
+    return _postJson("/api/mobile/import/brokerage/ibkr/sync");
+  }
+
+  Future<Map<String, dynamic>> deleteIbkrBrokerageConnection() {
+    return _deleteJson("/api/mobile/import/brokerage/ibkr/connection");
+  }
+
   Future<Map<String, dynamic>> confirmBrokerageImportDraft(String draftId) {
     return _postJson(
       "/api/mobile/import/brokerage/drafts/confirm",

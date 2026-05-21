@@ -222,6 +222,13 @@ export const ibkrFlexPreviewInputSchema = z.object({
   queryId: z.string().trim().min(1).max(64),
 });
 
+export const ibkrConnectionSaveInputSchema = z.object({
+  token: z.string().trim().min(8).max(512),
+  queryId: z.string().trim().min(1).max(64),
+  ttlDays: z.number().int().min(1).max(365).default(90),
+  autoSyncEnabled: z.boolean().default(false),
+});
+
 export const brokerageImportDraftConfirmInputSchema = z.object({
   draftId: z.string().trim().uuid(),
 });
@@ -697,6 +704,9 @@ export type WatchlistSymbolInputPayload = z.infer<
 >;
 export type MobileSecurityObservationInputPayload = z.infer<
   typeof mobileSecurityObservationInputSchema
+>;
+export type IbkrConnectionSaveInputPayload = z.infer<
+  typeof ibkrConnectionSaveInputSchema
 >;
 export type ImportJobCreatePayload = z.infer<typeof importJobCreateSchema>;
 export type ImportMappingPresetCreatePayload = z.infer<

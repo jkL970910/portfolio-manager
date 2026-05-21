@@ -489,7 +489,8 @@ class _BrokerageImportSheet extends StatelessWidget {
             children: [
               Text("券商同步", style: Theme.of(context).textTheme.headlineMedium),
               const SizedBox(height: 8),
-              const Text("统一入口会先导入到预览区，确认账户、持仓和现金后再写入 Loo国账本。"),
+              const Text(
+                  "统一入口会先生成导入草稿，确认账户、持仓和现金后再写入 Loo国账本。IBKR 连接可保存 90 天，后续手动刷新无需重复输入。"),
               const SizedBox(height: 14),
               ...providers.map(
                 (provider) => _BrokerageProviderCard(
@@ -788,14 +789,150 @@ class _IbkrFlexPreviewSheetState extends State<_IbkrFlexPreviewSheet> {
   final _queryIdController = TextEditingController();
   var _loading = false;
   var _confirming = false;
+  var _connectionLoading = true;
+  var _savingConnection = false;
+  var _syncingConnection = false;
+  var _deletingConnection = false;
   String? _error;
   MobileIbkrFlexPreview? _preview;
+  MobileBrokerageConnection? _connection;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadConnection();
+  }
 
   @override
   void dispose() {
     _tokenController.dispose();
     _queryIdController.dispose();
     super.dispose();
+  }
+
+  Future<void> _loadConnection() async {
+    setState(() {
+      _connectionLoading = true;
+      _error = null;
+    });
+    try {
+      final response = await widget.apiClient.getIbkrBrokerageConnection();
+      final data = response["data"];
+      final connectionJson =
+          data is Map<String, dynamic> ? data["connection"] : null;
+      if (mounted) {
+        setState(() {
+          _connection = connectionJson is Map<String, dynamic>
+              ? MobileBrokerageConnection.fromJson(connectionJson)
+              : null;
+          _connectionLoading = false;
+        });
+      }
+    } catch (error) {
+      if (mounted) {
+        setState(() {
+          _error = error.toString();
+          _connectionLoading = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _saveConnection() async {
+    if (!_formKey.currentState!.validate()) {
+      return;
+    }
+    setState(() {
+      _savingConnection = true;
+      _error = null;
+    });
+    try {
+      final response = await widget.apiClient.saveIbkrBrokerageConnection(
+        token: _tokenController.text.trim(),
+        queryId: _queryIdController.text.trim(),
+        ttlDays: 90,
+      );
+      final data = response["data"];
+      final connectionJson =
+          data is Map<String, dynamic> ? data["connection"] : null;
+      if (connectionJson is! Map<String, dynamic>) {
+        throw const LooApiException("IBKR 连接返回格式不正确。");
+      }
+      if (mounted) {
+        setState(() {
+          _connection = MobileBrokerageConnection.fromJson(connectionJson);
+          _savingConnection = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("IBKR 连接已保存，90 天内手动同步无需重复输入。")),
+        );
+      }
+    } catch (error) {
+      if (mounted) {
+        setState(() {
+          _error = error.toString();
+          _savingConnection = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _syncSavedConnection() async {
+    setState(() {
+      _syncingConnection = true;
+      _error = null;
+      _preview = null;
+    });
+    try {
+      final response = await widget.apiClient.syncIbkrBrokerageConnection();
+      final data = response["data"];
+      final previewJson = data is Map<String, dynamic> ? data["preview"] : null;
+      final connectionJson =
+          data is Map<String, dynamic> ? data["connection"] : null;
+      if (previewJson is! Map<String, dynamic>) {
+        throw const LooApiException("IBKR 同步返回格式不正确。");
+      }
+      if (mounted) {
+        setState(() {
+          _preview = MobileIbkrFlexPreview.fromJson(previewJson);
+          _connection = connectionJson is Map<String, dynamic>
+              ? MobileBrokerageConnection.fromJson(connectionJson)
+              : _connection;
+          _syncingConnection = false;
+        });
+      }
+    } catch (error) {
+      if (mounted) {
+        setState(() {
+          _error = error.toString();
+          _syncingConnection = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _deleteConnection() async {
+    setState(() {
+      _deletingConnection = true;
+      _error = null;
+    });
+    try {
+      await widget.apiClient.deleteIbkrBrokerageConnection();
+      if (mounted) {
+        setState(() {
+          _connection = null;
+          _preview = null;
+          _deletingConnection = false;
+        });
+      }
+    } catch (error) {
+      if (mounted) {
+        setState(() {
+          _error = error.toString();
+          _deletingConnection = false;
+        });
+      }
+    }
   }
 
   Future<void> _confirmDraft() async {
@@ -910,6 +1047,17 @@ class _IbkrFlexPreviewSheetState extends State<_IbkrFlexPreviewSheet> {
                       ),
                 ),
                 const SizedBox(height: 12),
+                if (_connectionLoading)
+                  const Center(child: CircularProgressIndicator())
+                else if (_connection != null)
+                  _IbkrConnectionCard(
+                    _connection!,
+                    syncing: _syncingConnection,
+                    deleting: _deletingConnection,
+                    onSync: _syncingConnection ? null : _syncSavedConnection,
+                    onDelete: _deletingConnection ? null : _deleteConnection,
+                  ),
+                if (_connection != null) const SizedBox(height: 12),
                 const _IbkrSetupGuideCard(),
                 const SizedBox(height: 16),
                 TextFormField(
@@ -943,19 +1091,38 @@ class _IbkrFlexPreviewSheetState extends State<_IbkrFlexPreviewSheet> {
                   ),
                 ],
                 const SizedBox(height: 14),
-                SizedBox(
-                  width: double.infinity,
-                  child: FilledButton.icon(
-                    onPressed: _loading ? null : _previewFlex,
-                    icon: _loading
-                        ? const SizedBox(
-                            width: 16,
-                            height: 16,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : const Icon(Icons.search_rounded),
-                    label: Text(_loading ? "读取 IBKR..." : "读取预览"),
-                  ),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: _savingConnection ? null : _saveConnection,
+                        icon: _savingConnection
+                            ? const SizedBox(
+                                width: 16,
+                                height: 16,
+                                child:
+                                    CircularProgressIndicator(strokeWidth: 2),
+                              )
+                            : const Icon(Icons.lock_rounded),
+                        label: Text(_savingConnection ? "保存中..." : "保存连接"),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: FilledButton.icon(
+                        onPressed: _loading ? null : _previewFlex,
+                        icon: _loading
+                            ? const SizedBox(
+                                width: 16,
+                                height: 16,
+                                child:
+                                    CircularProgressIndicator(strokeWidth: 2),
+                              )
+                            : const Icon(Icons.search_rounded),
+                        label: Text(_loading ? "读取中..." : "一次性预览"),
+                      ),
+                    ),
+                  ],
                 ),
                 if (_preview != null) ...[
                   const SizedBox(height: 16),
@@ -982,17 +1149,15 @@ class _IbkrSetupGuideCard extends StatelessWidget {
     const steps = [
       (
         title: "1. 生成授权口令",
-        body:
-            "IBKR 客户端门户 → 报告 → Flex 查询 → Flex 网页服务设置，开启服务后复制“当前授权口令（Current Token）”。",
+        body: "业绩与报告 → 自主查询 → 自主网络服务配置，确认状态为“已启用”，进入齿轮后复制“授权口令 / Token”。",
       ),
       (
         title: "2. 创建活动 Flex 查询",
-        body:
-            "新建“活动 Flex 查询（Activity Flex Query）”，并至少勾选账户资料、当前持仓、现金报表、基础币种权益汇总。",
+        body: "在“活动自主查询”右上角点 +，新建查询。格式选 XML，保存后不要填查询名称，要复制数字“查询编号 / Query ID”。",
       ),
       (
-        title: "3. 复制查询编号",
-        body: "保存查询后复制数字“查询编号（Query ID）”。不要填账户号，也不要填报表名称。",
+        title: "3. 必选报表字段",
+        body: "勾选：账户信息、未平仓仓位、现金报告、以基础货币计的实现和未实现业绩总结。交易可选，股息/利息/税务/公司行动先不用。",
       ),
     ];
 
@@ -1016,7 +1181,7 @@ class _IbkrSetupGuideCard extends StatelessWidget {
                 ),
                 const SizedBox(width: 7),
                 Text(
-                  "IBKR 需要两个值",
+                  "IBKR 设置指引",
                   style: Theme.of(context).textTheme.titleSmall,
                 ),
               ],
@@ -1044,7 +1209,7 @@ class _IbkrSetupGuideCard extends StatelessWidget {
               ),
             ),
             Text(
-              "如果预览没有持仓，请确认活动 Flex 查询里启用了“当前持仓”。",
+              "如果预览没有持仓，优先检查“未平仓仓位”；如果没有净值/现金，检查“现金报告”和“基础币种权益总结”。运行查询下载 XML 只用于自查，Loo国会用 Token + Query ID 自动拉取。",
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
                     color: context.looTokens.accent,
                   ),
@@ -1053,6 +1218,127 @@ class _IbkrSetupGuideCard extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+class _IbkrConnectionCard extends StatelessWidget {
+  const _IbkrConnectionCard(
+    this.connection, {
+    required this.syncing,
+    required this.deleting,
+    required this.onSync,
+    required this.onDelete,
+  });
+
+  final MobileBrokerageConnection connection;
+  final bool syncing;
+  final bool deleting;
+  final VoidCallback? onSync;
+  final VoidCallback? onDelete;
+
+  @override
+  Widget build(BuildContext context) {
+    final usable = connection.isUsable;
+    return LooGlassCard(
+      padding: const EdgeInsets.all(14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  usable ? "IBKR 已连接" : "IBKR 连接需处理",
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+              ),
+              _ImportPill(_connectionStatusLabel(connection.status)),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(
+            [
+              "Query ID ${connection.queryId}",
+              if (connection.tokenLast4 != null)
+                "Token 尾号 ${connection.tokenLast4}",
+              "有效期 ${_formatIsoDate(connection.tokenExpiresAt)}",
+            ].join(" · "),
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: context.looTokens.mutedText,
+                ),
+          ),
+          if (connection.lastSyncedAt != null) ...[
+            const SizedBox(height: 4),
+            Text(
+              "上次同步 ${_formatIsoDate(connection.lastSyncedAt!)}"
+              "${connection.lastSyncStatus == "failed" ? " · 失败" : ""}",
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: context.looTokens.mutedText,
+                  ),
+            ),
+          ],
+          if (connection.lastSyncError != null) ...[
+            const SizedBox(height: 6),
+            Text(
+              connection.lastSyncError!,
+              style: TextStyle(color: Theme.of(context).colorScheme.error),
+            ),
+          ],
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: FilledButton.icon(
+                  onPressed: usable ? onSync : null,
+                  icon: syncing
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.sync_rounded),
+                  label: Text(syncing ? "同步中..." : "刷新 IBKR 草稿"),
+                ),
+              ),
+              const SizedBox(width: 10),
+              IconButton.outlined(
+                tooltip: "删除连接",
+                onPressed: deleting ? null : onDelete,
+                icon: deleting
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.delete_outline_rounded),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(
+            "同步只生成导入草稿，不会自动覆盖账本；你确认后才写入。",
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: context.looTokens.mutedText,
+                ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+String _connectionStatusLabel(String status) {
+  switch (status) {
+    case "active":
+      return "可用";
+    case "expired":
+      return "已过期";
+    case "error":
+      return "需重试";
+    case "revoked":
+      return "已删除";
+    default:
+      return status;
   }
 }
 
@@ -1247,6 +1533,15 @@ String _formatNumber(num value) {
   return number % 1 == 0
       ? number.toStringAsFixed(0)
       : number.toStringAsFixed(2);
+}
+
+String _formatIsoDate(String value) {
+  final parsed = DateTime.tryParse(value);
+  if (parsed == null) {
+    return value;
+  }
+  final local = parsed.toLocal();
+  return "${local.year}-${local.month.toString().padLeft(2, "0")}-${local.day.toString().padLeft(2, "0")}";
 }
 
 class _BrokerageFlowCard extends StatelessWidget {

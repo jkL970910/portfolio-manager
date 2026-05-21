@@ -204,6 +204,55 @@ class MobileIbkrFlexPreview {
   }
 }
 
+class MobileBrokerageConnection {
+  const MobileBrokerageConnection({
+    required this.id,
+    required this.provider,
+    required this.displayName,
+    required this.status,
+    required this.queryId,
+    required this.tokenLast4,
+    required this.tokenExpiresAt,
+    required this.autoSyncEnabled,
+    required this.lastSyncedAt,
+    required this.lastSyncStatus,
+    required this.lastSyncError,
+    required this.lastDraftId,
+  });
+
+  final String id;
+  final String provider;
+  final String displayName;
+  final String status;
+  final String queryId;
+  final String? tokenLast4;
+  final String tokenExpiresAt;
+  final bool autoSyncEnabled;
+  final String? lastSyncedAt;
+  final String? lastSyncStatus;
+  final String? lastSyncError;
+  final String? lastDraftId;
+
+  factory MobileBrokerageConnection.fromJson(Map<String, dynamic> json) {
+    return MobileBrokerageConnection(
+      id: json["id"] as String? ?? "",
+      provider: json["provider"] as String? ?? "ibkr-flex",
+      displayName: json["displayName"] as String? ?? "IBKR Flex",
+      status: json["status"] as String? ?? "active",
+      queryId: json["queryId"] as String? ?? "",
+      tokenLast4: json["tokenLast4"] as String?,
+      tokenExpiresAt: json["tokenExpiresAt"] as String? ?? "",
+      autoSyncEnabled: json["autoSyncEnabled"] as bool? ?? false,
+      lastSyncedAt: json["lastSyncedAt"] as String?,
+      lastSyncStatus: json["lastSyncStatus"] as String?,
+      lastSyncError: json["lastSyncError"] as String?,
+      lastDraftId: json["lastDraftId"] as String?,
+    );
+  }
+
+  bool get isUsable => status == "active";
+}
+
 class MobileIbkrFlexAccount {
   const MobileIbkrFlexAccount({
     required this.accountId,

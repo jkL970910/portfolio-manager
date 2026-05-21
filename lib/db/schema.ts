@@ -1270,6 +1270,52 @@ export const brokerageImportDrafts = pgTable(
   }),
 );
 
+export const brokerageConnections = pgTable(
+  "brokerage_connections",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id),
+    provider: varchar("provider", { length: 32 }).notNull(),
+    displayName: varchar("display_name", { length: 160 }).notNull(),
+    status: varchar("status", { length: 24 }).notNull().default("active"),
+    queryId: varchar("query_id", { length: 64 }).notNull(),
+    encryptedToken: text("encrypted_token").notNull(),
+    tokenIv: varchar("token_iv", { length: 64 }).notNull(),
+    tokenAuthTag: varchar("token_auth_tag", { length: 64 }).notNull(),
+    tokenLast4: varchar("token_last4", { length: 8 }),
+    tokenExpiresAt: timestamp("token_expires_at", {
+      withTimezone: true,
+    }).notNull(),
+    autoSyncEnabled: boolean("auto_sync_enabled").notNull().default(false),
+    lastSyncedAt: timestamp("last_synced_at", { withTimezone: true }),
+    lastSyncStatus: varchar("last_sync_status", { length: 24 }),
+    lastSyncError: text("last_sync_error"),
+    lastDraftId: uuid("last_draft_id").references(
+      () => brokerageImportDrafts.id,
+    ),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => ({
+    userProviderUniqueIdx: uniqueIndex(
+      "brokerage_connections_user_provider_idx",
+    ).on(table.userId, table.provider),
+    userStatusIdx: index("brokerage_connections_user_status_idx").on(
+      table.userId,
+      table.status,
+    ),
+    tokenExpiryIdx: index("brokerage_connections_token_expiry_idx").on(
+      table.tokenExpiresAt,
+    ),
+  }),
+);
+
 export const importMappingPresets = pgTable(
   "import_mapping_presets",
   {

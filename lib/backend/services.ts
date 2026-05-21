@@ -1,8 +1,12 @@
-﻿import { hash } from "bcryptjs";
+﻿import crypto from "node:crypto";
+import { hash } from "bcryptjs";
 import { and, desc, eq, sql } from "drizzle-orm";
 import { apiSuccess } from "@/lib/backend/contracts";
 import type { PortfolioHoldingDetailData } from "@/lib/contracts";
-import type { IbkrFlexPreview } from "@/lib/backend/import/ibkr-flex";
+import {
+  fetchIbkrFlexPreview,
+  type IbkrFlexPreview,
+} from "@/lib/backend/import/ibkr-flex";
 import {
   ImportFieldMapping,
   ImportValidationError,
@@ -66,6 +70,7 @@ import {
   holdingPositions,
   importJobs,
   importMappingPresets,
+  brokerageConnections,
   brokerageImportDrafts,
   investmentAccounts,
   cashAccounts,
@@ -81,6 +86,7 @@ import {
 } from "@/lib/db/schema";
 import type {
   HoldingPosition,
+  BrokerageConnection,
   BrokerageImportDraft,
   ImportJob,
   ImportMappingPreset,
@@ -101,6 +107,7 @@ import {
 import { resolveCanonicalSecurityIdentity } from "@/lib/market-data/security-identity";
 import { inferEconomicAssetClass } from "@/lib/backend/security-economic-exposure";
 import type { MobileSecurityObservationInputPayload } from "@/lib/backend/payload-schemas";
+import type { IbkrConnectionSaveInputPayload } from "@/lib/backend/payload-schemas";
 import type {
   SecurityQuote,
   SecurityHistoricalPoint,
@@ -761,6 +768,56 @@ function inferBrokerageAccountType(
     return "FHSA";
   }
   return "Taxable";
+}
+
+function getBrokerageConnectionEncryptionKey() {
+  const secret =
+    process.env.BROKERAGE_CONNECTION_ENCRYPTION_SECRET ||
+    process.env.LOO_MINISTER_ENCRYPTION_SECRET ||
+    process.env.AUTH_SECRET;
+  if (!secret || secret.trim().length < 16) {
+    throw new Error(
+      "Brokerage connection encryption requires BROKERAGE_CONNECTION_ENCRYPTION_SECRET, LOO_MINISTER_ENCRYPTION_SECRET, or AUTH_SECRET.",
+    );
+  }
+  return crypto.createHash("sha256").update(secret).digest();
+}
+
+function encryptBrokerageToken(token: string) {
+  const normalized = token.trim();
+  const iv = crypto.randomBytes(12);
+  const cipher = crypto.createCipheriv(
+    "aes-256-gcm",
+    getBrokerageConnectionEncryptionKey(),
+    iv,
+  );
+  const encrypted = Buffer.concat([
+    cipher.update(normalized, "utf8"),
+    cipher.final(),
+  ]);
+  return {
+    encryptedToken: encrypted.toString("base64"),
+    tokenIv: iv.toString("base64"),
+    tokenAuthTag: cipher.getAuthTag().toString("base64"),
+    tokenLast4: normalized.slice(-4),
+  };
+}
+
+function decryptBrokerageToken(row: {
+  encryptedToken: string;
+  tokenIv: string;
+  tokenAuthTag: string;
+}) {
+  const decipher = crypto.createDecipheriv(
+    "aes-256-gcm",
+    getBrokerageConnectionEncryptionKey(),
+    Buffer.from(row.tokenIv, "base64"),
+  );
+  decipher.setAuthTag(Buffer.from(row.tokenAuthTag, "base64"));
+  return Buffer.concat([
+    decipher.update(Buffer.from(row.encryptedToken, "base64")),
+    decipher.final(),
+  ]).toString("utf8");
 }
 
 function normalizeExchangeCode(value: string | null | undefined) {
@@ -3527,6 +3584,29 @@ function mapBrokerageImportDraft(
   };
 }
 
+function mapBrokerageConnection(
+  row: typeof brokerageConnections.$inferSelect,
+): BrokerageConnection {
+  return {
+    id: row.id,
+    userId: row.userId,
+    provider: row.provider,
+    displayName: row.displayName,
+    status: row.status as BrokerageConnection["status"],
+    queryId: row.queryId,
+    tokenLast4: row.tokenLast4,
+    tokenExpiresAt: row.tokenExpiresAt.toISOString(),
+    autoSyncEnabled: row.autoSyncEnabled,
+    lastSyncedAt: row.lastSyncedAt?.toISOString() ?? null,
+    lastSyncStatus:
+      (row.lastSyncStatus as BrokerageConnection["lastSyncStatus"]) ?? null,
+    lastSyncError: row.lastSyncError,
+    lastDraftId: row.lastDraftId,
+    createdAt: row.createdAt.toISOString(),
+    updatedAt: row.updatedAt.toISOString(),
+  };
+}
+
 export async function createBrokerageImportDraft(
   userId: string,
   preview: IbkrFlexPreview,
@@ -3562,6 +3642,148 @@ export async function createBrokerageImportDraft(
       },
     },
   };
+}
+
+export async function getIbkrBrokerageConnection(userId: string) {
+  const row = await getDb().query.brokerageConnections.findFirst({
+    where: and(
+      eq(brokerageConnections.userId, userId),
+      eq(brokerageConnections.provider, "ibkr-flex"),
+    ),
+  });
+  return row ? mapBrokerageConnection(row) : null;
+}
+
+export async function saveIbkrBrokerageConnection(
+  userId: string,
+  input: IbkrConnectionSaveInputPayload,
+) {
+  const encrypted = encryptBrokerageToken(input.token);
+  const now = new Date();
+  const tokenExpiresAt = new Date(
+    now.getTime() + input.ttlDays * 24 * 60 * 60 * 1000,
+  );
+  const values = {
+    userId,
+    provider: "ibkr-flex",
+    displayName: "IBKR Flex",
+    status: "active",
+    queryId: input.queryId.trim(),
+    encryptedToken: encrypted.encryptedToken,
+    tokenIv: encrypted.tokenIv,
+    tokenAuthTag: encrypted.tokenAuthTag,
+    tokenLast4: encrypted.tokenLast4,
+    tokenExpiresAt,
+    autoSyncEnabled: input.autoSyncEnabled,
+    lastSyncError: null,
+    updatedAt: now,
+  };
+
+  const existing = await getDb().query.brokerageConnections.findFirst({
+    where: and(
+      eq(brokerageConnections.userId, userId),
+      eq(brokerageConnections.provider, "ibkr-flex"),
+    ),
+  });
+  const [row] = existing
+    ? await getDb()
+        .update(brokerageConnections)
+        .set(values)
+        .where(eq(brokerageConnections.id, existing.id))
+        .returning()
+    : await getDb()
+        .insert(brokerageConnections)
+        .values({ ...values, createdAt: now })
+        .returning();
+
+  return mapBrokerageConnection(row);
+}
+
+export async function deleteIbkrBrokerageConnection(userId: string) {
+  await getDb()
+    .update(brokerageConnections)
+    .set({
+      status: "revoked",
+      autoSyncEnabled: false,
+      updatedAt: new Date(),
+    })
+    .where(
+      and(
+        eq(brokerageConnections.userId, userId),
+        eq(brokerageConnections.provider, "ibkr-flex"),
+      ),
+    );
+  return { provider: "ibkr-flex", status: "revoked" as const };
+}
+
+export async function syncIbkrBrokerageConnection(userId: string) {
+  const db = getDb();
+  const row = await db.query.brokerageConnections.findFirst({
+    where: and(
+      eq(brokerageConnections.userId, userId),
+      eq(brokerageConnections.provider, "ibkr-flex"),
+    ),
+  });
+  if (!row || row.status === "revoked") {
+    throw new Error("IBKR connection was not found.");
+  }
+  if (row.tokenExpiresAt.getTime() < Date.now()) {
+    await db
+      .update(brokerageConnections)
+      .set({
+        status: "expired",
+        lastSyncStatus: "failed",
+        lastSyncError: "IBKR Token 已过期，请重新保存连接。",
+        updatedAt: new Date(),
+      })
+      .where(eq(brokerageConnections.id, row.id));
+    throw new Error("IBKR Token 已过期，请重新保存连接。");
+  }
+
+  try {
+    const token = decryptBrokerageToken(row);
+    const result = await createIbkrBrokerageDraftFromCredentials(userId, {
+      token,
+      queryId: row.queryId,
+    });
+    await db
+      .update(brokerageConnections)
+      .set({
+        status: "active",
+        lastSyncedAt: new Date(),
+        lastSyncStatus: "succeeded",
+        lastSyncError: null,
+        lastDraftId: result.draft.id,
+        updatedAt: new Date(),
+      })
+      .where(eq(brokerageConnections.id, row.id));
+    return {
+      connection: await getIbkrBrokerageConnection(userId),
+      ...result,
+    };
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "IBKR 连接同步失败。";
+    await db
+      .update(brokerageConnections)
+      .set({
+        status: "error",
+        lastSyncedAt: new Date(),
+        lastSyncStatus: "failed",
+        lastSyncError: message,
+        updatedAt: new Date(),
+      })
+      .where(eq(brokerageConnections.id, row.id));
+    throw error;
+  }
+}
+
+export async function createIbkrBrokerageDraftFromCredentials(
+  userId: string,
+  input: { token: string; queryId: string },
+) {
+  const preview = await fetchIbkrFlexPreview(input);
+  return createBrokerageImportDraft(userId, preview);
 }
 
 export async function confirmBrokerageImportDraft(

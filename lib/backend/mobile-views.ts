@@ -2002,13 +2002,13 @@ function mapMobileImportData(data: ImportData): MobileImportData {
         description: "适合从 IBKR 导入账户、持仓和现金；不作为实时行情源。",
         primaryUse: "IBKR 真实账户导入",
         setupItems: [
-          "报告 → Flex 查询 → Flex 网页服务设置，启用服务并复制“当前授权口令（Token）”",
-          "Flex 查询 → 新建“活动 Flex 查询”，勾选账户资料、当前持仓、现金报表和基础币种权益汇总",
-          "保存查询后复制“查询编号（Query ID）”，再回到 Loo国读取预览",
+          "业绩与报告 → 自主查询 → 自主网络服务配置，启用服务并复制“授权口令 / Token”",
+          "活动自主查询 → 新建查询，格式选 XML；必选账户信息、未平仓仓位、现金报告、基础币种权益总结",
+          "保存查询后复制数字“查询编号 / Query ID”；不要填账户号或查询名称",
         ],
         limitations: [
           "只覆盖 IBKR，不覆盖 Wealthsimple",
-          "Flex Statement 适合手动或每日同步，不适合实时行情",
+          "Flex Statement 适合每日持仓快照，不适合实时行情",
         ],
       },
       {
@@ -2046,7 +2046,8 @@ function mapMobileImportData(data: ImportData): MobileImportData {
     notes: [
       "移动端 MVP 只保留手动/引导式导入，不迁移 CSV 上传和字段映射。",
       "CSV 批量导入后续可作为桌面高级功能保留。",
-      "券商同步会共用同一套导入预览：先识别账户/持仓/现金/交易，再由用户确认写入。",
+      "券商同步会共用同一套导入草稿：先识别账户/持仓/现金，再由用户确认写入。",
+      "IBKR Token 可加密保存 90 天；手动刷新只生成草稿，不会自动覆盖账本。",
       ...data.portfolioSuccessStates.slice(0, 2),
     ],
   };
