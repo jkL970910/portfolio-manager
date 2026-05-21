@@ -189,6 +189,22 @@ class LooApiClient {
     return _deleteJson("/api/mobile/import/brokerage/ibkr/connection");
   }
 
+  Future<Map<String, dynamic>> getSnapTradeBrokerageConnection() {
+    return _getJson("/api/mobile/import/brokerage/snaptrade/connection");
+  }
+
+  Future<Map<String, dynamic>> createSnapTradeConnectionPortal() {
+    return _postJson("/api/mobile/import/brokerage/snaptrade/connection");
+  }
+
+  Future<Map<String, dynamic>> syncSnapTradeBrokerageConnection() {
+    return _postJson("/api/mobile/import/brokerage/snaptrade/sync");
+  }
+
+  Future<Map<String, dynamic>> deleteSnapTradeBrokerageConnection() {
+    return _deleteJson("/api/mobile/import/brokerage/snaptrade/connection");
+  }
+
   Future<Map<String, dynamic>> confirmBrokerageImportDraft(String draftId) {
     return _postJson(
       "/api/mobile/import/brokerage/drafts/confirm",

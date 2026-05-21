@@ -28,9 +28,11 @@ export type IbkrFlexPreviewAccount = {
   holdings: IbkrFlexPreviewHolding[];
 };
 
-export type IbkrFlexPreview = {
+export type BrokerageImportPreviewProvider = "ibkr-flex" | "snaptrade";
+
+export type BrokerageImportPreview = {
   draftId?: string;
-  provider: "ibkr-flex";
+  provider: BrokerageImportPreviewProvider;
   generatedAt: string;
   referenceCode: string;
   accountCount: number;
@@ -41,6 +43,10 @@ export type IbkrFlexPreview = {
     subtitle: string;
     warnings: string[];
   };
+};
+
+export type IbkrFlexPreview = BrokerageImportPreview & {
+  provider: "ibkr-flex";
 };
 
 export type FetchIbkrFlexPreviewInput = {

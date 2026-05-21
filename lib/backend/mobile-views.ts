@@ -2014,19 +2014,19 @@ function mapMobileImportData(data: ImportData): MobileImportData {
       {
         id: "snaptrade",
         name: "Wealthsimple via SnapTrade",
-        status: "feasibility-check",
-        statusLabel: "验证中",
+        status: "ready-to-build",
+        statusLabel: "Beta",
         description:
-          "用于验证 Wealthsimple 是否能稳定返回账户、持仓、现金、交易和币种信息。",
-        primaryUse: "Wealthsimple 连接验证",
+          "通过 SnapTrade 连接 Wealthsimple，先生成草稿，确认后再写入账本。",
+        primaryUse: "Wealthsimple 券商同步",
         setupItems: [
-          "申请 SnapTrade 开发者账户",
-          "验证 Wealthsimple 连接是否可用",
-          "确认返回字段能保留 symbol + exchange + currency",
+          "打开 SnapTrade 连接入口",
+          "选择 Wealthsimple 并完成授权",
+          "返回 Loo国读取账户与持仓草稿",
         ],
         limitations: [
-          "Free plan 通常限制 brokerage connections",
-          "正式同步前必须确认费用、OAuth 流程和断连重连策略",
+          "SnapTrade Daily 数据通常按券商缓存刷新",
+          "写入前仍会检查 symbol + exchange + currency",
         ],
       },
     ],

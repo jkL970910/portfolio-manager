@@ -5,8 +5,17 @@ import { apiSuccess } from "@/lib/backend/contracts";
 import type { PortfolioHoldingDetailData } from "@/lib/contracts";
 import {
   fetchIbkrFlexPreview,
+  type BrokerageImportPreview,
   type IbkrFlexPreview,
 } from "@/lib/backend/import/ibkr-flex";
+import {
+  buildSnapTradeUserId,
+  createSnapTradeConnectionPortal,
+  fetchSnapTradePreview,
+  getSnapTradeConnectionTtlDays,
+  isSnapTradeConfigured,
+  registerSnapTradeCredential,
+} from "@/lib/backend/import/snaptrade";
 import {
   ImportFieldMapping,
   ImportValidationError,
@@ -108,6 +117,8 @@ import { resolveCanonicalSecurityIdentity } from "@/lib/market-data/security-ide
 import { inferEconomicAssetClass } from "@/lib/backend/security-economic-exposure";
 import type { MobileSecurityObservationInputPayload } from "@/lib/backend/payload-schemas";
 import type { IbkrConnectionSaveInputPayload } from "@/lib/backend/payload-schemas";
+import type { snapTradeConnectionPortalInputSchema } from "@/lib/backend/payload-schemas";
+import type { z } from "zod";
 import type {
   SecurityQuote,
   SecurityHistoricalPoint,
@@ -3609,7 +3620,7 @@ function mapBrokerageConnection(
 
 export async function createBrokerageImportDraft(
   userId: string,
-  preview: IbkrFlexPreview,
+  preview: BrokerageImportPreview,
 ) {
   const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
   const [row] = await getDb()
@@ -3622,7 +3633,7 @@ export async function createBrokerageImportDraft(
       sourceHoldingCount: preview.holdingCount,
       previewJson: preview,
       sourceMetadataJson: {
-        source: "ibkr-flex",
+        source: preview.provider,
         generatedAt: preview.generatedAt,
         referenceCode: preview.referenceCode,
       },
@@ -3645,10 +3656,17 @@ export async function createBrokerageImportDraft(
 }
 
 export async function getIbkrBrokerageConnection(userId: string) {
+  return getBrokerageConnectionByProvider(userId, "ibkr-flex");
+}
+
+async function getBrokerageConnectionByProvider(
+  userId: string,
+  provider: string,
+) {
   const row = await getDb().query.brokerageConnections.findFirst({
     where: and(
       eq(brokerageConnections.userId, userId),
-      eq(brokerageConnections.provider, "ibkr-flex"),
+      eq(brokerageConnections.provider, provider),
     ),
   });
   return row ? mapBrokerageConnection(row) : null;
@@ -3786,6 +3804,160 @@ export async function createIbkrBrokerageDraftFromCredentials(
   return createBrokerageImportDraft(userId, preview);
 }
 
+type SnapTradeConnectionPortalInput = z.infer<
+  typeof snapTradeConnectionPortalInputSchema
+>;
+
+export async function getSnapTradeBrokerageConnection(userId: string) {
+  return getBrokerageConnectionByProvider(userId, "snaptrade");
+}
+
+export async function createSnapTradeBrokerageConnectionPortal(
+  userId: string,
+  input: SnapTradeConnectionPortalInput = {},
+) {
+  if (!isSnapTradeConfigured()) {
+    throw new Error(
+      "SnapTrade 尚未配置。请先在 Vercel 配置 SNAPTRADE_CLIENT_ID 和 SNAPTRADE_CONSUMER_KEY。",
+    );
+  }
+
+  const db = getDb();
+  let row = await db.query.brokerageConnections.findFirst({
+    where: and(
+      eq(brokerageConnections.userId, userId),
+      eq(brokerageConnections.provider, "snaptrade"),
+    ),
+  });
+  let credential: { snapTradeUserId: string; userSecret: string } | null = null;
+
+  if (!row || row.status === "revoked") {
+    credential = await registerSnapTradeCredential(userId);
+    const encrypted = encryptBrokerageToken(credential.userSecret);
+    const now = new Date();
+    const tokenExpiresAt = new Date(
+      now.getTime() + getSnapTradeConnectionTtlDays() * 24 * 60 * 60 * 1000,
+    );
+    const values = {
+      userId,
+      provider: "snaptrade",
+      displayName: "Wealthsimple via SnapTrade",
+      status: "active",
+      queryId: credential.snapTradeUserId,
+      encryptedToken: encrypted.encryptedToken,
+      tokenIv: encrypted.tokenIv,
+      tokenAuthTag: encrypted.tokenAuthTag,
+      tokenLast4: encrypted.tokenLast4,
+      tokenExpiresAt,
+      autoSyncEnabled: false,
+      lastSyncError: null,
+      updatedAt: now,
+    };
+    const [saved] = row
+      ? await db
+          .update(brokerageConnections)
+          .set(values)
+          .where(eq(brokerageConnections.id, row.id))
+          .returning()
+      : await db
+          .insert(brokerageConnections)
+          .values({ ...values, createdAt: now })
+          .returning();
+    row = saved;
+  } else {
+    credential = {
+      snapTradeUserId: row.queryId || buildSnapTradeUserId(userId),
+      userSecret: decryptBrokerageToken(row),
+    };
+  }
+
+  const portal = await createSnapTradeConnectionPortal(credential, input);
+  return {
+    connection: row ? mapBrokerageConnection(row) : null,
+    portal,
+  };
+}
+
+export async function deleteSnapTradeBrokerageConnection(userId: string) {
+  await getDb()
+    .update(brokerageConnections)
+    .set({
+      status: "revoked",
+      autoSyncEnabled: false,
+      updatedAt: new Date(),
+    })
+    .where(
+      and(
+        eq(brokerageConnections.userId, userId),
+        eq(brokerageConnections.provider, "snaptrade"),
+      ),
+    );
+  return { provider: "snaptrade", status: "revoked" as const };
+}
+
+export async function syncSnapTradeBrokerageConnection(userId: string) {
+  const db = getDb();
+  const row = await db.query.brokerageConnections.findFirst({
+    where: and(
+      eq(brokerageConnections.userId, userId),
+      eq(brokerageConnections.provider, "snaptrade"),
+    ),
+  });
+  if (!row || row.status === "revoked") {
+    throw new Error("SnapTrade connection was not found.");
+  }
+  if (row.tokenExpiresAt.getTime() < Date.now()) {
+    await db
+      .update(brokerageConnections)
+      .set({
+        status: "expired",
+        lastSyncStatus: "failed",
+        lastSyncError: "SnapTrade 连接已过期，请重新授权。",
+        updatedAt: new Date(),
+      })
+      .where(eq(brokerageConnections.id, row.id));
+    throw new Error("SnapTrade 连接已过期，请重新授权。");
+  }
+
+  try {
+    const credential = {
+      snapTradeUserId: row.queryId || buildSnapTradeUserId(userId),
+      userSecret: decryptBrokerageToken(row),
+    };
+    const preview = await fetchSnapTradePreview(credential);
+    const result = await createBrokerageImportDraft(userId, preview);
+    await db
+      .update(brokerageConnections)
+      .set({
+        status: "active",
+        lastSyncedAt: new Date(),
+        lastSyncStatus: "succeeded",
+        lastSyncError: null,
+        lastDraftId: result.draft.id,
+        updatedAt: new Date(),
+      })
+      .where(eq(brokerageConnections.id, row.id));
+    return {
+      connection: await getSnapTradeBrokerageConnection(userId),
+      ...result,
+    };
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "SnapTrade 连接同步失败。";
+    await db
+      .update(brokerageConnections)
+      .set({
+        status: "error",
+        lastSyncedAt: new Date(),
+        lastSyncStatus: "failed",
+        lastSyncError: message,
+        updatedAt: new Date(),
+      })
+      .where(eq(brokerageConnections.id, row.id));
+    throw error;
+  }
+}
+
 export async function confirmBrokerageImportDraft(
   userId: string,
   draftId: string,
@@ -3813,7 +3985,7 @@ export async function confirmBrokerageImportDraft(
       throw new Error("Brokerage import draft has expired.");
     }
 
-    const preview = draftRow.previewJson as IbkrFlexPreview;
+    const preview = draftRow.previewJson as BrokerageImportPreview;
     const accounts = Array.isArray(preview.accounts) ? preview.accounts : [];
     const holdingsNeedingReview = accounts
       .flatMap((account) => account.holdings)
@@ -3826,10 +3998,18 @@ export async function confirmBrokerageImportDraft(
     let accountsCreated = 0;
     let holdingsCreated = 0;
     let holdingsUpdated = 0;
+    const institution =
+      preview.provider === "snaptrade" ? "Wealthsimple" : "Interactive Brokers";
+    const accountPrefix =
+      preview.provider === "snaptrade" ? "Wealthsimple" : "IBKR";
+    const eventSource =
+      preview.provider === "snaptrade"
+        ? "snaptrade-import"
+        : "ibkr-flex-import";
 
     for (const sourceAccount of accounts) {
       const currency = normalizeCurrencyCode(sourceAccount.currency);
-      const nickname = `IBKR ${sourceAccount.accountId}`;
+      const nickname = `${accountPrefix} ${sourceAccount.accountId}`;
       const accountType = inferBrokerageAccountType(
         `${sourceAccount.accountType} ${sourceAccount.accountId}`,
       );
@@ -3845,7 +4025,7 @@ export async function confirmBrokerageImportDraft(
       const existingAccount = await tx.query.investmentAccounts.findFirst({
         where: and(
           eq(investmentAccounts.userId, userId),
-          eq(investmentAccounts.institution, "Interactive Brokers"),
+          eq(investmentAccounts.institution, institution),
           eq(investmentAccounts.nickname, nickname),
         ),
       });
@@ -3856,7 +4036,7 @@ export async function confirmBrokerageImportDraft(
             .insert(investmentAccounts)
             .values({
               userId,
-              institution: "Interactive Brokers",
+              institution,
               type: accountType,
               nickname,
               currency,
@@ -3965,7 +4145,7 @@ export async function confirmBrokerageImportDraft(
             quantity,
             priceAmount: lastPriceAmount,
             currency: holdingCurrency,
-            source: "ibkr-flex-import",
+            source: eventSource,
           });
         }
       }

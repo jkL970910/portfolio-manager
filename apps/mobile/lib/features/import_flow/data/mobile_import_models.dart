@@ -204,6 +204,23 @@ class MobileIbkrFlexPreview {
   }
 }
 
+class MobileSnapTradePortal {
+  const MobileSnapTradePortal({
+    required this.redirectUri,
+    this.sessionId,
+  });
+
+  final String redirectUri;
+  final String? sessionId;
+
+  factory MobileSnapTradePortal.fromJson(Map<String, dynamic> json) {
+    return MobileSnapTradePortal(
+      redirectUri: json["redirectUri"] as String? ?? "",
+      sessionId: json["sessionId"] as String?,
+    );
+  }
+}
+
 class MobileBrokerageConnection {
   const MobileBrokerageConnection({
     required this.id,

@@ -1,6 +1,8 @@
 import "package:flutter/material.dart";
 
 import "../../../core/api/loo_api_client.dart";
+import "../../../core/platform/external_link_stub.dart"
+    if (dart.library.html) "../../../core/platform/external_link_web.dart";
 import "../../../core/presentation/loo_components.dart";
 import "../../../core/theme/loo_theme.dart";
 import "../data/mobile_import_models.dart";
@@ -495,9 +497,11 @@ class _BrokerageImportSheet extends StatelessWidget {
               ...providers.map(
                 (provider) => _BrokerageProviderCard(
                   provider,
-                  onTap: provider.id == "ibkr-flex"
-                      ? () => _openIbkrFlexPreview(context)
-                      : null,
+                  onTap: switch (provider.id) {
+                    "ibkr-flex" => () => _openIbkrFlexPreview(context),
+                    "snaptrade" => () => _openSnapTradePreview(context),
+                    _ => null,
+                  },
                 ),
               ),
               const SizedBox(height: 12),
@@ -523,6 +527,15 @@ class _BrokerageImportSheet extends StatelessWidget {
       isScrollControlled: true,
       showDragHandle: true,
       builder: (context) => _IbkrFlexPreviewSheet(apiClient: apiClient),
+    );
+  }
+
+  Future<void> _openSnapTradePreview(BuildContext context) {
+    return showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (context) => _SnapTradePreviewSheet(apiClient: apiClient),
     );
   }
 }
@@ -730,30 +743,21 @@ class _BrokerageProviderCard extends StatelessWidget {
                 ),
               ],
             ),
-            const SizedBox(height: 8),
-            Text(provider.description),
-            if (provider.primaryUse.isNotEmpty) ...[
-              const SizedBox(height: 8),
-              Text("用途：${provider.primaryUse}",
-                  style: Theme.of(context).textTheme.bodyMedium),
-            ],
-            if (provider.setupItems.isNotEmpty) ...[
-              const SizedBox(height: 10),
-              ...provider.setupItems.take(5).map(
-                    (item) => _BrokerageBullet(text: item),
+            const SizedBox(height: 6),
+            Text(
+              provider.id == "ibkr-flex"
+                  ? "保存 Flex Token 后可手动刷新草稿"
+                  : "打开 SnapTrade 授权后读取 Wealthsimple 草稿",
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: context.looTokens.mutedText,
                   ),
-            ],
-            if (provider.limitations.isNotEmpty) ...[
-              const SizedBox(height: 8),
-              Text("注意：${provider.limitations.first}",
-                  style: Theme.of(context).textTheme.bodySmall),
-            ],
+            ),
             if (onTap != null) ...[
-              const SizedBox(height: 10),
+              const SizedBox(height: 8),
               Row(
                 children: [
                   Text(
-                    "输入授权口令 / 查询编号",
+                    "进入设置",
                     style: Theme.of(context).textTheme.labelLarge?.copyWith(
                           color: context.looTokens.accent,
                         ),
@@ -1327,6 +1331,412 @@ class _IbkrConnectionCard extends StatelessWidget {
   }
 }
 
+class _SnapTradePreviewSheet extends StatefulWidget {
+  const _SnapTradePreviewSheet({required this.apiClient});
+
+  final LooApiClient apiClient;
+
+  @override
+  State<_SnapTradePreviewSheet> createState() => _SnapTradePreviewSheetState();
+}
+
+class _SnapTradePreviewSheetState extends State<_SnapTradePreviewSheet> {
+  var _connectionLoading = true;
+  var _creatingPortal = false;
+  var _syncing = false;
+  var _deleting = false;
+  var _confirming = false;
+  String? _error;
+  MobileBrokerageConnection? _connection;
+  MobileSnapTradePortal? _portal;
+  MobileIbkrFlexPreview? _preview;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadConnection();
+  }
+
+  Future<void> _loadConnection() async {
+    setState(() {
+      _connectionLoading = true;
+      _error = null;
+    });
+    try {
+      final response = await widget.apiClient.getSnapTradeBrokerageConnection();
+      final data = response["data"];
+      final connectionJson =
+          data is Map<String, dynamic> ? data["connection"] : null;
+      if (mounted) {
+        setState(() {
+          _connection = connectionJson is Map<String, dynamic>
+              ? MobileBrokerageConnection.fromJson(connectionJson)
+              : null;
+          _connectionLoading = false;
+        });
+      }
+    } catch (error) {
+      if (mounted) {
+        setState(() {
+          _error = error.toString();
+          _connectionLoading = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _createPortal() async {
+    setState(() {
+      _creatingPortal = true;
+      _error = null;
+    });
+    try {
+      final response = await widget.apiClient.createSnapTradeConnectionPortal();
+      final data = response["data"];
+      final portalJson = data is Map<String, dynamic> ? data["portal"] : null;
+      final connectionJson =
+          data is Map<String, dynamic> ? data["connection"] : null;
+      if (portalJson is! Map<String, dynamic>) {
+        throw const LooApiException("SnapTrade 连接入口返回格式不正确。");
+      }
+      final portal = MobileSnapTradePortal.fromJson(portalJson);
+      if (portal.redirectUri.isEmpty) {
+        throw const LooApiException("SnapTrade 没有返回连接入口链接。");
+      }
+      await openExternalLink(portal.redirectUri);
+      if (mounted) {
+        setState(() {
+          _portal = portal;
+          _connection = connectionJson is Map<String, dynamic>
+              ? MobileBrokerageConnection.fromJson(connectionJson)
+              : _connection;
+          _creatingPortal = false;
+        });
+      }
+    } catch (error) {
+      if (mounted) {
+        setState(() {
+          _error = error.toString();
+          _creatingPortal = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _syncConnection() async {
+    setState(() {
+      _syncing = true;
+      _error = null;
+      _preview = null;
+    });
+    try {
+      final response =
+          await widget.apiClient.syncSnapTradeBrokerageConnection();
+      final data = response["data"];
+      final previewJson = data is Map<String, dynamic> ? data["preview"] : null;
+      final connectionJson =
+          data is Map<String, dynamic> ? data["connection"] : null;
+      if (previewJson is! Map<String, dynamic>) {
+        throw const LooApiException("SnapTrade 同步返回格式不正确。");
+      }
+      if (mounted) {
+        setState(() {
+          _preview = MobileIbkrFlexPreview.fromJson(previewJson);
+          _connection = connectionJson is Map<String, dynamic>
+              ? MobileBrokerageConnection.fromJson(connectionJson)
+              : _connection;
+          _syncing = false;
+        });
+      }
+    } catch (error) {
+      if (mounted) {
+        setState(() {
+          _error = error.toString();
+          _syncing = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _deleteConnection() async {
+    setState(() {
+      _deleting = true;
+      _error = null;
+    });
+    try {
+      await widget.apiClient.deleteSnapTradeBrokerageConnection();
+      if (mounted) {
+        setState(() {
+          _connection = null;
+          _portal = null;
+          _preview = null;
+          _deleting = false;
+        });
+      }
+    } catch (error) {
+      if (mounted) {
+        setState(() {
+          _error = error.toString();
+          _deleting = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _confirmDraft() async {
+    final preview = _preview;
+    if (preview == null || preview.draftId.isEmpty) {
+      return;
+    }
+    setState(() {
+      _confirming = true;
+      _error = null;
+    });
+
+    try {
+      final response =
+          await widget.apiClient.confirmBrokerageImportDraft(preview.draftId);
+      final data = response["data"];
+      final accountsCreated = data is Map<String, dynamic>
+          ? data["accountsCreated"] as int? ?? 0
+          : 0;
+      final holdingsCreated = data is Map<String, dynamic>
+          ? data["holdingsCreated"] as int? ?? 0
+          : 0;
+      final holdingsUpdated = data is Map<String, dynamic>
+          ? data["holdingsUpdated"] as int? ?? 0
+          : 0;
+      if (mounted) {
+        Navigator.of(context).pop();
+        await showDialog<void>(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text("Wealthsimple 草稿已写入"),
+            content: Text(
+              "新增 $accountsCreated 个账户，新增 $holdingsCreated 个持仓，更新 $holdingsUpdated 个持仓。",
+            ),
+            actions: [
+              FilledButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text("知道了"),
+              ),
+            ],
+          ),
+        );
+      }
+    } catch (error) {
+      if (mounted) {
+        setState(() {
+          _error = error.toString();
+          _confirming = false;
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
+    return SafeArea(
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(20, 4, 20, bottomInset + 20),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                "Wealthsimple 同步",
+                style: Theme.of(context).textTheme.headlineMedium,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                "通过 SnapTrade 只读授权读取 Wealthsimple 账户和持仓。Loo国会先生成草稿，确认后才写入账本。",
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: context.looTokens.mutedText,
+                    ),
+              ),
+              const SizedBox(height: 12),
+              if (_connectionLoading)
+                const Center(child: CircularProgressIndicator())
+              else
+                _SnapTradeConnectionCard(
+                  connection: _connection,
+                  portal: _portal,
+                  creatingPortal: _creatingPortal,
+                  syncing: _syncing,
+                  deleting: _deleting,
+                  onCreatePortal: _creatingPortal ? null : _createPortal,
+                  onSync: _syncing ? null : _syncConnection,
+                  onDelete: _deleting ? null : _deleteConnection,
+                ),
+              if (_error != null) ...[
+                const SizedBox(height: 12),
+                Text(
+                  _error!,
+                  style: TextStyle(color: Theme.of(context).colorScheme.error),
+                ),
+              ],
+              if (_preview != null) ...[
+                const SizedBox(height: 16),
+                _IbkrPreviewResultCard(
+                  _preview!,
+                  confirming: _confirming,
+                  onConfirm: _confirming ? null : _confirmDraft,
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SnapTradeConnectionCard extends StatelessWidget {
+  const _SnapTradeConnectionCard({
+    required this.connection,
+    required this.portal,
+    required this.creatingPortal,
+    required this.syncing,
+    required this.deleting,
+    required this.onCreatePortal,
+    required this.onSync,
+    required this.onDelete,
+  });
+
+  final MobileBrokerageConnection? connection;
+  final MobileSnapTradePortal? portal;
+  final bool creatingPortal;
+  final bool syncing;
+  final bool deleting;
+  final VoidCallback? onCreatePortal;
+  final VoidCallback? onSync;
+  final VoidCallback? onDelete;
+
+  @override
+  Widget build(BuildContext context) {
+    final usable = connection?.isUsable ?? false;
+    return LooGlassCard(
+      padding: const EdgeInsets.all(14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  usable ? "SnapTrade 已准备" : "连接 Wealthsimple",
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+              ),
+              _ImportPill(
+                connection == null
+                    ? "待授权"
+                    : _connectionStatusLabel(connection!.status),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(
+            connection == null
+                ? "先打开 SnapTrade 入口，选择 Wealthsimple 完成只读授权。"
+                : [
+                    "User ${connection!.queryId}",
+                    "有效期 ${_formatIsoDate(connection!.tokenExpiresAt)}",
+                  ].join(" · "),
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: context.looTokens.mutedText,
+                ),
+          ),
+          if (connection?.lastSyncedAt != null) ...[
+            const SizedBox(height: 4),
+            Text(
+              "上次同步 ${_formatIsoDate(connection!.lastSyncedAt!)}"
+              "${connection!.lastSyncStatus == "failed" ? " · 失败" : ""}",
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: context.looTokens.mutedText,
+                  ),
+            ),
+          ],
+          if (connection?.lastSyncError != null) ...[
+            const SizedBox(height: 6),
+            Text(
+              connection!.lastSyncError!,
+              style: TextStyle(color: Theme.of(context).colorScheme.error),
+            ),
+          ],
+          if (portal != null) ...[
+            const SizedBox(height: 8),
+            Text(
+              "连接入口已打开。授权完成后返回这里点击“读取草稿”。入口链接通常 5 分钟内有效。",
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: context.looTokens.accent,
+                  ),
+            ),
+          ],
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: onCreatePortal,
+                  icon: creatingPortal
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.open_in_new_rounded),
+                  label: Text(creatingPortal ? "打开中..." : "打开授权入口"),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: FilledButton.icon(
+                  onPressed: usable ? onSync : null,
+                  icon: syncing
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.sync_rounded),
+                  label: Text(syncing ? "读取中..." : "读取草稿"),
+                ),
+              ),
+            ],
+          ),
+          if (connection != null) ...[
+            const SizedBox(height: 8),
+            Align(
+              alignment: Alignment.centerRight,
+              child: TextButton.icon(
+                onPressed: deleting ? null : onDelete,
+                icon: deleting
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.delete_outline_rounded),
+                label: const Text("删除连接"),
+              ),
+            ),
+          ],
+          const SizedBox(height: 4),
+          Text(
+            "SnapTrade 返回的是券商缓存快照；确认草稿前仍需检查账户、标的和币种。",
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: context.looTokens.mutedText,
+                ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 String _connectionStatusLabel(String status) {
   switch (status) {
     case "active":
@@ -1563,27 +1973,6 @@ class _BrokerageFlowCard extends StatelessWidget {
             "4. 用户确认后才写入账本\n\n"
             "当前阶段先展示入口和方案；真实连接会在下一步接入。",
           ),
-        ],
-      ),
-    );
-  }
-}
-
-class _BrokerageBullet extends StatelessWidget {
-  const _BrokerageBullet({required this.text});
-
-  final String text;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(top: 6),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Icon(Icons.check_circle_outline, size: 17),
-          const SizedBox(width: 8),
-          Expanded(child: Text(text)),
         ],
       ),
     );

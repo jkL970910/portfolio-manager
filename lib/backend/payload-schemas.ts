@@ -229,6 +229,17 @@ export const ibkrConnectionSaveInputSchema = z.object({
   autoSyncEnabled: z.boolean().default(false),
 });
 
+export const snapTradeConnectionPortalInputSchema = z.object({
+  customRedirect: z.string().trim().url().max(500).nullable().optional(),
+  reconnectAuthorizationId: z
+    .string()
+    .trim()
+    .min(1)
+    .max(128)
+    .nullable()
+    .optional(),
+});
+
 export const brokerageImportDraftConfirmInputSchema = z.object({
   draftId: z.string().trim().uuid(),
 });
