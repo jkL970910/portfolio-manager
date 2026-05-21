@@ -185,12 +185,15 @@ class MobileIbkrFlexPreview {
   final List<String> warnings;
   final List<MobileIbkrFlexAccount> accounts;
 
-  factory MobileIbkrFlexPreview.fromJson(Map<String, dynamic> json) {
+  factory MobileIbkrFlexPreview.fromJson(
+    Map<String, dynamic> json, {
+    String? fallbackDraftId,
+  }) {
     final summary = json["summary"] is Map<String, dynamic>
         ? json["summary"] as Map<String, dynamic>
         : const <String, dynamic>{};
     return MobileIbkrFlexPreview(
-      draftId: json["draftId"] as String? ?? "",
+      draftId: json["draftId"] as String? ?? fallbackDraftId ?? "",
       accountCount: (json["accountCount"] as num?)?.toInt() ?? 0,
       holdingCount: (json["holdingCount"] as num?)?.toInt() ?? 0,
       title: summary["title"] as String? ?? "IBKR 预览",

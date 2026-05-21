@@ -27,6 +27,19 @@ Future<void> _showImportResultDialog(
   );
 }
 
+String? _draftIdFallbackFromResponse(Map<String, dynamic>? data) {
+  final draftJson = data?["draft"];
+  if (draftJson is Map<String, dynamic> && draftJson["id"] is String) {
+    return draftJson["id"] as String;
+  }
+  final connectionJson = data?["connection"];
+  if (connectionJson is Map<String, dynamic> &&
+      connectionJson["lastDraftId"] is String) {
+    return connectionJson["lastDraftId"] as String;
+  }
+  return null;
+}
+
 class ImportPage extends StatefulWidget {
   const ImportPage({
     required this.apiClient,
@@ -920,7 +933,10 @@ class _IbkrFlexPreviewSheetState extends State<_IbkrFlexPreviewSheet> {
       }
       if (mounted) {
         setState(() {
-          _preview = MobileIbkrFlexPreview.fromJson(previewJson);
+          _preview = MobileIbkrFlexPreview.fromJson(
+            previewJson,
+            fallbackDraftId: _draftIdFallbackFromResponse(data),
+          );
           _selectedAccountIds
             ..clear()
             ..addAll(_preview!.readyAccounts.map((account) => account.accountId));
@@ -1068,7 +1084,10 @@ class _IbkrFlexPreviewSheetState extends State<_IbkrFlexPreviewSheet> {
       }
       if (mounted) {
         setState(() {
-          _preview = MobileIbkrFlexPreview.fromJson(previewJson);
+          _preview = MobileIbkrFlexPreview.fromJson(
+            previewJson,
+            fallbackDraftId: _draftIdFallbackFromResponse(data),
+          );
           final readyIds =
               _preview!.readyAccounts.map((item) => item.accountId).toSet();
           _selectedAccountIds
@@ -1109,7 +1128,10 @@ class _IbkrFlexPreviewSheetState extends State<_IbkrFlexPreviewSheet> {
       }
       if (mounted) {
         setState(() {
-          _preview = MobileIbkrFlexPreview.fromJson(previewJson);
+          _preview = MobileIbkrFlexPreview.fromJson(
+            previewJson,
+            fallbackDraftId: _draftIdFallbackFromResponse(data),
+          );
           _selectedAccountIds
             ..clear()
             ..addAll(_preview!.readyAccounts.map((account) => account.accountId));
@@ -1555,7 +1577,10 @@ class _SnapTradePreviewSheetState extends State<_SnapTradePreviewSheet> {
       }
       if (mounted) {
         setState(() {
-          _preview = MobileIbkrFlexPreview.fromJson(previewJson);
+          _preview = MobileIbkrFlexPreview.fromJson(
+            previewJson,
+            fallbackDraftId: _draftIdFallbackFromResponse(data),
+          );
           _selectedAccountIds
             ..clear()
             ..addAll(
@@ -1706,7 +1731,10 @@ class _SnapTradePreviewSheetState extends State<_SnapTradePreviewSheet> {
       }
       if (mounted) {
         setState(() {
-          _preview = MobileIbkrFlexPreview.fromJson(previewJson);
+          _preview = MobileIbkrFlexPreview.fromJson(
+            previewJson,
+            fallbackDraftId: _draftIdFallbackFromResponse(data),
+          );
           final readyIds =
               _preview!.readyAccounts.map((item) => item.accountId).toSet();
           _selectedAccountIds
