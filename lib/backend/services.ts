@@ -3130,6 +3130,14 @@ export async function deleteInvestmentAccount(
             eq(holdingPositions.accountId, accountId),
           ),
         );
+      await tx
+        .delete(portfolioEvents)
+        .where(
+          and(
+            eq(portfolioEvents.userId, userId),
+            eq(portfolioEvents.accountId, accountId),
+          ),
+        );
     }
 
     await tx
