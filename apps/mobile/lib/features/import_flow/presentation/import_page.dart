@@ -7,6 +7,26 @@ import "../../../core/presentation/loo_components.dart";
 import "../../../core/theme/loo_theme.dart";
 import "../data/mobile_import_models.dart";
 
+Future<void> _showImportResultDialog(
+  BuildContext context, {
+  required String title,
+  required String message,
+}) {
+  return showDialog<void>(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: Text(title),
+      content: Text(message),
+      actions: [
+        FilledButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text("知道了"),
+        ),
+      ],
+    ),
+  );
+}
+
 class ImportPage extends StatefulWidget {
   const ImportPage({
     required this.apiClient,
@@ -947,11 +967,24 @@ class _IbkrFlexPreviewSheetState extends State<_IbkrFlexPreviewSheet> {
   Future<void> _confirmDraft() async {
     final preview = _preview;
     if (preview == null || preview.draftId.isEmpty) {
+      await _showImportResultDialog(
+        context,
+        title: "暂不能写入",
+        message: "当前没有可确认的导入草稿，请先读取券商草稿。",
+      );
+      return;
+    }
+    if (_selectedAccountIds.isEmpty) {
+      await _showImportResultDialog(
+        context,
+        title: "请选择账户",
+        message: "请先勾选至少一个账户，再写入 Loo国账本。",
+      );
       return;
     }
     setState(() {
       _confirming = true;
-      _error = null;
+      _error = "正在写入 Loo国账本，请稍候…";
     });
 
     try {
@@ -974,22 +1007,19 @@ class _IbkrFlexPreviewSheetState extends State<_IbkrFlexPreviewSheet> {
           ? data["holdingsSkipped"] as int? ?? 0
           : 0;
       if (mounted) {
-        Navigator.of(context).pop();
-        await showDialog<void>(
-          context: context,
-          builder: (context) => AlertDialog(
-            title: const Text("IBKR 草稿已写入"),
-            content: Text(
+        setState(() {
+          _confirming = false;
+          _error = null;
+        });
+        await _showImportResultDialog(
+          context,
+          title: "IBKR 草稿已写入",
+          message:
               "新增 $accountsCreated 个账户，新增 $holdingsCreated 个持仓，更新 $holdingsUpdated 个持仓。${holdingsSkipped > 0 ? "已跳过 $holdingsSkipped 个未确认持仓。" : ""}回到国库后可继续检查账户和标的详情。",
-            ),
-            actions: [
-              FilledButton(
-                onPressed: () => Navigator.of(context).pop(),
-                child: const Text("知道了"),
-              ),
-            ],
-          ),
         );
+        if (mounted) {
+          Navigator.of(context).pop();
+        }
       }
     } catch (error) {
       if (mounted) {
@@ -998,8 +1028,10 @@ class _IbkrFlexPreviewSheetState extends State<_IbkrFlexPreviewSheet> {
           _error = message;
           _confirming = false;
         });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(message)),
+        await _showImportResultDialog(
+          context,
+          title: "写入失败",
+          message: message,
         );
       }
     }
@@ -1573,11 +1605,24 @@ class _SnapTradePreviewSheetState extends State<_SnapTradePreviewSheet> {
   Future<void> _confirmDraft() async {
     final preview = _preview;
     if (preview == null || preview.draftId.isEmpty) {
+      await _showImportResultDialog(
+        context,
+        title: "暂不能写入",
+        message: "当前没有可确认的导入草稿，请先读取券商草稿。",
+      );
+      return;
+    }
+    if (_selectedAccountIds.isEmpty) {
+      await _showImportResultDialog(
+        context,
+        title: "请选择账户",
+        message: "请先勾选至少一个账户，再写入 Loo国账本。",
+      );
       return;
     }
     setState(() {
       _confirming = true;
-      _error = null;
+      _error = "正在写入 Loo国账本，请稍候…";
     });
 
     try {
@@ -1600,22 +1645,19 @@ class _SnapTradePreviewSheetState extends State<_SnapTradePreviewSheet> {
           ? data["holdingsSkipped"] as int? ?? 0
           : 0;
       if (mounted) {
-        Navigator.of(context).pop();
-        await showDialog<void>(
-          context: context,
-          builder: (context) => AlertDialog(
-            title: const Text("Wealthsimple 草稿已写入"),
-            content: Text(
+        setState(() {
+          _confirming = false;
+          _error = null;
+        });
+        await _showImportResultDialog(
+          context,
+          title: "Wealthsimple 草稿已写入",
+          message:
               "新增 $accountsCreated 个账户，新增 $holdingsCreated 个持仓，更新 $holdingsUpdated 个持仓。${holdingsSkipped > 0 ? "已跳过 $holdingsSkipped 个未确认持仓。" : ""}",
-            ),
-            actions: [
-              FilledButton(
-                onPressed: () => Navigator.of(context).pop(),
-                child: const Text("知道了"),
-              ),
-            ],
-          ),
         );
+        if (mounted) {
+          Navigator.of(context).pop();
+        }
       }
     } catch (error) {
       if (mounted) {
@@ -1624,8 +1666,10 @@ class _SnapTradePreviewSheetState extends State<_SnapTradePreviewSheet> {
           _error = message;
           _confirming = false;
         });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(message)),
+        await _showImportResultDialog(
+          context,
+          title: "写入失败",
+          message: message,
         );
       }
     }
