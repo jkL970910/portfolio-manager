@@ -19,6 +19,13 @@ import {
   looMinisterAnswerResultSchema,
 } from "@/lib/backend/loo-minister-contracts";
 import {
+  classifyLooMinisterIntent,
+  compactPageContextForMinisterIntent,
+  getMinisterContextSelectionPolicy,
+  selectMinisterFactsForIntent,
+  type ClassifiedMinisterIntent,
+} from "@/lib/backend/loo-minister-intent-router";
+import {
   recordLooMinisterUsage,
   resolveLooMinisterSettings,
   type ResolvedLooMinisterSettings,
@@ -742,16 +749,19 @@ function ensureStructuredMinisterAnswer(
 
 async function buildProjectKnowledgeFacts(
   input: LooMinisterQuestionRequest,
+  classifiedIntent?: ClassifiedMinisterIntent,
 ): Promise<LooMinisterFact[]> {
   return (
     await getOrBuildContextPack({
       key: projectKnowledgePackKey({
         version: LOO_MINISTER_VERSION,
         page: input.pageContext.page,
-        intent: inferLooMinisterProjectKnowledgeIntent({
-          page: input.pageContext.page,
-          question: input.question,
-        }),
+        intent:
+          classifiedIntent?.primary ??
+          inferLooMinisterProjectKnowledgeIntent({
+            page: input.pageContext.page,
+            question: input.question,
+          }),
       }),
       kind: "project-knowledge",
       ttlMs: LOO_MINISTER_CONTEXT_PACK_TTL_MS.projectKnowledge,
@@ -770,7 +780,25 @@ async function buildProjectKnowledgeFacts(
           unique.set(item.id, item);
         }
 
-        const items = Array.from(unique.values()).slice(0, 5);
+        const filtered = classifiedIntent
+          ? selectMinisterFactsForIntent(
+              Array.from(unique.values()).map((item) => ({
+                id: item.id,
+                label: item.label,
+                value: item.value,
+                detail: item.detail,
+                source: "system" as const,
+              })),
+              classifiedIntent,
+              5,
+            )
+          : [];
+        const items =
+          filtered.length > 0
+            ? Array.from(unique.values()).filter((item) =>
+                filtered.some((fact) => fact.id === item.id),
+              )
+            : Array.from(unique.values()).slice(0, 5);
         return items.map((item) => ({
           id: item.id,
           label: item.label,
@@ -2684,6 +2712,7 @@ function sanitizeUnavailableRunAnalysisPromise(
 
 function buildRouterCompatiblePrompt(input: LooMinisterQuestionRequest) {
   const pageContext = input.pageContext;
+  const classifiedIntent = classifyLooMinisterIntent(input);
   const freshness = pageContext.dataFreshness;
   const portfolioContext = getPortfolioContext(input);
   const securityContext = getSecurityContext(input);
@@ -2730,6 +2759,8 @@ function buildRouterCompatiblePrompt(input: LooMinisterQuestionRequest) {
   return [
     "你是 Loo国大臣。你是项目内的投资管家型助手，不是数据字段解释器。只使用下面的页面摘要、用户持仓/偏好背景和缓存资料回答中文问题。",
     "回答必须先给清晰结论，再说明为什么和用户相关、组合影响、主要风险、下一步可确认事项。不要把 provider、sourceMode、context pack、DTO、fallback、run-analysis 等工程词直接说给用户。",
+    `本轮意图分类：primary=${classifiedIntent.primary}; secondary=${classifiedIntent.secondary.join(",") || "none"}; confidence=${classifiedIntent.confidence}。必须先回答 primary intent；secondary 只能作为必要补充。`,
+    "如果 primary 是 import_workflow、how_to_action 或 page_explanation，不得主动展开组合配置、Health、推荐或买入判断，除非用户明确问它们会不会受影响。",
     "不要编造实时行情、新闻或论坛结论；投资相关回答必须包含不构成投资建议的免责声明。",
     "如果用户要求帮忙分析、运行快扫或生成分析报告，只有在本轮 allowedActions 里存在 run-analysis 动作时，才可以说页面会提供确认式智能快扫按钮；否则必须说明当前聊天只能给轻量解释，并引导用户进入标的详情、Health Score、账户 Health 或推荐页运行对应快扫。suggestedActions 必须返回 []，后端会基于 allowedActions 附加确认动作。",
     "如果用户问整体持仓、组合、配置、Health 或推荐，必须优先解释组合上下文；如果用户问标的或持仓详情，必须优先解释标的上下文；如果进一步问是否适合买入/适配，必须解释候选适配；currentExposure=0 只代表未持有，不得阻止分析。",
@@ -3065,6 +3096,7 @@ function buildExternalInput(
   input: LooMinisterQuestionRequest,
   settings: ResolvedLooMinisterSettings,
 ) {
+  const classifiedIntent = classifyLooMinisterIntent(input);
   if (settings.provider === "openrouter-compatible") {
     return [
       {
@@ -3085,6 +3117,7 @@ function buildExternalInput(
       content: JSON.stringify({
         question: input.question,
         answerStyle: input.answerStyle,
+        intent: classifiedIntent,
         pageContext: input.pageContext,
         outputContract: "LooMinisterAnswerResult",
       }),
@@ -3219,8 +3252,12 @@ async function enrichMinisterInputWithDailyIntelligence(
 
 async function enrichMinisterInputWithProjectKnowledge(
   input: LooMinisterQuestionRequest,
+  classifiedIntent?: ClassifiedMinisterIntent,
 ): Promise<LooMinisterQuestionRequest> {
-  const knowledgeFacts = await buildProjectKnowledgeFacts(input);
+  const knowledgeFacts = await buildProjectKnowledgeFacts(
+    input,
+    classifiedIntent,
+  );
   if (knowledgeFacts.length === 0) {
     return input;
   }
@@ -3609,8 +3646,11 @@ export async function getLooMinisterAnswer(
   const resolvedContext = options.skipContextResolver
     ? { request: normalizedInput }
     : await resolveLooMinisterContext({ userId, request: normalizedInput });
+  const classifiedIntent = classifyLooMinisterIntent(resolvedContext.request);
+  const contextPolicy = getMinisterContextSelectionPolicy(classifiedIntent);
   const projectKnowledgeInput = await enrichMinisterInputWithProjectKnowledge(
     resolvedContext.request,
+    classifiedIntent,
   );
   const [
     dailyIntelligenceInput,
@@ -3618,16 +3658,26 @@ export async function getLooMinisterAnswer(
     portfolioContextInput,
     securityContextInput,
   ] = await Promise.all([
-    enrichMinisterInputWithDailyIntelligence(userId, projectKnowledgeInput),
-    enrichMinisterInputWithGlobalUserContext(userId, projectKnowledgeInput),
-    enrichMinisterInputWithPortfolioContext(userId, projectKnowledgeInput),
-    enrichMinisterInputWithSecurityContext(userId, projectKnowledgeInput),
+    contextPolicy.includeDailyIntelligence
+      ? enrichMinisterInputWithDailyIntelligence(userId, projectKnowledgeInput)
+      : projectKnowledgeInput,
+    contextPolicy.includeGlobalUserContext
+      ? enrichMinisterInputWithGlobalUserContext(userId, projectKnowledgeInput)
+      : projectKnowledgeInput,
+    contextPolicy.includePortfolioContext
+      ? enrichMinisterInputWithPortfolioContext(userId, projectKnowledgeInput)
+      : projectKnowledgeInput,
+    contextPolicy.includeSecurityContext
+      ? enrichMinisterInputWithSecurityContext(userId, projectKnowledgeInput)
+      : projectKnowledgeInput,
   ]);
   const [candidateFitInput, settings] = await Promise.all([
-    enrichMinisterInputWithCandidateFit(userId, securityContextInput),
+    contextPolicy.includeCandidateFit
+      ? enrichMinisterInputWithCandidateFit(userId, securityContextInput)
+      : securityContextInput,
     settingsPromise,
   ]);
-  const enrichedInput = mergeMinisterRequests(
+  const enrichedInputRaw = mergeMinisterRequests(
     projectKnowledgeInput,
     dailyIntelligenceInput,
     globalUserContextInput,
@@ -3635,6 +3685,13 @@ export async function getLooMinisterAnswer(
     securityContextInput,
     candidateFitInput,
   );
+  const enrichedInput = {
+    ...enrichedInputRaw,
+    pageContext: compactPageContextForMinisterIntent(
+      enrichedInputRaw.pageContext,
+      classifiedIntent,
+    ),
+  };
   const persistUsage = options.persistUsage ?? true;
   const allowProviderFallback = options.allowProviderFallback ?? true;
   const localAnswer = (fallbackReason?: string) =>
