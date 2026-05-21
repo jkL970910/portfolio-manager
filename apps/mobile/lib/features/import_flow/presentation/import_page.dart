@@ -2032,7 +2032,20 @@ class _IbkrPreviewAccountCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final holdings = account.holdings.take(5).toList();
+    final reviewHoldings = account.holdings
+        .where(
+          (holding) =>
+              holding.identityStatus != "ready" &&
+              holding.identityStatus != "skipped",
+        )
+        .toList();
+    final readyHoldings =
+        account.holdings.where((holding) => !reviewHoldings.contains(holding));
+    final holdings = [
+      ...reviewHoldings,
+      ...readyHoldings.take(5),
+    ];
+    final hiddenCount = account.holdings.length - holdings.length;
     return DecoratedBox(
       decoration: BoxDecoration(
         color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.16),
@@ -2089,11 +2102,11 @@ class _IbkrPreviewAccountCard extends StatelessWidget {
                   onReviewHolding: onReviewHolding,
                 ),
               ),
-              if (account.holdings.length > holdings.length)
+              if (hiddenCount > 0)
                 Padding(
                   padding: const EdgeInsets.only(top: 6),
                   child: Text(
-                    "还有 ${account.holdings.length - holdings.length} 个持仓未展开",
+                    "已优先显示待确认持仓；还有 $hiddenCount 个可导入持仓未展开",
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
                           color: context.looTokens.mutedText,
                         ),
