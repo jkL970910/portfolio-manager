@@ -2010,7 +2010,7 @@ class _IbkrPreviewResultCard extends StatelessWidget {
   }
 }
 
-class _IbkrPreviewAccountCard extends StatelessWidget {
+class _IbkrPreviewAccountCard extends StatefulWidget {
   const _IbkrPreviewAccountCard(
     this.account, {
     required this.selected,
@@ -2031,7 +2031,15 @@ class _IbkrPreviewAccountCard extends StatelessWidget {
   }) onReviewHolding;
 
   @override
+  State<_IbkrPreviewAccountCard> createState() => _IbkrPreviewAccountCardState();
+}
+
+class _IbkrPreviewAccountCardState extends State<_IbkrPreviewAccountCard> {
+  var _expanded = false;
+
+  @override
   Widget build(BuildContext context) {
+    final account = widget.account;
     final reviewHoldings = account.holdings
         .where(
           (holding) =>
@@ -2041,7 +2049,7 @@ class _IbkrPreviewAccountCard extends StatelessWidget {
         .toList();
     final readyHoldings =
         account.holdings.where((holding) => !reviewHoldings.contains(holding));
-    final holdings = [
+    final holdings = _expanded ? account.holdings : [
       ...reviewHoldings,
       ...readyHoldings.take(5),
     ];
@@ -2067,10 +2075,11 @@ class _IbkrPreviewAccountCard extends StatelessWidget {
                 ),
                 if (account.isReady)
                   Checkbox(
-                    value: selected,
-                    onChanged: onSelectionChanged == null
+                    value: widget.selected,
+                    onChanged: widget.onSelectionChanged == null
                         ? null
-                        : (value) => onSelectionChanged!(value ?? false),
+                        : (value) =>
+                            widget.onSelectionChanged!(value ?? false),
                   )
                 else
                   const _ImportPill("持仓待确认"),
@@ -2096,20 +2105,30 @@ class _IbkrPreviewAccountCard extends StatelessWidget {
                 (holding) => _IbkrPreviewHoldingRow(
                   account: account,
                   holding: holding,
-                  reviewing: reviewingHoldingKeys.contains(
+                  reviewing: widget.reviewingHoldingKeys.contains(
                     _draftHoldingKey(account, holding),
                   ),
-                  onReviewHolding: onReviewHolding,
+                  onReviewHolding: widget.onReviewHolding,
                 ),
               ),
               if (hiddenCount > 0)
-                Padding(
-                  padding: const EdgeInsets.only(top: 6),
-                  child: Text(
-                    "已优先显示待确认持仓；还有 $hiddenCount 个可导入持仓未展开",
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: context.looTokens.mutedText,
-                        ),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: TextButton.icon(
+                    onPressed: () => setState(() => _expanded = true),
+                    icon: const Icon(Icons.keyboard_arrow_down_rounded),
+                    label: Text(
+                      "展开全部持仓（还有 $hiddenCount 个）",
+                    ),
+                  ),
+                )
+              else if (_expanded && account.holdings.length > 5)
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: TextButton.icon(
+                    onPressed: () => setState(() => _expanded = false),
+                    icon: const Icon(Icons.keyboard_arrow_up_rounded),
+                    label: const Text("收起持仓"),
                   ),
                 ),
             ],
