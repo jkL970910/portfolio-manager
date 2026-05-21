@@ -4007,6 +4007,7 @@ export async function confirmBrokerageImportDraft(
       .filter(
         (holding) =>
           holding.identityStatus !== "ready" &&
+          holding.identityStatus !== "other_asset" &&
           holding.identityStatus !== "skipped",
       );
     if (holdingsNeedingReview.length > 0) {

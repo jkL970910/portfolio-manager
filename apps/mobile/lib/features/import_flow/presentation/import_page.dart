@@ -990,10 +990,14 @@ class _IbkrFlexPreviewSheetState extends State<_IbkrFlexPreviewSheet> {
       }
     } catch (error) {
       if (mounted) {
+        final message = error.toString();
         setState(() {
-          _error = error.toString();
+          _error = message;
           _confirming = false;
         });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(message)),
+        );
       }
     }
   }
@@ -1609,10 +1613,14 @@ class _SnapTradePreviewSheetState extends State<_SnapTradePreviewSheet> {
       }
     } catch (error) {
       if (mounted) {
+        final message = error.toString();
         setState(() {
-          _error = error.toString();
+          _error = message;
           _confirming = false;
         });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(message)),
+        );
       }
     }
   }
