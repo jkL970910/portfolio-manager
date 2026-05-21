@@ -205,10 +205,16 @@ class LooApiClient {
     return _deleteJson("/api/mobile/import/brokerage/snaptrade/connection");
   }
 
-  Future<Map<String, dynamic>> confirmBrokerageImportDraft(String draftId) {
+  Future<Map<String, dynamic>> confirmBrokerageImportDraft(
+    String draftId, {
+    List<String>? selectedAccountIds,
+  }) {
     return _postJson(
       "/api/mobile/import/brokerage/drafts/confirm",
-      body: {"draftId": draftId},
+      body: {
+        "draftId": draftId,
+        if (selectedAccountIds != null) "selectedAccountIds": selectedAccountIds,
+      },
     );
   }
 

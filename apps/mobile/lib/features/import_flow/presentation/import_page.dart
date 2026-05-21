@@ -800,6 +800,7 @@ class _IbkrFlexPreviewSheetState extends State<_IbkrFlexPreviewSheet> {
   String? _error;
   MobileIbkrFlexPreview? _preview;
   MobileBrokerageConnection? _connection;
+  final Set<String> _selectedAccountIds = {};
 
   @override
   void initState() {
@@ -899,6 +900,9 @@ class _IbkrFlexPreviewSheetState extends State<_IbkrFlexPreviewSheet> {
       if (mounted) {
         setState(() {
           _preview = MobileIbkrFlexPreview.fromJson(previewJson);
+          _selectedAccountIds
+            ..clear()
+            ..addAll(_preview!.readyAccounts.map((account) => account.accountId));
           _connection = connectionJson is Map<String, dynamic>
               ? MobileBrokerageConnection.fromJson(connectionJson)
               : _connection;
@@ -951,7 +955,10 @@ class _IbkrFlexPreviewSheetState extends State<_IbkrFlexPreviewSheet> {
 
     try {
       final response =
-          await widget.apiClient.confirmBrokerageImportDraft(preview.draftId);
+          await widget.apiClient.confirmBrokerageImportDraft(
+        preview.draftId,
+        selectedAccountIds: _selectedAccountIds.toList(),
+      );
       final data = response["data"];
       final accountsCreated = data is Map<String, dynamic>
           ? data["accountsCreated"] as int? ?? 0
@@ -1013,6 +1020,9 @@ class _IbkrFlexPreviewSheetState extends State<_IbkrFlexPreviewSheet> {
       if (mounted) {
         setState(() {
           _preview = MobileIbkrFlexPreview.fromJson(previewJson);
+          _selectedAccountIds
+            ..clear()
+            ..addAll(_preview!.readyAccounts.map((account) => account.accountId));
           _loading = false;
         });
       }
@@ -1131,10 +1141,20 @@ class _IbkrFlexPreviewSheetState extends State<_IbkrFlexPreviewSheet> {
                 if (_preview != null) ...[
                   const SizedBox(height: 16),
                   _IbkrPreviewResultCard(
-                    _preview!,
-                    confirming: _confirming,
-                    onConfirm: _confirming ? null : _confirmDraft,
-                  ),
+                  _preview!,
+                  confirming: _confirming,
+                  onConfirm: _confirming ? null : _confirmDraft,
+                  selectedAccountIds: _selectedAccountIds,
+                  onSelectionChanged: (accountId, selected) {
+                    setState(() {
+                      if (selected) {
+                        _selectedAccountIds.add(accountId);
+                      } else {
+                        _selectedAccountIds.remove(accountId);
+                      }
+                    });
+                  },
+                ),
                 ],
               ],
             ),
@@ -1350,6 +1370,7 @@ class _SnapTradePreviewSheetState extends State<_SnapTradePreviewSheet> {
   MobileBrokerageConnection? _connection;
   MobileSnapTradePortal? _portal;
   MobileIbkrFlexPreview? _preview;
+  final Set<String> _selectedAccountIds = {};
 
   @override
   void initState() {
@@ -1442,6 +1463,11 @@ class _SnapTradePreviewSheetState extends State<_SnapTradePreviewSheet> {
       if (mounted) {
         setState(() {
           _preview = MobileIbkrFlexPreview.fromJson(previewJson);
+          _selectedAccountIds
+            ..clear()
+            ..addAll(
+              _preview!.readyAccounts.map((account) => account.accountId),
+            );
           _connection = connectionJson is Map<String, dynamic>
               ? MobileBrokerageConnection.fromJson(connectionJson)
               : _connection;
@@ -1495,7 +1521,10 @@ class _SnapTradePreviewSheetState extends State<_SnapTradePreviewSheet> {
 
     try {
       final response =
-          await widget.apiClient.confirmBrokerageImportDraft(preview.draftId);
+          await widget.apiClient.confirmBrokerageImportDraft(
+        preview.draftId,
+        selectedAccountIds: _selectedAccountIds.toList(),
+      );
       final data = response["data"];
       final accountsCreated = data is Map<String, dynamic>
           ? data["accountsCreated"] as int? ?? 0
@@ -1583,6 +1612,16 @@ class _SnapTradePreviewSheetState extends State<_SnapTradePreviewSheet> {
                   _preview!,
                   confirming: _confirming,
                   onConfirm: _confirming ? null : _confirmDraft,
+                  selectedAccountIds: _selectedAccountIds,
+                  onSelectionChanged: (accountId, selected) {
+                    setState(() {
+                      if (selected) {
+                        _selectedAccountIds.add(accountId);
+                      } else {
+                        _selectedAccountIds.remove(accountId);
+                      }
+                    });
+                  },
                 ),
               ],
             ],
@@ -1757,17 +1796,22 @@ class _IbkrPreviewResultCard extends StatelessWidget {
     this.preview, {
     required this.confirming,
     required this.onConfirm,
+    required this.selectedAccountIds,
+    required this.onSelectionChanged,
   });
 
   final MobileIbkrFlexPreview preview;
   final bool confirming;
   final VoidCallback? onConfirm;
+  final Set<String> selectedAccountIds;
+  final void Function(String accountId, bool selected) onSelectionChanged;
 
   @override
   Widget build(BuildContext context) {
-    final hasReviewItems = preview.accounts
-        .expand((account) => account.holdings)
-        .any((holding) => holding.identityStatus != "ready");
+    final selectedReadyAccounts = preview.readyAccounts
+        .where((account) => selectedAccountIds.contains(account.accountId))
+        .toList();
+    final disabledConfirm = selectedReadyAccounts.isEmpty || confirming;
     return LooGlassCard(
       padding: const EdgeInsets.all(14),
       child: Column(
@@ -1795,7 +1839,15 @@ class _IbkrPreviewResultCard extends StatelessWidget {
           ),
           if (preview.accounts.isNotEmpty) ...[
             const SizedBox(height: 12),
-            ...preview.accounts.map(_IbkrPreviewAccountCard.new),
+            ...preview.accounts.map(
+              (account) => _IbkrPreviewAccountCard(
+                account,
+                selected: selectedAccountIds.contains(account.accountId),
+                onSelectionChanged: account.isReady
+                    ? (value) => onSelectionChanged(account.accountId, value)
+                    : null,
+              ),
+            ),
           ],
           if (preview.warnings.isNotEmpty) ...[
             const SizedBox(height: 12),
@@ -1815,7 +1867,7 @@ class _IbkrPreviewResultCard extends StatelessWidget {
           SizedBox(
             width: double.infinity,
             child: FilledButton.icon(
-              onPressed: hasReviewItems ? null : onConfirm,
+              onPressed: disabledConfirm ? null : onConfirm,
               icon: confirming
                   ? const SizedBox(
                       width: 16,
@@ -1828,8 +1880,8 @@ class _IbkrPreviewResultCard extends StatelessWidget {
           ),
           const SizedBox(height: 6),
           Text(
-            hasReviewItems
-                ? "有持仓仍待身份确认，暂不能写入主账本。"
+            preview.reviewAccounts.isNotEmpty
+                ? "已自动跳过 ${preview.reviewAccounts.length} 个需要确认的账户；可先写入已勾选账户。"
                 : "当前使用安全快照合并：同账户同标的会更新，不会重复新增。",
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
                   color: context.looTokens.mutedText,
@@ -1842,9 +1894,15 @@ class _IbkrPreviewResultCard extends StatelessWidget {
 }
 
 class _IbkrPreviewAccountCard extends StatelessWidget {
-  const _IbkrPreviewAccountCard(this.account);
+  const _IbkrPreviewAccountCard(
+    this.account, {
+    required this.selected,
+    required this.onSelectionChanged,
+  });
 
   final MobileIbkrFlexAccount account;
+  final bool selected;
+  final ValueChanged<bool>? onSelectionChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -1868,7 +1926,15 @@ class _IbkrPreviewAccountCard extends StatelessWidget {
                     style: Theme.of(context).textTheme.titleMedium,
                   ),
                 ),
-                _ImportPill("${account.holdings.length} 持仓"),
+                if (account.isReady)
+                  Checkbox(
+                    value: selected,
+                    onChanged: onSelectionChanged == null
+                        ? null
+                        : (value) => onSelectionChanged!(value ?? false),
+                  )
+                else
+                  const _ImportPill("需确认"),
               ],
             ),
             const SizedBox(height: 4),
@@ -1879,6 +1945,7 @@ class _IbkrPreviewAccountCard extends StatelessWidget {
                 if (account.netLiquidation != null)
                   "净值 ${_formatNumber(account.netLiquidation!)}",
                 if (account.cash != null) "现金 ${_formatNumber(account.cash!)}",
+                if (!account.isReady) "${account.reviewHoldingCount} 个持仓待确认",
               ].join(" · "),
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
                     color: context.looTokens.mutedText,

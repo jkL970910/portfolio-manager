@@ -202,6 +202,12 @@ class MobileIbkrFlexPreview {
           .toList(),
     );
   }
+
+  List<MobileIbkrFlexAccount> get readyAccounts =>
+      accounts.where((account) => account.isReady).toList();
+
+  List<MobileIbkrFlexAccount> get reviewAccounts =>
+      accounts.where((account) => !account.isReady).toList();
 }
 
 class MobileSnapTradePortal {
@@ -299,6 +305,12 @@ class MobileIbkrFlexAccount {
           .toList(),
     );
   }
+
+  bool get isReady =>
+      holdings.every((holding) => holding.identityStatus == "ready");
+
+  int get reviewHoldingCount =>
+      holdings.where((holding) => holding.identityStatus != "ready").length;
 }
 
 class MobileIbkrFlexHolding {

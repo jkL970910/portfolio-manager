@@ -3965,6 +3965,7 @@ export async function syncSnapTradeBrokerageConnection(userId: string) {
 export async function confirmBrokerageImportDraft(
   userId: string,
   draftId: string,
+  options: { selectedAccountIds?: string[] } = {},
 ) {
   const db = getDb();
 
@@ -3990,7 +3991,17 @@ export async function confirmBrokerageImportDraft(
     }
 
     const preview = draftRow.previewJson as BrokerageImportPreview;
-    const accounts = Array.isArray(preview.accounts) ? preview.accounts : [];
+    const allAccounts = Array.isArray(preview.accounts) ? preview.accounts : [];
+    const selectedAccountIds = new Set(
+      options.selectedAccountIds?.map((id) => id.trim()).filter(Boolean) ?? [],
+    );
+    const accounts =
+      selectedAccountIds.size > 0
+        ? allAccounts.filter((account) => selectedAccountIds.has(account.accountId))
+        : allAccounts;
+    if (accounts.length === 0) {
+      throw new Error("No brokerage import draft accounts were selected.");
+    }
     const holdingsNeedingReview = accounts
       .flatMap((account) => account.holdings)
       .filter((holding) => holding.identityStatus !== "ready");
@@ -4169,6 +4180,8 @@ export async function confirmBrokerageImportDraft(
 
     return {
       draftId,
+      accountsSelected: accounts.length,
+      accountsSkipped: Math.max(allAccounts.length - accounts.length, 0),
       accountsCreated,
       holdingsCreated,
       holdingsUpdated,

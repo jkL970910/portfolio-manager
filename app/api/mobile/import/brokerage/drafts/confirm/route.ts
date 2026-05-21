@@ -26,6 +26,7 @@ export async function POST(request: NextRequest) {
     const result = await confirmBrokerageImportDraft(
       viewer.id,
       parsed.data.draftId,
+      { selectedAccountIds: parsed.data.selectedAccountIds },
     );
     return NextResponse.json({ data: result }, { status: 200 });
   } catch (error) {

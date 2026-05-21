@@ -242,6 +242,10 @@ export const snapTradeConnectionPortalInputSchema = z.object({
 
 export const brokerageImportDraftConfirmInputSchema = z.object({
   draftId: z.string().trim().uuid(),
+  selectedAccountIds: z
+    .array(z.string().trim().min(1).max(160))
+    .max(100)
+    .optional(),
 });
 
 export const looMinisterSettingsInputSchema = z
