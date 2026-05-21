@@ -164,7 +164,12 @@ class _SettingsPageState extends State<SettingsPage> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text("设置", style: Theme.of(context).textTheme.headlineMedium),
-          const SizedBox(height: 12),
+          const SizedBox(height: 6),
+          Text(
+            "管理 Loo国身份、进货规矩、AI 大臣和外部数据源。",
+            style: Theme.of(context).textTheme.bodyMedium,
+          ),
+          const SizedBox(height: 14),
           Card(
             child: ListTile(
               title: Text(widget.viewerName),
@@ -173,79 +178,90 @@ class _SettingsPageState extends State<SettingsPage> {
             ),
           ),
           const SizedBox(height: 16),
-          _CitizenProfileCard(apiClient: widget.apiClient),
-          const SizedBox(height: 16),
-          _AppearanceModeCard(
-            selected: _themeMode,
-            onChanged: _changeThemeMode,
-          ),
-          const SizedBox(height: 16),
-          Text("显示币种", style: Theme.of(context).textTheme.titleLarge),
-          const SizedBox(height: 8),
-          SegmentedButton<String>(
-            segments: const [
-              ButtonSegment(value: "CAD", label: Text("CAD")),
-              ButtonSegment(value: "USD", label: Text("USD")),
-            ],
-            selected: {_currency},
-            onSelectionChanged: _savingCurrency
-                ? null
-                : (value) => _changeCurrency(value.first),
-          ),
-          if (_savingCurrency) ...[
-            const SizedBox(height: 8),
-            const LinearProgressIndicator(),
-          ],
-          if (_error != null) ...[
-            const SizedBox(height: 8),
-            Text(_error!,
-                style: TextStyle(color: Theme.of(context).colorScheme.error)),
-          ],
-          const SizedBox(height: 12),
-          _FxDisplayPolicyCard(
-            displayCurrency: _currency,
-            refreshResult: _fxRefreshResult,
-            refreshing: _refreshingFx,
-            onRefresh: _refreshFxRate,
-          ),
-          const SizedBox(height: 16),
-          Text("行情数据", style: Theme.of(context).textTheme.titleLarge),
-          const SizedBox(height: 8),
-          Card(
-            child: ListTile(
-              leading: const Icon(Icons.sync),
-              title: const Text("刷新组合行情"),
-              subtitle: Text(
-                _refreshResult ?? "按代码 + 交易所 + 币种刷新，避免 CAD 版本和美股正股混淆。",
+          _SettingsSectionCard(
+            icon: Icons.badge_outlined,
+            title: "我的身份",
+            subtitle: "Loo国身份、外观主题和显示口径",
+            initiallyExpanded: true,
+            children: [
+              _CitizenProfileCard(apiClient: widget.apiClient),
+              const SizedBox(height: 12),
+              _AppearanceModeCard(
+                selected: _themeMode,
+                onChanged: _changeThemeMode,
               ),
-              trailing: _refreshingQuotes
-                  ? const SizedBox(
-                      width: 22,
-                      height: 22,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Icon(Icons.chevron_right),
-              onTap: _refreshingQuotes ? null : _refreshQuotes,
-            ),
+              const SizedBox(height: 12),
+              _DisplayCurrencyCard(
+                currency: _currency,
+                saving: _savingCurrency,
+                error: _error,
+                onChanged: _changeCurrency,
+              ),
+            ],
           ),
           const SizedBox(height: 16),
-          _WorkerStatusCenterCard(apiClient: widget.apiClient),
+          _SettingsSectionCard(
+            icon: Icons.tune_rounded,
+            title: "进货规矩",
+            subtitle: "风险偏好、税务偏好和推荐约束",
+            initiallyExpanded: true,
+            children: [
+              InvestmentPreferencesCard(apiClient: widget.apiClient),
+            ],
+          ),
           const SizedBox(height: 16),
-          _SecurityMetadataReviewCard(apiClient: widget.apiClient),
+          _SettingsSectionCard(
+            icon: Icons.smart_toy_outlined,
+            title: "AI 与大臣",
+            subtitle: "OpenRouter / OpenAI Key、GPT 增强和调用状态",
+            initiallyExpanded: true,
+            children: [
+              _AiMinisterSettingsCard(apiClient: widget.apiClient),
+              const SizedBox(height: 12),
+              _DataAiCapabilitiesCard(apiClient: widget.apiClient),
+              const SizedBox(height: 12),
+              _RecentAnalysisCard(apiClient: widget.apiClient),
+            ],
+          ),
           const SizedBox(height: 16),
-          _MarketDataStatusCard(apiClient: widget.apiClient),
+          _SettingsSectionCard(
+            icon: Icons.hub_outlined,
+            title: "数据源与券商",
+            subtitle: "券商同步凭证、行情刷新、FX 口径和外部资料",
+            initiallyExpanded: true,
+            children: [
+              _ExternalServiceCredentialsCard(apiClient: widget.apiClient),
+              const SizedBox(height: 12),
+              _PortfolioQuoteRefreshCard(
+                refreshResult: _refreshResult,
+                refreshing: _refreshingQuotes,
+                onRefresh: _refreshQuotes,
+              ),
+              const SizedBox(height: 12),
+              _FxDisplayPolicyCard(
+                displayCurrency: _currency,
+                refreshResult: _fxRefreshResult,
+                refreshing: _refreshingFx,
+                onRefresh: _refreshFxRate,
+              ),
+              const SizedBox(height: 12),
+              _ExternalResearchPolicyCard(apiClient: widget.apiClient),
+              const SizedBox(height: 12),
+              _MarketDataStatusCard(apiClient: widget.apiClient),
+            ],
+          ),
           const SizedBox(height: 16),
-          _RecentAnalysisCard(apiClient: widget.apiClient),
-          const SizedBox(height: 16),
-          _ExternalResearchPolicyCard(apiClient: widget.apiClient),
-          const SizedBox(height: 16),
-          _DataAiCapabilitiesCard(apiClient: widget.apiClient),
-          const SizedBox(height: 16),
-          _AiMinisterSettingsCard(apiClient: widget.apiClient),
-          const SizedBox(height: 16),
-          _ExternalServiceCredentialsCard(apiClient: widget.apiClient),
-          const SizedBox(height: 16),
-          InvestmentPreferencesCard(apiClient: widget.apiClient),
+          _SettingsSectionCard(
+            icon: Icons.admin_panel_settings_outlined,
+            title: "高级维护",
+            subtitle: "Worker 状态、标的元数据和系统维护入口",
+            initiallyExpanded: false,
+            children: [
+              _WorkerStatusCenterCard(apiClient: widget.apiClient),
+              const SizedBox(height: 12),
+              _SecurityMetadataReviewCard(apiClient: widget.apiClient),
+            ],
+          ),
           const SizedBox(height: 24),
           FilledButton.tonalIcon(
             onPressed: widget.onLogout,
@@ -253,6 +269,145 @@ class _SettingsPageState extends State<SettingsPage> {
             label: const Text("退出 Loo国"),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _SettingsSectionCard extends StatelessWidget {
+  const _SettingsSectionCard({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.children,
+    this.initiallyExpanded = false,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final List<Widget> children;
+  final bool initiallyExpanded;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    return Card(
+      clipBehavior: Clip.antiAlias,
+      child: ExpansionTile(
+        initiallyExpanded: initiallyExpanded,
+        tilePadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+        childrenPadding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+        leading: Icon(icon),
+        title: Text(title, style: Theme.of(context).textTheme.titleMedium),
+        subtitle: Text(subtitle),
+        children: [
+          DecoratedBox(
+            decoration: BoxDecoration(
+              color: colors.surfaceContainerHighest.withValues(alpha: 0.18),
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(color: colors.outlineVariant),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(8),
+              child: Column(children: children),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _DisplayCurrencyCard extends StatelessWidget {
+  const _DisplayCurrencyCard({
+    required this.currency,
+    required this.saving,
+    required this.error,
+    required this.onChanged,
+  });
+
+  final String currency;
+  final bool saving;
+  final String? error;
+  final ValueChanged<String> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.currency_exchange_rounded),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    "显示币种",
+                    style: Theme.of(context).textTheme.titleLarge,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            SegmentedButton<String>(
+              segments: const [
+                ButtonSegment(value: "CAD", label: Text("CAD")),
+                ButtonSegment(value: "USD", label: Text("USD")),
+              ],
+              selected: {currency},
+              onSelectionChanged:
+                  saving ? null : (value) => onChanged(value.first),
+            ),
+            if (saving) ...[
+              const SizedBox(height: 8),
+              const LinearProgressIndicator(),
+            ],
+            if (error != null) ...[
+              const SizedBox(height: 8),
+              Text(
+                error!,
+                style: TextStyle(color: Theme.of(context).colorScheme.error),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _PortfolioQuoteRefreshCard extends StatelessWidget {
+  const _PortfolioQuoteRefreshCard({
+    required this.refreshResult,
+    required this.refreshing,
+    required this.onRefresh,
+  });
+
+  final String? refreshResult;
+  final bool refreshing;
+  final VoidCallback onRefresh;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: ListTile(
+        leading: const Icon(Icons.sync),
+        title: const Text("刷新组合行情"),
+        subtitle: Text(
+          refreshResult ?? "按代码 + 交易所 + 币种刷新，避免 CAD 版本和美股正股混淆。",
+        ),
+        trailing: refreshing
+            ? const SizedBox(
+                width: 22,
+                height: 22,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              )
+            : const Icon(Icons.chevron_right),
+        onTap: refreshing ? null : onRefresh,
       ),
     );
   }
