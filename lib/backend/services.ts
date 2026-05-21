@@ -4247,7 +4247,10 @@ export async function reviewBrokerageImportDraftHolding(
     throw new Error("Brokerage import draft has expired.");
   }
 
-  const preview = draftRow.previewJson as BrokerageImportPreview;
+  const preview = {
+    ...(draftRow.previewJson as BrokerageImportPreview),
+    draftId: draftRow.id,
+  };
   const account = preview.accounts.find(
     (item) => item.accountId === input.accountId,
   );
@@ -4302,6 +4305,11 @@ export async function reviewBrokerageImportDraftHolding(
 
   return {
     preview,
+    draft: mapBrokerageImportDraft({
+      ...draftRow,
+      previewJson: preview,
+      updatedAt: new Date(),
+    }),
     accountId: account.accountId,
     symbol: holding.symbol,
     identityStatus: holding.identityStatus,
