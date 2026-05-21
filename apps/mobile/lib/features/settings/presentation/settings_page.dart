@@ -254,7 +254,7 @@ class _SettingsPageState extends State<SettingsPage> {
           _SettingsSectionCard(
             icon: Icons.admin_panel_settings_outlined,
             title: "高级维护",
-            subtitle: "Worker 状态、标的元数据和系统维护入口",
+            subtitle: "云端更新、标的资料和系统维护入口",
             initiallyExpanded: false,
             children: [
               _WorkerStatusCenterCard(apiClient: widget.apiClient),
@@ -1043,7 +1043,7 @@ class _DataAiCapabilitiesCardState extends State<_DataAiCapabilitiesCard> {
                 ),
                 const SizedBox(height: 6),
                 Text(
-                  "这里展示会影响费用、速度或资料覆盖的功能。可保存的个人开关在对应设置卡片中调整；provider 可用性由云端配置决定。",
+                  "这里展示会影响费用、速度或资料覆盖的功能。可保存的个人开关在对应设置卡片中调整。",
                   style: Theme.of(context).textTheme.bodySmall,
                 ),
                 const SizedBox(height: 12),
@@ -1105,8 +1105,7 @@ class _DataAiCapabilities {
           title: "标的基本资料",
           statusLabel: profile?.enabled == true ? "可刷新" : "未启用",
           enabled: profile?.enabled == true && policy.canRunLiveResearch,
-          detail:
-              "个股当前走 Alpha Vantage；ETF/基金等待 EODHD 接入后再开放。${profile?.reason ?? ""}",
+          detail: "个股基本面资料已开放；ETF/基金资料等待下一阶段接入。${profile?.reason ?? ""}",
           actionLabel:
               "在标的详情页按单个刷新，额度 ${policy.remainingRuns}/${policy.dailyRunLimit}",
         ),
@@ -1122,9 +1121,9 @@ class _DataAiCapabilities {
         _DataAiCapabilityItem(
           icon: Icons.newspaper_outlined,
           title: "每日秘闻 / 新闻",
-          statusLabel: policy.scheduledOverviewEnabled ? "后台缓存" : "未启用",
+          statusLabel: policy.scheduledOverviewEnabled ? "已启用" : "未启用",
           enabled: policy.scheduledOverviewEnabled && news?.enabled == true,
-          detail: "总览级内容只由 worker 缓存；页面打开不会自动抓取新闻。${news?.reason ?? ""}",
+          detail: "总览级内容按日准备；页面打开不会临时抓取新闻。${news?.reason ?? ""}",
           actionLabel: "后续接入真实新闻源后按日刷新",
         ),
         _DataAiCapabilityItem(
@@ -1133,7 +1132,7 @@ class _DataAiCapabilities {
           statusLabel: "独立链路",
           enabled: true,
           detail:
-              "报价/走势图刷新不消耗外部研究额度；provider 状态在行情数据卡片中查看。${marketData?.reason ?? ""}",
+              "报价/走势图刷新不消耗 AI 资料额度；刷新状态在行情数据卡片中查看。${marketData?.reason ?? ""}",
           actionLabel: "可在组合或标的详情刷新",
         ),
       ],
@@ -1238,7 +1237,7 @@ class _WorkerStatusCenterCardState extends State<_WorkerStatusCenterCard> {
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                        status?.title ?? "云端后台任务中心",
+                        status?.title ?? "云端更新中心",
                         style: Theme.of(context).textTheme.titleLarge,
                       ),
                     ),
@@ -1248,7 +1247,7 @@ class _WorkerStatusCenterCardState extends State<_WorkerStatusCenterCard> {
                               ? null
                               : _refresh,
                       icon: const Icon(Icons.refresh),
-                      tooltip: "刷新后台任务状态",
+                      tooltip: "刷新云端更新状态",
                     ),
                   ],
                 ),
@@ -1257,12 +1256,12 @@ class _WorkerStatusCenterCardState extends State<_WorkerStatusCenterCard> {
                   const LinearProgressIndicator(),
                 ] else if (snapshot.hasError) ...[
                   Text(
-                    "后台任务状态暂时读取失败：${snapshot.error}",
+                    "云端更新状态暂时读取失败：${snapshot.error}",
                     style:
                         TextStyle(color: Theme.of(context).colorScheme.error),
                   ),
                 ] else if (status == null) ...[
-                  const Text("后台任务状态暂时不可用。"),
+                  const Text("云端更新状态暂时不可用。"),
                 ] else ...[
                   Text(status.statusLabel),
                   const SizedBox(height: 6),
@@ -1290,7 +1289,7 @@ class _WorkerStatusCenterCardState extends State<_WorkerStatusCenterCard> {
                   if (status.providerUsage.isNotEmpty) ...[
                     const Divider(),
                     Text(
-                      "最近外部接口用量",
+                      "最近外部资料用量",
                       style: Theme.of(context).textTheme.titleMedium,
                     ),
                     const SizedBox(height: 6),
@@ -1361,7 +1360,7 @@ class _SecurityMetadataReviewCardState
       final failed = payload["failedCount"] as int? ?? 0;
       if (!mounted) return;
       setState(() {
-        _message = "已检查 $sampled 个标的；更新 $updated，跳过 $skipped，失败 $failed。";
+        _message = "已检查 $sampled 个标的；更新 $updated，未更新 $skipped，失败 $failed。";
         _refreshingProvider = false;
         _snapshot = _loadSnapshot();
       });
@@ -1880,17 +1879,17 @@ class _ExternalServiceCredentialsCardState
                     children: [
                       Expanded(
                         child: FilledButton.icon(
-                          onPressed:
-                              _saving ? null : () => _saveSnapTrade(),
+                          onPressed: _saving ? null : () => _saveSnapTrade(),
                           icon: const Icon(Icons.save_outlined),
                           label: Text(_saving ? "保存中..." : "保存 SnapTrade"),
                         ),
                       ),
                       const SizedBox(width: 10),
                       OutlinedButton(
-                        onPressed: _saving || !snapTrade.userCredentialsConfigured
-                            ? null
-                            : () => _saveSnapTrade(clearCredentials: true),
+                        onPressed:
+                            _saving || !snapTrade.userCredentialsConfigured
+                                ? null
+                                : () => _saveSnapTrade(clearCredentials: true),
                         child: const Text("清除"),
                       ),
                     ],
@@ -2224,7 +2223,7 @@ class _MarketDataStatusCardState extends State<_MarketDataStatusCard> {
                 ),
                 const SizedBox(height: 6),
                 const Text(
-                  "顶部优先显示最近手动刷新；下方历史包含后台 worker 的预算保护记录。",
+                  "顶部优先显示最近手动刷新；下方保留最近更新记录。",
                 ),
                 if (snapshot.connectionState == ConnectionState.waiting) ...[
                   const SizedBox(height: 12),
@@ -2342,7 +2341,7 @@ class _FreshnessPolicySummary extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text("数据新鲜度策略", style: Theme.of(context).textTheme.titleSmall),
+            Text("数据有效期", style: Theme.of(context).textTheme.titleSmall),
             const SizedBox(height: 6),
             Text(policy.workerBoundaryLabel),
             const SizedBox(height: 8),
@@ -2362,7 +2361,7 @@ class _FreshnessPolicySummary extends StatelessWidget {
                     (item) => Padding(
                       padding: const EdgeInsets.only(top: 6),
                       child: Text(
-                        "${item.label}：${item.sourceLabel}；${item.staleBehaviorLabel}",
+                        "${item.label}：${item.ttlLabel}；${item.staleBehaviorLabel}",
                         style: Theme.of(context).textTheme.bodySmall,
                       ),
                     ),
@@ -2558,7 +2557,7 @@ class _ExternalResearchPolicyCardState
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                        "AI 外部研究",
+                        "AI 资料更新",
                         style: Theme.of(context).textTheme.titleLarge,
                       ),
                     ),
@@ -2577,7 +2576,7 @@ class _ExternalResearchPolicyCardState
                   const LinearProgressIndicator(),
                 ] else if (snapshot.hasError) ...[
                   Text(
-                    "外部研究策略暂时读取失败：${snapshot.error}",
+                    "资料更新策略暂时读取失败：${snapshot.error}",
                     style:
                         TextStyle(color: Theme.of(context).colorScheme.error),
                   ),
@@ -2596,24 +2595,23 @@ class _ExternalResearchPolicyCardState
                         label: Text(policy.statusLabel),
                       ),
                       if (policy.scheduledOverviewEnabled)
-                        const Chip(label: Text("每日总览缓存"))
+                        const Chip(label: Text("每日总览已启用"))
                       else
-                        const Chip(label: Text("总览自动缓存未启用")),
+                        const Chip(label: Text("每日总览未启用")),
                       if (policy.securityManualRefreshEnabled)
                         const Chip(label: Text("单标的限额刷新")),
-                      Chip(label: Text("TTL >= ${policy.ttlHours} 小时")),
+                      Chip(label: Text("有效期 >= ${policy.ttlHours} 小时")),
                     ],
                   ),
                   const SizedBox(height: 10),
-                  const Text(
-                      "总览秘闻只由后台 worker 每日缓存；单个标的可显式刷新且受次数和 TTL 限制。页面加载不会抓取新闻、论坛或付费外部 API。"),
+                  const Text("总览秘闻按日准备；单个标的可手动刷新且受次数和有效期限制。页面加载不会临时抓取新闻或付费资料。"),
                   const SizedBox(height: 10),
                   Text(
                     "今日用量：${policy.usedRuns}/${policy.dailyRunLimit} 次；剩余 ${policy.remainingRuns} 次。",
                     style: Theme.of(context).textTheme.bodySmall,
                   ),
                   Text(
-                    "成本边界：单次最多 ${policy.maxSymbolsPerRun} 个标的。",
+                    "单次最多处理 ${policy.maxSymbolsPerRun} 个标的。",
                     style: Theme.of(context).textTheme.bodySmall,
                   ),
                   const SizedBox(height: 10),
@@ -2654,13 +2652,13 @@ class _ExternalResearchPolicyCardState
                       final jobs = jobStatus?.items ??
                           const <_ExternalResearchJobItem>[];
                       if (jobs.isEmpty) {
-                        return const Text("最近没有外部研究任务。");
+                        return const Text("最近没有资料更新记录。");
                       }
                       return Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            "最近任务",
+                            "最近更新",
                             style: Theme.of(context).textTheme.titleMedium,
                           ),
                           const SizedBox(height: 6),
@@ -2713,8 +2711,8 @@ class _ExternalIntelligenceFreshnessNote extends StatelessWidget {
         padding: const EdgeInsets.all(12),
         child: Text(
           externalItem == null
-              ? "外部情报 TTL：${policy.externalIntelligenceTtlLabel}。${policy.workerBoundaryLabel}"
-              : "外部情报 TTL：${externalItem.ttlLabel}。${externalItem.staleBehaviorLabel} ${externalItem.userActionLabel}",
+              ? "每日资料有效期：${policy.externalIntelligenceTtlLabel}。${policy.workerBoundaryLabel}"
+              : "每日资料有效期：${externalItem.ttlLabel}。${externalItem.staleBehaviorLabel} ${externalItem.userActionLabel}",
           style: Theme.of(context).textTheme.bodySmall,
         ),
       ),
@@ -2765,7 +2763,7 @@ class _ExternalResearchJobsStatus {
     return [
       latestStatusLabel,
       latestStatusNote,
-      "运行 $runningCount / 排队 $queuedCount / 跳过 $skippedCount / 失败 $failedCount",
+      "运行 $runningCount / 排队 $queuedCount / 未更新 $skippedCount / 失败 $failedCount",
       workerBoundaryLabel,
     ].where((item) => item.isNotEmpty).join("\n");
   }
@@ -2776,11 +2774,11 @@ class _ExternalResearchJobsStatus {
         : const <String, dynamic>{};
     final rawItems = json["items"];
     return _ExternalResearchJobsStatus(
-      latestStatusLabel: summary["latestStatusLabel"] as String? ?? "还没有外部研究任务",
+      latestStatusLabel: summary["latestStatusLabel"] as String? ?? "还没有资料更新记录",
       latestStatusNote:
-          summary["latestStatusNote"] as String? ?? "最近没有外部研究任务；页面不会自动抓新闻或论坛。",
-      workerBoundaryLabel: summary["workerBoundaryLabel"] as String? ??
-          "外部研究只能由手动入队或后台 worker 执行。",
+          summary["latestStatusNote"] as String? ?? "最近没有资料更新记录；页面不会临时抓新闻或论坛。",
+      workerBoundaryLabel:
+          summary["workerBoundaryLabel"] as String? ?? "资料更新只能由手动触发或云端定时执行。",
       runningCount: summary["runningCount"] as int? ?? 0,
       queuedCount: summary["queuedCount"] as int? ?? 0,
       failedCount: summary["failedCount"] as int? ?? 0,
@@ -2873,7 +2871,7 @@ class _ExternalResearchJobItem {
         ? json["freshness"] as Map<String, dynamic>
         : const <String, dynamic>{};
     return _ExternalResearchJobItem(
-      scopeLabel: json["scopeLabel"] as String? ?? "外部研究",
+      scopeLabel: json["scopeLabel"] as String? ?? "资料更新",
       status: json["status"] as String? ?? "unknown",
       statusLabel: json["statusLabel"] as String? ?? "状态未知",
       targetKey: json["targetKey"] as String? ?? "目标未知",
@@ -2884,7 +2882,7 @@ class _ExternalResearchJobItem {
       maxAttempts: json["maxAttempts"] as int? ?? 3,
       statusNote: json["statusNote"] as String? ?? "状态待确认。",
       nextRetryLabel: json["nextRetryLabel"] as String?,
-      freshnessLabel: freshness["freshnessLabel"] as String? ?? "缓存状态未知",
+      freshnessLabel: freshness["freshnessLabel"] as String? ?? "资料状态未知",
       resultExpiresAtLabel: freshness["resultExpiresAtLabel"] as String?,
       createdAt:
           rawCreatedAt is String ? DateTime.tryParse(rawCreatedAt) : null,
@@ -2989,7 +2987,7 @@ class _ExternalResearchSource {
   factory _ExternalResearchSource.fromJson(Map<String, dynamic> json) {
     return _ExternalResearchSource(
       id: json["id"] as String? ?? "",
-      label: json["label"] as String? ?? "外部来源",
+      label: json["label"] as String? ?? "资料来源",
       enabled: json["enabled"] == true,
       reason: json["reason"] as String? ?? "暂未启用。",
     );
@@ -3080,7 +3078,7 @@ class _RecentAnalysisTile extends StatelessWidget {
                 const Divider(),
               ],
               if (item.sources.isNotEmpty) ...[
-                Text("来源", style: Theme.of(context).textTheme.titleMedium),
+                Text("数据依据", style: Theme.of(context).textTheme.titleMedium),
                 const SizedBox(height: 8),
                 ...item.sources.map(
                   (source) => ListTile(
@@ -3143,7 +3141,7 @@ class _RecentAnalysisItem {
     final rawGeneratedAt = json["generatedAt"];
     return _RecentAnalysisItem(
       scopeLabel: json["scopeLabel"] as String? ?? "智能快扫",
-      sourceLabel: json["sourceLabel"] as String? ?? "本地快扫",
+      sourceLabel: json["sourceLabel"] as String? ?? "智能快扫",
       title: json["title"] as String? ?? "智能快扫记录",
       detail: json["detail"] as String? ?? "",
       generatedAt:
@@ -3263,7 +3261,7 @@ class _AnalysisSource {
 
   factory _AnalysisSource.fromJson(Map<String, dynamic> json) {
     return _AnalysisSource(
-      title: json["title"] as String? ?? "来源",
+      title: json["title"] as String? ?? "数据依据",
       sourceType: json["sourceType"] as String? ?? "portfolio-data",
       date: json["date"] as String?,
     );

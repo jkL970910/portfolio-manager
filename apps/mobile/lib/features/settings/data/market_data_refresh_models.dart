@@ -108,7 +108,7 @@ class MobileFreshnessPolicy {
           readSummary("externalIntelligenceTtlLabel", "6 小时"),
       workerBoundaryLabel: readSummary(
         "workerBoundaryLabel",
-        "行情、FX、历史和外部情报都应走 worker/cache；手机页面只读状态或手动确认触发。",
+        "行情、FX、历史和每日资料由后台统一更新；手机端只展示结果或手动触发。",
       ),
       items: rawItems is List
           ? rawItems
@@ -145,8 +145,8 @@ class MobileFreshnessPolicyItem {
     return MobileFreshnessPolicyItem(
       id: json["id"] as String? ?? "unknown",
       label: json["label"] as String? ?? "数据策略",
-      ttlLabel: json["ttlLabel"] as String? ?? "TTL 未知",
-      sourceLabel: json["sourceLabel"] as String? ?? "来源待确认",
+      ttlLabel: json["ttlLabel"] as String? ?? "有效期待确认",
+      sourceLabel: json["sourceLabel"] as String? ?? "资料待确认",
       usageLabel: json["usageLabel"] as String? ?? "用途待确认",
       staleBehaviorLabel:
           json["staleBehaviorLabel"] as String? ?? "过期后会显示边界说明。",
@@ -217,7 +217,7 @@ class MarketDataRefreshRunItem {
   String get subtitle {
     return [
       "$triggerLabel · $createdAtLabel · $durationLabel",
-      if (isSkippedWorker) "这是后台 worker 的预算保护跳过，不代表手动行情刷新失败。",
+      if (isSkippedWorker) "这是系统预算保护，手动行情刷新不受影响。",
       "检查 $sampledSymbolCount 个标的；刷新 $refreshedHoldingCount 笔持仓；缺失 $missingQuoteCount；历史 $historyPointCount 条；${snapshotRecorded ? "已记录快照" : "未记录快照"}",
       if (fxRateLabel != null && fxRateLabel!.isNotEmpty) fxRateLabel!,
       if (fxFreshnessLabel != null && fxFreshnessLabel!.isNotEmpty)
@@ -252,13 +252,13 @@ class MarketDataRefreshRunItem {
       fxRateLabel: json["fxRateLabel"] as String?,
       fxFreshnessLabel: json["fxFreshnessLabel"] as String?,
       providerStatusLabel:
-          json["providerStatusLabel"] as String? ?? "没有 provider 状态说明。",
+          json["providerStatusLabel"] as String? ?? "暂无数据通道状态说明。",
       providerLimitLabels: rawProviderLimits is List
           ? rawProviderLimits
               .whereType<Map<String, dynamic>>()
               .where((item) => item["limited"] == true)
               .map((item) {
-              final provider = item["provider"] as String? ?? "provider";
+              final provider = item["provider"] as String? ?? "数据通道";
               final retryAfter = item["retryAfterSeconds"] as int?;
               return retryAfter == null
                   ? "$provider 已限流"
@@ -301,9 +301,8 @@ class WorkerStatusCenter {
     final rawTasks = json["tasks"];
     final rawProviderUsage = json["providerUsage"];
     return WorkerStatusCenter(
-      title: summary["title"] as String? ?? "云端后台任务中心",
-      statusLabel:
-          summary["statusLabel"] as String? ?? "行情、标的资料和外部研究由后台任务统一管理。",
+      title: summary["title"] as String? ?? "云端更新中心",
+      statusLabel: summary["statusLabel"] as String? ?? "行情、标的资料和每日内容由云端统一更新。",
       nextRunLabel: summary["nextRunLabel"] as String? ?? "下一次运行时间待确认。",
       tasks: rawTasks is List
           ? rawTasks
@@ -354,7 +353,7 @@ class WorkerTaskStatus {
     final rawLastFinishedAt = json["lastFinishedAt"];
     return WorkerTaskStatus(
       id: json["id"] as String? ?? "unknown",
-      title: json["title"] as String? ?? "后台任务",
+      title: json["title"] as String? ?? "云端更新",
       status: json["status"] as String? ?? "unknown",
       statusLabel: json["statusLabel"] as String? ?? "状态未知",
       note: json["note"] as String? ?? "暂无说明。",
@@ -392,12 +391,12 @@ class ProviderUsageItem {
   String get compactLabel {
     final quota =
         quotaLimit != null && quotaLimit! > 0 ? " / 上限 $quotaLimit" : "";
-    return "$provider：请求 $requestCount$quota，成功 $successCount，失败 $failureCount，跳过 $skippedCount";
+    return "$provider：使用 $requestCount$quota，成功 $successCount，失败 $failureCount，未更新 $skippedCount";
   }
 
   factory ProviderUsageItem.fromJson(Map<String, dynamic> json) {
     return ProviderUsageItem(
-      provider: json["provider"] as String? ?? "provider",
+      provider: json["provider"] as String? ?? "数据通道",
       endpoint: json["endpoint"] as String? ?? "unknown",
       usageDate: json["usageDate"] as String? ?? "",
       requestCount: json["requestCount"] as int? ?? 0,

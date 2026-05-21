@@ -86,7 +86,7 @@ class MobileChartFreshness {
       status: json["status"] as String? ?? "fallback",
       label: json["label"] as String? ?? "参考曲线",
       latestDate: json["latestDate"] as String?,
-      detail: json["detail"] as String? ?? "请确认数据来源和更新时间。",
+      detail: json["detail"] as String? ?? "请确认数据更新时间。",
     );
   }
 }

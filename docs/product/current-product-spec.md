@@ -1,6 +1,6 @@
 # Loo国的财富宝库 Current Product Spec
 
-Last updated: 2026-05-09
+Last updated: 2026-05-21
 
 ## Purpose
 
@@ -93,8 +93,10 @@ Design direction:
 
 Approved direction as of 2026-05-11:
 
-- The bottom nav remains `总览 / 组合 / 推荐 / 导入 / 设置`.
-- `组合` is the overall portfolio dashboard. It should focus on portfolio-level
+- The bottom nav product labels are `总览 / 国库 / 进货 / 上贡 / 设置`.
+  Internally, `国库` maps to portfolio, `进货` maps to recommendations, and
+  `上贡` maps to import/sync.
+- `国库` is the overall portfolio dashboard. It should focus on portfolio-level
   health, allocation, concentration, risk, and entry points.
 - Account list, holding list, account detail, holding detail, and security
   detail are explicit second-level routes rather than hidden sections inside one
@@ -141,6 +143,22 @@ Approved direction as of 2026-05-11:
   This prevents ZQQ/VFV-style CAD wrappers and CGL.C-style gold products from
   being incorrectly treated as Canadian Equity.
 
+### 3A. 上贡 / Brokerage Sync
+
+The mobile import surface is now `上贡`.
+
+- Manual account/holding maintenance remains available for repair and edge cases.
+- Brokerage sync is one user-facing flow, not separate product tabs per provider.
+- IBKR Flex Query and SnapTrade/Wealthsimple both use a draft-preview-confirm
+  boundary before writing into the Loo国 ledger.
+- Users can review imported accounts and unresolved holdings before confirm.
+- `other asset` is allowed for assets such as physical gold/GIC-like records,
+  but it is not eligible for AI security analysis or recommendation ranking.
+- Confirmed brokerage imports may create/update accounts and holdings, then the
+  page should refresh so duplicate manual accounts can be cleaned up.
+- Recurring automatic broker sync and long-lived credential lifecycle are P1/P2,
+  not MVP blockers.
+
 ### 4. Loo国研究台 And 智能快扫
 
 Security Detail starts with `Loo国研究台`:
@@ -170,6 +188,12 @@ Default quick scans are deterministic, backend-owned smart scans. They do not
 automatically call external GPT. GPT enhancement is a user-triggered explanation
 layer that must not override quick-scan conclusions, guardrails, or position
 boundaries.
+
+User-facing research UI should hide debug/audit language by default. Terms such
+as raw provider IDs, `cache`, `worker`, `fallback`, `DTO`, `sourceMode`, and
+`run-analysis` should not appear in primary mobile cards. Necessary trust
+signals should be expressed as product language such as `资料有效期`, `数据依据`,
+`云端更新`, `已有资料`, or explicit expandable detail sheets.
 
 ### 5. Security Decision Layer
 
@@ -241,13 +265,13 @@ Current first pass:
   PE/Forward PE, 52-week range, Beta, market cap, and one extra valuation anchor
   when available. Longer provider summaries, sanity checks, and extra metrics
   should be collapsed behind optional detail sections.
-- Security Detail should expose one user-facing `研究资料状态 / 更新` entry for
+- Security Detail should expose one user-facing `研究资料更新` entry for
   quote/history refresh, profile refresh, institutional refresh, and local
   research regeneration. The backend actions stay separate; the mobile UI should
   not scatter separate `刷新报价`、`刷新资料`、`重新生成` buttons across unrelated
   cards.
 - The update sheet must show the user-facing manual-refresh boundary: daily
-  remaining quota, cache TTL/window, latest task state, and source-specific
+  remaining quota,资料有效期, latest task state, and source-specific
   availability for profile vs institutional refresh. Source status must be
   matched by complete security identity and source id, not ticker-only.
 - Page load remains cache-only; new provider documents can invalidate old

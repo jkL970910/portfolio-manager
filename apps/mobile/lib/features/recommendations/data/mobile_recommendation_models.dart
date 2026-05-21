@@ -238,7 +238,7 @@ class MobileRecommendationMarketItem {
       dayChangeLabel: json["dayChangeLabel"] as String? ?? "待刷新",
       dayChangePctLabel: json["dayChangePctLabel"] as String? ?? "今日涨跌待刷新",
       dayChangeVariant: json["dayChangeVariant"] as String? ?? "unavailable",
-      freshnessLabel: json["freshnessLabel"] as String? ?? "暂无缓存行情",
+      freshnessLabel: json["freshnessLabel"] as String? ?? "暂无行情",
     );
   }
 }
@@ -367,9 +367,8 @@ class MobileRecommendationV4Policy {
       excludeRoles:
           (json["excludeRoles"] as List?)?.whereType<String>().toList() ??
               const [],
-      hardRules:
-          (json["hardRules"] as List?)?.whereType<String>().toList() ??
-              const [],
+      hardRules: (json["hardRules"] as List?)?.whereType<String>().toList() ??
+          const [],
       contributionAmountLabel:
           json["contributionAmountLabel"] as String? ?? "--",
       noSilentFallback: json["noSilentFallback"] as bool? ?? true,
@@ -686,8 +685,8 @@ class MobileCandidateBrief {
       decision: MobileCandidateBriefDecision.fromJson(json["decision"]),
       portfolioImpact:
           MobileCandidatePortfolioImpact.fromJson(json["portfolioImpact"]),
-      badges: (json["badges"] as List?)?.whereType<String>().toList() ??
-          const [],
+      badges:
+          (json["badges"] as List?)?.whereType<String>().toList() ?? const [],
       primaryBlocker: json["primaryBlocker"] as String?,
       rejectionReason: json["rejectionReason"] as String?,
       dailyBriefId: json["dailyBriefId"] as String?,
@@ -844,7 +843,7 @@ class MobileRecommendationIntelligenceRef {
     return MobileRecommendationIntelligenceRef(
       title: json["title"] as String? ?? "Loo国秘闻",
       detail: json["detail"] as String? ?? "",
-      sourceLabel: json["sourceLabel"] as String? ?? "本地快扫",
+      sourceLabel: json["sourceLabel"] as String? ?? "智能快扫",
       freshnessLabel: json["freshnessLabel"] as String? ?? "暂无行情新鲜度",
       scopeLabel: json["scopeLabel"] as String? ?? "底层资产情报",
       listingLabel: json["listingLabel"] as String? ?? "",

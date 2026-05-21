@@ -2499,7 +2499,7 @@ class _RecommendationPoolVisibilityCardState
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      "推荐池透明度",
+                      "候选池检查",
                       style: theme.textTheme.titleMedium?.copyWith(
                         fontWeight: FontWeight.w900,
                       ),
@@ -2538,13 +2538,13 @@ class _RecommendationPoolVisibilityCardState
             Divider(height: 1, color: tokens.cardBorder),
             const SizedBox(height: 12),
             _V4BreakdownBlock(
-              title: "来源构成",
+              title: "候选来源",
               items: snapshot.sourceBreakdown,
             ),
             if (snapshot.candidateEvidence.isNotEmpty) ...[
               const SizedBox(height: 12),
               Text(
-                "动态候选状态",
+                "候选状态",
                 style: theme.textTheme.labelLarge?.copyWith(
                   color: tokens.mutedText,
                 ),
@@ -2582,7 +2582,7 @@ class _RecommendationPoolVisibilityCardState
               ...rejected.map(_V4RejectedCandidateTile.new),
             const SizedBox(height: 10),
             Text(
-              "硬规则",
+              "进货规矩",
               style: theme.textTheme.labelLarge?.copyWith(
                 color: tokens.mutedText,
               ),

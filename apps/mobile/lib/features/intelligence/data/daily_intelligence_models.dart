@@ -32,7 +32,7 @@ class MobileDailyIntelligenceSnapshot {
     return MobileDailyIntelligenceSnapshot(
       generatedAt: json["generatedAt"] as String? ?? "",
       disclaimer: policy["disclaimer"] as String? ??
-          "Loo国今日秘闻只展示已缓存资料；页面加载不会触发实时外部 API。",
+          "Loo国今日秘闻只展示已准备好的每日资料；页面加载不会临时抓取新闻。",
       manualTriggerOnly: policy["manualTriggerOnly"] as bool? ?? true,
       scheduledOverviewEnabled:
           policy["scheduledOverviewEnabled"] as bool? ?? false,
@@ -43,7 +43,7 @@ class MobileDailyIntelligenceSnapshot {
           .toList(),
       emptyTitle: emptyState["title"] as String? ?? "暂时没有可用秘闻",
       emptyDetail:
-          emptyState["detail"] as String? ?? "先运行智能快扫或缓存外部研究，系统不会自动抓取新闻或论坛。",
+          emptyState["detail"] as String? ?? "今日还没有生成秘闻；请稍后刷新或手动运行每日更新。",
     );
   }
 }
@@ -73,8 +73,7 @@ class MobileDailyIntelligenceAiSummary {
   final bool cached;
   final String expiresAt;
 
-  factory MobileDailyIntelligenceAiSummary.fromJson(
-      Map<String, dynamic> json) {
+  factory MobileDailyIntelligenceAiSummary.fromJson(Map<String, dynamic> json) {
     return MobileDailyIntelligenceAiSummary(
       itemId: json["itemId"] as String? ?? "",
       generatedAt: json["generatedAt"] as String? ?? "",
@@ -247,10 +246,7 @@ class MobileDailyIntelligenceItem {
     final labels = <String>[
       displayTypeLabel,
       identity.symbol,
-    ]
-        .map((value) => value.trim())
-        .where((value) => value.isNotEmpty)
-        .toList();
+    ].map((value) => value.trim()).where((value) => value.isNotEmpty).toList();
     final deduped = <String>[];
     for (final label in labels) {
       if (!deduped.any((existing) => _sameLooseLabel(existing, label))) {
@@ -293,7 +289,7 @@ class MobileDailyIntelligenceItem {
       id: json["id"] as String? ?? "",
       title: json["title"] as String? ?? "Loo国秘闻",
       summary: json["summary"] as String? ?? "",
-      sourceLabel: json["sourceLabel"] as String? ?? "缓存情报",
+      sourceLabel: json["sourceLabel"] as String? ?? "每日资料",
       sourceType: json["sourceType"] as String? ?? "analysis",
       sourceMode: json["sourceMode"] as String? ?? "local",
       confidenceLabel: json["confidenceLabel"] as String? ?? "可信度待校准",

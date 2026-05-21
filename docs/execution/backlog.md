@@ -3,7 +3,7 @@
 > [!IMPORTANT]
 > As of 2026-04-25, this project is now Flutter-first, mobile-first, Chinese-only, and Loo皇-themed. When this document conflicts with `docs/execution/flutter-mobile-migration-plan.md`, follow the migration plan first.
 
-Last updated: 2026-05-13
+Last updated: 2026-05-21
 
 ## Objective
 
@@ -105,7 +105,7 @@ This is the current source of truth before starting the next P0 implementation.
 | -------------------------- | ------------------------------------------- |
 | Full budgeting parity      | Still outside the product core              |
 | Automated trading          | Not part of the current thesis              |
-| Broker-native integrations | CSV remains the right first boundary        |
+| Fully automated broker sync | MVP supports manual/confirmed sync; unattended scheduled sync and credential lifecycle hardening remain later work |
 | English-mode support       | Explicitly dropped                          |
 | Desktop-first web polish   | Explicitly dropped as the primary direction |
 
@@ -121,6 +121,43 @@ This is the current source of truth before starting the next P0 implementation.
 | Independent news provider for 今日秘闻       | P1               | Alpha Vantage `NEWS_SENTIMENT` is the first worker-only news cache source, but it shares quota with profile/earnings and has weak TSX ETF coverage. Add a dedicated news provider later so daily briefs do not consume fundamentals quota and can return at least three reliable overview-level items. |
 | AlphaPick screenshot ingestion               | P1               | Convert purchased AlphaPick list screenshots into a reviewed watchlist/import pipeline with OCR, symbol identity resolution, source attribution, freshness labels, and manual confirmation before use.                                                         |
 | Unified brokerage import                     | P1               | Add one `券商同步` flow for broker imports instead of provider-specific tabs. First build target: IBKR Flex Query. First feasibility spike: Wealthsimple via SnapTrade. Architecture source: `docs/execution/brokerage-import-architecture.md`.                |
+
+## MVP Signoff Gate
+
+Before tagging an MVP baseline, only the following items block signoff:
+
+1. Commit the current mobile-facing copy cleanup so primary cards avoid debug
+   terms such as `cache`, `worker`, raw provider IDs, `fallback`, `DTO`,
+   `sourceMode`, and `run-analysis`.
+2. Run the mobile smoke checklist in
+   `docs/guides/mobile-manual-qa-sop.md`, especially auth/session, Overview,
+   国库/portfolio, Health, 进货/recommendations, 上贡/import, Settings,
+   AI 大臣, search/watchlist, and Security Detail research.
+3. Verify brokerage import safety:
+   - IBKR Flex Query preview and confirm path works once.
+   - SnapTrade/Wealthsimple preview and confirm path works once, or an external
+     auth blocker is recorded.
+   - unresolved holdings can be confirmed, marked as other asset, or skipped.
+   - duplicate manual accounts can be force-deleted and the page refreshes.
+4. Verify destructive actions are explicit and scoped: account delete, holding
+   delete, and brokerage draft confirm must require user action and must not
+   silently merge ticker-only identities.
+5. Verify cloud/mobile deployment targets are current:
+   - Vercel backend API is reachable.
+   - Cloudflare Pages mobile URL loads the latest build.
+   - Worker-driven data such as market pulse/news can be stale or unavailable,
+     but must be labelled as unavailable rather than fabricated.
+
+The following do not block MVP signoff and remain P1/P2:
+
+- Recommendation algorithm deepening beyond current V4 visibility/policy work.
+- Dynamic candidate registry and worker-discovered recommendation pool.
+- Dedicated independent news provider for 今日秘闻.
+- AlphaPick screenshot ingestion.
+- Fully scheduled unattended IBKR/SnapTrade sync and long-lived credential
+  lifecycle hardening.
+- Light/dark/system theme settings.
+- AI 大臣 intent-router/context-selector refactor.
 
 ## Recommendation V3 / 进货工作台 Next Task List
 

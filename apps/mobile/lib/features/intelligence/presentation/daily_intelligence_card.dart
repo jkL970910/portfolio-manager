@@ -699,7 +699,7 @@ class _DailyAiSummarySection extends StatelessWidget {
                 ),
                 if (summary?.cached == true)
                   Text(
-                    "已缓存",
+                    "已生成",
                     style: theme.textTheme.labelSmall?.copyWith(
                       color: tokens.mutedText,
                     ),

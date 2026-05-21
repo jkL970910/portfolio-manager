@@ -281,7 +281,7 @@ class _SecurityDetailPageState extends State<SecurityDetailPage> {
                         ),
                         const SizedBox(height: 6),
                         Text(
-                          "报价、基本资料、财报资料分开刷新；研究结论只读取已经落入缓存的资料。",
+                          "报价、基本资料、财报资料分开刷新；刷新完成后会更新研究台。",
                           style: Theme.of(sheetContext).textTheme.bodySmall,
                         ),
                         const SizedBox(height: 14),
@@ -339,7 +339,7 @@ class _SecurityDetailPageState extends State<SecurityDetailPage> {
                           icon: Icons.event_note_outlined,
                           title: institutionalAction?.label ?? "刷新财报资料",
                           detail: institutionalAction?.displayDetail ??
-                              "财报/盈利披露资料，完成后进入缓存供研究台使用。",
+                              "财报/盈利披露资料，完成后供研究台使用。",
                           isBusy: isRefreshingInstitutional,
                           onTap: !isRefreshingInstitutional &&
                                   (institutionalAction?.enabled ?? false)
@@ -362,7 +362,7 @@ class _SecurityDetailPageState extends State<SecurityDetailPage> {
                           title: "重新生成研究结论",
                           detail: _isSubmittingExternalResearch
                               ? "资料刷新完成后会自动更新；也可以稍后手动重新生成。"
-                              : "不抓新资料，只用当前缓存重新跑智能快扫。",
+                              : "不抓新资料，只用现有资料重新跑智能快扫。",
                           isBusy: _isSubmittingExternalResearch,
                           onTap: _isSubmittingExternalResearch
                               ? null
@@ -453,7 +453,7 @@ class _SecurityDetailPageState extends State<SecurityDetailPage> {
       final targetKey = job?["targetKey"] as String?;
       if (!mounted) return;
       setState(() {
-        _externalResearchMessage = "已提交后台刷新。系统会轮询任务状态，等资料真正写入缓存后再自动更新研究结果。";
+        _externalResearchMessage = "已提交刷新。完成后会自动更新研究台。";
         if (targetKey != null && targetKey.isNotEmpty) {
           _runningResearchTargetKeys[source] = targetKey;
         }
@@ -827,7 +827,10 @@ String? _watchlistKeyForData(MobileSecurityDetailSnapshot data) {
   final symbol = data.symbol.trim().toUpperCase();
   final exchange = data.exchange.trim().toUpperCase();
   final currency = data.currency.trim().toUpperCase();
-  if (symbol.isEmpty || symbol == "--" || exchange.isEmpty || currency.isEmpty) {
+  if (symbol.isEmpty ||
+      symbol == "--" ||
+      exchange.isEmpty ||
+      currency.isEmpty) {
     return null;
   }
   return _normalizeWatchlistSymbol("$symbol:$exchange:$currency");
@@ -1086,8 +1089,7 @@ class MobileResearchRefreshAction {
     return [
       if (!enabled && disabledReason != null) disabledReason,
       detail,
-      if (providerLabel.isNotEmpty) "来源：$providerLabel",
-      if (estimatedCalls > 0) "预计 $estimatedCalls 次调用",
+      if (estimatedCalls > 0) "预计消耗 $estimatedCalls 次额度",
       quotaLabel,
       cache.label,
       if (cache.lastUpdatedAtLabel != null) "最近尝试 ${cache.lastUpdatedAtLabel}",
@@ -2080,7 +2082,7 @@ class _ResearchRefreshStatusCard extends StatelessWidget {
       return const _ResearchRefreshStatusShell(
         icon: Icons.hourglass_empty,
         title: "正在读取刷新状态",
-        detail: "确认缓存窗口和最近任务状态。",
+        detail: "正在确认可刷新项目和最近尝试记录。",
       );
     }
     if (errorMessage != null && errorMessage!.isNotEmpty) {
@@ -2304,23 +2306,23 @@ class _ResearchRefreshSnapshot {
         manualRefreshEnabled &&
         (remainingRuns == null || remainingRuns > 0);
     final ttlLabel = defaultTtlSeconds == null
-        ? "缓存窗口待确认"
-        : "缓存 ${_formatTtl(defaultTtlSeconds)}";
+        ? "有效期待确认"
+        : "资料有效期 ${_formatTtl(defaultTtlSeconds)}";
     final quotaLabel = dailyRunLimit == null
-        ? "外部资料额度待确认"
-        : "外部资料额度剩余 ${remainingRuns ?? "--"} / $dailyRunLimit";
+        ? "刷新额度待确认"
+        : "今日刷新额度剩余 ${remainingRuns ?? "--"} / $dailyRunLimit";
     final latestLabel = (summary["latestStatusLabel"] as String?)?.trim() ?? "";
 
     final detail = !canRunLiveResearch
-        ? "外部资料来源尚未完整启用；当前只能使用已缓存资料和本地快扫。"
+        ? "外部资料尚未完整启用；当前只能使用已有资料。"
         : !manualRefreshEnabled
-            ? "单标的手动刷新当前关闭；等待后台任务写入缓存。"
+            ? "单标的手动刷新当前未开启。"
             : remainingRuns == 0
-                ? "今日外部资料刷新次数已用完；报价刷新不受这个额度影响。"
-                : "点击基本资料或财报资料会提交后台任务，完成后再重新生成研究结论。";
+                ? "今日资料刷新次数已用完；报价刷新不受这个额度影响。"
+                : "点击基本资料或财报资料会开始更新，完成后再重新生成研究结论。";
 
     return _ResearchRefreshSnapshot(
-      statusLabel: baseCanSubmit ? "可手动刷新外部资料" : "外部资料暂不可刷新",
+      statusLabel: baseCanSubmit ? "可手动刷新资料" : "资料暂不可刷新",
       detail: detail,
       ttlLabel: ttlLabel,
       latestLabel: latestLabel,
@@ -2401,7 +2403,7 @@ class _ResearchSourceRefreshStatus {
             : !baseCanSubmit
                 ? blockedDetail
                 : latest == null
-                    ? "未见最近刷新；$quotaLabel；完成后进入$ttlLabel。"
+                    ? "未见最近刷新；$quotaLabel；$ttlLabel。"
                     : [
                         quotaLabel,
                         latest["resultLabel"] as String? ??

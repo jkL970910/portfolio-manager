@@ -951,7 +951,8 @@ class _IbkrFlexPreviewSheetState extends State<_IbkrFlexPreviewSheet> {
           );
           _selectedAccountIds
             ..clear()
-            ..addAll(_preview!.readyAccounts.map((account) => account.accountId));
+            ..addAll(
+                _preview!.readyAccounts.map((account) => account.accountId));
           _connection = connectionJson is Map<String, dynamic>
               ? MobileBrokerageConnection.fromJson(connectionJson)
               : _connection;
@@ -1017,8 +1018,7 @@ class _IbkrFlexPreviewSheetState extends State<_IbkrFlexPreviewSheet> {
     });
 
     try {
-      final response =
-          await widget.apiClient.confirmBrokerageImportDraft(
+      final response = await widget.apiClient.confirmBrokerageImportDraft(
         preview.draftId,
         selectedAccountIds: _selectedAccountIds.toList(),
       );
@@ -1147,7 +1147,8 @@ class _IbkrFlexPreviewSheetState extends State<_IbkrFlexPreviewSheet> {
           );
           _selectedAccountIds
             ..clear()
-            ..addAll(_preview!.readyAccounts.map((account) => account.accountId));
+            ..addAll(
+                _preview!.readyAccounts.map((account) => account.accountId));
           _loading = false;
         });
       }
@@ -1727,8 +1728,7 @@ class _SnapTradePreviewSheetState extends State<_SnapTradePreviewSheet> {
     });
 
     try {
-      final response =
-          await widget.apiClient.confirmBrokerageImportDraft(
+      final response = await widget.apiClient.confirmBrokerageImportDraft(
         preview.draftId,
         selectedAccountIds: _selectedAccountIds.toList(),
       );
@@ -2033,7 +2033,7 @@ class _SnapTradeConnectionCard extends StatelessWidget {
           ],
           const SizedBox(height: 4),
           Text(
-            "SnapTrade 返回的是券商缓存快照；确认草稿前仍需检查账户、标的和币种。",
+            "SnapTrade 返回的是券商账户快照；确认草稿前仍需检查账户、标的和币种。",
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
                   color: context.looTokens.mutedText,
                 ),
@@ -2192,7 +2192,8 @@ class _IbkrPreviewAccountCard extends StatefulWidget {
   }) onReviewHolding;
 
   @override
-  State<_IbkrPreviewAccountCard> createState() => _IbkrPreviewAccountCardState();
+  State<_IbkrPreviewAccountCard> createState() =>
+      _IbkrPreviewAccountCardState();
 }
 
 class _IbkrPreviewAccountCardState extends State<_IbkrPreviewAccountCard> {
@@ -2209,10 +2210,12 @@ class _IbkrPreviewAccountCardState extends State<_IbkrPreviewAccountCard> {
         .toList();
     final readyHoldings =
         account.holdings.where((holding) => !reviewHoldings.contains(holding));
-    final holdings = _expanded ? account.holdings : [
-      ...reviewHoldings,
-      ...readyHoldings.take(5),
-    ];
+    final holdings = _expanded
+        ? account.holdings
+        : [
+            ...reviewHoldings,
+            ...readyHoldings.take(5),
+          ];
     final hiddenCount = account.holdings.length - holdings.length;
     return DecoratedBox(
       decoration: BoxDecoration(
@@ -2237,8 +2240,7 @@ class _IbkrPreviewAccountCardState extends State<_IbkrPreviewAccountCard> {
                   value: widget.selected,
                   onChanged: widget.onSelectionChanged == null
                       ? null
-                      : (value) =>
-                          widget.onSelectionChanged!(value ?? false),
+                      : (value) => widget.onSelectionChanged!(value ?? false),
                 ),
               ],
             ),
@@ -2322,7 +2324,7 @@ class _IbkrPreviewHoldingRow extends StatelessWidget {
     final statusLabel = switch (holding.identityStatus) {
       "ready" => "可导入",
       "other_asset" => "其他资产",
-      "skipped" => "已跳过",
+      "skipped" => "本次不导入",
       _ => "待确认",
     };
     return Padding(
@@ -2405,7 +2407,7 @@ class _IbkrPreviewHoldingRow extends StatelessWidget {
                                 holding: holding,
                                 action: "skip",
                               ),
-                      child: const Text("本次跳过"),
+                      child: const Text("本次不导入"),
                     ),
                   ],
                 ),

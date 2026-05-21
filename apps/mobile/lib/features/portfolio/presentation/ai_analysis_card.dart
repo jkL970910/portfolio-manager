@@ -1081,11 +1081,11 @@ String _friendlyAnalysisText(String value) {
   var text = value;
   text = text.replaceAllMapped(
     RegExp(r"quotes=([a-zA-Z0-9_-]+)"),
-    (match) => "报价来自 ${_providerLabel(match.group(1) ?? "")}",
+    (match) => "报价已更新",
   );
   text = text.replaceAllMapped(
     RegExp(r"history=([a-zA-Z0-9_-]+)"),
-    (match) => "历史价格来自 ${_providerLabel(match.group(1) ?? "")}",
+    (match) => "历史价格已更新",
   );
   text = text.replaceAllMapped(
     RegExp(r"quoteStatus=([a-zA-Z0-9_-]+)"),
@@ -1100,33 +1100,23 @@ String _friendlyAnalysisText(String value) {
     (match) => "历史样本 ${match.group(1)} 个交易日",
   );
   text = text
-      .replaceAll("Cached holding quotes", "缓存持仓报价")
-      .replaceAll("Cached price history", "缓存价格历史")
-      .replaceAll("Local holdings and account data", "本地持仓与账户数据")
-      .replaceAll("Cached holding quote fields", "缓存持仓报价字段")
-      .replaceAll("Local portfolio health summary", "本地组合健康摘要")
-      .replaceAll("Local account health summary", "本地账户健康摘要")
-      .replaceAll("Local account holdings", "本地账户持仓")
-      .replaceAll("Local recommendation run", "本地推荐记录")
-      .replaceAll("provider", "数据来源")
-      .replaceAll("Provider", "数据来源")
-      .replaceAll("sourceMode", "来源状态")
+      .replaceAll("Cached holding quotes", "持仓报价")
+      .replaceAll("Cached price history", "历史价格")
+      .replaceAll("Local holdings and account data", "持仓与账户数据")
+      .replaceAll("Cached holding quote fields", "持仓报价字段")
+      .replaceAll("Local portfolio health summary", "组合健康摘要")
+      .replaceAll("Local account health summary", "账户健康摘要")
+      .replaceAll("Local account holdings", "账户持仓")
+      .replaceAll("Local recommendation run", "推荐记录")
+      .replaceAll("provider", "数据依据")
+      .replaceAll("Provider", "数据依据")
+      .replaceAll("sourceMode", "资料状态")
       .replaceAll("fallback", "保守参考")
       .replaceAll("Fallback", "保守参考")
       .replaceAll("run-analysis", "智能快扫")
       .replaceAll("DTO", "数据结构");
   text = text.replaceAll(RegExp(r"\bP[0-3]\b\s*[:：]?\s*"), "");
   return text.replaceAll(RegExp(r"\s*;\s*"), "；").trim();
-}
-
-String _providerLabel(String value) {
-  return value
-      .split(RegExp(r"[-_\s]+"))
-      .where((part) => part.isNotEmpty)
-      .map((part) => part.length <= 3
-          ? part.toUpperCase()
-          : "${part.substring(0, 1).toUpperCase()}${part.substring(1)}")
-      .join(" ");
 }
 
 String _quoteStatusLabel(String value) {
@@ -1430,8 +1420,8 @@ class _SecurityResearchProfileView extends StatelessWidget {
             ),
           ),
         _AuditSheetButton(
-          label: "查看资料来源",
-          title: "标的资料来源",
+          label: "查看数据依据",
+          title: "数据依据",
           child: _ResearchEvidenceAuditView(
             evidence: data.evidence,
             valuationEvidence: data.valuationEvidence,
@@ -1643,9 +1633,8 @@ class _ValuationEvidenceView extends StatelessWidget {
           const SizedBox(height: 10),
           const _InlineInfoCallout(
             icon: Icons.badge_outlined,
-            title: "需要先缓存基本资料",
-            detail:
-                "点击标的详情里的「研究资料状态」提交「基本资料」或「财报资料」。任务完成并写入缓存后，再重新生成研究结论即可看到估值锚点。",
+            title: "需要先补充基本资料",
+            detail: "点击标的详情里的「研究资料更新」提交「基本资料」或「财报资料」。任务完成后，再重新生成研究结论即可看到估值锚点。",
           ),
         ],
         if (remainingAnchors.isNotEmpty) ...[
@@ -3029,10 +3018,9 @@ bool _hasAnalysisAuditData(MobileAiAnalysisResult data) {
 }
 
 List<String> _securityInfoSummaryPills(MobileSecurityResearchProfile data) {
-  final limitationPill =
-      data.limitationSummary == null
-          ? null
-          : _researchLimitationPill(data.limitationSummary!);
+  final limitationPill = data.limitationSummary == null
+      ? null
+      : _researchLimitationPill(data.limitationSummary!);
   return [
     data.securityLabel,
     _assetTypeLabel(data.assetType),
@@ -3048,8 +3036,7 @@ String? _researchLimitationPill(String value) {
   if (normalized.isEmpty) {
     return null;
   }
-  final hasInsufficientSignal =
-      normalized.contains("不足") ||
+  final hasInsufficientSignal = normalized.contains("不足") ||
       normalized.contains("缺") ||
       normalized.contains("不能支撑") ||
       normalized.contains("低置信") ||
