@@ -2004,6 +2004,7 @@ function mapMobileImportData(data: ImportData): MobileImportData {
         setupItems: [
           "业绩与报告 → 自主查询 → 自主网络服务配置，启用服务并复制“授权口令 / Token”",
           "活动自主查询 → 新建查询，格式选 XML；必选账户信息、未平仓仓位、现金报告、基础币种权益总结",
+          "未平仓仓位字段请勾选数量、币种、标的、交易所、Mark Price、Position Value、Cost Basis Price、Cost Basis Money；否则导入后会显示成本待补",
           "保存查询后复制数字“查询编号 / Query ID”；不要填账户号或查询名称",
         ],
         limitations: [

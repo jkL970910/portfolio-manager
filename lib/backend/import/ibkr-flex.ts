@@ -238,19 +238,34 @@ function parseOpenPositions(xml: string): IbkrFlexPreviewHolding[] {
         getAttribute(element, "listingExchange") ??
         getAttribute(element, "exchange") ??
         null;
+      const markPrice = parseFlexNumber(getAttribute(element, "markPrice"));
+      const avgCostPerShare = getFirstNumericAttributeFromElement(element, [
+        "costPrice",
+        "costBasisPrice",
+        "openPrice",
+        "costBasisPriceInBase",
+      ]);
+      const costBasis =
+        getFirstNumericAttributeFromElement(element, [
+          "costBasisMoney",
+          "costBasis",
+          "costBasisInBase",
+          "costBasisMoneyInBase",
+        ]) ??
+        (avgCostPerShare != null && quantity !== 0
+          ? round(avgCostPerShare * Math.abs(quantity), 2)
+          : null);
+      const price = markPrice ?? avgCostPerShare;
+      const marketValue =
+        parseFlexNumber(getAttribute(element, "positionValue")) ??
+        parseFlexNumber(getAttribute(element, "value"));
+
       const warnings = buildHoldingWarnings({
         assetCategory: getAttribute(element, "assetCategory") ?? "Unknown",
         exchange,
-        price:
-          parseFlexNumber(getAttribute(element, "markPrice")) ??
-          parseFlexNumber(getAttribute(element, "costPrice")),
-        marketValue: parseFlexNumber(getAttribute(element, "positionValue")),
+        price,
+        marketValue,
       });
-      const avgCostPerShare = parseFlexNumber(getAttribute(element, "costPrice"));
-      const costBasis =
-        avgCostPerShare != null && quantity > 0
-          ? round(avgCostPerShare * quantity, 2)
-          : null;
 
       const holding: IbkrFlexPreviewHolding = {
         symbol: symbol.toUpperCase(),
@@ -260,10 +275,8 @@ function parseOpenPositions(xml: string): IbkrFlexPreviewHolding[] {
           symbol.toUpperCase(),
         currency: normalizeCurrency(getAttribute(element, "currency")),
         quantity,
-        price:
-          parseFlexNumber(getAttribute(element, "markPrice")) ??
-          parseFlexNumber(getAttribute(element, "costPrice")),
-        marketValue: parseFlexNumber(getAttribute(element, "positionValue")),
+        price,
+        marketValue,
         avgCostPerShare,
         costBasis,
         assetCategory: getAttribute(element, "assetCategory") ?? "Unknown",
@@ -363,6 +376,19 @@ function getFirstNumericAttribute(
 ) {
   for (const attribute of attributes) {
     const value = parseFlexNumber(getFirstAttribute(xml, tag, attribute));
+    if (value != null) {
+      return value;
+    }
+  }
+  return null;
+}
+
+function getFirstNumericAttributeFromElement(
+  element: string,
+  attributes: string[],
+) {
+  for (const attribute of attributes) {
+    const value = parseFlexNumber(getAttribute(element, attribute));
     if (value != null) {
       return value;
     }

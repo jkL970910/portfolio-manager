@@ -53,6 +53,11 @@ IBKR setup copy exposed in mobile:
 - `活动自主查询 → +` to create the Activity Flex Query. Use XML.
 - Required sections: `账户信息`, `未平仓仓位`, `现金报告`,
   `以基础货币计的实现和未实现业绩总结`.
+- Required Open Positions fields for cost-aware holdings: quantity, currency,
+  symbol, exchange/listing exchange, mark price, position value, cost basis
+  price/open price, and cost basis money/cost basis. If the Flex Query omits the
+  cost-basis fields, Loo 国 can still import quantity and value, but the position
+  will show `成本待补`.
 - Optional for later evidence: `交易`.
 - Not required for the current snapshot MVP: dividends, interest, taxes,
   corporate actions, closed positions, securities lending, IPO/rights activity.
