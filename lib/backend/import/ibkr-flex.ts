@@ -15,7 +15,7 @@ export type IbkrFlexPreviewHolding = {
   marketValue: number | null;
   assetCategory: string;
   exchange: string | null;
-  identityStatus: "ready" | "needs_review" | "skipped";
+  identityStatus: "ready" | "needs_review" | "other_asset" | "skipped";
   warnings: string[];
 };
 

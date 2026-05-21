@@ -99,6 +99,8 @@ const EXCHANGE_ALIASES: Record<
     micCode: "ARCX",
     country: "United States",
   },
+  OTHER: { canonicalExchange: "OTHER", country: undefined },
+  "OTHER / MANUAL": { canonicalExchange: "OTHER", country: undefined },
 };
 
 function normalizeText(value: string | null | undefined) {

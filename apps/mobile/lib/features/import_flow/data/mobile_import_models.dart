@@ -307,13 +307,13 @@ class MobileIbkrFlexAccount {
   }
 
   bool get isReady =>
-      holdings.every((holding) => holding.identityStatus == "ready");
+      holdings.every((holding) => holding.isImportable);
 
   bool get hasWritableHoldings =>
       holdings.any((holding) => holding.identityStatus == "ready");
 
   int get reviewHoldingCount =>
-      holdings.where((holding) => holding.identityStatus != "ready").length;
+      holdings.where((holding) => !holding.isImportable).length;
 }
 
 class MobileIbkrFlexHolding {
@@ -355,5 +355,17 @@ class MobileIbkrFlexHolding {
       warnings:
           (json["warnings"] as List?)?.whereType<String>().toList() ?? const [],
     );
+  }
+
+  bool get isImportable =>
+      identityStatus == "ready" || identityStatus == "other_asset";
+
+  bool get isOtherAssetCandidate {
+    final text = "$symbol $description $assetCategory".toLowerCase();
+    return assetCategory.toUpperCase() == "OTHER" ||
+        assetCategory.toUpperCase() == "METAL" ||
+        text.contains("gold") ||
+        text.contains("precious") ||
+        text.contains("bullion");
   }
 }

@@ -253,7 +253,7 @@ export const brokerageImportDraftHoldingReviewInputSchema = z.object({
   accountId: z.string().trim().min(1).max(160),
   symbol: z.string().trim().min(1).max(32),
   currency: z.enum(["CAD", "USD"]),
-  action: z.enum(["mark_ready", "skip"]),
+  action: z.enum(["mark_ready", "mark_other_asset", "skip"]),
   exchange: z.string().trim().min(1).max(64).optional(),
 });
 

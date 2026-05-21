@@ -4070,7 +4070,9 @@ export async function confirmBrokerageImportDraft(
       }
 
       for (const sourceHolding of sourceAccount.holdings.filter(
-        (holding) => holding.identityStatus === "ready",
+        (holding) =>
+          holding.identityStatus === "ready" ||
+          holding.identityStatus === "other_asset",
       )) {
         const holdingCurrency = normalizeCurrencyCode(sourceHolding.currency);
         const quantity = sourceHolding.quantity;
@@ -4086,12 +4088,15 @@ export async function confirmBrokerageImportDraft(
           lastPriceAmount,
           holdingCurrency,
         );
+        const isOtherAsset = sourceHolding.identityStatus === "other_asset";
         const security = await resolveCanonicalSecurityIdentity({
           symbol: sourceHolding.symbol,
-          exchange: sourceHolding.exchange ?? null,
+          exchange: isOtherAsset ? "OTHER" : (sourceHolding.exchange ?? null),
           currency: holdingCurrency,
-          name: sourceHolding.description || sourceHolding.symbol,
-          securityType: sourceHolding.assetCategory,
+          name: isOtherAsset
+            ? sourceHolding.description || `${sourceHolding.symbol} Other Asset`
+            : sourceHolding.description || sourceHolding.symbol,
+          securityType: isOtherAsset ? "Other / Manual" : sourceHolding.assetCategory,
         });
 
         const existingHolding = await tx.query.holdingPositions.findFirst({
@@ -4109,8 +4114,12 @@ export async function confirmBrokerageImportDraft(
           name:
             sourceHolding.description?.trim() ||
             sourceHolding.symbol.trim().toUpperCase(),
-          assetClass: security.economicAssetClass ?? "Other",
-          sector: security.economicSector ?? "Multi-sector",
+          assetClass: isOtherAsset
+            ? inferBrokerageOtherAssetClass(sourceHolding)
+            : (security.economicAssetClass ?? "Other"),
+          sector: isOtherAsset
+            ? inferBrokerageOtherAssetSector(sourceHolding)
+            : (security.economicSector ?? "Multi-sector"),
           currency: holdingCurrency,
           quantity: quantity.toFixed(6),
           avgCostPerShareAmount: existingHolding?.avgCostPerShareAmount ?? null,
@@ -4126,9 +4135,15 @@ export async function confirmBrokerageImportDraft(
           weightPct: "0.00",
           assetClassOverride: existingHolding?.assetClassOverride ?? null,
           sectorOverride: existingHolding?.sectorOverride ?? null,
-          securityTypeOverride: sourceHolding.assetCategory,
-          exchangeOverride: security.canonicalExchange,
-          marketSectorOverride: security.marketSector,
+          securityTypeOverride: isOtherAsset
+            ? "Other / Manual"
+            : sourceHolding.assetCategory,
+          exchangeOverride: isOtherAsset
+            ? "Other / Manual"
+            : security.canonicalExchange,
+          marketSectorOverride: isOtherAsset
+            ? inferBrokerageOtherAssetSector(sourceHolding)
+            : security.marketSector,
         };
 
         const savedHolding = existingHolding
@@ -4202,7 +4217,7 @@ export async function reviewBrokerageImportDraftHolding(
     accountId: string;
     symbol: string;
     currency: CurrencyCode;
-    action: "mark_ready" | "skip";
+    action: "mark_ready" | "mark_other_asset" | "skip";
     exchange?: string;
   },
 ) {
@@ -4247,6 +4262,15 @@ export async function reviewBrokerageImportDraftHolding(
   if (input.action === "skip") {
     holding.identityStatus = "skipped";
     holding.warnings = ["本次导入已跳过，不会写入 Loo国账本。"];
+  } else if (input.action === "mark_other_asset") {
+    if (holding.marketValue == null) {
+      throw new Error("该其他资产缺少市值，暂不能确认写入。");
+    }
+    holding.exchange = "OTHER";
+    holding.identityStatus = "other_asset";
+    holding.warnings = [
+      "将作为其他资产写入净值，不参与标的研究台、AI快扫或推荐。",
+    ];
   } else {
     const exchange = input.exchange?.trim().toUpperCase();
     if (!exchange) {
@@ -4277,6 +4301,35 @@ export async function reviewBrokerageImportDraftHolding(
     symbol: holding.symbol,
     identityStatus: holding.identityStatus,
   };
+}
+
+function inferBrokerageOtherAssetClass(holding: {
+  symbol: string;
+  description: string;
+  assetCategory: string;
+}) {
+  const text = `${holding.symbol} ${holding.description} ${holding.assetCategory}`
+    .trim()
+    .toLowerCase();
+  if (
+    text.includes("gold") ||
+    text.includes("precious") ||
+    text.includes("metal") ||
+    text.includes("bullion")
+  ) {
+    return "Commodity";
+  }
+  return "Other";
+}
+
+function inferBrokerageOtherAssetSector(holding: {
+  symbol: string;
+  description: string;
+  assetCategory: string;
+}) {
+  return inferBrokerageOtherAssetClass(holding) === "Commodity"
+    ? "Precious Metals"
+    : "Other";
 }
 
 export async function getPreferenceView(userId: string) {

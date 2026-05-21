@@ -2043,8 +2043,7 @@ class _IbkrPreviewAccountCardState extends State<_IbkrPreviewAccountCard> {
     final reviewHoldings = account.holdings
         .where(
           (holding) =>
-              holding.identityStatus != "ready" &&
-              holding.identityStatus != "skipped",
+              !holding.isImportable && holding.identityStatus != "skipped",
         )
         .toList();
     final readyHoldings =
@@ -2161,6 +2160,7 @@ class _IbkrPreviewHoldingRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final statusLabel = switch (holding.identityStatus) {
       "ready" => "可导入",
+      "other_asset" => "其他资产",
       "skipped" => "已跳过",
       _ => "待确认",
     };
@@ -2197,7 +2197,7 @@ class _IbkrPreviewHoldingRow extends StatelessWidget {
                   ),
                 ],
               ),
-              if (holding.identityStatus != "ready" &&
+              if (!holding.isImportable &&
                   holding.identityStatus != "skipped") ...[
                 const SizedBox(height: 6),
                 if (holding.warnings.isNotEmpty)
@@ -2212,17 +2212,30 @@ class _IbkrPreviewHoldingRow extends StatelessWidget {
                   spacing: 8,
                   runSpacing: 8,
                   children: [
-                    OutlinedButton(
-                      onPressed: reviewing
-                          ? null
-                          : () => _showHoldingExchangeReviewSheet(
-                                context: context,
-                                account: account,
-                                holding: holding,
-                                onReviewHolding: onReviewHolding,
-                              ),
-                      child: Text(reviewing ? "处理中..." : "补交易所确认"),
-                    ),
+                    if (holding.isOtherAssetCandidate)
+                      OutlinedButton(
+                        onPressed: reviewing
+                            ? null
+                            : () => _showOtherAssetReviewSheet(
+                                  context: context,
+                                  account: account,
+                                  holding: holding,
+                                  onReviewHolding: onReviewHolding,
+                                ),
+                        child: Text(reviewing ? "处理中..." : "作为其他资产导入"),
+                      )
+                    else
+                      OutlinedButton(
+                        onPressed: reviewing
+                            ? null
+                            : () => _showHoldingExchangeReviewSheet(
+                                  context: context,
+                                  account: account,
+                                  holding: holding,
+                                  onReviewHolding: onReviewHolding,
+                                ),
+                        child: Text(reviewing ? "处理中..." : "补交易所确认"),
+                      ),
                     TextButton(
                       onPressed: reviewing
                           ? null
@@ -2336,6 +2349,65 @@ Future<void> _showHoldingExchangeReviewSheet({
     },
   );
   controller.dispose();
+}
+
+Future<void> _showOtherAssetReviewSheet({
+  required BuildContext context,
+  required MobileIbkrFlexAccount account,
+  required MobileIbkrFlexHolding holding,
+  required Future<void> Function({
+    required MobileIbkrFlexAccount account,
+    required MobileIbkrFlexHolding holding,
+    required String action,
+    String? exchange,
+  }) onReviewHolding,
+}) async {
+  await showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    builder: (context) {
+      final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
+      return SafeArea(
+        child: Padding(
+          padding: EdgeInsets.fromLTRB(20, 16, 20, bottomInset + 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                "确认 ${holding.symbol}",
+                style: Theme.of(context).textTheme.headlineSmall,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                "这看起来是 Wealthsimple 的实体黄金/贵金属或非标准证券资产。它会计入账户净值，但不会进入标的研究台、AI快扫或进货推荐。",
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: context.looTokens.mutedText,
+                    ),
+              ),
+              const SizedBox(height: 12),
+              const _ImportPill("其他资产 · 贵金属"),
+              const SizedBox(height: 16),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton(
+                  onPressed: () async {
+                    Navigator.of(context).pop();
+                    await onReviewHolding(
+                      account: account,
+                      holding: holding,
+                      action: "mark_other_asset",
+                    );
+                  },
+                  child: const Text("作为其他资产导入"),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    },
+  );
 }
 
 String _defaultExchangeForHolding(MobileIbkrFlexHolding holding) {
