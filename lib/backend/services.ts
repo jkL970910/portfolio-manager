@@ -4004,7 +4004,11 @@ export async function confirmBrokerageImportDraft(
     }
     const holdingsNeedingReview = accounts
       .flatMap((account) => account.holdings)
-      .filter((holding) => holding.identityStatus !== "ready");
+      .filter(
+        (holding) =>
+          holding.identityStatus !== "ready" &&
+          holding.identityStatus !== "skipped",
+      );
     if (holdingsNeedingReview.length > 0) {
       throw new Error(
         `Brokerage import draft has ${holdingsNeedingReview.length} holdings that need identity review.`,
@@ -4065,7 +4069,9 @@ export async function confirmBrokerageImportDraft(
         accountsCreated += 1;
       }
 
-      for (const sourceHolding of sourceAccount.holdings) {
+      for (const sourceHolding of sourceAccount.holdings.filter(
+        (holding) => holding.identityStatus === "ready",
+      )) {
         const holdingCurrency = normalizeCurrencyCode(sourceHolding.currency);
         const quantity = sourceHolding.quantity;
         const holdingMarketValueAmount = sourceHolding.marketValue ?? 0;
@@ -4187,6 +4193,90 @@ export async function confirmBrokerageImportDraft(
       holdingsUpdated,
     };
   });
+}
+
+export async function reviewBrokerageImportDraftHolding(
+  userId: string,
+  input: {
+    draftId: string;
+    accountId: string;
+    symbol: string;
+    currency: CurrencyCode;
+    action: "mark_ready" | "skip";
+    exchange?: string;
+  },
+) {
+  const db = getDb();
+  const draftRow = await db.query.brokerageImportDrafts.findFirst({
+    where: and(
+      eq(brokerageImportDrafts.userId, userId),
+      eq(brokerageImportDrafts.id, input.draftId),
+    ),
+  });
+  if (!draftRow) {
+    throw new Error("Brokerage import draft was not found.");
+  }
+  if (draftRow.status !== "preview") {
+    throw new Error("Brokerage import draft is not reviewable.");
+  }
+  if (draftRow.expiresAt.getTime() < Date.now()) {
+    await db
+      .update(brokerageImportDrafts)
+      .set({ status: "expired", updatedAt: new Date() })
+      .where(eq(brokerageImportDrafts.id, draftRow.id));
+    throw new Error("Brokerage import draft has expired.");
+  }
+
+  const preview = draftRow.previewJson as BrokerageImportPreview;
+  const account = preview.accounts.find(
+    (item) => item.accountId === input.accountId,
+  );
+  if (!account) {
+    throw new Error("Brokerage import draft account was not found.");
+  }
+  const normalizedSymbol = input.symbol.trim().toUpperCase();
+  const holding = account.holdings.find(
+    (item) =>
+      item.symbol.trim().toUpperCase() === normalizedSymbol &&
+      item.currency === input.currency,
+  );
+  if (!holding) {
+    throw new Error("Brokerage import draft holding was not found.");
+  }
+
+  if (input.action === "skip") {
+    holding.identityStatus = "skipped";
+    holding.warnings = ["本次导入已跳过，不会写入 Loo国账本。"];
+  } else {
+    const exchange = input.exchange?.trim().toUpperCase();
+    if (!exchange) {
+      throw new Error("确认持仓前需要填写交易所。");
+    }
+    if (holding.marketValue == null) {
+      throw new Error("该持仓缺少市值，暂不能确认写入。");
+    }
+    if (holding.price == null) {
+      throw new Error("该持仓缺少价格，暂不能确认写入。");
+    }
+    holding.exchange = exchange;
+    holding.identityStatus = "ready";
+    holding.warnings = [];
+  }
+
+  await db
+    .update(brokerageImportDrafts)
+    .set({
+      previewJson: preview,
+      updatedAt: new Date(),
+    })
+    .where(eq(brokerageImportDrafts.id, draftRow.id));
+
+  return {
+    preview,
+    accountId: account.accountId,
+    symbol: holding.symbol,
+    identityStatus: holding.identityStatus,
+  };
 }
 
 export async function getPreferenceView(userId: string) {

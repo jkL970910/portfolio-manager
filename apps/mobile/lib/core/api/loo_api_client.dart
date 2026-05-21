@@ -218,6 +218,28 @@ class LooApiClient {
     );
   }
 
+  Future<Map<String, dynamic>> reviewBrokerageImportDraftHolding({
+    required String draftId,
+    required String accountId,
+    required String symbol,
+    required String currency,
+    required String action,
+    String? exchange,
+  }) {
+    return _postJson(
+      "/api/mobile/import/brokerage/drafts/holdings/review",
+      body: {
+        "draftId": draftId,
+        "accountId": accountId,
+        "symbol": symbol,
+        "currency": currency,
+        "action": action,
+        if (exchange != null && exchange.trim().isNotEmpty)
+          "exchange": exchange.trim(),
+      },
+    );
+  }
+
   Future<Map<String, dynamic>> resolveSecurity(String symbol) {
     return _getJson(
         "/api/mobile/market-data/resolve?symbol=${Uri.encodeQueryComponent(symbol)}");

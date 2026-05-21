@@ -309,6 +309,9 @@ class MobileIbkrFlexAccount {
   bool get isReady =>
       holdings.every((holding) => holding.identityStatus == "ready");
 
+  bool get hasWritableHoldings =>
+      holdings.any((holding) => holding.identityStatus == "ready");
+
   int get reviewHoldingCount =>
       holdings.where((holding) => holding.identityStatus != "ready").length;
 }

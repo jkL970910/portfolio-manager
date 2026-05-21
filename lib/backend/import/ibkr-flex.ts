@@ -15,7 +15,7 @@ export type IbkrFlexPreviewHolding = {
   marketValue: number | null;
   assetCategory: string;
   exchange: string | null;
-  identityStatus: "ready" | "needs_review";
+  identityStatus: "ready" | "needs_review" | "skipped";
   warnings: string[];
 };
 
@@ -245,7 +245,7 @@ function parseOpenPositions(xml: string): IbkrFlexPreviewHolding[] {
         marketValue: parseFlexNumber(getAttribute(element, "positionValue")),
       });
 
-      return {
+      const holding: IbkrFlexPreviewHolding = {
         symbol: symbol.toUpperCase(),
         description:
           getAttribute(element, "description") ??
@@ -261,7 +261,8 @@ function parseOpenPositions(xml: string): IbkrFlexPreviewHolding[] {
         exchange,
         identityStatus: warnings.length > 0 ? "needs_review" : "ready",
         warnings,
-      } satisfies IbkrFlexPreviewHolding;
+      };
+      return holding;
     })
     .filter((holding): holding is IbkrFlexPreviewHolding => holding != null);
 }

@@ -801,6 +801,7 @@ class _IbkrFlexPreviewSheetState extends State<_IbkrFlexPreviewSheet> {
   MobileIbkrFlexPreview? _preview;
   MobileBrokerageConnection? _connection;
   final Set<String> _selectedAccountIds = {};
+  final Set<String> _reviewingHoldingKeys = {};
 
   @override
   void initState() {
@@ -997,6 +998,56 @@ class _IbkrFlexPreviewSheetState extends State<_IbkrFlexPreviewSheet> {
     }
   }
 
+  Future<void> _reviewDraftHolding({
+    required MobileIbkrFlexAccount account,
+    required MobileIbkrFlexHolding holding,
+    required String action,
+    String? exchange,
+  }) async {
+    final preview = _preview;
+    if (preview == null || preview.draftId.isEmpty) {
+      return;
+    }
+    final key = _draftHoldingKey(account, holding);
+    setState(() {
+      _reviewingHoldingKeys.add(key);
+      _error = null;
+    });
+    try {
+      final response = await widget.apiClient.reviewBrokerageImportDraftHolding(
+        draftId: preview.draftId,
+        accountId: account.accountId,
+        symbol: holding.symbol,
+        currency: holding.currency,
+        action: action,
+        exchange: exchange,
+      );
+      final data = response["data"];
+      final previewJson = data is Map<String, dynamic> ? data["preview"] : null;
+      if (previewJson is! Map<String, dynamic>) {
+        throw const LooApiException("草稿确认返回格式不正确。");
+      }
+      if (mounted) {
+        setState(() {
+          _preview = MobileIbkrFlexPreview.fromJson(previewJson);
+          final readyIds =
+              _preview!.readyAccounts.map((item) => item.accountId).toSet();
+          _selectedAccountIds
+            ..removeWhere((id) => !readyIds.contains(id))
+            ..addAll(readyIds);
+          _reviewingHoldingKeys.remove(key);
+        });
+      }
+    } catch (error) {
+      if (mounted) {
+        setState(() {
+          _error = error.toString();
+          _reviewingHoldingKeys.remove(key);
+        });
+      }
+    }
+  }
+
   Future<void> _previewFlex() async {
     if (!_formKey.currentState!.validate()) {
       return;
@@ -1141,20 +1192,22 @@ class _IbkrFlexPreviewSheetState extends State<_IbkrFlexPreviewSheet> {
                 if (_preview != null) ...[
                   const SizedBox(height: 16),
                   _IbkrPreviewResultCard(
-                  _preview!,
-                  confirming: _confirming,
-                  onConfirm: _confirming ? null : _confirmDraft,
-                  selectedAccountIds: _selectedAccountIds,
-                  onSelectionChanged: (accountId, selected) {
-                    setState(() {
-                      if (selected) {
-                        _selectedAccountIds.add(accountId);
-                      } else {
-                        _selectedAccountIds.remove(accountId);
-                      }
-                    });
-                  },
-                ),
+                    _preview!,
+                    confirming: _confirming,
+                    onConfirm: _confirming ? null : _confirmDraft,
+                    selectedAccountIds: _selectedAccountIds,
+                    reviewingHoldingKeys: _reviewingHoldingKeys,
+                    onSelectionChanged: (accountId, selected) {
+                      setState(() {
+                        if (selected) {
+                          _selectedAccountIds.add(accountId);
+                        } else {
+                          _selectedAccountIds.remove(accountId);
+                        }
+                      });
+                    },
+                    onReviewHolding: _reviewDraftHolding,
+                  ),
                 ],
               ],
             ),
@@ -1371,6 +1424,7 @@ class _SnapTradePreviewSheetState extends State<_SnapTradePreviewSheet> {
   MobileSnapTradePortal? _portal;
   MobileIbkrFlexPreview? _preview;
   final Set<String> _selectedAccountIds = {};
+  final Set<String> _reviewingHoldingKeys = {};
 
   @override
   void initState() {
@@ -1563,6 +1617,56 @@ class _SnapTradePreviewSheetState extends State<_SnapTradePreviewSheet> {
     }
   }
 
+  Future<void> _reviewDraftHolding({
+    required MobileIbkrFlexAccount account,
+    required MobileIbkrFlexHolding holding,
+    required String action,
+    String? exchange,
+  }) async {
+    final preview = _preview;
+    if (preview == null || preview.draftId.isEmpty) {
+      return;
+    }
+    final key = _draftHoldingKey(account, holding);
+    setState(() {
+      _reviewingHoldingKeys.add(key);
+      _error = null;
+    });
+    try {
+      final response = await widget.apiClient.reviewBrokerageImportDraftHolding(
+        draftId: preview.draftId,
+        accountId: account.accountId,
+        symbol: holding.symbol,
+        currency: holding.currency,
+        action: action,
+        exchange: exchange,
+      );
+      final data = response["data"];
+      final previewJson = data is Map<String, dynamic> ? data["preview"] : null;
+      if (previewJson is! Map<String, dynamic>) {
+        throw const LooApiException("草稿确认返回格式不正确。");
+      }
+      if (mounted) {
+        setState(() {
+          _preview = MobileIbkrFlexPreview.fromJson(previewJson);
+          final readyIds =
+              _preview!.readyAccounts.map((item) => item.accountId).toSet();
+          _selectedAccountIds
+            ..removeWhere((id) => !readyIds.contains(id))
+            ..addAll(readyIds);
+          _reviewingHoldingKeys.remove(key);
+        });
+      }
+    } catch (error) {
+      if (mounted) {
+        setState(() {
+          _error = error.toString();
+          _reviewingHoldingKeys.remove(key);
+        });
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
@@ -1613,6 +1717,7 @@ class _SnapTradePreviewSheetState extends State<_SnapTradePreviewSheet> {
                   confirming: _confirming,
                   onConfirm: _confirming ? null : _confirmDraft,
                   selectedAccountIds: _selectedAccountIds,
+                  reviewingHoldingKeys: _reviewingHoldingKeys,
                   onSelectionChanged: (accountId, selected) {
                     setState(() {
                       if (selected) {
@@ -1622,6 +1727,7 @@ class _SnapTradePreviewSheetState extends State<_SnapTradePreviewSheet> {
                       }
                     });
                   },
+                  onReviewHolding: _reviewDraftHolding,
                 ),
               ],
             ],
@@ -1797,14 +1903,23 @@ class _IbkrPreviewResultCard extends StatelessWidget {
     required this.confirming,
     required this.onConfirm,
     required this.selectedAccountIds,
+    required this.reviewingHoldingKeys,
     required this.onSelectionChanged,
+    required this.onReviewHolding,
   });
 
   final MobileIbkrFlexPreview preview;
   final bool confirming;
   final VoidCallback? onConfirm;
   final Set<String> selectedAccountIds;
+  final Set<String> reviewingHoldingKeys;
   final void Function(String accountId, bool selected) onSelectionChanged;
+  final Future<void> Function({
+    required MobileIbkrFlexAccount account,
+    required MobileIbkrFlexHolding holding,
+    required String action,
+    String? exchange,
+  }) onReviewHolding;
 
   @override
   Widget build(BuildContext context) {
@@ -1843,9 +1958,11 @@ class _IbkrPreviewResultCard extends StatelessWidget {
               (account) => _IbkrPreviewAccountCard(
                 account,
                 selected: selectedAccountIds.contains(account.accountId),
+                reviewingHoldingKeys: reviewingHoldingKeys,
                 onSelectionChanged: account.isReady
                     ? (value) => onSelectionChanged(account.accountId, value)
                     : null,
+                onReviewHolding: onReviewHolding,
               ),
             ),
           ],
@@ -1897,12 +2014,21 @@ class _IbkrPreviewAccountCard extends StatelessWidget {
   const _IbkrPreviewAccountCard(
     this.account, {
     required this.selected,
+    required this.reviewingHoldingKeys,
     required this.onSelectionChanged,
+    required this.onReviewHolding,
   });
 
   final MobileIbkrFlexAccount account;
   final bool selected;
+  final Set<String> reviewingHoldingKeys;
   final ValueChanged<bool>? onSelectionChanged;
+  final Future<void> Function({
+    required MobileIbkrFlexAccount account,
+    required MobileIbkrFlexHolding holding,
+    required String action,
+    String? exchange,
+  }) onReviewHolding;
 
   @override
   Widget build(BuildContext context) {
@@ -1934,7 +2060,7 @@ class _IbkrPreviewAccountCard extends StatelessWidget {
                         : (value) => onSelectionChanged!(value ?? false),
                   )
                 else
-                  const _ImportPill("需确认"),
+                  const _ImportPill("持仓待确认"),
               ],
             ),
             const SizedBox(height: 4),
@@ -1953,7 +2079,16 @@ class _IbkrPreviewAccountCard extends StatelessWidget {
             ),
             if (holdings.isNotEmpty) ...[
               const SizedBox(height: 10),
-              ...holdings.map(_IbkrPreviewHoldingRow.new),
+              ...holdings.map(
+                (holding) => _IbkrPreviewHoldingRow(
+                  account: account,
+                  holding: holding,
+                  reviewing: reviewingHoldingKeys.contains(
+                    _draftHoldingKey(account, holding),
+                  ),
+                  onReviewHolding: onReviewHolding,
+                ),
+              ),
               if (account.holdings.length > holdings.length)
                 Padding(
                   padding: const EdgeInsets.only(top: 6),
@@ -1973,36 +2108,213 @@ class _IbkrPreviewAccountCard extends StatelessWidget {
 }
 
 class _IbkrPreviewHoldingRow extends StatelessWidget {
-  const _IbkrPreviewHoldingRow(this.holding);
+  const _IbkrPreviewHoldingRow({
+    required this.account,
+    required this.holding,
+    required this.reviewing,
+    required this.onReviewHolding,
+  });
 
+  final MobileIbkrFlexAccount account;
   final MobileIbkrFlexHolding holding;
+  final bool reviewing;
+  final Future<void> Function({
+    required MobileIbkrFlexAccount account,
+    required MobileIbkrFlexHolding holding,
+    required String action,
+    String? exchange,
+  }) onReviewHolding;
 
   @override
   Widget build(BuildContext context) {
+    final statusLabel = switch (holding.identityStatus) {
+      "ready" => "可导入",
+      "skipped" => "已跳过",
+      _ => "待确认",
+    };
     return Padding(
       padding: const EdgeInsets.only(bottom: 7),
-      child: Row(
-        children: [
-          Expanded(
-            child: Text(
-              holding.symbol,
-              style: Theme.of(context).textTheme.labelLarge,
-            ),
-          ),
-          Text(
-            [
-              _formatNumber(holding.quantity),
-              holding.currency,
-              if (holding.identityStatus != "ready") "待确认",
-            ].join(" · "),
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: context.looTokens.mutedText,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.12),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: context.looTokens.cardBorder),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(10),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      holding.symbol,
+                      style: Theme.of(context).textTheme.labelLarge,
+                    ),
+                  ),
+                  Text(
+                    [
+                      _formatNumber(holding.quantity),
+                      holding.currency,
+                      statusLabel,
+                    ].join(" · "),
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: context.looTokens.mutedText,
+                        ),
+                  ),
+                ],
+              ),
+              if (holding.identityStatus != "ready" &&
+                  holding.identityStatus != "skipped") ...[
+                const SizedBox(height: 6),
+                if (holding.warnings.isNotEmpty)
+                  Text(
+                    holding.warnings.take(2).join("；"),
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: context.looTokens.mutedText,
+                        ),
+                  ),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    OutlinedButton(
+                      onPressed: reviewing
+                          ? null
+                          : () => _showHoldingExchangeReviewSheet(
+                                context: context,
+                                account: account,
+                                holding: holding,
+                                onReviewHolding: onReviewHolding,
+                              ),
+                      child: Text(reviewing ? "处理中..." : "补交易所确认"),
+                    ),
+                    TextButton(
+                      onPressed: reviewing
+                          ? null
+                          : () => onReviewHolding(
+                                account: account,
+                                holding: holding,
+                                action: "skip",
+                              ),
+                      child: const Text("本次跳过"),
+                    ),
+                  ],
                 ),
+              ],
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
+}
+
+String _draftHoldingKey(
+  MobileIbkrFlexAccount account,
+  MobileIbkrFlexHolding holding,
+) {
+  return "${account.accountId}|${holding.symbol}|${holding.currency}";
+}
+
+Future<void> _showHoldingExchangeReviewSheet({
+  required BuildContext context,
+  required MobileIbkrFlexAccount account,
+  required MobileIbkrFlexHolding holding,
+  required Future<void> Function({
+    required MobileIbkrFlexAccount account,
+    required MobileIbkrFlexHolding holding,
+    required String action,
+    String? exchange,
+  }) onReviewHolding,
+}) async {
+  final controller = TextEditingController(
+    text: _defaultExchangeForHolding(holding),
+  );
+  await showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    builder: (context) {
+      final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
+      return SafeArea(
+        child: Padding(
+          padding: EdgeInsets.fromLTRB(20, 16, 20, bottomInset + 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                "确认 ${holding.symbol}",
+                style: Theme.of(context).textTheme.headlineSmall,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                "需要确认真实上市交易所，避免把同名美股、加股、CDR 或 ETF 写错到账本。",
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: context.looTokens.mutedText,
+                    ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: controller,
+                textCapitalization: TextCapitalization.characters,
+                decoration: const InputDecoration(
+                  labelText: "交易所",
+                  helperText: "常用：NASDAQ / NYSE / NYSEARCA / TSX / TSXV",
+                ),
+              ),
+              const SizedBox(height: 12),
+              Wrap(
+                spacing: 8,
+                children: ["NASDAQ", "NYSE", "NYSEARCA", "TSX", "TSXV"]
+                    .map(
+                      (exchange) => ActionChip(
+                        label: Text(exchange),
+                        onPressed: () => controller.text = exchange,
+                      ),
+                    )
+                    .toList(),
+              ),
+              const SizedBox(height: 16),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton(
+                  onPressed: () async {
+                    final exchange = controller.text.trim().toUpperCase();
+                    if (exchange.isEmpty) {
+                      return;
+                    }
+                    Navigator.of(context).pop();
+                    await onReviewHolding(
+                      account: account,
+                      holding: holding,
+                      action: "mark_ready",
+                      exchange: exchange,
+                    );
+                  },
+                  child: const Text("确认该持仓可导入"),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    },
+  );
+  controller.dispose();
+}
+
+String _defaultExchangeForHolding(MobileIbkrFlexHolding holding) {
+  final exchange = holding.exchange?.trim().toUpperCase();
+  if (exchange != null && exchange.isNotEmpty && exchange != "SMART") {
+    return exchange;
+  }
+  if (holding.symbol.contains(".")) {
+    return "TSX";
+  }
+  return holding.currency == "CAD" ? "TSX" : "NASDAQ";
 }
 
 String _formatNumber(num value) {
