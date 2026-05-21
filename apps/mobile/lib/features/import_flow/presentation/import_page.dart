@@ -830,6 +830,7 @@ class _IbkrFlexPreviewSheetState extends State<_IbkrFlexPreviewSheet> {
   var _savingConnection = false;
   var _syncingConnection = false;
   var _deletingConnection = false;
+  var _showSavedConnectionSettings = true;
   String? _error;
   MobileIbkrFlexPreview? _preview;
   MobileBrokerageConnection? _connection;
@@ -864,6 +865,7 @@ class _IbkrFlexPreviewSheetState extends State<_IbkrFlexPreviewSheet> {
           _connection = connectionJson is Map<String, dynamic>
               ? MobileBrokerageConnection.fromJson(connectionJson)
               : null;
+          _showSavedConnectionSettings = _connection == null;
           _connectionLoading = false;
         });
       }
@@ -900,6 +902,7 @@ class _IbkrFlexPreviewSheetState extends State<_IbkrFlexPreviewSheet> {
       if (mounted) {
         setState(() {
           _connection = MobileBrokerageConnection.fromJson(connectionJson);
+          _showSavedConnectionSettings = false;
           _savingConnection = false;
         });
         ScaffoldMessenger.of(context).showSnackBar(
@@ -967,6 +970,7 @@ class _IbkrFlexPreviewSheetState extends State<_IbkrFlexPreviewSheet> {
         setState(() {
           _connection = null;
           _preview = null;
+          _showSavedConnectionSettings = true;
           _deletingConnection = false;
         });
       }
@@ -1184,30 +1188,43 @@ class _IbkrFlexPreviewSheetState extends State<_IbkrFlexPreviewSheet> {
                     onDelete: _deletingConnection ? null : _deleteConnection,
                   ),
                 if (_connection != null) const SizedBox(height: 12),
-                const _IbkrSetupGuideCard(),
-                const SizedBox(height: 16),
-                TextFormField(
-                  controller: _tokenController,
-                  decoration: const InputDecoration(
-                    labelText: "授权口令（Flex Token）",
-                    helperText: "报告 → Flex 查询 → Flex 网页服务设置",
+                if (_connection != null)
+                  _SavedConnectionSettingsToggle(
+                    expanded: _showSavedConnectionSettings,
+                    onTap: () => setState(
+                      () => _showSavedConnectionSettings =
+                          !_showSavedConnectionSettings,
+                    ),
                   ),
-                  obscureText: true,
-                  validator: (value) => value == null || value.trim().length < 8
-                      ? "请输入有效的授权口令"
-                      : null,
-                ),
-                const SizedBox(height: 12),
-                TextFormField(
-                  controller: _queryIdController,
-                  decoration: const InputDecoration(
-                    labelText: "查询编号（Query ID）",
-                    helperText: "保存活动 Flex 查询后显示的数字编号",
+                if (_connection == null || _showSavedConnectionSettings) ...[
+                  if (_connection != null) const SizedBox(height: 10),
+                  const _IbkrSetupGuideCard(),
+                  const SizedBox(height: 16),
+                  TextFormField(
+                    controller: _tokenController,
+                    decoration: const InputDecoration(
+                      labelText: "授权口令（Flex Token）",
+                      helperText: "报告 → Flex 查询 → Flex 网页服务设置",
+                    ),
+                    obscureText: true,
+                    validator: (value) =>
+                        value == null || value.trim().length < 8
+                            ? "请输入有效的授权口令"
+                            : null,
                   ),
-                  keyboardType: TextInputType.number,
-                  validator: (value) =>
-                      value == null || value.trim().isEmpty ? "请输入查询编号" : null,
-                ),
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    controller: _queryIdController,
+                    decoration: const InputDecoration(
+                      labelText: "查询编号（Query ID）",
+                      helperText: "保存活动 Flex 查询后显示的数字编号",
+                    ),
+                    keyboardType: TextInputType.number,
+                    validator: (value) => value == null || value.trim().isEmpty
+                        ? "请输入查询编号"
+                        : null,
+                  ),
+                ],
                 if (_error != null) ...[
                   const SizedBox(height: 12),
                   Text(
@@ -1217,39 +1234,41 @@ class _IbkrFlexPreviewSheetState extends State<_IbkrFlexPreviewSheet> {
                   ),
                 ],
                 const SizedBox(height: 14),
-                Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        onPressed: _savingConnection ? null : _saveConnection,
-                        icon: _savingConnection
-                            ? const SizedBox(
-                                width: 16,
-                                height: 16,
-                                child:
-                                    CircularProgressIndicator(strokeWidth: 2),
-                              )
-                            : const Icon(Icons.lock_rounded),
-                        label: Text(_savingConnection ? "保存中..." : "保存连接"),
+                if (_connection == null || _showSavedConnectionSettings) ...[
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: _savingConnection ? null : _saveConnection,
+                          icon: _savingConnection
+                              ? const SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child:
+                                      CircularProgressIndicator(strokeWidth: 2),
+                                )
+                              : const Icon(Icons.lock_rounded),
+                          label: Text(_savingConnection ? "保存中..." : "保存连接"),
+                        ),
                       ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: FilledButton.icon(
-                        onPressed: _loading ? null : _previewFlex,
-                        icon: _loading
-                            ? const SizedBox(
-                                width: 16,
-                                height: 16,
-                                child:
-                                    CircularProgressIndicator(strokeWidth: 2),
-                              )
-                            : const Icon(Icons.search_rounded),
-                        label: Text(_loading ? "读取中..." : "一次性预览"),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: FilledButton.icon(
+                          onPressed: _loading ? null : _previewFlex,
+                          icon: _loading
+                              ? const SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child:
+                                      CircularProgressIndicator(strokeWidth: 2),
+                                )
+                              : const Icon(Icons.search_rounded),
+                          label: Text(_loading ? "读取中..." : "一次性预览"),
+                        ),
                       ),
-                    ),
-                  ],
-                ),
+                    ],
+                  ),
+                ],
                 if (_preview != null) ...[
                   const SizedBox(height: 16),
                   _IbkrPreviewResultCard(
@@ -1351,6 +1370,54 @@ class _IbkrSetupGuideCard extends StatelessWidget {
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
                     color: context.looTokens.accent,
                   ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SavedConnectionSettingsToggle extends StatelessWidget {
+  const _SavedConnectionSettingsToggle({
+    required this.expanded,
+    required this.onTap,
+  });
+
+  final bool expanded;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = context.looTokens;
+    return InkWell(
+      borderRadius: BorderRadius.circular(16),
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.14),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: tokens.cardBorder),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              Icons.tune_rounded,
+              size: 18,
+              color: tokens.accent,
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                expanded ? "收起授权设置" : "修改授权设置 / 查看 IBKR 指引",
+                style: Theme.of(context).textTheme.labelLarge,
+              ),
+            ),
+            Icon(
+              expanded
+                  ? Icons.keyboard_arrow_up_rounded
+                  : Icons.keyboard_arrow_down_rounded,
             ),
           ],
         ),
