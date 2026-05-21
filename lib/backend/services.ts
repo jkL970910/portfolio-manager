@@ -3093,6 +3093,7 @@ export async function updateInvestmentAccount(
 export async function deleteInvestmentAccount(
   userId: string,
   accountId: string,
+  options: { force?: boolean } = {},
 ) {
   const db = getDb();
   return db.transaction(async (tx) => {
@@ -3114,28 +3115,43 @@ export async function deleteInvestmentAccount(
           eq(holdingPositions.userId, userId),
           eq(holdingPositions.accountId, accountId),
         ),
-      );
+    );
     if (remainingHoldings.length > 0) {
-      throw new Error(
-        "Please move, delete, or merge the holdings in this account before deleting the account.",
-      );
+      if (!options.force) {
+        throw new Error(
+          "这个账户还有持仓。请先合并账户、删除持仓，或使用强制删除账户及持仓。",
+        );
+      }
+      await tx
+        .delete(holdingPositions)
+        .where(
+          and(
+            eq(holdingPositions.userId, userId),
+            eq(holdingPositions.accountId, accountId),
+          ),
+        );
     }
 
     await tx
       .delete(investmentAccounts)
       .where(eq(investmentAccounts.id, account.id));
+    await recalculatePortfolioState(tx, userId);
     await createPortfolioEditLog(
       tx,
       userId,
       "account",
       account.id,
       "delete",
-      `Deleted account ${account.nickname}`,
+      options.force
+        ? `Force deleted account ${account.nickname} and ${remainingHoldings.length} holdings`
+        : `Deleted account ${account.nickname}`,
       {
         deleted: {
           nickname: account.nickname,
           institution: account.institution,
           type: account.type,
+          force: Boolean(options.force),
+          holdingCount: remainingHoldings.length,
         },
       },
     );

@@ -695,6 +695,13 @@ export const accountMergeConfirmSchema = accountMergePreviewSchema.extend({
   confirm: z.literal(true),
 });
 
+export const accountDeleteSchema = z
+  .object({
+    mode: z.enum(["safe", "force"]).default("safe"),
+    confirm: z.boolean().optional(),
+  })
+  .optional();
+
 export const guidedAllocationDraftSchema = z.object({
   answers: z.object({
     goal: z.enum(["retirement", "home", "wealth", "capital-preservation"]),

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getMobileViewerFromRequest } from "@/lib/auth/mobile-tokens";
-import { accountEditSchema } from "@/lib/backend/payload-schemas";
+import { accountDeleteSchema, accountEditSchema } from "@/lib/backend/payload-schemas";
 import { deleteInvestmentAccount, updateInvestmentAccount } from "@/lib/backend/services";
 
 export async function PATCH(
@@ -43,7 +43,29 @@ export async function DELETE(
 
   try {
     const { accountId } = await params;
-    await deleteInvestmentAccount(viewer.id, accountId);
+    let body: unknown = undefined;
+    try {
+      body = await request.json();
+    } catch {
+      body = undefined;
+    }
+    const parsed = accountDeleteSchema.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: parsed.error.issues[0]?.message ?? "Invalid account delete payload." },
+        { status: 400 }
+      );
+    }
+    const deleteMode = parsed.data?.mode ?? "safe";
+    if (deleteMode === "force" && parsed.data?.confirm !== true) {
+      return NextResponse.json(
+        { error: "强制删除账户及持仓需要二次确认。" },
+        { status: 400 }
+      );
+    }
+    await deleteInvestmentAccount(viewer.id, accountId, {
+      force: deleteMode === "force",
+    });
     return NextResponse.json({ data: { ok: true } });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Failed to delete account.";

@@ -367,9 +367,35 @@ class LooApiClient {
         "/api/mobile/portfolio/securities/${Uri.encodeComponent(symbol)}/refresh-price$suffix");
   }
 
-  Future<void> deletePortfolioAccount(String accountId) async {
-    await _deleteJson(
-        "/api/mobile/portfolio/accounts/${Uri.encodeComponent(accountId)}/manage");
+  Future<void> deletePortfolioAccount(
+    String accountId, {
+    bool force = false,
+  }) async {
+    await _deleteJsonWithBody(
+      "/api/mobile/portfolio/accounts/${Uri.encodeComponent(accountId)}/manage",
+      body: force
+          ? {
+              "mode": "force",
+              "confirm": true,
+            }
+          : {
+              "mode": "safe",
+            },
+    );
+  }
+
+  Future<Map<String, dynamic>> mergePortfolioAccounts({
+    required String sourceAccountId,
+    required String targetAccountId,
+  }) {
+    return _postJson(
+      "/api/mobile/portfolio/accounts/merge",
+      body: {
+        "sourceAccountId": sourceAccountId,
+        "targetAccountId": targetAccountId,
+        "confirm": true,
+      },
+    );
   }
 
   Future<Map<String, dynamic>> updatePortfolioAccount({

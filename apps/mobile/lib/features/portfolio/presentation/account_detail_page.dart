@@ -10,6 +10,7 @@ import "../../../core/theme/loo_theme.dart";
 import "../../shared/data/mobile_chart_models.dart";
 import "../../shared/data/loo_minister_context_models.dart";
 import "../../shared/data/mobile_models.dart";
+import "../data/mobile_portfolio_models.dart";
 import "../../shared/presentation/loo_charts.dart";
 import "../../shared/presentation/loo_minister_scope.dart";
 import "detail_state_widgets.dart";
@@ -83,7 +84,7 @@ class _AccountDetailPageState extends State<AccountDetailPage> {
           ),
           IconButton(
               tooltip: "删除账户",
-              onPressed: _confirmDeleteAccount,
+              onPressed: _openAccountCleanupSheet,
               icon: const Icon(Icons.delete_outline)),
         ],
       ),
@@ -215,19 +216,48 @@ class _AccountDetailPageState extends State<AccountDetailPage> {
     }
   }
 
-  Future<void> _confirmDeleteAccount() async {
+  Future<void> _openAccountCleanupSheet() async {
+    final current = await _snapshot;
+    if (!mounted || current == null) {
+      return;
+    }
+    final changed = await showModalBottomSheet<bool>(
+      context: context,
+      showDragHandle: true,
+      isScrollControlled: true,
+      builder: (context) => _AccountCleanupSheet(
+        apiClient: widget.apiClient,
+        accountId: widget.accountId,
+        account: current,
+        onSafeDelete: () => _confirmDeleteAccount(current),
+        onForceDelete: () => _confirmDeleteAccount(current, force: true),
+      ),
+    );
+    if (changed == true && mounted) {
+      _refresh();
+    }
+  }
+
+  Future<void> _confirmDeleteAccount(
+    MobileAccountDetailSnapshot account, {
+    bool force = false,
+  }) async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text("删除账户？"),
-        content: const Text("删除账户会移除这个账户及其相关持仓。这个操作不能撤销。"),
+        title: Text(force ? "强制删除账户及持仓？" : "安全删除空账户？"),
+        content: Text(
+          force
+              ? "这会删除该账户和账户内全部 ${account.holdings.length} 个持仓。这个操作不能撤销，适合清理重复手动导入账户。"
+              : "只有账户内没有持仓时才能删除。若账户仍有持仓，请先合并、删除持仓，或使用强制删除。",
+        ),
         actions: [
           TextButton(
               onPressed: () => Navigator.of(context).pop(false),
               child: const Text("取消")),
           FilledButton.tonal(
               onPressed: () => Navigator.of(context).pop(true),
-              child: const Text("删除")),
+              child: Text(force ? "强制删除" : "删除空账户")),
         ],
       ),
     );
@@ -237,8 +267,12 @@ class _AccountDetailPageState extends State<AccountDetailPage> {
     }
 
     try {
-      await widget.apiClient.deletePortfolioAccount(widget.accountId);
+      await widget.apiClient.deletePortfolioAccount(
+        widget.accountId,
+        force: force,
+      );
       if (mounted) {
+        Navigator.of(context).pop(true);
         Navigator.of(context).pop();
       }
     } catch (error) {
@@ -248,6 +282,279 @@ class _AccountDetailPageState extends State<AccountDetailPage> {
         );
       }
     }
+  }
+}
+
+class _AccountCleanupSheet extends StatefulWidget {
+  const _AccountCleanupSheet({
+    required this.apiClient,
+    required this.accountId,
+    required this.account,
+    required this.onSafeDelete,
+    required this.onForceDelete,
+  });
+
+  final LooApiClient apiClient;
+  final String accountId;
+  final MobileAccountDetailSnapshot account;
+  final Future<void> Function() onSafeDelete;
+  final Future<void> Function() onForceDelete;
+
+  @override
+  State<_AccountCleanupSheet> createState() => _AccountCleanupSheetState();
+}
+
+class _AccountCleanupSheetState extends State<_AccountCleanupSheet> {
+  late Future<List<MobileAccountCard>> _accountsFuture;
+  String? _targetAccountId;
+  String? _error;
+  var _merging = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _accountsFuture = _loadAccounts();
+  }
+
+  Future<List<MobileAccountCard>> _loadAccounts() async {
+    final response = await widget.apiClient.getPortfolioOverview();
+    final data = response["data"];
+    if (data is! Map<String, dynamic>) {
+      throw const LooApiException("账户列表格式不正确。");
+    }
+    return MobilePortfolioSnapshot.fromJson(data)
+        .accounts
+        .where((account) => account.id != widget.accountId)
+        .toList();
+  }
+
+  Future<void> _mergeIntoTarget() async {
+    final targetAccountId = _targetAccountId;
+    if (targetAccountId == null || targetAccountId.isEmpty) {
+      setState(() => _error = "请先选择要合并到的目标账户。");
+      return;
+    }
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text("合并账户？"),
+        content: Text(
+          "会把 ${widget.account.name} 的 ${widget.account.holdings.length} 个持仓合并到目标账户，然后删除当前重复账户。相同标的会合并数量和市值。",
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text("取消"),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text("确认合并"),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) {
+      return;
+    }
+    setState(() {
+      _merging = true;
+      _error = null;
+    });
+    try {
+      await widget.apiClient.mergePortfolioAccounts(
+        sourceAccountId: widget.accountId,
+        targetAccountId: targetAccountId,
+      );
+      if (mounted) {
+        Navigator.of(context).pop(true);
+      }
+    } catch (error) {
+      if (mounted) {
+        setState(() {
+          _error = error.toString();
+          _merging = false;
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = context.looTokens;
+    return SafeArea(
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(
+          20,
+          8,
+          20,
+          20 + MediaQuery.of(context).viewInsets.bottom,
+        ),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text("账户清理", style: Theme.of(context).textTheme.titleLarge),
+              const SizedBox(height: 6),
+              Text(
+                "${widget.account.name} · ${widget.account.holdings.length} 个持仓",
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: tokens.mutedText,
+                    ),
+              ),
+              const SizedBox(height: 16),
+              _CleanupActionTile(
+                title: "安全删除空账户",
+                detail: "仅当账户内没有持仓时删除。适合清理空壳账户。",
+                icon: Icons.delete_outline_rounded,
+                onTap: widget.onSafeDelete,
+              ),
+              const SizedBox(height: 10),
+              _CleanupActionTile(
+                title: "强制删除账户及持仓",
+                detail: "直接删除当前账户和全部持仓。适合清理重复手动导入账户。",
+                icon: Icons.warning_amber_rounded,
+                destructive: true,
+                onTap: widget.onForceDelete,
+              ),
+              const SizedBox(height: 18),
+              Text("合并到账户", style: Theme.of(context).textTheme.titleMedium),
+              const SizedBox(height: 8),
+              FutureBuilder<List<MobileAccountCard>>(
+                future: _accountsFuture,
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
+                  if (snapshot.hasError) {
+                    return Text(
+                      snapshot.error.toString(),
+                      style: TextStyle(color: Theme.of(context).colorScheme.error),
+                    );
+                  }
+                  final accounts = snapshot.data ?? const <MobileAccountCard>[];
+                  if (accounts.isEmpty) {
+                    return Text(
+                      "没有可合并的目标账户。",
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: tokens.mutedText,
+                          ),
+                    );
+                  }
+                  return Column(
+                    children: [
+                      DropdownButtonFormField<String>(
+                        initialValue: _targetAccountId,
+                        decoration: const InputDecoration(labelText: "目标账户"),
+                        items: accounts
+                            .map(
+                              (account) => DropdownMenuItem(
+                                value: account.id,
+                                child: Text(
+                                  "${account.name} · ${account.value}",
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            )
+                            .toList(),
+                        onChanged: _merging
+                            ? null
+                            : (value) => setState(() => _targetAccountId = value),
+                      ),
+                      const SizedBox(height: 10),
+                      SizedBox(
+                        width: double.infinity,
+                        child: FilledButton.icon(
+                          onPressed: _merging ? null : _mergeIntoTarget,
+                          icon: _merging
+                              ? const SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(strokeWidth: 2),
+                                )
+                              : const Icon(Icons.merge_type_rounded),
+                          label: Text(_merging ? "合并中..." : "确认合并"),
+                        ),
+                      ),
+                    ],
+                  );
+                },
+              ),
+              if (_error != null) ...[
+                const SizedBox(height: 12),
+                Text(
+                  _error!,
+                  style: TextStyle(color: Theme.of(context).colorScheme.error),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _CleanupActionTile extends StatelessWidget {
+  const _CleanupActionTile({
+    required this.title,
+    required this.detail,
+    required this.icon,
+    required this.onTap,
+    this.destructive = false,
+  });
+
+  final String title;
+  final String detail;
+  final IconData icon;
+  final Future<void> Function() onTap;
+  final bool destructive;
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = context.looTokens;
+    final color = destructive
+        ? Theme.of(context).colorScheme.error
+        : Theme.of(context).colorScheme.onSurface;
+    return InkWell(
+      borderRadius: BorderRadius.circular(18),
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: tokens.cardBorder),
+          color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.16),
+        ),
+        child: Row(
+          children: [
+            Icon(icon, color: color),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                          color: color,
+                        ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    detail,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: tokens.mutedText,
+                        ),
+                  ),
+                ],
+              ),
+            ),
+            const Icon(Icons.chevron_right_rounded),
+          ],
+        ),
+      ),
+    );
   }
 }
 
