@@ -168,8 +168,8 @@ class _ImportPageState extends State<ImportPage> {
   }
 
   Future<void> _openBrokerageImportSheet(
-      List<MobileBrokerageProvider> providers) {
-    return showModalBottomSheet<void>(
+      List<MobileBrokerageProvider> providers) async {
+    final changed = await showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
       builder: (context) => _BrokerageImportSheet(
@@ -177,6 +177,9 @@ class _ImportPageState extends State<ImportPage> {
         providers: providers,
       ),
     );
+    if (changed == true && mounted) {
+      _refresh();
+    }
   }
 
   Future<void> _showImportResult(_ImportResult result) {
@@ -554,22 +557,28 @@ class _BrokerageImportSheet extends StatelessWidget {
     );
   }
 
-  Future<void> _openIbkrFlexPreview(BuildContext context) {
-    return showModalBottomSheet<void>(
+  Future<void> _openIbkrFlexPreview(BuildContext context) async {
+    final changed = await showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
       showDragHandle: true,
       builder: (context) => _IbkrFlexPreviewSheet(apiClient: apiClient),
     );
+    if (changed == true && context.mounted) {
+      Navigator.of(context).pop(true);
+    }
   }
 
-  Future<void> _openSnapTradePreview(BuildContext context) {
-    return showModalBottomSheet<void>(
+  Future<void> _openSnapTradePreview(BuildContext context) async {
+    final changed = await showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
       showDragHandle: true,
       builder: (context) => _SnapTradePreviewSheet(apiClient: apiClient),
     );
+    if (changed == true && context.mounted) {
+      Navigator.of(context).pop(true);
+    }
   }
 }
 
@@ -1038,7 +1047,7 @@ class _IbkrFlexPreviewSheetState extends State<_IbkrFlexPreviewSheet> {
               "新增 $accountsCreated 个账户，新增 $holdingsCreated 个持仓，更新 $holdingsUpdated 个持仓。${holdingsSkipped > 0 ? "已跳过 $holdingsSkipped 个未确认持仓。" : ""}回到国库后可继续检查账户和标的详情。",
         );
         if (mounted) {
-          Navigator.of(context).pop();
+          Navigator.of(context).pop(true);
         }
       }
     } catch (error) {
@@ -1748,7 +1757,7 @@ class _SnapTradePreviewSheetState extends State<_SnapTradePreviewSheet> {
               "新增 $accountsCreated 个账户，新增 $holdingsCreated 个持仓，更新 $holdingsUpdated 个持仓。${holdingsSkipped > 0 ? "已跳过 $holdingsSkipped 个未确认持仓。" : ""}",
         );
         if (mounted) {
-          Navigator.of(context).pop();
+          Navigator.of(context).pop(true);
         }
       }
     } catch (error) {
