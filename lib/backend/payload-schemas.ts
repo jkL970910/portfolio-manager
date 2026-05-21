@@ -274,6 +274,43 @@ export const looMinisterSettingsInputSchema = z
     }
   });
 
+export const externalServiceCredentialsInputSchema = z
+  .object({
+    service: z.literal("snaptrade"),
+    clientId: z.string().trim().min(4).max(240).optional(),
+    consumerKey: z.string().trim().min(8).max(512).optional(),
+    clearCredentials: z.boolean().optional().default(false),
+  })
+  .superRefine((value, context) => {
+    if (value.clearCredentials && (value.clientId || value.consumerKey)) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["clearCredentials"],
+        message: "Cannot save and clear credentials in the same request.",
+      });
+    }
+
+    if (!value.clearCredentials && !value.clientId && !value.consumerKey) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["clientId"],
+        message: "Client ID or Consumer Key is required.",
+      });
+    }
+
+    if (!value.clearCredentials && value.consumerKey && !value.clientId) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["clientId"],
+        message: "Client ID is required when saving a Consumer Key.",
+      });
+    }
+  });
+
+export type ExternalServiceCredentialsInputPayload = z.infer<
+  typeof externalServiceCredentialsInputSchema
+>;
+
 export const displayLanguageInputSchema = z.object({
   language: z.enum(["zh", "en"]),
 });

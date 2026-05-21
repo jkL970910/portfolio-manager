@@ -11,6 +11,7 @@ import type {
   IbkrFlexPreviewAccount,
   IbkrFlexPreviewHolding,
 } from "@/lib/backend/import/ibkr-flex";
+import { resolveSnapTradeApiCredentials } from "@/lib/backend/external-service-credentials";
 
 type SnapTradeCredential = {
   snapTradeUserId: string;
@@ -51,24 +52,20 @@ export function buildSnapTradeUserId(userId: string) {
   return `loo-${userId.replace(/[^a-zA-Z0-9_-]/g, "")}`;
 }
 
-export function isSnapTradeConfigured() {
-  return Boolean(
-    process.env.SNAPTRADE_CLIENT_ID?.trim() &&
-    process.env.SNAPTRADE_CONSUMER_KEY?.trim(),
-  );
+export async function isSnapTradeConfigured(userId?: string | null) {
+  return Boolean(await resolveSnapTradeApiCredentials(userId));
 }
 
-export function getSnapTradeClient() {
-  const clientId = process.env.SNAPTRADE_CLIENT_ID?.trim();
-  const consumerKey = process.env.SNAPTRADE_CONSUMER_KEY?.trim();
-  if (!clientId || !consumerKey) {
+export async function getSnapTradeClient(userId?: string | null) {
+  const credentials = await resolveSnapTradeApiCredentials(userId);
+  if (!credentials) {
     throw new Error(
-      "SnapTrade 尚未配置。请在 Vercel 设置 SNAPTRADE_CLIENT_ID 和 SNAPTRADE_CONSUMER_KEY。",
+      "SnapTrade 尚未配置。请先在设置页保存 SnapTrade Client ID 和 Consumer Key；没有用户凭证时才会使用 Vercel 服务端兜底凭证。",
     );
   }
   return new Snaptrade({
-    clientId,
-    consumerKey,
+    clientId: credentials.clientId,
+    consumerKey: credentials.consumerKey,
     basePath: process.env.SNAPTRADE_BASE_URL?.trim() || undefined,
   });
 }
@@ -77,7 +74,7 @@ export async function registerSnapTradeCredential(
   userId: string,
 ): Promise<SnapTradeCredential> {
   const snapTradeUserId = buildSnapTradeUserId(userId);
-  const client = getSnapTradeClient();
+  const client = await getSnapTradeClient(userId);
   const response = await client.authentication.registerSnapTradeUser({
     userId: snapTradeUserId,
   });
@@ -91,8 +88,9 @@ export async function registerSnapTradeCredential(
 export async function createSnapTradeConnectionPortal(
   credential: SnapTradeCredential,
   input: SnapTradePortalInput = {},
+  appUserId?: string | null,
 ): Promise<SnapTradePortal> {
-  const client = getSnapTradeClient();
+  const client = await getSnapTradeClient(appUserId);
   const response = await client.authentication.loginSnapTradeUser({
     userId: credential.snapTradeUserId,
     userSecret: credential.userSecret,
@@ -124,8 +122,9 @@ export async function createSnapTradeConnectionPortal(
 
 export async function fetchSnapTradePreview(
   credential: SnapTradeCredential,
+  appUserId?: string | null,
 ): Promise<SnapTradePreview> {
-  const client = getSnapTradeClient();
+  const client = await getSnapTradeClient(appUserId);
   const connectionsResponse =
     await client.connections.listBrokerageAuthorizations({
       userId: credential.snapTradeUserId,

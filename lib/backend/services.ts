@@ -3816,9 +3816,9 @@ export async function createSnapTradeBrokerageConnectionPortal(
   userId: string,
   input: SnapTradeConnectionPortalInput = {},
 ) {
-  if (!isSnapTradeConfigured()) {
+  if (!(await isSnapTradeConfigured(userId))) {
     throw new Error(
-      "SnapTrade 尚未配置。请先在 Vercel 配置 SNAPTRADE_CLIENT_ID 和 SNAPTRADE_CONSUMER_KEY。",
+      "SnapTrade 尚未配置。请先到设置页保存 SnapTrade Client ID 和 Consumer Key；没有用户凭证时才会使用 Vercel 服务端兜底凭证。",
     );
   }
 
@@ -3871,7 +3871,11 @@ export async function createSnapTradeBrokerageConnectionPortal(
     };
   }
 
-  const portal = await createSnapTradeConnectionPortal(credential, input);
+  const portal = await createSnapTradeConnectionPortal(
+    credential,
+    input,
+    userId,
+  );
   return {
     connection: row ? mapBrokerageConnection(row) : null,
     portal,
@@ -3924,7 +3928,7 @@ export async function syncSnapTradeBrokerageConnection(userId: string) {
       snapTradeUserId: row.queryId || buildSnapTradeUserId(userId),
       userSecret: decryptBrokerageToken(row),
     };
-    const preview = await fetchSnapTradePreview(credential);
+    const preview = await fetchSnapTradePreview(credential, userId);
     const result = await createBrokerageImportDraft(userId, preview);
     await db
       .update(brokerageConnections)

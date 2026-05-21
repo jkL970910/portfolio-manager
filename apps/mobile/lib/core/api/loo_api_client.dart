@@ -419,6 +419,15 @@ class LooApiClient {
     return _patchJson("/api/mobile/settings/ai-minister", body: payload);
   }
 
+  Future<Map<String, dynamic>> getExternalServiceCredentials() {
+    return _getJson("/api/mobile/settings/external-services");
+  }
+
+  Future<Map<String, dynamic>> updateExternalServiceCredentials(
+      Map<String, dynamic> payload) {
+    return _patchJson("/api/mobile/settings/external-services", body: payload);
+  }
+
   Future<Map<String, dynamic>> updateInvestmentPreferences(
       Map<String, dynamic> payload) {
     return _patchJson("/api/mobile/settings/preferences", body: payload);

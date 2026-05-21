@@ -966,6 +966,34 @@ export const looMinisterSettings = pgTable(
   }),
 );
 
+export const externalServiceCredentials = pgTable(
+  "external_service_credentials",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id),
+    service: varchar("service", { length: 64 }).notNull(),
+    clientId: varchar("client_id", { length: 240 }),
+    encryptedSecret: text("encrypted_secret"),
+    secretIv: varchar("secret_iv", { length: 64 }),
+    secretAuthTag: varchar("secret_auth_tag", { length: 64 }),
+    secretLast4: varchar("secret_last4", { length: 8 }),
+    secretUpdatedAt: timestamp("secret_updated_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => ({
+    userServiceUniqueIdx: uniqueIndex(
+      "external_service_credentials_user_service_idx",
+    ).on(table.userId, table.service),
+  }),
+);
+
 export const looMinisterUsageLogs = pgTable(
   "loo_minister_usage_logs",
   {

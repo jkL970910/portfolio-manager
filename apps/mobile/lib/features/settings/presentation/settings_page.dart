@@ -243,6 +243,8 @@ class _SettingsPageState extends State<SettingsPage> {
           const SizedBox(height: 16),
           _AiMinisterSettingsCard(apiClient: widget.apiClient),
           const SizedBox(height: 16),
+          _ExternalServiceCredentialsCard(apiClient: widget.apiClient),
+          const SizedBox(height: 16),
           InvestmentPreferencesCard(apiClient: widget.apiClient),
           const SizedBox(height: 24),
           FilledButton.tonalIcon(
@@ -1559,6 +1561,208 @@ class _SecurityMetadataEditorSheetState
   }
 }
 
+class _ExternalServiceCredentialsCard extends StatefulWidget {
+  const _ExternalServiceCredentialsCard({required this.apiClient});
+
+  final LooApiClient apiClient;
+
+  @override
+  State<_ExternalServiceCredentialsCard> createState() =>
+      _ExternalServiceCredentialsCardState();
+}
+
+class _ExternalServiceCredentialsCardState
+    extends State<_ExternalServiceCredentialsCard> {
+  late Future<_ExternalServiceCredentials> _settings = _loadSettings();
+  final _snapTradeClientIdController = TextEditingController();
+  final _snapTradeConsumerKeyController = TextEditingController();
+  var _saving = false;
+  String? _message;
+
+  @override
+  void dispose() {
+    _snapTradeClientIdController.dispose();
+    _snapTradeConsumerKeyController.dispose();
+    super.dispose();
+  }
+
+  Future<_ExternalServiceCredentials> _loadSettings() async {
+    final response = await widget.apiClient.getExternalServiceCredentials();
+    final data = response["data"];
+    final payload =
+        data is Map<String, dynamic> ? data : const <String, dynamic>{};
+    return _ExternalServiceCredentials.fromJson(payload);
+  }
+
+  void _refresh() {
+    setState(() {
+      _settings = _loadSettings();
+      _message = null;
+    });
+  }
+
+  Future<void> _saveSnapTrade({bool clearCredentials = false}) async {
+    if (_saving) return;
+    final clientId = _snapTradeClientIdController.text.trim();
+    final consumerKey = _snapTradeConsumerKeyController.text.trim();
+    if (!clearCredentials && (clientId.isEmpty || consumerKey.isEmpty)) {
+      setState(() {
+        _message = "请同时填写 SnapTrade Client ID 和 Consumer Key。";
+      });
+      return;
+    }
+
+    setState(() {
+      _saving = true;
+      _message = null;
+    });
+
+    try {
+      final response = await widget.apiClient.updateExternalServiceCredentials({
+        "service": "snaptrade",
+        if (clearCredentials) "clearCredentials": true,
+        if (!clearCredentials) "clientId": clientId,
+        if (!clearCredentials) "consumerKey": consumerKey,
+      });
+      final data = response["data"];
+      final payload =
+          data is Map<String, dynamic> ? data : const <String, dynamic>{};
+      if (!mounted) return;
+      setState(() {
+        _snapTradeClientIdController.clear();
+        _snapTradeConsumerKeyController.clear();
+        _settings = Future.value(_ExternalServiceCredentials.fromJson(payload));
+        _message = clearCredentials ? "SnapTrade 凭证已清除。" : "SnapTrade 凭证已保存。";
+        _saving = false;
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _message = error.toString();
+        _saving = false;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: FutureBuilder<_ExternalServiceCredentials>(
+          future: _settings,
+          builder: (context, snapshot) {
+            final settings = snapshot.data;
+            final snapTrade = settings?.snapTrade;
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    const Icon(Icons.vpn_key_outlined),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        "外部服务凭证",
+                        style: Theme.of(context).textTheme.titleLarge,
+                      ),
+                    ),
+                    IconButton(
+                      onPressed:
+                          snapshot.connectionState == ConnectionState.waiting
+                              ? null
+                              : _refresh,
+                      icon: const Icon(Icons.refresh),
+                      tooltip: "刷新凭证状态",
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                const Text("这里保存券商/数据聚合平台的用户级凭证，避免多用户共用 Loo国开发额度。"),
+                if (snapshot.connectionState == ConnectionState.waiting) ...[
+                  const SizedBox(height: 12),
+                  const LinearProgressIndicator(),
+                ] else if (snapshot.hasError) ...[
+                  const SizedBox(height: 12),
+                  Text(
+                    "外部服务凭证暂时读取失败：${snapshot.error}",
+                    style:
+                        TextStyle(color: Theme.of(context).colorScheme.error),
+                  ),
+                ] else if (snapTrade != null) ...[
+                  const SizedBox(height: 12),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      Chip(label: Text(snapTrade.statusLabel)),
+                      Chip(label: Text(snapTrade.consumerKeyLabel)),
+                      Chip(label: Text(snapTrade.serverCredentialsLabel)),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  Text(snapTrade.privacyNote),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: _snapTradeClientIdController,
+                    decoration: InputDecoration(
+                      labelText: "SnapTrade Client ID",
+                      helperText: "留空不会修改；保存新 Consumer Key 时必须同时填写。",
+                      hintText: snapTrade.clientId ?? "来自 SnapTrade Dashboard",
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  TextField(
+                    controller: _snapTradeConsumerKeyController,
+                    obscureText: true,
+                    decoration: const InputDecoration(
+                      labelText: "SnapTrade Consumer Key",
+                      helperText: "只保存到后端加密存储；不会返回给 Flutter 客户端。",
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: FilledButton.icon(
+                          onPressed:
+                              _saving ? null : () => _saveSnapTrade(),
+                          icon: const Icon(Icons.save_outlined),
+                          label: Text(_saving ? "保存中..." : "保存 SnapTrade"),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      OutlinedButton(
+                        onPressed: _saving || !snapTrade.userCredentialsConfigured
+                            ? null
+                            : () => _saveSnapTrade(clearCredentials: true),
+                        child: const Text("清除"),
+                      ),
+                    ],
+                  ),
+                  if (_message != null) ...[
+                    const SizedBox(height: 8),
+                    Text(
+                      _message!,
+                      style: TextStyle(
+                        color: _message!.contains("失败") ||
+                                _message!.contains("Exception") ||
+                                _message!.contains("required")
+                            ? Theme.of(context).colorScheme.error
+                            : Theme.of(context).colorScheme.primary,
+                      ),
+                    ),
+                  ],
+                ],
+              ],
+            );
+          },
+        ),
+      ),
+    );
+  }
+}
+
 class _AiMinisterSettings {
   const _AiMinisterSettings({
     required this.mode,
@@ -1644,6 +1848,73 @@ class _AiMinisterSettings {
               .map(_AiMinisterUsage.fromJson)
               .toList()
           : const [],
+    );
+  }
+}
+
+class _ExternalServiceCredentials {
+  const _ExternalServiceCredentials({required this.snapTrade});
+
+  final _SnapTradeCredentials snapTrade;
+
+  factory _ExternalServiceCredentials.fromJson(Map<String, dynamic> json) {
+    final rawSnapTrade = json["snaptrade"];
+    return _ExternalServiceCredentials(
+      snapTrade: _SnapTradeCredentials.fromJson(
+        rawSnapTrade is Map<String, dynamic>
+            ? rawSnapTrade
+            : const <String, dynamic>{},
+      ),
+    );
+  }
+}
+
+class _SnapTradeCredentials {
+  const _SnapTradeCredentials({
+    required this.clientIdConfigured,
+    required this.clientId,
+    required this.consumerKeyConfigured,
+    required this.consumerKeyLast4,
+    required this.serverCredentialsAvailable,
+    required this.effectiveSource,
+    required this.statusLabel,
+    required this.privacyNote,
+  });
+
+  final bool clientIdConfigured;
+  final String? clientId;
+  final bool consumerKeyConfigured;
+  final String? consumerKeyLast4;
+  final bool serverCredentialsAvailable;
+  final String effectiveSource;
+  final String statusLabel;
+  final String privacyNote;
+
+  bool get userCredentialsConfigured =>
+      clientIdConfigured && consumerKeyConfigured;
+
+  String get consumerKeyLabel {
+    if (consumerKeyConfigured) {
+      return "用户 Key：****$consumerKeyLast4";
+    }
+    return "未保存用户 Key";
+  }
+
+  String get serverCredentialsLabel {
+    return serverCredentialsAvailable ? "服务端兜底可用" : "无服务端兜底";
+  }
+
+  factory _SnapTradeCredentials.fromJson(Map<String, dynamic> json) {
+    return _SnapTradeCredentials(
+      clientIdConfigured: json["clientIdConfigured"] == true,
+      clientId: json["clientId"] as String?,
+      consumerKeyConfigured: json["consumerKeyConfigured"] == true,
+      consumerKeyLast4: json["consumerKeyLast4"] as String?,
+      serverCredentialsAvailable: json["serverCredentialsAvailable"] == true,
+      effectiveSource: json["effectiveSource"] as String? ?? "none",
+      statusLabel: json["statusLabel"] as String? ?? "尚未配置 SnapTrade",
+      privacyNote: json["privacyNote"] as String? ??
+          "Wealthsimple 同步会优先使用你的 SnapTrade 凭证。",
     );
   }
 }
