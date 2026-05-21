@@ -229,58 +229,10 @@ class _AccountDetailPageState extends State<AccountDetailPage> {
         apiClient: widget.apiClient,
         accountId: widget.accountId,
         account: current,
-        onSafeDelete: () => _confirmDeleteAccount(current),
-        onForceDelete: () => _confirmDeleteAccount(current, force: true),
       ),
     );
     if (changed == true && mounted) {
-      _refresh();
-    }
-  }
-
-  Future<void> _confirmDeleteAccount(
-    MobileAccountDetailSnapshot account, {
-    bool force = false,
-  }) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(force ? "强制删除账户及持仓？" : "安全删除空账户？"),
-        content: Text(
-          force
-              ? "这会删除该账户和账户内全部 ${account.holdings.length} 个持仓。这个操作不能撤销，适合清理重复手动导入账户。"
-              : "只有账户内没有持仓时才能删除。若账户仍有持仓，请先合并、删除持仓，或使用强制删除。",
-        ),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.of(context).pop(false),
-              child: const Text("取消")),
-          FilledButton.tonal(
-              onPressed: () => Navigator.of(context).pop(true),
-              child: Text(force ? "强制删除" : "删除空账户")),
-        ],
-      ),
-    );
-
-    if (confirmed != true) {
-      return;
-    }
-
-    try {
-      await widget.apiClient.deletePortfolioAccount(
-        widget.accountId,
-        force: force,
-      );
-      if (mounted) {
-        Navigator.of(context).pop(true);
-        Navigator.of(context).pop(true);
-      }
-    } catch (error) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(error.toString())),
-        );
-      }
+      Navigator.of(context).pop(true);
     }
   }
 }
@@ -290,15 +242,11 @@ class _AccountCleanupSheet extends StatefulWidget {
     required this.apiClient,
     required this.accountId,
     required this.account,
-    required this.onSafeDelete,
-    required this.onForceDelete,
   });
 
   final LooApiClient apiClient;
   final String accountId;
   final MobileAccountDetailSnapshot account;
-  final Future<void> Function() onSafeDelete;
-  final Future<void> Function() onForceDelete;
 
   @override
   State<_AccountCleanupSheet> createState() => _AccountCleanupSheetState();
@@ -309,6 +257,7 @@ class _AccountCleanupSheetState extends State<_AccountCleanupSheet> {
   String? _targetAccountId;
   String? _error;
   var _merging = false;
+  var _deleting = false;
 
   @override
   void initState() {
@@ -379,6 +328,53 @@ class _AccountCleanupSheetState extends State<_AccountCleanupSheet> {
     }
   }
 
+  Future<void> _deleteAccount({required bool force}) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(force ? "强制删除账户及持仓？" : "安全删除空账户？"),
+        content: Text(
+          force
+              ? "这会删除该账户和账户内全部 ${widget.account.holdings.length} 个持仓。这个操作不能撤销，适合清理重复手动导入账户。"
+              : "只有账户内没有持仓时才能删除。若账户仍有持仓，请先合并、删除持仓，或使用强制删除。",
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text("取消"),
+          ),
+          FilledButton.tonal(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: Text(force ? "强制删除" : "删除空账户"),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) {
+      return;
+    }
+    setState(() {
+      _deleting = true;
+      _error = null;
+    });
+    try {
+      await widget.apiClient.deletePortfolioAccount(
+        widget.accountId,
+        force: force,
+      );
+      if (mounted) {
+        Navigator.of(context).pop(true);
+      }
+    } catch (error) {
+      if (mounted) {
+        setState(() {
+          _error = error.toString();
+          _deleting = false;
+        });
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final tokens = context.looTokens;
@@ -406,17 +402,26 @@ class _AccountCleanupSheetState extends State<_AccountCleanupSheet> {
               const SizedBox(height: 16),
               _CleanupActionTile(
                 title: "安全删除空账户",
-                detail: "仅当账户内没有持仓时删除。适合清理空壳账户。",
+                detail: _deleting ? "删除中..." : "仅当账户内没有持仓时删除。适合清理空壳账户。",
                 icon: Icons.delete_outline_rounded,
-                onTap: widget.onSafeDelete,
+                onTap: _deleting ? null : () => _deleteAccount(force: false),
               ),
               const SizedBox(height: 10),
               _CleanupActionTile(
                 title: "强制删除账户及持仓",
-                detail: "直接删除当前账户和全部持仓。适合清理重复手动导入账户。",
+                detail: _deleting
+                    ? "正在删除账户和持仓..."
+                    : "直接删除当前账户和全部持仓。适合清理重复手动导入账户。",
                 icon: Icons.warning_amber_rounded,
                 destructive: true,
-                onTap: widget.onForceDelete,
+                trailing: _deleting
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : null,
+                onTap: _deleting ? null : () => _deleteAccount(force: true),
               ),
               const SizedBox(height: 18),
               Text("合并到账户", style: Theme.of(context).textTheme.titleMedium),
@@ -503,13 +508,15 @@ class _CleanupActionTile extends StatelessWidget {
     required this.icon,
     required this.onTap,
     this.destructive = false,
+    this.trailing,
   });
 
   final String title;
   final String detail;
   final IconData icon;
-  final Future<void> Function() onTap;
+  final Future<void> Function()? onTap;
   final bool destructive;
+  final Widget? trailing;
 
   @override
   Widget build(BuildContext context) {
@@ -551,7 +558,7 @@ class _CleanupActionTile extends StatelessWidget {
                 ],
               ),
             ),
-            const Icon(Icons.chevron_right_rounded),
+            trailing ?? const Icon(Icons.chevron_right_rounded),
           ],
         ),
       ),
