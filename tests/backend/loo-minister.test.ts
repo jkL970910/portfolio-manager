@@ -141,7 +141,10 @@ test("Loo Minister GPT mode falls back safely when provider is not enabled", asy
   assert.equal(response.data.page, "security-detail");
   assert.equal(response.data.title, "标的大臣答复");
   assert.match(response.data.answer, /当前页面、持仓和缓存资料/);
-  assert.doesNotMatch(response.data.answer, /provider|API Key|GPT-5\.5 provider/i);
+  assert.doesNotMatch(
+    response.data.answer,
+    /provider|API Key|GPT-5\.5 provider/i,
+  );
   assert.doesNotMatch(response.data.answer, /context \d+\/100|资料完整度/);
   assert.match(response.data.answer, /NVDA/);
   assert.match(response.data.disclaimer.zh, /不构成投资建议/);
@@ -386,11 +389,7 @@ test("Loo Minister enriches answers with cached profile intelligence", async () 
     sentiment: "neutral",
     relevanceScore: 78,
     sourceReliability: 76,
-    keyPoints: [
-      "资产类型：Common Stock",
-      "行业板块：Technology",
-      "地区：USA",
-    ],
+    keyPoints: ["资产类型：Common Stock", "行业板块：Technology", "地区：USA"],
     riskFlags: ["OVERVIEW 只提供公司基本资料快照，不代表实时买卖建议。"],
     tags: ["profile", "alpha-vantage", "company-overview"],
     rawPayload: {},
@@ -684,7 +683,10 @@ test("Loo Minister treats CGL.C as precious metals exposure, not Canadian equity
 
   assert.match(response.data.answer, /Commodity 暴露/);
   assert.match(response.data.answer, /新增候选|继续加仓/);
-  assert.doesNotMatch(response.data.answer, /加拿大股票整体配置|Canadian Equity 高于目标/);
+  assert.doesNotMatch(
+    response.data.answer,
+    /加拿大股票整体配置|Canadian Equity 高于目标/,
+  );
   assert.doesNotMatch(response.data.answer, /目标 22\.0%|目标约 22/);
 });
 
@@ -1162,9 +1164,7 @@ test("Loo Minister treats V2 as deprecated and points users to V2.1 Core", async
 });
 
 test("legacy empty recommendation run defaults to V2.1 engine version", async () => {
-  const { getRecommendationView } = await import(
-    "@/lib/backend/services"
-  );
+  const { getRecommendationView } = await import("@/lib/backend/services");
   const response = await getRecommendationView("user_demo");
 
   assert.equal(response.data.engine.version, "V2.1 Core");
@@ -1480,7 +1480,10 @@ test("Loo Minister explains analysis handoff without actions when page cannot ru
     },
   );
 
-  assert.match(response.data.answer, /当前页面没有提供可直接运行的智能快扫动作/);
+  assert.match(
+    response.data.answer,
+    /当前页面没有提供可直接运行的智能快扫动作/,
+  );
   assert.equal(response.data.suggestedActions.length, 0);
 });
 
@@ -1589,6 +1592,57 @@ test("Loo Minister uses global user context on import page when portfolio contex
   assert.doesNotMatch(response.data.answer, /当前页面没有提供足够的结构化事实/);
 });
 
+test("Loo Minister answers IBKR import setup before portfolio context", async () => {
+  const response = await getLooMinisterAnswer(
+    "user_casey",
+    {
+      pageContext: {
+        version: LOO_MINISTER_VERSION,
+        page: "import",
+        locale: "zh",
+        title: "券商同步",
+        asOf: now,
+        displayCurrency: "CAD",
+        subject: {},
+        dataFreshness: {
+          portfolioAsOf: now,
+          quotesAsOf: now,
+          fxAsOf: now,
+          chartFreshness: "unknown",
+          sourceMode: "local",
+        },
+        facts: [],
+        warnings: [],
+        allowedActions: [],
+      },
+      question:
+        "我想从IBKR导入一个新的账户，需要怎样设置？我目前已经拿到token了",
+      answerStyle: "beginner",
+      cacheStrategy: "prefer-cache",
+      includeExternalResearch: false,
+    },
+    {
+      settings: {
+        mode: "local",
+        provider: "official-openai",
+        model: "gpt-5.5",
+        reasoningEffort: "medium",
+        endpoint: "https://api.openai.com/v1/responses",
+        apiKey: null,
+        apiKeySource: "none",
+        providerEnabled: false,
+      },
+      persistUsage: false,
+    },
+  );
+
+  assert.match(response.data.answer, /授权口令/);
+  assert.match(response.data.answer, /查询编号/);
+  assert.match(response.data.answer, /活动 Flex 查询/);
+  assert.doesNotMatch(response.data.answer, /US Equity/);
+  assert.doesNotMatch(response.data.answer, /Health 当前为/);
+});
+
 test("Loo Minister provider fallback redacts API keys in user-visible reason", async () => {
   const originalFetch = globalThis.fetch;
   globalThis.fetch = async () =>
@@ -1662,9 +1716,12 @@ test("Loo Minister provider fallback redacts API keys in user-visible reason", a
       },
     );
 
-  assert.equal(response.data.title, "总览大臣答复");
-  assert.match(response.data.answer, /当前页面、持仓和缓存资料/);
-  assert.doesNotMatch(response.data.answer, /sk-\.\.\.cdef|sk-test-secret|API key|provider|外部模型没有参与/i);
+    assert.equal(response.data.title, "总览大臣答复");
+    assert.match(response.data.answer, /当前页面、持仓和缓存资料/);
+    assert.doesNotMatch(
+      response.data.answer,
+      /sk-\.\.\.cdef|sk-test-secret|API key|provider|外部模型没有参与/i,
+    );
   } finally {
     globalThis.fetch = originalFetch;
   }
@@ -1818,20 +1875,23 @@ test("Loo Minister can call an OpenRouter-compatible Responses endpoint", async 
     assert.equal(Array.isArray(requestedInput), true);
     assert.equal((requestedInput as Array<unknown>).length, 1);
     assert.match(
-      ((requestedInput as Array<{ content?: string }>)[0]?.content ?? ""),
+      (requestedInput as Array<{ content?: string }>)[0]?.content ?? "",
       /关键事实/,
     );
     assert.match(
-      ((requestedInput as Array<{ content?: string }>)[0]?.content ?? ""),
+      (requestedInput as Array<{ content?: string }>)[0]?.content ?? "",
       /source=analysis-cache/,
     );
     assert.match(
-      ((requestedInput as Array<{ content?: string }>)[0]?.content ?? ""),
+      (requestedInput as Array<{ content?: string }>)[0]?.content ?? "",
       /优先引用它/,
     );
     assert.equal(response.data.title, "总览大臣答复");
     assert.equal(response.data.suggestedActions.length, 1);
-    assert.equal(response.data.suggestedActions[0]?.id, "run-portfolio-analysis");
+    assert.equal(
+      response.data.suggestedActions[0]?.id,
+      "run-portfolio-analysis",
+    );
     assert.doesNotMatch(response.data.answer, /本地 deterministic 回答/);
   } finally {
     globalThis.fetch = originalFetch;
@@ -1858,7 +1918,8 @@ test("Loo Minister OpenRouter prompt prioritizes candidate fit context", async (
           role: "loo-minister",
           page: "security-detail",
           title: "标的大臣答复",
-          answer: "我会按候选买入问题处理，0% 只代表当前未持有，不代表无法分析。",
+          answer:
+            "我会按候选买入问题处理，0% 只代表当前未持有，不代表无法分析。",
           keyPoints: ["候选标的适配口径: 0% 不是无法分析"],
           suggestedActions: [],
           sources: [
@@ -2043,7 +2104,10 @@ test("Loo Minister replaces misleading candidate fit provider answers", async ()
     assert.match(response.data.answer, /当前页面、持仓和缓存资料/);
     assert.match(response.data.answer, /0% 只代表还没买入/);
     assert.doesNotMatch(response.data.answer, /就不能继续分析/);
-    assert.doesNotMatch(response.data.answer, /质量守卫|quality_guard|provider|外部模型没有参与/i);
+    assert.doesNotMatch(
+      response.data.answer,
+      /质量守卫|quality_guard|provider|外部模型没有参与/i,
+    );
   } finally {
     globalThis.fetch = originalFetch;
   }
@@ -2223,7 +2287,10 @@ test("Loo Minister sanitizes provider answers that promise unavailable quick sca
 
     assert.match(response.data.answer, /动作边界修正/);
     assert.match(response.data.answer, /没有可确认的智能快扫按钮/);
-    assert.match(response.data.keyPoints[0] ?? "", /保留 GPT 主回答并修正动作边界/);
+    assert.match(
+      response.data.keyPoints[0] ?? "",
+      /保留 GPT 主回答并修正动作边界/,
+    );
     assert.doesNotMatch(response.data.answer, /由你确认后再运行/);
     assert.equal(response.data.suggestedActions.length, 0);
   } finally {
