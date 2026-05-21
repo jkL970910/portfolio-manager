@@ -316,6 +316,9 @@ class MobileIbkrFlexAccount {
 
   bool get hasWritableHoldings => hasImportableHoldings;
 
+  int get importableHoldingCount =>
+      holdings.where((holding) => holding.isImportable).length;
+
   int get reviewHoldingCount =>
       holdings.where((holding) => !holding.isImportable).length;
 }

@@ -1937,10 +1937,10 @@ class _IbkrPreviewResultCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final selectedReadyAccounts = preview.importableAccounts
+    final selectedAccounts = preview.accounts
         .where((account) => selectedAccountIds.contains(account.accountId))
         .toList();
-    final disabledConfirm = selectedReadyAccounts.isEmpty || confirming;
+    final disabledConfirm = selectedAccounts.isEmpty || confirming;
     return LooGlassCard(
       padding: const EdgeInsets.all(14),
       child: Column(
@@ -1973,9 +1973,8 @@ class _IbkrPreviewResultCard extends StatelessWidget {
                 account,
                 selected: selectedAccountIds.contains(account.accountId),
                 reviewingHoldingKeys: reviewingHoldingKeys,
-                onSelectionChanged: account.hasImportableHoldings
-                    ? (value) => onSelectionChanged(account.accountId, value)
-                    : null,
+                onSelectionChanged: (value) =>
+                    onSelectionChanged(account.accountId, value),
                 onReviewHolding: onReviewHolding,
               ),
             ),
@@ -2086,16 +2085,13 @@ class _IbkrPreviewAccountCardState extends State<_IbkrPreviewAccountCard> {
                     style: Theme.of(context).textTheme.titleMedium,
                   ),
                 ),
-                if (account.hasImportableHoldings)
-                  Checkbox(
-                    value: widget.selected,
-                    onChanged: widget.onSelectionChanged == null
-                        ? null
-                        : (value) =>
-                            widget.onSelectionChanged!(value ?? false),
-                  )
-                else
-                  const _ImportPill("持仓待确认"),
+                Checkbox(
+                  value: widget.selected,
+                  onChanged: widget.onSelectionChanged == null
+                      ? null
+                      : (value) =>
+                          widget.onSelectionChanged!(value ?? false),
+                ),
               ],
             ),
             const SizedBox(height: 4),
@@ -2106,7 +2102,10 @@ class _IbkrPreviewAccountCardState extends State<_IbkrPreviewAccountCard> {
                 if (account.netLiquidation != null)
                   "净值 ${_formatNumber(account.netLiquidation!)}",
                 if (account.cash != null) "现金 ${_formatNumber(account.cash!)}",
-                if (!account.isReady) "${account.reviewHoldingCount} 个持仓待确认",
+                if (account.importableHoldingCount > 0)
+                  "${account.importableHoldingCount} 个可写入",
+                if (account.reviewHoldingCount > 0)
+                  "${account.reviewHoldingCount} 个待确认",
               ].join(" · "),
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
                     color: context.looTokens.mutedText,
