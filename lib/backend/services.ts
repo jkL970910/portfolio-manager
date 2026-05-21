@@ -4126,6 +4126,33 @@ export async function confirmBrokerageImportDraft(
             eq(holdingPositions.securityId, security.id),
           ),
         });
+        const sourceAvgCostPerShareAmount = sourceHolding.avgCostPerShare ?? null;
+        const sourceCostBasisAmount =
+          sourceHolding.costBasis ??
+          (sourceAvgCostPerShareAmount != null && quantity > 0
+            ? round(sourceAvgCostPerShareAmount * quantity, 2)
+            : null);
+        const avgCostPerShareAmount =
+          sourceAvgCostPerShareAmount ??
+          (existingHolding?.avgCostPerShareAmount == null
+            ? null
+            : Number(existingHolding.avgCostPerShareAmount));
+        const costBasisAmount =
+          sourceCostBasisAmount ??
+          (existingHolding?.costBasisAmount == null
+            ? null
+            : Number(existingHolding.costBasisAmount));
+        const avgCostPerShareCad = await toCadAmount(
+          avgCostPerShareAmount,
+          holdingCurrency,
+        );
+        const costBasisCad = await toCadAmount(costBasisAmount, holdingCurrency);
+        const gainLossPct =
+          costBasisCad != null && costBasisCad > 0
+            ? round(((holdingMarketValueCad - costBasisCad) / costBasisCad) * 100, 2)
+            : existingHolding?.gainLossPct == null
+              ? "0.00"
+              : Number(existingHolding.gainLossPct);
         const holdingValues = {
           userId,
           accountId: accountRow.id,
@@ -4142,16 +4169,22 @@ export async function confirmBrokerageImportDraft(
             : (security.economicSector ?? "Multi-sector"),
           currency: holdingCurrency,
           quantity: quantity.toFixed(6),
-          avgCostPerShareAmount: existingHolding?.avgCostPerShareAmount ?? null,
-          costBasisAmount: existingHolding?.costBasisAmount ?? null,
+          avgCostPerShareAmount:
+            avgCostPerShareAmount == null
+              ? null
+              : avgCostPerShareAmount.toFixed(4),
+          costBasisAmount:
+            costBasisAmount == null ? null : costBasisAmount.toFixed(2),
           lastPriceAmount:
             lastPriceAmount == null ? null : lastPriceAmount.toFixed(4),
           marketValueAmount: holdingMarketValueAmount.toFixed(2),
-          avgCostPerShareCad: existingHolding?.avgCostPerShareCad ?? null,
-          costBasisCad: existingHolding?.costBasisCad ?? null,
+          avgCostPerShareCad:
+            avgCostPerShareCad == null ? null : avgCostPerShareCad.toFixed(4),
+          costBasisCad: costBasisCad == null ? null : costBasisCad.toFixed(2),
           lastPriceCad: lastPriceCad == null ? null : lastPriceCad.toFixed(4),
           marketValueCad: holdingMarketValueCad.toFixed(2),
-          gainLossPct: existingHolding?.gainLossPct ?? "0.00",
+          gainLossPct:
+            typeof gainLossPct === "number" ? gainLossPct.toFixed(2) : gainLossPct,
           weightPct: "0.00",
           assetClassOverride: existingHolding?.assetClassOverride ?? null,
           sectorOverride: existingHolding?.sectorOverride ?? null,

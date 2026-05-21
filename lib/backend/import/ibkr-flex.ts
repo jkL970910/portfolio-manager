@@ -13,6 +13,8 @@ export type IbkrFlexPreviewHolding = {
   quantity: number;
   price: number | null;
   marketValue: number | null;
+  avgCostPerShare: number | null;
+  costBasis: number | null;
   assetCategory: string;
   exchange: string | null;
   identityStatus: "ready" | "needs_review" | "other_asset" | "skipped";
@@ -244,6 +246,11 @@ function parseOpenPositions(xml: string): IbkrFlexPreviewHolding[] {
           parseFlexNumber(getAttribute(element, "costPrice")),
         marketValue: parseFlexNumber(getAttribute(element, "positionValue")),
       });
+      const avgCostPerShare = parseFlexNumber(getAttribute(element, "costPrice"));
+      const costBasis =
+        avgCostPerShare != null && quantity > 0
+          ? round(avgCostPerShare * quantity, 2)
+          : null;
 
       const holding: IbkrFlexPreviewHolding = {
         symbol: symbol.toUpperCase(),
@@ -257,6 +264,8 @@ function parseOpenPositions(xml: string): IbkrFlexPreviewHolding[] {
           parseFlexNumber(getAttribute(element, "markPrice")) ??
           parseFlexNumber(getAttribute(element, "costPrice")),
         marketValue: parseFlexNumber(getAttribute(element, "positionValue")),
+        avgCostPerShare,
+        costBasis,
         assetCategory: getAttribute(element, "assetCategory") ?? "Unknown",
         exchange,
         identityStatus: warnings.length > 0 ? "needs_review" : "ready",
@@ -390,4 +399,9 @@ function decodeXml(value: string) {
     .replaceAll("&gt;", ">")
     .replaceAll("&quot;", '"')
     .replaceAll("&apos;", "'");
+}
+
+function round(value: number, digits: number) {
+  const factor = 10 ** digits;
+  return Math.round(value * factor) / factor;
 }

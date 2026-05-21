@@ -176,8 +176,13 @@ class _OverviewPageState extends State<OverviewPage> {
     );
   }
 
-  void _openAccountDetail(MobileAccountCard account) {
-    context.push(MobileRoutes.accountDetail(account.id));
+  Future<void> _openAccountDetail(MobileAccountCard account) async {
+    final changed = await context.push<bool>(
+      MobileRoutes.accountDetail(account.id),
+    );
+    if (changed == true && mounted) {
+      _refresh();
+    }
   }
 
   void _showTopHoldingsShare(List<MobileHoldingCard> holdings) {

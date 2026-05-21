@@ -273,7 +273,7 @@ class _AccountDetailPageState extends State<AccountDetailPage> {
       );
       if (mounted) {
         Navigator.of(context).pop(true);
-        Navigator.of(context).pop();
+        Navigator.of(context).pop(true);
       }
     } catch (error) {
       if (mounted) {
@@ -366,6 +366,7 @@ class _AccountCleanupSheetState extends State<_AccountCleanupSheet> {
         targetAccountId: targetAccountId,
       );
       if (mounted) {
+        Navigator.of(context).pop(true);
         Navigator.of(context).pop(true);
       }
     } catch (error) {

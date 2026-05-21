@@ -304,6 +304,19 @@ function mapSnapTradePosition(
   const assetCategory = mapInstrumentKind(getString(instrument?.kind));
   const marketValue =
     price != null && quantity != null ? round(price * quantity, 2) : null;
+  const avgCostPerShare =
+    normalizeNumber("cost_basis" in position ? position.cost_basis : null) ??
+    normalizeNumber(
+      "average_purchase_price" in position
+        ? position.average_purchase_price
+        : null,
+    );
+  const costBasis =
+    avgCostPerShare != null && quantity > 0
+      ? round(avgCostPerShare * quantity, 2)
+      : marketValue != null && normalizeNumber("open_pnl" in position ? position.open_pnl : null) != null
+        ? round(marketValue - normalizeNumber("open_pnl" in position ? position.open_pnl : null)!, 2)
+        : null;
   const warnings = buildSnapTradeHoldingWarnings({
     exchange,
     price,
@@ -318,6 +331,8 @@ function mapSnapTradePosition(
     quantity,
     price,
     marketValue,
+    avgCostPerShare,
+    costBasis,
     assetCategory,
     exchange,
     identityStatus: warnings.length > 0 ? "needs_review" : "ready",

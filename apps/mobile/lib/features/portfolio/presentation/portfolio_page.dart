@@ -152,9 +152,14 @@ class _PortfolioPageState extends State<PortfolioPage> {
                         _AccountsDropdownCard(
                           key: _accountsKey,
                           accounts: snapshot.data!.accounts,
-                          onOpenAccount: (account) => context.push(
-                            MobileRoutes.accountDetail(account.id),
-                          ),
+                          onOpenAccount: (account) async {
+                            final changed = await context.push<bool>(
+                              MobileRoutes.accountDetail(account.id),
+                            );
+                            if (changed == true && context.mounted) {
+                              _refresh();
+                            }
+                          },
                         ),
                         const SizedBox(height: 10),
                         _HoldingsSummaryEntryCard(

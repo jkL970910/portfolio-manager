@@ -86,9 +86,14 @@ class _AccountsListPageState extends State<AccountsListPage> {
                             subtitle: account.detail,
                             value: account.value,
                             valueDetail: account.gainLoss,
-                            onTap: () => context.push(
-                              MobileRoutes.accountDetail(account.id),
-                            ),
+                            onTap: () async {
+                              final changed = await context.push<bool>(
+                                MobileRoutes.accountDetail(account.id),
+                              );
+                              if (changed == true && context.mounted) {
+                                _refresh();
+                              }
+                            },
                           ),
                         ),
                       ],

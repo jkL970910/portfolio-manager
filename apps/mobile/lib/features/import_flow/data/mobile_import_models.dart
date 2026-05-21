@@ -334,6 +334,8 @@ class MobileIbkrFlexHolding {
     required this.quantity,
     required this.price,
     required this.marketValue,
+    required this.avgCostPerShare,
+    required this.costBasis,
     required this.assetCategory,
     required this.exchange,
     required this.identityStatus,
@@ -346,6 +348,8 @@ class MobileIbkrFlexHolding {
   final num quantity;
   final num? price;
   final num? marketValue;
+  final num? avgCostPerShare;
+  final num? costBasis;
   final String assetCategory;
   final String? exchange;
   final String identityStatus;
@@ -359,6 +363,8 @@ class MobileIbkrFlexHolding {
       quantity: json["quantity"] as num? ?? 0,
       price: json["price"] as num?,
       marketValue: json["marketValue"] as num?,
+      avgCostPerShare: json["avgCostPerShare"] as num?,
+      costBasis: json["costBasis"] as num?,
       assetCategory: json["assetCategory"] as String? ?? "Unknown",
       exchange: json["exchange"] as String?,
       identityStatus: json["identityStatus"] as String? ?? "needs_review",
