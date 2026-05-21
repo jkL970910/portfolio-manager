@@ -970,6 +970,9 @@ class _IbkrFlexPreviewSheetState extends State<_IbkrFlexPreviewSheet> {
       final holdingsUpdated = data is Map<String, dynamic>
           ? data["holdingsUpdated"] as int? ?? 0
           : 0;
+      final holdingsSkipped = data is Map<String, dynamic>
+          ? data["holdingsSkipped"] as int? ?? 0
+          : 0;
       if (mounted) {
         Navigator.of(context).pop();
         await showDialog<void>(
@@ -977,7 +980,7 @@ class _IbkrFlexPreviewSheetState extends State<_IbkrFlexPreviewSheet> {
           builder: (context) => AlertDialog(
             title: const Text("IBKR 草稿已写入"),
             content: Text(
-              "新增 $accountsCreated 个账户，新增 $holdingsCreated 个持仓，更新 $holdingsUpdated 个持仓。回到国库后可继续检查账户和标的详情。",
+              "新增 $accountsCreated 个账户，新增 $holdingsCreated 个持仓，更新 $holdingsUpdated 个持仓。${holdingsSkipped > 0 ? "已跳过 $holdingsSkipped 个未确认持仓。" : ""}回到国库后可继续检查账户和标的详情。",
             ),
             actions: [
               FilledButton(
@@ -1593,6 +1596,9 @@ class _SnapTradePreviewSheetState extends State<_SnapTradePreviewSheet> {
       final holdingsUpdated = data is Map<String, dynamic>
           ? data["holdingsUpdated"] as int? ?? 0
           : 0;
+      final holdingsSkipped = data is Map<String, dynamic>
+          ? data["holdingsSkipped"] as int? ?? 0
+          : 0;
       if (mounted) {
         Navigator.of(context).pop();
         await showDialog<void>(
@@ -1600,7 +1606,7 @@ class _SnapTradePreviewSheetState extends State<_SnapTradePreviewSheet> {
           builder: (context) => AlertDialog(
             title: const Text("Wealthsimple 草稿已写入"),
             content: Text(
-              "新增 $accountsCreated 个账户，新增 $holdingsCreated 个持仓，更新 $holdingsUpdated 个持仓。",
+              "新增 $accountsCreated 个账户，新增 $holdingsCreated 个持仓，更新 $holdingsUpdated 个持仓。${holdingsSkipped > 0 ? "已跳过 $holdingsSkipped 个未确认持仓。" : ""}",
             ),
             actions: [
               FilledButton(
@@ -1931,7 +1937,7 @@ class _IbkrPreviewResultCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final selectedReadyAccounts = preview.readyAccounts
+    final selectedReadyAccounts = preview.importableAccounts
         .where((account) => selectedAccountIds.contains(account.accountId))
         .toList();
     final disabledConfirm = selectedReadyAccounts.isEmpty || confirming;
@@ -1967,7 +1973,7 @@ class _IbkrPreviewResultCard extends StatelessWidget {
                 account,
                 selected: selectedAccountIds.contains(account.accountId),
                 reviewingHoldingKeys: reviewingHoldingKeys,
-                onSelectionChanged: account.isReady
+                onSelectionChanged: account.hasImportableHoldings
                     ? (value) => onSelectionChanged(account.accountId, value)
                     : null,
                 onReviewHolding: onReviewHolding,
@@ -2006,7 +2012,7 @@ class _IbkrPreviewResultCard extends StatelessWidget {
           const SizedBox(height: 6),
           Text(
             preview.reviewAccounts.isNotEmpty
-                ? "已自动跳过 ${preview.reviewAccounts.length} 个需要确认的账户；可先写入已勾选账户。"
+                ? "未确认持仓会自动跳过；已勾选账户内的可写入持仓会先进入账本。"
                 : "当前使用安全快照合并：同账户同标的会更新，不会重复新增。",
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
                   color: context.looTokens.mutedText,
@@ -2080,7 +2086,7 @@ class _IbkrPreviewAccountCardState extends State<_IbkrPreviewAccountCard> {
                     style: Theme.of(context).textTheme.titleMedium,
                   ),
                 ),
-                if (account.isReady)
+                if (account.hasImportableHoldings)
                   Checkbox(
                     value: widget.selected,
                     onChanged: widget.onSelectionChanged == null

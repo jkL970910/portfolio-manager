@@ -4002,22 +4002,28 @@ export async function confirmBrokerageImportDraft(
     if (accounts.length === 0) {
       throw new Error("No brokerage import draft accounts were selected.");
     }
-    const holdingsNeedingReview = accounts
-      .flatMap((account) => account.holdings)
-      .filter(
-        (holding) =>
-          holding.identityStatus !== "ready" &&
-          holding.identityStatus !== "other_asset" &&
-          holding.identityStatus !== "skipped",
-      );
-    if (holdingsNeedingReview.length > 0) {
-      throw new Error(
-        `Brokerage import draft has ${holdingsNeedingReview.length} holdings that need identity review.`,
-      );
+    const importableAccounts = accounts
+      .map((account) => ({
+        ...account,
+        holdings: account.holdings.filter(
+          (holding) =>
+            holding.identityStatus === "ready" ||
+            holding.identityStatus === "other_asset",
+        ),
+        skippedHoldingCount: account.holdings.filter(
+          (holding) =>
+            holding.identityStatus !== "ready" &&
+            holding.identityStatus !== "other_asset",
+        ).length,
+      }))
+      .filter((account) => account.holdings.length > 0);
+    if (importableAccounts.length === 0) {
+      throw new Error("No confirmed brokerage import draft holdings were selected.");
     }
     let accountsCreated = 0;
     let holdingsCreated = 0;
     let holdingsUpdated = 0;
+    let holdingsSkipped = 0;
     const institution =
       preview.provider === "snaptrade" ? "Wealthsimple" : "Interactive Brokers";
     const accountPrefix =
@@ -4027,7 +4033,8 @@ export async function confirmBrokerageImportDraft(
         ? "snaptrade-import"
         : "ibkr-flex-import";
 
-    for (const sourceAccount of accounts) {
+    for (const sourceAccount of importableAccounts) {
+      holdingsSkipped += sourceAccount.skippedHoldingCount;
       const currency = normalizeCurrencyCode(sourceAccount.currency);
       const nickname = `${accountPrefix} ${sourceAccount.accountId}`;
       const accountType = inferBrokerageAccountType(
@@ -4070,11 +4077,7 @@ export async function confirmBrokerageImportDraft(
         accountsCreated += 1;
       }
 
-      for (const sourceHolding of sourceAccount.holdings.filter(
-        (holding) =>
-          holding.identityStatus === "ready" ||
-          holding.identityStatus === "other_asset",
-      )) {
+      for (const sourceHolding of sourceAccount.holdings) {
         const holdingCurrency = normalizeCurrencyCode(sourceHolding.currency);
         const quantity = sourceHolding.quantity;
         const holdingMarketValueAmount = sourceHolding.marketValue ?? 0;
@@ -4202,11 +4205,12 @@ export async function confirmBrokerageImportDraft(
 
     return {
       draftId,
-      accountsSelected: accounts.length,
+      accountsSelected: importableAccounts.length,
       accountsSkipped: Math.max(allAccounts.length - accounts.length, 0),
       accountsCreated,
       holdingsCreated,
       holdingsUpdated,
+      holdingsSkipped,
     };
   });
 }

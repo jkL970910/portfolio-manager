@@ -203,8 +203,10 @@ class MobileIbkrFlexPreview {
     );
   }
 
-  List<MobileIbkrFlexAccount> get readyAccounts =>
-      accounts.where((account) => account.isReady).toList();
+  List<MobileIbkrFlexAccount> get importableAccounts =>
+      accounts.where((account) => account.hasImportableHoldings).toList();
+
+  List<MobileIbkrFlexAccount> get readyAccounts => importableAccounts;
 
   List<MobileIbkrFlexAccount> get reviewAccounts =>
       accounts.where((account) => !account.isReady).toList();
@@ -309,8 +311,10 @@ class MobileIbkrFlexAccount {
   bool get isReady =>
       holdings.every((holding) => holding.isImportable);
 
-  bool get hasWritableHoldings =>
-      holdings.any((holding) => holding.identityStatus == "ready");
+  bool get hasImportableHoldings =>
+      holdings.any((holding) => holding.isImportable);
+
+  bool get hasWritableHoldings => hasImportableHoldings;
 
   int get reviewHoldingCount =>
       holdings.where((holding) => !holding.isImportable).length;

@@ -42,6 +42,14 @@ export async function POST(request: NextRequest) {
         { status: 400 },
       );
     }
+    if (/No confirmed brokerage import draft holdings/i.test(message)) {
+      return NextResponse.json(
+        {
+          error: "所选账户没有可写入持仓。请先确认交易所，或将实物黄金等非证券标记为其他资产。",
+        },
+        { status: 400 },
+      );
+    }
     const status = /not found/i.test(message) ? 404 : 400;
     return NextResponse.json({ error: message }, { status });
   }
