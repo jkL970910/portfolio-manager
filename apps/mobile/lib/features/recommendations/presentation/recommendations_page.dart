@@ -1304,7 +1304,7 @@ class _MarketItemCard extends StatelessWidget {
     final statusColor = _poolStatusColor(context, item.poolStatus);
     return SizedBox(
       width: 132,
-      height: 124,
+      height: 132,
       child: Material(
         color: Colors.transparent,
         child: InkWell(
@@ -1324,10 +1324,10 @@ class _MarketItemCard extends StatelessWidget {
               ),
             ),
             child: Padding(
-              padding: const EdgeInsets.all(12),
+              padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisAlignment: MainAxisAlignment.center,
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Row(
                     children: [
@@ -1346,7 +1346,6 @@ class _MarketItemCard extends StatelessWidget {
                       _TinyStatusDot(color: statusColor),
                     ],
                   ),
-                  const SizedBox(height: 7),
                   SizedBox(
                     width: double.infinity,
                     child: Text(
@@ -1359,7 +1358,6 @@ class _MarketItemCard extends StatelessWidget {
                           ),
                     ),
                   ),
-                  const SizedBox(height: 9),
                   Align(
                     alignment: Alignment.centerLeft,
                     child: _MarketStatusPill(
@@ -1367,7 +1365,6 @@ class _MarketItemCard extends StatelessWidget {
                       color: statusColor,
                     ),
                   ),
-                  const SizedBox(height: 8),
                   SizedBox(
                     width: double.infinity,
                     child: _MarketMoveBadge(
@@ -1460,7 +1457,7 @@ class _MarketMoveBadge extends StatelessWidget {
             borderRadius: BorderRadius.circular(999),
           ),
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
             child: Text(
               label,
               maxLines: 1,
@@ -1468,6 +1465,7 @@ class _MarketMoveBadge extends StatelessWidget {
               style: Theme.of(context).textTheme.labelSmall?.copyWith(
                     color: color,
                     fontWeight: FontWeight.w800,
+                    height: 1.0,
                   ),
             ),
           ),
