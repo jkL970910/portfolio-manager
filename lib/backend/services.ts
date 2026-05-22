@@ -2392,6 +2392,12 @@ export async function recordMobileSecurityObservation(
   let currency = input.currency ?? null;
   let name = input.name?.trim() || null;
 
+  const existingObservations =
+    await repositories.mobileSecurityObservations.listByUserAndSymbol(
+      userId,
+      symbol,
+    );
+
   if (securityId) {
     const security = await repositories.securities.getById(securityId);
     if (security) {
@@ -2400,6 +2406,19 @@ export async function recordMobileSecurityObservation(
       name = name || security.name;
     } else {
       securityId = null;
+    }
+  }
+
+  if (!securityId && (!exchange || !currency)) {
+    const canonicalObservation = existingObservations.find(
+      (observation) =>
+        observation.securityId && observation.exchange && observation.currency,
+    );
+    if (canonicalObservation) {
+      securityId = canonicalObservation.securityId;
+      exchange = canonicalObservation.exchange;
+      currency = canonicalObservation.currency;
+      name = name || canonicalObservation.name;
     }
   }
 

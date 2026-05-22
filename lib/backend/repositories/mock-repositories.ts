@@ -298,6 +298,17 @@ export const mockRepositories: BackendRepositories = {
         )
         .slice(0, limit);
     },
+    async listByUserAndSymbol(userId, symbol) {
+      const normalizedSymbol = symbol.trim().toUpperCase();
+      return mobileSecurityObservations
+        .filter(
+          (item) => item.userId === userId && item.symbol === normalizedSymbol,
+        )
+        .sort(
+          (left, right) =>
+            Date.parse(right.lastObservedAt) - Date.parse(left.lastObservedAt),
+        );
+    },
   },
   preferences: {
     async getByUserId(userId) {

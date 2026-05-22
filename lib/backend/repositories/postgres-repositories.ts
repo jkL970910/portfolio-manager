@@ -1043,6 +1043,17 @@ export const postgresRepositories: BackendRepositories = {
       });
       return rows.map(mapMobileSecurityObservation);
     },
+    async listByUserAndSymbol(userId, symbol) {
+      const db = getDb();
+      const rows = await db.query.mobileSecurityObservations.findMany({
+        where: and(
+          eq(mobileSecurityObservations.userId, userId),
+          eq(mobileSecurityObservations.symbol, symbol.trim().toUpperCase()),
+        ),
+        orderBy: desc(mobileSecurityObservations.lastObservedAt),
+      });
+      return rows.map(mapMobileSecurityObservation);
+    },
   },
   preferences: {
     async getByUserId(userId) {

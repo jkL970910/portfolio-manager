@@ -135,6 +135,10 @@ export interface MobileSecurityObservationRepository {
     userId: EntityId,
     limit: number,
   ): Promise<MobileSecurityObservation[]>;
+  listByUserAndSymbol(
+    userId: EntityId,
+    symbol: string,
+  ): Promise<MobileSecurityObservation[]>;
 }
 
 export interface PreferenceRepository {
