@@ -25,6 +25,7 @@ import {
   SecurityPriceHistoryPoint,
   PreferenceProfile,
   RecommendationRun,
+  RegisteredAccountRoom,
   RiskProfile,
   UserProfile,
 } from "@/lib/backend/models";
@@ -1426,6 +1427,59 @@ function buildBuyingPowerSummary(args: {
   };
 }
 
+const REGISTERED_ROOM_ACCOUNT_TYPES = ["TFSA", "RRSP", "FHSA"] as const;
+
+function getCurrentTaxYear() {
+  return new Date().getFullYear();
+}
+
+function getRegisteredRoomSummary(args: {
+  accounts: InvestmentAccount[];
+  registeredRooms?: RegisteredAccountRoom[];
+  display: DisplayContext;
+  language: DisplayLanguage;
+  taxYear?: number;
+}): DashboardData["registeredRoom"] {
+  const taxYear = args.taxYear ?? getCurrentTaxYear();
+  const roomByType = new Map(
+    (args.registeredRooms ?? [])
+      .filter((room) => room.taxYear === taxYear)
+      .map((room) => [room.accountType, room]),
+  );
+  const hasSharedRooms = roomByType.size > 0;
+  const rooms = REGISTERED_ROOM_ACCOUNT_TYPES.map((accountType) => {
+    const sharedRoom = roomByType.get(accountType);
+    const legacyRoomCad = sum(
+      args.accounts
+        .filter((account) => account.type === accountType)
+        .map((account) => account.contributionRoomCad ?? 0),
+    );
+    const remainingRoomCad = sharedRoom?.remainingRoomCad ?? legacyRoomCad;
+    return {
+      accountType,
+      remainingRoomCad,
+      label: accountType,
+      value: formatDisplayCurrency(remainingRoomCad, args.display),
+      note:
+        sharedRoom?.note ??
+        (hasSharedRooms
+          ? null
+          : pick(
+              args.language,
+              "沿用账户旧额度，建议在设置里改为共享额度。",
+              "Using legacy account-level room; update shared room in Settings.",
+            )),
+    };
+  });
+
+  return {
+    totalCad: sum(rooms.map((room) => room.remainingRoomCad)),
+    source: hasSharedRooms ? "shared" : "legacy_accounts",
+    taxYear,
+    rooms,
+  };
+}
+
 function getMonthlyTransactionSeries(
   transactions: CashflowTransaction[],
   language: DisplayLanguage,
@@ -2396,6 +2450,7 @@ export function buildDashboardData(args: {
   transactions: CashflowTransaction[];
   cashAccounts?: CashAccount[];
   cashAccountBalanceEvents?: CashAccountBalanceEvent[];
+  registeredRooms?: RegisteredAccountRoom[];
   portfolioEvents?: PortfolioEvent[];
   priceHistory?: SecurityPriceHistoryPoint[];
   snapshots?: PortfolioSnapshot[];
@@ -2410,6 +2465,7 @@ export function buildDashboardData(args: {
     transactions,
     cashAccounts = [],
     cashAccountBalanceEvents = [],
+    registeredRooms = [],
     portfolioEvents = [],
     priceHistory = [],
     snapshots = [],
@@ -2429,10 +2485,14 @@ export function buildDashboardData(args: {
     display,
     language,
   });
+  const registeredRoom = getRegisteredRoomSummary({
+    accounts,
+    registeredRooms,
+    display,
+    language,
+  });
   const totalNetWorthCad = totalPortfolio + currentCashBalanceCad;
-  const availableRoom = sum(
-    accounts.map((account) => account.contributionRoomCad ?? 0),
-  );
+  const availableRoom = registeredRoom.totalCad;
   const currentAllocation = getCurrentAllocation(holdings);
   const targetAllocation = getTargetAllocation(profile);
   const health = buildPortfolioHealthSummary({
@@ -2564,6 +2624,7 @@ export function buildDashboardData(args: {
         detail: health.status,
       },
     ],
+    registeredRoom,
     buyingPower,
     accounts: [...accounts]
       .sort((left, right) => {
@@ -5595,9 +5656,31 @@ export function buildImportData(args: {
 export function buildSettingsData(
   profile: PreferenceProfile,
   language: DisplayLanguage,
+  input?: {
+    accounts?: InvestmentAccount[];
+    registeredRooms?: RegisteredAccountRoom[];
+    display?: DisplayContext;
+  },
 ): SettingsData {
+  const display =
+    input?.display ??
+    ({
+      currency: "CAD",
+      cadToDisplayRate: 1,
+      usdToCadRate: 1,
+      fxRateDate: null,
+      fxRateSource: "fallback",
+      fxRateFreshness: "fallback",
+    } satisfies DisplayContext);
+  const registeredRooms = getRegisteredRoomSummary({
+    accounts: input?.accounts ?? [],
+    registeredRooms: input?.registeredRooms ?? [],
+    display,
+    language,
+  });
   return {
     guidedQuestions: getGuidedQuestions(profile, language),
     manualGroups: getManualGroups(profile, language),
+    registeredRooms,
   };
 }

@@ -22,6 +22,7 @@ import {
   PreferenceProfile,
   RecommendationDynamicCandidateRecord,
   RecommendationRun,
+  RegisteredAccountRoom,
   UserProfile,
 } from "@/lib/backend/models";
 
@@ -46,6 +47,17 @@ export interface UserRepository {
 
 export interface AccountRepository {
   listByUserId(userId: EntityId): Promise<InvestmentAccount[]>;
+}
+
+export interface RegisteredAccountRoomRepository {
+  listByUserId(userId: EntityId): Promise<RegisteredAccountRoom[]>;
+  upsert(input: {
+    userId: EntityId;
+    accountType: RegisteredAccountRoom["accountType"];
+    taxYear: number;
+    remainingRoomCad: number;
+    note?: string | null;
+  }): Promise<RegisteredAccountRoom>;
 }
 
 export interface HoldingRepository {
@@ -310,6 +322,7 @@ export interface ImportJobRepository {
 export interface BackendRepositories {
   users: UserRepository;
   accounts: AccountRepository;
+  registeredAccountRooms: RegisteredAccountRoomRepository;
   holdings: HoldingRepository;
   transactions: TransactionRepository;
   cashAccounts: CashAccountRepository;

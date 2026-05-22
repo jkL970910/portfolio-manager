@@ -11,6 +11,7 @@ class MobileHomeSnapshot {
     required this.accounts,
     required this.topHoldings,
     required this.buyingPower,
+    required this.registeredRoom,
     this.holdingCount = 0,
     required this.netWorthTrend,
     required this.netWorthChart,
@@ -27,6 +28,7 @@ class MobileHomeSnapshot {
   final List<MobileAccountCard> accounts;
   final List<MobileHoldingCard> topHoldings;
   final MobileBuyingPower buyingPower;
+  final MobileRegisteredRoomSummary registeredRoom;
   final int holdingCount;
   final List<MobileHomeTrendPoint> netWorthTrend;
   final MobileChartSeries? netWorthChart;
@@ -150,6 +152,8 @@ class MobileHomeSnapshot {
           .map(MobileHoldingCard.fromJson)
           .toList(),
       buyingPower: MobileBuyingPower.fromJson(json["buyingPower"]),
+      registeredRoom:
+          MobileRegisteredRoomSummary.fromJson(json["registeredRoom"]),
       holdingCount: context is Map<String, dynamic>
           ? context["holdingCount"] as int? ?? 0
           : 0,
@@ -518,6 +522,73 @@ class MobileHomeHealth {
       status: json["status"] as String? ?? "待评估",
       highlights: (json["highlights"] as List?)?.whereType<String>().toList() ??
           const [],
+    );
+  }
+}
+
+class MobileRegisteredRoomSummary {
+  const MobileRegisteredRoomSummary({
+    required this.totalCad,
+    required this.source,
+    required this.taxYear,
+    required this.rooms,
+  });
+
+  final double totalCad;
+  final String source;
+  final int taxYear;
+  final List<MobileRegisteredRoomLine> rooms;
+
+  String get value {
+    final rounded = totalCad.round().toString();
+    final buffer = StringBuffer();
+    for (var index = 0; index < rounded.length; index += 1) {
+      final reverseIndex = rounded.length - index;
+      buffer.write(rounded[index]);
+      if (reverseIndex > 1 && reverseIndex % 3 == 1) {
+        buffer.write(",");
+      }
+    }
+    return "CAD $buffer";
+  }
+
+  String get detail => source == "shared"
+      ? "$taxYear 共享额度"
+      : "$taxYear 旧账户额度";
+
+  factory MobileRegisteredRoomSummary.fromJson(dynamic json) {
+    if (json is! Map<String, dynamic>) {
+      return MobileRegisteredRoomSummary(
+        totalCad: 0,
+        source: "legacy_accounts",
+        taxYear: DateTime.now().year,
+        rooms: const [],
+      );
+    }
+    return MobileRegisteredRoomSummary(
+      totalCad: (json["totalCad"] as num?)?.toDouble() ?? 0,
+      source: json["source"] as String? ?? "legacy_accounts",
+      taxYear: (json["taxYear"] as num?)?.toInt() ?? DateTime.now().year,
+      rooms: readJsonList(json, "rooms")
+          .map(MobileRegisteredRoomLine.fromJson)
+          .toList(),
+    );
+  }
+}
+
+class MobileRegisteredRoomLine {
+  const MobileRegisteredRoomLine({
+    required this.accountType,
+    required this.value,
+  });
+
+  final String accountType;
+  final String value;
+
+  factory MobileRegisteredRoomLine.fromJson(Map<String, dynamic> json) {
+    return MobileRegisteredRoomLine(
+      accountType: json["accountType"] as String? ?? "",
+      value: json["value"] as String? ?? "",
     );
   }
 }

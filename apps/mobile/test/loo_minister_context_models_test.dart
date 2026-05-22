@@ -128,6 +128,17 @@ void main() {
         detail: "1 个现金账户",
         confidence: "medium",
       ),
+      registeredRoom: MobileRegisteredRoomSummary(
+        taxYear: 2026,
+        totalCad: 7000,
+        source: "shared",
+        rooms: [
+          MobileRegisteredRoomLine(
+            accountType: "TFSA",
+            value: "CAD 7,000",
+          ),
+        ],
+      ),
       netWorthTrend: [],
       netWorthChart: MobileChartSeries(
         title: "总资产走势",

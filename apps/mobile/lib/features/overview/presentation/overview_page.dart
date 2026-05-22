@@ -364,8 +364,6 @@ class _OverviewSummaryPanel extends StatelessWidget {
     final total = _metricByLabel(snapshot.metrics, "总资产");
     final allTimeReturn = _metricByLabel(snapshot.metrics, "累计收益") ??
         _metricByLabel(snapshot.metrics, "All-time return");
-    final registeredRoom = _metricByLabel(snapshot.metrics, "注册额度") ??
-        _metricByLabel(snapshot.metrics, "可用额度");
     final risk = _metricByLabel(snapshot.metrics, "风险风格");
     final health = _metricByLabel(snapshot.metrics, "组合健康分");
 
@@ -373,7 +371,7 @@ class _OverviewSummaryPanel extends StatelessWidget {
       children: [
           _AssetHeroCard(
             total: total,
-            registeredRoom: registeredRoom,
+            registeredRoom: snapshot.registeredRoom,
             buyingPower: snapshot.buyingPower,
             risk: risk,
             allTimeReturn: allTimeReturn,
@@ -441,7 +439,7 @@ class _AssetHeroCard extends StatelessWidget {
   });
 
   final MobileMetric? total;
-  final MobileMetric? registeredRoom;
+  final MobileRegisteredRoomSummary registeredRoom;
   final MobileBuyingPower buyingPower;
   final MobileMetric? risk;
   final MobileMetric? allTimeReturn;
@@ -511,8 +509,8 @@ class _AssetHeroCard extends StatelessWidget {
                 children: [
                   Expanded(
                     child: _AssetMiniMetric(
-                      label: registeredRoom?.label ?? "注册额度",
-                      value: registeredRoom?.value ?? "--",
+                      label: "注册额度",
+                      value: registeredRoom.value,
                       valueColor: theme.colorScheme.onSurface,
                     ),
                   ),

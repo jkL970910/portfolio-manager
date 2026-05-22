@@ -140,6 +140,18 @@ export interface DashboardData {
       cadValue: number;
     }[];
   };
+  registeredRoom: {
+    totalCad: number;
+    source: "shared" | "legacy_accounts";
+    taxYear: number;
+    rooms: {
+      accountType: "TFSA" | "RRSP" | "FHSA";
+      remainingRoomCad: number;
+      label: string;
+      value: string;
+      note: string | null;
+    }[];
+  };
   spendingMonthLabel: string;
   savingsPattern: string;
   investableCash: string;
@@ -1023,4 +1035,16 @@ export interface SettingsData {
     description: string;
     badge?: string;
   }[];
+  registeredRooms: {
+    taxYear: number;
+    totalCad: number;
+    source: "shared" | "legacy_accounts";
+    rooms: {
+      accountType: "TFSA" | "RRSP" | "FHSA";
+      remainingRoomCad: number;
+      label: string;
+      value: string;
+      note: string | null;
+    }[];
+  };
 }

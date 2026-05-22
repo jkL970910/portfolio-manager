@@ -7,6 +7,7 @@
   PreferenceProfile,
   RecommendationDynamicCandidateRecord,
   RecommendationRun,
+  RegisteredAccountRoom,
   SecurityRecord,
   SecurityMetadata
 } from "@/lib/backend/models";
@@ -129,16 +130,54 @@ type AccountScore = {
   fxPenaltyBps: number;
 };
 
-function isAccountEligibleForContribution(account: InvestmentAccount) {
+type RegisteredRoomByAccountType = Partial<Record<AccountType, number>>;
+
+function getCurrentTaxYear() {
+  return new Date().getFullYear();
+}
+
+function buildRegisteredRoomByAccountType(
+  registeredRooms: RegisteredAccountRoom[] | undefined,
+): RegisteredRoomByAccountType {
+  const taxYear = getCurrentTaxYear();
+  return (registeredRooms ?? [])
+    .filter((room) => room.taxYear === taxYear)
+    .reduce<RegisteredRoomByAccountType>((map, room) => {
+      if (room.accountType === "Taxable") {
+        return map;
+      }
+      map[room.accountType] = room.remainingRoomCad;
+      return map;
+    }, {});
+}
+
+function getEffectiveContributionRoomCad(
+  account: InvestmentAccount,
+  registeredRoomByType?: RegisteredRoomByAccountType,
+) {
+  if (account.type === "Taxable") {
+    return null;
+  }
+  return registeredRoomByType?.[account.type] ?? account.contributionRoomCad;
+}
+
+function isAccountEligibleForContribution(
+  account: InvestmentAccount,
+  registeredRoomByType?: RegisteredRoomByAccountType,
+) {
   if (account.type === "Taxable") {
     return true;
   }
 
-  if (account.contributionRoomCad == null) {
+  const contributionRoomCad = getEffectiveContributionRoomCad(
+    account,
+    registeredRoomByType,
+  );
+  if (contributionRoomCad == null) {
     return true;
   }
 
-  return account.contributionRoomCad > 0;
+  return contributionRoomCad > 0;
 }
 
 const ACCOUNT_FIT_MATRIX: Record<string, Record<AccountType, number>> = {
@@ -314,9 +353,12 @@ function scoreAccountPlacement(
   profile: PreferenceProfile,
   assetClass: string,
   securityCurrency: CurrencyCode,
-  fxPolicy: FxPolicy
+  fxPolicy: FxPolicy,
+  registeredRoomByType?: RegisteredRoomByAccountType,
 ): AccountScore {
-  const eligibleAccounts = accounts.filter(isAccountEligibleForContribution);
+  const eligibleAccounts = accounts.filter((account) =>
+    isAccountEligibleForContribution(account, registeredRoomByType),
+  );
   const scoringPool = eligibleAccounts.length > 0 ? eligibleAccounts : accounts;
   const orderedAccounts = [...scoringPool].sort((left, right) => {
     const leftRank = profile.accountFundingPriority.indexOf(left.type);
@@ -326,7 +368,11 @@ function scoreAccountPlacement(
 
   const scores = orderedAccounts.map((account) => {
     const baseScore = ACCOUNT_FIT_MATRIX[assetClass]?.[account.type] ?? 0.45;
-    const roomPenalty = account.type !== "Taxable" && account.contributionRoomCad != null && account.contributionRoomCad <= 0 ? 0.28 : 0;
+    const effectiveRoomCad = getEffectiveContributionRoomCad(
+      account,
+      registeredRoomByType,
+    );
+    const roomPenalty = account.type !== "Taxable" && effectiveRoomCad != null && effectiveRoomCad <= 0 ? 0.28 : 0;
     const priorityBoost = Math.max(0, 0.08 - Math.max(profile.accountFundingPriority.indexOf(account.type), 0) * 0.02);
     const taxBoost = profile.taxAwarePlacement ? 0.04 : 0;
     const preferredAccountBoost = profile.recommendationConstraints.preferredAccountTypes.includes(account.type) ? 0.08 : 0;
@@ -533,6 +579,7 @@ export function buildRecommendationV2(args: {
   observations?: MobileSecurityObservation[];
   dynamicCandidates?: RecommendationDynamicCandidateRecord[];
   candidateProviders?: RecommendationCandidateProvider[];
+  registeredRooms?: RegisteredAccountRoom[];
   fallbackMode?: "core_only_relaxed" | null;
 }): Pick<RecommendationRun, "assumptions" | "items" | "notes" | "engineVersion" | "objective" | "confidenceScore"> & {
   poolStatus?: RecommendationPoolStatus;
@@ -548,11 +595,13 @@ export function buildRecommendationV2(args: {
     observations = [],
     dynamicCandidates = [],
     candidateProviders,
+    registeredRooms = [],
     fallbackMode = null,
   } = args;
   const { total, allocation } = getCurrentAllocationFromHoldings(holdings);
   const targetAllocation = getTargetAllocation(profile);
   const fxPolicy = inferFxPolicy(accounts, holdings);
+  const registeredRoomByType = buildRegisteredRoomByAccountType(registeredRooms);
   const holdingRiskContributionRaw = holdings.map((holding) => ({
     holding,
     weightedRisk: holding.weightPct * (ASSET_CLASS_RISK_WEIGHTS[getHoldingEconomicAssetClass(holding)] ?? 1)
@@ -617,7 +666,14 @@ export function buildRecommendationV2(args: {
       return [];
     }
     const accountPlacements = candidates.map((candidate) => {
-      const placement = scoreAccountPlacement(accounts, profile, priority.assetClass, candidate.currency, fxPolicy);
+      const placement = scoreAccountPlacement(
+        accounts,
+        profile,
+        priority.assetClass,
+        candidate.currency,
+        fxPolicy,
+        registeredRoomByType,
+      );
       const security = scoreSecurityCandidate(candidate, priority.assetClass, placement.account, holdings, profile, fxPolicy);
       return {
         placement,
@@ -807,8 +863,9 @@ export function scoreCandidateSecurity(args: {
   profile: PreferenceProfile;
   language: DisplayLanguage;
   candidate: CandidateSecurityScoreInput;
+  registeredRooms?: RegisteredAccountRoom[];
 }): CandidateSecurityScoreResult {
-  const { accounts, holdings, profile, language, candidate } = args;
+  const { accounts, holdings, profile, language, candidate, registeredRooms } = args;
   const normalizedSymbol = candidate.symbol.trim().toUpperCase();
   const knownUniverse = buildKnownUniverseLookup();
   const existingHolding = holdings.find((holding) => holding.symbol.trim().toUpperCase() === normalizedSymbol);
@@ -863,7 +920,15 @@ export function scoreCandidateSecurity(args: {
       : "Manual candidate.",
   };
   const fxPolicy = inferFxPolicy(accounts, holdings);
-  const placement = scoreAccountPlacement(accounts, profile, assetClass, securityCandidate.currency, fxPolicy);
+  const registeredRoomByType = buildRegisteredRoomByAccountType(registeredRooms);
+  const placement = scoreAccountPlacement(
+    accounts,
+    profile,
+    assetClass,
+    securityCandidate.currency,
+    fxPolicy,
+    registeredRoomByType,
+  );
   const security = scoreSecurityCandidate(securityCandidate, assetClass, placement.account, holdings, profile, fxPolicy);
   const score = round(((placement.accountFitScore * 100) + (placement.taxFitScore * 100) + security.score + security.preferenceFitScore) / 4, 1);
   const verdict: CandidateSecurityScoreResult["verdict"] = score >= 80 ? "strong" : score >= 62 ? "watch" : "weak";

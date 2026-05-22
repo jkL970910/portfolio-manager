@@ -57,16 +57,26 @@ class InvestmentPreferencesCard extends StatefulWidget {
       _InvestmentPreferencesCardState();
 }
 
+class _PreferenceSettingsSnapshot {
+  const _PreferenceSettingsSnapshot({
+    required this.profile,
+    required this.registeredRooms,
+  });
+
+  final MobilePreferenceProfile profile;
+  final MobileRegisteredRooms registeredRooms;
+}
+
 class _InvestmentPreferencesCardState extends State<InvestmentPreferencesCard> {
-  late Future<MobilePreferenceProfile> _profile;
+  late Future<_PreferenceSettingsSnapshot> _settings;
 
   @override
   void initState() {
     super.initState();
-    _profile = _loadProfile();
+    _settings = _loadSettings();
   }
 
-  Future<MobilePreferenceProfile> _loadProfile() async {
+  Future<_PreferenceSettingsSnapshot> _loadSettings() async {
     final response = await widget.apiClient.getInvestmentPreferences();
     final data = response["data"];
     if (data is! Map<String, dynamic>) {
@@ -76,12 +86,16 @@ class _InvestmentPreferencesCardState extends State<InvestmentPreferencesCard> {
     if (profile is! Map<String, dynamic>) {
       throw const LooApiException("投资偏好档案不存在。");
     }
-    return MobilePreferenceProfile.fromJson(profile);
+    return _PreferenceSettingsSnapshot(
+      profile: MobilePreferenceProfile.fromJson(profile),
+      registeredRooms:
+          MobileRegisteredRooms.fromJson(data["registeredRooms"]),
+    );
   }
 
   void _refresh() {
     setState(() {
-      _profile = _loadProfile();
+      _settings = _loadSettings();
     });
   }
 
@@ -172,10 +186,28 @@ class _InvestmentPreferencesCardState extends State<InvestmentPreferencesCard> {
     }
   }
 
+  Future<void> _openRegisteredRoomEditor(
+      MobileRegisteredRooms registeredRooms) async {
+    final saved = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) => _RegisteredRoomEditorSheet(
+        apiClient: widget.apiClient,
+        registeredRooms: registeredRooms,
+      ),
+    );
+    if (saved == true && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("注册额度已保存。")),
+      );
+      _refresh();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    return FutureBuilder<MobilePreferenceProfile>(
-      future: _profile,
+    return FutureBuilder<_PreferenceSettingsSnapshot>(
+      future: _settings,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Card(
@@ -200,7 +232,9 @@ class _InvestmentPreferencesCardState extends State<InvestmentPreferencesCard> {
           );
         }
 
-        final profile = snapshot.data!;
+        final settings = snapshot.data!;
+        final profile = settings.profile;
+        final registeredRooms = settings.registeredRooms;
         return Card(
           child: Padding(
             padding: const EdgeInsets.all(16),
@@ -254,6 +288,11 @@ class _InvestmentPreferencesCardState extends State<InvestmentPreferencesCard> {
                         "\$${profile.cashBufferTargetCad.toStringAsFixed(0)}"),
                     _InfoChip("税务放置", profile.taxAwarePlacement ? "开启" : "关闭"),
                   ],
+                ),
+                const SizedBox(height: 12),
+                _RegisteredRoomSummaryCard(
+                  registeredRooms: registeredRooms,
+                  onEdit: () => _openRegisteredRoomEditor(registeredRooms),
                 ),
                 const SizedBox(height: 10),
                 Text("进阶偏好：${profile.preferenceFactors.summary}"),
@@ -2412,6 +2451,213 @@ class _InfoChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Chip(label: Text("$label：$value"));
+  }
+}
+
+class _RegisteredRoomSummaryCard extends StatelessWidget {
+  const _RegisteredRoomSummaryCard({
+    required this.registeredRooms,
+    required this.onEdit,
+  });
+
+  final MobileRegisteredRooms registeredRooms;
+  final VoidCallback onEdit;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: Theme.of(context).dividerColor),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  "注册额度 · ${registeredRooms.taxYear}",
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+              ),
+              TextButton(
+                onPressed: onEdit,
+                child: const Text("编辑"),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            "按账户类别共享，多个 TFSA/RRSP/FHSA 账户不会重复计算。",
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              for (final room in registeredRooms.rooms)
+                _InfoChip(room.accountType, room.value),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            "来源：${registeredRooms.sourceLabel}",
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _RegisteredRoomEditorSheet extends StatefulWidget {
+  const _RegisteredRoomEditorSheet({
+    required this.apiClient,
+    required this.registeredRooms,
+  });
+
+  final LooApiClient apiClient;
+  final MobileRegisteredRooms registeredRooms;
+
+  @override
+  State<_RegisteredRoomEditorSheet> createState() =>
+      _RegisteredRoomEditorSheetState();
+}
+
+class _RegisteredRoomEditorSheetState extends State<_RegisteredRoomEditorSheet> {
+  late final _taxYearController =
+      TextEditingController(text: widget.registeredRooms.taxYear.toString());
+  late final Map<String, TextEditingController> _roomControllers = {
+    for (final type in const ["TFSA", "RRSP", "FHSA"])
+      type: TextEditingController(text: _initialRoom(type).toStringAsFixed(0)),
+  };
+  var _saving = false;
+  String? _error;
+
+  double _initialRoom(String accountType) {
+    return widget.registeredRooms.rooms
+        .firstWhere(
+          (room) => room.accountType == accountType,
+          orElse: () => MobileRegisteredRoom(
+            accountType: accountType,
+            remainingRoomCad: 0,
+            label: accountType,
+            value: "\$0",
+            note: null,
+          ),
+        )
+        .remainingRoomCad;
+  }
+
+  @override
+  void dispose() {
+    _taxYearController.dispose();
+    for (final controller in _roomControllers.values) {
+      controller.dispose();
+    }
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    setState(() {
+      _saving = true;
+      _error = null;
+    });
+    try {
+      await widget.apiClient.updateRegisteredRooms({
+        "taxYear":
+            int.tryParse(_taxYearController.text.trim()) ?? DateTime.now().year,
+        "rooms": [
+          for (final entry in _roomControllers.entries)
+            {
+              "accountType": entry.key,
+              "remainingRoomCad":
+                  double.tryParse(entry.value.text.trim()) ?? 0,
+            },
+        ],
+      });
+      if (mounted) {
+        Navigator.of(context).pop(true);
+      }
+    } catch (error) {
+      if (mounted) {
+        setState(() {
+          _error = error.toString();
+          _saving = false;
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      child: Padding(
+        padding: EdgeInsets.only(
+          left: 20,
+          right: 20,
+          top: 20,
+          bottom: MediaQuery.of(context).viewInsets.bottom + 20,
+        ),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text("注册额度", style: Theme.of(context).textTheme.titleLarge),
+              const SizedBox(height: 6),
+              Text(
+                "这里是 TFSA/RRSP/FHSA 按类别共享的剩余额度，不属于任何单个券商账户。",
+                style: Theme.of(context).textTheme.bodyMedium,
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: _taxYearController,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(
+                  labelText: "税务年度",
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 12),
+              for (final entry in _roomControllers.entries) ...[
+                TextField(
+                  controller: entry.value,
+                  keyboardType:
+                      const TextInputType.numberWithOptions(decimal: true),
+                  decoration: InputDecoration(
+                    labelText: "${entry.key} 剩余额度 CAD",
+                    border: const OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 12),
+              ],
+              if (_error != null) ...[
+                Text(
+                  _error!,
+                  style: TextStyle(color: Theme.of(context).colorScheme.error),
+                ),
+                const SizedBox(height: 10),
+              ],
+              FilledButton.icon(
+                onPressed: _saving ? null : _save,
+                icon: _saving
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.save_outlined),
+                label: Text(_saving ? "保存中…" : "保存注册额度"),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }
 

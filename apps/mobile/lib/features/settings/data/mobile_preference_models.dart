@@ -107,6 +107,64 @@ class MobilePreferenceProfile {
   }
 }
 
+class MobileRegisteredRooms {
+  const MobileRegisteredRooms({
+    required this.taxYear,
+    required this.totalCad,
+    required this.source,
+    required this.rooms,
+  });
+
+  final int taxYear;
+  final double totalCad;
+  final String source;
+  final List<MobileRegisteredRoom> rooms;
+
+  String get sourceLabel =>
+      source == "shared" ? "共享额度" : "旧账户额度";
+
+  factory MobileRegisteredRooms.fromJson(Object? value) {
+    final json =
+        value is Map<String, dynamic> ? value : const <String, dynamic>{};
+    return MobileRegisteredRooms(
+      taxYear: (json["taxYear"] as num?)?.toInt() ?? DateTime.now().year,
+      totalCad: (json["totalCad"] as num?)?.toDouble() ?? 0,
+      source: json["source"] as String? ?? "legacy_accounts",
+      rooms: (json["rooms"] as List?)
+              ?.whereType<Map<String, dynamic>>()
+              .map(MobileRegisteredRoom.fromJson)
+              .toList() ??
+          const [],
+    );
+  }
+}
+
+class MobileRegisteredRoom {
+  const MobileRegisteredRoom({
+    required this.accountType,
+    required this.remainingRoomCad,
+    required this.label,
+    required this.value,
+    required this.note,
+  });
+
+  final String accountType;
+  final double remainingRoomCad;
+  final String label;
+  final String value;
+  final String? note;
+
+  factory MobileRegisteredRoom.fromJson(Map<String, dynamic> json) {
+    return MobileRegisteredRoom(
+      accountType: json["accountType"] as String? ?? "TFSA",
+      remainingRoomCad: (json["remainingRoomCad"] as num?)?.toDouble() ?? 0,
+      label: json["label"] as String? ?? json["accountType"] as String? ?? "",
+      value: json["value"] as String? ?? "",
+      note: json["note"] as String?,
+    );
+  }
+}
+
 class MobileRecommendationConstraints {
   const MobileRecommendationConstraints({
     required this.excludedSymbols,

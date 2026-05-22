@@ -118,6 +118,7 @@ import { inferEconomicAssetClass } from "@/lib/backend/security-economic-exposur
 import type { MobileSecurityObservationInputPayload } from "@/lib/backend/payload-schemas";
 import type { IbkrConnectionSaveInputPayload } from "@/lib/backend/payload-schemas";
 import type { snapTradeConnectionPortalInputSchema } from "@/lib/backend/payload-schemas";
+import type { RegisteredAccountRoomsInputPayload } from "@/lib/backend/payload-schemas";
 import type { z } from "zod";
 import type {
   SecurityQuote,
@@ -1644,6 +1645,7 @@ export async function getDashboardView(userId: string) {
     userTransactions,
     userCashAccounts,
     userCashBalanceEvents,
+    userRegisteredRooms,
     userEvents,
     userSnapshots,
     profile,
@@ -1653,6 +1655,7 @@ export async function getDashboardView(userId: string) {
     repositories.transactions.listByUserId(user.id),
     repositories.cashAccounts.listByUserId(user.id),
     repositories.cashAccountBalanceEvents.listByUserId(user.id),
+    repositories.registeredAccountRooms.listByUserId(user.id),
     repositories.portfolioEvents.listByUserId(user.id),
     repositories.snapshots.listByUserId(user.id),
     repositories.preferences.getByUserId(user.id),
@@ -1678,6 +1681,7 @@ export async function getDashboardView(userId: string) {
         transactions: userTransactions,
         cashAccounts: userCashAccounts,
         cashAccountBalanceEvents: userCashBalanceEvents,
+        registeredRooms: userRegisteredRooms,
         portfolioEvents: userEvents,
         priceHistory: userPriceHistory,
         snapshots: userSnapshots,
@@ -3445,12 +3449,20 @@ export async function mergeAccounts(
 
 export async function getRecommendationView(userId: string) {
   const repositories = getRepositories();
-  const [user, profile, accounts, holdings, observations] = await Promise.all([
+  const [
+    user,
+    profile,
+    accounts,
+    holdings,
+    observations,
+    registeredRooms,
+  ] = await Promise.all([
     repositories.users.getById(userId),
     repositories.preferences.getByUserId(userId),
     repositories.accounts.listByUserId(userId),
     repositories.holdings.listByUserId(userId),
     repositories.mobileSecurityObservations.listRecentByUserId(userId, 20),
+    repositories.registeredAccountRooms.listByUserId(userId),
   ]);
   const recommendationSecurities = await repositories.securities.listByIds([
     ...holdings
@@ -3504,6 +3516,7 @@ export async function getRecommendationView(userId: string) {
             securities: recommendationSecurities,
             observations,
             dynamicCandidates,
+            registeredRooms,
           });
 
           return {
@@ -4616,9 +4629,11 @@ function inferBrokerageOtherAssetSector(holding: {
 
 export async function getPreferenceView(userId: string) {
   const repositories = getRepositories();
-  const [user, profile] = await Promise.all([
+  const [user, profile, userAccounts, userRegisteredRooms] = await Promise.all([
     repositories.users.getById(userId),
     repositories.preferences.getByUserId(userId),
+    repositories.accounts.listByUserId(userId),
+    repositories.registeredAccountRooms.listByUserId(userId),
   ]);
   const db = getDb();
   const guidedDraftRow = await db.query.guidedAllocationDrafts.findFirst({
@@ -4647,12 +4662,47 @@ export async function getPreferenceView(userId: string) {
 
   return apiSuccess(
     {
-      ...buildSettingsData(profile, user.displayLanguage),
+      ...buildSettingsData(profile, user.displayLanguage, {
+        accounts: userAccounts,
+        registeredRooms: userRegisteredRooms,
+        display: await buildServiceDisplayContext(user.baseCurrency),
+      }),
       profile,
       guidedDraft,
     },
     "database",
   );
+}
+
+export async function updateRegisteredAccountRooms(
+  userId: string,
+  input: RegisteredAccountRoomsInputPayload,
+) {
+  const repositories = getRepositories();
+  const user = await repositories.users.getById(userId);
+  const taxYear = input.taxYear ?? new Date().getFullYear();
+  await Promise.all(
+    input.rooms.map((room) =>
+      repositories.registeredAccountRooms.upsert({
+        userId,
+        accountType: room.accountType,
+        taxYear,
+        remainingRoomCad: room.remainingRoomCad,
+        note: room.note ?? null,
+      }),
+    ),
+  );
+  const [profile, userAccounts, userRegisteredRooms] = await Promise.all([
+    repositories.preferences.getByUserId(userId),
+    repositories.accounts.listByUserId(userId),
+    repositories.registeredAccountRooms.listByUserId(userId),
+  ]);
+  const settings = buildSettingsData(profile, user.displayLanguage, {
+    accounts: userAccounts,
+    registeredRooms: userRegisteredRooms,
+    display: await buildServiceDisplayContext(user.baseCurrency),
+  });
+  return settings.registeredRooms;
 }
 
 export async function getCitizenProfileView(userId: string) {
@@ -5189,11 +5239,12 @@ export async function scoreCandidateSecurityForUser(
   input: ScoreCandidateSecurityInput,
 ) {
   const repositories = getRepositories();
-  const [user, accounts, holdings, profile] = await Promise.all([
+  const [user, accounts, holdings, profile, registeredRooms] = await Promise.all([
     repositories.users.getById(userId),
     repositories.accounts.listByUserId(userId),
     repositories.holdings.listByUserId(userId),
     repositories.preferences.getByUserId(userId),
+    repositories.registeredAccountRooms.listByUserId(userId),
   ]);
 
   return apiSuccess(
@@ -5204,6 +5255,7 @@ export async function scoreCandidateSecurityForUser(
         profile,
         language: user.displayLanguage,
         candidate: input,
+        registeredRooms,
       }),
     },
     "database",
@@ -5215,11 +5267,12 @@ export async function scoreCandidateSecuritiesForUser(
   symbols: string[],
 ) {
   const repositories = getRepositories();
-  const [user, accounts, holdings, profile] = await Promise.all([
+  const [user, accounts, holdings, profile, registeredRooms] = await Promise.all([
     repositories.users.getById(userId),
     repositories.accounts.listByUserId(userId),
     repositories.holdings.listByUserId(userId),
     repositories.preferences.getByUserId(userId),
+    repositories.registeredAccountRooms.listByUserId(userId),
   ]);
 
   const uniqueSymbols = [
@@ -5237,6 +5290,7 @@ export async function scoreCandidateSecuritiesForUser(
           profile,
           language: user.displayLanguage,
           candidate: { symbol },
+          registeredRooms,
         }),
       ),
     },
@@ -6589,12 +6643,20 @@ export async function createRecommendationRun(
 ): Promise<RecommendationRun> {
   const repositories = getRepositories();
   await refreshRecommendationDynamicPoolForUser(userId);
-  const [user, accounts, holdings, profile, observations] = await Promise.all([
+  const [
+    user,
+    accounts,
+    holdings,
+    profile,
+    observations,
+    registeredRooms,
+  ] = await Promise.all([
     repositories.users.getById(userId),
     repositories.accounts.listByUserId(userId),
     repositories.holdings.listByUserId(userId),
     repositories.preferences.getByUserId(userId),
     repositories.mobileSecurityObservations.listRecentByUserId(userId, 20),
+    repositories.registeredAccountRooms.listByUserId(userId),
   ]);
 
   if (accounts.length === 0 || holdings.length === 0) {
@@ -6620,6 +6682,7 @@ export async function createRecommendationRun(
     language: user.displayLanguage,
     securities: recommendationSecurities,
     observations,
+    registeredRooms,
     dynamicCandidates:
       await repositories.recommendationDynamicCandidates.listFreshByUserId(
         userId,

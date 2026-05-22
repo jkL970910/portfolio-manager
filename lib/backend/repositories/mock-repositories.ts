@@ -24,6 +24,7 @@ import {
   PortfolioAnalysisGptEnhancement,
   PortfolioAnalysisRun,
   RecommendationDynamicCandidateRecord,
+  RegisteredAccountRoom,
 } from "@/lib/backend/models";
 import {
   ExternalResearchJob,
@@ -42,6 +43,7 @@ const marketSentimentSnapshots: MarketSentimentSnapshot[] = [];
 const mobileSecurityObservations: MobileSecurityObservation[] = [];
 const mobileRefreshTokens: MobileRefreshTokenRecord[] = [];
 const recommendationDynamicCandidates: RecommendationDynamicCandidateRecord[] = [];
+const registeredAccountRooms: RegisteredAccountRoom[] = [];
 
 export const mockRepositories: BackendRepositories = {
   users: {
@@ -83,6 +85,38 @@ export const mockRepositories: BackendRepositories = {
   accounts: {
     async listByUserId(userId) {
       return accounts.filter((account) => account.userId === userId);
+    },
+  },
+  registeredAccountRooms: {
+    async listByUserId(userId) {
+      return registeredAccountRooms.filter((room) => room.userId === userId);
+    },
+    async upsert(input) {
+      const now = new Date().toISOString();
+      const existing = registeredAccountRooms.find(
+        (room) =>
+          room.userId === input.userId &&
+          room.accountType === input.accountType &&
+          room.taxYear === input.taxYear,
+      );
+      if (existing) {
+        existing.remainingRoomCad = input.remainingRoomCad;
+        existing.note = input.note ?? null;
+        existing.updatedAt = now;
+        return existing;
+      }
+      const room: RegisteredAccountRoom = {
+        id: `registered_room_${registeredAccountRooms.length + 1}`,
+        userId: input.userId,
+        accountType: input.accountType,
+        taxYear: input.taxYear,
+        remainingRoomCad: input.remainingRoomCad,
+        note: input.note ?? null,
+        createdAt: now,
+        updatedAt: now,
+      };
+      registeredAccountRooms.push(room);
+      return room;
     },
   },
   holdings: {

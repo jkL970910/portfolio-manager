@@ -762,6 +762,22 @@ export const guidedAllocationDraftSchema = z.object({
 export type PreferenceProfileInputPayload = z.infer<
   typeof preferenceProfileInputSchema
 >;
+export const registeredAccountRoomsInputSchema = z.object({
+  taxYear: z.number().int().min(2009).max(2100).optional(),
+  rooms: z
+    .array(
+      z.object({
+        accountType: z.enum(["TFSA", "RRSP", "FHSA"]),
+        remainingRoomCad: z.number().min(0).max(1_000_000),
+        note: z.string().trim().max(240).nullable().optional(),
+      }),
+    )
+    .min(1)
+    .max(3),
+});
+export type RegisteredAccountRoomsInputPayload = z.infer<
+  typeof registeredAccountRoomsInputSchema
+>;
 export type PreferenceFactorsDraftRequestPayload = z.infer<
   typeof preferenceFactorsDraftRequestSchema
 >;

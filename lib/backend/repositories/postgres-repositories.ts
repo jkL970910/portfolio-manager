@@ -22,6 +22,7 @@ import {
   recommendationDynamicCandidates,
   recommendationItems,
   recommendationRuns,
+  registeredAccountRooms,
   securities,
   securityAliases,
   securityPriceHistory,
@@ -49,6 +50,7 @@ import {
   PreferenceProfile,
   RecommendationDynamicCandidateRecord,
   RecommendationRun,
+  RegisteredAccountRoom,
   UserProfile,
 } from "@/lib/backend/models";
 import { BackendRepositories } from "@/lib/backend/repositories/interfaces";
@@ -230,6 +232,21 @@ function mapCashAccountBalanceEvent(
     balanceCad: toNumber(row.balanceCad),
     source: row.source,
     createdAt: row.createdAt.toISOString(),
+  };
+}
+
+function mapRegisteredAccountRoom(
+  row: typeof registeredAccountRooms.$inferSelect,
+): RegisteredAccountRoom {
+  return {
+    id: row.id,
+    userId: row.userId,
+    accountType: row.accountType as RegisteredAccountRoom["accountType"],
+    taxYear: row.taxYear,
+    remainingRoomCad: toNumber(row.remainingRoomCad),
+    note: row.note ?? null,
+    createdAt: row.createdAt.toISOString(),
+    updatedAt: row.updatedAt.toISOString(),
   };
 }
 
@@ -607,6 +624,44 @@ export const postgresRepositories: BackendRepositories = {
         where: eq(investmentAccounts.userId, userId),
       });
       return rows.map(mapAccount);
+    },
+  },
+  registeredAccountRooms: {
+    async listByUserId(userId) {
+      const rows = await getDb().query.registeredAccountRooms.findMany({
+        where: eq(registeredAccountRooms.userId, userId),
+        orderBy: [desc(registeredAccountRooms.taxYear)],
+      });
+      return rows.map(mapRegisteredAccountRoom);
+    },
+    async upsert(input) {
+      const db = getDb();
+      const existing = await db.query.registeredAccountRooms.findFirst({
+        where: and(
+          eq(registeredAccountRooms.userId, input.userId),
+          eq(registeredAccountRooms.accountType, input.accountType),
+          eq(registeredAccountRooms.taxYear, input.taxYear),
+        ),
+      });
+      const values = {
+        userId: input.userId,
+        accountType: input.accountType,
+        taxYear: input.taxYear,
+        remainingRoomCad: input.remainingRoomCad.toFixed(2),
+        note: input.note ?? null,
+        updatedAt: new Date(),
+      };
+      const [row] = existing
+        ? await db
+            .update(registeredAccountRooms)
+            .set(values)
+            .where(eq(registeredAccountRooms.id, existing.id))
+            .returning()
+        : await db
+            .insert(registeredAccountRooms)
+            .values(values)
+            .returning();
+      return mapRegisteredAccountRoom(row);
     },
   },
   holdings: {

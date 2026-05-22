@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import type { InvestmentAccount, PreferenceProfile } from "@/lib/backend/models";
+import type {
+  InvestmentAccount,
+  PreferenceProfile,
+  RegisteredAccountRoom,
+} from "@/lib/backend/models";
 import { DEFAULT_PREFERENCE_FACTORS } from "@/lib/backend/preference-factors";
 import { DEFAULT_RECOMMENDATION_CONSTRAINTS } from "@/lib/backend/recommendation-constraints";
 import { buildRecommendationV2, scoreCandidateSecurity } from "@/lib/backend/recommendation-v2";
@@ -185,6 +189,70 @@ test("relaxed core fallback is explicit and does not run by default", () => {
   assert.equal(strictRun.poolStatus?.status, "needs_policy_relaxation");
   assert.equal(relaxedRun.poolStatus?.status, "ok");
   assert.ok(relaxedRun.items.some((item) => item.assetClass === "US Equity"));
+});
+
+test("shared registered room overrides duplicate account-level room for placement", () => {
+  const duplicateRoomAccounts: InvestmentAccount[] = [
+    {
+      id: "acct_tfsa_a",
+      userId: "user_test",
+      institution: "Broker A",
+      type: "TFSA",
+      nickname: "TFSA A",
+      currency: "CAD",
+      marketValueCad: 25000,
+      contributionRoomCad: 10000,
+    },
+    {
+      id: "acct_tfsa_b",
+      userId: "user_test",
+      institution: "Broker B",
+      type: "TFSA",
+      nickname: "TFSA B",
+      currency: "CAD",
+      marketValueCad: 25000,
+      contributionRoomCad: 10000,
+    },
+    {
+      id: "acct_taxable",
+      userId: "user_test",
+      institution: "Broker C",
+      type: "Taxable",
+      nickname: "Taxable",
+      currency: "CAD",
+      marketValueCad: 10000,
+      contributionRoomCad: null,
+    },
+  ];
+  const registeredRooms: RegisteredAccountRoom[] = [
+    {
+      id: "room_tfsa_zero",
+      userId: "user_test",
+      accountType: "TFSA",
+      taxYear: new Date().getFullYear(),
+      remainingRoomCad: 0,
+      note: null,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    },
+  ];
+
+  const run = buildRecommendationV2({
+    accounts: duplicateRoomAccounts,
+    holdings: [],
+    profile: makeProfile({
+      accountFundingPriority: ["TFSA", "Taxable", "RRSP"],
+      riskProfile: "Conservative",
+    }),
+    contributionAmountCad: 5000,
+    language: "zh",
+    registeredRooms,
+  });
+
+  assert.ok(
+    run.items.every((item) => item.targetAccountType !== "TFSA"),
+    "TFSA should not be selected when shared TFSA room is zero.",
+  );
 });
 
 test("candidate pool policy can hide routine cash for high-risk profiles", () => {

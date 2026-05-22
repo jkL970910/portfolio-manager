@@ -85,6 +85,7 @@ type MobileHomeData = {
     gainLoss: string;
   }>;
   buyingPower: DashboardData["buyingPower"];
+  registeredRoom: DashboardData["registeredRoom"];
   netWorthTrend: DashboardData["netWorthTrend"];
   chartSeries?: DashboardData["chartSeries"];
   healthScore: DashboardData["healthScore"];
@@ -734,6 +735,7 @@ async function mapMobileHomeData(
     displayContext: payload.data.displayContext,
     metrics: payload.data.metrics,
     buyingPower: payload.data.buyingPower,
+    registeredRoom: payload.data.registeredRoom,
     accounts: payload.data.accounts.map((account) => ({
       id: account.id,
       name: account.name,

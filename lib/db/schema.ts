@@ -139,6 +139,38 @@ export const investmentAccounts = pgTable("investment_accounts", {
     .defaultNow(),
 });
 
+export const registeredAccountRooms = pgTable(
+  "registered_account_rooms",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id),
+    accountType: varchar("account_type", { length: 24 }).notNull(),
+    taxYear: integer("tax_year").notNull(),
+    remainingRoomCad: numeric("remaining_room_cad", {
+      precision: 14,
+      scale: 2,
+    })
+      .notNull()
+      .default("0"),
+    note: text("note"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => ({
+    userTypeYearIdx: uniqueIndex("registered_account_rooms_user_type_year_idx").on(
+      table.userId,
+      table.accountType,
+      table.taxYear,
+    ),
+  }),
+);
+
 export const holdingPositions = pgTable(
   "holding_positions",
   {

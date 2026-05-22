@@ -77,6 +77,17 @@ export interface InvestmentAccount {
   contributionRoomCad: number | null;
 }
 
+export interface RegisteredAccountRoom {
+  id: EntityId;
+  userId: EntityId;
+  accountType: AccountType;
+  taxYear: number;
+  remainingRoomCad: number;
+  note: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface HoldingPosition {
   id: EntityId;
   userId: EntityId;
