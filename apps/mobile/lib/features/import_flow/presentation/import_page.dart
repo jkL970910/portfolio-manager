@@ -845,6 +845,7 @@ class _IbkrFlexPreviewSheetState extends State<_IbkrFlexPreviewSheet> {
   MobileBrokerageConnection? _connection;
   final Set<String> _selectedAccountIds = {};
   final Set<String> _reviewingHoldingKeys = {};
+  var _confirmMode = "snapshot_merge";
 
   @override
   void initState() {
@@ -1021,6 +1022,7 @@ class _IbkrFlexPreviewSheetState extends State<_IbkrFlexPreviewSheet> {
       final response = await widget.apiClient.confirmBrokerageImportDraft(
         preview.draftId,
         selectedAccountIds: _selectedAccountIds.toList(),
+        confirmMode: _confirmMode,
       );
       final data = response["data"];
       final accountsCreated = data is Map<String, dynamic>
@@ -1035,6 +1037,9 @@ class _IbkrFlexPreviewSheetState extends State<_IbkrFlexPreviewSheet> {
       final holdingsSkipped = data is Map<String, dynamic>
           ? data["holdingsSkipped"] as int? ?? 0
           : 0;
+      final holdingsClosed = data is Map<String, dynamic>
+          ? data["holdingsClosed"] as int? ?? 0
+          : 0;
       if (mounted) {
         setState(() {
           _confirming = false;
@@ -1044,7 +1049,7 @@ class _IbkrFlexPreviewSheetState extends State<_IbkrFlexPreviewSheet> {
           context,
           title: "IBKR 草稿已写入",
           message:
-              "新增 $accountsCreated 个账户，新增 $holdingsCreated 个持仓，更新 $holdingsUpdated 个持仓。${holdingsSkipped > 0 ? "已跳过 $holdingsSkipped 个未确认持仓。" : ""}回到国库后可继续检查账户和标的详情。",
+              "新增 $accountsCreated 个账户，新增 $holdingsCreated 个持仓，更新 $holdingsUpdated 个持仓。${holdingsClosed > 0 ? "已关闭 $holdingsClosed 个本次快照缺失持仓。" : ""}${holdingsSkipped > 0 ? "已跳过 $holdingsSkipped 个未确认持仓。" : ""}回到国库后可继续检查账户和标的详情。",
         );
         if (mounted) {
           Navigator.of(context).pop(true);
@@ -1285,6 +1290,10 @@ class _IbkrFlexPreviewSheetState extends State<_IbkrFlexPreviewSheet> {
                     _preview!,
                     confirming: _confirming,
                     onConfirm: _confirming ? null : _confirmDraft,
+                    confirmMode: _confirmMode,
+                    onConfirmModeChanged: (value) {
+                      setState(() => _confirmMode = value);
+                    },
                     selectedAccountIds: _selectedAccountIds,
                     reviewingHoldingKeys: _reviewingHoldingKeys,
                     onSelectionChanged: (accountId, selected) {
@@ -1563,6 +1572,7 @@ class _SnapTradePreviewSheetState extends State<_SnapTradePreviewSheet> {
   MobileIbkrFlexPreview? _preview;
   final Set<String> _selectedAccountIds = {};
   final Set<String> _reviewingHoldingKeys = {};
+  var _confirmMode = "snapshot_merge";
 
   @override
   void initState() {
@@ -1731,6 +1741,7 @@ class _SnapTradePreviewSheetState extends State<_SnapTradePreviewSheet> {
       final response = await widget.apiClient.confirmBrokerageImportDraft(
         preview.draftId,
         selectedAccountIds: _selectedAccountIds.toList(),
+        confirmMode: _confirmMode,
       );
       final data = response["data"];
       final accountsCreated = data is Map<String, dynamic>
@@ -1745,6 +1756,9 @@ class _SnapTradePreviewSheetState extends State<_SnapTradePreviewSheet> {
       final holdingsSkipped = data is Map<String, dynamic>
           ? data["holdingsSkipped"] as int? ?? 0
           : 0;
+      final holdingsClosed = data is Map<String, dynamic>
+          ? data["holdingsClosed"] as int? ?? 0
+          : 0;
       if (mounted) {
         setState(() {
           _confirming = false;
@@ -1754,7 +1768,7 @@ class _SnapTradePreviewSheetState extends State<_SnapTradePreviewSheet> {
           context,
           title: "Wealthsimple 草稿已写入",
           message:
-              "新增 $accountsCreated 个账户，新增 $holdingsCreated 个持仓，更新 $holdingsUpdated 个持仓。${holdingsSkipped > 0 ? "已跳过 $holdingsSkipped 个未确认持仓。" : ""}",
+              "新增 $accountsCreated 个账户，新增 $holdingsCreated 个持仓，更新 $holdingsUpdated 个持仓。${holdingsClosed > 0 ? "已关闭 $holdingsClosed 个本次快照缺失持仓。" : ""}${holdingsSkipped > 0 ? "已跳过 $holdingsSkipped 个未确认持仓。" : ""}",
         );
         if (mounted) {
           Navigator.of(context).pop(true);
@@ -1878,6 +1892,10 @@ class _SnapTradePreviewSheetState extends State<_SnapTradePreviewSheet> {
                   _preview!,
                   confirming: _confirming,
                   onConfirm: _confirming ? null : _confirmDraft,
+                  confirmMode: _confirmMode,
+                  onConfirmModeChanged: (value) {
+                    setState(() => _confirmMode = value);
+                  },
                   selectedAccountIds: _selectedAccountIds,
                   reviewingHoldingKeys: _reviewingHoldingKeys,
                   onSelectionChanged: (accountId, selected) {
@@ -2064,6 +2082,8 @@ class _IbkrPreviewResultCard extends StatelessWidget {
     this.preview, {
     required this.confirming,
     required this.onConfirm,
+    required this.confirmMode,
+    required this.onConfirmModeChanged,
     required this.selectedAccountIds,
     required this.reviewingHoldingKeys,
     required this.onSelectionChanged,
@@ -2073,6 +2093,8 @@ class _IbkrPreviewResultCard extends StatelessWidget {
   final MobileIbkrFlexPreview preview;
   final bool confirming;
   final VoidCallback? onConfirm;
+  final String confirmMode;
+  final ValueChanged<String> onConfirmModeChanged;
   final Set<String> selectedAccountIds;
   final Set<String> reviewingHoldingKeys;
   final void Function(String accountId, bool selected) onSelectionChanged;
@@ -2088,7 +2110,12 @@ class _IbkrPreviewResultCard extends StatelessWidget {
     final selectedAccounts = preview.accounts
         .where((account) => selectedAccountIds.contains(account.accountId))
         .toList();
-    final disabledConfirm = selectedAccounts.isEmpty || confirming;
+    final hasReviewInSelectedAccounts = selectedAccounts.any(
+      (account) => account.reviewHoldingCount > 0,
+    );
+    final disabledConfirm = selectedAccounts.isEmpty ||
+        confirming ||
+        (confirmMode == "snapshot_replace" && hasReviewInSelectedAccounts);
     return LooGlassCard(
       padding: const EdgeInsets.all(14),
       child: Column(
@@ -2127,6 +2154,11 @@ class _IbkrPreviewResultCard extends StatelessWidget {
               ),
             ),
           ],
+          const SizedBox(height: 12),
+          _BrokerageConfirmModeSelector(
+            value: confirmMode,
+            onChanged: confirming ? null : onConfirmModeChanged,
+          ),
           if (preview.warnings.isNotEmpty) ...[
             const SizedBox(height: 12),
             ...preview.warnings.take(3).map(
@@ -2158,14 +2190,77 @@ class _IbkrPreviewResultCard extends StatelessWidget {
           ),
           const SizedBox(height: 6),
           Text(
-            preview.reviewAccounts.isNotEmpty
-                ? "未确认持仓会自动跳过；已勾选账户内的可写入持仓会先进入账本。"
-                : "当前使用安全快照合并：同账户同标的会更新，不会重复新增。",
+            confirmMode == "snapshot_replace"
+                ? hasReviewInSelectedAccounts
+                    ? "快照替换前，请先处理所选账户里的待确认持仓。"
+                    : "替换模式只影响已勾选账户：本次快照没有出现的旧持仓会被置为 0，成本记录保留。"
+                : preview.reviewAccounts.isNotEmpty
+                    ? "未确认持仓会自动跳过；已勾选账户内的可写入持仓会先进入账本。"
+                    : "安全合并：同账户同标的会更新，不会关闭本次快照缺失的旧持仓。",
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
                   color: context.looTokens.mutedText,
                 ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _BrokerageConfirmModeSelector extends StatelessWidget {
+  const _BrokerageConfirmModeSelector({
+    required this.value,
+    required this.onChanged,
+  });
+
+  final String value;
+  final ValueChanged<String>? onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final isReplace = value == "snapshot_replace";
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.14),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: context.looTokens.cardBorder),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(10),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text("写入方式", style: Theme.of(context).textTheme.titleSmall),
+            const SizedBox(height: 8),
+            SegmentedButton<String>(
+              segments: const [
+                ButtonSegment(
+                  value: "snapshot_merge",
+                  label: Text("安全合并"),
+                ),
+                ButtonSegment(
+                  value: "snapshot_replace",
+                  label: Text("快照替换"),
+                ),
+              ],
+              selected: {value},
+              onSelectionChanged: onChanged == null
+                  ? null
+                  : (values) => onChanged!(values.first),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              isReplace
+                  ? "适合确认券商快照完整时使用；所选账户必须先处理全部待确认持仓。"
+                  : "适合日常同步；只新增/更新本次出现的持仓。",
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: isReplace
+                        ? Theme.of(context).colorScheme.error
+                        : context.looTokens.mutedText,
+                  ),
+            ),
+          ],
+        ),
       ),
     );
   }

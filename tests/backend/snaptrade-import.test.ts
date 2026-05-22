@@ -1,6 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { buildSnapTradePreview } from "@/lib/backend/import/snaptrade";
+import type { AccountPosition, Position } from "snaptrade-typescript-sdk";
+
+function testPosition(position: Record<string, unknown>): AccountPosition | Position {
+  return position as AccountPosition | Position;
+}
 
 test("builds SnapTrade preview from connection-scoped accounts and positions", () => {
   const preview = buildSnapTradePreview({
@@ -30,7 +35,7 @@ test("builds SnapTrade preview from connection-scoped accounts and positions", (
     },
     positionsByAccount: {
       "account-1": [
-        {
+        testPosition({
           instrument: {
             kind: "etf",
             id: "zqq",
@@ -40,10 +45,10 @@ test("builds SnapTrade preview from connection-scoped accounts and positions", (
             currency: "CAD",
             exchange: "XTSE",
           },
-          units: "10",
-          price: "140.12",
+          units: 10,
+          price: 140.12,
           currency: "CAD",
-        },
+        }),
       ],
     },
   });
@@ -87,7 +92,7 @@ test("preserves SnapTrade TSX suffix when raw symbol is unavailable", () => {
     },
     positionsByAccount: {
       "account-1": [
-        {
+        testPosition({
           instrument: {
             kind: "etf",
             id: "vfv",
@@ -96,10 +101,10 @@ test("preserves SnapTrade TSX suffix when raw symbol is unavailable", () => {
             currency: "CAD",
             exchange: "XTSE",
           },
-          units: "10",
-          price: "140.12",
+          units: 10,
+          price: 140.12,
           currency: "CAD",
-        },
+        }),
       ],
     },
   });
@@ -137,7 +142,7 @@ test("marks SnapTrade positions without exchange as needing review", () => {
     },
     positionsByAccount: {
       "account-1": [
-        {
+        testPosition({
           instrument: {
             kind: "stock",
             id: "aaoi",
@@ -147,10 +152,10 @@ test("marks SnapTrade positions without exchange as needing review", () => {
             currency: "USD",
             exchange: null,
           },
-          units: "3",
-          price: "17.5",
+          units: 3,
+          price: 17.5,
           currency: "USD",
-        },
+        }),
       ],
     },
   });

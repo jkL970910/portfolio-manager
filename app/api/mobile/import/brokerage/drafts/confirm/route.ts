@@ -26,7 +26,10 @@ export async function POST(request: NextRequest) {
     const result = await confirmBrokerageImportDraft(
       viewer.id,
       parsed.data.draftId,
-      { selectedAccountIds: parsed.data.selectedAccountIds },
+      {
+        selectedAccountIds: parsed.data.selectedAccountIds,
+        confirmMode: parsed.data.confirmMode,
+      },
     );
     return NextResponse.json({ data: result }, { status: 200 });
   } catch (error) {
@@ -46,6 +49,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         {
           error: "所选账户没有可写入持仓。请先确认交易所，或将实物黄金等非证券标记为其他资产。",
+        },
+        { status: 400 },
+      );
+    }
+    if (/Snapshot replace requires every selected account holding/i.test(message)) {
+      return NextResponse.json(
+        {
+          error: "快照替换前，请先处理所选账户里的全部待确认持仓；否则可能把实际存在但未确认的持仓关闭。",
         },
         { status: 400 },
       );

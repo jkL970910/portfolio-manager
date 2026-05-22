@@ -3989,9 +3989,13 @@ export async function syncSnapTradeBrokerageConnection(userId: string) {
 export async function confirmBrokerageImportDraft(
   userId: string,
   draftId: string,
-  options: { selectedAccountIds?: string[] } = {},
+  options: {
+    selectedAccountIds?: string[];
+    confirmMode?: "snapshot_merge" | "snapshot_replace";
+  } = {},
 ) {
   const db = getDb();
+  const confirmMode = options.confirmMode ?? "snapshot_merge";
 
   return db.transaction(async (tx) => {
     const draftRow = await tx.query.brokerageImportDrafts.findFirst({
@@ -4044,10 +4048,19 @@ export async function confirmBrokerageImportDraft(
     if (importableAccounts.length === 0) {
       throw new Error("No confirmed brokerage import draft holdings were selected.");
     }
+    if (
+      confirmMode === "snapshot_replace" &&
+      importableAccounts.some((account) => account.skippedHoldingCount > 0)
+    ) {
+      throw new Error(
+        "Snapshot replace requires every selected account holding to be confirmed or marked as other asset.",
+      );
+    }
     let accountsCreated = 0;
     let holdingsCreated = 0;
     let holdingsUpdated = 0;
     let holdingsSkipped = 0;
+    let holdingsClosed = 0;
     const institution =
       preview.provider === "snaptrade" ? "Wealthsimple" : "Interactive Brokers";
     const accountPrefix =
@@ -4100,6 +4113,20 @@ export async function confirmBrokerageImportDraft(
       if (!existingAccount) {
         accountsCreated += 1;
       }
+      if (existingAccount) {
+        await tx
+          .update(investmentAccounts)
+          .set({
+            type: accountType,
+            currency,
+            marketValueAmount: accountMarketValueAmount.toFixed(2),
+            marketValueCad: accountMarketValueCad.toFixed(2),
+            updatedAt: new Date(),
+          })
+          .where(eq(investmentAccounts.id, existingAccount.id));
+      }
+
+      const activeSecurityIds = new Set<string>();
 
       for (const sourceHolding of sourceAccount.holdings) {
         const holdingCurrency = normalizeCurrencyCode(sourceHolding.currency);
@@ -4126,6 +4153,7 @@ export async function confirmBrokerageImportDraft(
             : sourceHolding.description || sourceHolding.symbol,
           securityType: isOtherAsset ? "Other / Manual" : sourceHolding.assetCategory,
         });
+        activeSecurityIds.add(security.id);
 
         const existingHolding = await tx.query.holdingPositions.findFirst({
           where: and(
@@ -4246,6 +4274,56 @@ export async function confirmBrokerageImportDraft(
           });
         }
       }
+
+      if (confirmMode === "snapshot_replace") {
+        const existingAccountHoldings = await tx.query.holdingPositions.findMany({
+          where: and(
+            eq(holdingPositions.userId, userId),
+            eq(holdingPositions.accountId, accountRow.id),
+          ),
+        });
+        for (const staleHolding of existingAccountHoldings) {
+          if (!staleHolding.securityId || activeSecurityIds.has(staleHolding.securityId)) {
+            continue;
+          }
+          const staleQuantity = Number(staleHolding.quantity ?? 0);
+          const staleCurrency = normalizeCurrencyCode(
+            (staleHolding.currency as string) || currency,
+          );
+          await tx
+            .update(holdingPositions)
+            .set({
+              quantity: "0.000000",
+              lastPriceAmount: staleHolding.lastPriceAmount,
+              marketValueAmount: "0.00",
+              lastPriceCad: staleHolding.lastPriceCad,
+              marketValueCad: "0.00",
+              gainLossPct:
+                staleHolding.gainLossPct == null
+                  ? "0.00"
+                  : String(staleHolding.gainLossPct),
+              weightPct: "0.00",
+              updatedAt: new Date(),
+            })
+            .where(eq(holdingPositions.id, staleHolding.id));
+          holdingsClosed += 1;
+          if (staleQuantity > 0) {
+            await createPortfolioEvent(tx, {
+              userId,
+              accountId: accountRow.id,
+              symbol: staleHolding.symbol,
+              eventType: "brokerage_snapshot_close",
+              quantity: -Math.abs(staleQuantity),
+              priceAmount:
+                staleHolding.lastPriceAmount == null
+                  ? null
+                  : Number(staleHolding.lastPriceAmount),
+              currency: staleCurrency,
+              source: eventSource,
+            });
+          }
+        }
+      }
     }
 
     await recalculatePortfolioState(tx, userId, {
@@ -4268,6 +4346,8 @@ export async function confirmBrokerageImportDraft(
       holdingsCreated,
       holdingsUpdated,
       holdingsSkipped,
+      holdingsClosed,
+      confirmMode,
     };
   });
 }

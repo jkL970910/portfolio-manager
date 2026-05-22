@@ -246,6 +246,7 @@ export const brokerageImportDraftConfirmInputSchema = z.object({
     .array(z.string().trim().min(1).max(160))
     .max(100)
     .optional(),
+  confirmMode: z.enum(["snapshot_merge", "snapshot_replace"]).default("snapshot_merge"),
 });
 
 export const brokerageImportDraftHoldingReviewInputSchema = z.object({

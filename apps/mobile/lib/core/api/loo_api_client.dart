@@ -208,11 +208,13 @@ class LooApiClient {
   Future<Map<String, dynamic>> confirmBrokerageImportDraft(
     String draftId, {
     List<String>? selectedAccountIds,
+    String confirmMode = "snapshot_merge",
   }) {
     return _postJson(
       "/api/mobile/import/brokerage/drafts/confirm",
       body: {
         "draftId": draftId,
+        "confirmMode": confirmMode,
         if (selectedAccountIds != null) "selectedAccountIds": selectedAccountIds,
       },
     );
