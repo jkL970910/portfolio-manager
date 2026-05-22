@@ -371,12 +371,13 @@ class _OverviewSummaryPanel extends StatelessWidget {
 
     return Column(
       children: [
-        _AssetHeroCard(
-          total: total,
-          registeredRoom: registeredRoom,
-          risk: risk,
-          allTimeReturn: allTimeReturn,
-          chart: snapshot.netWorthChart,
+          _AssetHeroCard(
+            total: total,
+            registeredRoom: registeredRoom,
+            buyingPower: snapshot.buyingPower,
+            risk: risk,
+            allTimeReturn: allTimeReturn,
+            chart: snapshot.netWorthChart,
           fallbackPoints: snapshot.netWorthTrend,
         ),
         const SizedBox(height: 12),
@@ -432,6 +433,7 @@ class _AssetHeroCard extends StatelessWidget {
   const _AssetHeroCard({
     required this.total,
     required this.registeredRoom,
+    required this.buyingPower,
     required this.risk,
     required this.allTimeReturn,
     required this.chart,
@@ -440,6 +442,7 @@ class _AssetHeroCard extends StatelessWidget {
 
   final MobileMetric? total;
   final MobileMetric? registeredRoom;
+  final MobileBuyingPower buyingPower;
   final MobileMetric? risk;
   final MobileMetric? allTimeReturn;
   final MobileChartSeries? chart;
@@ -516,9 +519,11 @@ class _AssetHeroCard extends StatelessWidget {
                   SizedBox(height: tokens.gapSm),
                   Expanded(
                     child: _AssetMiniMetric(
-                      label: "购买力",
-                      value: "待接入",
-                      valueColor: tokens.mutedText,
+                      label: buyingPower.label,
+                      value: buyingPower.value,
+                      valueColor: buyingPower.confidence == "low"
+                          ? tokens.mutedText
+                          : theme.colorScheme.onSurface,
                     ),
                   ),
                 ],

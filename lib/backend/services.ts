@@ -349,6 +349,13 @@ export interface CreateManualInvestmentAccountInput {
   initialMarketValueAmount: number;
 }
 
+export interface CreateManualCashAccountInput {
+  institution: string;
+  nickname: string;
+  currency: CurrencyCode;
+  currentBalanceAmount: number;
+}
+
 export interface CreateGuidedImportResult {
   account: InvestmentAccount;
   importJob: ImportJob | null;
@@ -394,6 +401,32 @@ export async function createManualInvestmentAccount(
         ? null
         : Number(accountRow.contributionRoomCad),
   };
+}
+
+export async function createManualCashAccount(
+  userId: string,
+  input: CreateManualCashAccountInput,
+) {
+  const currentBalanceCad =
+    (await toCadAmount(input.currentBalanceAmount, input.currency)) ?? 0;
+  const repositories = getRepositories();
+  const account = await repositories.cashAccounts.create({
+    userId,
+    institution: input.institution,
+    nickname: input.nickname,
+    currency: input.currency,
+    currentBalanceAmount: input.currentBalanceAmount,
+    currentBalanceCad,
+  });
+  await repositories.cashAccountBalanceEvents.create({
+    userId,
+    cashAccountId: account.id,
+    bookedAt: new Date().toISOString().slice(0, 10),
+    balanceAmount: input.currentBalanceAmount,
+    balanceCad: currentBalanceCad,
+    source: "manual",
+  });
+  return account;
 }
 
 const DEFAULT_TARGETS_BY_RISK: Record<RiskProfile, AllocationTarget[]> = {
@@ -3552,10 +3585,11 @@ export async function updateDisplayLanguage(
 
 export async function getImportView(userId: string) {
   const repositories = getRepositories();
-  const [user, userAccounts, userHoldings] = await Promise.all([
+  const [user, userAccounts, userHoldings, userCashAccounts] = await Promise.all([
     repositories.users.getById(userId),
     repositories.accounts.listByUserId(userId),
     repositories.holdings.listByUserId(userId),
+    repositories.cashAccounts.listByUserId(userId),
   ]);
   const holdingCountsByAccount = new Map<string, number>();
   for (const holding of userHoldings) {
@@ -3616,6 +3650,7 @@ export async function getImportView(userId: string) {
         latestPortfolioJob,
         latestSpendingJob,
         accounts: accountsWithHoldingCounts,
+        cashAccounts: userCashAccounts,
         language: user.displayLanguage,
       }),
       latestPortfolioJob,
@@ -4069,9 +4104,14 @@ export async function confirmBrokerageImportDraft(
             holding.identityStatus !== "other_asset",
         ).length,
       }))
-      .filter((account) => account.holdings.length > 0);
+      .filter(
+        (account) =>
+          account.holdings.length > 0 ||
+          account.cash != null ||
+          account.netLiquidation != null,
+      );
     if (importableAccounts.length === 0) {
-      throw new Error("No confirmed brokerage import draft holdings were selected.");
+      throw new Error("No confirmed brokerage import draft accounts were selected.");
     }
     if (
       confirmMode === "snapshot_replace" &&
@@ -4086,6 +4126,7 @@ export async function confirmBrokerageImportDraft(
     let holdingsUpdated = 0;
     let holdingsSkipped = 0;
     let holdingsClosed = 0;
+    let cashAccountsSynced = 0;
     const institution =
       preview.provider === "snaptrade" ? "Wealthsimple" : "Interactive Brokers";
     const accountPrefix =
@@ -4106,6 +4147,7 @@ export async function confirmBrokerageImportDraft(
       );
       const accountMarketValueAmount =
         sourceAccount.netLiquidation ??
+        sourceAccount.cash ??
         sourceAccount.holdings.reduce(
           (sum, holding) => sum + (holding.marketValue ?? 0),
           0,
@@ -4165,6 +4207,54 @@ export async function confirmBrokerageImportDraft(
             updatedAt: new Date(),
           })
           .where(eq(investmentAccounts.id, existingAccount.id));
+      }
+
+      if (sourceAccount.cash != null) {
+        const cashBalanceAmount = sourceAccount.cash;
+        const cashBalanceCad = (await toCadAmount(cashBalanceAmount, currency)) ?? 0;
+        const cashNickname = `${brokerageAccountMarker}${sourceAccountId}:cash`;
+        const existingCashAccount = await tx.query.cashAccounts.findFirst({
+          where: and(
+            eq(cashAccounts.userId, userId),
+            eq(cashAccounts.institution, institution),
+            eq(cashAccounts.nickname, cashNickname),
+          ),
+        });
+        const cashAccountRow =
+          existingCashAccount ??
+          (
+            await tx
+              .insert(cashAccounts)
+              .values({
+                userId,
+                institution,
+                nickname: cashNickname,
+                currency,
+                currentBalanceAmount: cashBalanceAmount.toFixed(2),
+                currentBalanceCad: cashBalanceCad.toFixed(2),
+              })
+              .returning()
+          )[0];
+        if (existingCashAccount) {
+          await tx
+            .update(cashAccounts)
+            .set({
+              currency,
+              currentBalanceAmount: cashBalanceAmount.toFixed(2),
+              currentBalanceCad: cashBalanceCad.toFixed(2),
+              updatedAt: new Date(),
+            })
+            .where(eq(cashAccounts.id, existingCashAccount.id));
+        }
+        await tx.insert(cashAccountBalanceEvents).values({
+          userId,
+          cashAccountId: cashAccountRow.id,
+          bookedAt: new Date().toISOString().slice(0, 10),
+          balanceAmount: cashBalanceAmount.toFixed(2),
+          balanceCad: cashBalanceCad.toFixed(2),
+          source: eventSource,
+        });
+        cashAccountsSynced += 1;
       }
 
       const activeSecurityIds = new Set<string>();
@@ -4388,6 +4478,7 @@ export async function confirmBrokerageImportDraft(
       holdingsUpdated,
       holdingsSkipped,
       holdingsClosed,
+      cashAccountsSynced,
       confirmMode,
     };
   });

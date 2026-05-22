@@ -10,6 +10,7 @@ class MobileHomeSnapshot {
     required this.health,
     required this.accounts,
     required this.topHoldings,
+    required this.buyingPower,
     this.holdingCount = 0,
     required this.netWorthTrend,
     required this.netWorthChart,
@@ -25,6 +26,7 @@ class MobileHomeSnapshot {
   final MobileHomeHealth health;
   final List<MobileAccountCard> accounts;
   final List<MobileHoldingCard> topHoldings;
+  final MobileBuyingPower buyingPower;
   final int holdingCount;
   final List<MobileHomeTrendPoint> netWorthTrend;
   final MobileChartSeries? netWorthChart;
@@ -147,6 +149,7 @@ class MobileHomeSnapshot {
       topHoldings: readJsonList(json, "topHoldings")
           .map(MobileHoldingCard.fromJson)
           .toList(),
+      buyingPower: MobileBuyingPower.fromJson(json["buyingPower"]),
       holdingCount: context is Map<String, dynamic>
           ? context["holdingCount"] as int? ?? 0
           : 0,
@@ -166,6 +169,37 @@ class MobileHomeSnapshot {
           ? recommendation["reason"] as String? ?? "完成数据导入后，Loo国会生成组合建议。"
           : "完成数据导入后，Loo国会生成组合建议。",
       marketSentiment: MobileMarketSentiment.tryParse(json["marketSentiment"]),
+    );
+  }
+}
+
+class MobileBuyingPower {
+  const MobileBuyingPower({
+    required this.label,
+    required this.value,
+    required this.detail,
+    required this.confidence,
+  });
+
+  final String label;
+  final String value;
+  final String detail;
+  final String confidence;
+
+  factory MobileBuyingPower.fromJson(dynamic json) {
+    if (json is! Map<String, dynamic>) {
+      return const MobileBuyingPower(
+        label: "Buying Power",
+        value: "--",
+        detail: "尚未添加现金账户。",
+        confidence: "low",
+      );
+    }
+    return MobileBuyingPower(
+      label: json["label"] as String? ?? "Buying Power",
+      value: json["value"] as String? ?? "--",
+      detail: json["detail"] as String? ?? "",
+      confidence: json["confidence"] as String? ?? "low",
     );
   }
 }

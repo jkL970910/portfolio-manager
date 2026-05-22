@@ -295,6 +295,23 @@ class LooApiClient {
     );
   }
 
+  Future<Map<String, dynamic>> createManualCashAccount({
+    required String institution,
+    required String nickname,
+    required String currency,
+    required double currentBalanceAmount,
+  }) {
+    return _postJson(
+      "/api/mobile/import/cash-accounts",
+      body: {
+        "institution": institution,
+        "nickname": nickname,
+        "currency": currency,
+        "currentBalanceAmount": currentBalanceAmount,
+      },
+    );
+  }
+
   Future<Map<String, dynamic>> createManualHolding({
     required String accountId,
     required String symbol,

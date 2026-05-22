@@ -1378,6 +1378,54 @@ function getCurrentCashBalanceCad(cashAccounts: CashAccount[]) {
   return sum(cashAccounts.map((account) => account.currentBalanceCad));
 }
 
+function buildBuyingPowerSummary(args: {
+  cashAccounts: CashAccount[];
+  display: DisplayContext;
+  language: DisplayLanguage;
+}): DashboardData["buyingPower"] {
+  const { cashAccounts, display, language } = args;
+  const byCurrency = [...cashAccounts].reduce<
+    Map<CurrencyCode, { amount: number; cadValue: number }>
+  >((groups, account) => {
+    const current = groups.get(account.currency) ?? {
+      amount: 0,
+      cadValue: 0,
+    };
+    current.amount += account.currentBalanceAmount;
+    current.cadValue += account.currentBalanceCad;
+    groups.set(account.currency, current);
+    return groups;
+  }, new Map());
+  const manualCashCad = getCurrentCashBalanceCad(cashAccounts);
+
+  return {
+    totalCad: round(manualCashCad, 2),
+    brokerageCashCad: 0,
+    manualCashCad: round(manualCashCad, 2),
+    lockedCashCad: 0,
+    label: pick(language, "Buying Power", "Buying Power"),
+    value: formatDisplayCurrency(manualCashCad, display),
+    detail:
+      cashAccounts.length > 0
+        ? pick(
+            language,
+            `${cashAccounts.length} 个现金账户；暂未扣除应急金/买房锁定资金。`,
+            `${cashAccounts.length} cash account(s); locked goals are not deducted yet.`,
+          )
+        : pick(
+            language,
+            "尚未添加现金账户；券商现金同步后会进入这里。",
+            "No cash accounts yet; broker cash will flow here after sync.",
+          ),
+    confidence: cashAccounts.length > 0 ? "medium" : "low",
+    byCurrency: [...byCurrency.entries()].map(([currency, value]) => ({
+      currency,
+      amount: round(value.amount, 2),
+      cadValue: round(value.cadValue, 2),
+    })),
+  };
+}
+
 function getMonthlyTransactionSeries(
   transactions: CashflowTransaction[],
   language: DisplayLanguage,
@@ -2376,6 +2424,11 @@ export function buildDashboardData(args: {
   );
   const totalPortfolio = sum(accounts.map((account) => account.marketValueCad));
   const currentCashBalanceCad = getCurrentCashBalanceCad(cashAccounts);
+  const buyingPower = buildBuyingPowerSummary({
+    cashAccounts,
+    display,
+    language,
+  });
   const totalNetWorthCad = totalPortfolio + currentCashBalanceCad;
   const availableRoom = sum(
     accounts.map((account) => account.contributionRoomCad ?? 0),
@@ -2511,6 +2564,7 @@ export function buildDashboardData(args: {
         detail: health.status,
       },
     ],
+    buyingPower,
     accounts: [...accounts]
       .sort((left, right) => {
         const priorityDelta =
@@ -5319,9 +5373,16 @@ export function buildImportData(args: {
   latestPortfolioJob: ImportJob | null;
   latestSpendingJob: ImportJob | null;
   accounts: Array<InvestmentAccount & { holdingCount?: number }>;
+  cashAccounts?: CashAccount[];
   language: DisplayLanguage;
 }): ImportData {
-  const { latestPortfolioJob, latestSpendingJob, accounts, language } = args;
+  const {
+    latestPortfolioJob,
+    latestSpendingJob,
+    accounts,
+    cashAccounts = [],
+    language,
+  } = args;
   return {
     portfolioSteps: [
       {
@@ -5518,6 +5579,15 @@ export function buildImportData(args: {
       marketValueAmount: account.marketValueAmount ?? account.marketValueCad,
       marketValueCad: account.marketValueCad,
       holdingCount: account.holdingCount ?? 0,
+    })),
+    existingCashAccounts: cashAccounts.map((account) => ({
+      id: account.id,
+      institution: account.institution,
+      nickname: account.nickname,
+      currency: account.currency,
+      currentBalanceAmount: account.currentBalanceAmount,
+      currentBalanceCad: account.currentBalanceCad,
+      updatedAt: account.updatedAt,
     })),
   };
 }

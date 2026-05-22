@@ -122,6 +122,12 @@ void main() {
       ),
       accounts: [],
       topHoldings: [],
+      buyingPower: MobileBuyingPower(
+        label: "Buying Power",
+        value: "CAD 12,000",
+        detail: "1 个现金账户",
+        confidence: "medium",
+      ),
       netWorthTrend: [],
       netWorthChart: MobileChartSeries(
         title: "总资产走势",

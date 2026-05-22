@@ -109,6 +109,7 @@ class _ImportPageState extends State<ImportPage> {
                         _EntryWorkbench(
                           data: snapshot.data!,
                           onCreateAccount: _openCreateAccountSheet,
+                          onCreateCashAccount: _openCreateCashAccountSheet,
                           onCreateHolding: () =>
                               _openCreateHoldingSheet(snapshot.data!.accounts),
                           onBrokerageSync: () => _openBrokerageImportSheet(
@@ -116,7 +117,10 @@ class _ImportPageState extends State<ImportPage> {
                           ),
                         ),
                         const SizedBox(height: 14),
-                        _AccountVaultCard(snapshot.data!.accounts),
+                        _AccountVaultCard(
+                          accounts: snapshot.data!.accounts,
+                          cashAccounts: snapshot.data!.cashAccounts,
+                        ),
                         if (snapshot.data!.notes.isNotEmpty) ...[
                           const SizedBox(height: 14),
                           _RulesAccordion(snapshot.data!.notes),
@@ -137,6 +141,20 @@ class _ImportPageState extends State<ImportPage> {
       context: context,
       isScrollControlled: true,
       builder: (context) => _CreateAccountSheet(apiClient: widget.apiClient),
+    );
+    if (created != null && mounted) {
+      _refresh();
+      await _showImportResult(created);
+    }
+  }
+
+  Future<void> _openCreateCashAccountSheet() async {
+    final created = await showModalBottomSheet<_ImportResult>(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) => _CreateCashAccountSheet(
+        apiClient: widget.apiClient,
+      ),
     );
     if (created != null && mounted) {
       _refresh();
@@ -224,6 +242,7 @@ class _HeroCard extends StatelessWidget {
       0,
       (sum, account) => sum + account.holdingCount,
     );
+    final accountCount = data.accounts.length + data.cashAccounts.length;
     return LooGlassCard(
       isHero: true,
       child: Column(
@@ -244,7 +263,7 @@ class _HeroCard extends StatelessWidget {
               Expanded(
                 child: _HeroMetric(
                   label: "账户",
-                  value: "${data.accounts.length}",
+                  value: "$accountCount",
                   detail: "已入账",
                 ),
               ),
@@ -313,12 +332,14 @@ class _EntryWorkbench extends StatelessWidget {
   const _EntryWorkbench({
     required this.data,
     required this.onCreateAccount,
+    required this.onCreateCashAccount,
     required this.onCreateHolding,
     required this.onBrokerageSync,
   });
 
   final MobileImportSnapshot data;
   final VoidCallback onCreateAccount;
+  final VoidCallback onCreateCashAccount;
   final VoidCallback onCreateHolding;
   final VoidCallback onBrokerageSync;
 
@@ -391,6 +412,16 @@ class _EntryWorkbench extends StatelessWidget {
                 onTap: () {
                   Navigator.of(context).pop();
                   onCreateAccount();
+                },
+              ),
+              const SizedBox(height: 10),
+              _ManualActionRow(
+                title: "添加现金账户",
+                subtitle: "现金 / 储蓄 / 可投资弹药",
+                icon: Icons.savings_outlined,
+                onTap: () {
+                  Navigator.of(context).pop();
+                  onCreateCashAccount();
                 },
               ),
               const SizedBox(height: 10),
@@ -583,9 +614,13 @@ class _BrokerageImportSheet extends StatelessWidget {
 }
 
 class _AccountVaultCard extends StatefulWidget {
-  const _AccountVaultCard(this.accounts);
+  const _AccountVaultCard({
+    required this.accounts,
+    required this.cashAccounts,
+  });
 
   final List<MobileImportAccount> accounts;
+  final List<MobileImportCashAccount> cashAccounts;
 
   @override
   State<_AccountVaultCard> createState() => _AccountVaultCardState();
@@ -597,10 +632,12 @@ class _AccountVaultCardState extends State<_AccountVaultCard> {
   @override
   Widget build(BuildContext context) {
     final accounts = widget.accounts;
+    final cashAccounts = widget.cashAccounts;
     final holdingCount = accounts.fold<int>(
       0,
       (sum, account) => sum + account.holdingCount,
     );
+    final itemCount = accounts.length + cashAccounts.length;
 
     return LooGlassCard(
       padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
@@ -609,7 +646,7 @@ class _AccountVaultCardState extends State<_AccountVaultCard> {
         children: [
           InkWell(
             borderRadius: BorderRadius.circular(18),
-            onTap: accounts.isEmpty
+            onTap: itemCount == 0
                 ? null
                 : () => setState(() => _expanded = !_expanded),
             child: Row(
@@ -624,9 +661,9 @@ class _AccountVaultCardState extends State<_AccountVaultCard> {
                       ),
                       const SizedBox(height: 3),
                       Text(
-                        accounts.isEmpty
+                        itemCount == 0
                             ? "还没有账户"
-                            : "${accounts.length} 个账户 · $holdingCount 个持仓",
+                            : "${accounts.length} 个投资账户 · ${cashAccounts.length} 个现金账户 · $holdingCount 个持仓",
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
                               color: context.looTokens.mutedText,
                             ),
@@ -634,7 +671,7 @@ class _AccountVaultCardState extends State<_AccountVaultCard> {
                     ],
                   ),
                 ),
-                _ImportPill("${accounts.length} 个账户"),
+                _ImportPill("$itemCount 个账户"),
                 const SizedBox(width: 8),
                 AnimatedRotation(
                   turns: _expanded ? 0.5 : 0,
@@ -644,12 +681,13 @@ class _AccountVaultCardState extends State<_AccountVaultCard> {
               ],
             ),
           ),
-          if (accounts.isEmpty) ...[
+          if (itemCount == 0) ...[
             const SizedBox(height: 10),
             const _EmptyVaultMessage(),
           ] else if (_expanded) ...[
             const SizedBox(height: 10),
             ...accounts.map(_AccountCard.new),
+            ...cashAccounts.map(_CashAccountCard.new),
           ],
         ],
       ),
@@ -1040,6 +1078,9 @@ class _IbkrFlexPreviewSheetState extends State<_IbkrFlexPreviewSheet> {
       final holdingsClosed = data is Map<String, dynamic>
           ? data["holdingsClosed"] as int? ?? 0
           : 0;
+      final cashAccountsSynced = data is Map<String, dynamic>
+          ? data["cashAccountsSynced"] as int? ?? 0
+          : 0;
       if (mounted) {
         setState(() {
           _confirming = false;
@@ -1049,7 +1090,7 @@ class _IbkrFlexPreviewSheetState extends State<_IbkrFlexPreviewSheet> {
           context,
           title: "IBKR 草稿已写入",
           message:
-              "新增 $accountsCreated 个账户，新增 $holdingsCreated 个持仓，更新 $holdingsUpdated 个持仓。${holdingsClosed > 0 ? "已关闭 $holdingsClosed 个本次快照缺失持仓。" : ""}${holdingsSkipped > 0 ? "已跳过 $holdingsSkipped 个未确认持仓。" : ""}回到国库后可继续检查账户和标的详情。",
+              "新增 $accountsCreated 个账户，新增 $holdingsCreated 个持仓，更新 $holdingsUpdated 个持仓。${cashAccountsSynced > 0 ? "同步 $cashAccountsSynced 个现金账户。" : ""}${holdingsClosed > 0 ? "已关闭 $holdingsClosed 个本次快照缺失持仓。" : ""}${holdingsSkipped > 0 ? "已跳过 $holdingsSkipped 个未确认持仓。" : ""}回到国库后可继续检查账户和标的详情。",
         );
         if (mounted) {
           Navigator.of(context).pop(true);
@@ -1759,6 +1800,9 @@ class _SnapTradePreviewSheetState extends State<_SnapTradePreviewSheet> {
       final holdingsClosed = data is Map<String, dynamic>
           ? data["holdingsClosed"] as int? ?? 0
           : 0;
+      final cashAccountsSynced = data is Map<String, dynamic>
+          ? data["cashAccountsSynced"] as int? ?? 0
+          : 0;
       if (mounted) {
         setState(() {
           _confirming = false;
@@ -1768,7 +1812,7 @@ class _SnapTradePreviewSheetState extends State<_SnapTradePreviewSheet> {
           context,
           title: "Wealthsimple 草稿已写入",
           message:
-              "新增 $accountsCreated 个账户，新增 $holdingsCreated 个持仓，更新 $holdingsUpdated 个持仓。${holdingsClosed > 0 ? "已关闭 $holdingsClosed 个本次快照缺失持仓。" : ""}${holdingsSkipped > 0 ? "已跳过 $holdingsSkipped 个未确认持仓。" : ""}",
+              "新增 $accountsCreated 个账户，新增 $holdingsCreated 个持仓，更新 $holdingsUpdated 个持仓。${cashAccountsSynced > 0 ? "同步 $cashAccountsSynced 个现金账户。" : ""}${holdingsClosed > 0 ? "已关闭 $holdingsClosed 个本次快照缺失持仓。" : ""}${holdingsSkipped > 0 ? "已跳过 $holdingsSkipped 个未确认持仓。" : ""}",
         );
         if (mounted) {
           Navigator.of(context).pop(true);
@@ -2904,6 +2948,162 @@ class _CreateAccountSheetState extends State<_CreateAccountSheet> {
   }
 }
 
+class _CreateCashAccountSheet extends StatefulWidget {
+  const _CreateCashAccountSheet({required this.apiClient});
+
+  final LooApiClient apiClient;
+
+  @override
+  State<_CreateCashAccountSheet> createState() => _CreateCashAccountSheetState();
+}
+
+class _CreateCashAccountSheetState extends State<_CreateCashAccountSheet> {
+  final _formKey = GlobalKey<FormState>();
+  final _institutionController = TextEditingController();
+  final _nicknameController = TextEditingController();
+  final _balanceController = TextEditingController(text: "0");
+
+  var _currency = "CAD";
+  var _submitting = false;
+  String? _error;
+
+  @override
+  void dispose() {
+    _institutionController.dispose();
+    _nicknameController.dispose();
+    _balanceController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    if (!_formKey.currentState!.validate()) {
+      return;
+    }
+
+    setState(() {
+      _submitting = true;
+      _error = null;
+    });
+
+    try {
+      final response = await widget.apiClient.createManualCashAccount(
+        institution: _institutionController.text.trim(),
+        nickname: _nicknameController.text.trim(),
+        currency: _currency,
+        currentBalanceAmount:
+            double.tryParse(_balanceController.text.trim()) ?? 0,
+      );
+      if (mounted) {
+        final data = response["data"];
+        final cashAccount =
+            data is Map<String, dynamic> ? data["cashAccount"] : null;
+        final accountId = cashAccount is Map<String, dynamic>
+            ? cashAccount["id"] as String? ?? ""
+            : "";
+        Navigator.of(context).pop(_ImportResult(
+          title: "现金账户已加入 Loo国账本",
+          message: [
+            "${_nicknameController.text.trim()} 已创建。",
+            if (accountId.isNotEmpty) "现金账户 ID：$accountId",
+            "这部分会进入首页 Buying Power，不会被当成股票/ETF 持仓。",
+          ].join("\n"),
+        ));
+      }
+    } catch (error) {
+      if (mounted) {
+        setState(() {
+          _error = error.toString();
+          _submitting = false;
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
+
+    return Padding(
+      padding: EdgeInsets.fromLTRB(20, 20, 20, bottomInset + 20),
+      child: Form(
+        key: _formKey,
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text("添加现金账户", style: Theme.of(context).textTheme.headlineMedium),
+              const SizedBox(height: 8),
+              const Text("现金账户会计入 Buying Power，但不会进入持仓研究台。"),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _institutionController,
+                enabled: !_submitting,
+                decoration: const InputDecoration(labelText: "机构"),
+                validator: (value) => (value == null || value.trim().length < 2)
+                    ? "机构至少 2 个字符"
+                    : null,
+              ),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: _nicknameController,
+                enabled: !_submitting,
+                decoration: const InputDecoration(labelText: "账户昵称"),
+                validator: (value) => (value == null || value.trim().length < 2)
+                    ? "昵称至少 2 个字符"
+                    : null,
+              ),
+              const SizedBox(height: 12),
+              DropdownButtonFormField<String>(
+                initialValue: _currency,
+                decoration: const InputDecoration(labelText: "账户币种"),
+                items: const [
+                  DropdownMenuItem(value: "CAD", child: Text("CAD")),
+                  DropdownMenuItem(value: "USD", child: Text("USD")),
+                ],
+                onChanged: _submitting
+                    ? null
+                    : (value) => setState(() => _currency = value ?? _currency),
+              ),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: _balanceController,
+                enabled: !_submitting,
+                keyboardType:
+                    const TextInputType.numberWithOptions(decimal: true),
+                decoration: const InputDecoration(labelText: "当前现金余额"),
+                validator: _validateMoney,
+              ),
+              if (_error != null) ...[
+                const SizedBox(height: 12),
+                Text(_error!,
+                    style:
+                        TextStyle(color: Theme.of(context).colorScheme.error)),
+              ],
+              const SizedBox(height: 18),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton(
+                  onPressed: _submitting ? null : _submit,
+                  child: Text(_submitting ? "保存中..." : "保存现金账户"),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  String? _validateMoney(String? value) {
+    final parsed = double.tryParse((value ?? "").trim());
+    if (parsed == null || parsed < 0) {
+      return "请输入大于等于 0 的数字";
+    }
+    return null;
+  }
+}
+
 class _CreateHoldingSheet extends StatefulWidget {
   const _CreateHoldingSheet({
     required this.apiClient,
@@ -3438,6 +3638,64 @@ class _AccountCard extends StatelessWidget {
                         account.detail,
                         "${account.holdingCount} 个持仓",
                       ].where((item) => item.isNotEmpty).join(" · "),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: context.looTokens.mutedText,
+                          ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 10),
+              Text(
+                account.value,
+                style: Theme.of(context).textTheme.titleLarge,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _CashAccountCard extends StatelessWidget {
+  const _CashAccountCard(this.account);
+
+  final MobileImportCashAccount account;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.16),
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: context.looTokens.cardBorder),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(14),
+          child: Row(
+            children: [
+              Icon(
+                Icons.savings_outlined,
+                color: context.looTokens.accent,
+                size: 20,
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      account.displayName,
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      account.detail,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(

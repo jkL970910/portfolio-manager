@@ -546,6 +546,13 @@ export const mobileManualAccountCreateSchema = z.object({
     .default(0),
 });
 
+export const mobileManualCashAccountCreateSchema = z.object({
+  institution: z.string().trim().min(2).max(120),
+  nickname: z.string().trim().min(2).max(120),
+  currency: z.enum(["CAD", "USD"]).default("CAD"),
+  currentBalanceAmount: z.number().min(0).max(100000000).default(0),
+});
+
 export const recommendationRunCreateSchema = z.object({
   contributionAmountCad: z.number().positive().max(1000000),
   fallbackMode: z.enum(["core_only_relaxed"]).optional(),
@@ -789,6 +796,9 @@ export type GuidedImportCreatePayload = z.infer<
 >;
 export type MobileManualAccountCreatePayload = z.infer<
   typeof mobileManualAccountCreateSchema
+>;
+export type MobileManualCashAccountCreatePayload = z.infer<
+  typeof mobileManualCashAccountCreateSchema
 >;
 export type RecommendationRunCreatePayload = z.infer<
   typeof recommendationRunCreateSchema

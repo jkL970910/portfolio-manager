@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import type {
+  CashAccount,
   HoldingPosition,
   InvestmentAccount,
   PreferenceProfile,
@@ -685,6 +686,19 @@ test("portfolio overview chart contract uses local history freshness when availa
 });
 
 test("mobile home overview chart contract exposes net worth freshness", () => {
+  const cashAccounts: CashAccount[] = [
+    {
+      id: "cash_test",
+      userId: "user_test",
+      institution: "Wealthsimple",
+      nickname: "Cash",
+      currency: "CAD",
+      currentBalanceAmount: 2500,
+      currentBalanceCad: 2500,
+      createdAt: "2026-04-28T00:00:00.000Z",
+      updatedAt: "2026-04-28T00:00:00.000Z",
+    },
+  ];
   const dashboard = buildDashboardData({
     viewer: {
       id: "user_test",
@@ -696,6 +710,7 @@ test("mobile home overview chart contract exposes net worth freshness", () => {
     accounts,
     holdings,
     transactions: [],
+    cashAccounts,
     portfolioEvents: [],
     priceHistory,
     snapshots: [],
@@ -712,6 +727,9 @@ test("mobile home overview chart contract exposes net worth freshness", () => {
   assert.equal(chart.points.at(-1)?.rawDate, "2026-04-26");
   assert.equal(chart.points.at(-1)?.value, 1410);
   assert.equal(chart.sourceMode, "local");
+  assert.equal(dashboard.buyingPower.totalCad, 2500);
+  assert.equal(dashboard.buyingPower.value, "$2,500");
+  assert.equal(dashboard.buyingPower.confidence, "medium");
 });
 
 test("mobile home overview chart contract preserves intraday replay points", () => {

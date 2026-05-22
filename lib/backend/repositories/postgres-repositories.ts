@@ -739,6 +739,24 @@ export const postgresRepositories: BackendRepositories = {
       });
       return rows.map(mapCashAccount);
     },
+    async create(input) {
+      const db = getDb();
+      const [row] = await db
+        .insert(cashAccounts)
+        .values({
+          userId: input.userId,
+          institution: input.institution,
+          nickname: input.nickname,
+          currency: input.currency,
+          currentBalanceAmount: input.currentBalanceAmount.toFixed(2),
+          currentBalanceCad: input.currentBalanceCad.toFixed(2),
+        })
+        .returning();
+      if (!row) {
+        throw new Error("Failed to create cash account.");
+      }
+      return mapCashAccount(row);
+    },
   },
   cashAccountBalanceEvents: {
     async listByUserId(userId) {
@@ -748,6 +766,24 @@ export const postgresRepositories: BackendRepositories = {
         orderBy: desc(cashAccountBalanceEvents.bookedAt),
       });
       return rows.map(mapCashAccountBalanceEvent);
+    },
+    async create(input) {
+      const db = getDb();
+      const [row] = await db
+        .insert(cashAccountBalanceEvents)
+        .values({
+          userId: input.userId,
+          cashAccountId: input.cashAccountId,
+          bookedAt: input.bookedAt,
+          balanceAmount: input.balanceAmount.toFixed(2),
+          balanceCad: input.balanceCad.toFixed(2),
+          source: input.source,
+        })
+        .returning();
+      if (!row) {
+        throw new Error("Failed to create cash balance event.");
+      }
+      return mapCashAccountBalanceEvent(row);
     },
   },
   portfolioEvents: {

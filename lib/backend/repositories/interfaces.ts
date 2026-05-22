@@ -58,10 +58,26 @@ export interface TransactionRepository {
 
 export interface CashAccountRepository {
   listByUserId(userId: EntityId): Promise<CashAccount[]>;
+  create(input: {
+    userId: EntityId;
+    institution: string;
+    nickname: string;
+    currency: CashAccount["currency"];
+    currentBalanceAmount: number;
+    currentBalanceCad: number;
+  }): Promise<CashAccount>;
 }
 
 export interface CashAccountBalanceEventRepository {
   listByUserId(userId: EntityId): Promise<CashAccountBalanceEvent[]>;
+  create(input: {
+    userId: EntityId;
+    cashAccountId: EntityId;
+    bookedAt: string;
+    balanceAmount: number;
+    balanceCad: number;
+    source: string;
+  }): Promise<CashAccountBalanceEvent>;
 }
 
 export interface PortfolioEventRepository {

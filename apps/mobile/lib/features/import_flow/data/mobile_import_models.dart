@@ -6,6 +6,7 @@ class MobileImportSnapshot {
     required this.actionCards,
     required this.brokerageProviders,
     required this.accounts,
+    required this.cashAccounts,
     required this.notes,
   });
 
@@ -13,6 +14,7 @@ class MobileImportSnapshot {
   final List<MobileImportAction> actionCards;
   final List<MobileBrokerageProvider> brokerageProviders;
   final List<MobileImportAccount> accounts;
+  final List<MobileImportCashAccount> cashAccounts;
   final List<String> notes;
 
   factory MobileImportSnapshot.fromJson(Map<String, dynamic> json) {
@@ -28,6 +30,9 @@ class MobileImportSnapshot {
           .toList(),
       accounts: readJsonList(json, "existingAccounts")
           .map(MobileImportAccount.fromJson)
+          .toList(),
+      cashAccounts: readJsonList(json, "existingCashAccounts")
+          .map(MobileImportCashAccount.fromJson)
           .toList(),
       notes: (json["notes"] as List?)?.whereType<String>().toList() ?? const [],
     );
@@ -133,6 +138,31 @@ class MobileImportAccount {
       value: json["value"] as String? ?? "--",
       detail: json["detail"] as String? ?? "",
       holdingCount: (json["holdingCount"] as num?)?.toInt() ?? 0,
+    );
+  }
+}
+
+class MobileImportCashAccount {
+  const MobileImportCashAccount({
+    required this.id,
+    required this.displayName,
+    required this.value,
+    required this.detail,
+  });
+
+  final String id;
+  final String displayName;
+  final String value;
+  final String detail;
+
+  factory MobileImportCashAccount.fromJson(Map<String, dynamic> json) {
+    return MobileImportCashAccount(
+      id: json["id"] as String? ?? "",
+      displayName: json["displayName"] as String? ??
+          json["nickname"] as String? ??
+          "现金账户",
+      value: json["value"] as String? ?? "--",
+      detail: json["detail"] as String? ?? "",
     );
   }
 }

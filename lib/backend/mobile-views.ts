@@ -84,6 +84,7 @@ type MobileHomeData = {
     value: string;
     gainLoss: string;
   }>;
+  buyingPower: DashboardData["buyingPower"];
   netWorthTrend: DashboardData["netWorthTrend"];
   chartSeries?: DashboardData["chartSeries"];
   healthScore: DashboardData["healthScore"];
@@ -711,6 +712,13 @@ type MobileImportData = {
       holdingCount: number;
     }
   >;
+  existingCashAccounts: Array<
+    ImportData["existingCashAccounts"][number] & {
+      displayName: string;
+      value: string;
+      detail: string;
+    }
+  >;
   notes: string[];
 };
 
@@ -725,6 +733,7 @@ async function mapMobileHomeData(
     citizenProfile,
     displayContext: payload.data.displayContext,
     metrics: payload.data.metrics,
+    buyingPower: payload.data.buyingPower,
     accounts: payload.data.accounts.map((account) => ({
       id: account.id,
       name: account.name,
@@ -2119,6 +2128,18 @@ function mapMobileImportData(data: ImportData): MobileImportData {
         .filter(Boolean)
         .join(" · "),
       holdingCount: account.holdingCount ?? 0,
+    })),
+    existingCashAccounts: data.existingCashAccounts.map((account) => ({
+      ...account,
+      displayName: account.nickname || account.institution || "现金账户",
+      value: new Intl.NumberFormat("en-CA", {
+        style: "currency",
+        currency: "CAD",
+        maximumFractionDigits: 0,
+      }).format(account.currentBalanceCad),
+      detail: [account.institution, account.currency, "Buying Power"]
+        .filter(Boolean)
+        .join(" · "),
     })),
     notes: [
       "移动端 MVP 只保留手动/引导式导入，不迁移 CSV 上传和字段映射。",

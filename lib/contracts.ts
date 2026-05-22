@@ -125,6 +125,21 @@ export interface DashboardData {
   chartSeries?: {
     netWorth?: MobileChartSeries;
   };
+  buyingPower: {
+    totalCad: number;
+    brokerageCashCad: number;
+    manualCashCad: number;
+    lockedCashCad: number;
+    label: string;
+    value: string;
+    detail: string;
+    confidence: "high" | "medium" | "low";
+    byCurrency: {
+      currency: "CAD" | "USD";
+      amount: number;
+      cadValue: number;
+    }[];
+  };
   spendingMonthLabel: string;
   savingsPattern: string;
   investableCash: string;
@@ -989,6 +1004,15 @@ export interface ImportData {
     marketValueAmount: number;
     marketValueCad: number;
     holdingCount?: number;
+  }[];
+  existingCashAccounts: {
+    id: string;
+    institution: string;
+    nickname: string;
+    currency: "CAD" | "USD";
+    currentBalanceAmount: number;
+    currentBalanceCad: number;
+    updatedAt: string;
   }[];
 }
 

@@ -101,12 +101,42 @@ export const mockRepositories: BackendRepositories = {
     async listByUserId(userId) {
       return cashAccounts.filter((account) => account.userId === userId);
     },
+    async create(input) {
+      const now = new Date().toISOString();
+      const account = {
+        id: `cash_account_${cashAccounts.length + 1}`,
+        userId: input.userId,
+        institution: input.institution,
+        nickname: input.nickname,
+        currency: input.currency,
+        currentBalanceAmount: input.currentBalanceAmount,
+        currentBalanceCad: input.currentBalanceCad,
+        createdAt: now,
+        updatedAt: now,
+      };
+      cashAccounts.push(account);
+      return account;
+    },
   },
   cashAccountBalanceEvents: {
     async listByUserId(userId) {
       return cashAccountBalanceEvents.filter(
         (event) => event.userId === userId,
       );
+    },
+    async create(input) {
+      const event = {
+        id: `cash_account_balance_event_${cashAccountBalanceEvents.length + 1}`,
+        userId: input.userId,
+        cashAccountId: input.cashAccountId,
+        bookedAt: input.bookedAt,
+        balanceAmount: input.balanceAmount,
+        balanceCad: input.balanceCad,
+        source: input.source,
+        createdAt: new Date().toISOString(),
+      };
+      cashAccountBalanceEvents.push(event);
+      return event;
     },
   },
   portfolioEvents: {
