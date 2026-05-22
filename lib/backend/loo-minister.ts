@@ -416,7 +416,7 @@ function summarizeFacts(facts: LooMinisterFact[]) {
     .slice(0, 5)
     .map(
       (fact) =>
-        `${fact.label}: ${fact.value}${fact.detail ? `（${fact.detail}）` : ""}`,
+        `${fact.label}: ${fact.value}`,
     );
 }
 
@@ -571,7 +571,7 @@ function isImportSetupQuestion(question: string) {
 }
 
 function isPreferenceQuestion(question: string) {
-  return /偏好|preference|factor|风险|行业|科技|能源|买房|税务|现金|新手|进阶/i.test(
+  return /偏好|preference|factor|风险偏好|行业|科技|能源|买房|税务|现金|新手|进阶/i.test(
     question,
   );
 }
@@ -713,36 +713,15 @@ function ensureStructuredMinisterAnswer(
 
   const lines = splitAnswerLines(answer.answer);
   const directAnswer = lines[0] ?? answer.answer;
-  const reasoning = lines.slice(1, 4);
-  const decisionGates = [
-    ...answer.keyPoints.slice(0, 3),
-    ...lines
-      .filter((line) =>
-        /确认|护栏|边界|新鲜|缺口|账户|税务|汇率|风险/.test(line),
-      )
-      .slice(0, 3),
-  ].slice(0, 6);
-  const boundary =
-    lines.find((line) =>
-      /边界|新鲜|缓存|不构成|实时|来源|资料完整度/.test(line),
-    ) ?? null;
-  const nextStep =
-    lines.find((line) => /下一步|建议|确认|运行|进入|点击/.test(line)) ??
-    answer.keyPoints[0] ??
-    null;
 
   return {
     ...answer,
     structured: {
       directAnswer: truncateStructuredText(directAnswer, 700) ?? answer.title,
-      reasoning: reasoning
-        .map((line) => truncateStructuredText(line, 500))
-        .filter((line): line is string => Boolean(line)),
-      decisionGates: decisionGates
-        .map((line) => truncateStructuredText(line, 500))
-        .filter((line): line is string => Boolean(line)),
-      boundary: truncateStructuredText(boundary, 700),
-      nextStep: truncateStructuredText(nextStep, 500),
+      reasoning: [],
+      decisionGates: [],
+      boundary: null,
+      nextStep: null,
     },
   };
 }
@@ -2018,9 +1997,8 @@ function buildGlobalUserContextAnswer(input: LooMinisterQuestionRequest) {
   }
 
   return [
-    `大臣会按用户级背景回答，而不是只看当前页面。`,
-    formatGlobalUserContextLine(context),
-    `前几大持仓：${formatGlobalUserTopHoldings(context)}。`,
+    `我会按你的整体持仓和偏好背景来看，不只盯着当前页面。${formatGlobalUserContextLine(context)}`,
+    `前几大持仓是 ${formatGlobalUserTopHoldings(context)}。`,
     context.leadAllocation
       ? `主要配置缺口：${context.leadAllocation.assetClass} 当前 ${formatPct(context.leadAllocation.currentPct)}，目标 ${formatPct(context.leadAllocation.targetPct)}，缺口 ${formatPct(context.leadAllocation.gapPct)}。`
       : "主要配置缺口：暂无可用资产类别缺口。",
@@ -2029,8 +2007,7 @@ function buildGlobalUserContextAnswer(input: LooMinisterQuestionRequest) {
       ? `最新推荐：${context.recommendation.engineVersion ?? "版本未记录"}；${context.recommendation.topItems.slice(0, 3).join("；")}。`
       : "最新推荐：暂无最新推荐批次。",
     `资料完整度：${context.contextCompleteness.score}/100；缺口：${context.contextCompleteness.missing.length > 0 ? context.contextCompleteness.missing.join("、") : "无主要缺口"}。`,
-    `数据边界：${formatDataBoundaryForUser(freshness)}。`,
-    "这层背景可以帮助解释用户持仓、类似标的、偏好影响和推荐路径，但不会覆盖当前页面的标的身份和行情事实。",
+    `当前数据口径是 ${formatDataBoundaryForUser(freshness)}。`,
   ].join("\n");
 }
 
@@ -2048,8 +2025,7 @@ function buildComparisonAnswer(input: LooMinisterQuestionRequest) {
   const freshness = input.pageContext.dataFreshness;
 
   return [
-    `大臣会按对比问题处理：当前页面标的是「${current}」，对比对象是 ${comparisonFacts.map((fact) => fact.value).join("、")}。`,
-    "比较时不会只按 ticker 合并；每个标的都必须保留 securityId 或完整 symbol + exchange + currency。",
+    `可以对比。当前页面是「${current}」，你提到的对比对象是 ${comparisonFacts.map((fact) => fact.value).join("、")}。我会按各自 listing 身份看，不把同 ticker 的 CAD/USD 或不同交易所版本混在一起。`,
     comparisonFacts
       .map(
         (fact) =>
@@ -2059,11 +2035,8 @@ function buildComparisonAnswer(input: LooMinisterQuestionRequest) {
     intelligenceFacts.length > 0
       ? `可用缓存情报：${intelligenceFacts.map((fact) => `${fact.label}：${fact.value}`).join("；")}。`
       : "当前没有匹配到对比标的的缓存秘闻；这不是利好或利空，只是外部情报缓存不足。",
-    status
-      ? `资料补齐状态：${status.value}（${status.detail ?? "无补充说明"}）。`
-      : "当前状态：已基于当前页面和本地缓存回答。",
-    `数据边界：${formatDataBoundaryForUser(freshness)}。`,
-    "下一步判断应该看：资产类别是否重叠、费用/税务/账户位置、CAD/USD 或 hedged 差异、集中度、推荐路径，以及你的偏好因素。",
+    status ? `资料补齐状态：${status.value}。` : "",
+    `下一步主要看资产类别是否重叠、费用/税务/账户位置、CAD/USD 或 hedged 差异、集中度、推荐路径，以及你的偏好因素。当前数据口径是 ${formatDataBoundaryForUser(freshness)}。`,
   ].join("\n");
 }
 
@@ -2095,10 +2068,10 @@ function buildMentionedSecurityAnswer(input: LooMinisterQuestionRequest) {
     : "标的相关";
 
   return [
-    `大臣会把这个问题按「${intent}」处理；虽然当前页不是单个标的详情页，但问题里提到的 ticker 会先尝试补齐资料，不能只因为页面主体为空就说没有相关信息。`,
+    `我会把这个问题按「${intent}」处理。虽然当前页不是单个标的详情页，但你提到的 ticker 会先尝试补齐资料，不会因为页面主体不是标的页就直接说没资料。`,
     resolvedFacts.length > 0
-      ? `已识别标的：${resolvedFacts.map((fact) => `${fact.label}：${fact.value}${fact.detail ? `（${fact.detail}）` : ""}`).join("；")}。`
-      : "本轮没有得到唯一可用的 listing 身份；大臣不会只按 ticker 猜测 CAD/US 或不同交易所版本。",
+      ? `已识别到：${resolvedFacts.map((fact) => `${fact.label}：${fact.value}`).join("；")}。`
+      : "这轮还没有得到唯一可用的 listing 身份，所以不会只按 ticker 猜 CAD/US 或不同交易所版本。",
     unresolvedFacts.length > 0
       ? `未补齐项：${unresolvedFacts.map((fact) => `${fact.label}：${fact.value}${fact.detail ? `（${fact.detail}）` : ""}`).join("；")}。`
       : "所有已识别对象都会保留 symbol + exchange + currency 或 securityId，不会把同 ticker 的不同 listing 合并。",
@@ -2117,9 +2090,9 @@ function buildMentionedSecurityAnswer(input: LooMinisterQuestionRequest) {
       ? "买入判断口径：把这些标的当作候选新增标的，先看标的身份、资产类别、行业和数据新鲜度，再结合组合配置缺口、偏好、现金/买房目标、账户/税务/FX 和最新推荐路径。当前未持有不代表不能分析。"
       : "标的判断口径：先确认身份，再看它在组合里的角色、风险来源、缓存行情/秘闻和偏好匹配；如果是跨标的比较，应分别说明每个标的的数据边界。",
     statusFacts.length > 0
-      ? `资料补齐状态：${statusFacts.map((fact) => `${fact.value}${fact.detail ? `（${fact.detail}）` : ""}`).join("；")}。`
-      : "当前状态：已基于当前页面和本地缓存处理。",
-    `数据边界：${formatDataBoundaryForUser(freshness)}。`,
+      ? `资料补齐状态：${statusFacts.map((fact) => fact.value).join("；")}。`
+      : "",
+    `当前数据口径是 ${formatDataBoundaryForUser(freshness)}。`,
   ].join("\n");
 }
 
@@ -2149,11 +2122,11 @@ function buildPortfolioContextAnswer(input: LooMinisterQuestionRequest) {
     }
     const facts = summarizeFacts(input.pageContext.facts);
     return [
-      "大臣会按整体组合问题回答，但本轮没有生成完整组合上下文，只能使用页面事实保守解释。",
+      "我先按当前页面能看到的组合资料回答；这轮没有完整组合上下文，所以不会硬扩展成完整配置报告。",
       facts.length > 0
         ? `页面事实：${facts.join("；")}。`
         : "当前页面没有足够组合事实。",
-      `数据边界：${formatDataBoundaryForUser(freshness)}。`,
+      `当前数据口径是 ${formatDataBoundaryForUser(freshness)}。`,
     ].join("\n");
   }
 
@@ -2165,7 +2138,7 @@ function buildPortfolioContextAnswer(input: LooMinisterQuestionRequest) {
     )[0];
 
   return [
-    `大臣会按组合上下文回答整体持仓/组合问题。当前净资产为 ${formatCad(context.summary.totalNetWorthCad)}，其中投资资产 ${formatCad(context.summary.totalMarketValueCad)}，现金 ${formatCad(context.summary.cashBalanceCad)}。`,
+    `整体看，当前净资产为 ${formatCad(context.summary.totalNetWorthCad)}，其中投资资产 ${formatCad(context.summary.totalMarketValueCad)}，现金 ${formatCad(context.summary.cashBalanceCad)}。`,
     `账户与持仓：${context.summary.accountCount} 个投资账户，${context.summary.holdingCount} 个持仓；最大持仓 ${context.summary.topHolding ?? "未记录"}；前五大持仓约 ${formatPct(context.concentration.topFiveWeightPct)}。`,
     leadGap
       ? `配置缺口：${leadGap.assetClass} 当前 ${formatPct(leadGap.currentPct)}，目标 ${formatPct(leadGap.targetPct)}，缺口 ${formatPct(leadGap.gapPct)}，状态 ${leadGap.status}。`
@@ -2181,8 +2154,7 @@ function buildPortfolioContextAnswer(input: LooMinisterQuestionRequest) {
       ? `缓存情报：${context.cachedIntelligence.summaries.slice(0, 2).join("；")}。`
       : "缓存情报：当前没有可用秘闻；页面不会自动抓取新闻或论坛。",
     `资料完整度：${context.contextCompleteness.score}/100；缺口：${context.contextCompleteness.missing.length > 0 ? context.contextCompleteness.missing.join("、") : "无主要缺口"}。`,
-    `数据边界：${formatDataBoundaryForUser(context.dataFreshness)}。`,
-    "判断顺序：先看配置偏离和集中度，再看账户/税务/FX 与现金缓冲，最后才看单个标的或短期新闻。单个标的追问应切换到标的上下文。",
+    `我会先看配置偏离和集中度，再看账户/税务/FX 与现金缓冲；如果继续追问单个标的，再切到标的上下文。当前数据口径是 ${formatDataBoundaryForUser(context.dataFreshness)}。`,
   ].join("\n");
 }
 
@@ -2365,8 +2337,8 @@ function buildSecurityDetailAnswer(input: LooMinisterQuestionRequest) {
 
   return [
     context
-      ? `大臣会按标的上下文回答，并保留 listing 身份：「${context.identity.symbol} · ${context.identity.exchange ?? "exchange?"} · ${context.identity.currency ?? "currency?"}」。不会只按 ticker 合并 CAD/US 或不同交易所版本。`
-      : `大臣会按标的/持仓详情回答，并保留 listing 身份：「${securityName}」。不会只按 ticker 合并 CAD/US 或不同交易所版本。`,
+      ? `我会按这个 listing 回答：「${context.identity.symbol} · ${context.identity.exchange ?? "exchange?"} · ${context.identity.currency ?? "currency?"}」，不会只按 ticker 合并 CAD/US 或不同交易所版本。`
+      : `我会按这个标的/持仓详情回答：「${securityName}」，不会只按 ticker 合并 CAD/US 或不同交易所版本。`,
     context
       ? `身份与分类：底层经济暴露 ${context.economicExposure.assetClass}${context.economicExposure.sector ? `；行业/板块 ${context.economicExposure.sector}` : ""}；来源 ${context.economicExposure.source}。`
       : identityFacts.length > 0
@@ -2403,8 +2375,7 @@ function buildSecurityDetailAnswer(input: LooMinisterQuestionRequest) {
             .map((fact) => `${fact.label}：${fact.value}`)
             .join("；")}。`
         : "当前没有同一标的的缓存秘闻；这不是利好或利空，只表示外部资料不足。",
-    `数据边界：${formatDataBoundaryForUser(freshness)}。`,
-    "判断顺序：先确认身份和数据新鲜度，再看资产类别和行业暴露、与偏好因素的适配、推荐路径、账户/税务/FX 摩擦，最后才看短期价格走势。",
+    `我会先确认身份和数据新鲜度，再看资产类别、行业暴露、偏好适配、推荐路径、账户/税务/FX 摩擦，最后才看短期价格走势。当前数据口径是 ${formatDataBoundaryForUser(freshness)}。`,
   ]
     .filter(Boolean)
     .join("\n");
@@ -2488,20 +2459,6 @@ function buildAnswer(input: LooMinisterQuestionRequest) {
   if (isRecommendationQuestion(question)) {
     return buildRecommendationAnswer(input);
   }
-  if (
-    isPortfolioContextPage(pageContext.page) &&
-    isPortfolioQuestion(question)
-  ) {
-    return buildPortfolioContextAnswer(input);
-  }
-  if (
-    (pageContext.page === "security-detail" ||
-      pageContext.page === "holding-detail") &&
-    isSecurityDetailQuestion(question) &&
-    !isFreshnessQuestion(question)
-  ) {
-    return buildSecurityDetailAnswer(input);
-  }
   if (isPreferenceQuestion(question)) {
     return buildPreferenceAnswer(input);
   }
@@ -2516,6 +2473,12 @@ function buildAnswer(input: LooMinisterQuestionRequest) {
       isHealthQuestion(question))
   ) {
     return buildGlobalUserContextAnswer(input);
+  }
+  if (
+    isPortfolioContextPage(pageContext.page) &&
+    isPortfolioQuestion(question)
+  ) {
+    return buildPortfolioContextAnswer(input);
   }
   if (
     (pageContext.page === "security-detail" ||
@@ -2758,7 +2721,8 @@ function buildRouterCompatiblePrompt(input: LooMinisterQuestionRequest) {
 
   return [
     "你是 Loo国大臣。你是项目内的投资管家型助手，不是数据字段解释器。只使用下面的页面摘要、用户持仓/偏好背景和缓存资料回答中文问题。",
-    "回答必须先给清晰结论，再说明为什么和用户相关、组合影响、主要风险、下一步可确认事项。不要把 provider、sourceMode、context pack、DTO、fallback、run-analysis 等工程词直接说给用户。",
+    "默认按自然聊天方式回答，像 ChatGPT 一样直接回应用户问题；不要每次套用固定小标题、固定段落或报告模板。只有当用户明确要求分析报告、对比、清单或步骤时，才使用条列。",
+    "回答要简洁，优先 1-3 段。先回答问题本身，再按需要补充和用户相关的上下文。不要把 provider、sourceMode、context pack、DTO、fallback、run-analysis 等工程词直接说给用户。",
     `本轮意图分类：primary=${classifiedIntent.primary}; secondary=${classifiedIntent.secondary.join(",") || "none"}; confidence=${classifiedIntent.confidence}。必须先回答 primary intent；secondary 只能作为必要补充。`,
     "如果 primary 是 import_workflow、how_to_action 或 page_explanation，不得主动展开组合配置、Health、推荐或买入判断，除非用户明确问它们会不会受影响。",
     "不要编造实时行情、新闻或论坛结论；投资相关回答必须包含不构成投资建议的免责声明。",
@@ -2773,7 +2737,7 @@ function buildRouterCompatiblePrompt(input: LooMinisterQuestionRequest) {
     "用户问某个标的是否值得买/加仓/比较时，必须把它当成投资判断问题：标的本身、底层经济暴露、现有持仓重复度、目标配置缺口、Preference Factors、账户/税务/FX、数据新鲜度都要纳入；不要只用组合占比或是否已持有作结论。",
     "只返回合法 JSON object，不要 markdown，不要额外解释。",
     "JSON 字段必须是：version, generatedAt, role, page, title, answer, structured, keyPoints, suggestedActions, sources, disclaimer。",
-    "structured 必须包含 directAnswer, reasoning, decisionGates, boundary, nextStep。directAnswer 是 1-2 句直接结论；reasoning 是 2-4 条原因；decisionGates 是会改变判断的确认项；boundary 是数据/身份/新鲜度边界；nextStep 是一个具体下一步。",
+    "answer 是面向用户展示的聊天正文，不能机械拼接“判断依据/需要确认/边界/下一步”等固定标题。structured 只作兼容字段：directAnswer 填 answer 的一句话摘要；reasoning、decisionGates 填 []；boundary 和 nextStep 默认 null，除非用户明确要求严肃投资分析或操作步骤。",
     `固定字段：version=${LOO_MINISTER_VERSION}; role=loo-minister; page=${pageContext.page}。suggestedActions 必须返回 []；产品动作由后端 deterministic 附加，不能由模型生成。`,
     "sources 至少包含一个 {title, sourceType, asOf}，sourceType 可用 page-context、portfolio-data、quote-cache、fx-cache、analysis-cache、external-intelligence、manual。",
     `disclaimer 必须是 {"zh":"仅用于研究学习，不构成投资建议。","en":"For research and education only. This is not investment advice."}`,
@@ -3110,7 +3074,7 @@ function buildExternalInput(
     {
       role: "system",
       content:
-        "你是 Loo国大臣，是项目内的投资管家型助手，不是数据字段解释器。只用提供的页面 context、用户持仓/偏好背景和缓存资料回答中文问题；先给清晰结论，再说明为什么和用户相关、组合影响、主要风险、下一步可确认事项。不要把 DTO、overlay、deterministic、sourceMode、provider、fallback、run-analysis、context pack 等工程词直接说给用户。如果 context 里有 portfolio-context、security-context、candidate-fit、global-user-context、analysis-cache 或 external-intelligence 结果，优先引用它，但对用户要说“组合上下文、标的上下文、候选适配、用户持仓和偏好背景、缓存分析、外部资料”。上下文优先级必须是：当前页面事实和 security-context/candidate-fit > 用户明确提到的标的 > recentSubjects 补齐资料 > portfolio-context > global-user-context > project knowledge。global-user-context 是用户级背景，只能补足持仓/偏好/推荐背景，不能覆盖当前页面或当前标的事实。没有资料时说明只能基于页面上下文和本地缓存回答。不要编造实时行情、新闻或论坛结论；保留 securityId 以及 symbol + exchange + currency 身份；所有投资相关回答必须包含不构成投资建议的免责声明。若用户要求帮忙分析、运行快扫或生成分析报告，只有当 pageContext.allowedActions 里存在 run-analysis 时，才可以说页面会提供确认式智能快扫按钮；否则必须说明当前聊天只能轻量解释，并引导用户进入标的详情、Health Score、账户 Health 或推荐页运行对应快扫。suggestedActions 必须返回 []，后端会基于 pageContext.allowedActions 附加确认动作。若用户问整体持仓、组合、配置、Health 或推荐，必须优先解释组合上下文；若缺少 portfolio-context 但存在 global-user-context，也必须使用用户持仓和偏好背景回答，不能说完全没有组合 context。若用户问标的/持仓详情，必须优先解释标的上下文；若用户问某标的是否适合买入/适配，必须进一步解释候选适配资料，并把标的本身、底层经济暴露、现有持仓重复度、目标配置缺口、Preference Factors、账户/税务/FX、数据新鲜度都纳入；currentExposure=0 只代表未持有，不得阻止 candidate-new-buy 分析。若用户问 Health Score，要区分全组合评分与账户级评分。若用户问推荐，要区分 V2.1 规则核心、偏好因素、推荐约束和 V3 外部情报层。若用户问偏好，要说明新手引导与手动进阶两条线。只返回合法 JSON object，不要 markdown。JSON 必须符合 LooMinisterAnswerResult：version、generatedAt、role、page、title、answer、structured、keyPoints、suggestedActions、sources、disclaimer。structured 必须包含 directAnswer, reasoning, decisionGates, boundary, nextStep；answer 可作为 structured 的简洁拼接文本。role 必须是 loo-minister，产品动作由本地应用控制。",
+        "你是 Loo国大臣，是项目内的投资管家型助手，不是数据字段解释器。只用提供的页面 context、用户持仓/偏好背景和缓存资料回答中文问题。默认按自然聊天方式回答，像 ChatGPT 一样直接回应用户问题；不要每次套用固定小标题、固定段落或报告模板。只有当用户明确要求分析报告、对比、清单或步骤时，才使用条列。回答要简洁，优先 1-3 段。不要把 DTO、overlay、deterministic、sourceMode、provider、fallback、run-analysis、context pack 等工程词直接说给用户。如果 context 里有 portfolio-context、security-context、candidate-fit、global-user-context、analysis-cache 或 external-intelligence 结果，优先引用它，但对用户要说“组合上下文、标的上下文、候选适配、用户持仓和偏好背景、缓存分析、外部资料”。上下文优先级必须是：当前页面事实和 security-context/candidate-fit > 用户明确提到的标的 > recentSubjects 补齐资料 > portfolio-context > global-user-context > project knowledge。global-user-context 是用户级背景，只能补足持仓/偏好/推荐背景，不能覆盖当前页面或当前标的事实。没有资料时说明只能基于页面上下文和本地缓存回答。不要编造实时行情、新闻或论坛结论；保留 securityId 以及 symbol + exchange + currency 身份；投资相关回答必须保留不构成投资建议口径。若用户要求帮忙分析、运行快扫或生成分析报告，只有当 pageContext.allowedActions 里存在 run-analysis 时，才可以说页面会提供确认式智能快扫按钮；否则说明当前聊天只能轻量解释，并引导用户进入对应页面运行快扫。suggestedActions 必须返回 []，后端会基于 pageContext.allowedActions 附加确认动作。若用户问整体持仓、组合、配置、Health 或推荐，优先解释组合上下文；若缺少 portfolio-context 但存在 global-user-context，也必须使用用户持仓和偏好背景回答。若用户问标的/持仓详情，优先解释标的上下文；若用户问某标的是否适合买入/适配，进一步解释候选适配资料，并把标的本身、底层经济暴露、现有持仓重复度、目标配置缺口、Preference Factors、账户/税务/FX、数据新鲜度都纳入；currentExposure=0 只代表未持有，不得阻止 candidate-new-buy 分析。只返回合法 JSON object，不要 markdown。JSON 必须符合 LooMinisterAnswerResult：version、generatedAt、role、page、title、answer、structured、keyPoints、suggestedActions、sources、disclaimer。answer 是面向用户展示的聊天正文，不能机械拼接“判断依据/需要确认/边界/下一步”等固定标题。structured 只作兼容字段：directAnswer 填 answer 的一句话摘要；reasoning、decisionGates 填 []；boundary 和 nextStep 默认 null，除非用户明确要求严肃投资分析或操作步骤。role 必须是 loo-minister，产品动作由本地应用控制。",
     },
     {
       role: "user",
@@ -3127,13 +3091,14 @@ function buildExternalInput(
 
 function buildOpenRouterCompatibleInstructions() {
   return [
-    "你是 Loo国大臣，是项目内的投资管家型助手。你必须用中文回答，先给直接结论，再说明组合影响、关键风险、确认项和下一步。",
+    "你是 Loo国大臣，是项目内的投资管家型助手。你必须用中文回答，默认像 ChatGPT 一样自然聊天，不要每次套用固定小标题、固定段落或报告模板。",
+    "回答要简洁，优先 1-3 段；只有当用户明确要求分析报告、对比、清单或步骤时，才使用条列。",
     "只能使用用户提供的页面 context、持仓/偏好背景、缓存分析和明确的数据新鲜度；不要编造实时新闻、论坛或未提供的行情。",
     "不要向用户暴露 provider、sourceMode、context pack、DTO、fallback、run-analysis 等工程词。",
     "如果用户问某标的是否适合买入/适配，必须把它当成候选标的分析；currentExposure=0 只代表未持有，不得阻止分析。",
     "suggestedActions 必须返回 []；产品动作由后端 deterministic 附加。",
     "只返回合法 JSON object，不要 markdown。JSON 字段必须是 version, generatedAt, role, page, title, answer, structured, keyPoints, suggestedActions, sources, disclaimer。",
-    "structured 必须包含 directAnswer, reasoning, decisionGates, boundary, nextStep。",
+    "answer 是面向用户展示的聊天正文，不能机械拼接“判断依据/需要确认/边界/下一步”等固定标题。structured 只作兼容字段：directAnswer 填 answer 的一句话摘要；reasoning、decisionGates 填 []；boundary 和 nextStep 默认 null，除非用户明确要求严肃投资分析或操作步骤。",
     "disclaimer 必须说明仅用于研究学习，不构成投资建议。",
   ].join("\n");
 }

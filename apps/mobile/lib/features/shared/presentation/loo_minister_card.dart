@@ -3,6 +3,7 @@ import "dart:async";
 import "package:flutter/material.dart";
 
 import "../../../core/api/loo_api_client.dart";
+import "../../../core/presentation/loo_components.dart";
 import "../data/loo_minister_context_models.dart";
 
 class LooMinisterSessionController extends ChangeNotifier {
@@ -403,18 +404,20 @@ class _DraggableMinisterButtonState extends State<_DraggableMinisterButton> {
     }
 
     setState(() => _sheetOpen = true);
-    showModalBottomSheet<void>(
+    showLooFloatingSheet<void>(
       context: sheetContext,
-      isScrollControlled: true,
       useRootNavigator: true,
-      useSafeArea: true,
-      builder: (_) => _LooMinisterSheet(
-        apiClient: widget.apiClient,
-        sessionController: _sessionController,
-        pageContext: widget.pageContext,
-        recentSubjects: widget.recentSubjects,
-        suggestedQuestion: widget.suggestedQuestion,
-        onSuggestedActionConfirmed: widget.onSuggestedActionConfirmed,
+      padding: EdgeInsets.zero,
+      builder: (context) => SizedBox(
+        height: MediaQuery.sizeOf(context).height * 0.78,
+        child: _LooMinisterSheet(
+          apiClient: widget.apiClient,
+          sessionController: _sessionController,
+          pageContext: widget.pageContext,
+          recentSubjects: widget.recentSubjects,
+          suggestedQuestion: widget.suggestedQuestion,
+          onSuggestedActionConfirmed: widget.onSuggestedActionConfirmed,
+        ),
       ),
     ).whenComplete(() {
       if (mounted) {
@@ -1035,7 +1038,6 @@ class _MinisterAnswerView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final structured = answer.structured;
     return DecoratedBox(
       decoration: BoxDecoration(
         color: Theme.of(context)
@@ -1050,45 +1052,7 @@ class _MinisterAnswerView extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(answer.title, style: Theme.of(context).textTheme.titleMedium),
-            const SizedBox(height: 8),
-            if (structured != null &&
-                structured.directAnswer.trim().isNotEmpty) ...[
-              Text(structured.directAnswer),
-              if (structured.reasoning.isNotEmpty) ...[
-                const SizedBox(height: 10),
-                Text("判断依据", style: Theme.of(context).textTheme.titleSmall),
-                const SizedBox(height: 4),
-                ...structured.reasoning
-                    .take(4)
-                    .map((point) => Text("• $point")),
-              ],
-              if (structured.decisionGates.isNotEmpty) ...[
-                const SizedBox(height: 10),
-                Text("需要确认", style: Theme.of(context).textTheme.titleSmall),
-                const SizedBox(height: 4),
-                ...structured.decisionGates
-                    .take(4)
-                    .map((point) => Text("• $point")),
-              ],
-              if (structured.boundary != null &&
-                  structured.boundary!.trim().isNotEmpty) ...[
-                const SizedBox(height: 10),
-                Text("边界：${structured.boundary}",
-                    style: Theme.of(context).textTheme.bodySmall),
-              ],
-              if (structured.nextStep != null &&
-                  structured.nextStep!.trim().isNotEmpty) ...[
-                const SizedBox(height: 10),
-                Text("下一步：${structured.nextStep}"),
-              ],
-            ] else ...[
-              Text(answer.answer),
-            ],
-            if (structured == null && answer.keyPoints.isNotEmpty) ...[
-              const SizedBox(height: 10),
-              ...answer.keyPoints.take(4).map((point) => Text("• $point")),
-            ],
+            Text(answer.answer),
             if (answer.suggestedActions.isNotEmpty) ...[
               const SizedBox(height: 12),
               ...answer.suggestedActions.take(3).map(
@@ -1098,15 +1062,24 @@ class _MinisterAnswerView extends StatelessWidget {
                     ),
                   ),
             ],
-            const SizedBox(height: 10),
-            Text(
-              answer.disclaimer,
-              style: Theme.of(context).textTheme.bodySmall,
-            ),
+            if (_shouldShowDisclaimer(answer.answer)) ...[
+              const SizedBox(height: 10),
+              Text(
+                answer.disclaimer,
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+            ],
           ],
         ),
       ),
     );
+  }
+
+  bool _shouldShowDisclaimer(String text) {
+    return RegExp(
+      r"买|卖|加仓|减仓|持仓|投资|推荐|风险|收益|标的|股票|ETF|基金|债券|现金|配置",
+      caseSensitive: false,
+    ).hasMatch(text);
   }
 }
 

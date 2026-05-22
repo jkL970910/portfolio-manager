@@ -255,7 +255,8 @@ export function getMinisterContextSelectionPolicy(
       includesIntent(classified, "daily_intelligence") ||
       includesIntent(classified, "security_research") ||
       includesIntent(classified, "recommendation_explain"),
-    includeGlobalUserContext: portfolio,
+    includeGlobalUserContext:
+      portfolio || includesIntent(classified, "import_workflow"),
     includePortfolioContext: portfolio,
     includeSecurityContext: security,
     includeCandidateFit: includesIntent(classified, "candidate_fit"),
@@ -265,12 +266,15 @@ export function getMinisterContextSelectionPolicy(
 
 const INTENT_CONTEXT_FACTS: Partial<Record<LooMinisterIntent, Set<string>>> = {
   import_workflow: new Set(["project-feature-import"]),
+  how_to_action: new Set(["project-feature-import"]),
+  page_explanation: new Set(["project-feature-import"]),
   recommendation_explain: new Set([
     "project-feature-recommendations",
     "project-feature-recommendation-constraints",
   ]),
   preference_settings: new Set(["project-feature-preferences"]),
   portfolio_analysis: new Set([
+    "net-worth",
     "portfolio-context",
     "portfolio-context-summary",
     "portfolio-context-allocation",
@@ -311,6 +315,29 @@ export function selectMinisterFactsForIntent(
       return true;
     }
     if (fact.source === "user-input") {
+      return true;
+    }
+    if (
+      fact.id.startsWith("comparison-subject-") ||
+      fact.id.startsWith("security-mention-") ||
+      fact.id.startsWith("context-resolver-status-")
+    ) {
+      return true;
+    }
+    if (
+      fact.source === "external-intelligence" &&
+      classified.primary !== "import_workflow" &&
+      (includesIntent(classified, "daily_intelligence") ||
+        includesIntent(classified, "security_research") ||
+        includesIntent(classified, "candidate_fit") ||
+        includesIntent(classified, "recommendation_explain"))
+    ) {
+      return true;
+    }
+    if (
+      fact.id.startsWith("global-user-context") &&
+      includesIntent(classified, "import_workflow")
+    ) {
       return true;
     }
     if (

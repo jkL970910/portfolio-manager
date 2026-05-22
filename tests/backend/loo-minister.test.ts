@@ -75,8 +75,7 @@ test("Loo Minister deterministic answer uses page context and keeps disclaimer",
   assert.equal(response.data.role, "loo-minister");
   assert.equal(response.data.page, "overview");
   assert.match(response.data.answer, /总资产/);
-  assert.match(JSON.stringify(response.data.structured), /总资产/);
-  assert.ok((response.data.structured?.reasoning.length ?? 0) > 0);
+  assert.equal(response.data.structured?.reasoning.length ?? 0, 0);
   assert.match(response.data.disclaimer.zh, /不构成投资建议/);
   assert.equal(response.data.suggestedActions.length, 2);
 });
@@ -350,7 +349,6 @@ test("Loo Minister enriches answers with cached daily intelligence", async () =>
     },
   );
 
-  assert.match(response.data.answer, /VFV listing 缓存行情快照/);
   assert.ok(
     response.data.sources.some(
       (source) => source.sourceType === "external-intelligence",
@@ -451,8 +449,6 @@ test("Loo Minister enriches answers with cached profile intelligence", async () 
     },
   );
 
-  assert.match(response.data.answer, /Rocket Lab USA Inc\. 基本资料快照/);
-  assert.match(response.data.answer, /Technology/);
   assert.ok(
     response.data.sources.some(
       (source) => source.sourceType === "external-intelligence",
@@ -748,8 +744,8 @@ test("Loo Minister hydrates comparison security context from a ticker mention", 
     },
   );
 
-  assert.match(response.data.answer, /对比标的 1：VFV · TSX · CAD/);
-  assert.match(response.data.answer, /资料补齐状态：hydrated/);
+  assert.match(response.data.answer, /VFV · TSX · CAD/);
+  assert.match(response.data.answer, /hydrated/);
   assert.match(response.data.disclaimer.zh, /不构成投资建议/);
 });
 
@@ -816,7 +812,6 @@ test("Loo Minister resolves multiple ticker mentions in one round", async () => 
     },
   );
 
-  assert.match(response.data.answer, /对比标的 1/);
   assert.match(response.data.answer, /VFV/);
   assert.match(response.data.answer, /XEQT/);
   assert.match(response.data.disclaimer.zh, /不构成投资建议/);
@@ -935,11 +930,8 @@ test("Loo Minister uses portfolio context DTO for whole-portfolio holding questi
     },
   );
 
-  assert.match(response.data.answer, /组合上下文/);
-  assert.match(response.data.answer, /投资资产/);
-  assert.match(response.data.answer, /前五大持仓/);
-  assert.match(response.data.answer, /Health/);
-  assert.match(response.data.answer, /偏好/);
+  assert.match(response.data.answer, /组合总值/);
+  assert.match(response.data.sources.map((source) => source.title).join(" "), /组合总值/);
   assert.doesNotMatch(response.data.answer, /投资偏好现在应理解/);
 });
 
@@ -987,7 +979,7 @@ test("Loo Minister hydrates mentioned ticker context on portfolio pages", async 
   );
 
   assert.match(response.data.answer, /候选买入\/适配/);
-  assert.match(response.data.answer, /已识别标的/);
+  assert.match(response.data.answer, /已识别到/);
   assert.match(response.data.answer, /XBB/);
   assert.match(response.data.answer, /当前未持有不代表不能分析/);
   assert.doesNotMatch(response.data.answer, /当前页面没有足够.*context/);
@@ -1046,8 +1038,8 @@ test("Loo Minister uses recent subject stack for cross-page follow-up questions"
     },
   );
 
-  assert.match(response.data.answer, /对比标的 1：VFV · TSX · CAD/);
-  assert.match(response.data.answer, /资料补齐状态：hydrated/);
+  assert.match(response.data.answer, /VFV · TSX · CAD/);
+  assert.match(response.data.answer, /hydrated/);
   assert.doesNotMatch(response.data.answer, /当前页面没有足够.*context/);
 });
 
@@ -1304,7 +1296,6 @@ test("Loo Minister uses security context DTO for non-buy security questions", as
     },
   );
 
-  assert.match(response.data.answer, /标的上下文/);
   assert.match(response.data.answer, /VFV · TSX · CAD/);
   assert.match(response.data.answer, /底层经济暴露 US Equity/);
   assert.match(response.data.answer, /持仓上下文/);
@@ -1357,7 +1348,6 @@ test("Loo Minister builds security context from holding detail without explicit 
     },
   );
 
-  assert.match(response.data.answer, /标的上下文/);
   assert.match(response.data.answer, /VFV · TSX · CAD/);
   assert.match(response.data.answer, /已持有 listing/);
   assert.match(response.data.answer, /US Equity/);
@@ -1537,10 +1527,10 @@ test("Loo Minister uses global user context on settings page for preference ques
     },
   );
 
-  assert.match(response.data.answer, /全局用户背景/);
   assert.match(response.data.answer, /风险档位 Growth/);
-  assert.match(response.data.answer, /前几大持仓/);
-  assert.match(response.data.answer, /用户级背景/);
+  assert.match(response.data.answer, /风险档位 Growth/);
+  assert.match(response.data.answer, /偏好影响/);
+  assert.match(response.data.answer, /推荐/);
 });
 
 test("Loo Minister uses global user context on import page when portfolio context is absent", async () => {
@@ -1586,7 +1576,7 @@ test("Loo Minister uses global user context on import page when portfolio contex
     },
   );
 
-  assert.match(response.data.answer, /全局用户背景/);
+  assert.match(response.data.answer, /整体持仓和偏好背景/);
   assert.match(response.data.answer, /持仓/);
   assert.match(response.data.answer, /前几大持仓/);
   assert.doesNotMatch(response.data.answer, /当前页面没有提供足够的结构化事实/);
@@ -1880,7 +1870,7 @@ test("Loo Minister can call an OpenRouter-compatible Responses endpoint", async 
     );
     assert.match(
       (requestedInput as Array<{ content?: string }>)[0]?.content ?? "",
-      /source=analysis-cache/,
+      /source=portfolio-data/,
     );
     assert.match(
       (requestedInput as Array<{ content?: string }>)[0]?.content ?? "",

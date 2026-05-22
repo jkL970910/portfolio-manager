@@ -605,42 +605,43 @@ class _SummaryCard extends StatelessWidget {
   }
 
   void _showRadarSheet(BuildContext context, MobileHealthSnapshot data) {
-    showModalBottomSheet<void>(
+    showLooFloatingSheet<void>(
       context: context,
-      isScrollControlled: true,
-      showDragHandle: true,
-      backgroundColor: Theme.of(context).colorScheme.surface,
-      builder: (context) => DraggableScrollableSheet(
-        expand: false,
-        initialChildSize: 0.76,
-        minChildSize: 0.48,
-        maxChildSize: 0.92,
-        builder: (context, scrollController) => SafeArea(
-          child: SingleChildScrollView(
-            controller: scrollController,
-            padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+      builder: (context) => SingleChildScrollView(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
               children: [
-                Text("健康雷达", style: Theme.of(context).textTheme.titleLarge),
-                const SizedBox(height: 12),
-                SizedBox(
-                  width: double.infinity,
-                  child: LooRadarChart(
-                    height: 300,
-                    points: data.radar
-                        .map((point) => LooRadarPoint(
-                              label: point.dimension,
-                              value: point.value,
-                            ))
-                        .toList(),
+                Expanded(
+                  child: Text(
+                    "健康雷达",
+                    style: Theme.of(context).textTheme.titleLarge,
                   ),
                 ),
-                const SizedBox(height: 12),
-                ...data.radar.map(_RadarTile.new),
+                IconButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  icon: const Icon(Icons.close_rounded),
+                  tooltip: "关闭",
+                ),
               ],
             ),
-          ),
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: LooRadarChart(
+                height: 300,
+                points: data.radar
+                    .map((point) => LooRadarPoint(
+                          label: point.dimension,
+                          value: point.value,
+                        ))
+                    .toList(),
+              ),
+            ),
+            const SizedBox(height: 12),
+            ...data.radar.map(_RadarTile.new),
+          ],
         ),
       ),
     );

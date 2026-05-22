@@ -2,6 +2,50 @@ import "package:flutter/material.dart";
 
 import "../theme/loo_theme.dart";
 
+Future<T?> showLooFloatingSheet<T>({
+  required BuildContext context,
+  required WidgetBuilder builder,
+  bool isScrollControlled = true,
+  bool useRootNavigator = false,
+  EdgeInsetsGeometry? padding,
+}) {
+  return showModalBottomSheet<T>(
+    context: context,
+    isScrollControlled: isScrollControlled,
+    useRootNavigator: useRootNavigator,
+    useSafeArea: true,
+    backgroundColor: Colors.transparent,
+    barrierColor: Colors.black.withValues(alpha: 0.42),
+    elevation: 0,
+    builder: (sheetContext) {
+      final media = MediaQuery.of(sheetContext);
+      final tokens = sheetContext.looTokens;
+      final horizontalInset = media.size.width >= 640 ? 44.0 : 16.0;
+      return Padding(
+        padding: EdgeInsets.only(
+          left: horizontalInset,
+          right: horizontalInset,
+          bottom: media.viewInsets.bottom + 16,
+          top: 16,
+        ),
+        child: Align(
+          alignment: Alignment.bottomCenter,
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              maxWidth: 620,
+              maxHeight: media.size.height * 0.88,
+            ),
+            child: LooGlassCard(
+              padding: padding ?? EdgeInsets.all(tokens.gapLg),
+              child: builder(sheetContext),
+            ),
+          ),
+        ),
+      );
+    },
+  );
+}
+
 EdgeInsets looPagePadding(
   BuildContext context, {
   double left = 20,
@@ -54,6 +98,7 @@ class LooGlassCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final tokens = context.looTokens;
+    final dark = Theme.of(context).brightness == Brightness.dark;
     final shape = RoundedRectangleBorder(
       borderRadius:
           BorderRadius.circular(isHero ? tokens.radiusXl : tokens.radiusLg),
@@ -65,13 +110,15 @@ class LooGlassCard extends StatelessWidget {
         borderRadius:
             BorderRadius.circular(isHero ? tokens.radiusXl : tokens.radiusLg),
         border: Border.all(color: tokens.cardBorder),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.18),
-            blurRadius: isHero ? 28 : 18,
-            offset: const Offset(0, 12),
-          ),
-        ],
+        boxShadow: dark
+            ? [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.18),
+                  blurRadius: isHero ? 28 : 18,
+                  offset: const Offset(0, 12),
+                ),
+              ]
+            : const [],
       ),
       child: Padding(
         padding:

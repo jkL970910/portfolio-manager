@@ -360,6 +360,19 @@ ThemeData _buildLooTheme({
         side: BorderSide(color: tokens.cardBorder),
       ),
     ),
+    dialogTheme: DialogThemeData(
+      elevation: 0,
+      backgroundColor: Colors.transparent,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(tokens.radiusXl),
+      ),
+    ),
+    bottomSheetTheme: const BottomSheetThemeData(
+      elevation: 0,
+      backgroundColor: Colors.transparent,
+      modalBackgroundColor: Colors.transparent,
+      surfaceTintColor: Colors.transparent,
+    ),
     chipTheme: ChipThemeData(
       backgroundColor: tokens.accentSoft,
       selectedColor: tokens.accentSoft,

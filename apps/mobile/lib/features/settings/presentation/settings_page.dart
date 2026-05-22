@@ -170,22 +170,22 @@ class _SettingsPageState extends State<SettingsPage> {
             style: Theme.of(context).textTheme.bodyMedium,
           ),
           const SizedBox(height: 14),
-          Card(
-            child: ListTile(
-              title: Text(widget.viewerName),
-              subtitle: const Text("Loo国居民档案"),
-              leading: const CircleAvatar(child: Icon(Icons.person_outline)),
-            ),
-          ),
-          const SizedBox(height: 16),
           _SettingsSectionCard(
             icon: Icons.badge_outlined,
-            title: "我的身份",
-            subtitle: "Loo国身份、外观主题和显示口径",
+            title: "Loo国身份",
+            subtitle: "公民证件、爵位和住址",
             initiallyExpanded: true,
             children: [
               _CitizenProfileCard(apiClient: widget.apiClient),
-              const SizedBox(height: 12),
+            ],
+          ),
+          const SizedBox(height: 16),
+          _SettingsSectionCard(
+            icon: Icons.palette_outlined,
+            title: "外观与显示",
+            subtitle: "深浅主题和汇总币种",
+            initiallyExpanded: false,
+            children: [
               _AppearanceModeCard(
                 selected: _themeMode,
                 onChanged: _changeThemeMode,
@@ -499,106 +499,451 @@ class _CitizenProfileCardState extends State<_CitizenProfileCard> {
     setState(() => _profile = _load());
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final tokens = context.looTokens;
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: FutureBuilder<_CitizenProfileView>(
-          future: _profile,
-          builder: (context, snapshot) {
-            if (snapshot.connectionState == ConnectionState.waiting) {
-              return const LinearProgressIndicator();
-            }
-            if (snapshot.hasError) {
-              return ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: const Icon(Icons.badge_outlined),
-                title: const Text("Loo皇身份"),
-                subtitle: Text(snapshot.error.toString()),
-                trailing: IconButton(
-                  onPressed: _refresh,
-                  icon: const Icon(Icons.refresh),
-                ),
-              );
-            }
-            final profile = snapshot.data!;
-            return Column(
+  void _showStampSheet({
+    required String title,
+    required String value,
+    required String asset,
+    required String detail,
+  }) {
+    showLooFloatingSheet<void>(
+      context: context,
+      builder: (context) {
+        final tokens = context.looTokens;
+        return Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(22),
-                      child: Image.asset(
-                        profile.avatarAsset,
-                        width: 78,
-                        height: 78,
-                        fit: BoxFit.cover,
-                      ),
-                    ),
-                    const SizedBox(width: 14),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            profile.name,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: Theme.of(context).textTheme.titleLarge,
-                          ),
-                          const SizedBox(height: 6),
-                          Wrap(
-                            spacing: 8,
-                            runSpacing: 8,
-                            children: [
-                              Chip(label: Text(profile.rankLabel)),
-                              Chip(label: Text(profile.addressLabel)),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                    IconButton(
-                      onPressed: _refresh,
-                      icon: const Icon(Icons.refresh),
-                      tooltip: "刷新身份",
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 14),
-                Container(
-                  padding: const EdgeInsets.all(14),
-                  decoration: BoxDecoration(
-                    color: tokens.accentSoft,
-                    borderRadius: BorderRadius.circular(tokens.radiusMd),
-                    border: Border.all(color: tokens.cardBorder),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(tokens.radiusLg),
+                  child: Image.asset(
+                    asset,
+                    width: 96,
+                    height: 96,
+                    fit: BoxFit.cover,
                   ),
-                  child: Row(
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Expanded(
-                        child: _CitizenMetric(
-                          label: "公民编号",
-                          value: profile.idCode,
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: _CitizenMetric(
-                          label: "财富快照",
-                          value: profile.wealthSnapshotLabel,
-                        ),
+                      Text(title,
+                          style: Theme.of(context).textTheme.labelLarge),
+                      const SizedBox(height: 6),
+                      Text(
+                        value,
+                        style: Theme.of(context).textTheme.headlineSmall,
                       ),
                     ],
                   ),
                 ),
+                IconButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  icon: const Icon(Icons.close_rounded),
+                  tooltip: "关闭",
+                ),
               ],
-            );
-          },
+            ),
+            const SizedBox(height: 18),
+            Text(detail, style: Theme.of(context).textTheme.bodyMedium),
+          ],
+        );
+      },
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = context.looTokens;
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    return FutureBuilder<_CitizenProfileView>(
+      future: _profile,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const LooGlassCard(
+            padding: EdgeInsets.all(18),
+            child: LinearProgressIndicator(),
+          );
+        }
+        if (snapshot.hasError) {
+          return LooGlassCard(
+            padding: const EdgeInsets.all(16),
+            child: ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: const Icon(Icons.badge_outlined),
+              title: const Text("Loo皇身份"),
+              subtitle: Text(snapshot.error.toString()),
+              trailing: IconButton(
+                onPressed: _refresh,
+                icon: const Icon(Icons.refresh),
+              ),
+            ),
+          );
+        }
+        final profile = snapshot.data!;
+        return DecoratedBox(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                tokens.info.withValues(alpha: 0.46),
+                tokens.accent.withValues(alpha: 0.48),
+                tokens.warning.withValues(alpha: 0.28),
+              ],
+            ),
+            borderRadius: BorderRadius.circular(tokens.radiusXl + 2),
+            boxShadow: dark
+                ? [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.22),
+                      blurRadius: 26,
+                      offset: const Offset(0, 14),
+                    ),
+                  ]
+                : const [],
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(2),
+            child: Container(
+              padding: const EdgeInsets.all(18),
+              decoration: BoxDecoration(
+                gradient: tokens.heroGradient,
+                borderRadius: BorderRadius.circular(tokens.radiusXl),
+                border: Border.all(
+                  color: Colors.white.withValues(alpha: 0.16),
+                ),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 7,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.10),
+                          borderRadius: BorderRadius.circular(999),
+                          border: Border.all(color: tokens.cardBorder),
+                        ),
+                        child: Text(
+                          "Loo国公民身份证",
+                          style: Theme.of(context).textTheme.labelMedium,
+                        ),
+                      ),
+                      const Spacer(),
+                      IconButton.filledTonal(
+                        onPressed: _refresh,
+                        icon: const Icon(Icons.refresh),
+                        tooltip: "刷新身份",
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            _CitizenNameBlock(profile: profile),
+                            const SizedBox(height: 12),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: _CitizenMetric(
+                                    label: "性别",
+                                    value: profile.genderLabel,
+                                  ),
+                                ),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: _CitizenMetric(
+                                    label: "生日",
+                                    value: profile.birthDateLabel,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 10),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: _CitizenMetric(
+                                    label: "身份",
+                                    value: profile.rankLabel,
+                                  ),
+                                ),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: _CitizenMetric(
+                                    label: "住址",
+                                    value: profile.addressLabel,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 14),
+                      _CitizenAvatarPanel(
+                        profile: profile,
+                        onRankTap: () => _showStampSheet(
+                          title: "身份等级",
+                          value: profile.rankLabel,
+                          asset: profile.rankVisualAsset,
+                          detail: profile.rankDetail,
+                        ),
+                        onAddressTap: () => _showStampSheet(
+                          title: "Loo国住址",
+                          value: profile.addressLabel,
+                          asset: profile.addressVisualAsset,
+                          detail: profile.addressDetail,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+                  Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.08),
+                      borderRadius: BorderRadius.circular(tokens.radiusLg),
+                      border: Border.all(color: tokens.cardBorder),
+                    ),
+                    child: Column(
+                      children: [
+                        Row(
+                          children: [
+                            Expanded(
+                              child: _CitizenMetric(
+                                label: "发证时间",
+                                value: profile.issuedAtLabel,
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: _CitizenMetric(
+                                label: "财富快照",
+                                value: profile.wealthSnapshotLabel,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        _CitizenIdPlate(idCode: profile.idCode),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _CitizenNameBlock extends StatelessWidget {
+  const _CitizenNameBlock({required this.profile});
+
+  final _CitizenProfileView profile;
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = context.looTokens;
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.10),
+        borderRadius: BorderRadius.circular(tokens.radiusLg),
+        border: Border.all(color: tokens.cardBorder),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text("公民姓名", style: Theme.of(context).textTheme.labelSmall),
+          const SizedBox(height: 6),
+          Text(
+            profile.name,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: -0.6,
+                ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CitizenAvatarPanel extends StatelessWidget {
+  const _CitizenAvatarPanel({
+    required this.profile,
+    required this.onRankTap,
+    required this.onAddressTap,
+  });
+
+  final _CitizenProfileView profile;
+  final VoidCallback onRankTap;
+  final VoidCallback onAddressTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = context.looTokens;
+    return SizedBox(
+      width: 118,
+      child: Column(
+        children: [
+          Stack(
+            clipBehavior: Clip.none,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(tokens.radiusXl),
+                  border: Border.all(color: tokens.cardBorder),
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(tokens.radiusLg),
+                  child: Image.asset(
+                    profile.avatarAsset,
+                    width: 106,
+                    height: 138,
+                    fit: BoxFit.cover,
+                  ),
+                ),
+              ),
+              Positioned(
+                left: -6,
+                bottom: -8,
+                child: _CitizenStampButton(
+                  asset: profile.rankVisualAsset,
+                  tooltip: "身份等级",
+                  onTap: onRankTap,
+                ),
+              ),
+              Positioned(
+                right: -6,
+                bottom: -8,
+                child: _CitizenStampButton(
+                  asset: profile.addressVisualAsset,
+                  tooltip: "Loo国住址",
+                  onTap: onAddressTap,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 18),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(tokens.radiusMd),
+              border: Border.all(color: tokens.cardBorder),
+            ),
+            child: Text(
+              profile.rankLabel,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.labelMedium,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CitizenStampButton extends StatelessWidget {
+  const _CitizenStampButton({
+    required this.asset,
+    required this.tooltip,
+    required this.onTap,
+  });
+
+  final String asset;
+  final String tooltip;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: tooltip,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(18),
+          onTap: onTap,
+          child: Container(
+            padding: const EdgeInsets.all(3),
+            decoration: BoxDecoration(
+              color: Colors.black.withValues(alpha: 0.22),
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.24)),
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(15),
+              child: Image.asset(
+                asset,
+                width: 42,
+                height: 42,
+                fit: BoxFit.cover,
+              ),
+            ),
+          ),
         ),
+      ),
+    );
+  }
+}
+
+class _CitizenIdPlate extends StatelessWidget {
+  const _CitizenIdPlate({required this.idCode});
+
+  final String idCode;
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = context.looTokens;
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(tokens.radiusMd),
+        border: Border.all(color: tokens.cardBorder),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text("公民编号", style: Theme.of(context).textTheme.labelSmall),
+          const SizedBox(height: 6),
+          Text(
+            idCode,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 1.4,
+                ),
+          ),
+        ],
       ),
     );
   }
@@ -634,19 +979,33 @@ class _CitizenMetric extends StatelessWidget {
 class _CitizenProfileView {
   const _CitizenProfileView({
     required this.name,
+    required this.genderLabel,
+    required this.birthDateLabel,
     required this.rankLabel,
     required this.addressLabel,
     required this.idCode,
+    required this.issuedAtLabel,
     required this.wealthSnapshotLabel,
     required this.avatarAsset,
+    required this.rankVisualAsset,
+    required this.addressVisualAsset,
+    required this.rankDetail,
+    required this.addressDetail,
   });
 
   final String name;
+  final String genderLabel;
+  final String birthDateLabel;
   final String rankLabel;
   final String addressLabel;
   final String idCode;
+  final String issuedAtLabel;
   final String wealthSnapshotLabel;
   final String avatarAsset;
+  final String rankVisualAsset;
+  final String addressVisualAsset;
+  final String rankDetail;
+  final String addressDetail;
 
   factory _CitizenProfileView.fromJson(Map<String, dynamic> json) {
     final rank = json["effectiveRank"] as String? ?? "citizen";
@@ -658,12 +1017,38 @@ class _CitizenProfileView {
         .replaceAllMapped(RegExp(r"\B(?=(\d{3})+(?!\d))"), (match) => ",");
     return _CitizenProfileView(
       name: json["citizenName"] as String? ?? "Loo国居民",
+      genderLabel: _genderLabel(json["gender"] as String?),
+      birthDateLabel: _dateLabel(json["birthDate"] as String?),
       rankLabel: _rankLabel(rank),
       addressLabel: _addressLabel(address),
       idCode: json["effectiveIdCode"] as String? ?? "LOO-未颁发",
+      issuedAtLabel: _dateLabel(json["issuedAt"] as String?),
       wealthSnapshotLabel: "CAD $wealthLabel",
       avatarAsset: _avatarAsset(avatar, rank),
+      rankVisualAsset: _rankVisualAsset(rank),
+      addressVisualAsset: _addressVisualAsset(address),
+      rankDetail: _rankDetail(rank),
+      addressDetail: _addressDetail(address),
     );
+  }
+
+  static String _genderLabel(String? value) {
+    return switch (value) {
+      "male" => "男",
+      "female" => "女",
+      _ => "未登记",
+    };
+  }
+
+  static String _dateLabel(String? value) {
+    if (value == null || value.isEmpty) return "未登记";
+    final parsed = DateTime.tryParse(value);
+    if (parsed == null) {
+      return value.length >= 10 ? value.substring(0, 10) : value;
+    }
+    return "${parsed.year.toString().padLeft(4, "0")}/"
+        "${parsed.month.toString().padLeft(2, "0")}/"
+        "${parsed.day.toString().padLeft(2, "0")}";
   }
 
   static String _rankLabel(String value) {
@@ -695,6 +1080,46 @@ class _CitizenProfileView {
       "base-loo" => "assets/images/mascot/rank_base_loo.jpg",
       "general" => "assets/images/mascot/rank_general.jpg",
       _ => "assets/images/mascot/citizen_default.jpg",
+    };
+  }
+
+  static String _rankVisualAsset(String rank) {
+    return switch (rank) {
+      "lowly-ox" => "assets/images/mascot/rank_lowly_ox.jpg",
+      "base-loo" => "assets/images/mascot/rank_base_loo.jpg",
+      "general" => "assets/images/mascot/rank_general.jpg",
+      "emperor" => "assets/images/mascot/loo_king.jpg",
+      _ => "assets/images/mascot/rank_citizen.jpg",
+    };
+  }
+
+  static String _addressVisualAsset(String address) {
+    return switch (address) {
+      "cowshed" => "assets/images/mascot/address_lowly_ox.jpg",
+      "suburbs" => "assets/images/mascot/address_base_loo.jpg",
+      "palace-gate" => "assets/images/mascot/address_general.jpg",
+      "bedchamber" => "assets/images/mascot/address_emperor.jpg",
+      _ => "assets/images/mascot/address_citizen.jpg",
+    };
+  }
+
+  static String _rankDetail(String rank) {
+    return switch (rank) {
+      "lowly-ox" => "刚完成入籍登记的基层档位，代表国库仍在起步积累阶段。",
+      "base-loo" => "已经离开牛棚，进入 Loo国郊区，说明宝库开始形成稳定基础。",
+      "general" => "自动晋升可达到的高阶身份，代表国库规模已接近核心层。",
+      "emperor" => "Loo皇属于最高位阶，通常来自皇令特批或最高等级身份。",
+      _ => "正式 Loo国子民，代表资产配置已经进入更稳定的城内阶段。",
+    };
+  }
+
+  static String _addressDetail(String address) {
+    return switch (address) {
+      "cowshed" => "牛棚是最外层起点住址，适合早期观察与积累阶段。",
+      "suburbs" => "Loo国郊区代表已跨过基础财富门槛，开始拥有稳定席位。",
+      "palace-gate" => "Loo皇殿前说明资产已经逼近核心层，只差一步进入皇室区域。",
+      "bedchamber" => "Loo皇寝宫仅向最高等级开放，是最尊贵的住址层级。",
+      _ => "Loo国城内代表正式居民身份，资产配置进入更成熟的长期阶段。",
     };
   }
 }

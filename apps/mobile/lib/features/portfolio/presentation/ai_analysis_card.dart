@@ -192,22 +192,30 @@ class _AiAnalysisCardState extends State<AiAnalysisCard> {
   }
 
   void _showAnalysisInfoSheet(BuildContext context) {
-    showModalBottomSheet<void>(
+    showLooFloatingSheet<void>(
       context: context,
-      showDragHandle: true,
-      builder: (context) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
+      builder: (context) => Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
             children: [
-              Text("研究台说明", style: Theme.of(context).textTheme.titleLarge),
-              const SizedBox(height: 10),
-              Text(widget.description),
+              Expanded(
+                child: Text(
+                  "研究台说明",
+                  style: Theme.of(context).textTheme.titleLarge,
+                ),
+              ),
+              IconButton(
+                onPressed: () => Navigator.of(context).pop(),
+                icon: const Icon(Icons.close_rounded),
+                tooltip: "关闭",
+              ),
             ],
           ),
-        ),
+          const SizedBox(height: 10),
+          Text(widget.description),
+        ],
       ),
     );
   }
