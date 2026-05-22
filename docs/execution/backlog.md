@@ -126,23 +126,40 @@ This is the current source of truth before starting the next P0 implementation.
 
 Before tagging an MVP baseline, only the following items block signoff:
 
-1. Commit the current mobile-facing copy cleanup so primary cards avoid debug
+1. Verify mobile auth hardening:
+   - login issues access + refresh tokens normally.
+   - refresh rotates the refresh token; the old refresh token cannot be reused.
+   - logout revokes the active refresh token and the app returns to login.
+   - production DB has the `mobile_refresh_tokens` migration applied before
+     deploying the backend that writes refresh-token records.
+2. Commit the current mobile-facing copy cleanup so primary cards avoid debug
    terms such as `cache`, `worker`, raw provider IDs, `fallback`, `DTO`,
    `sourceMode`, and `run-analysis`.
-2. Run the mobile smoke checklist in
+3. Run the mobile smoke checklist in
    `docs/guides/mobile-manual-qa-sop.md`, especially auth/session, Overview,
    国库/portfolio, Health, 进货/recommendations, 上贡/import, Settings,
    AI 大臣, search/watchlist, and Security Detail research.
-3. Verify brokerage import safety:
+4. Verify brokerage import safety:
    - IBKR Flex Query preview and confirm path works once.
    - SnapTrade/Wealthsimple preview and confirm path works once, or an external
      auth blocker is recorded.
    - unresolved holdings can be confirmed, marked as other asset, or skipped.
    - duplicate manual accounts can be force-deleted and the page refreshes.
-4. Verify destructive actions are explicit and scoped: account delete, holding
+   - second sync of the same broker account is reviewed as snapshot merge or
+     snapshot replace; missing holdings must not silently remain without a
+     visible policy decision.
+   - broker-created accounts should not silently take over old manual accounts
+     or legacy provider nickname collisions.
+5. Verify destructive actions are explicit and scoped: account delete, holding
    delete, and brokerage draft confirm must require user action and must not
    silently merge ticker-only identities.
-5. Verify cloud/mobile deployment targets are current:
+6. Verify search/watchlist/observation identity hygiene:
+   - search entries resolve listing identity before entering recent observations.
+   - revisiting the same symbol updates the canonical observation instead of
+     creating naked ticker duplicates.
+   - existing old incomplete observations are cleaned once the same symbol has a
+     complete listing identity.
+7. Verify cloud/mobile deployment targets are current:
    - Vercel backend API is reachable.
    - Cloudflare Pages mobile URL loads the latest build.
    - Worker-driven data such as market pulse/news can be stale or unavailable,

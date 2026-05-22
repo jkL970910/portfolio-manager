@@ -12,6 +12,7 @@ import {
   importJobs,
   investmentAccounts,
   marketSentimentSnapshots,
+  mobileRefreshTokens,
   mobileSecurityObservations,
   portfolioAnalysisGptEnhancements,
   portfolioEvents,
@@ -36,6 +37,7 @@ import {
   ExternalResearchJob,
   ExternalResearchUsageCounter,
   MarketSentimentSnapshot,
+  MobileRefreshTokenRecord,
   MobileSecurityObservation,
   PortfolioAnalysisGptEnhancement,
   PortfolioEvent,
@@ -182,6 +184,21 @@ function mapMobileSecurityObservation(
       row.source as MobileSecurityObservation["source"],
     observationCount: row.observationCount,
     lastObservedAt: row.lastObservedAt.toISOString(),
+    createdAt: row.createdAt.toISOString(),
+    updatedAt: row.updatedAt.toISOString(),
+  };
+}
+
+function mapMobileRefreshToken(
+  row: typeof mobileRefreshTokens.$inferSelect,
+): MobileRefreshTokenRecord {
+  return {
+    id: row.id,
+    userId: row.userId,
+    tokenId: row.tokenId,
+    tokenHash: row.tokenHash,
+    revokedAt: row.revokedAt?.toISOString() ?? null,
+    expiresAt: row.expiresAt.toISOString(),
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   };
@@ -1053,6 +1070,80 @@ export const postgresRepositories: BackendRepositories = {
         orderBy: desc(mobileSecurityObservations.lastObservedAt),
       });
       return rows.map(mapMobileSecurityObservation);
+    },
+    async deleteIncompleteCoveredByCanonical(userId, symbol) {
+      const db = getDb();
+      const normalizedSymbol = symbol.trim().toUpperCase();
+      const canonicalRows = await db.query.mobileSecurityObservations.findMany({
+        where: and(
+          eq(mobileSecurityObservations.userId, userId),
+          eq(mobileSecurityObservations.symbol, normalizedSymbol),
+          sql`${mobileSecurityObservations.exchange} <> ''`,
+          sql`${mobileSecurityObservations.currency} <> ''`,
+        ),
+        limit: 1,
+      });
+      if (canonicalRows.length === 0) {
+        return 0;
+      }
+      const deletedRows = await db
+        .delete(mobileSecurityObservations)
+        .where(
+          and(
+            eq(mobileSecurityObservations.userId, userId),
+            eq(mobileSecurityObservations.symbol, normalizedSymbol),
+            or(
+              eq(mobileSecurityObservations.exchange, ""),
+              eq(mobileSecurityObservations.currency, ""),
+            ),
+          ),
+        )
+        .returning({ id: mobileSecurityObservations.id });
+      return deletedRows.length;
+    },
+  },
+  mobileRefreshTokens: {
+    async create(input) {
+      const db = getDb();
+      const [row] = await db
+        .insert(mobileRefreshTokens)
+        .values({
+          userId: input.userId,
+          tokenId: input.tokenId,
+          tokenHash: input.tokenHash,
+          expiresAt: input.expiresAt,
+        })
+        .returning();
+      if (!row) {
+        throw new Error("Failed to create mobile refresh token.");
+      }
+      return mapMobileRefreshToken(row);
+    },
+    async getByTokenId(tokenId) {
+      const db = getDb();
+      const row = await db.query.mobileRefreshTokens.findFirst({
+        where: eq(mobileRefreshTokens.tokenId, tokenId),
+      });
+      return row ? mapMobileRefreshToken(row) : null;
+    },
+    async revoke(tokenId, now) {
+      const db = getDb();
+      await db
+        .update(mobileRefreshTokens)
+        .set({ revokedAt: now, updatedAt: now })
+        .where(eq(mobileRefreshTokens.tokenId, tokenId));
+    },
+    async revokeAllForUser(userId, now) {
+      const db = getDb();
+      await db
+        .update(mobileRefreshTokens)
+        .set({ revokedAt: now, updatedAt: now })
+        .where(
+          and(
+            eq(mobileRefreshTokens.userId, userId),
+            isNull(mobileRefreshTokens.revokedAt),
+          ),
+        );
     },
   },
   preferences: {

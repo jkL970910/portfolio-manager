@@ -16,6 +16,7 @@ import {
   SecurityPriceHistoryPoint,
   SecurityRecord,
   MarketSentimentSnapshot,
+  MobileRefreshTokenRecord,
   MobileSecurityObservation,
   PortfolioAnalysisGptEnhancement,
   PreferenceProfile,
@@ -139,6 +140,22 @@ export interface MobileSecurityObservationRepository {
     userId: EntityId,
     symbol: string,
   ): Promise<MobileSecurityObservation[]>;
+  deleteIncompleteCoveredByCanonical(
+    userId: EntityId,
+    symbol: string,
+  ): Promise<number>;
+}
+
+export interface MobileRefreshTokenRepository {
+  create(input: {
+    userId: EntityId;
+    tokenId: string;
+    tokenHash: string;
+    expiresAt: Date;
+  }): Promise<MobileRefreshTokenRecord>;
+  getByTokenId(tokenId: string): Promise<MobileRefreshTokenRecord | null>;
+  revoke(tokenId: string, now: Date): Promise<void>;
+  revokeAllForUser(userId: EntityId, now: Date): Promise<void>;
 }
 
 export interface PreferenceRepository {
@@ -286,6 +303,7 @@ export interface BackendRepositories {
   securityPriceHistory: SecurityPriceHistoryRepository;
   securities: SecurityRepository;
   mobileSecurityObservations: MobileSecurityObservationRepository;
+  mobileRefreshTokens: MobileRefreshTokenRepository;
   preferences: PreferenceRepository;
   recommendations: RecommendationRepository;
   recommendationDynamicCandidates: RecommendationDynamicCandidateRepository;

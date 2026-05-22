@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { mobileAuthRefreshSchema } from "@/lib/backend/payload-schemas";
 import { getViewerByUserId } from "@/lib/auth/session";
-import { issueMobileAuthTokens, verifyMobileToken } from "@/lib/auth/mobile-tokens";
+import { issueMobileAuthTokens, rotateMobileRefreshToken } from "@/lib/auth/mobile-tokens";
 
 export async function POST(request: NextRequest) {
   const body = await request.json();
@@ -11,7 +11,7 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const payload = await verifyMobileToken(parsed.data.refreshToken, "refresh");
+    const payload = await rotateMobileRefreshToken(parsed.data.refreshToken);
     if (!payload.sub) {
       return NextResponse.json({ error: "Refresh token is missing a subject." }, { status: 401 });
     }

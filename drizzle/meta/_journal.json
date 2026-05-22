@@ -239,6 +239,13 @@
       "when": 1779386400000,
       "tag": "0033_external_service_credentials",
       "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "7",
+      "when": 1779478800000,
+      "tag": "0034_mobile_refresh_tokens",
+      "breakpoints": true
     }
   ]
 }

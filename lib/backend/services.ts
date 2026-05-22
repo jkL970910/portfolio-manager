@@ -2435,7 +2435,7 @@ export async function recordMobileSecurityObservation(
     name = name || security.name;
   }
 
-  return repositories.mobileSecurityObservations.upsert({
+  const observation = await repositories.mobileSecurityObservations.upsert({
     userId,
     securityId,
     symbol,
@@ -2445,6 +2445,12 @@ export async function recordMobileSecurityObservation(
     source: input.source,
     observedAt: new Date(),
   });
+  if (exchange && currency) {
+    await repositories.mobileSecurityObservations
+      .deleteIncompleteCoveredByCanonical(userId, symbol)
+      .catch(() => 0);
+  }
+  return observation;
 }
 
 export async function updateHoldingPosition(
@@ -4084,6 +4090,7 @@ export async function confirmBrokerageImportDraft(
       preview.provider === "snaptrade" ? "Wealthsimple" : "Interactive Brokers";
     const accountPrefix =
       preview.provider === "snaptrade" ? "Wealthsimple" : "IBKR";
+    const brokerageAccountMarker = `${accountPrefix}:`;
     const eventSource =
       preview.provider === "snaptrade"
         ? "snaptrade-import"
@@ -4092,9 +4099,10 @@ export async function confirmBrokerageImportDraft(
     for (const sourceAccount of importableAccounts) {
       holdingsSkipped += sourceAccount.skippedHoldingCount;
       const currency = normalizeCurrencyCode(sourceAccount.currency);
-      const nickname = `${accountPrefix} ${sourceAccount.accountId}`;
+      const sourceAccountId = sourceAccount.accountId.trim();
+      const nickname = `${brokerageAccountMarker}${sourceAccountId}`;
       const accountType = inferBrokerageAccountType(
-        `${sourceAccount.accountType} ${sourceAccount.accountId}`,
+        `${sourceAccount.accountType} ${sourceAccountId}`,
       );
       const accountMarketValueAmount =
         sourceAccount.netLiquidation ??
@@ -4112,6 +4120,20 @@ export async function confirmBrokerageImportDraft(
           eq(investmentAccounts.nickname, nickname),
         ),
       });
+      const legacyAccount = existingAccount
+        ? null
+        : await tx.query.investmentAccounts.findFirst({
+            where: and(
+              eq(investmentAccounts.userId, userId),
+              eq(investmentAccounts.institution, institution),
+              eq(investmentAccounts.nickname, `${accountPrefix} ${sourceAccountId}`),
+            ),
+          });
+      if (legacyAccount) {
+        throw new Error(
+          `Brokerage account ${sourceAccountId} uses an older account identity. Rename or merge the existing account before syncing this provider again.`,
+        );
+      }
       const accountRow =
         existingAccount ??
         (

@@ -611,8 +611,14 @@ class LooApiClient {
     );
   }
 
-  Future<void> logout() async {
-    await _postJson("/api/mobile/auth/logout");
+  Future<void> logout({String? refreshToken}) async {
+    await _postJson(
+      "/api/mobile/auth/logout",
+      body: {
+        if (refreshToken != null && refreshToken.isNotEmpty)
+          "refreshToken": refreshToken,
+      },
+    );
   }
 
   Future<Map<String, dynamic>> _getJson(String path) async {

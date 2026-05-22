@@ -39,6 +39,36 @@ export const users = pgTable(
   }),
 );
 
+export const mobileRefreshTokens = pgTable(
+  "mobile_refresh_tokens",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id),
+    tokenId: varchar("token_id", { length: 64 }).notNull(),
+    tokenHash: varchar("token_hash", { length: 128 }).notNull(),
+    revokedAt: timestamp("revoked_at", { withTimezone: true }),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => ({
+    tokenUniqueIdx: uniqueIndex("mobile_refresh_tokens_token_id_idx").on(
+      table.tokenId,
+    ),
+    userActiveIdx: index("mobile_refresh_tokens_user_active_idx").on(
+      table.userId,
+      table.revokedAt,
+      table.expiresAt,
+    ),
+  }),
+);
+
 export const citizenProfiles = pgTable(
   "citizen_profiles",
   {

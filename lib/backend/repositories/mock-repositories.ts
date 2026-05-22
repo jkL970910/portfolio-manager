@@ -19,6 +19,7 @@ import {
 import {
   ExternalResearchDocumentRecord,
   MarketSentimentSnapshot,
+  MobileRefreshTokenRecord,
   MobileSecurityObservation,
   PortfolioAnalysisGptEnhancement,
   PortfolioAnalysisRun,
@@ -39,6 +40,7 @@ const externalResearchUsageCounters: ExternalResearchUsageCounter[] = [];
 const externalResearchDocuments: ExternalResearchDocumentRecord[] = [];
 const marketSentimentSnapshots: MarketSentimentSnapshot[] = [];
 const mobileSecurityObservations: MobileSecurityObservation[] = [];
+const mobileRefreshTokens: MobileRefreshTokenRecord[] = [];
 const recommendationDynamicCandidates: RecommendationDynamicCandidateRecord[] = [];
 
 export const mockRepositories: BackendRepositories = {
@@ -308,6 +310,67 @@ export const mockRepositories: BackendRepositories = {
           (left, right) =>
             Date.parse(right.lastObservedAt) - Date.parse(left.lastObservedAt),
         );
+    },
+    async deleteIncompleteCoveredByCanonical(userId, symbol) {
+      const normalizedSymbol = symbol.trim().toUpperCase();
+      const hasCanonical = mobileSecurityObservations.some(
+        (item) =>
+          item.userId === userId &&
+          item.symbol === normalizedSymbol &&
+          item.exchange &&
+          item.currency,
+      );
+      if (!hasCanonical) {
+        return 0;
+      }
+      let deleted = 0;
+      for (let index = mobileSecurityObservations.length - 1; index >= 0; index -= 1) {
+        const item = mobileSecurityObservations[index];
+        if (
+          item.userId === userId &&
+          item.symbol === normalizedSymbol &&
+          (!item.exchange || !item.currency)
+        ) {
+          mobileSecurityObservations.splice(index, 1);
+          deleted += 1;
+        }
+      }
+      return deleted;
+    },
+  },
+  mobileRefreshTokens: {
+    async create(input) {
+      const now = new Date().toISOString();
+      const record: MobileRefreshTokenRecord = {
+        id: `mobile_refresh_token_${mobileRefreshTokens.length + 1}`,
+        userId: input.userId,
+        tokenId: input.tokenId,
+        tokenHash: input.tokenHash,
+        revokedAt: null,
+        expiresAt: input.expiresAt.toISOString(),
+        createdAt: now,
+        updatedAt: now,
+      };
+      mobileRefreshTokens.push(record);
+      return record;
+    },
+    async getByTokenId(tokenId) {
+      return mobileRefreshTokens.find((item) => item.tokenId === tokenId) ?? null;
+    },
+    async revoke(tokenId, now) {
+      const record = mobileRefreshTokens.find((item) => item.tokenId === tokenId);
+      if (record) {
+        record.revokedAt = now.toISOString();
+        record.updatedAt = now.toISOString();
+      }
+    },
+    async revokeAllForUser(userId, now) {
+      for (const record of mobileRefreshTokens) {
+        if (record.userId === userId && !record.revokedAt) {
+          record.revokedAt = now.toISOString();
+          record.updatedAt = now.toISOString();
+        }
+      }
     },
   },
   preferences: {

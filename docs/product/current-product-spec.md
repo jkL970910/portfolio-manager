@@ -117,10 +117,13 @@ Approved direction as of 2026-05-11:
 ### 1. Authentication And Session
 
 - Mobile login/session persistence exists.
+- Mobile refresh tokens are server-tracked and rotate on refresh; logout revokes
+  the active refresh token so a logged-out session cannot silently refresh.
 - AI 大臣 chat session continuity exists: closing and reopening the floating
   sheet should restore the latest session, and recent conversations can be
   reopened or deleted.
-- Future hardening: revocable refresh tokens and production auth/storage policy.
+- Future hardening: stricter mobile-only bearer enforcement and broader
+  production auth/storage policy.
 
 ### 2. Portfolio Overview
 

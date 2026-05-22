@@ -561,7 +561,8 @@ class _LooWealthAppState extends State<LooWealthApp> {
     final session = _session;
     if (session != null) {
       try {
-        await LooApiClient(accessToken: session.accessToken).logout();
+        await LooApiClient(accessToken: session.accessToken)
+            .logout(refreshToken: session.refreshToken);
       } catch (_) {}
     }
 

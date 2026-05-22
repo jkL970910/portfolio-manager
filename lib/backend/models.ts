@@ -173,6 +173,17 @@ export interface MobileSecurityObservation {
   updatedAt: string;
 }
 
+export interface MobileRefreshTokenRecord {
+  id: EntityId;
+  userId: EntityId;
+  tokenId: string;
+  tokenHash: string;
+  revokedAt: string | null;
+  expiresAt: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export type SecurityMetadataSource =
   | "manual"
   | "provider"

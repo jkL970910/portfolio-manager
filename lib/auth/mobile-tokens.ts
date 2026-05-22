@@ -1,5 +1,7 @@
 import { jwtVerify, SignJWT } from "jose";
+import { createHash, randomUUID } from "node:crypto";
 import type { NextRequest } from "next/server";
+import { getRepositories } from "@/lib/backend/repositories/factory";
 import { getAuthenticatedUserId, getViewerByUserId, type Viewer } from "@/lib/auth/session";
 
 type MobileTokenType = "access" | "refresh";
@@ -9,6 +11,7 @@ type MobileTokenPayload = {
   type: MobileTokenType;
   email: string;
   displayName: string;
+  jti?: string;
 };
 
 const ACCESS_TOKEN_TTL_SECONDS = 60 * 60;
@@ -18,11 +21,21 @@ function getAuthSecret() {
   return new TextEncoder().encode(process.env.AUTH_SECRET ?? "dev-only-auth-secret-change-me");
 }
 
-async function signMobileToken(viewer: Viewer, type: MobileTokenType, ttlSeconds: number) {
+function hashRefreshToken(token: string) {
+  return createHash("sha256").update(token).digest("hex");
+}
+
+async function signMobileToken(
+  viewer: Viewer,
+  type: MobileTokenType,
+  ttlSeconds: number,
+  tokenId?: string,
+) {
   return new SignJWT({
     email: viewer.email,
     displayName: viewer.displayName,
     type,
+    ...(tokenId ? { jti: tokenId } : {}),
   })
     .setProtectedHeader({ alg: "HS256" })
     .setSubject(viewer.id)
@@ -33,7 +46,19 @@ async function signMobileToken(viewer: Viewer, type: MobileTokenType, ttlSeconds
 
 export async function issueMobileAuthTokens(viewer: Viewer) {
   const accessToken = await signMobileToken(viewer, "access", ACCESS_TOKEN_TTL_SECONDS);
-  const refreshToken = await signMobileToken(viewer, "refresh", REFRESH_TOKEN_TTL_SECONDS);
+  const refreshTokenId = randomUUID();
+  const refreshToken = await signMobileToken(
+    viewer,
+    "refresh",
+    REFRESH_TOKEN_TTL_SECONDS,
+    refreshTokenId,
+  );
+  await getRepositories().mobileRefreshTokens.create({
+    userId: viewer.id,
+    tokenId: refreshTokenId,
+    tokenHash: hashRefreshToken(refreshToken),
+    expiresAt: new Date(Date.now() + REFRESH_TOKEN_TTL_SECONDS * 1000),
+  });
 
   return {
     accessToken,
@@ -50,6 +75,41 @@ export async function verifyMobileToken(token: string, expectedType: MobileToken
     throw new Error("Invalid token type.");
   }
   return verified.payload;
+}
+
+export async function verifyMobileRefreshToken(token: string) {
+  const payload = await verifyMobileToken(token, "refresh");
+  if (!payload.jti) {
+    throw new Error("Refresh token is missing server id.");
+  }
+  const record = await getRepositories().mobileRefreshTokens.getByTokenId(
+    payload.jti,
+  );
+  if (
+    !record ||
+    record.userId !== payload.sub ||
+    record.revokedAt ||
+    Date.parse(record.expiresAt) <= Date.now() ||
+    record.tokenHash !== hashRefreshToken(token)
+  ) {
+    throw new Error("Refresh token was revoked or is invalid.");
+  }
+  return payload;
+}
+
+export async function revokeMobileRefreshToken(token: string) {
+  const payload = await verifyMobileToken(token, "refresh");
+  if (payload.jti) {
+    await getRepositories().mobileRefreshTokens.revoke(payload.jti, new Date());
+  }
+}
+
+export async function rotateMobileRefreshToken(token: string) {
+  const payload = await verifyMobileRefreshToken(token);
+  if (payload.jti) {
+    await getRepositories().mobileRefreshTokens.revoke(payload.jti, new Date());
+  }
+  return payload;
 }
 
 function readBearerToken(request: NextRequest) {
