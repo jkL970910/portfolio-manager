@@ -42,8 +42,8 @@ class LooBottomNavBar extends StatelessWidget {
     final tokens = context.looTokens;
     final theme = Theme.of(context);
     final dark = theme.brightness == Brightness.dark;
-    final surface = dark ? const Color(0x661B0C13) : const Color(0xB8FFF7F9);
-    final selectedText = dark ? Colors.white : const Color(0xFF3B1425);
+    final surface = dark ? const Color(0x661B0C13) : const Color(0xBAFFF8E1);
+    final selectedText = dark ? Colors.white : const Color(0xFF3A2023);
     final unselectedText = dark ? Colors.white70 : tokens.mutedText;
     final selectedGradient = LinearGradient(
       begin: Alignment.topLeft,
@@ -54,8 +54,8 @@ class LooBottomNavBar extends StatelessWidget {
               Color(0xCCC85078),
             ]
           : const [
-              Color(0xD9F7A1B9),
-              Color(0xE6E45F88),
+              Color(0xE6F8BBD0),
+              Color(0xE6FF6F61),
             ],
     );
 
