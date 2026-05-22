@@ -275,9 +275,8 @@ class _LooWealthAppState extends State<LooWealthApp> {
         return true;
       case "discover":
       case "security-discover":
-        return _pushMinisterPage(
-          DiscoverPage(apiClient: _currentApiClient),
-        );
+        _router.push(MobileRoutes.discover);
+        return true;
       case "import":
         _router.go(MobileRoutes.importFlow);
         return true;
@@ -288,14 +287,14 @@ class _LooWealthAppState extends State<LooWealthApp> {
         return true;
       case "portfolio-health":
       case "health-score":
-        return _pushMinisterPage(
-          HealthScorePage(
-            apiClient: _currentApiClient,
-            accountId: _targetString(action, "accountId") ??
-                _ministerContext?.subject.accountId,
-            fallbackTitle: "健康巡查",
-          ),
+        final accountId = _targetString(action, "accountId") ??
+            _ministerContext?.subject.accountId;
+        _router.push(
+          accountId == null || accountId.isEmpty
+              ? MobileRoutes.portfolioHealth
+              : MobileRoutes.portfolioHealthForAccount(accountId),
         );
+        return true;
       case "account-detail":
         final accountId = _targetString(action, "accountId") ??
             _ministerContext?.subject.accountId;
@@ -353,15 +352,6 @@ class _LooWealthAppState extends State<LooWealthApp> {
       refreshAccessToken: _refreshAccessToken,
       onUnauthorized: _clearSession,
     );
-  }
-
-  bool _pushMinisterPage(Widget page) {
-    final navigator = _navigatorKey.currentState;
-    if (navigator == null) {
-      return false;
-    }
-    navigator.push(MaterialPageRoute<void>(builder: (_) => page));
-    return true;
   }
 
   String? _pageForScope(String? scope) {
@@ -478,10 +468,15 @@ class _LooWealthAppState extends State<LooWealthApp> {
         ),
         GoRoute(
           path: MobileRoutes.portfolioHealth,
-          builder: (context, state) => HealthScorePage(
-            apiClient: _currentApiClient,
-            fallbackTitle: "健康巡查",
-          ),
+          builder: (context, state) {
+            final accountId = state.uri.queryParameters["accountId"];
+            return HealthScorePage(
+              apiClient: _currentApiClient,
+              accountId:
+                  accountId == null || accountId.isEmpty ? null : accountId,
+              fallbackTitle: "健康巡查",
+            );
+          },
         ),
         GoRoute(
           path: "/securities/:symbol",
@@ -504,6 +499,12 @@ class _LooWealthAppState extends State<LooWealthApp> {
             context,
             currentIndex: 2,
             child: RecommendationsPage(apiClient: _currentApiClient),
+          ),
+        ),
+        GoRoute(
+          path: MobileRoutes.discover,
+          builder: (context, state) => DiscoverPage(
+            apiClient: _currentApiClient,
           ),
         ),
         GoRoute(

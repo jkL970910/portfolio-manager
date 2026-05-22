@@ -132,6 +132,9 @@ export function classifyLooMinisterIntent(
   ) {
     addScore(scores, reasons, "portfolio_analysis", 5, "portfolio terms");
   }
+  if (has(text, /整体持仓|持仓最大|持仓风险|持仓.*调整|仓位.*调整/)) {
+    addScore(scores, reasons, "portfolio_analysis", 6, "holding risk terms");
+  }
   if (has(text, /health|健康|评分|雷达|风险护栏|分数|巡查/)) {
     addScore(scores, reasons, "portfolio_analysis", 5, "health terms");
   }
@@ -180,6 +183,18 @@ export function classifyLooMinisterIntent(
   const asksPortfolioImpact =
     has(text, /影响|导致|会不会|是否会|变化|改变/) &&
     has(text, /组合|配置|health|健康|超配|低配|占比/);
+  const asksExistingPortfolioLookup =
+    has(text, /已有持仓|持仓里|当前持仓|类似标的|相似标的|我持有|我有/) &&
+    has(text, /持仓|标的|股票|etf|基金/);
+  if (asksExistingPortfolioLookup) {
+    addScore(
+      scores,
+      reasons,
+      "portfolio_analysis",
+      5,
+      "existing holding lookup",
+    );
+  }
   if (asksPortfolioImpact) {
     addScore(
       scores,
@@ -193,7 +208,8 @@ export function classifyLooMinisterIntent(
     page === "import" &&
     scores.import_workflow > 0 &&
     scores.portfolio_analysis > 0 &&
-    !asksPortfolioImpact
+    !asksPortfolioImpact &&
+    !asksExistingPortfolioLookup
   ) {
     scores.portfolio_analysis -= 5;
     reasons.push("portfolio_analysis-5: import page account/config conflict");
@@ -246,6 +262,14 @@ export function getMinisterContextSelectionPolicy(
     includesIntent(classified, "portfolio_analysis") ||
     includesIntent(classified, "recommendation_explain") ||
     includesIntent(classified, "candidate_fit");
+  const importOnly =
+    classified.primary === "import_workflow" &&
+    !classified.secondary.some(
+      (intent) =>
+        intent === "portfolio_analysis" ||
+        intent === "recommendation_explain" ||
+        intent === "candidate_fit",
+    );
   const security =
     includesIntent(classified, "security_research") ||
     includesIntent(classified, "candidate_fit");
@@ -255,8 +279,7 @@ export function getMinisterContextSelectionPolicy(
       includesIntent(classified, "daily_intelligence") ||
       includesIntent(classified, "security_research") ||
       includesIntent(classified, "recommendation_explain"),
-    includeGlobalUserContext:
-      portfolio || includesIntent(classified, "import_workflow"),
+    includeGlobalUserContext: portfolio || !importOnly,
     includePortfolioContext: portfolio,
     includeSecurityContext: security,
     includeCandidateFit: includesIntent(classified, "candidate_fit"),
@@ -315,6 +338,12 @@ export function selectMinisterFactsForIntent(
       return true;
     }
     if (fact.source === "user-input") {
+      return true;
+    }
+    if (
+      includesIntent(classified, "portfolio_analysis") &&
+      fact.source === "portfolio-data"
+    ) {
       return true;
     }
     if (

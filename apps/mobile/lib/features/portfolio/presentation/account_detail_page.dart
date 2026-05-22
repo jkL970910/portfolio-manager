@@ -14,7 +14,6 @@ import "../data/mobile_portfolio_models.dart";
 import "../../shared/presentation/loo_charts.dart";
 import "../../shared/presentation/loo_minister_scope.dart";
 import "detail_state_widgets.dart";
-import "health_score_page.dart";
 
 class AccountDetailPage extends StatefulWidget {
   const AccountDetailPage({
@@ -173,15 +172,8 @@ class _AccountDetailPageState extends State<AccountDetailPage> {
         data: data,
         onOpenFullHealth: () {
           Navigator.of(context).pop();
-          Navigator.of(context).push(
-            MaterialPageRoute<void>(
-              builder: (_) => HealthScorePage(
-                apiClient: widget.apiClient,
-                accountId: widget.accountId,
-                fallbackTitle: "${data.name}健康巡查",
-              ),
-            ),
-          );
+          context
+              .push(MobileRoutes.portfolioHealthForAccount(widget.accountId));
         },
       ),
     );
@@ -409,9 +401,8 @@ class _AccountCleanupSheetState extends State<_AccountCleanupSheet> {
               const SizedBox(height: 10),
               _CleanupActionTile(
                 title: "强制删除账户及持仓",
-                detail: _deleting
-                    ? "正在删除账户和持仓..."
-                    : "直接删除当前账户和全部持仓。适合清理重复手动导入账户。",
+                detail:
+                    _deleting ? "正在删除账户和持仓..." : "直接删除当前账户和全部持仓。适合清理重复手动导入账户。",
                 icon: Icons.warning_amber_rounded,
                 destructive: true,
                 trailing: _deleting
@@ -435,7 +426,8 @@ class _AccountCleanupSheetState extends State<_AccountCleanupSheet> {
                   if (snapshot.hasError) {
                     return Text(
                       snapshot.error.toString(),
-                      style: TextStyle(color: Theme.of(context).colorScheme.error),
+                      style:
+                          TextStyle(color: Theme.of(context).colorScheme.error),
                     );
                   }
                   final accounts = snapshot.data ?? const <MobileAccountCard>[];
@@ -465,7 +457,8 @@ class _AccountCleanupSheetState extends State<_AccountCleanupSheet> {
                             .toList(),
                         onChanged: _merging
                             ? null
-                            : (value) => setState(() => _targetAccountId = value),
+                            : (value) =>
+                                setState(() => _targetAccountId = value),
                       ),
                       const SizedBox(height: 10),
                       SizedBox(
@@ -476,7 +469,8 @@ class _AccountCleanupSheetState extends State<_AccountCleanupSheet> {
                               ? const SizedBox(
                                   width: 16,
                                   height: 16,
-                                  child: CircularProgressIndicator(strokeWidth: 2),
+                                  child:
+                                      CircularProgressIndicator(strokeWidth: 2),
                                 )
                               : const Icon(Icons.merge_type_rounded),
                           label: Text(_merging ? "合并中..." : "确认合并"),
@@ -934,7 +928,7 @@ class MobileAccountHealthScore {
 
   final String score;
   final String status;
-  final List<MobileHealthRadarPoint> radar;
+  final List<MobileAccountHealthRadarPoint> radar;
   final List<String> highlights;
   final List<String> actions;
 
@@ -946,12 +940,30 @@ class MobileAccountHealthScore {
       score: "${json["score"] ?? "--"} 分",
       status: json["status"] as String? ?? "待评估",
       radar: readJsonList(json, "radar")
-          .map(MobileHealthRadarPoint.fromJson)
+          .map(MobileAccountHealthRadarPoint.fromJson)
           .toList(),
       highlights: (json["highlights"] as List?)?.whereType<String>().toList() ??
           const [],
       actions: (json["actionQueue"] as List?)?.whereType<String>().toList() ??
           const [],
+    );
+  }
+}
+
+class MobileAccountHealthRadarPoint {
+  const MobileAccountHealthRadarPoint({
+    required this.dimension,
+    required this.value,
+  });
+
+  final String dimension;
+  final double value;
+
+  factory MobileAccountHealthRadarPoint.fromJson(Map<String, dynamic> json) {
+    final rawValue = json["value"];
+    return MobileAccountHealthRadarPoint(
+      dimension: json["dimension"] as String? ?? "未知维度",
+      value: rawValue is num ? rawValue.toDouble().clamp(0, 100) : 0,
     );
   }
 }

@@ -10,7 +10,6 @@ import "../../../core/theme/loo_theme.dart";
 import "../../intelligence/data/daily_intelligence_models.dart";
 import "../../intelligence/presentation/daily_intelligence_card.dart";
 import "../data/mobile_home_models.dart";
-import "../../portfolio/presentation/health_score_page.dart";
 import "../../shared/data/mobile_chart_models.dart";
 import "../../shared/data/mobile_models.dart";
 import "../../shared/presentation/loo_charts.dart";
@@ -220,11 +219,7 @@ class _OverviewPageState extends State<OverviewPage> {
   }
 
   void _openHealthScore() {
-    Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (_) => HealthScorePage(apiClient: widget.apiClient),
-      ),
-    );
+    context.push(MobileRoutes.portfolioHealth);
   }
 }
 
@@ -369,7 +364,8 @@ class _OverviewSummaryPanel extends StatelessWidget {
     final total = _metricByLabel(snapshot.metrics, "总资产");
     final allTimeReturn = _metricByLabel(snapshot.metrics, "累计收益") ??
         _metricByLabel(snapshot.metrics, "All-time return");
-    final available = _metricByLabel(snapshot.metrics, "可用额度");
+    final registeredRoom = _metricByLabel(snapshot.metrics, "注册额度") ??
+        _metricByLabel(snapshot.metrics, "可用额度");
     final risk = _metricByLabel(snapshot.metrics, "风险风格");
     final health = _metricByLabel(snapshot.metrics, "组合健康分");
 
@@ -377,7 +373,7 @@ class _OverviewSummaryPanel extends StatelessWidget {
       children: [
         _AssetHeroCard(
           total: total,
-          available: available,
+          registeredRoom: registeredRoom,
           risk: risk,
           allTimeReturn: allTimeReturn,
           chart: snapshot.netWorthChart,
@@ -435,7 +431,7 @@ class _OverviewSummaryPanel extends StatelessWidget {
 class _AssetHeroCard extends StatelessWidget {
   const _AssetHeroCard({
     required this.total,
-    required this.available,
+    required this.registeredRoom,
     required this.risk,
     required this.allTimeReturn,
     required this.chart,
@@ -443,7 +439,7 @@ class _AssetHeroCard extends StatelessWidget {
   });
 
   final MobileMetric? total;
-  final MobileMetric? available;
+  final MobileMetric? registeredRoom;
   final MobileMetric? risk;
   final MobileMetric? allTimeReturn;
   final MobileChartSeries? chart;
@@ -512,17 +508,17 @@ class _AssetHeroCard extends StatelessWidget {
                 children: [
                   Expanded(
                     child: _AssetMiniMetric(
-                      label: available?.label ?? "可用额度",
-                      value: available?.value ?? "--",
+                      label: registeredRoom?.label ?? "注册额度",
+                      value: registeredRoom?.value ?? "--",
                       valueColor: theme.colorScheme.onSurface,
                     ),
                   ),
                   SizedBox(height: tokens.gapSm),
                   Expanded(
                     child: _AssetMiniMetric(
-                      label: risk?.label ?? "风险风格",
-                      value: risk?.value ?? "待设置",
-                      valueColor: tokens.accent,
+                      label: "购买力",
+                      value: "待接入",
+                      valueColor: tokens.mutedText,
                     ),
                   ),
                 ],

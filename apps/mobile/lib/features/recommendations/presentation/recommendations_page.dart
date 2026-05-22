@@ -7,7 +7,6 @@ import "../../../app/mobile_routes.dart";
 import "../../../core/api/loo_api_client.dart";
 import "../../../core/presentation/loo_components.dart";
 import "../../../core/theme/loo_theme.dart";
-import "../../discover/presentation/discover_page.dart";
 import "../data/mobile_recommendation_models.dart";
 
 class RecommendationsPage extends StatefulWidget {
@@ -294,11 +293,7 @@ class _RecommendationsPageState extends State<RecommendationsPage> {
   }
 
   Future<void> _openDiscover() async {
-    await Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (_) => DiscoverPage(apiClient: widget.apiClient),
-      ),
-    );
+    await context.push(MobileRoutes.discover);
     if (!mounted) {
       return;
     }

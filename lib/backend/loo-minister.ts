@@ -2136,8 +2136,21 @@ function buildPortfolioContextAnswer(input: LooMinisterQuestionRequest) {
     .sort(
       (left, right) => Math.abs(right.gapPct ?? 0) - Math.abs(left.gapPct ?? 0),
     )[0];
+  const pageFacts = input.pageContext.facts.filter(
+    (fact) =>
+      fact.source === "portfolio-data" &&
+      ![
+        "portfolio-context",
+        "portfolio-context-summary",
+        "portfolio-context-allocation",
+        "portfolio-context-health",
+      ].includes(fact.id),
+  );
 
   return [
+    ...pageFacts
+      .slice(0, 2)
+      .map((fact) => `${fact.label}：${fact.value}。`),
     `整体看，当前净资产为 ${formatCad(context.summary.totalNetWorthCad)}，其中投资资产 ${formatCad(context.summary.totalMarketValueCad)}，现金 ${formatCad(context.summary.cashBalanceCad)}。`,
     `账户与持仓：${context.summary.accountCount} 个投资账户，${context.summary.holdingCount} 个持仓；最大持仓 ${context.summary.topHolding ?? "未记录"}；前五大持仓约 ${formatPct(context.concentration.topFiveWeightPct)}。`,
     leadGap

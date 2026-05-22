@@ -2240,7 +2240,9 @@ class _ResearchUpdateStatusChips extends StatelessWidget {
         data.priceHistoryChart!.freshness.label,
     ]) {
       final normalized = label.trim();
-      if (normalized.isEmpty || seen.contains(normalized)) {
+      if (normalized.isEmpty ||
+          seen.contains(normalized) ||
+          _statusLabelsAreEquivalent(trust.label, normalized)) {
         continue;
       }
       seen.add(normalized);
@@ -2259,6 +2261,15 @@ class _ResearchUpdateStatusChips extends StatelessWidget {
       ],
     );
   }
+}
+
+bool _statusLabelsAreEquivalent(String left, String right) {
+  final normalizedLeft = left.trim();
+  final normalizedRight = right.trim();
+  if (normalizedLeft == normalizedRight) return true;
+  const availableLabels = {"数据较新", "报价较新", "走势可用", "可用于快扫"};
+  return availableLabels.contains(normalizedLeft) &&
+      availableLabels.contains(normalizedRight);
 }
 
 class _ResearchRefreshSnapshot {

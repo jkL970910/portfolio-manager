@@ -2492,7 +2492,7 @@ export function buildDashboardData(args: {
         ),
       },
       {
-        label: pick(language, "可用额度", "Available Room"),
+        label: pick(language, "注册额度", "Registered Room"),
         value: formatDisplayCurrency(availableRoom, display),
         detail: pick(
           language,
@@ -4228,6 +4228,16 @@ export function buildPortfolioSecurityDetailData(args: {
       : priceHistoryChart.freshness.status === "stale"
         ? "warning"
         : "neutral";
+  const securityFreshnessVariant =
+    referenceViewHolding?.freshnessVariant ??
+    (chartBackedStatus ? chartFreshnessVariant : "neutral");
+  const securityQuoteStatusLabel = referenceHolding
+    ? getHoldingQuoteStatusLabel(referenceHolding, language)
+    : chartBackedStatus
+      ? chartQuoteStatusLabel
+      : priceHistoryChart.freshness.status === "fallback"
+        ? pick(language, "报价待补充", "Quote pending")
+        : pick(language, "报价待确认", "Quote unverified");
 
   return {
     displayContext: portfolio.displayContext,
@@ -4261,15 +4271,9 @@ export function buildPortfolioSecurityDetailData(args: {
         referenceViewHolding?.lastUpdated ??
         (chartBackedStatus ? chartTimestampLabel : null) ??
         pick(language, "还没刷新过", "Not refreshed yet"),
-      freshnessVariant:
-        referenceViewHolding?.freshnessVariant ??
-        (chartBackedStatus ? chartFreshnessVariant : "neutral"),
+      freshnessVariant: securityFreshnessVariant,
       quoteStatus: referenceHolding?.quoteStatus ?? null,
-      quoteStatusLabel: referenceHolding
-        ? getHoldingQuoteStatusLabel(referenceHolding, language)
-        : chartBackedStatus
-          ? chartQuoteStatusLabel
-          : pick(language, "报价待确认", "Quote unverified"),
+      quoteStatusLabel: securityQuoteStatusLabel,
     },
     facts: [
       {

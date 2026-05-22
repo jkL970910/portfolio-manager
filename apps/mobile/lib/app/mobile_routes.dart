@@ -7,6 +7,7 @@ class MobileRoutes {
   static const portfolioHoldings = "/portfolio/holdings";
   static const portfolioHealth = "/portfolio/health";
   static const recommendations = "/recommendations";
+  static const discover = "/discover";
   static const importFlow = "/import";
   static const settings = "/settings";
 
@@ -16,6 +17,14 @@ class MobileRoutes {
 
   static String holdingDetail(String holdingId) {
     return "/portfolio/holdings/${_encode(holdingId)}";
+  }
+
+  static String portfolioHealthForAccount(String accountId) {
+    final trimmed = accountId.trim();
+    if (trimmed.isEmpty) {
+      return portfolioHealth;
+    }
+    return "$portfolioHealth?accountId=${_encode(trimmed)}";
   }
 
   static String securityDetail({

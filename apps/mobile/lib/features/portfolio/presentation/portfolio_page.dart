@@ -12,7 +12,6 @@ import "../../shared/data/mobile_models.dart";
 import "../../shared/presentation/loo_charts.dart";
 import "../../shared/presentation/loo_minister_scope.dart";
 import "../data/mobile_portfolio_models.dart";
-import "health_score_page.dart";
 
 class PortfolioPage extends StatefulWidget {
   const PortfolioPage({
@@ -227,11 +226,7 @@ class _PortfolioPageState extends State<PortfolioPage> {
         data: data,
         onOpenFullHealth: () {
           Navigator.of(context).pop();
-          Navigator.of(context).push(
-            MaterialPageRoute<void>(
-              builder: (_) => HealthScorePage(apiClient: widget.apiClient),
-            ),
-          );
+          context.push(MobileRoutes.portfolioHealth);
         },
       ),
     );

@@ -1,9 +1,10 @@
 import "package:flutter/material.dart";
+import "package:go_router/go_router.dart";
 
+import "../../../app/mobile_routes.dart";
 import "../../../core/api/loo_api_client.dart";
 import "../../../core/presentation/loo_components.dart";
 import "../../../core/theme/loo_theme.dart";
-import "../../portfolio/presentation/security_detail_page.dart";
 
 class DiscoverPage extends StatefulWidget {
   const DiscoverPage({
@@ -137,15 +138,11 @@ class _DiscoverPageState extends State<DiscoverPage> {
       );
     }
     if (!mounted) return;
-    Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (_) => SecurityDetailPage(
-          apiClient: widget.apiClient,
-          symbol: candidate.symbol,
-          fallbackTitle: candidate.symbol,
-          exchange: candidate.exchange,
-          currency: candidate.currency,
-        ),
+    context.push(
+      MobileRoutes.securityDetail(
+        symbol: candidate.symbol,
+        exchange: candidate.exchange,
+        currency: candidate.currency,
       ),
     );
   }
@@ -169,15 +166,11 @@ class _DiscoverPageState extends State<DiscoverPage> {
       );
     }
     if (!mounted) return;
-    Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (_) => SecurityDetailPage(
-          apiClient: widget.apiClient,
-          symbol: identity.symbol,
-          fallbackTitle: identity.label,
-          exchange: identity.exchange,
-          currency: identity.currency,
-        ),
+    context.push(
+      MobileRoutes.securityDetail(
+        symbol: identity.symbol,
+        exchange: identity.exchange,
+        currency: identity.currency,
       ),
     );
   }

@@ -325,7 +325,7 @@ function mapSnapTradePosition(
   });
 
   return {
-    symbol: symbol.toUpperCase().replace(/\.TO$/u, ""),
+    symbol: symbol.toUpperCase(),
     description,
     currency,
     quantity,

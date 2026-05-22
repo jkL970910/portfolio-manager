@@ -6,13 +6,15 @@ Future<T?> showLooFloatingSheet<T>({
   required BuildContext context,
   required WidgetBuilder builder,
   bool isScrollControlled = true,
-  bool useRootNavigator = false,
+  bool useRootNavigator = true,
   EdgeInsetsGeometry? padding,
 }) {
   return showModalBottomSheet<T>(
     context: context,
     isScrollControlled: isScrollControlled,
     useRootNavigator: useRootNavigator,
+    isDismissible: true,
+    enableDrag: true,
     useSafeArea: true,
     backgroundColor: Colors.transparent,
     barrierColor: Colors.black.withValues(alpha: 0.42),

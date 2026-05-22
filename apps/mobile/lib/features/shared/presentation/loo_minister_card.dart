@@ -409,7 +409,7 @@ class _DraggableMinisterButtonState extends State<_DraggableMinisterButton> {
       useRootNavigator: true,
       padding: EdgeInsets.zero,
       builder: (context) => SizedBox(
-        height: MediaQuery.sizeOf(context).height * 0.78,
+        height: MediaQuery.sizeOf(context).height * 0.74,
         child: _LooMinisterSheet(
           apiClient: widget.apiClient,
           sessionController: _sessionController,
@@ -446,52 +446,46 @@ class _LooMinisterSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return DraggableScrollableSheet(
-      expand: false,
-      initialChildSize: 0.72,
-      minChildSize: 0.42,
-      maxChildSize: 0.92,
-      builder: (context, scrollController) {
-        return SingleChildScrollView(
-          controller: scrollController,
-          padding: EdgeInsets.only(
-            left: 16,
-            right: 16,
-            top: 10,
-            bottom: MediaQuery.of(context).viewInsets.bottom + 16,
+    return Padding(
+      padding: EdgeInsets.only(
+        left: 12,
+        right: 12,
+        top: 6,
+        bottom: MediaQuery.of(context).viewInsets.bottom + 10,
+      ),
+      child: Column(
+        children: [
+          Container(
+            width: 48,
+            height: 5,
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.outlineVariant,
+              borderRadius: BorderRadius.circular(999),
+            ),
           ),
-          child: Column(
-            children: [
-              Container(
-                width: 48,
-                height: 5,
-                decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.outlineVariant,
-                  borderRadius: BorderRadius.circular(999),
-                ),
-              ),
-              const SizedBox(height: 10),
-              LooMinisterCard(
-                apiClient: apiClient,
-                sessionController: sessionController,
-                pageContext: pageContext,
-                recentSubjects: recentSubjects,
-                suggestedQuestion: suggestedQuestion,
-                onSuggestedActionConfirmed: onSuggestedActionConfirmed,
-              ),
-            ],
+          const SizedBox(height: 8),
+          Expanded(
+            child: LooMinisterCard(
+              apiClient: apiClient,
+              sessionController: sessionController,
+              pageContext: pageContext,
+              recentSubjects: recentSubjects,
+              suggestedQuestion: suggestedQuestion,
+              onSuggestedActionConfirmed: onSuggestedActionConfirmed,
+            ),
           ),
-        );
-      },
+        ],
+      ),
     );
   }
 }
 
 class _LooMinisterCardState extends State<LooMinisterCard> {
-  static const _ministerSlowThreshold = Duration(seconds: 12);
+  static const _ministerSlowThreshold = Duration(seconds: 20);
 
   late final TextEditingController _questionController =
       TextEditingController(text: widget.suggestedQuestion);
+  final _messageScrollController = ScrollController();
   final List<Timer> _phaseTimers = [];
   var _loading = false;
   String? _phaseLabel;
@@ -507,6 +501,7 @@ class _LooMinisterCardState extends State<LooMinisterCard> {
   void dispose() {
     _clearPhaseTimers();
     widget.sessionController.removeListener(_handleSessionChanged);
+    _messageScrollController.dispose();
     _questionController.dispose();
     super.dispose();
   }
@@ -514,7 +509,22 @@ class _LooMinisterCardState extends State<LooMinisterCard> {
   void _handleSessionChanged() {
     if (mounted) {
       setState(() {});
+      _scrollMessagesToBottom();
     }
+  }
+
+  void _scrollMessagesToBottom() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_messageScrollController.hasClients) {
+        return;
+      }
+      final position = _messageScrollController.position;
+      _messageScrollController.animateTo(
+        position.maxScrollExtent,
+        duration: const Duration(milliseconds: 240),
+        curve: Curves.easeOutCubic,
+      );
+    });
   }
 
   Future<Map<String, dynamic>> _requestMinister(
@@ -562,6 +572,7 @@ class _LooMinisterCardState extends State<LooMinisterCard> {
   Future<_MinisterTimeoutChoice?> _showTimeoutChoice() {
     return showDialog<_MinisterTimeoutChoice>(
       context: context,
+      useRootNavigator: true,
       builder: (dialogContext) => AlertDialog(
         title: const Text("大臣回复较慢"),
         content: const Text(
@@ -655,60 +666,68 @@ class _LooMinisterCardState extends State<LooMinisterCard> {
     if (!mounted) {
       return;
     }
-    await showModalBottomSheet<void>(
+    await showLooFloatingSheet<void>(
       context: context,
-      showDragHandle: true,
-      builder: (sheetContext) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text("最近大臣对话", style: Theme.of(context).textTheme.titleMedium),
-              const SizedBox(height: 8),
-              if (widget.sessionController.sessions.isEmpty)
-                const Padding(
-                  padding: EdgeInsets.symmetric(vertical: 24),
-                  child: Text("还没有历史对话。"),
-                )
-              else
-                Flexible(
-                  child: ListView.separated(
-                    shrinkWrap: true,
-                    itemCount: widget.sessionController.sessions.length,
-                    separatorBuilder: (_, __) => const Divider(height: 1),
-                    itemBuilder: (context, index) {
-                      final session = widget.sessionController.sessions[index];
-                      return ListTile(
-                        contentPadding: EdgeInsets.zero,
-                        title: Text(session.title),
-                        subtitle: Text(
-                          [
-                            if (session.updatedAtLabel.isNotEmpty)
-                              session.updatedAtLabel,
-                            "${session.messageCount} 条消息",
-                            session.page,
-                          ].join(" · "),
-                        ),
-                        trailing: IconButton(
-                          tooltip: "删除",
-                          icon: const Icon(Icons.delete_outline),
-                          onPressed: () => _confirmDeleteSession(
-                            sheetContext,
-                            session,
-                          ),
-                        ),
-                        onTap: () async {
-                          Navigator.of(sheetContext).pop();
-                          await widget.sessionController
-                              .loadSession(session.id);
-                        },
-                      );
-                    },
-                  ),
+      useRootNavigator: true,
+      padding: EdgeInsets.zero,
+      builder: (sheetContext) => SizedBox(
+        height: MediaQuery.sizeOf(sheetContext).height * 0.58,
+        child: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  "最近大臣对话",
+                  style: Theme.of(context).textTheme.titleMedium,
                 ),
-            ],
+                const SizedBox(height: 8),
+                if (widget.sessionController.sessions.isEmpty)
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 24),
+                    child: Text("还没有历史对话。"),
+                  )
+                else
+                  Flexible(
+                    child: ListView.separated(
+                      shrinkWrap: true,
+                      itemCount: widget.sessionController.sessions.length,
+                      separatorBuilder: (_, __) => const Divider(height: 1),
+                      itemBuilder: (context, index) {
+                        final session =
+                            widget.sessionController.sessions[index];
+                        return ListTile(
+                          contentPadding: EdgeInsets.zero,
+                          title: Text(session.title),
+                          subtitle: Text(
+                            [
+                              if (session.updatedAtLabel.isNotEmpty)
+                                session.updatedAtLabel,
+                              "${session.messageCount} 条消息",
+                              session.page,
+                            ].join(" · "),
+                          ),
+                          trailing: IconButton(
+                            tooltip: "删除",
+                            icon: const Icon(Icons.delete_outline),
+                            onPressed: () => _confirmDeleteSession(
+                              sheetContext,
+                              session,
+                            ),
+                          ),
+                          onTap: () async {
+                            Navigator.of(sheetContext).pop();
+                            await widget.sessionController
+                                .loadSession(session.id);
+                          },
+                        );
+                      },
+                    ),
+                  ),
+              ],
+            ),
           ),
         ),
       ),
@@ -721,6 +740,7 @@ class _LooMinisterCardState extends State<LooMinisterCard> {
   ) async {
     final confirmed = await showDialog<bool>(
       context: context,
+      useRootNavigator: true,
       builder: (dialogContext) => AlertDialog(
         title: const Text("删除这轮对话？"),
         content: Text("删除「${session.title}」后，手机端无法再恢复这轮大臣会话。"),
@@ -750,7 +770,7 @@ class _LooMinisterCardState extends State<LooMinisterCard> {
     final activeSessionId = widget.sessionController.activeSessionId;
     return Card(
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -770,6 +790,7 @@ class _LooMinisterCardState extends State<LooMinisterCard> {
                       : () {
                           widget.sessionController.startNew();
                           _questionController.text = widget.suggestedQuestion;
+                          _scrollMessagesToBottom();
                         },
                   child: const Text("新对话"),
                 ),
@@ -778,15 +799,18 @@ class _LooMinisterCardState extends State<LooMinisterCard> {
                   onPressed: _loading ? null : _showHistory,
                   icon: const Icon(Icons.history),
                 ),
+                IconButton(
+                  tooltip: "关闭大臣",
+                  onPressed: () => Navigator.of(context).pop(),
+                  icon: const Icon(Icons.close_rounded),
+                ),
               ],
             ),
-            const SizedBox(height: 8),
-            const Text("大臣会保留最近对话，并结合当前页面、持仓和偏好上下文继续回答。"),
             if (activeSessionId != null) ...[
-              const SizedBox(height: 6),
+              const SizedBox(height: 4),
               Text(
                 widget.sessionController.activeTitle == null
-                    ? "本轮对话已开启，可关闭后继续追问。"
+                    ? "本轮对话已开启"
                     : "正在继续：${widget.sessionController.activeTitle}",
                 style: Theme.of(context).textTheme.bodySmall,
               ),
@@ -795,15 +819,26 @@ class _LooMinisterCardState extends State<LooMinisterCard> {
               const SizedBox(height: 10),
               const LinearProgressIndicator(),
             ],
-            if (messages.isNotEmpty) ...[
-              const SizedBox(height: 12),
-              ...messages.map(
-                (message) => _MinisterChatBubble(
-                  message,
-                  onSuggestedActionConfirmed: widget.onSuggestedActionConfirmed,
-                ),
-              ),
-            ],
+            const SizedBox(height: 12),
+            Expanded(
+              child: messages.isEmpty
+                  ? const Center(
+                      child: Padding(
+                        padding: EdgeInsets.all(18),
+                        child: Text("可以直接继续提问，或打开历史会话。"),
+                      ),
+                    )
+                  : ListView.builder(
+                      controller: _messageScrollController,
+                      padding: const EdgeInsets.fromLTRB(0, 4, 0, 0),
+                      itemCount: messages.length,
+                      itemBuilder: (context, index) => _MinisterChatBubble(
+                        messages[index],
+                        onSuggestedActionConfirmed:
+                            widget.onSuggestedActionConfirmed,
+                      ),
+                    ),
+            ),
             const SizedBox(height: 12),
             TextField(
               controller: _questionController,
@@ -910,6 +945,7 @@ class _MinisterChatBubble extends StatelessWidget {
   Widget build(BuildContext context) {
     final isUser = message.role == "user";
     final theme = Theme.of(context);
+    final dark = theme.brightness == Brightness.dark;
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
       child: Align(
@@ -920,12 +956,19 @@ class _MinisterChatBubble extends StatelessWidget {
             decoration: BoxDecoration(
               color: isUser
                   ? theme.colorScheme.secondaryContainer
-                  : theme.colorScheme.primaryContainer.withValues(alpha: 0.32),
-              borderRadius: BorderRadius.circular(18),
-              border: Border.all(color: theme.colorScheme.outlineVariant),
+                  : theme.colorScheme.primaryContainer.withValues(
+                      alpha: dark ? 0.52 : 0.78,
+                    ),
+              borderRadius: BorderRadius.circular(20),
+              border: isUser
+                  ? null
+                  : Border.all(
+                      color: theme.colorScheme.outlineVariant
+                          .withValues(alpha: 0.72),
+                    ),
             ),
             child: Padding(
-              padding: const EdgeInsets.all(12),
+              padding: EdgeInsets.all(isUser ? 12 : 14),
               child: isUser
                   ? Text(message.text)
                   : message.isError
@@ -1038,40 +1081,27 @@ class _MinisterAnswerView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: Theme.of(context)
-            .colorScheme
-            .primaryContainer
-            .withValues(alpha: 0.32),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(14),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(answer.answer),
-            if (answer.suggestedActions.isNotEmpty) ...[
-              const SizedBox(height: 12),
-              ...answer.suggestedActions.take(3).map(
-                    (action) => _MinisterSuggestedActionChip(
-                      action: action,
-                      onConfirmed: onSuggestedActionConfirmed,
-                    ),
-                  ),
-            ],
-            if (_shouldShowDisclaimer(answer.answer)) ...[
-              const SizedBox(height: 10),
-              Text(
-                answer.disclaimer,
-                style: Theme.of(context).textTheme.bodySmall,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(answer.answer),
+        if (answer.suggestedActions.isNotEmpty) ...[
+          const SizedBox(height: 12),
+          ...answer.suggestedActions.take(3).map(
+                (action) => _MinisterSuggestedActionChip(
+                  action: action,
+                  onConfirmed: onSuggestedActionConfirmed,
+                ),
               ),
-            ],
-          ],
-        ),
-      ),
+        ],
+        if (_shouldShowDisclaimer(answer.answer)) ...[
+          const SizedBox(height: 10),
+          Text(
+            answer.disclaimer,
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+        ],
+      ],
     );
   }
 
@@ -1113,6 +1143,7 @@ class _MinisterSuggestedActionChip extends StatelessWidget {
     final confirmationDetail = _confirmationDetail;
     final confirmed = await showDialog<bool>(
       context: context,
+      useRootNavigator: true,
       builder: (dialogContext) => AlertDialog(
         title: Text(action.label),
         content: Text([

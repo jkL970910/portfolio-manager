@@ -204,7 +204,7 @@ class _SettingsPageState extends State<SettingsPage> {
             icon: Icons.tune_rounded,
             title: "进货规矩",
             subtitle: "风险偏好、税务偏好和推荐约束",
-            initiallyExpanded: true,
+            initiallyExpanded: false,
             children: [
               InvestmentPreferencesCard(apiClient: widget.apiClient),
             ],
@@ -214,7 +214,7 @@ class _SettingsPageState extends State<SettingsPage> {
             icon: Icons.smart_toy_outlined,
             title: "AI 与大臣",
             subtitle: "OpenRouter / OpenAI Key、GPT 增强和调用状态",
-            initiallyExpanded: true,
+            initiallyExpanded: false,
             children: [
               _AiMinisterSettingsCard(apiClient: widget.apiClient),
               const SizedBox(height: 12),
@@ -228,7 +228,7 @@ class _SettingsPageState extends State<SettingsPage> {
             icon: Icons.hub_outlined,
             title: "数据源与券商",
             subtitle: "券商同步凭证、行情刷新、FX 口径和外部资料",
-            initiallyExpanded: true,
+            initiallyExpanded: false,
             children: [
               _ExternalServiceCredentialsCard(apiClient: widget.apiClient),
               const SizedBox(height: 12),
@@ -291,29 +291,44 @@ class _SettingsSectionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
     return Card(
       clipBehavior: Clip.antiAlias,
       child: ExpansionTile(
         initiallyExpanded: initiallyExpanded,
         tilePadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-        childrenPadding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+        childrenPadding: const EdgeInsets.fromLTRB(12, 0, 12, 14),
         leading: Icon(icon),
         title: Text(title, style: Theme.of(context).textTheme.titleMedium),
         subtitle: Text(subtitle),
         children: [
-          DecoratedBox(
-            decoration: BoxDecoration(
-              color: colors.surfaceContainerHighest.withValues(alpha: 0.18),
-              borderRadius: BorderRadius.circular(18),
-              border: Border.all(color: colors.outlineVariant),
-            ),
-            child: Padding(
-              padding: const EdgeInsets.all(8),
-              child: Column(children: children),
-            ),
+          Padding(
+            padding: const EdgeInsets.only(top: 2),
+            child: Column(children: children),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _SettingsInnerSurface extends StatelessWidget {
+  const _SettingsInnerSurface({required this.child, this.padding});
+
+  final Widget child;
+  final EdgeInsetsGeometry? padding;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: colors.surfaceContainerHighest.withValues(alpha: 0.16),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: colors.outlineVariant.withValues(alpha: 0.7)),
+      ),
+      child: Padding(
+        padding: padding ?? const EdgeInsets.all(16),
+        child: child,
       ),
     );
   }
@@ -334,47 +349,44 @@ class _DisplayCurrencyCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                const Icon(Icons.currency_exchange_rounded),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    "显示币种",
-                    style: Theme.of(context).textTheme.titleLarge,
-                  ),
+    return _SettingsInnerSurface(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.currency_exchange_rounded),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  "显示币种",
+                  style: Theme.of(context).textTheme.titleLarge,
                 ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            SegmentedButton<String>(
-              segments: const [
-                ButtonSegment(value: "CAD", label: Text("CAD")),
-                ButtonSegment(value: "USD", label: Text("USD")),
-              ],
-              selected: {currency},
-              onSelectionChanged:
-                  saving ? null : (value) => onChanged(value.first),
-            ),
-            if (saving) ...[
-              const SizedBox(height: 8),
-              const LinearProgressIndicator(),
-            ],
-            if (error != null) ...[
-              const SizedBox(height: 8),
-              Text(
-                error!,
-                style: TextStyle(color: Theme.of(context).colorScheme.error),
               ),
             ],
+          ),
+          const SizedBox(height: 12),
+          SegmentedButton<String>(
+            segments: const [
+              ButtonSegment(value: "CAD", label: Text("CAD")),
+              ButtonSegment(value: "USD", label: Text("USD")),
+            ],
+            selected: {currency},
+            onSelectionChanged:
+                saving ? null : (value) => onChanged(value.first),
+          ),
+          if (saving) ...[
+            const SizedBox(height: 8),
+            const LinearProgressIndicator(),
           ],
-        ),
+          if (error != null) ...[
+            const SizedBox(height: 8),
+            Text(
+              error!,
+              style: TextStyle(color: Theme.of(context).colorScheme.error),
+            ),
+          ],
+        ],
       ),
     );
   }
@@ -393,7 +405,8 @@ class _PortfolioQuoteRefreshCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
+    return _SettingsInnerSurface(
+      padding: EdgeInsets.zero,
       child: ListTile(
         leading: const Icon(Icons.sync),
         title: const Text("刷新组合行情"),
@@ -424,48 +437,45 @@ class _AppearanceModeCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                const Icon(Icons.contrast_rounded),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    "外观模式",
-                    style: Theme.of(context).textTheme.titleLarge,
-                  ),
+    return _SettingsInnerSurface(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.contrast_rounded),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  "外观模式",
+                  style: Theme.of(context).textTheme.titleLarge,
                 ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            SegmentedButton<LooThemeMode>(
-              segments: const [
-                ButtonSegment(
-                  value: LooThemeMode.system,
-                  label: Text("跟随系统"),
-                  icon: Icon(Icons.phone_iphone_rounded),
-                ),
-                ButtonSegment(
-                  value: LooThemeMode.dark,
-                  label: Text("深色"),
-                  icon: Icon(Icons.dark_mode_rounded),
-                ),
-                ButtonSegment(
-                  value: LooThemeMode.light,
-                  label: Text("浅色"),
-                  icon: Icon(Icons.light_mode_rounded),
-                ),
-              ],
-              selected: {selected},
-              onSelectionChanged: (value) => onChanged(value.first),
-            ),
-          ],
-        ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          SegmentedButton<LooThemeMode>(
+            segments: const [
+              ButtonSegment(
+                value: LooThemeMode.system,
+                label: Text("跟随系统"),
+                icon: Icon(Icons.phone_iphone_rounded),
+              ),
+              ButtonSegment(
+                value: LooThemeMode.dark,
+                label: Text("深色"),
+                icon: Icon(Icons.dark_mode_rounded),
+              ),
+              ButtonSegment(
+                value: LooThemeMode.light,
+                label: Text("浅色"),
+                icon: Icon(Icons.light_mode_rounded),
+              ),
+            ],
+            selected: {selected},
+            onSelectionChanged: (value) => onChanged(value.first),
+          ),
+        ],
       ),
     );
   }
@@ -1215,184 +1225,179 @@ class _AiMinisterSettingsCardState extends State<_AiMinisterSettingsCard> {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: FutureBuilder<_AiMinisterSettings>(
-          future: _settings,
-          builder: (context, snapshot) {
-            final settings = snapshot.data;
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
+    return _SettingsInnerSurface(
+      child: FutureBuilder<_AiMinisterSettings>(
+        future: _settings,
+        builder: (context, snapshot) {
+          final settings = snapshot.data;
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  const Icon(Icons.smart_toy_outlined),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      "AI 大臣设置",
+                      style: Theme.of(context).textTheme.titleLarge,
+                    ),
+                  ),
+                  IconButton(
+                    onPressed:
+                        snapshot.connectionState == ConnectionState.waiting
+                            ? null
+                            : _refresh,
+                    icon: const Icon(Icons.refresh),
+                    tooltip: "刷新设置",
+                  ),
+                ],
+              ),
+              const SizedBox(height: 6),
+              const Text("默认本地大臣不产生 OpenAI 费用；开启 GPT-5.5 后会发送当前页面结构化摘要。"),
+              if (snapshot.connectionState == ConnectionState.waiting) ...[
+                const SizedBox(height: 12),
+                const LinearProgressIndicator(),
+              ] else if (snapshot.hasError) ...[
+                const SizedBox(height: 12),
+                Text(
+                  "AI 大臣设置暂时读取失败：${snapshot.error}",
+                  style: TextStyle(color: Theme.of(context).colorScheme.error),
+                ),
+              ] else if (settings != null) ...[
+                const SizedBox(height: 12),
+                SegmentedButton<String>(
+                  segments: const [
+                    ButtonSegment(value: "local", label: Text("本地")),
+                    ButtonSegment(value: "gpt-5.5", label: Text("外部 GPT")),
+                  ],
+                  selected: {settings.mode},
+                  onSelectionChanged:
+                      _saving ? null : (value) => _save(mode: value.first),
+                ),
+                const SizedBox(height: 10),
+                SegmentedButton<String>(
+                  segments: const [
+                    ButtonSegment(
+                      value: "official-openai",
+                      label: Text("OpenAI 官方"),
+                    ),
+                    ButtonSegment(
+                      value: "openrouter-compatible",
+                      label: Text("Router"),
+                    ),
+                  ],
+                  selected: {settings.provider},
+                  onSelectionChanged:
+                      _saving ? null : (value) => _save(provider: value.first),
+                ),
+                const SizedBox(height: 12),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    Chip(label: Text(settings.effectiveModeLabel)),
+                    Chip(label: Text(settings.providerLabel)),
+                    Chip(label: Text("模型：${settings.model}")),
+                    Chip(label: Text("推理：${settings.reasoningEffortLabel}")),
+                    Chip(label: Text(settings.apiKeyLabel)),
+                    Chip(label: Text(settings.providerEnabledLabel)),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                Text(settings.privacyNote),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: _modelController,
+                  decoration: InputDecoration(
+                    labelText: "模型",
+                    helperText: "留空保持当前；Router 模式填写对应平台的 model slug。",
+                    hintText: settings.model,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                SegmentedButton<String>(
+                  segments: const [
+                    ButtonSegment(value: "low", label: Text("低")),
+                    ButtonSegment(value: "medium", label: Text("中")),
+                    ButtonSegment(value: "high", label: Text("高")),
+                    ButtonSegment(value: "xhigh", label: Text("极高")),
+                  ],
+                  selected: {settings.reasoningEffort},
+                  onSelectionChanged: _saving
+                      ? null
+                      : (value) => _save(reasoningEffort: value.first),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  "推理强度越高通常越慢、越贵；默认中档适合当前大臣问答。",
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+                const SizedBox(height: 10),
+                TextField(
+                  controller: _baseUrlController,
+                  enabled: settings.provider == "openrouter-compatible",
+                  decoration: InputDecoration(
+                    labelText: "Router Base URL",
+                    helperText:
+                        "留空使用默认；自定义兼容域名通常填 https://openrouter.icu，官方 OpenRouter 可填完整 /api/v1/responses。",
+                    hintText: settings.baseUrl ??
+                        "https://openrouter.ai/api/v1/responses",
+                  ),
+                ),
+                const SizedBox(height: 10),
+                TextField(
+                  controller: _apiKeyController,
+                  obscureText: true,
+                  decoration: InputDecoration(
+                    labelText: settings.provider == "openrouter-compatible"
+                        ? "Router API Key"
+                        : "OpenAI API Key",
+                    helperText: "只保存到后端加密存储；不会写入 Flutter 客户端。",
+                  ),
+                ),
+                const SizedBox(height: 10),
                 Row(
                   children: [
-                    const Icon(Icons.smart_toy_outlined),
-                    const SizedBox(width: 8),
                     Expanded(
-                      child: Text(
-                        "AI 大臣设置",
-                        style: Theme.of(context).textTheme.titleLarge,
+                      child: FilledButton.icon(
+                        onPressed: _saving ? null : () => _save(),
+                        icon: const Icon(Icons.save_outlined),
+                        label: Text(_saving ? "保存中..." : "保存设置"),
                       ),
                     ),
-                    IconButton(
-                      onPressed:
-                          snapshot.connectionState == ConnectionState.waiting
-                              ? null
-                              : _refresh,
-                      icon: const Icon(Icons.refresh),
-                      tooltip: "刷新设置",
+                    const SizedBox(width: 10),
+                    OutlinedButton(
+                      onPressed: _saving || !settings.apiKeyConfigured
+                          ? null
+                          : () => _save(clearApiKey: true),
+                      child: const Text("清除 Key"),
                     ),
                   ],
                 ),
-                const SizedBox(height: 6),
-                const Text("默认本地大臣不产生 OpenAI 费用；开启 GPT-5.5 后会发送当前页面结构化摘要。"),
-                if (snapshot.connectionState == ConnectionState.waiting) ...[
-                  const SizedBox(height: 12),
-                  const LinearProgressIndicator(),
-                ] else if (snapshot.hasError) ...[
-                  const SizedBox(height: 12),
+                if (_message != null) ...[
+                  const SizedBox(height: 8),
                   Text(
-                    "AI 大臣设置暂时读取失败：${snapshot.error}",
-                    style:
-                        TextStyle(color: Theme.of(context).colorScheme.error),
-                  ),
-                ] else if (settings != null) ...[
-                  const SizedBox(height: 12),
-                  SegmentedButton<String>(
-                    segments: const [
-                      ButtonSegment(value: "local", label: Text("本地")),
-                      ButtonSegment(value: "gpt-5.5", label: Text("外部 GPT")),
-                    ],
-                    selected: {settings.mode},
-                    onSelectionChanged:
-                        _saving ? null : (value) => _save(mode: value.first),
-                  ),
-                  const SizedBox(height: 10),
-                  SegmentedButton<String>(
-                    segments: const [
-                      ButtonSegment(
-                        value: "official-openai",
-                        label: Text("OpenAI 官方"),
-                      ),
-                      ButtonSegment(
-                        value: "openrouter-compatible",
-                        label: Text("Router"),
-                      ),
-                    ],
-                    selected: {settings.provider},
-                    onSelectionChanged: _saving
-                        ? null
-                        : (value) => _save(provider: value.first),
-                  ),
-                  const SizedBox(height: 12),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      Chip(label: Text(settings.effectiveModeLabel)),
-                      Chip(label: Text(settings.providerLabel)),
-                      Chip(label: Text("模型：${settings.model}")),
-                      Chip(label: Text("推理：${settings.reasoningEffortLabel}")),
-                      Chip(label: Text(settings.apiKeyLabel)),
-                      Chip(label: Text(settings.providerEnabledLabel)),
-                    ],
-                  ),
-                  const SizedBox(height: 10),
-                  Text(settings.privacyNote),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: _modelController,
-                    decoration: InputDecoration(
-                      labelText: "模型",
-                      helperText: "留空保持当前；Router 模式填写对应平台的 model slug。",
-                      hintText: settings.model,
+                    _message!,
+                    style: TextStyle(
+                      color: _message!.contains("失败") ||
+                              _message!.contains("requires")
+                          ? Theme.of(context).colorScheme.error
+                          : Theme.of(context).colorScheme.primary,
                     ),
                   ),
-                  const SizedBox(height: 10),
-                  SegmentedButton<String>(
-                    segments: const [
-                      ButtonSegment(value: "low", label: Text("低")),
-                      ButtonSegment(value: "medium", label: Text("中")),
-                      ButtonSegment(value: "high", label: Text("高")),
-                      ButtonSegment(value: "xhigh", label: Text("极高")),
-                    ],
-                    selected: {settings.reasoningEffort},
-                    onSelectionChanged: _saving
-                        ? null
-                        : (value) => _save(reasoningEffort: value.first),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    "推理强度越高通常越慢、越贵；默认中档适合当前大臣问答。",
-                    style: Theme.of(context).textTheme.bodySmall,
-                  ),
-                  const SizedBox(height: 10),
-                  TextField(
-                    controller: _baseUrlController,
-                    enabled: settings.provider == "openrouter-compatible",
-                    decoration: InputDecoration(
-                      labelText: "Router Base URL",
-                      helperText:
-                          "留空使用默认；自定义兼容域名通常填 https://openrouter.icu，官方 OpenRouter 可填完整 /api/v1/responses。",
-                      hintText: settings.baseUrl ??
-                          "https://openrouter.ai/api/v1/responses",
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  TextField(
-                    controller: _apiKeyController,
-                    obscureText: true,
-                    decoration: InputDecoration(
-                      labelText: settings.provider == "openrouter-compatible"
-                          ? "Router API Key"
-                          : "OpenAI API Key",
-                      helperText: "只保存到后端加密存储；不会写入 Flutter 客户端。",
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: FilledButton.icon(
-                          onPressed: _saving ? null : () => _save(),
-                          icon: const Icon(Icons.save_outlined),
-                          label: Text(_saving ? "保存中..." : "保存设置"),
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      OutlinedButton(
-                        onPressed: _saving || !settings.apiKeyConfigured
-                            ? null
-                            : () => _save(clearApiKey: true),
-                        child: const Text("清除 Key"),
-                      ),
-                    ],
-                  ),
-                  if (_message != null) ...[
-                    const SizedBox(height: 8),
-                    Text(
-                      _message!,
-                      style: TextStyle(
-                        color: _message!.contains("失败") ||
-                                _message!.contains("requires")
-                            ? Theme.of(context).colorScheme.error
-                            : Theme.of(context).colorScheme.primary,
-                      ),
-                    ),
-                  ],
-                  if (settings.recentUsage.isNotEmpty) ...[
-                    const SizedBox(height: 14),
-                    Text("最近使用记录",
-                        style: Theme.of(context).textTheme.titleMedium),
-                    const SizedBox(height: 6),
-                    ...settings.recentUsage.map(_AiMinisterUsageTile.new),
-                  ],
+                ],
+                if (settings.recentUsage.isNotEmpty) ...[
+                  const SizedBox(height: 14),
+                  Text("最近使用记录",
+                      style: Theme.of(context).textTheme.titleMedium),
+                  const SizedBox(height: 6),
+                  ...settings.recentUsage.map(_AiMinisterUsageTile.new),
                 ],
               ],
-            );
-          },
-        ),
+            ],
+          );
+        },
       ),
     );
   }
@@ -1436,57 +1441,53 @@ class _DataAiCapabilitiesCardState extends State<_DataAiCapabilitiesCard> {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: FutureBuilder<_DataAiCapabilities>(
-          future: _capabilities,
-          builder: (context, snapshot) {
-            final capabilities = snapshot.data;
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    const Icon(Icons.tune_outlined),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        "高级能力总览",
-                        style: Theme.of(context).textTheme.titleLarge,
-                      ),
+    return _SettingsInnerSurface(
+      child: FutureBuilder<_DataAiCapabilities>(
+        future: _capabilities,
+        builder: (context, snapshot) {
+          final capabilities = snapshot.data;
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  const Icon(Icons.tune_outlined),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      "高级能力总览",
+                      style: Theme.of(context).textTheme.titleLarge,
                     ),
-                    IconButton(
-                      onPressed:
-                          snapshot.connectionState == ConnectionState.waiting
-                              ? null
-                              : _refresh,
-                      icon: const Icon(Icons.refresh),
-                      tooltip: "刷新能力状态",
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  "这里展示会影响费用、速度或资料覆盖的功能。可保存的个人开关在对应设置卡片中调整。",
-                  style: Theme.of(context).textTheme.bodySmall,
-                ),
-                const SizedBox(height: 12),
-                if (snapshot.connectionState == ConnectionState.waiting)
-                  const LinearProgressIndicator()
-                else if (snapshot.hasError)
-                  Text(
-                    "能力状态暂时读取失败：${snapshot.error}",
-                    style:
-                        TextStyle(color: Theme.of(context).colorScheme.error),
-                  )
-                else if (capabilities != null) ...[
-                  ...capabilities.items.map(_CapabilityTile.new),
+                  ),
+                  IconButton(
+                    onPressed:
+                        snapshot.connectionState == ConnectionState.waiting
+                            ? null
+                            : _refresh,
+                    icon: const Icon(Icons.refresh),
+                    tooltip: "刷新能力状态",
+                  ),
                 ],
+              ),
+              const SizedBox(height: 6),
+              Text(
+                "这里展示会影响费用、速度或资料覆盖的功能。可保存的个人开关在对应设置卡片中调整。",
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+              const SizedBox(height: 12),
+              if (snapshot.connectionState == ConnectionState.waiting)
+                const LinearProgressIndicator()
+              else if (snapshot.hasError)
+                Text(
+                  "能力状态暂时读取失败：${snapshot.error}",
+                  style: TextStyle(color: Theme.of(context).colorScheme.error),
+                )
+              else if (capabilities != null) ...[
+                ...capabilities.items.map(_CapabilityTile.new),
               ],
-            );
-          },
-        ),
+            ],
+          );
+        },
       ),
     );
   }
@@ -1646,93 +1647,89 @@ class _WorkerStatusCenterCardState extends State<_WorkerStatusCenterCard> {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: FutureBuilder<WorkerStatusCenter>(
-          future: _status,
-          builder: (context, snapshot) {
-            final status = snapshot.data;
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    const Icon(Icons.cloud_sync_outlined),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        status?.title ?? "云端更新中心",
-                        style: Theme.of(context).textTheme.titleLarge,
-                      ),
+    return _SettingsInnerSurface(
+      child: FutureBuilder<WorkerStatusCenter>(
+        future: _status,
+        builder: (context, snapshot) {
+          final status = snapshot.data;
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  const Icon(Icons.cloud_sync_outlined),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      status?.title ?? "云端更新中心",
+                      style: Theme.of(context).textTheme.titleLarge,
                     ),
-                    IconButton(
-                      onPressed:
-                          snapshot.connectionState == ConnectionState.waiting
-                              ? null
-                              : _refresh,
-                      icon: const Icon(Icons.refresh),
-                      tooltip: "刷新云端更新状态",
-                    ),
-                  ],
+                  ),
+                  IconButton(
+                    onPressed:
+                        snapshot.connectionState == ConnectionState.waiting
+                            ? null
+                            : _refresh,
+                    icon: const Icon(Icons.refresh),
+                    tooltip: "刷新云端更新状态",
+                  ),
+                ],
+              ),
+              const SizedBox(height: 6),
+              if (snapshot.connectionState == ConnectionState.waiting) ...[
+                const LinearProgressIndicator(),
+              ] else if (snapshot.hasError) ...[
+                Text(
+                  "云端更新状态暂时读取失败：${snapshot.error}",
+                  style: TextStyle(color: Theme.of(context).colorScheme.error),
                 ),
+              ] else if (status == null) ...[
+                const Text("云端更新状态暂时不可用。"),
+              ] else ...[
+                Text(status.statusLabel),
                 const SizedBox(height: 6),
-                if (snapshot.connectionState == ConnectionState.waiting) ...[
-                  const LinearProgressIndicator(),
-                ] else if (snapshot.hasError) ...[
-                  Text(
-                    "云端更新状态暂时读取失败：${snapshot.error}",
-                    style:
-                        TextStyle(color: Theme.of(context).colorScheme.error),
+                Text(
+                  status.nextRunLabel,
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+                const SizedBox(height: 12),
+                ...status.tasks.map(
+                  (task) => ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    dense: true,
+                    leading: Icon(_iconForStatus(task.status)),
+                    title: Text("${task.title} · ${task.statusLabel}"),
+                    subtitle: Text(
+                      [
+                        task.metricsLabel,
+                        task.lastFinishedAtLabel,
+                        task.note,
+                      ].join("\n"),
+                    ),
+                    isThreeLine: true,
                   ),
-                ] else if (status == null) ...[
-                  const Text("云端更新状态暂时不可用。"),
-                ] else ...[
-                  Text(status.statusLabel),
+                ),
+                if (status.providerUsage.isNotEmpty) ...[
+                  const Divider(),
+                  Text(
+                    "最近外部资料用量",
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
                   const SizedBox(height: 6),
-                  Text(
-                    status.nextRunLabel,
-                    style: Theme.of(context).textTheme.bodySmall,
-                  ),
-                  const SizedBox(height: 12),
-                  ...status.tasks.map(
-                    (task) => ListTile(
+                  ...status.providerUsage.map(
+                    (item) => ListTile(
                       contentPadding: EdgeInsets.zero,
                       dense: true,
-                      leading: Icon(_iconForStatus(task.status)),
-                      title: Text("${task.title} · ${task.statusLabel}"),
-                      subtitle: Text(
-                        [
-                          task.metricsLabel,
-                          task.lastFinishedAtLabel,
-                          task.note,
-                        ].join("\n"),
-                      ),
-                      isThreeLine: true,
+                      leading: const Icon(Icons.speed_outlined),
+                      title: Text("${item.provider} · ${item.usageDate}"),
+                      subtitle: Text(item.compactLabel),
                     ),
                   ),
-                  if (status.providerUsage.isNotEmpty) ...[
-                    const Divider(),
-                    Text(
-                      "最近外部资料用量",
-                      style: Theme.of(context).textTheme.titleMedium,
-                    ),
-                    const SizedBox(height: 6),
-                    ...status.providerUsage.map(
-                      (item) => ListTile(
-                        contentPadding: EdgeInsets.zero,
-                        dense: true,
-                        leading: const Icon(Icons.speed_outlined),
-                        title: Text("${item.provider} · ${item.usageDate}"),
-                        subtitle: Text(item.compactLabel),
-                      ),
-                    ),
-                  ],
                 ],
               ],
-            );
-          },
-        ),
+            ],
+          );
+        },
       ),
     );
   }
@@ -1824,149 +1821,143 @@ class _SecurityMetadataReviewCardState
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: FutureBuilder<SecurityMetadataReviewSnapshot>(
-          future: _snapshot,
-          builder: (context, snapshot) {
-            final data = snapshot.data;
-            final visibleItems = data == null
-                ? const <SecurityMetadataItem>[]
-                : _showAllItems
-                    ? data.allItems
-                    : data.items;
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
+    return _SettingsInnerSurface(
+      child: FutureBuilder<SecurityMetadataReviewSnapshot>(
+        future: _snapshot,
+        builder: (context, snapshot) {
+          final data = snapshot.data;
+          final visibleItems = data == null
+              ? const <SecurityMetadataItem>[]
+              : _showAllItems
+                  ? data.allItems
+                  : data.items;
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  const Icon(Icons.verified_outlined),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      data?.title ?? "高级：标的资料可信度",
+                      style: Theme.of(context).textTheme.titleLarge,
+                    ),
+                  ),
+                  IconButton(
+                    onPressed:
+                        snapshot.connectionState == ConnectionState.waiting
+                            ? null
+                            : _refresh,
+                    icon: const Icon(Icons.refresh),
+                    tooltip: "刷新资料列表",
+                  ),
+                ],
+              ),
+              const SizedBox(height: 6),
+              if (snapshot.connectionState == ConnectionState.waiting) ...[
+                const LinearProgressIndicator(),
+              ] else if (snapshot.hasError) ...[
+                Text(
+                  "标的资料暂时读取失败：${snapshot.error}",
+                  style: TextStyle(color: Theme.of(context).colorScheme.error),
+                ),
+              ] else if (data != null) ...[
+                Text(data.statusLabel),
+                const SizedBox(height: 6),
+                Text(
+                  data.actionLabel,
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+                const SizedBox(height: 10),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
                   children: [
-                    const Icon(Icons.verified_outlined),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        data?.title ?? "高级：标的资料可信度",
-                        style: Theme.of(context).textTheme.titleLarge,
-                      ),
-                    ),
-                    IconButton(
-                      onPressed:
-                          snapshot.connectionState == ConnectionState.waiting
-                              ? null
-                              : _refresh,
-                      icon: const Icon(Icons.refresh),
-                      tooltip: "刷新资料列表",
-                    ),
+                    Chip(label: Text("共 ${data.totalCount} 个")),
+                    Chip(label: Text("已确认 ${data.manualCount} 个")),
+                    Chip(label: Text("建议复核 ${data.reviewCount} 个")),
                   ],
                 ),
-                const SizedBox(height: 6),
-                if (snapshot.connectionState == ConnectionState.waiting) ...[
-                  const LinearProgressIndicator(),
-                ] else if (snapshot.hasError) ...[
-                  Text(
-                    "标的资料暂时读取失败：${snapshot.error}",
-                    style:
-                        TextStyle(color: Theme.of(context).colorScheme.error),
-                  ),
-                ] else if (data != null) ...[
-                  Text(data.statusLabel),
-                  const SizedBox(height: 6),
-                  Text(
-                    data.actionLabel,
-                    style: Theme.of(context).textTheme.bodySmall,
-                  ),
-                  const SizedBox(height: 10),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      Chip(label: Text("共 ${data.totalCount} 个")),
-                      Chip(label: Text("已确认 ${data.manualCount} 个")),
-                      Chip(label: Text("建议复核 ${data.reviewCount} 个")),
-                    ],
-                  ),
-                  const SizedBox(height: 10),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      FilledButton.tonalIcon(
-                        onPressed:
-                            _refreshingProvider ? null : _refreshProvider,
-                        icon: _refreshingProvider
-                            ? const SizedBox(
-                                width: 16,
-                                height: 16,
-                                child:
-                                    CircularProgressIndicator(strokeWidth: 2),
-                              )
-                            : const Icon(Icons.manage_search_outlined),
-                        label: Text(_refreshingProvider ? "刷新中" : "复核低可信资料"),
-                      ),
-                      if (data.allItems.length > data.items.length)
-                        TextButton.icon(
-                          onPressed: () =>
-                              setState(() => _showAllItems = !_showAllItems),
-                          icon: Icon(
-                            _showAllItems
-                                ? Icons.visibility_off_outlined
-                                : Icons.visibility_outlined,
-                          ),
-                          label: Text(_showAllItems ? "只看需复核" : "查看全部"),
-                        ),
-                    ],
-                  ),
-                  if (_message != null) ...[
-                    const SizedBox(height: 8),
-                    Text(
-                      _message!,
-                      style: TextStyle(
-                        color: _message!.contains("失败") ||
-                                _message!.contains("Exception")
-                            ? Theme.of(context).colorScheme.error
-                            : Theme.of(context).colorScheme.primary,
-                      ),
+                const SizedBox(height: 10),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    FilledButton.tonalIcon(
+                      onPressed: _refreshingProvider ? null : _refreshProvider,
+                      icon: _refreshingProvider
+                          ? const SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(Icons.manage_search_outlined),
+                      label: Text(_refreshingProvider ? "刷新中" : "复核低可信资料"),
                     ),
-                  ],
-                  const Divider(),
-                  if (visibleItems.isEmpty)
-                    const Text("当前资料可信，无需手动维护。")
-                  else
-                    ...visibleItems.take(12).map(
-                          (item) => ListTile(
-                            contentPadding: EdgeInsets.zero,
-                            dense: true,
-                            leading: CircleAvatar(
-                              backgroundColor: _confidenceColor(context, item),
-                              child: Icon(
-                                item.locked
-                                    ? Icons.verified_outlined
-                                    : item.metadataConfidence >= 70
-                                        ? Icons.check_outlined
-                                        : Icons.priority_high_outlined,
-                                color: Colors.white,
-                                size: 18,
-                              ),
-                            ),
-                            title: Text(item.identityLabel),
-                            subtitle: Text(
-                              [
-                                item.name,
-                                item.detailLabel,
-                                if (item.metadataNotes.isNotEmpty)
-                                  item.metadataNotes,
-                              ].join("\n"),
-                            ),
-                            isThreeLine: true,
-                            trailing: const Icon(Icons.edit_outlined),
-                            onTap: () => _openManualEditor(item),
-                          ),
+                    if (data.allItems.length > data.items.length)
+                      TextButton.icon(
+                        onPressed: () =>
+                            setState(() => _showAllItems = !_showAllItems),
+                        icon: Icon(
+                          _showAllItems
+                              ? Icons.visibility_off_outlined
+                              : Icons.visibility_outlined,
                         ),
+                        label: Text(_showAllItems ? "只看需复核" : "查看全部"),
+                      ),
+                  ],
+                ),
+                if (_message != null) ...[
+                  const SizedBox(height: 8),
+                  Text(
+                    _message!,
+                    style: TextStyle(
+                      color: _message!.contains("失败") ||
+                              _message!.contains("Exception")
+                          ? Theme.of(context).colorScheme.error
+                          : Theme.of(context).colorScheme.primary,
+                    ),
+                  ),
                 ],
+                const Divider(),
+                if (visibleItems.isEmpty)
+                  const Text("当前资料可信，无需手动维护。")
+                else
+                  ...visibleItems.take(12).map(
+                        (item) => ListTile(
+                          contentPadding: EdgeInsets.zero,
+                          dense: true,
+                          leading: CircleAvatar(
+                            backgroundColor: _confidenceColor(context, item),
+                            child: Icon(
+                              item.locked
+                                  ? Icons.verified_outlined
+                                  : item.metadataConfidence >= 70
+                                      ? Icons.check_outlined
+                                      : Icons.priority_high_outlined,
+                              color: Colors.white,
+                              size: 18,
+                            ),
+                          ),
+                          title: Text(item.identityLabel),
+                          subtitle: Text(
+                            [
+                              item.name,
+                              item.detailLabel,
+                              if (item.metadataNotes.isNotEmpty)
+                                item.metadataNotes,
+                            ].join("\n"),
+                          ),
+                          isThreeLine: true,
+                          trailing: const Icon(Icons.edit_outlined),
+                          onTap: () => _openManualEditor(item),
+                        ),
+                      ),
               ],
-            );
-          },
-        ),
+            ],
+          );
+        },
       ),
     );
   }
@@ -2225,118 +2216,113 @@ class _ExternalServiceCredentialsCardState
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: FutureBuilder<_ExternalServiceCredentials>(
-          future: _settings,
-          builder: (context, snapshot) {
-            final settings = snapshot.data;
-            final snapTrade = settings?.snapTrade;
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
+    return _SettingsInnerSurface(
+      child: FutureBuilder<_ExternalServiceCredentials>(
+        future: _settings,
+        builder: (context, snapshot) {
+          final settings = snapshot.data;
+          final snapTrade = settings?.snapTrade;
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  const Icon(Icons.vpn_key_outlined),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      "外部服务凭证",
+                      style: Theme.of(context).textTheme.titleLarge,
+                    ),
+                  ),
+                  IconButton(
+                    onPressed:
+                        snapshot.connectionState == ConnectionState.waiting
+                            ? null
+                            : _refresh,
+                    icon: const Icon(Icons.refresh),
+                    tooltip: "刷新凭证状态",
+                  ),
+                ],
+              ),
+              const SizedBox(height: 6),
+              const Text("这里保存券商/数据聚合平台的用户级凭证，避免多用户共用 Loo国开发额度。"),
+              if (snapshot.connectionState == ConnectionState.waiting) ...[
+                const SizedBox(height: 12),
+                const LinearProgressIndicator(),
+              ] else if (snapshot.hasError) ...[
+                const SizedBox(height: 12),
+                Text(
+                  "外部服务凭证暂时读取失败：${snapshot.error}",
+                  style: TextStyle(color: Theme.of(context).colorScheme.error),
+                ),
+              ] else if (snapTrade != null) ...[
+                const SizedBox(height: 12),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    Chip(label: Text(snapTrade.statusLabel)),
+                    Chip(label: Text(snapTrade.consumerKeyLabel)),
+                    Chip(label: Text(snapTrade.serverCredentialsLabel)),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                Text(snapTrade.privacyNote),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: _snapTradeClientIdController,
+                  decoration: InputDecoration(
+                    labelText: "SnapTrade Client ID",
+                    helperText: "留空不会修改；保存新 Consumer Key 时必须同时填写。",
+                    hintText: snapTrade.clientId ?? "来自 SnapTrade Dashboard",
+                  ),
+                ),
+                const SizedBox(height: 10),
+                TextField(
+                  controller: _snapTradeConsumerKeyController,
+                  obscureText: true,
+                  decoration: const InputDecoration(
+                    labelText: "SnapTrade Consumer Key",
+                    helperText: "只保存到后端加密存储；不会返回给 Flutter 客户端。",
+                  ),
+                ),
+                const SizedBox(height: 10),
                 Row(
                   children: [
-                    const Icon(Icons.vpn_key_outlined),
-                    const SizedBox(width: 8),
                     Expanded(
-                      child: Text(
-                        "外部服务凭证",
-                        style: Theme.of(context).textTheme.titleLarge,
+                      child: FilledButton.icon(
+                        onPressed: _saving ? null : () => _saveSnapTrade(),
+                        icon: const Icon(Icons.save_outlined),
+                        label: Text(_saving ? "保存中..." : "保存 SnapTrade"),
                       ),
                     ),
-                    IconButton(
-                      onPressed:
-                          snapshot.connectionState == ConnectionState.waiting
-                              ? null
-                              : _refresh,
-                      icon: const Icon(Icons.refresh),
-                      tooltip: "刷新凭证状态",
+                    const SizedBox(width: 10),
+                    OutlinedButton(
+                      onPressed: _saving || !snapTrade.userCredentialsConfigured
+                          ? null
+                          : () => _saveSnapTrade(clearCredentials: true),
+                      child: const Text("清除"),
                     ),
                   ],
                 ),
-                const SizedBox(height: 6),
-                const Text("这里保存券商/数据聚合平台的用户级凭证，避免多用户共用 Loo国开发额度。"),
-                if (snapshot.connectionState == ConnectionState.waiting) ...[
-                  const SizedBox(height: 12),
-                  const LinearProgressIndicator(),
-                ] else if (snapshot.hasError) ...[
-                  const SizedBox(height: 12),
+                if (_message != null) ...[
+                  const SizedBox(height: 8),
                   Text(
-                    "外部服务凭证暂时读取失败：${snapshot.error}",
-                    style:
-                        TextStyle(color: Theme.of(context).colorScheme.error),
-                  ),
-                ] else if (snapTrade != null) ...[
-                  const SizedBox(height: 12),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      Chip(label: Text(snapTrade.statusLabel)),
-                      Chip(label: Text(snapTrade.consumerKeyLabel)),
-                      Chip(label: Text(snapTrade.serverCredentialsLabel)),
-                    ],
-                  ),
-                  const SizedBox(height: 10),
-                  Text(snapTrade.privacyNote),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: _snapTradeClientIdController,
-                    decoration: InputDecoration(
-                      labelText: "SnapTrade Client ID",
-                      helperText: "留空不会修改；保存新 Consumer Key 时必须同时填写。",
-                      hintText: snapTrade.clientId ?? "来自 SnapTrade Dashboard",
+                    _message!,
+                    style: TextStyle(
+                      color: _message!.contains("失败") ||
+                              _message!.contains("Exception") ||
+                              _message!.contains("required")
+                          ? Theme.of(context).colorScheme.error
+                          : Theme.of(context).colorScheme.primary,
                     ),
                   ),
-                  const SizedBox(height: 10),
-                  TextField(
-                    controller: _snapTradeConsumerKeyController,
-                    obscureText: true,
-                    decoration: const InputDecoration(
-                      labelText: "SnapTrade Consumer Key",
-                      helperText: "只保存到后端加密存储；不会返回给 Flutter 客户端。",
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: FilledButton.icon(
-                          onPressed: _saving ? null : () => _saveSnapTrade(),
-                          icon: const Icon(Icons.save_outlined),
-                          label: Text(_saving ? "保存中..." : "保存 SnapTrade"),
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      OutlinedButton(
-                        onPressed:
-                            _saving || !snapTrade.userCredentialsConfigured
-                                ? null
-                                : () => _saveSnapTrade(clearCredentials: true),
-                        child: const Text("清除"),
-                      ),
-                    ],
-                  ),
-                  if (_message != null) ...[
-                    const SizedBox(height: 8),
-                    Text(
-                      _message!,
-                      style: TextStyle(
-                        color: _message!.contains("失败") ||
-                                _message!.contains("Exception") ||
-                                _message!.contains("required")
-                            ? Theme.of(context).colorScheme.error
-                            : Theme.of(context).colorScheme.primary,
-                      ),
-                    ),
-                  ],
                 ],
               ],
-            );
-          },
-        ),
+            ],
+          );
+        },
       ),
     );
   }
@@ -2616,86 +2602,82 @@ class _MarketDataStatusCardState extends State<_MarketDataStatusCard> {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: FutureBuilder<MarketDataRefreshStatus>(
-          future: _status,
-          builder: (context, snapshot) {
-            final status = snapshot.data;
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
+    return _SettingsInnerSurface(
+      child: FutureBuilder<MarketDataRefreshStatus>(
+        future: _status,
+        builder: (context, snapshot) {
+          final status = snapshot.data;
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  const Icon(Icons.data_usage),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      "行情刷新状态",
+                      style: Theme.of(context).textTheme.titleLarge,
+                    ),
+                  ),
+                  IconButton(
+                    onPressed:
+                        snapshot.connectionState == ConnectionState.waiting
+                            ? null
+                            : _refresh,
+                    icon: const Icon(Icons.refresh),
+                    tooltip: "刷新状态",
+                  ),
+                ],
+              ),
+              const SizedBox(height: 6),
+              const Text(
+                "顶部优先显示最近手动刷新；下方保留最近更新记录。",
+              ),
+              if (snapshot.connectionState == ConnectionState.waiting) ...[
+                const SizedBox(height: 12),
+                const LinearProgressIndicator(),
+              ] else if (snapshot.hasError) ...[
+                const SizedBox(height: 12),
+                Text(
+                  "行情状态暂时读取失败：${snapshot.error}",
+                  style: TextStyle(color: Theme.of(context).colorScheme.error),
+                ),
+              ] else if (status == null || status.items.isEmpty) ...[
+                const SizedBox(height: 12),
+                const Text("还没有行情刷新记录。可以先点击上方“刷新组合行情”。"),
+              ] else ...[
+                const SizedBox(height: 12),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
                   children: [
-                    const Icon(Icons.data_usage),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        "行情刷新状态",
-                        style: Theme.of(context).textTheme.titleLarge,
-                      ),
-                    ),
-                    IconButton(
-                      onPressed:
-                          snapshot.connectionState == ConnectionState.waiting
-                              ? null
-                              : _refresh,
-                      icon: const Icon(Icons.refresh),
-                      tooltip: "刷新状态",
-                    ),
+                    Chip(label: Text(status.latestStatusLabel)),
+                    Chip(label: Text("手动：${status.latestManualStatusLabel}")),
+                    if (status.latestManualFxLabel != null)
+                      Chip(label: Text(status.latestManualFxLabel!)),
+                    if (status.latestManualFxFreshnessLabel != null)
+                      Chip(label: Text(status.latestManualFxFreshnessLabel!)),
                   ],
                 ),
-                const SizedBox(height: 6),
-                const Text(
-                  "顶部优先显示最近手动刷新；下方保留最近更新记录。",
+                const SizedBox(height: 8),
+                Text(
+                  status.latestManualProviderStatusLabel,
+                  style: Theme.of(context).textTheme.bodySmall,
                 ),
-                if (snapshot.connectionState == ConnectionState.waiting) ...[
-                  const SizedBox(height: 12),
-                  const LinearProgressIndicator(),
-                ] else if (snapshot.hasError) ...[
-                  const SizedBox(height: 12),
-                  Text(
-                    "行情状态暂时读取失败：${snapshot.error}",
-                    style:
-                        TextStyle(color: Theme.of(context).colorScheme.error),
-                  ),
-                ] else if (status == null || status.items.isEmpty) ...[
-                  const SizedBox(height: 12),
-                  const Text("还没有行情刷新记录。可以先点击上方“刷新组合行情”。"),
-                ] else ...[
-                  const SizedBox(height: 12),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      Chip(label: Text(status.latestStatusLabel)),
-                      Chip(label: Text("手动：${status.latestManualStatusLabel}")),
-                      if (status.latestManualFxLabel != null)
-                        Chip(label: Text(status.latestManualFxLabel!)),
-                      if (status.latestManualFxFreshnessLabel != null)
-                        Chip(label: Text(status.latestManualFxFreshnessLabel!)),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    status.latestManualProviderStatusLabel,
-                    style: Theme.of(context).textTheme.bodySmall,
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    "最近刷新：${status.latestStatusLabel} · ${status.latestProviderStatusLabel}",
-                    style: Theme.of(context).textTheme.bodySmall,
-                  ),
-                  const SizedBox(height: 10),
-                  _FreshnessPolicySummary(status.freshnessPolicy),
-                  const Divider(),
-                  ...status.items.map(_MarketDataRefreshRunTile.new),
-                ],
+                const SizedBox(height: 4),
+                Text(
+                  "最近刷新：${status.latestStatusLabel} · ${status.latestProviderStatusLabel}",
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+                const SizedBox(height: 10),
+                _FreshnessPolicySummary(status.freshnessPolicy),
+                const Divider(),
+                ...status.items.map(_MarketDataRefreshRunTile.new),
               ],
-            );
-          },
-        ),
+            ],
+          );
+        },
       ),
     );
   }
@@ -2716,7 +2698,8 @@ class _FxDisplayPolicyCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
+    return _SettingsInnerSurface(
+      padding: EdgeInsets.zero,
       child: ListTile(
         leading: const Icon(Icons.currency_exchange),
         title: Text("FX 折算 · $displayCurrency"),
@@ -2868,59 +2851,55 @@ class _RecentAnalysisCardState extends State<_RecentAnalysisCard> {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: FutureBuilder<List<_RecentAnalysisItem>>(
-          future: _items,
-          builder: (context, snapshot) {
-            final items = snapshot.data ?? const <_RecentAnalysisItem>[];
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    const Icon(Icons.history),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        "智能分析记录",
-                        style: Theme.of(context).textTheme.titleLarge,
-                      ),
+    return _SettingsInnerSurface(
+      child: FutureBuilder<List<_RecentAnalysisItem>>(
+        future: _items,
+        builder: (context, snapshot) {
+          final items = snapshot.data ?? const <_RecentAnalysisItem>[];
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  const Icon(Icons.history),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      "智能分析记录",
+                      style: Theme.of(context).textTheme.titleLarge,
                     ),
-                    IconButton(
-                      onPressed:
-                          snapshot.connectionState == ConnectionState.waiting
-                              ? null
-                              : _refresh,
-                      icon: const Icon(Icons.refresh),
-                      tooltip: "刷新记录",
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 6),
-                const Text("展示最近保存的快扫结果；实时新闻/论坛研究仍未接入。"),
-                if (snapshot.connectionState == ConnectionState.waiting) ...[
-                  const SizedBox(height: 12),
-                  const LinearProgressIndicator(),
-                ] else if (snapshot.hasError) ...[
-                  const SizedBox(height: 12),
-                  Text(
-                    "分析记录暂时读取失败：${snapshot.error}",
-                    style:
-                        TextStyle(color: Theme.of(context).colorScheme.error),
                   ),
-                ] else if (items.isEmpty) ...[
-                  const SizedBox(height: 12),
-                  const Text("还没有分析记录。先在标的、组合或账户页面生成一次智能快扫。"),
-                ] else ...[
-                  const SizedBox(height: 12),
-                  ...items.map(_RecentAnalysisTile.new),
+                  IconButton(
+                    onPressed:
+                        snapshot.connectionState == ConnectionState.waiting
+                            ? null
+                            : _refresh,
+                    icon: const Icon(Icons.refresh),
+                    tooltip: "刷新记录",
+                  ),
                 ],
+              ),
+              const SizedBox(height: 6),
+              const Text("展示最近保存的快扫结果；实时新闻/论坛研究仍未接入。"),
+              if (snapshot.connectionState == ConnectionState.waiting) ...[
+                const SizedBox(height: 12),
+                const LinearProgressIndicator(),
+              ] else if (snapshot.hasError) ...[
+                const SizedBox(height: 12),
+                Text(
+                  "分析记录暂时读取失败：${snapshot.error}",
+                  style: TextStyle(color: Theme.of(context).colorScheme.error),
+                ),
+              ] else if (items.isEmpty) ...[
+                const SizedBox(height: 12),
+                const Text("还没有分析记录。先在标的、组合或账户页面生成一次智能快扫。"),
+              ] else ...[
+                const SizedBox(height: 12),
+                ...items.map(_RecentAnalysisTile.new),
               ],
-            );
-          },
-        ),
+            ],
+          );
+        },
       ),
     );
   }
@@ -2966,144 +2945,140 @@ class _ExternalResearchPolicyCardState
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: FutureBuilder<_ExternalResearchPolicy>(
-          future: _policy,
-          builder: (context, snapshot) {
-            final policy = snapshot.data;
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    const Icon(Icons.shield_outlined),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        "AI 资料更新",
-                        style: Theme.of(context).textTheme.titleLarge,
-                      ),
-                    ),
-                    IconButton(
-                      onPressed:
-                          snapshot.connectionState == ConnectionState.waiting
-                              ? null
-                              : _refresh,
-                      icon: const Icon(Icons.refresh),
-                      tooltip: "刷新策略",
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 6),
-                if (snapshot.connectionState == ConnectionState.waiting) ...[
-                  const LinearProgressIndicator(),
-                ] else if (snapshot.hasError) ...[
-                  Text(
-                    "资料更新策略暂时读取失败：${snapshot.error}",
-                    style:
-                        TextStyle(color: Theme.of(context).colorScheme.error),
-                  ),
-                ] else if (policy != null) ...[
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      Chip(
-                        avatar: Icon(
-                          policy.canRunLiveResearch
-                              ? Icons.check_circle_outline
-                              : Icons.block,
-                          size: 18,
-                        ),
-                        label: Text(policy.statusLabel),
-                      ),
-                      if (policy.scheduledOverviewEnabled)
-                        const Chip(label: Text("每日总览已启用"))
-                      else
-                        const Chip(label: Text("每日总览未启用")),
-                      if (policy.securityManualRefreshEnabled)
-                        const Chip(label: Text("单标的限额刷新")),
-                      Chip(label: Text("有效期 >= ${policy.ttlHours} 小时")),
-                    ],
-                  ),
-                  const SizedBox(height: 10),
-                  const Text("总览秘闻按日准备；单个标的可手动刷新且受次数和有效期限制。页面加载不会临时抓取新闻或付费资料。"),
-                  const SizedBox(height: 10),
-                  Text(
-                    "今日用量：${policy.usedRuns}/${policy.dailyRunLimit} 次；剩余 ${policy.remainingRuns} 次。",
-                    style: Theme.of(context).textTheme.bodySmall,
-                  ),
-                  Text(
-                    "单次最多处理 ${policy.maxSymbolsPerRun} 个标的。",
-                    style: Theme.of(context).textTheme.bodySmall,
-                  ),
-                  const SizedBox(height: 10),
-                  _ExternalIntelligenceFreshnessNote(policy.freshnessPolicy),
-                  const SizedBox(height: 10),
-                  ...policy.sources.map(
-                    (source) => ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      dense: true,
-                      leading: Icon(
-                        source.enabled
-                            ? Icons.check_circle_outline
-                            : Icons.radio_button_unchecked,
-                      ),
-                      title: Text(source.label),
-                      subtitle: Text(source.reason),
+    return _SettingsInnerSurface(
+      child: FutureBuilder<_ExternalResearchPolicy>(
+        future: _policy,
+        builder: (context, snapshot) {
+          final policy = snapshot.data;
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  const Icon(Icons.shield_outlined),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      "AI 资料更新",
+                      style: Theme.of(context).textTheme.titleLarge,
                     ),
                   ),
-                  const Divider(),
-                  FutureBuilder<_ExternalResearchJobsStatus>(
-                    future: _jobs,
-                    builder: (context, jobsSnapshot) {
-                      if (jobsSnapshot.connectionState ==
-                          ConnectionState.waiting) {
-                        return const Padding(
-                          padding: EdgeInsets.symmetric(vertical: 8),
-                          child: LinearProgressIndicator(),
-                        );
-                      }
-                      if (jobsSnapshot.hasError) {
-                        return Text(
-                          "最近任务暂时读取失败：${jobsSnapshot.error}",
-                          style: TextStyle(
-                              color: Theme.of(context).colorScheme.error),
-                        );
-                      }
-                      final jobStatus = jobsSnapshot.data;
-                      final jobs = jobStatus?.items ??
-                          const <_ExternalResearchJobItem>[];
-                      if (jobs.isEmpty) {
-                        return const Text("最近没有资料更新记录。");
-                      }
-                      return Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            "最近更新",
-                            style: Theme.of(context).textTheme.titleMedium,
-                          ),
-                          const SizedBox(height: 6),
-                          if (jobStatus != null) ...[
-                            Text(
-                              jobStatus.summaryLine,
-                              style: Theme.of(context).textTheme.bodySmall,
-                            ),
-                            const SizedBox(height: 6),
-                          ],
-                          ...jobs.map(_ExternalResearchJobTile.new),
-                        ],
-                      );
-                    },
+                  IconButton(
+                    onPressed:
+                        snapshot.connectionState == ConnectionState.waiting
+                            ? null
+                            : _refresh,
+                    icon: const Icon(Icons.refresh),
+                    tooltip: "刷新策略",
                   ),
                 ],
+              ),
+              const SizedBox(height: 6),
+              if (snapshot.connectionState == ConnectionState.waiting) ...[
+                const LinearProgressIndicator(),
+              ] else if (snapshot.hasError) ...[
+                Text(
+                  "资料更新策略暂时读取失败：${snapshot.error}",
+                  style: TextStyle(color: Theme.of(context).colorScheme.error),
+                ),
+              ] else if (policy != null) ...[
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    Chip(
+                      avatar: Icon(
+                        policy.canRunLiveResearch
+                            ? Icons.check_circle_outline
+                            : Icons.block,
+                        size: 18,
+                      ),
+                      label: Text(policy.statusLabel),
+                    ),
+                    if (policy.scheduledOverviewEnabled)
+                      const Chip(label: Text("每日总览已启用"))
+                    else
+                      const Chip(label: Text("每日总览未启用")),
+                    if (policy.securityManualRefreshEnabled)
+                      const Chip(label: Text("单标的限额刷新")),
+                    Chip(label: Text("有效期 >= ${policy.ttlHours} 小时")),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                const Text("总览秘闻按日准备；单个标的可手动刷新且受次数和有效期限制。页面加载不会临时抓取新闻或付费资料。"),
+                const SizedBox(height: 10),
+                Text(
+                  "今日用量：${policy.usedRuns}/${policy.dailyRunLimit} 次；剩余 ${policy.remainingRuns} 次。",
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+                Text(
+                  "单次最多处理 ${policy.maxSymbolsPerRun} 个标的。",
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+                const SizedBox(height: 10),
+                _ExternalIntelligenceFreshnessNote(policy.freshnessPolicy),
+                const SizedBox(height: 10),
+                ...policy.sources.map(
+                  (source) => ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    dense: true,
+                    leading: Icon(
+                      source.enabled
+                          ? Icons.check_circle_outline
+                          : Icons.radio_button_unchecked,
+                    ),
+                    title: Text(source.label),
+                    subtitle: Text(source.reason),
+                  ),
+                ),
+                const Divider(),
+                FutureBuilder<_ExternalResearchJobsStatus>(
+                  future: _jobs,
+                  builder: (context, jobsSnapshot) {
+                    if (jobsSnapshot.connectionState ==
+                        ConnectionState.waiting) {
+                      return const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 8),
+                        child: LinearProgressIndicator(),
+                      );
+                    }
+                    if (jobsSnapshot.hasError) {
+                      return Text(
+                        "最近任务暂时读取失败：${jobsSnapshot.error}",
+                        style: TextStyle(
+                            color: Theme.of(context).colorScheme.error),
+                      );
+                    }
+                    final jobStatus = jobsSnapshot.data;
+                    final jobs =
+                        jobStatus?.items ?? const <_ExternalResearchJobItem>[];
+                    if (jobs.isEmpty) {
+                      return const Text("最近没有资料更新记录。");
+                    }
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          "最近更新",
+                          style: Theme.of(context).textTheme.titleMedium,
+                        ),
+                        const SizedBox(height: 6),
+                        if (jobStatus != null) ...[
+                          Text(
+                            jobStatus.summaryLine,
+                            style: Theme.of(context).textTheme.bodySmall,
+                          ),
+                          const SizedBox(height: 6),
+                        ],
+                        ...jobs.map(_ExternalResearchJobTile.new),
+                      ],
+                    );
+                  },
+                ),
               ],
-            );
-          },
-        ),
+            ],
+          );
+        },
       ),
     );
   }
