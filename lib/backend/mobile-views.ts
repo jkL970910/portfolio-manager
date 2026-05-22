@@ -679,6 +679,17 @@ type MobileRecommendationMarketItem = {
   freshnessLabel: string;
 };
 
+type RecommendationMarketCandidate = {
+  key: string;
+  identity: {
+    symbol: string;
+    exchange?: string | null;
+    currency?: "CAD" | "USD" | null;
+    securityId?: string | null;
+    name?: string | null;
+  };
+};
+
 type MobileImportData = {
   manualSteps: { title: string; description: string }[];
   actionCards: { label: string; title: string; description: string }[];
@@ -1106,15 +1117,20 @@ async function buildMobileRecommendationMarketItems(input: {
   const repositories = getRepositories();
   const holdings = await repositories.holdings.listByUserId(input.userId);
   const watchlistMarketItems = await Promise.all(
-    input.watchlistSymbols.slice(0, 12).map((key) =>
-      buildMobileRecommendationMarketItem({
+    dedupeRecommendationMarketCandidates(
+      input.watchlistSymbols.map((key) => ({
         key,
         identity: parseRecommendationMarketIdentity(key),
+      })),
+      holdings,
+    ).slice(0, 12).map((candidate) =>
+      buildMobileRecommendationMarketItem({
+        key: candidate.key,
+        identity: candidate.identity,
         holdings,
       }),
     ),
   );
-  const seenRecent = new Set<string>();
   const recentCandidates = input.observations
     .filter((observation) => observation.symbol.trim().length > 0)
     .map((observation) => ({
@@ -1132,17 +1148,14 @@ async function buildMobileRecommendationMarketItems(input: {
         securityId: observation.securityId ?? null,
         name: observation.name ?? observation.symbol,
       },
-    }))
-    .filter((candidate) => {
-      if (seenRecent.has(candidate.key)) {
-        return false;
-      }
-      seenRecent.add(candidate.key);
-      return true;
-    })
+    }));
+  const dedupedRecentCandidates = dedupeRecommendationMarketCandidates(
+    recentCandidates,
+    holdings,
+  )
     .slice(0, 8);
   const recentObservationItems = await Promise.all(
-    recentCandidates.map((candidate) =>
+    dedupedRecentCandidates.map((candidate) =>
       buildMobileRecommendationMarketItem({
         key: candidate.key,
         identity: candidate.identity,
@@ -1416,6 +1429,69 @@ function parseRecommendationMarketIdentity(key: string): {
     securityId: null,
     name: "",
   };
+}
+
+function dedupeRecommendationMarketCandidates(
+  candidates: RecommendationMarketCandidate[],
+  holdings: HoldingPosition[],
+): RecommendationMarketCandidate[] {
+  const bestByIdentity = new Map<
+    string,
+    { candidate: RecommendationMarketCandidate; score: number; index: number }
+  >();
+  for (const candidate of candidates) {
+    const normalized = normalizeRecommendationMarketIdentity(
+      candidate.identity,
+      holdings,
+    );
+    if (!normalized.symbol) {
+      continue;
+    }
+    const score =
+      (normalized.securityId ? 4 : 0) +
+      (normalized.exchange ? 2 : 0) +
+      (normalized.currency ? 1 : 0);
+    const dedupeKey =
+      normalized.exchange || normalized.currency || normalized.securityId
+        ? recommendationMarketIdentityKey(normalized)
+        : normalized.symbol;
+    const existing = bestByIdentity.get(dedupeKey);
+    if (existing && existing.score >= score) {
+      continue;
+    }
+    bestByIdentity.set(dedupeKey, {
+      candidate: {
+        key: recommendationMarketIdentityKey(normalized),
+        identity: normalized,
+      },
+      score,
+      index: existing?.index ?? bestByIdentity.size,
+    });
+  }
+  const completeSymbols = new Set(
+    [...bestByIdentity.values()]
+      .map((entry) => entry.candidate.identity)
+      .filter((identity) => identity.exchange || identity.currency)
+      .map((identity) => identity.symbol.trim().toUpperCase()),
+  );
+  return [...bestByIdentity.values()]
+    .filter((entry) => {
+      const identity = entry.candidate.identity;
+      const incomplete = !identity.exchange && !identity.currency;
+      return !(incomplete && completeSymbols.has(identity.symbol));
+    })
+    .sort((a, b) => a.index - b.index)
+    .map((entry) => entry.candidate);
+}
+
+function recommendationMarketIdentityKey(identity: {
+  symbol: string;
+  exchange?: string | null;
+  currency?: "CAD" | "USD" | null;
+}) {
+  return [identity.symbol, identity.exchange ?? "", identity.currency ?? ""]
+    .filter(Boolean)
+    .join(":");
 }
 
 async function buildMobileRecommendationMarketItem(input: {
