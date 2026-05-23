@@ -120,8 +120,8 @@ export default async function PortfolioAccountDetailPage({
                   <CompactMetric icon={<Wallet className="h-4 w-4" />} label={pick(language, "账户币种", "Account currency")} value={detail.account.currency} />
                   <CompactMetric
                     icon={<Wallet className="h-4 w-4" />}
-                    label={pick(language, "可用额度", "Available room")}
-                    value={compactRoom(detail.account.room, detail.account.currency)}
+                    label={pick(language, "注册额度", "Registered room")}
+                    value={pick(language, "设置页统一维护", "Managed in Settings")}
                   />
                 </div>
               </CardContent>
@@ -242,17 +242,4 @@ function CompactMetric({
 function compactPortfolioShare(value: string) {
   const match = value.match(/-?\d+(?:\.\d+)?%/);
   return match?.[0] ?? value;
-}
-
-function compactRoom(value: string, currency: string) {
-  if (value.includes("不记录") || value.toLowerCase().includes("does not track")) {
-    return value;
-  }
-
-  const moneyMatch = value.match(/([$¥€£]\s?[\d,]+(?:\.\d+)?|\d[\d,]*(?:\.\d+)?)/);
-  if (!moneyMatch) {
-    return value;
-  }
-
-  return `${currency} ${moneyMatch[0].replace(/\s+/g, "")}`;
 }

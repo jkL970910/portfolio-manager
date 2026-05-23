@@ -2076,13 +2076,13 @@ function formatRoomDetail(
   display: DisplayContext,
   language: DisplayLanguage,
 ) {
-  if (account.contributionRoomCad == null) {
+  if (account.type === "Taxable") {
     return pick(language, "这类账户没有免税额度概念", "No tax shelter");
   }
   return pick(
     language,
-    `还剩 ${formatDisplayCurrency(account.contributionRoomCad, display)} 可用额度`,
-    `${formatDisplayCurrency(account.contributionRoomCad, display)} room left`,
+    "额度在设置页按账户类别统一维护",
+    "Room is managed by account type in Settings",
   );
 }
 
@@ -2114,41 +2114,11 @@ function getEffectiveAccountPriorityOrder(
   priorityOrder: InvestmentAccount["type"][],
 ) {
   const accountTypes = new Set(accounts.map((account) => account.type));
-  const availableShelteredTypes = new Set(
-    accounts
-      .filter(
-        (account) =>
-          account.type === "Taxable" ||
-          account.contributionRoomCad == null ||
-          account.contributionRoomCad > 0,
-      )
-      .map((account) => account.type),
-  );
-
-  return priorityOrder.filter(
-    (type) => accountTypes.has(type) && availableShelteredTypes.has(type),
-  );
+  return priorityOrder.filter((type) => accountTypes.has(type));
 }
 
-function getExhaustedPriorityTypes(
-  accounts: InvestmentAccount[],
-  priorityOrder: InvestmentAccount["type"][],
-) {
-  const accountTypes = new Set(accounts.map((account) => account.type));
-  const availableShelteredTypes = new Set(
-    accounts
-      .filter(
-        (account) =>
-          account.type === "Taxable" ||
-          account.contributionRoomCad == null ||
-          account.contributionRoomCad > 0,
-      )
-      .map((account) => account.type),
-  );
-
-  return priorityOrder.filter(
-    (type) => accountTypes.has(type) && !availableShelteredTypes.has(type),
-  );
+function getExhaustedPriorityTypes() {
+  return [];
 }
 
 function formatHoldingPrice(
@@ -2208,10 +2178,7 @@ function getRecommendationAssumptions(
     accounts,
     profile.accountFundingPriority,
   );
-  const exhaustedTypes = getExhaustedPriorityTypes(
-    accounts,
-    profile.accountFundingPriority,
-  );
+  const exhaustedTypes = getExhaustedPriorityTypes();
   return [
     pick(
       language,
@@ -2227,8 +2194,8 @@ function getRecommendationAssumptions(
       ? [
           pick(
             language,
-            `${formatAccountPriorityOrder(exhaustedTypes, language)} 这次会先往后排，因为 Loo皇看到账户额度已经用完了。`,
-            `${formatAccountPriorityOrder(exhaustedTypes, language)} drops back for this contribution because the available room is already used up.`,
+            `${formatAccountPriorityOrder(exhaustedTypes, language)} 这次会先往后排，因为对应账户类别的共享额度已经用完了。`,
+            `${formatAccountPriorityOrder(exhaustedTypes, language)} drops back for this contribution because the shared account-type room is used up.`,
           ),
         ]
       : []),
@@ -2356,7 +2323,7 @@ function getGuidedQuestions(
       ),
       pick(
         language,
-        "这套推荐是先顾账户额度，还是先补配置缺口？",
+        "这套推荐是先顾共享注册额度，还是先补配置缺口？",
         "Should the engine prioritize sheltered room before broader drift correction?",
       ),
       pick(
@@ -3073,11 +3040,11 @@ export function buildPortfolioData(args: {
               )
             : pick(language, "还没有资产", "No assets yet"),
         room:
-          account.contributionRoomCad !== null
+          account.type !== "Taxable"
             ? pick(
                 language,
-                `按规划基准 CAD 还剩 ${formatMoney(account.contributionRoomCad, "CAD")}`,
-                `${formatMoney(account.contributionRoomCad, "CAD")} of planning-base CAD room left`,
+                "额度在设置页统一维护",
+                "Room is managed in Settings",
               )
             : pick(
                 language,
@@ -3191,11 +3158,11 @@ export function buildPortfolioData(args: {
                 "这个账户里现在还没有持仓。",
                 "There are no holdings in this account yet.",
               ),
-          account.contributionRoomCad !== null
+          account.type !== "Taxable"
             ? pick(
                 language,
-                `这个账户按规划基准还剩 ${formatMoney(account.contributionRoomCad, "CAD")} 可用额度。`,
-                `This account still has ${formatMoney(account.contributionRoomCad, "CAD")} of planning-base room left.`,
+                `${getAccountTypeLabel(account.type, language)} 的注册额度现在按账户类别统一维护，不跟单个券商账户绑定。`,
+                `${getAccountTypeLabel(account.type, language)} room is now managed by account type, not by an individual brokerage account.`,
               )
             : pick(
                 language,
@@ -4725,10 +4692,7 @@ export function buildRecommendationsData(args: {
     accounts,
     profile.accountFundingPriority,
   );
-  const exhaustedPriorityTypes = getExhaustedPriorityTypes(
-    accounts,
-    profile.accountFundingPriority,
-  );
+  const exhaustedPriorityTypes = getExhaustedPriorityTypes();
 
   const buildScenarioDiffs = (
     scenarioRun: RecommendationRun,
@@ -4917,8 +4881,8 @@ export function buildRecommendationsData(args: {
               ),
               value: pick(
                 language,
-                `${formatAccountPriorityOrder(exhaustedPriorityTypes, language)}（额度已满）`,
-                `${formatAccountPriorityOrder(exhaustedPriorityTypes, language)} (room exhausted)`,
+                `${formatAccountPriorityOrder(exhaustedPriorityTypes, language)}（共享额度已满）`,
+                `${formatAccountPriorityOrder(exhaustedPriorityTypes, language)} (shared room exhausted)`,
               ),
               tone: "warning" as const,
             },

@@ -279,7 +279,6 @@ class LooApiClient {
     required String institution,
     required String nickname,
     required String currency,
-    required double contributionRoomCad,
     required double initialMarketValueAmount,
   }) {
     return _postJson(
@@ -289,7 +288,6 @@ class LooApiClient {
         "institution": institution,
         "nickname": nickname,
         "currency": currency,
-        "contributionRoomCad": contributionRoomCad,
         "initialMarketValueAmount": initialMarketValueAmount,
       },
     );
@@ -423,7 +421,6 @@ class LooApiClient {
     required String institution,
     required String type,
     required String currency,
-    required double contributionRoomCad,
   }) {
     return _patchJson(
       "/api/mobile/portfolio/accounts/${Uri.encodeComponent(accountId)}/manage",
@@ -432,7 +429,6 @@ class LooApiClient {
         "institution": institution,
         "type": type,
         "currency": currency,
-        "contributionRoomCad": contributionRoomCad,
       },
     );
   }

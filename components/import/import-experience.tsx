@@ -396,7 +396,6 @@ export function ImportExperience({
   const [accountCurrency, setAccountCurrency] = useState<SupportedCurrency>("CAD");
   const [institution, setInstitution] = useState("");
   const [nickname, setNickname] = useState("");
-  const [contributionRoomCad, setContributionRoomCad] = useState("0");
   const [initialMarketValueAmount, setInitialMarketValueAmount] = useState("0");
   const [manualHoldings, setManualHoldings] = useState<ManualHoldingDraft[]>([createManualHoldingDraft()]);
   const [guidedResult, setGuidedResult] = useState<GuidedImportResult | null>(null);
@@ -416,7 +415,6 @@ export function ImportExperience({
   });
   const [isPending, startTransition] = useTransition();
 
-  const parsedContributionRoom = Number(contributionRoomCad) || 0;
   const parsedInitialMarketValue = Number(initialMarketValueAmount) || 0;
   const guidedCsvPreview = useMemo(() => previewCsvContent(guidedCsvContent, 10), [guidedCsvContent]);
   const guidedCsvPresetOptions = useMemo(
@@ -464,7 +462,6 @@ export function ImportExperience({
     setInstitution(selected.institution);
     setNickname(selected.nickname);
     setAccountCurrency(selected.currency);
-    setContributionRoomCad(String(selected.contributionRoomCad ?? 0));
     setInitialMarketValueAmount(String(selected.marketValueAmount ?? selected.marketValueCad ?? 0));
   }, [accountMode, existingAccounts, selectedExistingAccountId]);
 
@@ -794,7 +791,6 @@ export function ImportExperience({
     setAccountCurrency("CAD");
     setInstitution("");
     setNickname("");
-    setContributionRoomCad("0");
     setInitialMarketValueAmount("0");
     setManualHoldings([createManualHoldingDraft()]);
     setManualHoldingSuggestions({});
@@ -1035,7 +1031,6 @@ export function ImportExperience({
           institution: institution.trim(),
           nickname: nickname.trim(),
           currency: accountCurrency,
-          contributionRoomCad: parsedContributionRoom,
           initialMarketValueAmount: parsedInitialMarketValue,
           holdings: method === "manual-entry"
             ? manualHoldings.map((holding) => ({
@@ -1251,7 +1246,6 @@ export function ImportExperience({
                     accountCurrency={accountCurrency}
                     institution={institution}
                     nickname={nickname}
-                    contributionRoomCad={contributionRoomCad}
                     initialMarketValueAmount={initialMarketValueAmount}
                     manualHoldings={manualHoldings}
                     manualHoldingSuggestions={manualHoldingSuggestions}
@@ -1261,7 +1255,6 @@ export function ImportExperience({
                     onAccountCurrencyChange={setAccountCurrency}
                     onInstitutionChange={setInstitution}
                     onNicknameChange={setNickname}
-                    onContributionRoomChange={setContributionRoomCad}
                     onInitialMarketValueChange={setInitialMarketValueAmount}
                     onManualHoldingChange={updateManualHolding}
                     onAddManualHolding={addManualHolding}
@@ -1291,7 +1284,6 @@ export function ImportExperience({
                     institution={institution}
                     nickname={nickname}
                     accountCurrency={accountCurrency}
-                    contributionRoomCad={parsedContributionRoom}
                     initialMarketValueAmount={parsedInitialMarketValue}
                     accountMode={accountMode}
                     selectedExistingAccount={matchingExistingAccounts.find((account) => account.id === selectedExistingAccountId) ?? null}
@@ -1514,7 +1506,6 @@ function StepProvideSource(props: {
   accountCurrency: SupportedCurrency;
   institution: string;
   nickname: string;
-  contributionRoomCad: string;
   initialMarketValueAmount: string;
   manualHoldings: ManualHoldingDraft[];
   manualHoldingSuggestions: Record<string, MarketDataSearchResult[]>;
@@ -1524,7 +1515,6 @@ function StepProvideSource(props: {
   onAccountCurrencyChange: (value: SupportedCurrency) => void;
   onInstitutionChange: (value: string) => void;
   onNicknameChange: (value: string) => void;
-  onContributionRoomChange: (value: string) => void;
   onInitialMarketValueChange: (value: string) => void;
   onManualHoldingChange: (id: string, patch: Partial<ManualHoldingDraft>) => void;
   onAddManualHolding: () => void;
@@ -1554,7 +1544,6 @@ function StepProvideSource(props: {
     accountCurrency,
     institution,
     nickname,
-    contributionRoomCad,
     initialMarketValueAmount,
     manualHoldings,
     manualHoldingSuggestions,
@@ -1564,7 +1553,6 @@ function StepProvideSource(props: {
     onAccountCurrencyChange,
     onInstitutionChange,
     onNicknameChange,
-    onContributionRoomChange,
     onInitialMarketValueChange,
     onManualHoldingChange,
     onAddManualHolding,
@@ -1657,17 +1645,9 @@ function StepProvideSource(props: {
               <option value="USD">USD</option>
             </select>
           </label>
-          <label className="space-y-2">
-            <span className="text-sm font-medium">{pick(language, "供款额度（CAD）", "Contribution room (CAD)")}</span>
-            <input
-              type="number"
-              min="0"
-              value={contributionRoomCad}
-              onChange={(event) => onContributionRoomChange(event.target.value)}
-              className="w-full rounded-2xl border border-[color:var(--border)] bg-white px-4 py-3 text-sm outline-none"
-              placeholder="0"
-            />
-          </label>
+          <div className="rounded-2xl border border-[color:var(--border)] bg-[color:var(--card-muted)] px-4 py-3 text-sm text-[color:var(--muted-foreground)]">
+            {pick(language, "注册额度已改为在设置页按 TFSA/RRSP/FHSA 统一维护。", "Registered room is now managed in Settings by TFSA/RRSP/FHSA.")}
+          </div>
           <label className="space-y-2">
             <span className="text-sm font-medium">{pick(language, "当前市值", "Current market value")} ({accountCurrency})</span>
             <input
@@ -2005,7 +1985,6 @@ function StepReviewAndConfirm({
   institution,
   nickname,
   accountCurrency,
-  contributionRoomCad,
   initialMarketValueAmount,
   accountMode,
   selectedExistingAccount,
@@ -2020,7 +1999,6 @@ function StepReviewAndConfirm({
   institution: string;
   nickname: string;
   accountCurrency: SupportedCurrency;
-  contributionRoomCad: number;
   initialMarketValueAmount: number;
   accountMode: "new" | "existing";
   selectedExistingAccount: ExistingAccountOption | null;
@@ -2038,7 +2016,7 @@ function StepReviewAndConfirm({
           {accountMode === "existing" && selectedExistingAccount
             ? pick(language, `将更新已有 ${selectedExistingAccount.type} 账户 ${selectedExistingAccount.nickname}（${selectedExistingAccount.institution}）。`, `Updating existing ${selectedExistingAccount.type} account ${selectedExistingAccount.nickname} at ${selectedExistingAccount.institution}. `)
             : pick(language, `机构：${institution || "未设置"}。昵称：${nickname || "未设置"}。`, `Institution: ${institution || "Not set"}. Nickname: ${nickname || "Not set"}. `)}
-          {" "}{pick(language, "供款额度：", "Contribution room: ")}{formatCad(contributionRoomCad)}.
+          {" "}{pick(language, "注册额度会沿用设置页里的共享额度。", "Registered room uses the shared values from Settings.")}
         </p>
       </div>
 
@@ -2193,4 +2171,3 @@ function StepCompleteSetup({
     </div>
   );
 }
-

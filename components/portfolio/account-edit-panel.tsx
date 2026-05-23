@@ -28,18 +28,6 @@ export function AccountEditPanel({
   const [institution, setInstitution] = useState(detail.editContext.current.institution);
   const [type, setType] = useState(detail.editContext.current.type);
   const [currency, setCurrency] = useState<"CAD" | "USD">(detail.editContext.current.currency);
-  const [contributionRoomCad, setContributionRoomCad] = useState(
-    detail.editContext.current.contributionRoomCad == null ? "" : String(detail.editContext.current.contributionRoomCad)
-  );
-
-  function toNullableNumber(value: string) {
-    const trimmed = value.trim();
-    if (!trimmed) {
-      return null;
-    }
-    const parsed = Number(trimmed);
-    return Number.isFinite(parsed) ? parsed : null;
-  }
 
   function saveChanges() {
     setStatus("");
@@ -51,8 +39,7 @@ export function AccountEditPanel({
           nickname: nickname.trim(),
           institution: institution.trim(),
           type,
-          currency,
-          contributionRoomCad: toNullableNumber(contributionRoomCad)
+          currency
         })
       });
       const payload = await safeJson(response);
@@ -72,7 +59,7 @@ export function AccountEditPanel({
           <div className="space-y-1">
             <p className="text-sm font-semibold text-[color:var(--foreground)]">{pick(language, "改这个账户", "Edit this account")}</p>
             <p className="text-sm text-[color:var(--muted-foreground)]">
-              {pick(language, "先修账户名、机构、币种和可用额度这些基础资料。", "Start by correcting account name, institution, currency, and available room.")}
+              {pick(language, "先修账户名、机构和币种这些基础资料。注册额度请到设置页按账户类别统一维护。", "Start by correcting account name, institution, and currency. Registered room is managed by account type in Settings.")}
             </p>
           </div>
           <Button type="button" variant="secondary" onClick={() => setOpen((current) => !current)} leadingIcon={<PencilLine className="h-4 w-4" />}>
@@ -106,10 +93,6 @@ export function AccountEditPanel({
                     <option key={option.value} value={option.value}>{option.label}</option>
                   ))}
                 </select>
-              </label>
-              <label className="space-y-2 md:col-span-2">
-                <span className="text-sm font-medium">{pick(language, "按规划基准 CAD 的可用额度", "Available room in planning CAD")}</span>
-                <input className={FIELD_CLASS_NAME} value={contributionRoomCad} onChange={(event) => setContributionRoomCad(event.target.value)} inputMode="decimal" />
               </label>
             </div>
 

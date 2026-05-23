@@ -839,8 +839,8 @@ export function PreferencesWorkbench({
                         <div className="rounded-[22px] border border-white/55 bg-white/34 px-4 py-4 text-sm text-[color:var(--muted-foreground)]">
                           {pick(
                             language,
-                            "这里保存的是你希望先用哪些账户的顺序。真正生成推荐时，如果某类受保护账户额度已经用完，系统会自动把它暂时跳过。",
-                            "This saves the order you prefer to fund accounts. During recommendation runs, the system will temporarily skip sheltered accounts whose room is already exhausted."
+                            "这里保存的是你希望先用哪些账户的顺序。真正生成推荐时，系统会结合设置页里的共享注册额度判断哪些账户类别还能继续使用。",
+                            "This saves the order you prefer to fund accounts. During recommendation runs, the system checks shared registered room from Settings before using sheltered account types."
                           )}
                         </div>
                       </div>

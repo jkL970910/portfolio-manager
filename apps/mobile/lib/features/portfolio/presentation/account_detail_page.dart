@@ -790,7 +790,6 @@ class _SummaryCard extends StatelessWidget {
               if (data.gainLoss.isNotEmpty) _MiniPill(data.gainLoss),
               if (data.portfolioShare.isNotEmpty)
                 _MiniPill("组合 ${data.portfolioShare}"),
-              if (data.room.isNotEmpty) _MiniPill(data.room),
               _MiniPill("持仓 ${data.holdings.length} 个"),
             ],
           ),
@@ -1756,7 +1755,6 @@ class _EditAccountSheetState extends State<_EditAccountSheet> {
       TextEditingController(text: widget.account.name);
   late final _institutionController =
       TextEditingController(text: widget.account.institution);
-  final _roomController = TextEditingController(text: "0");
 
   late var _accountType = widget.account.typeId;
   late var _currency = widget.account.currency;
@@ -1767,7 +1765,6 @@ class _EditAccountSheetState extends State<_EditAccountSheet> {
   void dispose() {
     _nicknameController.dispose();
     _institutionController.dispose();
-    _roomController.dispose();
     super.dispose();
   }
 
@@ -1788,7 +1785,6 @@ class _EditAccountSheetState extends State<_EditAccountSheet> {
         institution: _institutionController.text.trim(),
         type: _accountType,
         currency: _currency,
-        contributionRoomCad: double.tryParse(_roomController.text.trim()) ?? 0,
       );
       if (mounted) {
         Navigator.of(context).pop(true);
@@ -1862,13 +1858,9 @@ class _EditAccountSheetState extends State<_EditAccountSheet> {
                     : (value) => setState(() => _currency = value ?? _currency),
               ),
               const SizedBox(height: 12),
-              TextFormField(
-                controller: _roomController,
-                enabled: !_submitting,
-                keyboardType:
-                    const TextInputType.numberWithOptions(decimal: true),
-                decoration: const InputDecoration(labelText: "贡献额度 CAD"),
-                validator: _validateMoney,
+              Text(
+                "TFSA/RRSP/FHSA 额度现在在设置页按账户类别统一维护，不属于单个券商账户。",
+                style: Theme.of(context).textTheme.bodySmall,
               ),
               if (_error != null) ...[
                 const SizedBox(height: 12),
@@ -1889,13 +1881,5 @@ class _EditAccountSheetState extends State<_EditAccountSheet> {
         ),
       ),
     );
-  }
-
-  String? _validateMoney(String? value) {
-    final parsed = double.tryParse((value ?? "").trim());
-    if (parsed == null || parsed < 0) {
-      return "请输入大于等于 0 的数字";
-    }
-    return null;
   }
 }

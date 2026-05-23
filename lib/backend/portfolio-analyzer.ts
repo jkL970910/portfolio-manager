@@ -1,5 +1,4 @@
 import {
-  AccountType,
   ExternalResearchDocumentRecord,
   HoldingPosition,
   InvestmentAccount,
@@ -23,10 +22,7 @@ import {
   buildSecurityDecisionContext,
   buildSecurityDecisionNarrative,
 } from "@/lib/backend/security-decision/context";
-import {
-  getHoldingEconomicAssetClass,
-  inferEconomicAssetClass,
-} from "@/lib/backend/security-economic-exposure";
+import { getHoldingEconomicAssetClass } from "@/lib/backend/security-economic-exposure";
 
 function round(value: number, digits = 0) {
   const factor = 10 ** digits;
@@ -1949,11 +1945,6 @@ export function buildAccountAnalyzerQuickScan(args: {
         detail: `${largestHolding.symbol} 在全组合中约占 ${round(largestHolding.weightPct, 1)}%，需要结合这个账户的税务位置和资产类别判断。`,
         relatedIdentity: getHoldingIdentity(largestHolding)
       }] : []),
-      ...(args.account.contributionRoomCad != null && args.account.contributionRoomCad <= 0 ? [{
-        severity: "info" as const,
-        title: "账户额度已接近用完",
-        detail: `${accountLabel} 当前记录的额度不高，后续新增资金可能需要优先考虑其他账户。`
-      }] : [])
     ].slice(0, 12),
     taxNotes: taxNotes.length > 0
       ? taxNotes

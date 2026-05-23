@@ -224,7 +224,6 @@ export interface UpdateInvestmentAccountInput {
   institution?: string;
   type?: AccountType;
   currency?: CurrencyCode;
-  contributionRoomCad?: number | null;
 }
 
 export interface MergeAccountsPreviewResult {
@@ -324,7 +323,6 @@ export interface CreateGuidedImportInput {
   institution: string;
   nickname: string;
   currency: CurrencyCode;
-  contributionRoomCad: number;
   initialMarketValueAmount: number;
   holdings?: Array<{
     symbol: string;
@@ -346,7 +344,6 @@ export interface CreateManualInvestmentAccountInput {
   institution: string;
   nickname: string;
   currency: CurrencyCode;
-  contributionRoomCad: number;
   initialMarketValueAmount: number;
 }
 
@@ -384,7 +381,7 @@ export async function createManualInvestmentAccount(
       marketValueCad: (
         (await toCadAmount(input.initialMarketValueAmount, input.currency)) ?? 0
       ).toFixed(2),
-      contributionRoomCad: input.contributionRoomCad.toFixed(2),
+      contributionRoomCad: null,
     })
     .returning();
 
@@ -3118,12 +3115,6 @@ export async function updateInvestmentAccount(
         institution: input.institution ?? account.institution,
         type: input.type ?? (account.type as AccountType),
         currency,
-        contributionRoomCad:
-          input.contributionRoomCad === undefined
-            ? account.contributionRoomCad
-            : input.contributionRoomCad == null
-              ? null
-              : input.contributionRoomCad.toFixed(2),
         marketValueAmount: marketValueAmount.toFixed(2),
         updatedAt: new Date(),
       })
@@ -3142,7 +3133,6 @@ export async function updateInvestmentAccount(
           institution: account.institution,
           type: account.type,
           currency: account.currency,
-          contributionRoomCad: account.contributionRoomCad,
         },
         after: input,
       },
@@ -3263,7 +3253,7 @@ export async function previewAccountMerge(
     (target.contributionRoomCad ?? null) != null
   ) {
     warnings.push(
-      "Contribution room is not additive during merge. The target account room value will be kept.",
+      "Legacy account room values are ignored. Registered room is managed by account type.",
     );
   }
 
@@ -5885,7 +5875,6 @@ export async function createGuidedImportAccount(
           institution: input.institution,
           nickname: input.nickname,
           currency: input.currency,
-          contributionRoomCad: input.contributionRoomCad.toFixed(2),
           updatedAt: new Date(),
         })
         .where(eq(investmentAccounts.id, existing.id))
@@ -5907,7 +5896,7 @@ export async function createGuidedImportAccount(
               input.currency,
             )) ?? 0
           ).toFixed(2),
-          contributionRoomCad: input.contributionRoomCad.toFixed(2),
+          contributionRoomCad: null,
         })
         .returning();
     }

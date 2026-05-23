@@ -504,7 +504,6 @@ export const guidedImportCreateSchema = z
     institution: z.string().trim().min(2).max(120),
     nickname: z.string().trim().min(2).max(120),
     currency: z.enum(["CAD", "USD"]).default("CAD"),
-    contributionRoomCad: z.number().min(0).max(1000000).optional().default(0),
     initialMarketValueAmount: z
       .number()
       .min(0)
@@ -537,7 +536,6 @@ export const mobileManualAccountCreateSchema = z.object({
   institution: z.string().trim().min(2).max(120),
   nickname: z.string().trim().min(2).max(120),
   currency: z.enum(["CAD", "USD"]).default("CAD"),
-  contributionRoomCad: z.number().min(0).max(1000000).optional().default(0),
   initialMarketValueAmount: z
     .number()
     .min(0)
@@ -682,7 +680,6 @@ export const accountEditSchema = z
     institution: z.string().trim().min(2).max(120).optional(),
     type: z.enum(["TFSA", "RRSP", "FHSA", "Taxable"]).optional(),
     currency: z.enum(["CAD", "USD"]).optional(),
-    contributionRoomCad: z.number().min(0).max(1_000_000).nullable().optional(),
   })
   .refine(
     (value) => Object.values(value).some((entry) => entry !== undefined),

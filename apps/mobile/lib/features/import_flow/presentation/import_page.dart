@@ -2777,7 +2777,6 @@ class _CreateAccountSheetState extends State<_CreateAccountSheet> {
   final _formKey = GlobalKey<FormState>();
   final _institutionController = TextEditingController();
   final _nicknameController = TextEditingController();
-  final _roomController = TextEditingController(text: "0");
   final _marketValueController = TextEditingController(text: "0");
 
   var _accountType = "TFSA";
@@ -2789,7 +2788,6 @@ class _CreateAccountSheetState extends State<_CreateAccountSheet> {
   void dispose() {
     _institutionController.dispose();
     _nicknameController.dispose();
-    _roomController.dispose();
     _marketValueController.dispose();
     super.dispose();
   }
@@ -2810,7 +2808,6 @@ class _CreateAccountSheetState extends State<_CreateAccountSheet> {
         institution: _institutionController.text.trim(),
         nickname: _nicknameController.text.trim(),
         currency: _currency,
-        contributionRoomCad: double.tryParse(_roomController.text.trim()) ?? 0,
         initialMarketValueAmount:
             double.tryParse(_marketValueController.text.trim()) ?? 0,
       );
@@ -2901,13 +2898,9 @@ class _CreateAccountSheetState extends State<_CreateAccountSheet> {
                     : (value) => setState(() => _currency = value ?? _currency),
               ),
               const SizedBox(height: 12),
-              TextFormField(
-                controller: _roomController,
-                enabled: !_submitting,
-                keyboardType:
-                    const TextInputType.numberWithOptions(decimal: true),
-                decoration: const InputDecoration(labelText: "贡献额度 CAD"),
-                validator: _validateMoney,
+              Text(
+                "注册额度请在设置页统一维护；这里仅创建账户本身。",
+                style: Theme.of(context).textTheme.bodySmall,
               ),
               const SizedBox(height: 12),
               TextFormField(

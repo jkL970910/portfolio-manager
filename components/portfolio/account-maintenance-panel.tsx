@@ -24,19 +24,12 @@ type MergePreview = {
 
 type Mode = "edit" | "add-holding" | "merge" | null;
 
-function toNullableNumber(value: string) {
-  const trimmed = value.trim();
-  if (!trimmed) return null;
-  const parsed = Number(trimmed);
-  return Number.isFinite(parsed) ? parsed : null;
-}
-
 function localizeMergeWarning(language: DisplayLanguage, warning: string) {
   if (/same account type/i.test(warning)) {
     return pick(language, "目前只能合并同一种账户类型，比如 TFSA 合到 TFSA。", "Only accounts with the same type can be merged right now.");
   }
   if (/Contribution room is not additive/i.test(warning)) {
-    return pick(language, "合并时，可用额度不会相加。系统会保留目标账户当前的额度数字。", "Contribution room is not additive during merge. The target account room value will be kept.");
+    return pick(language, "合并不会改变共享注册额度；请在设置页按账户类别维护。", "Merging does not change shared registered room; manage it by account type in Settings.");
   }
   return warning;
 }
@@ -58,9 +51,6 @@ export function AccountMaintenancePanel({
   const [institution, setInstitution] = useState(detail.editContext.current.institution);
   const [type, setType] = useState(detail.editContext.current.type);
   const [currency, setCurrency] = useState<"CAD" | "USD">(detail.editContext.current.currency);
-  const [contributionRoomCad, setContributionRoomCad] = useState(
-    detail.editContext.current.contributionRoomCad == null ? "" : String(detail.editContext.current.contributionRoomCad)
-  );
 
   const [targetAccountId, setTargetAccountId] = useState("");
   const [preview, setPreview] = useState<MergePreview | null>(null);
@@ -82,8 +72,7 @@ export function AccountMaintenancePanel({
           nickname: nickname.trim(),
           institution: institution.trim(),
           type,
-          currency,
-          contributionRoomCad: toNullableNumber(contributionRoomCad)
+          currency
         })
       });
       const payload = await safeJson(response);
@@ -172,7 +161,7 @@ export function AccountMaintenancePanel({
                 value: "edit" as const,
                 icon: <PencilLine className="h-4 w-4" />,
                 title: pick(language, "改账户资料", "Edit account"),
-                detail: pick(language, "改账户名、机构、币种和可用额度。", "Update the name, institution, currency, and room value.")
+              detail: pick(language, "改账户名、机构和币种。注册额度在设置页统一维护。", "Update the name, institution, and currency. Registered room is managed in Settings.")
               },
               {
                 value: "add-holding" as const,
@@ -250,13 +239,6 @@ export function AccountMaintenancePanel({
                       <option key={option.value} value={option.value}>{option.label}</option>
                     ))}
                   </select>
-                </label>
-                <label className="space-y-2">
-                  <span className="text-sm font-medium">{pick(language, "规划基准 CAD 下的可用额度", "Available room in planning CAD")}</span>
-                  <input className={FIELD_CLASS_NAME} value={contributionRoomCad} onChange={(event) => setContributionRoomCad(event.target.value)} inputMode="decimal" />
-                  <p className="text-xs text-[color:var(--muted-foreground)]">
-                    {pick(language, "这里填的是你希望系统在做推荐时参考的可用额度。", "This is the room value the recommendation engine should use when planning the next contribution.")}
-                  </p>
                 </label>
               </div>
               <div className="space-y-4">
