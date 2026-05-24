@@ -213,7 +213,7 @@ class _OverviewPageState extends State<OverviewPage> {
         await widget.apiClient.createDailyIntelligenceAiSummary(item.id);
     final data = response["data"];
     if (data is! Map<String, dynamic>) {
-      throw const LooApiException("AI 摘要数据格式不正确。");
+      throw const LooApiException("Loo皇总结数据格式不正确。");
     }
     return MobileDailyIntelligenceAiSummary.fromJson(data);
   }

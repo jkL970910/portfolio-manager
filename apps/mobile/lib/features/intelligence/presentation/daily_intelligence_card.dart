@@ -691,7 +691,7 @@ class _DailyAiSummarySection extends StatelessWidget {
                 const SizedBox(width: 6),
                 Expanded(
                   child: Text(
-                    summary?.headline ?? "AI 摘要总结",
+                    summary?.headline ?? "Loo皇总结",
                     style: theme.textTheme.titleSmall?.copyWith(
                       fontWeight: FontWeight.w900,
                     ),
@@ -711,7 +711,7 @@ class _DailyAiSummarySection extends StatelessWidget {
               const LinearProgressIndicator(minHeight: 3)
             else if (summary == null) ...[
               Text(
-                "用你在设置中配置的外部 GPT，总结核心内容、相关领域和可能影响的持仓。",
+                "用你在设置中配置的外部 GPT，生成 Loo皇口吻的新闻要点、相关领域和可能影响的持仓。",
                 style: theme.textTheme.bodySmall?.copyWith(height: 1.35),
               ),
               if (errorMessage != null) ...[
@@ -729,7 +729,7 @@ class _DailyAiSummarySection extends StatelessWidget {
                 child: FilledButton.tonalIcon(
                   onPressed: onGenerate,
                   icon: const Icon(Icons.psychology_alt_outlined, size: 16),
-                  label: const Text("生成 AI 总结"),
+                  label: const Text("生成 Loo皇总结"),
                 ),
               ),
             ] else ...[

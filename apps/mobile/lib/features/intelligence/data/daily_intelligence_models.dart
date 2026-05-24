@@ -77,7 +77,7 @@ class MobileDailyIntelligenceAiSummary {
     return MobileDailyIntelligenceAiSummary(
       itemId: json["itemId"] as String? ?? "",
       generatedAt: json["generatedAt"] as String? ?? "",
-      headline: json["headline"] as String? ?? "AI 摘要",
+      headline: json["headline"] as String? ?? "Loo皇总结",
       coreSummary: json["coreSummary"] as String? ?? "",
       relatedFields:
           (json["relatedFields"] as List?)?.whereType<String>().toList() ??

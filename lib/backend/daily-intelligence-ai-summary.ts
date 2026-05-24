@@ -120,7 +120,7 @@ function parseProviderJsonObject(text: string) {
     if (start >= 0 && end > start) {
       return JSON.parse(candidate.slice(start, end + 1));
     }
-    throw new Error("AI 摘要返回格式不是可解析 JSON。");
+    throw new Error("Loo皇总结返回格式不是可解析 JSON。");
   }
 }
 
@@ -421,7 +421,7 @@ async function callProvider(input: {
   const outputText = extractOutputText(payload);
   if (!outputText) {
     throw new Error(
-      `AI 摘要没有返回可读内容。Provider 返回字段：${Object.keys(payload).slice(0, 12).join(", ") || "empty"}`,
+      `Loo皇总结没有返回可读内容。Provider 返回字段：${Object.keys(payload).slice(0, 12).join(", ") || "empty"}`,
     );
   }
 
@@ -487,7 +487,7 @@ export async function getDailyIntelligenceAiSummary(
     );
   } catch (error) {
     const message = sanitizeProviderError(
-      error instanceof Error ? error.message : "AI 摘要生成失败。",
+      error instanceof Error ? error.message : "Loo皇总结生成失败。",
     );
     const fallback = buildLocalSummaryFallback({ item, holdings });
     try {

@@ -35,7 +35,7 @@ export async function POST(request: NextRequest) {
     );
   } catch (error) {
     const message =
-      error instanceof Error ? error.message : "AI 摘要生成失败。";
+      error instanceof Error ? error.message : "Loo皇总结生成失败。";
     const status = /api key|token|gpt|启用|provider|找不到|过期/i.test(message)
       ? 400
       : 500;
