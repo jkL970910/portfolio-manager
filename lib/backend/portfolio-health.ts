@@ -601,7 +601,10 @@ export function buildPortfolioHealthSummary(args: {
           return fit * (holding.marketValueCad / groupedValue) * 100;
         }))
         : 45;
-      const groupedScore = clamp(weightedFit - Math.max(0, sharePct - 45) * 0.9 + (account.type === "Taxable" ? -4 : 3), 22, 95);
+      const accountCrowdingPenalty = isAccountScope
+        ? 0
+        : Math.max(0, sharePct - 45) * 0.9;
+      const groupedScore = clamp(weightedFit - accountCrowdingPenalty + (account.type === "Taxable" ? -4 : 3), 22, 95);
       const topHoldingInGroup = [...groupedHoldings].sort((left, right) => right.marketValueCad - left.marketValueCad)[0];
       const nickname = account.nickname.trim();
       const accountLabel = nickname || getAccountTypeLabel(account.type, language);

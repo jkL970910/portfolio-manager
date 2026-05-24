@@ -3138,7 +3138,7 @@ export function buildPortfolioData(args: {
           weakestDimension: `${accountHealth.weakestDimension.label} ${accountHealth.weakestDimension.value}`,
           dimensions: accountHealth.dimensions,
           actionQueue: accountHealth.actionQueue,
-          accountDrilldown: accountHealth.accountDrilldown,
+          accountDrilldown: [],
           holdingDrilldown: accountHealth.holdingDrilldown,
         },
         summaryPoints: [
