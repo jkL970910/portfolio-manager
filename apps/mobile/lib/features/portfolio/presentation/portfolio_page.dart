@@ -312,14 +312,18 @@ class _PortfolioHeroMetrics extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final holdingsShare = data.securityHoldings
+    final topHoldingsShare = data.securityHoldings
         .where((holding) => _parsePercent(holding.weight) > 0)
         .take(8)
         .toList();
-    final largestHolding = holdingsShare.isEmpty ? null : holdingsShare.first;
-    final shareLabel = holdingsShare.isEmpty
+    final shareSheetHoldings = data.securityHoldings
+        .where((holding) => _parsePercent(holding.weight) > 0)
+        .toList();
+    final largestHolding =
+        topHoldingsShare.isEmpty ? null : topHoldingsShare.first;
+    final shareLabel = topHoldingsShare.isEmpty
         ? "${data.securityHoldings.length} 个"
-        : "前${holdingsShare.length}项";
+        : "前${topHoldingsShare.length}项";
 
     return Row(
       children: [
@@ -328,9 +332,9 @@ class _PortfolioHeroMetrics extends StatelessWidget {
             label: largestHolding?.symbol ?? "最大仓位",
             value: largestHolding?.weight ?? "--",
             icon: Icons.stacked_line_chart_rounded,
-            onTap: holdingsShare.isEmpty
+            onTap: shareSheetHoldings.isEmpty
                 ? null
-                : () => _showHoldingsShareSheet(context, holdingsShare),
+                : () => _showHoldingsShareSheet(context, shareSheetHoldings),
           ),
         ),
         const SizedBox(width: 8),
@@ -339,9 +343,9 @@ class _PortfolioHeroMetrics extends StatelessWidget {
             label: "持仓比例",
             value: shareLabel,
             icon: Icons.donut_large_rounded,
-            onTap: holdingsShare.isEmpty
+            onTap: shareSheetHoldings.isEmpty
                 ? null
-                : () => _showHoldingsShareSheet(context, holdingsShare),
+                : () => _showHoldingsShareSheet(context, shareSheetHoldings),
           ),
         ),
         const SizedBox(width: 8),
@@ -432,7 +436,8 @@ void _showHoldingsShareSheet(
   BuildContext context,
   List<MobileHoldingCard> holdings,
 ) {
-  final slices = holdings
+  final topHoldings = holdings.take(8).toList();
+  final slices = topHoldings
       .map(
         (holding) => _ShareSlice(
           label: holding.symbol,
@@ -443,10 +448,24 @@ void _showHoldingsShareSheet(
       )
       .where((slice) => slice.value > 0)
       .toList();
+  final visibleTotal =
+      slices.fold<double>(0, (sum, slice) => sum + slice.value);
+  final hiddenCount = math.max(holdings.length - topHoldings.length, 0).toInt();
+  final otherValue = math.max<double>(0.0, 100.0 - visibleTotal);
+  if (otherValue >= 0.05) {
+    slices.add(
+      _ShareSlice(
+        label: hiddenCount > 0 ? "其他持仓" : "未列出部分",
+        value: otherValue,
+        displayValue: "${otherValue.toStringAsFixed(1)}%",
+        amount: hiddenCount > 0 ? "$hiddenCount 项" : "",
+      ),
+    );
+  }
   _showShareSheet(
     context,
     title: "持仓比例",
-    subtitle: "按当前组合市值占比展示主要标的。",
+    subtitle: "按当前组合市值占比展示，前 8 项之外合并为其他持仓。",
     slices: slices,
   );
 }
@@ -647,6 +666,10 @@ class _ShareDonutChart extends StatelessWidget {
   Widget build(BuildContext context) {
     final total = slices.fold<double>(0, (sum, slice) => sum + slice.value);
     final tokens = context.looTokens;
+    final displayTotal =
+        slices.any((slice) => slice.label == "其他持仓" || slice.label == "未列出部分")
+            ? "100.0%"
+            : "${total.toStringAsFixed(1)}%";
     return SizedBox(
       width: 172,
       height: 172,
@@ -658,7 +681,7 @@ class _ShareDonutChart extends StatelessWidget {
         ),
         child: Center(
           child: Text(
-            "${total.toStringAsFixed(1)}%",
+            displayTotal,
             style: Theme.of(context).textTheme.titleLarge,
           ),
         ),
