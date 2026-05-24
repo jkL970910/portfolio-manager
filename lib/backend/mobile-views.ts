@@ -1127,11 +1127,17 @@ async function buildMobileRecommendationMarketItems(input: {
 }> {
   const repositories = getRepositories();
   const holdings = await repositories.holdings.listByUserId(input.userId);
+  const observationIdentityBySymbol = buildObservationIdentityBySymbol(
+    input.observations,
+  );
   const watchlistMarketItems = await Promise.all(
     dedupeRecommendationMarketCandidates(
       input.watchlistSymbols.map((key) => ({
         key,
-        identity: parseRecommendationMarketIdentity(key),
+        identity: completeRecommendationMarketIdentity(
+          parseRecommendationMarketIdentity(key),
+          observationIdentityBySymbol,
+        ),
       })),
       holdings,
     ).slice(0, 12).map((candidate) =>
@@ -1184,6 +1190,61 @@ async function buildMobileRecommendationMarketItems(input: {
     ),
   );
   return { watchlistMarketItems, recentObservationItems };
+}
+
+function buildObservationIdentityBySymbol(
+  observations: MobileSecurityObservation[],
+) {
+  const bySymbol = new Map<
+    string,
+    {
+      symbol: string;
+      exchange: string | null;
+      currency: "CAD" | "USD" | null;
+      securityId: string | null;
+      name: string;
+    }
+  >();
+  for (const observation of observations) {
+    const symbol = observation.symbol.trim().toUpperCase();
+    if (
+      !symbol ||
+      bySymbol.has(symbol) ||
+      !observation.exchange ||
+      (observation.currency !== "CAD" && observation.currency !== "USD")
+    ) {
+      continue;
+    }
+    bySymbol.set(symbol, {
+      symbol,
+      exchange: observation.exchange.trim().toUpperCase(),
+      currency: observation.currency,
+      securityId: observation.securityId ?? null,
+      name: observation.name ?? symbol,
+    });
+  }
+  return bySymbol;
+}
+
+function completeRecommendationMarketIdentity(
+  identity: ReturnType<typeof parseRecommendationMarketIdentity>,
+  observationIdentityBySymbol: ReturnType<typeof buildObservationIdentityBySymbol>,
+) {
+  if (identity.exchange && identity.currency) {
+    return identity;
+  }
+  const observed = observationIdentityBySymbol.get(
+    identity.symbol.trim().toUpperCase(),
+  );
+  return observed
+    ? {
+        ...identity,
+        exchange: identity.exchange ?? observed.exchange,
+        currency: identity.currency ?? observed.currency,
+        securityId: observed.securityId,
+        name: identity.name || observed.name,
+      }
+    : identity;
 }
 
 async function loadRecommendationV4Context(input: {
