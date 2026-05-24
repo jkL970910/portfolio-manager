@@ -1680,11 +1680,12 @@ class _AnalysisCard extends StatelessWidget {
                 ),
           ),
           const SizedBox(height: 12),
-          _ProgressMetric(
-            label: "目标占比",
-            value: analysis.targetAllocation,
-            progress: analysis.targetAllocationPct / 100,
-          ),
+          if (!isAccountScope)
+            _ProgressMetric(
+              label: "组合目标占比",
+              value: analysis.targetAllocation,
+              progress: analysis.targetAllocationPct / 100,
+            ),
           _ProgressMetric(
             label: isAccountScope ? "账户内同类暴露" : "组合内同类暴露",
             value: currentAllocation,
