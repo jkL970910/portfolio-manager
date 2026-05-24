@@ -334,7 +334,11 @@ class _PortfolioHeroMetrics extends StatelessWidget {
             icon: Icons.stacked_line_chart_rounded,
             onTap: shareSheetHoldings.isEmpty
                 ? null
-                : () => _showHoldingsShareSheet(context, shareSheetHoldings),
+                : () => _showHoldingsShareSheet(
+                      context,
+                      shareSheetHoldings,
+                      includeOtherHoldings: true,
+                    ),
           ),
         ),
         const SizedBox(width: 8),
@@ -343,9 +347,13 @@ class _PortfolioHeroMetrics extends StatelessWidget {
             label: "持仓比例",
             value: shareLabel,
             icon: Icons.donut_large_rounded,
-            onTap: shareSheetHoldings.isEmpty
+            onTap: topHoldingsShare.isEmpty
                 ? null
-                : () => _showHoldingsShareSheet(context, shareSheetHoldings),
+                : () => _showHoldingsShareSheet(
+                      context,
+                      topHoldingsShare,
+                      includeOtherHoldings: false,
+                    ),
           ),
         ),
         const SizedBox(width: 8),
@@ -434,10 +442,12 @@ class _HeroMetricButton extends StatelessWidget {
 
 void _showHoldingsShareSheet(
   BuildContext context,
-  List<MobileHoldingCard> holdings,
-) {
-  final topHoldings = holdings.take(8).toList();
-  final slices = topHoldings
+  List<MobileHoldingCard> holdings, {
+  required bool includeOtherHoldings,
+}) {
+  final visibleHoldings =
+      includeOtherHoldings ? holdings.take(8).toList() : holdings;
+  final slices = visibleHoldings
       .map(
         (holding) => _ShareSlice(
           label: holding.symbol,
@@ -450,9 +460,10 @@ void _showHoldingsShareSheet(
       .toList();
   final visibleTotal =
       slices.fold<double>(0, (sum, slice) => sum + slice.value);
-  final hiddenCount = math.max(holdings.length - topHoldings.length, 0).toInt();
+  final hiddenCount =
+      math.max(holdings.length - visibleHoldings.length, 0).toInt();
   final otherValue = math.max<double>(0.0, 100.0 - visibleTotal);
-  if (otherValue >= 0.05) {
+  if (includeOtherHoldings && otherValue >= 0.05) {
     slices.add(
       _ShareSlice(
         label: hiddenCount > 0 ? "其他持仓" : "未列出部分",
@@ -464,8 +475,10 @@ void _showHoldingsShareSheet(
   }
   _showShareSheet(
     context,
-    title: "持仓比例",
-    subtitle: "按当前组合市值占比展示，前 8 项之外合并为其他持仓。",
+    title: includeOtherHoldings ? "完整持仓比例" : "前 8 项持仓",
+    subtitle: includeOtherHoldings
+        ? "按当前组合市值占比展示，前 8 项之外合并为其他持仓。"
+        : "只展示前 8 项持仓在整个组合中的合计占比，不包含其他持仓。",
     slices: slices,
   );
 }
