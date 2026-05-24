@@ -1023,29 +1023,20 @@ class _AccountMetricStrip extends StatelessWidget {
       ),
       child: Padding(
         padding: EdgeInsets.all(tokens.gapMd),
-        child: Wrap(
-          spacing: tokens.gapSm,
-          runSpacing: tokens.gapSm,
-          children: [
-            for (final metric in metrics.take(4))
-              SizedBox(
-                width: _metricTileWidth(context, metrics.length),
-                child: _MetricCard(metric),
-              ),
-          ],
+        child: GridView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          itemCount: metrics.take(4).length,
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: metrics.length == 1 ? 1 : 2,
+            crossAxisSpacing: tokens.gapSm,
+            mainAxisSpacing: tokens.gapSm,
+            mainAxisExtent: 58,
+          ),
+          itemBuilder: (context, index) => _MetricCard(metrics[index]),
         ),
       ),
     );
-  }
-
-  double _metricTileWidth(BuildContext context, int count) {
-    final width = MediaQuery.sizeOf(context).width;
-    const horizontalPagePadding = 32.0;
-    final stripPadding = context.looTokens.gapMd * 2;
-    final gap = context.looTokens.gapSm;
-    final columns = count >= 4 ? 2 : count.clamp(1, 3);
-    return (width - horizontalPagePadding - stripPadding - gap * (columns - 1)) /
-        columns;
   }
 
   String _shortGainLoss(String value) {
