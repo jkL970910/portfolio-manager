@@ -1230,21 +1230,26 @@ function completeRecommendationMarketIdentity(
   identity: ReturnType<typeof parseRecommendationMarketIdentity>,
   observationIdentityBySymbol: ReturnType<typeof buildObservationIdentityBySymbol>,
 ) {
-  if (identity.exchange && identity.currency) {
-    return identity;
-  }
   const observed = observationIdentityBySymbol.get(
     identity.symbol.trim().toUpperCase(),
   );
-  return observed
-    ? {
-        ...identity,
-        exchange: identity.exchange ?? observed.exchange,
-        currency: identity.currency ?? observed.currency,
-        securityId: observed.securityId,
-        name: identity.name || observed.name,
-      }
-    : identity;
+  if (!observed) {
+    return identity;
+  }
+  if (
+    identity.currency &&
+    observed.currency &&
+    identity.currency !== observed.currency
+  ) {
+    return identity;
+  }
+  return {
+    ...identity,
+    exchange: observed.exchange,
+    currency: identity.currency ?? observed.currency,
+    securityId: observed.securityId,
+    name: identity.name || observed.name,
+  };
 }
 
 async function loadRecommendationV4Context(input: {
