@@ -32,8 +32,8 @@ class AiAnalysisCard extends StatefulWidget {
     required this.apiClient,
     required this.payload,
     this.controller,
-    this.title = "智能快扫",
-    this.description = "先用你的组合、偏好和已保存资料生成确定性判断；外部 GPT 只在你点击增强时调用。",
+    this.title = "Loo皇巡阅",
+    this.description = "先用你的组合、偏好和已保存资料生成确定性判断；Loo皇深度思考只在你点击后调用外部 GPT。",
     this.collapseDescriptionToInfo = false,
     this.autoRun = false,
     this.refreshKey,
@@ -229,7 +229,7 @@ class _AiAnalysisCardState extends State<AiAnalysisCard> {
       final response = await widget.apiClient.createAnalyzerQuickScan(payload);
       final data = response["data"];
       if (data is! Map<String, dynamic>) {
-        throw const LooApiException("智能快扫格式不正确。");
+        throw const LooApiException("Loo皇巡阅格式不正确。");
       }
       final result = MobileAiAnalysisResult.fromJson(data);
       if (mounted) {
@@ -267,7 +267,7 @@ class _AiAnalysisCardState extends State<AiAnalysisCard> {
       });
       final data = response["data"];
       if (data is! Map<String, dynamic>) {
-        throw const LooApiException("GPT 增强解读格式不正确。");
+        throw const LooApiException("Loo皇深度思考格式不正确。");
       }
       final enhancement = data["enhancement"];
       if (enhancement == null && readCacheOnly) {
@@ -280,7 +280,7 @@ class _AiAnalysisCardState extends State<AiAnalysisCard> {
         return null;
       }
       if (enhancement is! Map<String, dynamic>) {
-        throw const LooApiException("GPT 增强解读为空。");
+        throw const LooApiException("Loo皇深度思考为空。");
       }
       final result = MobileAiGptEnhancement.fromJson(enhancement);
       if (mounted) {
@@ -381,7 +381,7 @@ class _AiAnalysisCardState extends State<AiAnalysisCard> {
                 final data = snapshot.data;
                 if (data == null) {
                   return _AnalysisError(
-                    message: "没有拿到智能快扫结果。",
+                    message: "没有拿到 Loo皇巡阅结果。",
                     onRetry: () => _runAnalysis(refresh: true),
                   );
                 }
@@ -480,7 +480,7 @@ class MobileAiAnalysisResult {
     final disclaimer = _readMap(json["disclaimer"]);
     return MobileAiAnalysisResult(
       scope: json["scope"] as String? ?? "security",
-      title: summary["title"] as String? ?? "智能快扫",
+      title: _friendlyAnalysisText(summary["title"] as String? ?? "Loo皇巡阅"),
       thesis: _friendlyAnalysisText(summary["thesis"] as String? ?? ""),
       confidence: summary["confidence"] as String? ?? "medium",
       securityDecision: json["securityDecision"] is Map<String, dynamic>
@@ -1060,7 +1060,7 @@ class MobileAiGptEnhancement {
   factory MobileAiGptEnhancement.fromJson(Map<String, dynamic> json) {
     final disclaimer = _readMap(json["disclaimer"]);
     return MobileAiGptEnhancement(
-      title: json["title"] as String? ?? "GPT 增强解读",
+      title: _friendlyAnalysisText(json["title"] as String? ?? "Loo皇深度思考"),
       directAnswer:
           _friendlyAnalysisText(json["directAnswer"] as String? ?? ""),
       reasoning: _readStringList(json["reasoning"])
@@ -1071,9 +1071,10 @@ class MobileAiGptEnhancement {
           .toList(),
       boundary: _friendlyNullableText(json["boundary"] as String?),
       nextStep: _friendlyNullableText(json["nextStep"] as String?),
-      sourceLabel: json["sourceLabel"] as String? ?? "GPT 增强解读",
+      sourceLabel:
+          _friendlyAnalysisText(json["sourceLabel"] as String? ?? "Loo皇深度思考"),
       authorityBoundary: _friendlyAnalysisText(
-        json["authorityBoundary"] as String? ?? "GPT 只增强解释，不改变智能快扫结论、护栏或行动优先级。",
+        json["authorityBoundary"] as String? ?? "Loo皇深度思考只增强解释，不改变 Loo皇巡阅结论、护栏或行动优先级。",
       ),
       disclaimerZh: disclaimer["zh"] as String? ?? "仅用于研究学习，不构成投资建议。",
     );
@@ -1121,7 +1122,10 @@ String _friendlyAnalysisText(String value) {
       .replaceAll("sourceMode", "资料状态")
       .replaceAll("fallback", "保守参考")
       .replaceAll("Fallback", "保守参考")
-      .replaceAll("run-analysis", "智能快扫")
+      .replaceAll("run-analysis", "Loo皇巡阅")
+      .replaceAll("智能快扫", "Loo皇巡阅")
+      .replaceAll("GPT 增强解读", "Loo皇深度思考")
+      .replaceAll("GPT 增强", "Loo皇深度思考")
       .replaceAll("DTO", "数据结构");
   text = text.replaceAll(RegExp(r"\bP[0-3]\b\s*[:：]?\s*"), "");
   return text.replaceAll(RegExp(r"\s*;\s*"), "；").trim();
@@ -2334,11 +2338,11 @@ class _GptEnhancementPanel extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text("GPT 增强解读",
+                      Text("Loo皇深度思考",
                           style: Theme.of(context).textTheme.titleSmall),
                       const SizedBox(height: 4),
                       Text(
-                        "可选调用外部 GPT，把上方智能快扫改写成更自然的解释。GPT 只负责解释，不改变快扫结论、护栏或行动优先级。",
+                        "可选调用外部 GPT，把上方 Loo皇巡阅改写成更自然的解释。深度思考只负责解释，不改变巡阅结论、护栏或行动优先级。",
                         style: Theme.of(context).textTheme.bodySmall,
                       ),
                     ],
@@ -2347,7 +2351,7 @@ class _GptEnhancementPanel extends StatelessWidget {
                 const SizedBox(width: 8),
                 OutlinedButton(
                   onPressed: isLoading ? null : onRun,
-                  child: Text(hasResult ? "重新增强" : "增强"),
+                  child: Text(hasResult ? "重新思考" : "深度思考"),
                 ),
               ],
             ),
@@ -2364,14 +2368,14 @@ class _GptEnhancementPanel extends StatelessWidget {
                   }
                   if (snapshot.hasError) {
                     return Text(
-                      "${_friendlyGptEnhancementErrorMessage(snapshot.error)}\n上方智能快扫结果仍可继续参考。",
+                      "${_friendlyGptEnhancementErrorMessage(snapshot.error)}\n上方 Loo皇巡阅结果仍可继续参考。",
                       style:
                           TextStyle(color: Theme.of(context).colorScheme.error),
                     );
                   }
                   final data = snapshot.data;
                   if (data == null) {
-                    return const Text("暂时没有 GPT 增强解读。");
+                    return const Text("暂时没有 Loo皇深度思考。");
                   }
                   return _GptEnhancementView(data);
                 },
@@ -2388,25 +2392,25 @@ String _friendlyGptEnhancementErrorMessage(Object? error) {
   final raw = error?.toString().trim() ?? "";
   final normalized = raw.toLowerCase();
   if (raw.isEmpty) {
-    return "GPT 增强暂时不可用，请稍后重试。";
+    return "Loo皇深度思考暂时不可用，请稍后重试。";
   }
   if (normalized.contains("api key") ||
       normalized.contains("unauthorized") ||
       normalized.contains("401")) {
-    return "GPT 增强暂时不可用：请检查设置里的外部 GPT 开关和 API Key。";
+    return "Loo皇深度思考暂时不可用：请检查设置里的外部 GPT 开关和 API Key。";
   }
   if (normalized.contains("timeout") ||
       normalized.contains("timed out") ||
       normalized.contains("502") ||
       normalized.contains("503") ||
       normalized.contains("504")) {
-    return "GPT 增强暂时不可用：外部模型响应较慢或服务不稳定，请稍后重试。";
+    return "Loo皇深度思考暂时不可用：外部模型响应较慢或服务不稳定，请稍后重试。";
   }
   if (normalized.contains("output text") ||
       normalized.contains("可读内容") ||
       normalized.contains("provider fields") ||
       normalized.contains("empty")) {
-    return "GPT 增强暂时不可用：外部模型这次没有返回可读内容，请稍后重试。";
+    return "Loo皇深度思考暂时不可用：外部模型这次没有返回可读内容，请稍后重试。";
   }
   if (normalized.contains("schema") ||
       normalized.contains("zod") ||
@@ -2414,16 +2418,16 @@ String _friendlyGptEnhancementErrorMessage(Object? error) {
       normalized.contains("expected") ||
       normalized.contains("json") ||
       normalized.contains("格式")) {
-    return "GPT 增强暂时不可用：外部模型返回内容需要重新整理，请稍后重试。";
+    return "Loo皇深度思考暂时不可用：外部模型返回内容需要重新整理，请稍后重试。";
   }
-  return "GPT 增强暂时不可用，请稍后重试。";
+  return "Loo皇深度思考暂时不可用，请稍后重试。";
 }
 
 String _friendlyAnalysisErrorMessage(Object? error) {
   final raw = error?.toString().trim() ?? "";
   final normalized = raw.toLowerCase();
   if (raw.isEmpty) {
-    return "智能快扫暂时没有生成成功，请重试。";
+    return "Loo皇巡阅暂时没有生成成功，请重试。";
   }
   if (normalized.contains("401") || normalized.contains("unauthorized")) {
     return "登录状态已过期，请重新登录后再试。";
@@ -2433,14 +2437,14 @@ String _friendlyAnalysisErrorMessage(Object? error) {
       normalized.contains("502") ||
       normalized.contains("503") ||
       normalized.contains("504")) {
-    return "智能快扫暂时繁忙，请稍后重试。";
+    return "Loo皇巡阅暂时繁忙，请稍后重试。";
   }
   if (normalized.contains("格式") ||
       normalized.contains("schema") ||
       normalized.contains("zod") ||
       normalized.contains("json") ||
       normalized.contains("exception")) {
-    return "智能快扫暂时没有整理出可展示结果，请重试。";
+    return "Loo皇巡阅暂时没有整理出可展示结果，请重试。";
   }
   return raw
       .replaceFirst(RegExp(r"^LooApiException:\s*"), "")
@@ -3053,7 +3057,7 @@ String? _researchLimitationPill(String value) {
   if (hasInsufficientSignal) {
     return "资料待补全";
   }
-  return "可用于快扫";
+  return "可用于巡阅";
 }
 
 List<String> _valuationSummaryPills(MobileResearchValuationEvidence data) {
@@ -3310,7 +3314,7 @@ String _sourceModeLabel(String value) {
     "live-external" => "外部资料",
     "cached-external" => "已保存资料",
     "derived" => "规则派生",
-    _ => "基础快扫",
+    _ => "Loo皇巡阅",
   };
 }
 

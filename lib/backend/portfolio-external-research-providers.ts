@@ -871,11 +871,16 @@ export const alphaVantageNewsResearchProvider: ExternalResearchProvider = {
     const topics = symbol
       ? ["earnings", "financial_markets"]
       : ["financial_markets", "economy_macro", "finance"];
-    const news = await getAlphaVantageNewsSentiment({
+    let news = await getAlphaVantageNewsSentiment({
       tickers: symbol ? [symbol] : [],
       topics,
       limit: 8,
     });
+    if (!symbol && (!news || news.feed.length === 0)) {
+      news = await getAlphaVantageNewsSentiment({
+        limit: 8,
+      });
+    }
     if (!news || news.feed.length === 0) {
       throw new ExternalResearchProviderDisabledError(
         "No Alpha Vantage news payload was available for this request.",

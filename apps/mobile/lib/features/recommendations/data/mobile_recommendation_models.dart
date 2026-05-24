@@ -843,7 +843,7 @@ class MobileRecommendationIntelligenceRef {
     return MobileRecommendationIntelligenceRef(
       title: json["title"] as String? ?? "Loo国秘闻",
       detail: json["detail"] as String? ?? "",
-      sourceLabel: json["sourceLabel"] as String? ?? "智能快扫",
+      sourceLabel: json["sourceLabel"] as String? ?? "Loo皇巡阅",
       freshnessLabel: json["freshnessLabel"] as String? ?? "暂无行情新鲜度",
       scopeLabel: json["scopeLabel"] as String? ?? "底层资产情报",
       listingLabel: json["listingLabel"] as String? ?? "",

@@ -74,7 +74,7 @@ class DailyIntelligenceCard extends StatelessWidget {
             else if (items.isEmpty)
               _DailyEmptyState(
                 title: snapshot?.emptyTitle ?? "暂时没有可用秘闻",
-                detail: snapshot?.emptyDetail ?? "先在标的详情运行智能快扫，或手动刷新标的资料。",
+                detail: snapshot?.emptyDetail ?? "先在标的详情进行 Loo皇巡阅，或手动刷新标的资料。",
               )
             else
               _DailyIntelligenceDropdownList(
@@ -393,7 +393,7 @@ class DailyIntelligenceSummaryCard extends StatelessWidget {
           else if (items.isEmpty)
             _DailyEmptyState(
               title: snapshot?.emptyTitle ?? "暂时没有可用秘闻",
-              detail: snapshot?.emptyDetail ?? "先在标的详情运行智能快扫，或手动刷新标的资料。",
+              detail: snapshot?.emptyDetail ?? "先在标的详情进行 Loo皇巡阅，或手动刷新标的资料。",
             )
           else
             _DailyIntelligenceDropdownList(

@@ -55,7 +55,7 @@ export const looMinisterProjectKnowledgeItems: Array<{
     value:
       "标的/持仓详情必须按 securityId 或完整 symbol + exchange + currency 回答，不能只按 ticker 合并。",
     detail:
-      "价格、走势图、智能快扫、今日秘闻和推荐解释都要保留 listing 身份。US 正股与 CAD listed/CDR/hedged 版本可以共享 underlying 研究背景，但不能共享 listing 价格、FX 和持仓事实。",
+      "价格、走势图、Loo皇巡阅、今日秘闻和推荐解释都要保留 listing 身份。US 正股与 CAD listed/CDR/hedged 版本可以共享 underlying 研究背景，但不能共享 listing 价格、FX 和持仓事实。",
   },
   {
     id: "project-feature-recommendations",

@@ -362,7 +362,7 @@ class _SecurityDetailPageState extends State<SecurityDetailPage> {
                           title: "重新生成研究结论",
                           detail: _isSubmittingExternalResearch
                               ? "资料刷新完成后会自动更新；也可以稍后手动重新生成。"
-                              : "不抓新资料，只用现有资料重新跑智能快扫。",
+                              : "不抓新资料，只用现有资料重新进行 Loo皇巡阅。",
                           isBusy: _isSubmittingExternalResearch,
                           onTap: _isSubmittingExternalResearch
                               ? null
@@ -762,7 +762,7 @@ class _SecurityDetailPageState extends State<SecurityDetailPage> {
                       controller: _analysisController,
                       title: "Loo国研究工作台",
                       description:
-                          "基于标的事实、资料状态和你的组合上下文生成结论；GPT 增强只在你手动点击时作为解释层。",
+                          "基于标的事实、资料状态和你的组合上下文生成结论；Loo皇深度思考只在你手动点击时作为解释层。",
                       collapseDescriptionToInfo: true,
                       autoRun: true,
                       showGenerateButton: false,
@@ -998,7 +998,7 @@ class MobileSecurityDetailSnapshot {
       allowedActions: const [
         LooMinisterSuggestedAction(
           id: "run-security-analysis",
-          label: "运行智能标的快扫",
+          label: "开始标的巡阅",
           actionType: "run-analysis",
           target: {"scope": "security"},
           requiresConfirmation: true,
@@ -2267,7 +2267,7 @@ bool _statusLabelsAreEquivalent(String left, String right) {
   final normalizedLeft = left.trim();
   final normalizedRight = right.trim();
   if (normalizedLeft == normalizedRight) return true;
-  const availableLabels = {"数据较新", "报价较新", "走势可用", "可用于快扫"};
+  const availableLabels = {"数据较新", "报价较新", "走势可用", "可用于巡阅"};
   return availableLabels.contains(normalizedLeft) &&
       availableLabels.contains(normalizedRight);
 }
@@ -2575,7 +2575,7 @@ class _SecurityDataTrust {
     }
     if (quoteWarning || chartFallback || !chartFresh) {
       return _SecurityDataTrust(
-        label: "可用于快扫",
+        label: "可用于巡阅",
         summary: [
           data.quoteStatusLabel,
           if (hasChart) data.priceHistoryChart!.freshness.label else "走势待补充",

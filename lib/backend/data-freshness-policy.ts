@@ -66,7 +66,7 @@ export function getMobileDataFreshnessPolicy(): MobileDataFreshnessPolicy {
       label: "标的报价",
       ttlSeconds: quoteTtlSeconds,
       sourceLabel: "行情 provider + 本地报价缓存",
-      usageLabel: "持仓市值、标的详情、智能快扫、推荐适配都会读取它。",
+      usageLabel: "持仓市值、标的详情、Loo皇巡阅、推荐适配都会读取它。",
       staleBehaviorLabel:
         "过期后仍可用于方向解释，但下单前应重新刷新报价。",
       workerTarget: true,

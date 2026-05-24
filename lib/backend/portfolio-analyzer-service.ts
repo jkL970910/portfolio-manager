@@ -31,6 +31,7 @@ import {
 
 const GPT_ENHANCEMENT_PROMPT_VERSION = "gpt-enhance-v1";
 const GPT_ENHANCEMENT_TTL_SECONDS = 86400;
+const GPT_ENHANCEMENT_TIMEOUT_MS = 28_000;
 
 function normalizePart(value: string | null | undefined) {
   return value?.trim().toUpperCase() || "_";
@@ -233,20 +234,20 @@ export function sanitizeGptEnhancementPayloadForTest(value: unknown) {
     generatedAt: isIsoDateTime(data.generatedAt)
       ? data.generatedAt
       : new Date().toISOString(),
-    title: readNullableString(data.title, 120) ?? "GPT 增强解读",
+    title: readNullableString(data.title, 120) ?? "Loo皇深度思考",
     role: "explanation-only",
     directAnswer:
       readNullableString(data.directAnswer, 800) ??
       readNullableString(data.answer, 800) ??
-      "已根据智能快扫结果生成增强解读。",
+      "已根据 Loo皇巡阅结果生成深度思考。",
     reasoning: readStringArray(data.reasoning),
     decisionGates: readStringArray(data.decisionGates),
     boundary: readNullableString(data.boundary, 700),
     nextStep: readNullableString(data.nextStep, 500),
     sourceLabel:
-      readNullableString(data.sourceLabel, 120) ?? "GPT 增强解读 · 基于智能快扫",
+      readNullableString(data.sourceLabel, 120) ?? "Loo皇深度思考 · 基于 Loo皇巡阅",
     authorityBoundary:
-      "GPT 只增强解释，不改变智能快扫结论、护栏或行动优先级。",
+      "Loo皇深度思考只增强解释，不改变 Loo皇巡阅结论、护栏或行动优先级。",
     disclaimer: {
       zh:
         readNullableString(disclaimer.zh) ??
@@ -471,16 +472,16 @@ function sourceModeLabel(value: PortfolioAnalyzerResult["dataFreshness"]["source
 function buildGptEnhancementPrompt(result: PortfolioAnalyzerResult) {
   const securityDecision = result.securityDecision;
   return [
-    "你是 Loo国的投资分析大臣。请把下面的“智能快扫”结果改写成一段更像 ChatGPT 的增强解读。",
-    "重要边界：你只能增强解释，不能改变智能快扫的结论、护栏、行动优先级或仓位边界。不要编造实时行情、新闻、论坛或财报内容；只使用给定 JSON 的事实。不要说你已经做了外部研究。所有投资相关内容必须保留不构成投资建议。",
+    "你是 Loo国的投资分析大臣。请把下面的“Loo皇巡阅”结果改写成一段更像 ChatGPT 的深度思考。",
+    "重要边界：你只能增强解释，不能改变 Loo皇巡阅的结论、护栏、行动优先级或仓位边界。不要编造实时行情、新闻、论坛或财报内容；只使用给定 JSON 的事实。不要说你已经做了外部研究。所有投资相关内容必须保留不构成投资建议。",
     "回答目标：先给直接结论，再解释为什么和用户组合相关、主要护栏、哪些条件会改变结论、下一步该怎么确认。",
     "只返回 JSON object，不要 markdown。",
     "JSON 字段必须是：generatedAt, title, role, directAnswer, reasoning, decisionGates, boundary, nextStep, sourceLabel, authorityBoundary, disclaimer。",
-    "role 必须是 explanation-only。authorityBoundary 必须说明 GPT 只增强解释，不改变智能快扫结论、护栏或行动优先级。",
-    `sourceLabel 必须写成：GPT 增强解读 · 基于${sourceModeLabel(result.dataFreshness.sourceMode)}。`,
+    "role 必须是 explanation-only。authorityBoundary 必须说明 Loo皇深度思考只增强解释，不改变 Loo皇巡阅结论、护栏或行动优先级。",
+    `sourceLabel 必须写成：Loo皇深度思考 · 基于${sourceModeLabel(result.dataFreshness.sourceMode)}。`,
     `disclaimer 必须是 ${JSON.stringify(PORTFOLIO_ANALYZER_DISCLAIMER)}。`,
     "",
-    `快扫范围：${result.scope}`,
+    `巡阅范围：${result.scope}`,
     `标的身份：${result.identity ? JSON.stringify(result.identity) : "无"}`,
     `核心判断：${securityDecision?.directAnswer ?? result.summary.thesis}`,
     `为什么现在看：${(securityDecision?.whyNow ?? []).join("；") || "无"}`,
@@ -496,9 +497,9 @@ function buildGptEnhancementPrompt(result: PortfolioAnalyzerResult) {
 function buildGptEnhancementInstructions() {
   return [
     "你是 Loo国的投资分析大臣。",
-    "任务：只把后端智能快扫结果改写成更自然、更清晰的中文解释。",
-    "边界：GPT 只负责解释，不得改变智能快扫结论、护栏、行动优先级、仓位边界或数据新鲜度判断。",
-    "不得编造实时行情、新闻、论坛、财报、评级或外部研究；只能使用用户输入里给定的快扫事实。",
+    "任务：只把后端 Loo皇巡阅结果改写成更自然、更清晰的中文解释。",
+    "边界：Loo皇深度思考只负责解释，不得改变 Loo皇巡阅结论、护栏、行动优先级、仓位边界或数据新鲜度判断。",
+    "不得编造实时行情、新闻、论坛、财报、评级或外部研究；只能使用用户输入里给定的巡阅事实。",
     "必须返回 JSON object，不要 markdown。字段必须是 generatedAt, title, role, directAnswer, reasoning, decisionGates, boundary, nextStep, sourceLabel, authorityBoundary, disclaimer。",
     "role 必须是 explanation-only。disclaimer 必须保留不构成投资建议。",
   ].join("\n");
@@ -583,7 +584,7 @@ async function callGptEnhancementProvider(
   settings: Awaited<ReturnType<typeof resolveLooMinisterSettings>>,
 ): Promise<{ enhancement: PortfolioAnalyzerGptEnhancement; usage: ReturnType<typeof extractUsage> }> {
   if (!settings.apiKey) {
-    throw new Error("智能快扫 GPT 增强缺少可用 API Key。请先在设置里配置外部 GPT。");
+    throw new Error("Loo皇深度思考缺少可用 API Key。请先在设置里配置外部 GPT。");
   }
 
   const isOpenRouterCompatible = settings.provider === "openrouter-compatible";
@@ -592,51 +593,64 @@ async function callGptEnhancementProvider(
     : settings.endpoint;
   const instructions = buildGptEnhancementInstructions();
   const prompt = buildGptEnhancementPrompt(result);
-  const response = await fetch(endpoint, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${settings.apiKey}`,
-      "Content-Type": "application/json",
-      "HTTP-Referer": "http://localhost:3000",
-      "X-Title": "Loo Portfolio Manager",
-    },
-    body: JSON.stringify(
-      isOpenRouterCompatible
-        ? {
-            model: settings.model,
-            response_format: { type: "json_object" },
-            messages: [
-              {
-                role: "system",
-                content: instructions,
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), GPT_ENHANCEMENT_TIMEOUT_MS);
+  let response: Response;
+  try {
+    response = await fetch(endpoint, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${settings.apiKey}`,
+        "Content-Type": "application/json",
+        "HTTP-Referer": "http://localhost:3000",
+        "X-Title": "Loo Portfolio Manager",
+      },
+      signal: controller.signal,
+      body: JSON.stringify(
+        isOpenRouterCompatible
+          ? {
+              model: settings.model,
+              response_format: { type: "json_object" },
+              messages: [
+                {
+                  role: "system",
+                  content: instructions,
+                },
+                {
+                  role: "user",
+                  content: prompt,
+                },
+              ],
+            }
+          : {
+              model: settings.model,
+              instructions,
+              store:
+                process.env.LOO_MINISTER_DISABLE_RESPONSE_STORAGE === "true"
+                  ? false
+                  : undefined,
+              reasoning: { effort: settings.reasoningEffort },
+              text: {
+                verbosity: "low",
+                format: getGptEnhancementTextFormat(settings.provider),
               },
-              {
-                role: "user",
-                content: prompt,
-              },
-            ],
-          }
-        : {
-            model: settings.model,
-            instructions,
-            store:
-              process.env.LOO_MINISTER_DISABLE_RESPONSE_STORAGE === "true"
-                ? false
-                : undefined,
-            reasoning: { effort: settings.reasoningEffort },
-            text: {
-              verbosity: "low",
-              format: getGptEnhancementTextFormat(settings.provider),
+              input: [
+                {
+                  role: "user",
+                  content: prompt,
+                },
+              ],
             },
-            input: [
-              {
-                role: "user",
-                content: prompt,
-              },
-            ],
-          },
-    ),
-  });
+      ),
+    });
+  } catch (error) {
+    if (error instanceof Error && error.name === "AbortError") {
+      throw new Error("GPT enhancement provider timeout.");
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeout);
+  }
 
   const responseText = await response.text().catch(() => "");
   let payload: Record<string, unknown> = {};
@@ -953,6 +967,6 @@ export async function getPortfolioAnalyzerGptEnhancement(
       failureKind: "quick_scan_gpt_failed",
       errorMessage,
     });
-    throw new Error(`GPT 增强解读失败：${errorMessage}`);
+    throw new Error(`Loo皇深度思考失败：${errorMessage}`);
   }
 }

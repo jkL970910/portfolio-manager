@@ -102,7 +102,7 @@ const projectKnowledgeItems: Array<{
     value:
       "标的/持仓详情必须按 securityId 或完整 symbol + exchange + currency 回答，不能只按 ticker 合并。",
     detail:
-      "价格、走势图、智能快扫、今日秘闻和推荐解释都要保留 listing 身份。US 正股与 CAD listed/CDR/hedged 版本可以共享 underlying 研究背景，但不能共享 listing 价格、FX 和持仓事实。",
+      "价格、走势图、Loo皇巡阅、今日秘闻和推荐解释都要保留 listing 身份。US 正股与 CAD listed/CDR/hedged 版本可以共享 underlying 研究背景，但不能共享 listing 价格、FX 和持仓事实。",
   },
   {
     id: "project-feature-recommendations",
@@ -2399,10 +2399,10 @@ function buildAnalysisHandoffAnswer(input: LooMinisterQuestionRequest) {
   const scopeLine =
     actions.length > 0
       ? `当前页面可运行：${actions.map((action) => action.label).join("、")}。`
-      : "当前页面没有提供可直接运行的智能快扫动作；请进入标的详情、Health Score、账户 Health 或推荐页后再触发。";
+      : "当前页面没有提供可直接运行的 Loo皇巡阅动作；请进入标的详情、Health Score、账户 Health 或推荐页后再触发。";
 
   return [
-    "这类问题不应该只靠聊天回答。大臣会把它当作智能快扫分析交接：先解释可分析范围，再让你确认是否运行后端受控分析。",
+    "这类问题不应该只靠聊天回答。大臣会把它当作 Loo皇巡阅交接：先解释可分析范围，再让你确认是否运行后端受控分析。",
     scopeLine,
     "安全边界：运行分析属于显式动作，必须由你点击确认；大臣不会在聊天里自动修改数据、自动刷新行情、自动抓新闻论坛或绕过 provider quota。",
     "分析会复用现有 portfolio-analyzer 合约和缓存策略：标的分析保留 securityId / symbol + exchange + currency，组合/账户分析使用当前 Health 和持仓上下文，推荐分析使用当前 recommendation run。",
@@ -2640,7 +2640,7 @@ function hasRunAnalysisAction(input: LooMinisterQuestionRequest) {
 }
 
 function hasUnavailableRunAnalysisPromise(answer: LooMinisterAnswerResult) {
-  return /确认式\s*AI\s*快扫流程|由你确认后再运行|确认后再运行|点击确认.*快扫|应用里.*确认.*快扫/i.test(
+  return /确认式\s*AI\s*快扫流程|确认式\s*Loo皇巡阅|由你确认后再运行|确认后再运行|点击确认.*快扫|点击确认.*巡阅|应用里.*确认.*快扫|应用里.*确认.*巡阅/i.test(
     answer.answer,
   );
 }
@@ -2660,14 +2660,14 @@ function sanitizeUnavailableRunAnalysisPromise(
     .split(/(?<=[。！？\n])/u)
     .filter(
       (sentence) =>
-        !/确认式\s*AI\s*快扫流程|由你确认后再运行|确认后再运行|点击确认.*快扫|应用里.*确认.*快扫/i.test(
+        !/确认式\s*AI\s*快扫流程|确认式\s*Loo皇巡阅|由你确认后再运行|确认后再运行|点击确认.*快扫|点击确认.*巡阅|应用里.*确认.*快扫|应用里.*确认.*巡阅/i.test(
           sentence,
         ),
     )
     .join("")
     .trim();
   const boundary =
-    "动作边界修正：本轮回答下方没有可确认的智能快扫按钮，所以当前聊天只做轻量解释；如需智能快扫，请进入标的详情、Health Score、账户 Health 或推荐页，使用页面里的智能快扫卡片。";
+    "动作边界修正：本轮回答下方没有可确认的 Loo皇巡阅按钮，所以当前聊天只做轻量解释；如需 Loo皇巡阅，请进入标的详情、Health Score、账户 Health 或推荐页，使用页面里的巡阅卡片。";
 
   return attachDeterministicSuggestedActions(
     input,
@@ -2675,11 +2675,11 @@ function sanitizeUnavailableRunAnalysisPromise(
       ...answer,
       answer: [
         cleanedAnswer ||
-          "GPT 主回答只包含不可执行的快扫确认承诺，已移除该动作承诺。",
+          "GPT 主回答只包含不可执行的巡阅确认承诺，已移除该动作承诺。",
         boundary,
       ].join("\n\n"),
       keyPoints: [
-        "本轮没有可确认的智能快扫按钮；已保留 GPT 主回答并修正动作边界。",
+        "本轮没有可确认的 Loo皇巡阅按钮；已保留 GPT 主回答并修正动作边界。",
         ...answer.keyPoints,
       ].slice(0, 8),
     }),
@@ -2739,7 +2739,7 @@ function buildRouterCompatiblePrompt(input: LooMinisterQuestionRequest) {
     `本轮意图分类：primary=${classifiedIntent.primary}; secondary=${classifiedIntent.secondary.join(",") || "none"}; confidence=${classifiedIntent.confidence}。必须先回答 primary intent；secondary 只能作为必要补充。`,
     "如果 primary 是 import_workflow、how_to_action 或 page_explanation，不得主动展开组合配置、Health、推荐或买入判断，除非用户明确问它们会不会受影响。",
     "不要编造实时行情、新闻或论坛结论；投资相关回答必须包含不构成投资建议的免责声明。",
-    "如果用户要求帮忙分析、运行快扫或生成分析报告，只有在本轮 allowedActions 里存在 run-analysis 动作时，才可以说页面会提供确认式智能快扫按钮；否则必须说明当前聊天只能给轻量解释，并引导用户进入标的详情、Health Score、账户 Health 或推荐页运行对应快扫。suggestedActions 必须返回 []，后端会基于 allowedActions 附加确认动作。",
+    "如果用户要求帮忙分析、运行快扫、巡阅或生成分析报告，只有在本轮 allowedActions 里存在 run-analysis 动作时，才可以说页面会提供确认式 Loo皇巡阅按钮；否则必须说明当前聊天只能给轻量解释，并引导用户进入标的详情、Health Score、账户 Health 或推荐页运行对应巡阅。suggestedActions 必须返回 []，后端会基于 allowedActions 附加确认动作。",
     "如果用户问整体持仓、组合、配置、Health 或推荐，必须优先解释组合上下文；如果用户问标的或持仓详情，必须优先解释标的上下文；如果进一步问是否适合买入/适配，必须解释候选适配；currentExposure=0 只代表未持有，不得阻止分析。",
     "上下文优先级必须是：当前页面事实和 security-context/candidate-fit > 用户明确提到的标的 > recentSubjects 补齐资料 > portfolio-context > global-user-context > project knowledge。global-user-context 是用户级背景，只能补足持仓/偏好/推荐背景，不能覆盖当前页面或当前标的事实。",
     "如果用户在总览、组合或推荐页直接提到 ticker，必须先使用问题中提到的标的资料；有 comparison-subject 时表示 resolver 已补齐至少一个候选标的，不得再说没有资料。没有候选适配资料时，可以说明这是轻量问答而非完整快扫，但仍要基于已补齐标的、组合资料、偏好因素和数据边界回答。",
@@ -3087,7 +3087,7 @@ function buildExternalInput(
     {
       role: "system",
       content:
-        "你是 Loo国大臣，是项目内的投资管家型助手，不是数据字段解释器。只用提供的页面 context、用户持仓/偏好背景和缓存资料回答中文问题。默认按自然聊天方式回答，像 ChatGPT 一样直接回应用户问题；不要每次套用固定小标题、固定段落或报告模板。只有当用户明确要求分析报告、对比、清单或步骤时，才使用条列。回答要简洁，优先 1-3 段。不要把 DTO、overlay、deterministic、sourceMode、provider、fallback、run-analysis、context pack 等工程词直接说给用户。如果 context 里有 portfolio-context、security-context、candidate-fit、global-user-context、analysis-cache 或 external-intelligence 结果，优先引用它，但对用户要说“组合上下文、标的上下文、候选适配、用户持仓和偏好背景、缓存分析、外部资料”。上下文优先级必须是：当前页面事实和 security-context/candidate-fit > 用户明确提到的标的 > recentSubjects 补齐资料 > portfolio-context > global-user-context > project knowledge。global-user-context 是用户级背景，只能补足持仓/偏好/推荐背景，不能覆盖当前页面或当前标的事实。没有资料时说明只能基于页面上下文和本地缓存回答。不要编造实时行情、新闻或论坛结论；保留 securityId 以及 symbol + exchange + currency 身份；投资相关回答必须保留不构成投资建议口径。若用户要求帮忙分析、运行快扫或生成分析报告，只有当 pageContext.allowedActions 里存在 run-analysis 时，才可以说页面会提供确认式智能快扫按钮；否则说明当前聊天只能轻量解释，并引导用户进入对应页面运行快扫。suggestedActions 必须返回 []，后端会基于 pageContext.allowedActions 附加确认动作。若用户问整体持仓、组合、配置、Health 或推荐，优先解释组合上下文；若缺少 portfolio-context 但存在 global-user-context，也必须使用用户持仓和偏好背景回答。若用户问标的/持仓详情，优先解释标的上下文；若用户问某标的是否适合买入/适配，进一步解释候选适配资料，并把标的本身、底层经济暴露、现有持仓重复度、目标配置缺口、Preference Factors、账户/税务/FX、数据新鲜度都纳入；currentExposure=0 只代表未持有，不得阻止 candidate-new-buy 分析。只返回合法 JSON object，不要 markdown。JSON 必须符合 LooMinisterAnswerResult：version、generatedAt、role、page、title、answer、structured、keyPoints、suggestedActions、sources、disclaimer。answer 是面向用户展示的聊天正文，不能机械拼接“判断依据/需要确认/边界/下一步”等固定标题。structured 只作兼容字段：directAnswer 填 answer 的一句话摘要；reasoning、decisionGates 填 []；boundary 和 nextStep 默认 null，除非用户明确要求严肃投资分析或操作步骤。role 必须是 loo-minister，产品动作由本地应用控制。",
+        "你是 Loo国大臣，是项目内的投资管家型助手，不是数据字段解释器。只用提供的页面 context、用户持仓/偏好背景和缓存资料回答中文问题。默认按自然聊天方式回答，像 ChatGPT 一样直接回应用户问题；不要每次套用固定小标题、固定段落或报告模板。只有当用户明确要求分析报告、对比、清单或步骤时，才使用条列。回答要简洁，优先 1-3 段。不要把 DTO、overlay、deterministic、sourceMode、provider、fallback、run-analysis、context pack 等工程词直接说给用户。如果 context 里有 portfolio-context、security-context、candidate-fit、global-user-context、analysis-cache 或 external-intelligence 结果，优先引用它，但对用户要说“组合上下文、标的上下文、候选适配、用户持仓和偏好背景、缓存分析、外部资料”。上下文优先级必须是：当前页面事实和 security-context/candidate-fit > 用户明确提到的标的 > recentSubjects 补齐资料 > portfolio-context > global-user-context > project knowledge。global-user-context 是用户级背景，只能补足持仓/偏好/推荐背景，不能覆盖当前页面或当前标的事实。没有资料时说明只能基于页面上下文和本地缓存回答。不要编造实时行情、新闻或论坛结论；保留 securityId 以及 symbol + exchange + currency 身份；投资相关回答必须保留不构成投资建议口径。若用户要求帮忙分析、运行快扫、巡阅或生成分析报告，只有当 pageContext.allowedActions 里存在 run-analysis 时，才可以说页面会提供确认式 Loo皇巡阅按钮；否则说明当前聊天只能轻量解释，并引导用户进入对应页面运行巡阅。suggestedActions 必须返回 []，后端会基于 pageContext.allowedActions 附加确认动作。若用户问整体持仓、组合、配置、Health 或推荐，优先解释组合上下文；若缺少 portfolio-context 但存在 global-user-context，也必须使用用户持仓和偏好背景回答。若用户问标的/持仓详情，优先解释标的上下文；若用户问某标的是否适合买入/适配，进一步解释候选适配资料，并把标的本身、底层经济暴露、现有持仓重复度、目标配置缺口、Preference Factors、账户/税务/FX、数据新鲜度都纳入；currentExposure=0 只代表未持有，不得阻止 candidate-new-buy 分析。只返回合法 JSON object，不要 markdown。JSON 必须符合 LooMinisterAnswerResult：version、generatedAt、role、page、title、answer、structured、keyPoints、suggestedActions、sources、disclaimer。answer 是面向用户展示的聊天正文，不能机械拼接“判断依据/需要确认/边界/下一步”等固定标题。structured 只作兼容字段：directAnswer 填 answer 的一句话摘要；reasoning、decisionGates 填 []；boundary 和 nextStep 默认 null，除非用户明确要求严肃投资分析或操作步骤。role 必须是 loo-minister，产品动作由本地应用控制。",
     },
     {
       role: "user",

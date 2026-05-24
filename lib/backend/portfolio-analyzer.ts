@@ -401,7 +401,7 @@ function getAnalyzerLimitationSummary(marketData: ReturnType<typeof buildMarketD
       ? `包含 ${marketData.stalePointCount} 个可能过期价格点`
       : null,
   ].filter((item): item is string => Boolean(item));
-  return limits.length > 0 ? limits.join("；") : "资料足够做第一层快扫，但仍不构成投资建议";
+  return limits.length > 0 ? limits.join("；") : "资料足够做第一层 Loo皇巡阅，但仍不构成投资建议";
 }
 
 function buildAnalyzerEvidenceTrail(args: {
@@ -573,7 +573,7 @@ function buildSecurityNextSteps(args: {
 }) {
   const steps = [
     !args.hasCompleteIdentity ? "先补齐 symbol、exchange、currency，避免同 ticker 不同上市地混淆。" : null,
-    args.priceHistoryPointCount < 20 ? "刷新报价和历史价格，让快扫证据从低样本升级到可复核状态。" : null,
+    args.priceHistoryPointCount < 20 ? "刷新报价和历史价格，让巡阅证据从低样本升级到可复核状态。" : null,
     args.isHeld ? "对比当前持仓权重、账户位置和目标配置差距。" : "把它和现有同类持仓做一次重合度比较。",
     args.verdict === "good-candidate" ? "如果仍匹配，再进入观察清单或小额分批计划讨论。" : null,
   ].filter((item): item is string => Boolean(item));
@@ -907,7 +907,7 @@ function buildSecurityResearchValuationEvidence(args: {
   return {
     method: "unavailable",
     confidence: "low",
-    summary: `${args.symbol} 尚未缓存可用的估值资料；当前结论只使用组合适配、偏好、账户/税务和缓存行情，不声称已完成 DCF 或目标价判断。可在标的详情页提交“基本资料”后台刷新，任务完成后重新生成快扫。`,
+    summary: `${args.symbol} 尚未缓存可用的估值资料；当前结论只使用组合适配、偏好、账户/税务和缓存行情，不声称已完成 DCF 或目标价判断。可在标的详情页提交“基本资料”后台刷新，任务完成后重新巡阅。`,
     anchors: [],
     sanityChecks: [
       {
@@ -1106,7 +1106,7 @@ function buildSecurityResearchActionPlans(args: {
       isBlockedByPortfolioFit: blockedByPortfolioFit,
       priority: "P0",
       status: "needs_data",
-      triggerLabel: "补齐身份、报价和估值证据后重新快扫",
+      triggerLabel: "补齐身份、报价和估值证据后重新巡阅",
       evidenceLabels,
       requiredConfirmations: ["完整 symbol / exchange / currency", "可审计报价与历史样本", "估值证据来源"],
     }];
@@ -1160,7 +1160,7 @@ function buildSecurityResearchActionPlans(args: {
       isBlockedByPortfolioFit: false,
       priority: "P1",
       status: "needs_data",
-      triggerLabel: "缓存到估值证据后重新快扫",
+      triggerLabel: "缓存到估值证据后重新巡阅",
       evidenceLabels,
       requiredConfirmations: ["估值证据 provider", "关键价位", "组合暴露变化"],
     }];
@@ -1685,7 +1685,7 @@ export function buildSecurityAnalyzerQuickScan(args: {
             {
               priority: "P2" as const,
               title: "补充价格历史",
-              detail: "缓存价格历史不足时，快扫只能做低置信判断；后续可通过行情刷新或 worker 补齐历史样本。",
+              detail: "缓存价格历史不足时，Loo皇巡阅只能做低置信判断；后续可通过行情刷新或 worker 补齐历史样本。",
             },
           ]
         : []),
@@ -1765,7 +1765,7 @@ export function buildPortfolioAnalyzerQuickScan(args: {
         score: getMarketDataConfidenceScore(marketData),
         rationale: marketData.quoteFreshnessSummary
           ? `行情口径：${marketData.quoteFreshnessSummary}。`
-          : "没有足够缓存行情，组合快扫只能低置信使用本地字段。"
+          : "没有足够缓存行情，国库巡阅只能低置信使用本地字段。"
       },
       ...health.dimensions.map((dimension) => ({
         id: dimension.id,
@@ -1882,7 +1882,7 @@ export function buildAccountAnalyzerQuickScan(args: {
     },
     evidenceTrail,
     summary: {
-      title: `${accountLabel} 智能账户快扫`,
+      title: `${accountLabel} Loo皇巡阅账户`,
       thesis: `${accountLabel} 当前约占总组合 ${round(accountWeightPct, 1)}%，账户健康分为 ${health.score}。本轮只使用本地账户、持仓、偏好和报价缓存。`,
       confidence: accountHoldings.length > 0 ? "medium" : "low"
     },
@@ -1893,7 +1893,7 @@ export function buildAccountAnalyzerQuickScan(args: {
         score: getMarketDataConfidenceScore(marketData),
         rationale: marketData.quoteFreshnessSummary
           ? `行情口径：${marketData.quoteFreshnessSummary}。`
-          : "没有足够缓存行情，账户快扫只能低置信使用本地字段。"
+          : "没有足够缓存行情，账户巡阅只能低置信使用本地字段。"
       },
       {
         id: "account-health",

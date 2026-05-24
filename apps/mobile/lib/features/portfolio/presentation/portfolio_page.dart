@@ -316,6 +316,7 @@ class _PortfolioHeroMetrics extends StatelessWidget {
         .where((holding) => _parsePercent(holding.weight) > 0)
         .take(8)
         .toList();
+    final largestHolding = holdingsShare.isEmpty ? null : holdingsShare.first;
     final shareLabel = holdingsShare.isEmpty
         ? "${data.securityHoldings.length} 个"
         : "前${holdingsShare.length}项";
@@ -324,10 +325,12 @@ class _PortfolioHeroMetrics extends StatelessWidget {
       children: [
         Expanded(
           child: _HeroMetricButton(
-            label: "组合占比",
-            value: "100%",
-            icon: Icons.pie_chart_outline_rounded,
-            onTap: () => _showAllocationShareSheet(context, data),
+            label: largestHolding?.symbol ?? "最大仓位",
+            value: largestHolding?.weight ?? "--",
+            icon: Icons.stacked_line_chart_rounded,
+            onTap: holdingsShare.isEmpty
+                ? null
+                : () => _showHoldingsShareSheet(context, holdingsShare),
           ),
         ),
         const SizedBox(width: 8),
@@ -423,30 +426,6 @@ class _HeroMetricButton extends StatelessWidget {
       ),
     );
   }
-}
-
-void _showAllocationShareSheet(
-  BuildContext context,
-  MobilePortfolioSnapshot data,
-) {
-  final slices = data.assetClassDrilldown
-      .where((item) => item.currentPct > 0)
-      .take(8)
-      .map(
-        (item) => _ShareSlice(
-          label: item.name,
-          value: item.currentPct,
-          displayValue: item.current,
-          amount: item.value,
-        ),
-      )
-      .toList();
-  _showShareSheet(
-    context,
-    title: "组合占比",
-    subtitle: "按当前经济暴露展示资产类别比例。",
-    slices: slices,
-  );
 }
 
 void _showHoldingsShareSheet(

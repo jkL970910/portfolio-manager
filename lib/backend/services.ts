@@ -4549,7 +4549,7 @@ export async function reviewBrokerageImportDraftHolding(
     holding.exchange = "OTHER";
     holding.identityStatus = "other_asset";
     holding.warnings = [
-      "将作为其他资产写入净值，不参与标的研究台、AI快扫或推荐。",
+      "将作为其他资产写入净值，不参与标的研究台、Loo皇巡阅或推荐。",
     ];
   } else {
     const exchange = input.exchange?.trim().toUpperCase();

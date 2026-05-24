@@ -3,9 +3,9 @@ import { PortfolioAnalysisRun } from "@/lib/backend/models";
 import { getRepositories } from "@/lib/backend/repositories/factory";
 
 const SCOPE_LABELS: Record<PortfolioAnalysisRun["scope"], string> = {
-  security: "标的快扫",
-  portfolio: "组合快扫",
-  account: "账户快扫",
+  security: "Loo皇巡阅标的",
+  portfolio: "Loo皇巡阅国库",
+  account: "Loo皇巡阅账户",
   "recommendation-run": "推荐解释"
 };
 
@@ -50,7 +50,7 @@ function getSummaryTitle(result: Record<string, unknown>) {
       return title.trim();
     }
   }
-  return "智能快扫记录";
+  return "Loo皇巡阅记录";
 }
 
 function getSummaryThesis(result: Record<string, unknown>) {
@@ -71,7 +71,7 @@ function getSourceLabel(sourceMode: PortfolioAnalysisRun["sourceMode"]) {
     case "live-external":
       return "实时外部研究";
     default:
-      return "本地快扫";
+      return "Loo皇巡阅";
   }
 }
 

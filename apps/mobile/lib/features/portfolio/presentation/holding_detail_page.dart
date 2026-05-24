@@ -395,7 +395,7 @@ class MobileHoldingDetailSnapshot {
         ),
         LooMinisterSuggestedAction(
           id: "run-security-analysis",
-          label: "运行智能标的快扫",
+          label: "开始标的巡阅",
           actionType: "run-analysis",
           target: {"scope": "security"},
           requiresConfirmation: true,

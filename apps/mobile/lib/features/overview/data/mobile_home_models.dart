@@ -121,7 +121,7 @@ class MobileHomeSnapshot {
         ),
         LooMinisterSuggestedAction(
           id: "run-portfolio-analysis",
-          label: "运行智能组合快扫",
+          label: "开始国库巡阅",
           actionType: "run-analysis",
           target: {"page": "portfolio-health"},
           requiresConfirmation: true,

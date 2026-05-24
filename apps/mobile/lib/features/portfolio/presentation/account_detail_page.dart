@@ -674,7 +674,7 @@ class MobileAccountDetailSnapshot {
         ),
         LooMinisterSuggestedAction(
           id: "run-account-analysis",
-          label: "运行智能账户快扫",
+          label: "开始账户巡阅",
           actionType: "run-analysis",
           target: {"scope": "account"},
           requiresConfirmation: true,
@@ -780,17 +780,6 @@ class _SummaryCard extends StatelessWidget {
                   ),
                 ),
               ),
-            ],
-          ),
-          SizedBox(height: tokens.gapMd),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              if (data.gainLoss.isNotEmpty) _MiniPill(data.gainLoss),
-              if (data.portfolioShare.isNotEmpty)
-                _MiniPill("组合 ${data.portfolioShare}"),
-              _MiniPill("持仓 ${data.holdings.length} 个"),
             ],
           ),
           SizedBox(height: tokens.gapLg),
@@ -1016,6 +1005,7 @@ class _AccountMetricStrip extends StatelessWidget {
         _portfolioShareValue(data.portfolioShare),
         onTap: onOpenShare,
       ),
+      _MetricDatum("持仓", "${data.holdings.length} 个"),
       _MetricDatum(
         "健康分",
         data.healthScore.score.replaceAll(" 分", ""),
@@ -1033,16 +1023,29 @@ class _AccountMetricStrip extends StatelessWidget {
       ),
       child: Padding(
         padding: EdgeInsets.all(tokens.gapMd),
-        child: Row(
+        child: Wrap(
+          spacing: tokens.gapSm,
+          runSpacing: tokens.gapSm,
           children: [
-            for (var index = 0; index < metrics.take(3).length; index++) ...[
-              if (index > 0) SizedBox(width: tokens.gapSm),
-              Expanded(child: _MetricCard(metrics[index])),
-            ],
+            for (final metric in metrics.take(4))
+              SizedBox(
+                width: _metricTileWidth(context, metrics.length),
+                child: _MetricCard(metric),
+              ),
           ],
         ),
       ),
     );
+  }
+
+  double _metricTileWidth(BuildContext context, int count) {
+    final width = MediaQuery.sizeOf(context).width;
+    const horizontalPagePadding = 32.0;
+    final stripPadding = context.looTokens.gapMd * 2;
+    final gap = context.looTokens.gapSm;
+    final columns = count >= 4 ? 2 : count.clamp(1, 3);
+    return (width - horizontalPagePadding - stripPadding - gap * (columns - 1)) /
+        columns;
   }
 
   String _shortGainLoss(String value) {
@@ -1355,33 +1358,6 @@ class _SectionHeader extends StatelessWidget {
                 ),
           ),
       ],
-    );
-  }
-}
-
-class _MiniPill extends StatelessWidget {
-  const _MiniPill(this.label);
-
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    final tokens = context.looTokens;
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.38),
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: tokens.cardBorder),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-        child: Text(
-          label,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: Theme.of(context).textTheme.labelMedium,
-        ),
-      ),
     );
   }
 }

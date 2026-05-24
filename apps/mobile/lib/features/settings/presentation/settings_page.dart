@@ -213,7 +213,7 @@ class _SettingsPageState extends State<SettingsPage> {
           _SettingsSectionCard(
             icon: Icons.smart_toy_outlined,
             title: "AI 与大臣",
-            subtitle: "OpenRouter / OpenAI Key、GPT 增强和调用状态",
+            subtitle: "OpenRouter / OpenAI Key、Loo皇深度思考和调用状态",
             initiallyExpanded: false,
             children: [
               _AiMinisterSettingsCard(apiClient: widget.apiClient),
@@ -2880,7 +2880,7 @@ class _RecentAnalysisCardState extends State<_RecentAnalysisCard> {
                 ],
               ),
               const SizedBox(height: 6),
-              const Text("展示最近保存的快扫结果；实时新闻/论坛研究仍未接入。"),
+              const Text("展示最近保存的 Loo皇巡阅结果；实时新闻/论坛研究仍未接入。"),
               if (snapshot.connectionState == ConnectionState.waiting) ...[
                 const SizedBox(height: 12),
                 const LinearProgressIndicator(),
@@ -2892,7 +2892,7 @@ class _RecentAnalysisCardState extends State<_RecentAnalysisCard> {
                 ),
               ] else if (items.isEmpty) ...[
                 const SizedBox(height: 12),
-                const Text("还没有分析记录。先在标的、组合或账户页面生成一次智能快扫。"),
+                const Text("还没有分析记录。先在标的、组合或账户页面进行一次 Loo皇巡阅。"),
               ] else ...[
                 const SizedBox(height: 12),
                 ...items.map(_RecentAnalysisTile.new),
@@ -3540,9 +3540,9 @@ class _RecentAnalysisItem {
   factory _RecentAnalysisItem.fromJson(Map<String, dynamic> json) {
     final rawGeneratedAt = json["generatedAt"];
     return _RecentAnalysisItem(
-      scopeLabel: json["scopeLabel"] as String? ?? "智能快扫",
-      sourceLabel: json["sourceLabel"] as String? ?? "智能快扫",
-      title: json["title"] as String? ?? "智能快扫记录",
+      scopeLabel: json["scopeLabel"] as String? ?? "Loo皇巡阅",
+      sourceLabel: json["sourceLabel"] as String? ?? "Loo皇巡阅",
+      title: json["title"] as String? ?? "Loo皇巡阅记录",
       detail: json["detail"] as String? ?? "",
       generatedAt:
           rawGeneratedAt is String ? DateTime.tryParse(rawGeneratedAt) : null,

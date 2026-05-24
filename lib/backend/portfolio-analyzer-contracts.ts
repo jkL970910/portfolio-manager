@@ -71,7 +71,7 @@ export const portfolioAnalyzerGptEnhancementSchema = z.object({
   boundary: z.string().trim().min(1).max(700).nullable().default(null),
   nextStep: z.string().trim().min(1).max(500).nullable().default(null),
   sourceLabel: z.string().trim().min(1).max(120),
-  authorityBoundary: z.string().trim().min(1).max(300).default("GPT 只增强解释，不改变智能快扫结论、护栏或行动优先级。"),
+  authorityBoundary: z.string().trim().min(1).max(300).default("Loo皇深度思考只增强解释，不改变 Loo皇巡阅结论、护栏或行动优先级。"),
   disclaimer: z.object({
     zh: z.string().trim().min(1),
     en: z.string().trim().min(1)

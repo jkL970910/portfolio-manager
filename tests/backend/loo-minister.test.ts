@@ -44,7 +44,7 @@ test("Loo Minister deterministic answer uses page context and keeps disclaimer",
           },
           {
             id: "run-portfolio-analysis",
-            label: "运行智能组合快扫",
+            label: "开始国库巡阅",
             actionType: "run-analysis",
             target: { page: "portfolio-health" },
             requiresConfirmation: true,
@@ -1385,7 +1385,7 @@ test("Loo Minister hands analysis requests off to confirmed run-analysis actions
         allowedActions: [
           {
             id: "run-security-analysis",
-            label: "运行智能标的快扫",
+            label: "开始标的巡阅",
             actionType: "run-analysis",
             target: {
               page: "security-detail",
@@ -1420,7 +1420,7 @@ test("Loo Minister hands analysis requests off to confirmed run-analysis actions
     },
   );
 
-  assert.match(response.data.answer, /智能快扫分析交接/);
+  assert.match(response.data.answer, /Loo皇巡阅交接/);
   assert.match(response.data.answer, /必须由你点击确认/);
   assert.equal(response.data.suggestedActions.length, 1);
   assert.equal(response.data.suggestedActions[0]?.actionType, "run-analysis");
@@ -1472,7 +1472,7 @@ test("Loo Minister explains analysis handoff without actions when page cannot ru
 
   assert.match(
     response.data.answer,
-    /当前页面没有提供可直接运行的智能快扫动作/,
+    /当前页面没有提供可直接运行的 Loo皇巡阅动作/,
   );
   assert.equal(response.data.suggestedActions.length, 0);
 });
@@ -1829,7 +1829,7 @@ test("Loo Minister can call an OpenRouter-compatible Responses endpoint", async 
           allowedActions: [
             {
               id: "run-portfolio-analysis",
-              label: "运行智能组合快扫",
+              label: "开始国库巡阅",
               actionType: "run-analysis",
               target: { page: "portfolio-health" },
               requiresConfirmation: true,
@@ -2210,7 +2210,7 @@ test("Loo Minister sanitizes provider answers that promise unavailable quick sca
           page: "portfolio",
           title: "组合大臣答复",
           answer:
-            "如果要真正比较 RKLB 和 NASA 是否适合买入，会交给应用里的确认式智能快扫流程，由你确认后再运行。",
+            "如果要真正比较 RKLB 和 NASA 是否适合买入，会交给应用里的确认式 Loo皇巡阅流程，由你确认后再运行。",
           keyPoints: ["需要快扫"],
           suggestedActions: [],
           sources: [
@@ -2276,7 +2276,7 @@ test("Loo Minister sanitizes provider answers that promise unavailable quick sca
     );
 
     assert.match(response.data.answer, /动作边界修正/);
-    assert.match(response.data.answer, /没有可确认的智能快扫按钮/);
+    assert.match(response.data.answer, /没有可确认的 Loo皇巡阅按钮/);
     assert.match(
       response.data.keyPoints[0] ?? "",
       /保留 GPT 主回答并修正动作边界/,

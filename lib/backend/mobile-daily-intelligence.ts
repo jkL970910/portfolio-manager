@@ -50,7 +50,7 @@ function getSourceLabel(
     ? "缓存外部研究"
     : sourceMode === "live-external"
       ? "实时外部研究"
-      : "本地快扫";
+      : "Loo皇巡阅";
 }
 
 function getConfidenceLabel(
@@ -85,7 +85,7 @@ function getAnalysisTitle(result: Record<string, unknown>) {
   const summary = readNestedMap(result.summary);
   return typeof summary.title === "string" && summary.title.trim()
     ? summary.title.trim()
-    : "智能快扫记录";
+    : "Loo皇巡阅记录";
 }
 
 function getAnalysisSummary(result: Record<string, unknown>) {

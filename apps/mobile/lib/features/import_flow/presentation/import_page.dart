@@ -2682,7 +2682,7 @@ Future<void> _showOtherAssetReviewSheet({
               ),
               const SizedBox(height: 8),
               Text(
-                "这看起来是 Wealthsimple 的实体黄金/贵金属或非标准证券资产。它会计入账户净值，但不会进入标的研究台、AI快扫或进货推荐。",
+                "这看起来是 Wealthsimple 的实体黄金/贵金属或非标准证券资产。它会计入账户净值，但不会进入标的研究台、Loo皇巡阅或进货推荐。",
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                       color: context.looTokens.mutedText,
                     ),

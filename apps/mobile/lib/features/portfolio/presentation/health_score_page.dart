@@ -268,7 +268,7 @@ class MobileHealthSnapshot {
           id: isAccountScope
               ? "run-account-analysis"
               : "run-portfolio-analysis",
-          label: isAccountScope ? "运行智能账户快扫" : "运行智能组合快扫",
+          label: isAccountScope ? "开始账户巡阅" : "开始国库巡阅",
           actionType: "run-analysis",
           target: {
             "scope": isAccountScope ? "account" : "portfolio",
@@ -705,7 +705,7 @@ class _LooHealthBriefingCardState extends State<_LooHealthBriefingCard> {
                   children: [
                     if (widget.data.actionQueue.isNotEmpty)
                       _InfoPill("${widget.data.actionQueue.length} 行动"),
-                    const _InfoPill("快扫"),
+                    const _InfoPill("巡阅"),
                   ],
                 ),
                 AnimatedRotation(
@@ -736,10 +736,10 @@ class _LooHealthBriefingCardState extends State<_LooHealthBriefingCard> {
             const SizedBox(height: 12),
             AiAnalysisCard(
               apiClient: widget.apiClient,
-              title: widget.accountId == null ? "智能组合快扫" : "智能账户快扫",
+              title: widget.accountId == null ? "Loo皇巡阅国库" : "Loo皇巡阅账户",
               description: widget.accountId == null
-                  ? "先用组合健康、投资偏好和已保存资料生成确定性判断；GPT 增强需手动点击。"
-                  : "先用当前账户持仓、账户类型和偏好生成确定性判断；GPT 增强需手动点击。",
+                  ? "先用组合健康、投资偏好和已保存资料生成确定性判断；Loo皇深度思考需手动点击。"
+                  : "先用当前账户持仓、账户类型和偏好生成确定性判断；Loo皇深度思考需手动点击。",
               collapseDescriptionToInfo: true,
               payload: {
                 "scope": widget.accountId == null ? "portfolio" : "account",
@@ -760,7 +760,7 @@ class _LooHealthBriefingCardState extends State<_LooHealthBriefingCard> {
     if (data.actionQueue.isNotEmpty) {
       return data.actionQueue.first;
     }
-    return "展开查看批注、优先行动和智能快扫。";
+    return "展开查看批注、优先行动和 Loo皇巡阅。";
   }
 }
 

@@ -204,6 +204,8 @@ class _DiscoverPageState extends State<DiscoverPage> {
         child: ListView(
           padding: looPagePadding(context, top: 20),
           children: [
+            _BackToRecommendationsButton(onTap: () => context.pop()),
+            const SizedBox(height: 12),
             const _PageHeader(
               title: "搜货台",
               subtitle: "搜索股票、ETF 或 CDR，确认交易所和币种后再加入囤货或打开详情。",
@@ -250,6 +252,48 @@ class _DiscoverPageState extends State<DiscoverPage> {
                 ),
               ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _BackToRecommendationsButton extends StatelessWidget {
+  const _BackToRecommendationsButton({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final textColor = Theme.of(context).colorScheme.onSurface;
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(999),
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.arrow_back_rounded,
+                  size: 20,
+                  color: textColor,
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  "返回进货",
+                  style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                        color: textColor,
+                        fontWeight: FontWeight.w800,
+                      ),
+                ),
+              ],
+            ),
+          ),
         ),
       ),
     );

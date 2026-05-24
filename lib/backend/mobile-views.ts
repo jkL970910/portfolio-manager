@@ -1163,10 +1163,18 @@ async function buildMobileRecommendationMarketItems(input: {
   const dedupedRecentCandidates = dedupeRecommendationMarketCandidates(
     recentCandidates,
     holdings,
-  )
-    .slice(0, 8);
+  );
+  const recentBySymbol = new Map<string, RecommendationMarketCandidate>();
+  for (const candidate of dedupedRecentCandidates) {
+    const symbolKey = candidate.identity.symbol.trim().toUpperCase();
+    if (!symbolKey || recentBySymbol.has(symbolKey)) {
+      continue;
+    }
+    recentBySymbol.set(symbolKey, candidate);
+  }
+  const compactRecentCandidates = [...recentBySymbol.values()].slice(0, 8);
   const recentObservationItems = await Promise.all(
-    dedupedRecentCandidates.map((candidate) =>
+    compactRecentCandidates.map((candidate) =>
       buildMobileRecommendationMarketItem({
         key: candidate.key,
         identity: candidate.identity,
@@ -1932,7 +1940,7 @@ export function buildRecommendationV3Overlay(
     signals: [
       ...base.signals,
       hasListingRef ? "当前 listing 情报命中" : "底层资产情报命中",
-      hasExternalRef ? "缓存外部研究可用" : "本地智能快扫可用",
+      hasExternalRef ? "缓存外部研究可用" : "Loo皇巡阅可用",
       ...(hasMarketSentimentRef ? marketSentimentSignals : []),
     ],
     riskFlags,
