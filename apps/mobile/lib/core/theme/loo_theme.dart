@@ -362,16 +362,22 @@ ThemeData _buildLooTheme({
     ),
     dialogTheme: DialogThemeData(
       elevation: 0,
-      backgroundColor: Colors.transparent,
+      backgroundColor: surface,
+      surfaceTintColor: Colors.transparent,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(tokens.radiusXl),
       ),
     ),
-    bottomSheetTheme: const BottomSheetThemeData(
+    bottomSheetTheme: BottomSheetThemeData(
       elevation: 0,
-      backgroundColor: Colors.transparent,
-      modalBackgroundColor: Colors.transparent,
+      backgroundColor: surface,
+      modalBackgroundColor: surface,
       surfaceTintColor: Colors.transparent,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(
+          top: Radius.circular(tokens.radiusXl),
+        ),
+      ),
     ),
     chipTheme: ChipThemeData(
       backgroundColor: tokens.accentSoft,

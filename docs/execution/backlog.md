@@ -118,6 +118,7 @@ This is the current source of truth before starting the next P0 implementation.
 | Minister usage/cost dashboard with estimates | P1               | Current logs store provider/model/status/token counts; cost estimates can be added after pricing policy is fixed                                                                                                                                               |
 | Mobile UI / IA v2 implementation             | P1 / Active Next | Approved Figma direction exists in `https://www.figma.com/design/aYsiPJ8eybrWa6BcY1peIn`; next work is Flutter theme tokens, reusable components, page layout rewrites, full-list navigation, compact data visualization, and light/dark/system theme support. |
 | Security Research Cockpit / 估值证据链       | P1 / Active Feature | Build the signed-off research-workbench stack from `docs/execution/security-research-cockpit.md`: `SecurityResearchDecision`, cached Alpha Vantage valuation evidence, ETF macro proxy, entry key levels, action-plan orchestration, and Flutter research-decision rendering first passes are implemented. Latest architecture split adds `securityResearchProfile` so listing-level facts such as valuation evidence and key levels stay visible even when user-specific portfolio guardrails block buying. Next is manual QA and visual polish. |
+| Loo国研究档案 / Thesis Dossier               | P1               | Long-lived research-dossier layer for each canonical security identity, not a temporary UI patch and not a direct AlphaGBM runtime integration. Persist user thesis, security role, max allocation, review/sell triggers, thesis drift, research-health status, and theme baskets. Use deterministic backend contracts and existing external-research/cache/context boundaries; AI 大臣 may summarize and explain but must not own the stored thesis or override rules. |
 | Independent news provider for 今日秘闻       | P1               | Alpha Vantage `NEWS_SENTIMENT` is the first worker-only news cache source, but it shares quota with profile/earnings and has weak TSX ETF coverage. Add a dedicated news provider later so daily briefs do not consume fundamentals quota and can return at least three reliable overview-level items. |
 | AlphaPick screenshot ingestion               | P1               | Convert purchased AlphaPick list screenshots into a reviewed watchlist/import pipeline with OCR, symbol identity resolution, source attribution, freshness labels, and manual confirmation before use.                                                         |
 | Unified brokerage import                     | P1               | Add one `券商同步` flow for broker imports instead of provider-specific tabs. First build target: IBKR Flex Query. First feasibility spike: Wealthsimple via SnapTrade. Architecture source: `docs/execution/brokerage-import-architecture.md`.                |
@@ -175,6 +176,100 @@ The following do not block MVP signoff and remain P1/P2:
   lifecycle hardening.
 - Light/dark/system theme settings.
 - AI 大臣 intent-router/context-selector refactor.
+
+## P1 Loo国研究档案 / Thesis Dossier
+
+Status: planned P1 after MVP signoff. This is a long-term product capability,
+not a temporary shortcut and not a direct integration of external skill runtimes
+such as `AlphaGBM/skills`.
+
+Product intent:
+
+- Upgrade `Loo国研究台` from an instant quick-scan surface into persistent
+  research memory for each canonical security identity.
+- Preserve the current rule: deterministic backend contracts own portfolio fit,
+  guardrails, action labels, security identity, and write boundaries. AI 大臣
+  and external providers may summarize or explain evidence, but they must not
+  directly write buy/sell conclusions or override stored rules.
+- Use `symbol + exchange + currency` / `security_id` as the identity boundary.
+  Never store thesis records against naked tickers.
+
+Core domain model:
+
+- `SecurityResearchDossier`
+  - canonical `securityId` plus listing identity.
+  - user thesis: why the user holds or watches the security.
+  - portfolio role: core, satellite, defensive, income, cash-like, theme bet,
+    hedge, or custom.
+  - intended horizon and maximum allocation.
+  - review/sell triggers: price/key-level, allocation, stale data, thesis drift,
+    earnings/profile update, macro/sentiment change, and manual custom triggers.
+  - current thesis status: active, watch, challenged, invalidated, archived.
+  - user notes and source references.
+- `SecurityResearchDossierSnapshot`
+  - immutable snapshot of key thesis fields, latest deterministic quick-scan
+    verdict, guardrails, key levels, research-health status, and evidence hash.
+  - used for drift comparison instead of comparing rendered UI text.
+- `ResearchThemeBasket`
+  - user-defined topic such as AI infrastructure, gold defense, fixed income,
+    Canadian dividends, semiconductors, or custom.
+  - contains canonical securities, thesis summary, target exposure constraints,
+    and review cadence.
+
+Backend contracts:
+
+- Add typed service APIs for create/update/archive dossier, add triggers, record
+  snapshots, and compute drift.
+- Drift calculation should compare structured fields:
+  - verdict/action label changes.
+  - new or resolved guardrails.
+  - key-level movement.
+  - allocation/fit changes.
+  - research data freshness changes.
+  - economic exposure or metadata changes.
+- Research-health calculation should be deterministic:
+  - complete identity.
+  - quote/history freshness.
+  - profile/fundamental availability.
+  - valuation/key-level readiness.
+  - external evidence freshness.
+  - dossier trigger coverage.
+- Reuse existing external research documents and cached intelligence as evidence
+  inputs. Do not make page load call live external APIs.
+
+Mobile UI:
+
+- Security Detail `Loo国研究台` should show:
+  1. current deterministic conclusion.
+  2. compact dossier summary.
+  3. `我的 thesis` collapsed card.
+  4. `复核触发器` collapsed card.
+  5. `本次变化` / thesis drift card.
+  6. research-health card.
+  7. evidence/audit details behind an explicit secondary action.
+- For unheld watchlist securities, show watch thesis and candidate role instead
+  of owned-position thesis.
+- For held securities, connect dossier to `我的仓位` but keep listing-level facts
+  and position-level facts separate.
+
+AI 大臣 integration:
+
+- 大臣 may answer questions such as:
+  - "我当初为什么买/关注它？"
+  - "现在 thesis 变了吗？"
+  - "哪些触发器需要复核？"
+  - "这个主题篮子里哪个标的最需要更新？"
+- 大臣 responses should read from dossier/context packs and can suggest edits,
+  but saving dossier changes must remain an explicit user-confirmed action.
+
+Provider strategy:
+
+- `AlphaGBM/skills` is a product reference only for now.
+- Future optional providers can feed external evidence into the same dossier
+  system through backend adapters, provider ledger, TTL, quota, and source
+  disclosure.
+- Do not directly run external skills in the mobile client or grant them control
+  over recommendation, health, import, or portfolio-write flows.
 
 ## Recommendation V3 / 进货工作台 Next Task List
 

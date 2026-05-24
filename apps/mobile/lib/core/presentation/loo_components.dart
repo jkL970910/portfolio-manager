@@ -101,6 +101,7 @@ class LooGlassCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final tokens = context.looTokens;
     final dark = Theme.of(context).brightness == Brightness.dark;
+    final surface = Theme.of(context).colorScheme.surface;
     final shape = RoundedRectangleBorder(
       borderRadius:
           BorderRadius.circular(isHero ? tokens.radiusXl : tokens.radiusLg),
@@ -108,7 +109,8 @@ class LooGlassCard extends StatelessWidget {
     );
     final content = Ink(
       decoration: BoxDecoration(
-        gradient: isHero ? tokens.heroGradient : tokens.cardGradient,
+        color: surface.withValues(alpha: dark ? 0.96 : 0.98),
+        gradient: isHero ? tokens.heroGradient : null,
         borderRadius:
             BorderRadius.circular(isHero ? tokens.radiusXl : tokens.radiusLg),
         border: Border.all(color: tokens.cardBorder),
