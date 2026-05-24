@@ -1065,6 +1065,7 @@ class _WatchlistCardState extends State<_WatchlistCard> {
             _MarketItemRail(
               items: resolved,
               onOpen: widget.onOpen,
+              statusLabel: "已入清单",
               onLongPress: widget.working
                   ? null
                   : (item) => _confirmRemoveWatchlistItem(context, item),
@@ -1246,7 +1247,11 @@ class _RecentObservationCard extends StatelessWidget {
                   ),
             )
           else
-            _MarketItemRail(items: items, onOpen: onOpen),
+            _MarketItemRail(
+              items: items,
+              onOpen: onOpen,
+              statusLabel: "近期看过",
+            ),
         ],
       ),
     );
@@ -1257,11 +1262,13 @@ class _MarketItemRail extends StatelessWidget {
   const _MarketItemRail({
     required this.items,
     required this.onOpen,
+    required this.statusLabel,
     this.onLongPress,
   });
 
   final List<MobileRecommendationMarketItem> items;
   final ValueChanged<MobileRecommendationMarketItem> onOpen;
+  final String statusLabel;
   final ValueChanged<MobileRecommendationMarketItem>? onLongPress;
 
   @override
@@ -1274,6 +1281,7 @@ class _MarketItemRail extends StatelessWidget {
           for (final item in items.take(12)) ...[
             _MarketItemCard(
               item: item,
+              statusLabel: statusLabel,
               onTap: () => onOpen(item),
               onLongPress:
                   onLongPress == null ? null : () => onLongPress!(item),
@@ -1289,11 +1297,13 @@ class _MarketItemRail extends StatelessWidget {
 class _MarketItemCard extends StatelessWidget {
   const _MarketItemCard({
     required this.item,
+    required this.statusLabel,
     required this.onTap,
     this.onLongPress,
   });
 
   final MobileRecommendationMarketItem item;
+  final String statusLabel;
   final VoidCallback onTap;
   final VoidCallback? onLongPress;
 
@@ -1361,7 +1371,7 @@ class _MarketItemCard extends StatelessWidget {
                   Align(
                     alignment: Alignment.centerLeft,
                     child: _MarketStatusPill(
-                      label: item.poolStatusLabel,
+                      label: statusLabel,
                       color: statusColor,
                     ),
                   ),
