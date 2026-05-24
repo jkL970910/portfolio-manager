@@ -1065,7 +1065,6 @@ class _WatchlistCardState extends State<_WatchlistCard> {
             _MarketItemRail(
               items: resolved,
               onOpen: widget.onOpen,
-              statusLabel: "已入清单",
               onLongPress: widget.working
                   ? null
                   : (item) => _confirmRemoveWatchlistItem(context, item),
@@ -1250,7 +1249,6 @@ class _RecentObservationCard extends StatelessWidget {
             _MarketItemRail(
               items: items,
               onOpen: onOpen,
-              statusLabel: "近期看过",
             ),
         ],
       ),
@@ -1262,13 +1260,11 @@ class _MarketItemRail extends StatelessWidget {
   const _MarketItemRail({
     required this.items,
     required this.onOpen,
-    required this.statusLabel,
     this.onLongPress,
   });
 
   final List<MobileRecommendationMarketItem> items;
   final ValueChanged<MobileRecommendationMarketItem> onOpen;
-  final String statusLabel;
   final ValueChanged<MobileRecommendationMarketItem>? onLongPress;
 
   @override
@@ -1281,7 +1277,6 @@ class _MarketItemRail extends StatelessWidget {
           for (final item in items.take(12)) ...[
             _MarketItemCard(
               item: item,
-              statusLabel: statusLabel,
               onTap: () => onOpen(item),
               onLongPress:
                   onLongPress == null ? null : () => onLongPress!(item),
@@ -1297,13 +1292,11 @@ class _MarketItemRail extends StatelessWidget {
 class _MarketItemCard extends StatelessWidget {
   const _MarketItemCard({
     required this.item,
-    required this.statusLabel,
     required this.onTap,
     this.onLongPress,
   });
 
   final MobileRecommendationMarketItem item;
-  final String statusLabel;
   final VoidCallback onTap;
   final VoidCallback? onLongPress;
 
@@ -1311,10 +1304,9 @@ class _MarketItemCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final tokens = context.looTokens;
     final moveColor = _marketMoveColor(context, item.dayChangeVariant);
-    final statusColor = _poolStatusColor(context, item.poolStatus);
     return SizedBox(
       width: 132,
-      height: 132,
+      height: 112,
       child: Material(
         color: Colors.transparent,
         child: InkWell(
@@ -1352,8 +1344,6 @@ class _MarketItemCard extends StatelessWidget {
                                   ),
                         ),
                       ),
-                      const SizedBox(width: 6),
-                      _TinyStatusDot(color: statusColor),
                     ],
                   ),
                   SizedBox(
@@ -1366,13 +1356,6 @@ class _MarketItemCard extends StatelessWidget {
                             fontWeight: FontWeight.w900,
                             letterSpacing: -0.35,
                           ),
-                    ),
-                  ),
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: _MarketStatusPill(
-                      label: statusLabel,
-                      color: statusColor,
                     ),
                   ),
                   SizedBox(
@@ -1388,60 +1371,6 @@ class _MarketItemCard extends StatelessWidget {
           ),
         ),
       ),
-    );
-  }
-}
-
-class _MarketStatusPill extends StatelessWidget {
-  const _MarketStatusPill({
-    required this.label,
-    required this.color,
-  });
-
-  final String label;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    return ConstrainedBox(
-      constraints: const BoxConstraints(maxWidth: 108),
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.10),
-          borderRadius: BorderRadius.circular(999),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-          child: Text(
-            label,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                  color: color,
-                  fontWeight: FontWeight.w800,
-                  height: 1.0,
-                ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _TinyStatusDot extends StatelessWidget {
-  const _TinyStatusDot({required this.color});
-
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.18),
-        shape: BoxShape.circle,
-        border: Border.all(color: color.withValues(alpha: 0.45)),
-      ),
-      child: const SizedBox(width: 10, height: 10),
     );
   }
 }
@@ -1502,15 +1431,6 @@ Color _marketMoveColor(BuildContext context, String variant) {
     "negative" => Colors.red.shade300,
     "neutral" => context.looTokens.mutedText,
     _ => context.looTokens.mutedText,
-  };
-}
-
-Color _poolStatusColor(BuildContext context, String status) {
-  return switch (status) {
-    "eligible" => Colors.green.shade300,
-    "needs_identity" || "needs_data" => Colors.orange.shade300,
-    "excluded" => Theme.of(context).colorScheme.error,
-    _ => context.looTokens.accent,
   };
 }
 
