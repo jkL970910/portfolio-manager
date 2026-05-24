@@ -1094,6 +1094,7 @@ class _AccountDrilldownCarousel extends StatefulWidget {
 class _AccountDrilldownCarouselState extends State<_AccountDrilldownCarousel> {
   final PageController _pageController = PageController();
   int _selectedIndex = 0;
+  int _pageIndex = 0;
 
   @override
   void dispose() {
@@ -1102,7 +1103,10 @@ class _AccountDrilldownCarouselState extends State<_AccountDrilldownCarousel> {
   }
 
   void _select(int index) {
-    setState(() => _selectedIndex = index);
+    setState(() {
+      _selectedIndex = index;
+      _pageIndex = 1;
+    });
     _pageController.animateToPage(
       1,
       duration: const Duration(milliseconds: 260),
@@ -1135,6 +1139,7 @@ class _AccountDrilldownCarouselState extends State<_AccountDrilldownCarousel> {
             height: 260,
             child: PageView(
               controller: _pageController,
+              onPageChanged: (index) => setState(() => _pageIndex = index),
               children: [
                 _AccountDrilldownList(
                   items: widget.items,
@@ -1154,12 +1159,12 @@ class _AccountDrilldownCarouselState extends State<_AccountDrilldownCarousel> {
             ),
           ),
           const SizedBox(height: 8),
-          const Row(
+          Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              _CarouselDot(active: true),
-              SizedBox(width: 6),
-              _CarouselDot(active: false),
+              _CarouselDot(active: _pageIndex == 0),
+              const SizedBox(width: 6),
+              _CarouselDot(active: _pageIndex == 1),
             ],
           ),
         ],
