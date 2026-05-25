@@ -88,8 +88,7 @@ class _InvestmentPreferencesCardState extends State<InvestmentPreferencesCard> {
     }
     return _PreferenceSettingsSnapshot(
       profile: MobilePreferenceProfile.fromJson(profile),
-      registeredRooms:
-          MobileRegisteredRooms.fromJson(data["registeredRooms"]),
+      registeredRooms: MobileRegisteredRooms.fromJson(data["registeredRooms"]),
     );
   }
 
@@ -144,7 +143,7 @@ class _InvestmentPreferencesCardState extends State<InvestmentPreferencesCard> {
     );
     if (saved == true && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("推荐约束已保存，下一次推荐会读取新规则。")),
+        const SnackBar(content: Text("候选池治理已保存，下一次 Loo皇推荐会读取新边界。")),
       );
       _refresh();
     }
@@ -329,13 +328,13 @@ class _InvestmentPreferencesCardState extends State<InvestmentPreferencesCard> {
                     .recommendationConstraints.preferredSymbols.isNotEmpty) ...[
                   const SizedBox(height: 10),
                   Text(
-                      "推荐偏好：${profile.recommendationConstraints.preferredSymbols.join("、")}"),
+                      "候选偏好：${profile.recommendationConstraints.preferredSymbols.join("、")}"),
                 ],
                 if (profile
                     .recommendationConstraints.excludedSymbols.isNotEmpty) ...[
                   const SizedBox(height: 10),
                   Text(
-                      "排除标的：${profile.recommendationConstraints.excludedSymbols.join("、")}"),
+                      "不进候选池：${profile.recommendationConstraints.excludedSymbols.join("、")}"),
                 ],
               ],
             ),
@@ -388,12 +387,10 @@ class _ConstraintEditorSheetState extends State<_ConstraintEditorSheet> {
   late final _allowedSecurityTypesController = TextEditingController(
       text: widget.profile.recommendationConstraints.allowedSecurityTypes
           .join(", "));
-  late final List<String> _includedCandidateRoles =
-      _normalizeCandidateRoles(widget
-          .profile.recommendationConstraints.includedCandidateRoles);
-  late final List<String> _excludedCandidateRoles =
-      _normalizeCandidateRoles(widget
-          .profile.recommendationConstraints.excludedCandidateRoles);
+  late final List<String> _includedCandidateRoles = _normalizeCandidateRoles(
+      widget.profile.recommendationConstraints.includedCandidateRoles);
+  late final List<String> _excludedCandidateRoles = _normalizeCandidateRoles(
+      widget.profile.recommendationConstraints.excludedCandidateRoles);
   late var _allowRelaxedCoreFallback =
       widget.profile.recommendationConstraints.allowRelaxedCoreFallback;
   var _saving = false;
@@ -528,23 +525,25 @@ class _ConstraintEditorSheetState extends State<_ConstraintEditorSheet> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text("推荐约束", style: Theme.of(context).textTheme.headlineMedium),
+            Text("候选池治理", style: Theme.of(context).textTheme.headlineMedium),
             const SizedBox(height: 8),
-            const Text("这些规则会影响候选评分、账户放置和观察标的加分。"),
+            const Text(
+              "这里管理 Loo皇能看哪些标的：观察、偏好、排除、账户和候选角色。它不等于手动指定最终推荐，最终仍由组合缺口、税务放置和护栏决定。",
+            ),
             const SizedBox(height: 16),
             TextField(
               controller: _watchlistController,
               enabled: !_saving,
               textCapitalization: TextCapitalization.characters,
               decoration: const InputDecoration(
-                labelText: "优先观察标的",
-                helperText: "用逗号或空格分隔，例如 VFV, XEQT, XBB；最多 20 个。",
+                labelText: "近期观察/自选候选",
+                helperText: "会进入 raw pool 接受规则检查；用逗号或空格分隔，最多 20 个。",
               ),
             ),
             const SizedBox(height: 12),
             _SecurityIdentityChipEditor(
-              title: "偏好标的",
-              helperText: "通过搜索添加，保存代码、交易所和币种。",
+              title: "偏好候选",
+              helperText: "通过搜索添加，保存代码、交易所和币种；只加权，不保证入选。",
               items: _preferredSecurities,
               onAdd: _saving
                   ? null
@@ -556,8 +555,8 @@ class _ConstraintEditorSheetState extends State<_ConstraintEditorSheet> {
             ),
             const SizedBox(height: 12),
             _SecurityIdentityChipEditor(
-              title: "排除标的",
-              helperText: "排除优先级高于偏好；同一 identity 不会重复添加。",
+              title: "不进候选池",
+              helperText: "排除优先级高于偏好；被排除后不会被核心池兜底强塞。",
               items: _excludedSecurities,
               onAdd: _saving
                   ? null
@@ -573,8 +572,8 @@ class _ConstraintEditorSheetState extends State<_ConstraintEditorSheet> {
               enabled: !_saving,
               textCapitalization: TextCapitalization.characters,
               decoration: const InputDecoration(
-                labelText: "偏好账户类型",
-                helperText: "例如 TFSA, RRSP；推荐放置会加权。",
+                labelText: "偏好放置账户",
+                helperText: "例如 TFSA, RRSP；只影响账户放置评分。",
               ),
             ),
             const SizedBox(height: 12),
@@ -583,7 +582,7 @@ class _ConstraintEditorSheetState extends State<_ConstraintEditorSheet> {
               enabled: !_saving,
               textCapitalization: TextCapitalization.characters,
               decoration: const InputDecoration(
-                labelText: "回避账户类型",
+                labelText: "回避放置账户",
                 helperText: "例如 Taxable；回避优先级高于偏好。",
               ),
             ),
@@ -594,7 +593,7 @@ class _ConstraintEditorSheetState extends State<_ConstraintEditorSheet> {
               minLines: 2,
               maxLines: 5,
               decoration: const InputDecoration(
-                labelText: "资产类别上下限",
+                labelText: "资产类别候选边界",
                 helperText: "每行一个，例如 US Equity:10-45；用于约束推荐目标。",
               ),
             ),
@@ -604,7 +603,7 @@ class _ConstraintEditorSheetState extends State<_ConstraintEditorSheet> {
               enabled: !_saving,
               textCapitalization: TextCapitalization.words,
               decoration: const InputDecoration(
-                labelText: "允许标的类型",
+                labelText: "允许候选类型",
                 helperText: "例如 ETF, Common Stock, Commodity ETF；留空表示不限制。",
               ),
             ),
@@ -637,7 +636,7 @@ class _ConstraintEditorSheetState extends State<_ConstraintEditorSheet> {
             SwitchListTile(
               contentPadding: EdgeInsets.zero,
               title: const Text("允许手动启用核心池兜底"),
-              subtitle: const Text("候选池为空时不会自动强塞；开启后你可以在进货页手动跑一次核心池兜底。"),
+              subtitle: const Text("候选池为空时不会自动强塞；开启后只能手动放宽到高置信核心池，仍不会覆盖明确排除。"),
               value: _allowRelaxedCoreFallback,
               onChanged: _saving
                   ? null
@@ -738,7 +737,7 @@ class _ConstraintEditorSheetState extends State<_ConstraintEditorSheet> {
   Widget _buildCandidateRoleControls(BuildContext context) {
     return InputDecorator(
       decoration: const InputDecoration(
-        labelText: "进货候选角色",
+        labelText: "候选角色边界",
         helperText: "留空表示按风险偏好自动决定；排除优先于纳入。",
         border: OutlineInputBorder(),
       ),
@@ -1201,8 +1200,8 @@ class _ManualPreferenceHubSheet extends StatelessWidget {
           ),
           _ManualPreferenceChoice(
             icon: Icons.rule,
-            title: "推荐规则",
-            subtitle: "观察列表、偏好/排除标的、账户规则、资产区间和允许标的类型。",
+            title: "候选池治理",
+            subtitle: "观察列表、偏好/排除候选、账户放置、资产区间和允许标的类型。",
             onTap: () => Navigator.of(context).pop("rules"),
           ),
           _ManualPreferenceChoice(
@@ -2527,7 +2526,8 @@ class _RegisteredRoomEditorSheet extends StatefulWidget {
       _RegisteredRoomEditorSheetState();
 }
 
-class _RegisteredRoomEditorSheetState extends State<_RegisteredRoomEditorSheet> {
+class _RegisteredRoomEditorSheetState
+    extends State<_RegisteredRoomEditorSheet> {
   late final _taxYearController =
       TextEditingController(text: widget.registeredRooms.taxYear.toString());
   late final Map<String, TextEditingController> _roomControllers = {
@@ -2574,8 +2574,7 @@ class _RegisteredRoomEditorSheetState extends State<_RegisteredRoomEditorSheet> 
           for (final entry in _roomControllers.entries)
             {
               "accountType": entry.key,
-              "remainingRoomCad":
-                  double.tryParse(entry.value.text.trim()) ?? 0,
+              "remainingRoomCad": double.tryParse(entry.value.text.trim()) ?? 0,
             },
         ],
       });

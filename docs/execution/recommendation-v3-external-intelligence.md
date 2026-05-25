@@ -42,7 +42,7 @@ type RecommendationPoolStatus =
 
 User-facing behavior:
 
-- Show `进货规矩过严，暂无可推荐标的`.
+- Show `候选池边界过严，暂无可推荐标的`.
 - Show the main blockers, such as `固定收益被禁用` or `美股已超配`.
 - Offer explicit actions:
   - `放宽核心池`
@@ -1148,6 +1148,13 @@ Current implementation status:
    relaxed-core fallback.
 7. Complete: mobile recommendations expose raw-pool visibility, rejected
    candidates, dynamic-candidate freshness/confidence, and policy empty states.
+8. Complete: mobile copy now treats this as `候选池治理`, not manual result
+   editing. Users can manage watchlist/self-selected candidates, preferred
+   identities, excluded identities, account placement preferences, asset/security
+   type boundaries, role inclusion/exclusion, and explicit relaxed-core fallback.
+   These settings only decide what can enter the raw/eligible pool; the final
+   `Loo皇推荐` remains owned by the deterministic rules engine and cannot be
+   manually forced.
 
 Design constraints:
 
@@ -1160,6 +1167,10 @@ Design constraints:
 - Raw pool and recommendation pool are visible to the user at a product level:
   source counts, policy status, and rejected reasons are shown; implementation
   fields stay hidden.
+- User editing boundary: the app may let users add or remove candidate inputs
+  and constraints, but it must not let users directly pin an item into final
+  recommendations. Exclusions are hard boundaries; preferences are scoring
+  weights. Any fallback must stay explicit and user-triggered.
 
 ## Recommendation V4 QA Checklist
 

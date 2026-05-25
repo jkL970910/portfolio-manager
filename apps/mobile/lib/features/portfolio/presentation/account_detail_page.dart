@@ -668,13 +668,13 @@ class MobileAccountDetailSnapshot {
       allowedActions: const [
         LooMinisterSuggestedAction(
           id: "open-account-health",
-          label: "查看账户健康巡查",
+          label: "查看账户诊断",
           actionType: "navigate",
           target: {"page": "portfolio-health"},
         ),
         LooMinisterSuggestedAction(
           id: "run-account-analysis",
-          label: "开始账户巡阅",
+          label: "开始账户诊断",
           actionType: "run-analysis",
           target: {"scope": "account"},
           requiresConfirmation: true,

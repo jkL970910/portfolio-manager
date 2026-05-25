@@ -166,7 +166,7 @@ class _SettingsPageState extends State<SettingsPage> {
           Text("设置", style: Theme.of(context).textTheme.headlineMedium),
           const SizedBox(height: 6),
           Text(
-            "管理 Loo国身份、进货规矩、AI 大臣和外部数据源。",
+            "管理 Loo国身份、候选池治理、AI 大臣和外部数据源。",
             style: Theme.of(context).textTheme.bodyMedium,
           ),
           const SizedBox(height: 14),
@@ -202,8 +202,8 @@ class _SettingsPageState extends State<SettingsPage> {
           const SizedBox(height: 16),
           _SettingsSectionCard(
             icon: Icons.tune_rounded,
-            title: "进货规矩",
-            subtitle: "风险偏好、税务偏好和推荐约束",
+            title: "候选池治理",
+            subtitle: "风险偏好、税务偏好和推荐候选边界",
             initiallyExpanded: false,
             children: [
               InvestmentPreferencesCard(apiClient: widget.apiClient),

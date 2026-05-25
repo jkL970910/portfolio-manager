@@ -268,7 +268,7 @@ class MobileHealthSnapshot {
           id: isAccountScope
               ? "run-account-analysis"
               : "run-portfolio-analysis",
-          label: isAccountScope ? "开始账户巡阅" : "开始国库巡阅",
+          label: isAccountScope ? "开始账户诊断" : "开始国库巡阅",
           actionType: "run-analysis",
           target: {
             "scope": isAccountScope ? "account" : "portfolio",

@@ -232,8 +232,7 @@ class _RecommendationsPageState extends State<RecommendationsPage> {
                           onCustomAmount: _createCustomRun,
                           onRunAmount: _createRun,
                           onDiscover: _openDiscover,
-                          onOpenSettings: () =>
-                              context.push(MobileRoutes.settings),
+                          onOpenSettings: _openCandidatePoolSettings,
                           onOpenPriorities: () =>
                               _scrollToSection(_priorityKey),
                           onOpenWatchlist: () =>
@@ -259,8 +258,7 @@ class _RecommendationsPageState extends State<RecommendationsPage> {
                           snapshot.data!.poolStatus.needsPolicyRelaxation
                               ? _PoolPolicyEmptyCard(
                                   status: snapshot.data!.poolStatus,
-                                  onOpenSettings: () =>
-                                      context.push(MobileRoutes.settings),
+                                  onOpenSettings: _openCandidatePoolSettings,
                                 )
                               : const _EmptyCard(
                                   "暂时没有新的推荐。先完成持仓导入，Loo皇会再下达谕令。",
@@ -276,8 +274,7 @@ class _RecommendationsPageState extends State<RecommendationsPage> {
                         const SizedBox(height: 16),
                         _RecommendationPoolVisibilityCard(
                           visibility: snapshot.data!.recommendationV4,
-                          onOpenSettings: () =>
-                              context.push(MobileRoutes.settings),
+                          onOpenSettings: _openCandidatePoolSettings,
                           onRunRelaxedCoreFallback:
                               _createRelaxedCoreFallbackRun,
                         ),
@@ -294,6 +291,14 @@ class _RecommendationsPageState extends State<RecommendationsPage> {
 
   Future<void> _openDiscover() async {
     await context.push(MobileRoutes.discover);
+    if (!mounted) {
+      return;
+    }
+    _refresh();
+  }
+
+  Future<void> _openCandidatePoolSettings() async {
+    await context.push(MobileRoutes.settings);
     if (!mounted) {
       return;
     }
@@ -593,7 +598,7 @@ class _HeroRulesDisclosure extends StatelessWidget {
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      "囤货规矩 · ${_engineRuleSummary(summary)}",
+                      "候选池治理 · ${_engineRuleSummary(summary)}",
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: theme.textTheme.labelLarge,
@@ -627,12 +632,20 @@ class _HeroRulesDisclosure extends StatelessWidget {
                     _EngineInputGrid(summary.rankingInputs),
                   ],
                   const SizedBox(height: 10),
+                  Text(
+                    "你可以管理观察、偏好、排除和候选角色；这些只决定哪些标的进入候选池，最终是否推荐仍由 Loo皇规则引擎判断。",
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: tokens.mutedText,
+                      height: 1.35,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
                   Align(
                     alignment: Alignment.centerLeft,
                     child: TextButton.icon(
                       onPressed: onOpenSettings,
                       icon: const Icon(Icons.settings_outlined, size: 18),
-                      label: const Text("调整偏好因子"),
+                      label: const Text("管理候选池"),
                     ),
                   ),
                 ],
@@ -859,7 +872,7 @@ class _EngineSummaryCardState extends State<_EngineSummaryCard> {
               child: FilledButton.tonalIcon(
                 onPressed: widget.onOpenSettings,
                 icon: const Icon(Icons.settings_outlined),
-                label: const Text("调整偏好因子"),
+                label: const Text("管理候选池"),
               ),
             ),
           ],
@@ -1486,7 +1499,7 @@ class _PriorityWorkbenchState extends State<_PriorityWorkbench> {
           ),
           const SizedBox(height: 4),
           Text(
-            "已通过进货规矩筛选的推荐池；囤货清单里未入选的标的可展开查看原因。",
+            "已通过候选池治理和护栏筛选；用户可调整候选边界，但不能绕过规则强制推荐。",
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
             style: theme.textTheme.bodySmall?.copyWith(
@@ -2306,7 +2319,7 @@ class _PoolPolicyEmptyCard extends StatelessWidget {
               const SizedBox(width: 10),
               Expanded(
                 child: Text(
-                  "进货规矩过严",
+                  "候选池边界过严",
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
                         fontWeight: FontWeight.w900,
                       ),
@@ -2505,7 +2518,7 @@ class _RecommendationPoolVisibilityCardState
               ...rejected.map(_V4RejectedCandidateTile.new),
             const SizedBox(height: 10),
             Text(
-              "进货规矩",
+              "候选池边界",
               style: theme.textTheme.labelLarge?.copyWith(
                 color: tokens.mutedText,
               ),

@@ -802,7 +802,7 @@ class _FilterSummaryCard extends StatelessWidget {
         children: [
           Text("账户类型筛选", style: Theme.of(context).textTheme.titleLarge),
           const SizedBox(height: 8),
-          const Text("这里只显示健康巡查中对应账户类型下的账户和持仓。"),
+          const Text("这里只显示国库巡查中对应账户类型下的账户和持仓。"),
           const SizedBox(height: 12),
           Row(
             children: [
