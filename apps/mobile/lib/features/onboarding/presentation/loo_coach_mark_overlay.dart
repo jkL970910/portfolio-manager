@@ -5,11 +5,13 @@ class LooCoachStep {
     required this.targetKey,
     required this.title,
     required this.body,
+    this.beforeResolve,
   });
 
   final GlobalKey targetKey;
   final String title;
   final String body;
+  final Future<void> Function()? beforeResolve;
 }
 
 Future<void> showLooCoachMarks({
@@ -61,10 +63,22 @@ class _LooCoachMarkDialogState extends State<_LooCoachMarkDialog> {
     if (!mounted) {
       return;
     }
-    final keyContext = widget.steps[_index].targetKey.currentContext;
-    if (keyContext != null) {
+    final step = widget.steps[_index];
+    await step.beforeResolve?.call();
+    if (!mounted) {
+      return;
+    }
+    await WidgetsBinding.instance.endOfFrame;
+    if (!mounted) {
+      return;
+    }
+    final initialKeyContext = step.targetKey.currentContext;
+    if (initialKeyContext != null) {
+      if (!initialKeyContext.mounted) {
+        return;
+      }
       await Scrollable.ensureVisible(
-        keyContext,
+        initialKeyContext,
         duration: const Duration(milliseconds: 260),
         curve: Curves.easeOutCubic,
         alignment: 0.12,
@@ -74,6 +88,7 @@ class _LooCoachMarkDialogState extends State<_LooCoachMarkDialog> {
     if (!mounted) {
       return;
     }
+    final keyContext = step.targetKey.currentContext;
     await WidgetsBinding.instance.endOfFrame;
     if (!mounted) {
       return;

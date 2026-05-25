@@ -38,6 +38,7 @@ class OverviewPage extends StatefulWidget {
 class _OverviewPageState extends State<OverviewPage> {
   late Future<MobileHomeSnapshot> _snapshot;
   late Future<MobileDailyIntelligenceSnapshot> _dailyIntelligence;
+  final _scrollController = ScrollController();
   final _summaryCoachKey = GlobalKey();
   final _intelligenceCoachKey = GlobalKey();
   final _accountsCoachKey = GlobalKey();
@@ -48,6 +49,12 @@ class _OverviewPageState extends State<OverviewPage> {
     super.initState();
     _snapshot = _loadSnapshot();
     _dailyIntelligence = _loadDailyIntelligence();
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
   }
 
   Future<MobileHomeSnapshot> _loadSnapshot() async {
@@ -92,11 +99,19 @@ class _OverviewPageState extends State<OverviewPage> {
             targetKey: _intelligenceCoachKey,
             title: "Loo国秘闻",
             body: "这里是每日市场摘要，不是单个标的买卖指令。",
+            beforeResolve: () => _prepareLazyCoachTarget(
+              _intelligenceCoachKey,
+              approximateOffset: 760,
+            ),
           ),
           LooCoachStep(
             targetKey: _accountsCoachKey,
             title: "账户入口",
             body: "这里进入单个账户和持仓明细。",
+            beforeResolve: () => _prepareLazyCoachTarget(
+              _accountsCoachKey,
+              approximateOffset: 1180,
+            ),
           ),
         ],
         onCompleted: () => widget.apiClient.updateOnboarding({
@@ -107,6 +122,32 @@ class _OverviewPageState extends State<OverviewPage> {
         }),
       );
     });
+  }
+
+  Future<void> _prepareLazyCoachTarget(
+    GlobalKey targetKey, {
+    required double approximateOffset,
+  }) async {
+    if (!_scrollController.hasClients) {
+      return;
+    }
+    final existingContext = targetKey.currentContext;
+    if (existingContext != null) {
+      await Scrollable.ensureVisible(
+        existingContext,
+        duration: const Duration(milliseconds: 260),
+        curve: Curves.easeOutCubic,
+        alignment: 0.12,
+      );
+      return;
+    }
+    final maxOffset = _scrollController.position.maxScrollExtent;
+    await _scrollController.animateTo(
+      approximateOffset.clamp(0.0, maxOffset),
+      duration: const Duration(milliseconds: 320),
+      curve: Curves.easeOutCubic,
+    );
+    await Future<void>.delayed(const Duration(milliseconds: 120));
   }
 
   Future<MobileDailyIntelligenceSnapshot> _loadDailyIntelligence() async {
@@ -142,6 +183,7 @@ class _OverviewPageState extends State<OverviewPage> {
           onRefresh: () async => _refresh(),
           child: LooPageGradient(
             child: CustomScrollView(
+              controller: _scrollController,
               physics: const AlwaysScrollableScrollPhysics(),
               slivers: [
                 SliverToBoxAdapter(
