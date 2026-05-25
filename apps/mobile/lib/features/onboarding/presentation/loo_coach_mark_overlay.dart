@@ -57,8 +57,27 @@ class _LooCoachMarkDialogState extends State<_LooCoachMarkDialog> {
     WidgetsBinding.instance.addPostFrameCallback((_) => _resolveTarget());
   }
 
-  void _resolveTarget() {
+  Future<void> _resolveTarget() async {
+    if (!mounted) {
+      return;
+    }
     final keyContext = widget.steps[_index].targetKey.currentContext;
+    if (keyContext != null) {
+      await Scrollable.ensureVisible(
+        keyContext,
+        duration: const Duration(milliseconds: 260),
+        curve: Curves.easeOutCubic,
+        alignment: 0.12,
+      );
+      await Future<void>.delayed(const Duration(milliseconds: 80));
+    }
+    if (!mounted) {
+      return;
+    }
+    await WidgetsBinding.instance.endOfFrame;
+    if (!mounted) {
+      return;
+    }
     final renderObject = keyContext?.findRenderObject();
     if (renderObject is! RenderBox || !renderObject.hasSize) {
       setState(() => _targetRect = null);
@@ -89,7 +108,7 @@ class _LooCoachMarkDialogState extends State<_LooCoachMarkDialog> {
       _index += 1;
       _targetRect = null;
     });
-    WidgetsBinding.instance.addPostFrameCallback((_) => _resolveTarget());
+    await _resolveTarget();
   }
 
   @override
