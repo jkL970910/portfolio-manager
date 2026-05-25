@@ -104,13 +104,7 @@ class _LooCoachMarkDialogState extends State<_LooCoachMarkDialog> {
       color: Colors.transparent,
       child: Stack(
         children: [
-          Positioned.fill(
-            child: IgnorePointer(
-              child: CustomPaint(
-                painter: _CoachMarkScrimPainter(targetRect: rect),
-              ),
-            ),
-          ),
+          ..._buildScrimPieces(media.size, rect),
           if (rect != null)
             Positioned.fromRect(
               rect: rect.inflate(6),
@@ -177,32 +171,52 @@ class _LooCoachMarkDialogState extends State<_LooCoachMarkDialog> {
       ),
     );
   }
-}
 
-class _CoachMarkScrimPainter extends CustomPainter {
-  const _CoachMarkScrimPainter({required this.targetRect});
-
-  final Rect? targetRect;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final fullScreen = Offset.zero & size;
-    final scrimPath = Path()..addRect(fullScreen);
-    final rect = targetRect;
-    if (rect != null) {
-      scrimPath.addRRect(
-        RRect.fromRectAndRadius(rect.inflate(8), const Radius.circular(24)),
+  List<Widget> _buildScrimPieces(Size size, Rect? rect) {
+    final color = Colors.black.withValues(alpha: 0.64);
+    Widget piece({
+      required double left,
+      required double top,
+      required double width,
+      required double height,
+    }) {
+      if (width <= 0 || height <= 0) {
+        return const SizedBox.shrink();
+      }
+      return Positioned(
+        left: left,
+        top: top,
+        width: width,
+        height: height,
+        child: IgnorePointer(child: ColoredBox(color: color)),
       );
-      scrimPath.fillType = PathFillType.evenOdd;
     }
-    canvas.drawPath(
-      scrimPath,
-      Paint()..color = Colors.black.withValues(alpha: 0.64),
-    );
-  }
 
-  @override
-  bool shouldRepaint(covariant _CoachMarkScrimPainter oldDelegate) {
-    return oldDelegate.targetRect != targetRect;
+    if (rect == null) {
+      return [
+        piece(left: 0, top: 0, width: size.width, height: size.height),
+      ];
+    }
+
+    final cutout = rect.inflate(8);
+    final left = cutout.left.clamp(0.0, size.width);
+    final top = cutout.top.clamp(0.0, size.height);
+    final right = cutout.right.clamp(0.0, size.width);
+    final bottom = cutout.bottom.clamp(0.0, size.height);
+
+    return [
+      piece(left: 0, top: 0, width: size.width, height: top),
+      piece(
+          left: 0,
+          top: bottom,
+          width: size.width,
+          height: size.height - bottom),
+      piece(left: 0, top: top, width: left, height: bottom - top),
+      piece(
+          left: right,
+          top: top,
+          width: size.width - right,
+          height: bottom - top),
+    ];
   }
 }
