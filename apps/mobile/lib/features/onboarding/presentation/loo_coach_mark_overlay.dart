@@ -101,9 +101,16 @@ class _LooCoachMarkDialogState extends State<_LooCoachMarkDialog> {
         ? media.size.height * 0.28
         : (rect.bottom + 14).clamp(72.0, media.size.height - 240.0);
     return Material(
-      color: Colors.black.withValues(alpha: 0.58),
+      color: Colors.transparent,
       child: Stack(
         children: [
+          Positioned.fill(
+            child: IgnorePointer(
+              child: CustomPaint(
+                painter: _CoachMarkScrimPainter(targetRect: rect),
+              ),
+            ),
+          ),
           if (rect != null)
             Positioned.fromRect(
               rect: rect.inflate(6),
@@ -112,7 +119,7 @@ class _LooCoachMarkDialogState extends State<_LooCoachMarkDialog> {
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(22),
                     border: Border.all(color: Colors.white, width: 2),
-                    color: Colors.white.withValues(alpha: 0.08),
+                    color: Colors.white.withValues(alpha: 0.03),
                   ),
                 ),
               ),
@@ -169,5 +176,33 @@ class _LooCoachMarkDialogState extends State<_LooCoachMarkDialog> {
         ],
       ),
     );
+  }
+}
+
+class _CoachMarkScrimPainter extends CustomPainter {
+  const _CoachMarkScrimPainter({required this.targetRect});
+
+  final Rect? targetRect;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final fullScreen = Offset.zero & size;
+    final scrimPath = Path()..addRect(fullScreen);
+    final rect = targetRect;
+    if (rect != null) {
+      scrimPath.addRRect(
+        RRect.fromRectAndRadius(rect.inflate(8), const Radius.circular(24)),
+      );
+      scrimPath.fillType = PathFillType.evenOdd;
+    }
+    canvas.drawPath(
+      scrimPath,
+      Paint()..color = Colors.black.withValues(alpha: 0.64),
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant _CoachMarkScrimPainter oldDelegate) {
+    return oldDelegate.targetRect != targetRect;
   }
 }
