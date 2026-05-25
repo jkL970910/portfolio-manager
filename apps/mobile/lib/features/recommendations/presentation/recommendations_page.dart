@@ -7,6 +7,8 @@ import "../../../app/mobile_routes.dart";
 import "../../../core/api/loo_api_client.dart";
 import "../../../core/presentation/loo_components.dart";
 import "../../../core/theme/loo_theme.dart";
+import "../../onboarding/data/mobile_onboarding_models.dart";
+import "../../onboarding/presentation/loo_coach_mark_overlay.dart";
 import "../data/mobile_recommendation_models.dart";
 
 class RecommendationsPage extends StatefulWidget {
@@ -24,9 +26,12 @@ class RecommendationsPage extends StatefulWidget {
 class _RecommendationsPageState extends State<RecommendationsPage> {
   late Future<MobileRecommendationsSnapshot> _snapshot;
   final _scrollController = ScrollController();
+  final _summaryCoachKey = GlobalKey();
+  final _recentCoachKey = GlobalKey();
   final _watchlistKey = GlobalKey();
   final _priorityKey = GlobalKey();
   var _working = false;
+  var _coachScheduled = false;
   double _lastContributionAmount = 2500;
 
   @override
@@ -59,7 +64,9 @@ class _RecommendationsPageState extends State<RecommendationsPage> {
       throw const LooApiException("推荐数据格式不正确。");
     }
 
-    return MobileRecommendationsSnapshot.fromJson(data);
+    final parsed = MobileRecommendationsSnapshot.fromJson(data);
+    _scheduleRecommendationCoachMarks();
+    return parsed;
   }
 
   void _refresh() {
@@ -190,6 +197,60 @@ class _RecommendationsPageState extends State<RecommendationsPage> {
         fallbackMode: "core_only_relaxed");
   }
 
+  Future<void> _scheduleRecommendationCoachMarks() async {
+    if (_coachScheduled || !mounted) {
+      return;
+    }
+    _coachScheduled = true;
+    try {
+      final response = await widget.apiClient.getOnboarding();
+      final data = response["data"];
+      if (data is! Map<String, dynamic>) {
+        return;
+      }
+      final onboarding = MobileOnboardingState.fromJson(data);
+      if (onboarding.skippedAll ||
+          onboarding.coachStatusFor("recommendations") != "pending") {
+        return;
+      }
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) {
+          return;
+        }
+        unawaited(
+          showLooCoachMarks(
+            context: context,
+            steps: [
+              LooCoachStep(
+                targetKey: _summaryCoachKey,
+                title: "进货预算",
+                body: "这里控制本次准备投入的银两，也可以进入搜货台主动查标的。",
+              ),
+              LooCoachStep(
+                targetKey: _recentCoachKey,
+                title: "近期观察",
+                body: "你最近看过的标的会在这里聚合去重，方便回到详情继续判断。",
+              ),
+              LooCoachStep(
+                targetKey: _priorityKey,
+                title: "Loo皇推荐",
+                body: "候选会按组合缺口、账户适配和护栏排序。展开后能查看推荐依据。",
+              ),
+            ],
+            onCompleted: () => widget.apiClient.updateOnboarding({
+              "coachMarks": {"recommendations": "completed"},
+            }),
+            onSkipped: () => widget.apiClient.updateOnboarding({
+              "coachMarks": {"recommendations": "skipped"},
+            }),
+          ),
+        );
+      });
+    } catch (_) {
+      // Onboarding should never block the recommendation page.
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return FutureBuilder<MobileRecommendationsSnapshot>(
@@ -226,22 +287,28 @@ class _RecommendationsPageState extends State<RecommendationsPage> {
                     padding: looPagePadding(context),
                     sliver: SliverList.list(
                       children: [
-                        _SummaryCard(
-                          snapshot.data!,
-                          working: _working,
-                          onCustomAmount: _createCustomRun,
-                          onRunAmount: _createRun,
-                          onDiscover: _openDiscover,
-                          onOpenSettings: _openCandidatePoolSettings,
-                          onOpenPriorities: () =>
-                              _scrollToSection(_priorityKey),
-                          onOpenWatchlist: () =>
-                              _scrollToSection(_watchlistKey),
+                        KeyedSubtree(
+                          key: _summaryCoachKey,
+                          child: _SummaryCard(
+                            snapshot.data!,
+                            working: _working,
+                            onCustomAmount: _createCustomRun,
+                            onRunAmount: _createRun,
+                            onDiscover: _openDiscover,
+                            onOpenSettings: _openCandidatePoolSettings,
+                            onOpenPriorities: () =>
+                                _scrollToSection(_priorityKey),
+                            onOpenWatchlist: () =>
+                                _scrollToSection(_watchlistKey),
+                          ),
                         ),
                         const SizedBox(height: 16),
-                        _RecentObservationCard(
-                          items: snapshot.data!.recentObservationItems,
-                          onOpen: _openMarketItem,
+                        KeyedSubtree(
+                          key: _recentCoachKey,
+                          child: _RecentObservationCard(
+                            items: snapshot.data!.recentObservationItems,
+                            onOpen: _openMarketItem,
+                          ),
                         ),
                         const SizedBox(height: 16),
                         KeyedSubtree(

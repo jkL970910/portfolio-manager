@@ -17,6 +17,10 @@ import {
   SecurityRecord,
   MarketSentimentSnapshot,
   MobileRefreshTokenRecord,
+  MobileOnboardingState,
+  MobileOnboardingChecklistKey,
+  MobileCoachMarkKey,
+  MobileOnboardingStatus,
   MobileSecurityObservation,
   PortfolioAnalysisGptEnhancement,
   PreferenceProfile,
@@ -186,6 +190,21 @@ export interface MobileRefreshTokenRepository {
   revokeAllForUser(userId: EntityId, now: Date): Promise<void>;
 }
 
+export interface MobileOnboardingStateRepository {
+  getByUserId(userId: EntityId): Promise<MobileOnboardingState | null>;
+  upsert(input: {
+    userId: EntityId;
+    version?: string;
+    checklist?: Partial<
+      Record<MobileOnboardingChecklistKey, MobileOnboardingStatus>
+    >;
+    coachMarks?: Partial<Record<MobileCoachMarkKey, MobileOnboardingStatus>>;
+    skippedAll?: boolean;
+    completedAt?: Date | null;
+    lastPromptedAt?: Date | null;
+  }): Promise<MobileOnboardingState>;
+}
+
 export interface PreferenceRepository {
   getByUserId(userId: EntityId): Promise<PreferenceProfile>;
 }
@@ -333,6 +352,7 @@ export interface BackendRepositories {
   securities: SecurityRepository;
   mobileSecurityObservations: MobileSecurityObservationRepository;
   mobileRefreshTokens: MobileRefreshTokenRepository;
+  mobileOnboardingStates: MobileOnboardingStateRepository;
   preferences: PreferenceRepository;
   recommendations: RecommendationRepository;
   recommendationDynamicCandidates: RecommendationDynamicCandidateRepository;

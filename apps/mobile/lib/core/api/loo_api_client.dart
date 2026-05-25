@@ -40,6 +40,14 @@ class LooApiClient {
     return _getJson("/api/mobile/home");
   }
 
+  Future<Map<String, dynamic>> getOnboarding() {
+    return _getJson("/api/mobile/onboarding");
+  }
+
+  Future<Map<String, dynamic>> updateOnboarding(Map<String, dynamic> payload) {
+    return _patchJson("/api/mobile/onboarding", body: payload);
+  }
+
   Future<Map<String, dynamic>> getPortfolioOverview() {
     return _getJson("/api/mobile/portfolio/overview");
   }
@@ -215,7 +223,8 @@ class LooApiClient {
       body: {
         "draftId": draftId,
         "confirmMode": confirmMode,
-        if (selectedAccountIds != null) "selectedAccountIds": selectedAccountIds,
+        if (selectedAccountIds != null)
+          "selectedAccountIds": selectedAccountIds,
       },
     );
   }

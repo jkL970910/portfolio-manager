@@ -20,6 +20,7 @@ import {
   ExternalResearchDocumentRecord,
   MarketSentimentSnapshot,
   MobileRefreshTokenRecord,
+  MobileOnboardingState,
   MobileSecurityObservation,
   PortfolioAnalysisGptEnhancement,
   PortfolioAnalysisRun,
@@ -42,6 +43,7 @@ const externalResearchDocuments: ExternalResearchDocumentRecord[] = [];
 const marketSentimentSnapshots: MarketSentimentSnapshot[] = [];
 const mobileSecurityObservations: MobileSecurityObservation[] = [];
 const mobileRefreshTokens: MobileRefreshTokenRecord[] = [];
+const mobileOnboardingStates: MobileOnboardingState[] = [];
 const recommendationDynamicCandidates: RecommendationDynamicCandidateRecord[] = [];
 const registeredAccountRooms: RegisteredAccountRoom[] = [];
 
@@ -435,6 +437,47 @@ export const mockRepositories: BackendRepositories = {
           record.updatedAt = now.toISOString();
         }
       }
+    },
+  },
+  mobileOnboardingStates: {
+    async getByUserId(userId) {
+      return mobileOnboardingStates.find((item) => item.userId === userId) ?? null;
+    },
+    async upsert(input) {
+      const now = new Date().toISOString();
+      const existing = mobileOnboardingStates.find(
+        (item) => item.userId === input.userId,
+      );
+      if (existing) {
+        existing.version = input.version ?? existing.version;
+        existing.checklist = input.checklist ?? existing.checklist;
+        existing.coachMarks = input.coachMarks ?? existing.coachMarks;
+        existing.skippedAll = input.skippedAll ?? existing.skippedAll;
+        existing.completedAt =
+          input.completedAt === undefined
+            ? existing.completedAt
+            : input.completedAt?.toISOString() ?? null;
+        existing.lastPromptedAt =
+          input.lastPromptedAt === undefined
+            ? existing.lastPromptedAt
+            : input.lastPromptedAt?.toISOString() ?? null;
+        existing.updatedAt = now;
+        return existing;
+      }
+      const state: MobileOnboardingState = {
+        id: `mobile_onboarding_${mobileOnboardingStates.length + 1}`,
+        userId: input.userId,
+        version: input.version ?? "mvp-2026-05",
+        checklist: input.checklist ?? {},
+        coachMarks: input.coachMarks ?? {},
+        skippedAll: input.skippedAll ?? false,
+        completedAt: input.completedAt?.toISOString() ?? null,
+        lastPromptedAt: input.lastPromptedAt?.toISOString() ?? null,
+        createdAt: now,
+        updatedAt: now,
+      };
+      mobileOnboardingStates.push(state);
+      return state;
     },
   },
   preferences: {

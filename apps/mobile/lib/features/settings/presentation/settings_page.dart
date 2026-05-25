@@ -211,6 +211,16 @@ class _SettingsPageState extends State<SettingsPage> {
           ),
           const SizedBox(height: 16),
           _SettingsSectionCard(
+            icon: Icons.flag_outlined,
+            title: "新手开国指引",
+            subtitle: "重置任务清单和逐屏高亮提示",
+            initiallyExpanded: false,
+            children: [
+              _OnboardingSettingsCard(apiClient: widget.apiClient),
+            ],
+          ),
+          const SizedBox(height: 16),
+          _SettingsSectionCard(
             icon: Icons.smart_toy_outlined,
             title: "AI 与大臣",
             subtitle: "OpenRouter / OpenAI Key、Loo皇深度思考和调用状态",
@@ -475,6 +485,124 @@ class _AppearanceModeCard extends StatelessWidget {
             selected: {selected},
             onSelectionChanged: (value) => onChanged(value.first),
           ),
+        ],
+      ),
+    );
+  }
+}
+
+class _OnboardingSettingsCard extends StatefulWidget {
+  const _OnboardingSettingsCard({required this.apiClient});
+
+  final LooApiClient apiClient;
+
+  @override
+  State<_OnboardingSettingsCard> createState() =>
+      _OnboardingSettingsCardState();
+}
+
+class _OnboardingSettingsCardState extends State<_OnboardingSettingsCard> {
+  var _saving = false;
+  String? _message;
+
+  Future<void> _reset() async {
+    setState(() {
+      _saving = true;
+      _message = null;
+    });
+    try {
+      await widget.apiClient.updateOnboarding({
+        "skippedAll": false,
+        "checklist": {
+          "healthReview": "pending",
+          "firstRecommendation": "pending",
+        },
+        "coachMarks": {
+          "overview": "pending",
+          "recommendations": "pending",
+          "import": "pending",
+          "portfolio": "pending",
+          "health": "pending",
+          "securityDetail": "pending",
+        },
+        "lastPromptedAt": DateTime.now().toUtc().toIso8601String(),
+      });
+      if (mounted) {
+        setState(() {
+          _saving = false;
+          _message = "新手指引已重置。回到首页后会重新显示开国任务。";
+        });
+      }
+    } catch (error) {
+      if (mounted) {
+        setState(() {
+          _saving = false;
+          _message = error.toString();
+        });
+      }
+    }
+  }
+
+  Future<void> _hide() async {
+    setState(() {
+      _saving = true;
+      _message = null;
+    });
+    try {
+      await widget.apiClient.updateOnboarding({
+        "skippedAll": true,
+        "lastPromptedAt": DateTime.now().toUtc().toIso8601String(),
+      });
+      if (mounted) {
+        setState(() {
+          _saving = false;
+          _message = "已隐藏开国任务；你可以随时在这里重新开启。";
+        });
+      }
+    } catch (error) {
+      if (mounted) {
+        setState(() {
+          _saving = false;
+          _message = error.toString();
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return LooGlassCard(
+      padding: const EdgeInsets.all(14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text("开国任务与逐屏提示", style: Theme.of(context).textTheme.titleMedium),
+          const SizedBox(height: 6),
+          const Text("任务完成状态会结合真实账户、持仓、额度和推荐记录自动判断；这里仅控制是否重新显示提示。"),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: FilledButton.tonalIcon(
+                  onPressed: _saving ? null : _reset,
+                  icon: const Icon(Icons.restart_alt_rounded),
+                  label: const Text("重置提示"),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: _saving ? null : _hide,
+                  icon: const Icon(Icons.visibility_off_outlined),
+                  label: const Text("隐藏任务"),
+                ),
+              ),
+            ],
+          ),
+          if (_message != null) ...[
+            const SizedBox(height: 10),
+            Text(_message!, style: Theme.of(context).textTheme.bodySmall),
+          ],
         ],
       ),
     );

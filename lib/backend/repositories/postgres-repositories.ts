@@ -12,6 +12,7 @@ import {
   importJobs,
   investmentAccounts,
   marketSentimentSnapshots,
+  mobileOnboardingStates,
   mobileRefreshTokens,
   mobileSecurityObservations,
   portfolioAnalysisGptEnhancements,
@@ -38,6 +39,10 @@ import {
   ExternalResearchJob,
   ExternalResearchUsageCounter,
   MarketSentimentSnapshot,
+  MobileOnboardingState,
+  MobileCoachMarkKey,
+  MobileOnboardingChecklistKey,
+  MobileOnboardingStatus,
   MobileRefreshTokenRecord,
   MobileSecurityObservation,
   PortfolioAnalysisGptEnhancement,
@@ -201,6 +206,46 @@ function mapMobileRefreshToken(
     tokenHash: row.tokenHash,
     revokedAt: row.revokedAt?.toISOString() ?? null,
     expiresAt: row.expiresAt.toISOString(),
+    createdAt: row.createdAt.toISOString(),
+    updatedAt: row.updatedAt.toISOString(),
+  };
+}
+
+function normalizeOnboardingStatusMap<K extends string>(
+  value: unknown,
+): Partial<Record<K, MobileOnboardingStatus>> {
+  if (value == null || typeof value !== "object" || Array.isArray(value)) {
+    return {};
+  }
+  const result: Partial<Record<K, MobileOnboardingStatus>> = {};
+  for (const [key, rawStatus] of Object.entries(value)) {
+    if (
+      rawStatus === "pending" ||
+      rawStatus === "completed" ||
+      rawStatus === "skipped"
+    ) {
+      result[key as K] = rawStatus;
+    }
+  }
+  return result;
+}
+
+function mapMobileOnboardingState(
+  row: typeof mobileOnboardingStates.$inferSelect,
+): MobileOnboardingState {
+  return {
+    id: row.id,
+    userId: row.userId,
+    version: row.version,
+    checklist: normalizeOnboardingStatusMap<MobileOnboardingChecklistKey>(
+      row.checklistJson,
+    ),
+    coachMarks: normalizeOnboardingStatusMap<MobileCoachMarkKey>(
+      row.coachMarksJson,
+    ),
+    skippedAll: row.skippedAll,
+    completedAt: row.completedAt?.toISOString() ?? null,
+    lastPromptedAt: row.lastPromptedAt?.toISOString() ?? null,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   };
@@ -1234,7 +1279,50 @@ export const postgresRepositories: BackendRepositories = {
             eq(mobileRefreshTokens.userId, userId),
             isNull(mobileRefreshTokens.revokedAt),
           ),
-        );
+      );
+    },
+  },
+  mobileOnboardingStates: {
+    async getByUserId(userId) {
+      const db = getDb();
+      const row = await db.query.mobileOnboardingStates.findFirst({
+        where: eq(mobileOnboardingStates.userId, userId),
+      });
+      return row ? mapMobileOnboardingState(row) : null;
+    },
+    async upsert(input) {
+      const db = getDb();
+      const existing = await db.query.mobileOnboardingStates.findFirst({
+        where: eq(mobileOnboardingStates.userId, input.userId),
+      });
+      const now = new Date();
+      const values = {
+        userId: input.userId,
+        version: input.version ?? existing?.version ?? "mvp-2026-05",
+        checklistJson: input.checklist ?? existing?.checklistJson ?? {},
+        coachMarksJson: input.coachMarks ?? existing?.coachMarksJson ?? {},
+        skippedAll: input.skippedAll ?? existing?.skippedAll ?? false,
+        completedAt:
+          input.completedAt === undefined
+            ? existing?.completedAt ?? null
+            : input.completedAt,
+        lastPromptedAt:
+          input.lastPromptedAt === undefined
+            ? existing?.lastPromptedAt ?? null
+            : input.lastPromptedAt,
+        updatedAt: now,
+      };
+      const [row] = existing
+        ? await db
+            .update(mobileOnboardingStates)
+            .set(values)
+            .where(eq(mobileOnboardingStates.id, existing.id))
+            .returning()
+        : await db
+            .insert(mobileOnboardingStates)
+            .values(values)
+            .returning();
+      return mapMobileOnboardingState(row);
     },
   },
   preferences: {

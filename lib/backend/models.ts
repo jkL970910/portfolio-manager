@@ -88,6 +88,37 @@ export interface RegisteredAccountRoom {
   updatedAt: string;
 }
 
+export type MobileOnboardingStatus = "pending" | "completed" | "skipped";
+export type MobileOnboardingChecklistKey =
+  | "identity"
+  | "preferences"
+  | "registeredRoom"
+  | "importAssets"
+  | "healthReview"
+  | "firstRecommendation";
+export type MobileCoachMarkKey =
+  | "overview"
+  | "recommendations"
+  | "portfolio"
+  | "health"
+  | "securityDetail"
+  | "import";
+
+export interface MobileOnboardingState {
+  id: EntityId;
+  userId: EntityId;
+  version: string;
+  checklist: Partial<
+    Record<MobileOnboardingChecklistKey, MobileOnboardingStatus>
+  >;
+  coachMarks: Partial<Record<MobileCoachMarkKey, MobileOnboardingStatus>>;
+  skippedAll: boolean;
+  completedAt: string | null;
+  lastPromptedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface HoldingPosition {
   id: EntityId;
   userId: EntityId;

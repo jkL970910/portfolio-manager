@@ -1,3 +1,5 @@
+import "dart:async";
+
 import "package:flutter/material.dart";
 
 import "../../../core/api/loo_api_client.dart";
@@ -5,6 +7,8 @@ import "../../../core/platform/external_link_stub.dart"
     if (dart.library.html) "../../../core/platform/external_link_web.dart";
 import "../../../core/presentation/loo_components.dart";
 import "../../../core/theme/loo_theme.dart";
+import "../../onboarding/data/mobile_onboarding_models.dart";
+import "../../onboarding/presentation/loo_coach_mark_overlay.dart";
 import "../data/mobile_import_models.dart";
 
 Future<void> _showImportResultDialog(
@@ -54,6 +58,10 @@ class ImportPage extends StatefulWidget {
 
 class _ImportPageState extends State<ImportPage> {
   late Future<MobileImportSnapshot> _snapshot;
+  final _heroCoachKey = GlobalKey();
+  final _entryCoachKey = GlobalKey();
+  final _vaultCoachKey = GlobalKey();
+  var _coachScheduled = false;
 
   @override
   void initState() {
@@ -68,13 +76,70 @@ class _ImportPageState extends State<ImportPage> {
       throw const LooApiException("导入数据格式不正确。");
     }
 
-    return MobileImportSnapshot.fromJson(data);
+    final parsed = MobileImportSnapshot.fromJson(data);
+    _scheduleImportCoachMarks();
+    return parsed;
   }
 
   void _refresh() {
     setState(() {
       _snapshot = _loadSnapshot();
     });
+  }
+
+  Future<void> _scheduleImportCoachMarks() async {
+    if (_coachScheduled || !mounted) {
+      return;
+    }
+    _coachScheduled = true;
+    try {
+      final response = await widget.apiClient.getOnboarding();
+      final data = response["data"];
+      if (data is! Map<String, dynamic>) {
+        return;
+      }
+      final onboarding = MobileOnboardingState.fromJson(data);
+      if (onboarding.skippedAll ||
+          onboarding.coachStatusFor("import") != "pending") {
+        return;
+      }
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) {
+          return;
+        }
+        unawaited(
+          showLooCoachMarks(
+            context: context,
+            steps: [
+              LooCoachStep(
+                targetKey: _heroCoachKey,
+                title: "进贡先预览",
+                body: "这里显示已经入账的账户和持仓。券商同步也会先生成草稿，不会直接写入。",
+              ),
+              LooCoachStep(
+                targetKey: _entryCoachKey,
+                title: "选择上贡方式",
+                body: "手动上贡适合少量修正；券商同步适合 IBKR 或 Wealthsimple 的批量导入。",
+              ),
+              LooCoachStep(
+                targetKey: _vaultCoachKey,
+                title: "确认国库",
+                body: "写入后的账户会集中在这里。后续如果重复或错误，可在账户详情内处理。",
+              ),
+            ],
+            onCompleted: () => widget.apiClient.updateOnboarding({
+              "coachMarks": {"import": "completed"},
+              "checklist": {"importAssets": "completed"},
+            }),
+            onSkipped: () => widget.apiClient.updateOnboarding({
+              "coachMarks": {"import": "skipped"},
+            }),
+          ),
+        );
+      });
+    } catch (_) {
+      // Onboarding should never block import.
+    }
   }
 
   @override
@@ -104,22 +169,32 @@ class _ImportPageState extends State<ImportPage> {
                     padding: looPagePadding(context, top: 14),
                     sliver: SliverList.list(
                       children: [
-                        _HeroCard(snapshot.data!),
+                        KeyedSubtree(
+                          key: _heroCoachKey,
+                          child: _HeroCard(snapshot.data!),
+                        ),
                         const SizedBox(height: 14),
-                        _EntryWorkbench(
-                          data: snapshot.data!,
-                          onCreateAccount: _openCreateAccountSheet,
-                          onCreateCashAccount: _openCreateCashAccountSheet,
-                          onCreateHolding: () =>
-                              _openCreateHoldingSheet(snapshot.data!.accounts),
-                          onBrokerageSync: () => _openBrokerageImportSheet(
-                            snapshot.data!.brokerageProviders,
+                        KeyedSubtree(
+                          key: _entryCoachKey,
+                          child: _EntryWorkbench(
+                            data: snapshot.data!,
+                            onCreateAccount: _openCreateAccountSheet,
+                            onCreateCashAccount: _openCreateCashAccountSheet,
+                            onCreateHolding: () => _openCreateHoldingSheet(
+                              snapshot.data!.accounts,
+                            ),
+                            onBrokerageSync: () => _openBrokerageImportSheet(
+                              snapshot.data!.brokerageProviders,
+                            ),
                           ),
                         ),
                         const SizedBox(height: 14),
-                        _AccountVaultCard(
-                          accounts: snapshot.data!.accounts,
-                          cashAccounts: snapshot.data!.cashAccounts,
+                        KeyedSubtree(
+                          key: _vaultCoachKey,
+                          child: _AccountVaultCard(
+                            accounts: snapshot.data!.accounts,
+                            cashAccounts: snapshot.data!.cashAccounts,
+                          ),
                         ),
                         if (snapshot.data!.notes.isNotEmpty) ...[
                           const SizedBox(height: 14),
@@ -2947,7 +3022,8 @@ class _CreateCashAccountSheet extends StatefulWidget {
   final LooApiClient apiClient;
 
   @override
-  State<_CreateCashAccountSheet> createState() => _CreateCashAccountSheetState();
+  State<_CreateCashAccountSheet> createState() =>
+      _CreateCashAccountSheetState();
 }
 
 class _CreateCashAccountSheetState extends State<_CreateCashAccountSheet> {

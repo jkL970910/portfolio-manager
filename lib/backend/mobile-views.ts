@@ -12,6 +12,7 @@ import {
   getDashboardView,
   getCitizenProfile,
   getImportView,
+  getMobileOnboardingView,
   getPortfolioAccountDetailView,
   getPortfolioHoldingDetailView,
   getPortfolioSecurityDetailView,
@@ -91,6 +92,7 @@ type MobileHomeData = {
   healthScore: DashboardData["healthScore"];
   recommendation: DashboardData["recommendation"];
   marketSentiment?: NonNullable<DashboardData["marketSentiment"]>;
+  onboarding?: Awaited<ReturnType<typeof getMobileOnboardingView>>["data"];
   context?: {
     userId: string;
     accountCount: number;
@@ -728,7 +730,10 @@ async function mapMobileHomeData(
   payload: ApiSuccess<DashboardData & { context?: MobileHomeData["context"] }>,
 ): Promise<MobileHomeData> {
   const marketSentiment = await getOrCreateLatestMarketSentiment();
-  const citizenProfile = await getCitizenProfile(viewer.id);
+  const [citizenProfile, onboardingPayload] = await Promise.all([
+    getCitizenProfile(viewer.id),
+    getMobileOnboardingView(viewer.id),
+  ]);
   return {
     viewer,
     citizenProfile,
@@ -773,6 +778,7 @@ async function mapMobileHomeData(
     recommendation: payload.data.recommendation,
     marketSentiment:
       await mapMarketSentimentForMobileWithIndexes(marketSentiment),
+    onboarding: onboardingPayload.data,
     context: payload.data.context,
   };
 }

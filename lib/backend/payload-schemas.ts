@@ -6,6 +6,41 @@ const allocationTargetSchema = z.object({
 });
 
 const symbolListSchema = z.array(z.string().trim().min(1).max(32)).max(50);
+const mobileOnboardingStatusSchema = z.enum([
+  "pending",
+  "completed",
+  "skipped",
+]);
+const mobileOnboardingChecklistKeySchema = z.enum([
+  "identity",
+  "preferences",
+  "registeredRoom",
+  "importAssets",
+  "healthReview",
+  "firstRecommendation",
+]);
+const mobileCoachMarkKeySchema = z.enum([
+  "overview",
+  "recommendations",
+  "portfolio",
+  "health",
+  "securityDetail",
+  "import",
+]);
+
+export const mobileOnboardingUpdateSchema = z.object({
+  checklist: z
+    .partialRecord(
+      mobileOnboardingChecklistKeySchema,
+      mobileOnboardingStatusSchema,
+    )
+    .optional(),
+  coachMarks: z
+    .partialRecord(mobileCoachMarkKeySchema, mobileOnboardingStatusSchema)
+    .optional(),
+  skippedAll: z.boolean().optional(),
+  lastPromptedAt: z.string().datetime().nullable().optional(),
+});
 
 const securityConstraintIdentitySchema = z.object({
   symbol: z.string().trim().min(1).max(32),

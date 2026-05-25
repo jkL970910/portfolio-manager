@@ -69,6 +69,35 @@ export const mobileRefreshTokens = pgTable(
   }),
 );
 
+export const mobileOnboardingStates = pgTable(
+  "mobile_onboarding_states",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id),
+    version: varchar("version", { length: 40 })
+      .notNull()
+      .default("mvp-2026-05"),
+    checklistJson: jsonb("checklist_json").notNull().default({}),
+    coachMarksJson: jsonb("coach_marks_json").notNull().default({}),
+    skippedAll: boolean("skipped_all").notNull().default(false),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+    lastPromptedAt: timestamp("last_prompted_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => ({
+    userUniqueIdx: uniqueIndex("mobile_onboarding_states_user_id_idx").on(
+      table.userId,
+    ),
+  }),
+);
+
 export const citizenProfiles = pgTable(
   "citizen_profiles",
   {

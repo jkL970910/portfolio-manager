@@ -38,6 +38,9 @@ import {
   PreferenceProfileSource,
   RecommendationConstraints,
   RecommendationRun,
+  MobileCoachMarkKey,
+  MobileOnboardingChecklistKey,
+  MobileOnboardingStatus,
   RiskProfile,
   TransitionPreference,
   RecommendationStrategy,
@@ -179,6 +182,15 @@ export interface UpdateDisplayCurrencyInput {
 
 export interface UpdateDisplayLanguageInput {
   language: DisplayLanguage;
+}
+
+export interface UpdateMobileOnboardingInput {
+  checklist?: Partial<
+    Record<MobileOnboardingChecklistKey, MobileOnboardingStatus>
+  >;
+  coachMarks?: Partial<Record<MobileCoachMarkKey, MobileOnboardingStatus>>;
+  skippedAll?: boolean;
+  lastPromptedAt?: string | null;
 }
 
 export interface UpdateCitizenOverrideInput {
@@ -699,6 +711,184 @@ export async function isViewerAdmin(userId: string) {
 
 export async function getCitizenProfile(userId: string) {
   return ensureCitizenProfile(userId);
+}
+
+const MOBILE_ONBOARDING_VERSION = "mvp-2026-05";
+const MOBILE_ONBOARDING_CHECKLIST: MobileOnboardingChecklistKey[] = [
+  "identity",
+  "preferences",
+  "registeredRoom",
+  "importAssets",
+  "healthReview",
+  "firstRecommendation",
+];
+const MOBILE_ONBOARDING_COACH_MARKS: MobileCoachMarkKey[] = [
+  "overview",
+  "recommendations",
+  "portfolio",
+  "health",
+  "securityDetail",
+  "import",
+];
+
+function normalizeMobileOnboardingStatusMap<K extends string>(
+  value: Partial<Record<K, MobileOnboardingStatus>> | undefined,
+  keys: readonly K[],
+): Record<K, MobileOnboardingStatus> {
+  const result = {} as Record<K, MobileOnboardingStatus>;
+  for (const key of keys) {
+    const status: MobileOnboardingStatus = value?.[key] ?? "pending";
+    result[key] =
+      status === "completed" || status === "skipped" ? status : "pending";
+  }
+  return result;
+}
+
+function applyAutoCompletedStatus<K extends string>(
+  current: Record<K, MobileOnboardingStatus>,
+  autoCompleted: Set<K>,
+): Record<K, MobileOnboardingStatus> {
+  const result = { ...current };
+  for (const key of autoCompleted) {
+    result[key] = "completed";
+  }
+  return result;
+}
+
+function countCompletedStatuses<K extends string>(
+  values: Record<K, MobileOnboardingStatus>,
+) {
+  return Object.values(values).filter((status) => status === "completed")
+    .length;
+}
+
+function parseOptionalDate(value?: string | null) {
+  if (value == null) {
+    return value;
+  }
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    throw new Error("Invalid onboarding timestamp.");
+  }
+  return date;
+}
+
+export async function getMobileOnboardingView(userId: string) {
+  const repositories = getRepositories();
+  const [state, accounts, holdings, cashAccounts, registeredRooms] =
+    await Promise.all([
+      repositories.mobileOnboardingStates.getByUserId(userId),
+      repositories.accounts.listByUserId(userId),
+      repositories.holdings.listByUserId(userId),
+      repositories.cashAccounts.listByUserId(userId),
+      repositories.registeredAccountRooms.listByUserId(userId),
+    ]);
+
+  const db = getDb();
+  const [citizen, profile, latestRun] = await Promise.all([
+    db.query.citizenProfiles.findFirst({
+      where: eq(citizenProfiles.userId, userId),
+    }),
+    repositories.preferences.getByUserId(userId).catch(() => null),
+    repositories.recommendations.getLatestByUserId(userId).catch(() => null),
+  ]);
+
+  const autoCompleted = new Set<MobileOnboardingChecklistKey>();
+  if (citizen) {
+    autoCompleted.add("identity");
+  }
+  if (profile) {
+    autoCompleted.add("preferences");
+  }
+  if (
+    registeredRooms.some((room) => room.remainingRoomCad > 0) ||
+    cashAccounts.length > 0
+  ) {
+    autoCompleted.add("registeredRoom");
+  }
+  if (accounts.length > 0 || holdings.length > 0 || cashAccounts.length > 0) {
+    autoCompleted.add("importAssets");
+  }
+  if (accounts.length > 0 || holdings.length > 0) {
+    autoCompleted.add("healthReview");
+  }
+  if (latestRun && latestRun.id !== "pending-run") {
+    autoCompleted.add("firstRecommendation");
+  }
+
+  const checklist = applyAutoCompletedStatus(
+    normalizeMobileOnboardingStatusMap(
+      state?.checklist,
+      MOBILE_ONBOARDING_CHECKLIST,
+    ),
+    autoCompleted,
+  );
+  const coachMarks = normalizeMobileOnboardingStatusMap(
+    state?.coachMarks,
+    MOBILE_ONBOARDING_COACH_MARKS,
+  );
+  const completedCount = countCompletedStatuses(checklist);
+  const totalCount = MOBILE_ONBOARDING_CHECKLIST.length;
+  const completed = completedCount === totalCount;
+
+  return apiSuccess(
+    {
+      version: state?.version ?? MOBILE_ONBOARDING_VERSION,
+      skippedAll: state?.skippedAll ?? false,
+      completed,
+      progress: {
+        completed: completedCount,
+        total: totalCount,
+        percent: Math.round((completedCount / totalCount) * 100),
+      },
+      checklist,
+      coachMarks,
+      autoCompleted: Array.from(autoCompleted),
+      completedAt: state?.completedAt ?? (completed ? new Date().toISOString() : null),
+      lastPromptedAt: state?.lastPromptedAt ?? null,
+    },
+    "database",
+  );
+}
+
+export async function updateMobileOnboardingState(
+  userId: string,
+  input: UpdateMobileOnboardingInput,
+) {
+  const repositories = getRepositories();
+  const current = await repositories.mobileOnboardingStates.getByUserId(userId);
+  const checklist = {
+    ...normalizeMobileOnboardingStatusMap(
+      current?.checklist,
+      MOBILE_ONBOARDING_CHECKLIST,
+    ),
+    ...(input.checklist ?? {}),
+  };
+  const coachMarks = {
+    ...normalizeMobileOnboardingStatusMap(
+      current?.coachMarks,
+      MOBILE_ONBOARDING_COACH_MARKS,
+    ),
+    ...(input.coachMarks ?? {}),
+  };
+  const completed =
+    countCompletedStatuses(checklist) === MOBILE_ONBOARDING_CHECKLIST.length;
+  await repositories.mobileOnboardingStates.upsert({
+    userId,
+    version: current?.version ?? MOBILE_ONBOARDING_VERSION,
+    checklist,
+    coachMarks,
+    skippedAll: input.skippedAll ?? current?.skippedAll ?? false,
+    completedAt: completed
+      ? current?.completedAt
+        ? new Date(current.completedAt)
+        : new Date()
+      : current?.completedAt
+        ? new Date(current.completedAt)
+        : null,
+    lastPromptedAt: parseOptionalDate(input.lastPromptedAt) ?? undefined,
+  });
+  return getMobileOnboardingView(userId);
 }
 
 function createEmptyRun(userId: string): RecommendationRun {

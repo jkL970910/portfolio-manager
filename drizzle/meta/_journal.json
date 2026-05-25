@@ -253,6 +253,13 @@
       "when": 1779487200000,
       "tag": "0035_registered_account_rooms",
       "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "7",
+      "when": 1779660000000,
+      "tag": "0036_mobile_onboarding_states",
+      "breakpoints": true
     }
   ]
 }

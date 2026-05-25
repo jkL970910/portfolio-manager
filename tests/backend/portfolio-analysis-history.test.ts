@@ -26,11 +26,11 @@ test("analysis history maps saved analyzer runs to compact mobile rows", () => {
 
   const item = mapAnalysisRunForMobile(run);
 
-  assert.equal(item.scopeLabel, "账户快扫");
+  assert.equal(item.scopeLabel, "Loo皇巡阅账户");
   assert.equal(item.title, "TFSA 智能账户快扫");
   assert.equal(item.detail, "账户内适配和全组合目标参考需要分开看。");
   assert.equal(item.generatedAt, run.generatedAt);
-  assert.equal(item.sourceLabel, "本地快扫");
+  assert.equal(item.sourceLabel, "Loo皇巡阅");
   assert.equal(item.disclaimer, "仅用于研究学习，不构成投资建议。");
 });
 

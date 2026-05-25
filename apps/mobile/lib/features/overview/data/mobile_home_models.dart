@@ -1,6 +1,7 @@
 import "../../shared/data/mobile_chart_models.dart";
 import "../../shared/data/loo_minister_context_models.dart";
 import "../../shared/data/mobile_models.dart";
+import "../../onboarding/data/mobile_onboarding_models.dart";
 
 class MobileHomeSnapshot {
   const MobileHomeSnapshot({
@@ -19,6 +20,7 @@ class MobileHomeSnapshot {
     required this.recommendationTheme,
     required this.recommendationReason,
     required this.marketSentiment,
+    required this.onboarding,
   });
 
   final String viewerName;
@@ -36,6 +38,7 @@ class MobileHomeSnapshot {
   final String recommendationTheme;
   final String recommendationReason;
   final MobileMarketSentiment? marketSentiment;
+  final MobileOnboardingState onboarding;
 
   LooMinisterPageContext toMinisterContext({required String asOf}) {
     final chart = netWorthChart;
@@ -173,6 +176,7 @@ class MobileHomeSnapshot {
           ? recommendation["reason"] as String? ?? "完成数据导入后，Loo国会生成组合建议。"
           : "完成数据导入后，Loo国会生成组合建议。",
       marketSentiment: MobileMarketSentiment.tryParse(json["marketSentiment"]),
+      onboarding: MobileOnboardingState.fromJson(json["onboarding"]),
     );
   }
 }
@@ -552,9 +556,7 @@ class MobileRegisteredRoomSummary {
     return "CAD $buffer";
   }
 
-  String get detail => source == "shared"
-      ? "$taxYear 共享额度"
-      : "$taxYear 旧账户额度";
+  String get detail => source == "shared" ? "$taxYear 共享额度" : "$taxYear 旧账户额度";
 
   factory MobileRegisteredRoomSummary.fromJson(dynamic json) {
     if (json is! Map<String, dynamic>) {

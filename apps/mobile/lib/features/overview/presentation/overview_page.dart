@@ -9,6 +9,8 @@ import "../../../core/presentation/loo_components.dart";
 import "../../../core/theme/loo_theme.dart";
 import "../../intelligence/data/daily_intelligence_models.dart";
 import "../../intelligence/presentation/daily_intelligence_card.dart";
+import "../../onboarding/presentation/loo_coach_mark_overlay.dart";
+import "../../onboarding/presentation/onboarding_checklist_card.dart";
 import "../data/mobile_home_models.dart";
 import "../../shared/data/mobile_chart_models.dart";
 import "../../shared/data/mobile_models.dart";
@@ -36,6 +38,10 @@ class OverviewPage extends StatefulWidget {
 class _OverviewPageState extends State<OverviewPage> {
   late Future<MobileHomeSnapshot> _snapshot;
   late Future<MobileDailyIntelligenceSnapshot> _dailyIntelligence;
+  final _summaryCoachKey = GlobalKey();
+  final _intelligenceCoachKey = GlobalKey();
+  final _accountsCoachKey = GlobalKey();
+  var _coachScheduled = false;
 
   @override
   void initState() {
@@ -58,8 +64,49 @@ class _OverviewPageState extends State<OverviewPage> {
         snapshot.toMinisterContext(
             asOf: DateTime.now().toUtc().toIso8601String()),
       );
+      _scheduleOverviewCoachMarks(snapshot);
     }
     return snapshot;
+  }
+
+  void _scheduleOverviewCoachMarks(MobileHomeSnapshot snapshot) {
+    if (_coachScheduled ||
+        snapshot.onboarding.skippedAll ||
+        snapshot.onboarding.coachStatusFor("overview") != "pending") {
+      return;
+    }
+    _coachScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        return;
+      }
+      showLooCoachMarks(
+        context: context,
+        steps: [
+          LooCoachStep(
+            targetKey: _summaryCoachKey,
+            title: "国库总览",
+            body: "这里看总资产、健康分、buying power 和主要入口。",
+          ),
+          LooCoachStep(
+            targetKey: _intelligenceCoachKey,
+            title: "Loo国秘闻",
+            body: "这里是每日市场摘要，不是单个标的买卖指令。",
+          ),
+          LooCoachStep(
+            targetKey: _accountsCoachKey,
+            title: "账户入口",
+            body: "这里进入单个账户和持仓明细。",
+          ),
+        ],
+        onCompleted: () => widget.apiClient.updateOnboarding({
+          "coachMarks": {"overview": "completed"},
+        }),
+        onSkipped: () => widget.apiClient.updateOnboarding({
+          "coachMarks": {"overview": "skipped"},
+        }),
+      );
+    });
   }
 
   Future<MobileDailyIntelligenceSnapshot> _loadDailyIntelligence() async {
@@ -76,6 +123,14 @@ class _OverviewPageState extends State<OverviewPage> {
       _snapshot = _loadSnapshot();
       _dailyIntelligence = _loadDailyIntelligence();
     });
+  }
+
+  Future<void> _skipOnboarding() async {
+    await widget.apiClient.updateOnboarding({"skippedAll": true});
+    if (!mounted) {
+      return;
+    }
+    _refresh();
   }
 
   @override
@@ -111,15 +166,32 @@ class _OverviewPageState extends State<OverviewPage> {
                     padding: looPagePadding(context),
                     sliver: SliverList.list(
                       children: [
-                        _OverviewSummaryPanel(
-                          snapshot.data!,
-                          onOpenHealth: _openHealthScore,
-                          onOpenHoldings: widget.onOpenHoldings,
-                          onShowHoldingsShare: () => _showTopHoldingsShare(
-                            snapshot.data!.topHoldings,
+                        KeyedSubtree(
+                          key: _summaryCoachKey,
+                          child: _OverviewSummaryPanel(
+                            snapshot.data!,
+                            onOpenHealth: _openHealthScore,
+                            onOpenHoldings: widget.onOpenHoldings,
+                            onShowHoldingsShare: () => _showTopHoldingsShare(
+                              snapshot.data!.topHoldings,
+                            ),
+                            onOpenRecommendations: widget.onOpenRecommendations,
                           ),
-                          onOpenRecommendations: widget.onOpenRecommendations,
                         ),
+                        if (snapshot.data!.onboarding.shouldShowChecklist) ...[
+                          const SizedBox(height: 18),
+                          OnboardingChecklistCard(
+                            state: snapshot.data!.onboarding,
+                            onOpenSettings: () =>
+                                context.push(MobileRoutes.settings),
+                            onOpenImport: () =>
+                                context.push(MobileRoutes.importFlow),
+                            onOpenHealth: _openHealthScore,
+                            onOpenRecommendations:
+                                widget.onOpenRecommendations ?? () {},
+                            onSkip: _skipOnboarding,
+                          ),
+                        ],
                         if (snapshot.data!.netWorthChart != null ||
                             snapshot.data!.netWorthTrend.isNotEmpty) ...[
                           const SizedBox(height: 18),
@@ -135,33 +207,44 @@ class _OverviewPageState extends State<OverviewPage> {
                           ),
                         ],
                         const SizedBox(height: 18),
-                        FutureBuilder<MobileDailyIntelligenceSnapshot>(
-                          future: _dailyIntelligence,
-                          builder: (context, intelligenceSnapshot) {
-                            return DailyIntelligenceCard(
-                              snapshot: intelligenceSnapshot.data,
-                              isLoading: intelligenceSnapshot.connectionState ==
-                                  ConnectionState.waiting,
-                              errorMessage: intelligenceSnapshot.hasError
-                                  ? intelligenceSnapshot.error.toString()
-                                  : null,
-                              onViewSecurity: _openSecurityFromIntelligence,
-                              onGenerateAiSummary:
-                                  _generateDailyIntelligenceAiSummary,
-                              compactCarousel: true,
-                            );
-                          },
+                        KeyedSubtree(
+                          key: _intelligenceCoachKey,
+                          child: FutureBuilder<MobileDailyIntelligenceSnapshot>(
+                            future: _dailyIntelligence,
+                            builder: (context, intelligenceSnapshot) {
+                              return DailyIntelligenceCard(
+                                snapshot: intelligenceSnapshot.data,
+                                isLoading:
+                                    intelligenceSnapshot.connectionState ==
+                                        ConnectionState.waiting,
+                                errorMessage: intelligenceSnapshot.hasError
+                                    ? intelligenceSnapshot.error.toString()
+                                    : null,
+                                onViewSecurity: _openSecurityFromIntelligence,
+                                onGenerateAiSummary:
+                                    _generateDailyIntelligenceAiSummary,
+                                compactCarousel: true,
+                              );
+                            },
+                          ),
                         ),
                         const SizedBox(height: 18),
-                        _SectionTitle(
-                            title: "账户入口",
-                            actionLabel: "前往账户",
-                            onAction: widget.onOpenAccounts),
-                        const SizedBox(height: 10),
-                        ...snapshot.data!.accounts.map(
-                          (account) => _AccountTile(
-                            account,
-                            onTap: () => _openAccountDetail(account),
+                        KeyedSubtree(
+                          key: _accountsCoachKey,
+                          child: Column(
+                            children: [
+                              _SectionTitle(
+                                  title: "账户入口",
+                                  actionLabel: "前往账户",
+                                  onAction: widget.onOpenAccounts),
+                              const SizedBox(height: 10),
+                              ...snapshot.data!.accounts.map(
+                                (account) => _AccountTile(
+                                  account,
+                                  onTap: () => _openAccountDetail(account),
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ],
@@ -369,13 +452,13 @@ class _OverviewSummaryPanel extends StatelessWidget {
 
     return Column(
       children: [
-          _AssetHeroCard(
-            total: total,
-            registeredRoom: snapshot.registeredRoom,
-            buyingPower: snapshot.buyingPower,
-            risk: risk,
-            allTimeReturn: allTimeReturn,
-            chart: snapshot.netWorthChart,
+        _AssetHeroCard(
+          total: total,
+          registeredRoom: snapshot.registeredRoom,
+          buyingPower: snapshot.buyingPower,
+          risk: risk,
+          allTimeReturn: allTimeReturn,
+          chart: snapshot.netWorthChart,
           fallbackPoints: snapshot.netWorthTrend,
         ),
         const SizedBox(height: 12),

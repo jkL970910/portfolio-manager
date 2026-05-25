@@ -1,5 +1,6 @@
 import "package:flutter_test/flutter_test.dart";
 import "package:loo_wealth_mobile/features/overview/data/mobile_home_models.dart";
+import "package:loo_wealth_mobile/features/onboarding/data/mobile_onboarding_models.dart";
 import "package:loo_wealth_mobile/features/portfolio/data/mobile_portfolio_models.dart";
 import "package:loo_wealth_mobile/features/portfolio/presentation/account_detail_page.dart";
 import "package:loo_wealth_mobile/features/portfolio/presentation/health_score_page.dart";
@@ -102,9 +103,9 @@ void main() {
   });
 
   test("builds overview minister context from typed home snapshot", () {
-    const snapshot = MobileHomeSnapshot(
+    final snapshot = MobileHomeSnapshot(
       viewerName: "Loo国居民",
-      citizenProfile: MobileHomeCitizenProfile(
+      citizenProfile: const MobileHomeCitizenProfile(
         name: "Loo国居民",
         rankLabel: "Loo国子民",
         addressLabel: "Loo国城内",
@@ -113,22 +114,22 @@ void main() {
         avatarAsset: "assets/images/mascot/citizen_default.jpg",
       ),
       metrics: [
-        MobileMetric(label: "总资产", value: "CAD 100,000", detail: "当前净值"),
+        const MobileMetric(label: "总资产", value: "CAD 100,000", detail: "当前净值"),
       ],
-      health: MobileHomeHealth(
+      health: const MobileHomeHealth(
         score: "82 分",
         status: "稳定",
         highlights: ["US Equity 高于目标。"],
       ),
       accounts: [],
       topHoldings: [],
-      buyingPower: MobileBuyingPower(
+      buyingPower: const MobileBuyingPower(
         label: "Buying Power",
         value: "CAD 12,000",
         detail: "1 个现金账户",
         confidence: "medium",
       ),
-      registeredRoom: MobileRegisteredRoomSummary(
+      registeredRoom: const MobileRegisteredRoomSummary(
         taxYear: 2026,
         totalCad: 7000,
         source: "shared",
@@ -139,8 +140,9 @@ void main() {
           ),
         ],
       ),
+      onboarding: MobileOnboardingState.fromJson(null),
       netWorthTrend: [],
-      netWorthChart: MobileChartSeries(
+      netWorthChart: const MobileChartSeries(
         title: "总资产走势",
         valueType: "money",
         sourceMode: "local",
@@ -166,7 +168,7 @@ void main() {
         ],
         notes: ["走势使用组合快照。"],
       ),
-      fxContext: MobileFxContext(
+      fxContext: const MobileFxContext(
         label: "1 USD = 1.37 CAD",
         note: "仅展示折算。",
         asOf: "2026-04-30T04:00:00.000Z",
