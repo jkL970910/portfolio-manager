@@ -140,33 +140,50 @@ export const citizenProfiles = pgTable(
   }),
 );
 
-export const investmentAccounts = pgTable("investment_accounts", {
-  id: uuid("id").defaultRandom().primaryKey(),
-  userId: uuid("user_id")
-    .notNull()
-    .references(() => users.id),
-  institution: varchar("institution", { length: 120 }).notNull(),
-  type: varchar("type", { length: 24 }).notNull(),
-  nickname: varchar("nickname", { length: 120 }).notNull(),
-  currency: varchar("currency", { length: 3 }).notNull().default("CAD"),
-  marketValueAmount: numeric("market_value_amount", { precision: 14, scale: 2 })
-    .notNull()
-    .default("0"),
-  marketValueCad: numeric("market_value_cad", {
-    precision: 14,
-    scale: 2,
-  }).notNull(),
-  contributionRoomCad: numeric("contribution_room_cad", {
-    precision: 14,
-    scale: 2,
+export const investmentAccounts = pgTable(
+  "investment_accounts",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id),
+    institution: varchar("institution", { length: 120 }).notNull(),
+    type: varchar("type", { length: 24 }).notNull(),
+    nickname: varchar("nickname", { length: 120 }).notNull(),
+    currency: varchar("currency", { length: 3 }).notNull().default("CAD"),
+    marketValueAmount: numeric("market_value_amount", {
+      precision: 14,
+      scale: 2,
+    })
+      .notNull()
+      .default("0"),
+    marketValueCad: numeric("market_value_cad", {
+      precision: 14,
+      scale: 2,
+    }).notNull(),
+    contributionRoomCad: numeric("contribution_room_cad", {
+      precision: 14,
+      scale: 2,
+    }),
+    importSourceProvider: varchar("import_source_provider", { length: 32 }),
+    importSourceAccountId: varchar("import_source_account_id", { length: 160 }),
+    lastImportedAt: timestamp("last_imported_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => ({
+    importSourceIdx: uniqueIndex("investment_accounts_import_source_idx").on(
+      table.userId,
+      table.importSourceProvider,
+      table.importSourceAccountId,
+    ).where(sql`${table.importSourceProvider} IS NOT NULL
+      AND ${table.importSourceAccountId} IS NOT NULL`),
   }),
-  createdAt: timestamp("created_at", { withTimezone: true })
-    .notNull()
-    .defaultNow(),
-  updatedAt: timestamp("updated_at", { withTimezone: true })
-    .notNull()
-    .defaultNow(),
-});
+);
 
 export const registeredAccountRooms = pgTable(
   "registered_account_rooms",
@@ -263,6 +280,17 @@ export const holdingPositions = pgTable(
     marketDataRefreshRunId: uuid("market_data_refresh_run_id"),
     weightPct: numeric("weight_pct", { precision: 7, scale: 2 }).notNull(),
     gainLossPct: numeric("gain_loss_pct", { precision: 7, scale: 2 }).notNull(),
+    importSourceProvider: varchar("import_source_provider", { length: 32 }),
+    importSourceAccountId: varchar("import_source_account_id", { length: 160 }),
+    importSourceHoldingKey: varchar("import_source_holding_key", {
+      length: 256,
+    }),
+    importStatus: varchar("import_status", { length: 24 })
+      .notNull()
+      .default("active"),
+    importSyncedAt: timestamp("import_synced_at", { withTimezone: true }),
+    importClosedAt: timestamp("import_closed_at", { withTimezone: true }),
+    importCloseReason: text("import_close_reason"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -272,6 +300,21 @@ export const holdingPositions = pgTable(
   },
   (table) => ({
     securityIdx: index("holding_positions_security_idx").on(table.securityId),
+    importSourceIdx: index("holding_positions_import_source_idx").on(
+      table.userId,
+      table.importSourceProvider,
+      table.importSourceAccountId,
+    ),
+    importHoldingKeyIdx: index("holding_positions_import_holding_key_idx")
+      .on(
+        table.userId,
+        table.importSourceProvider,
+        table.importSourceAccountId,
+        table.importSourceHoldingKey,
+      )
+      .where(sql`${table.importSourceProvider} IS NOT NULL
+        AND ${table.importSourceAccountId} IS NOT NULL
+        AND ${table.importSourceHoldingKey} IS NOT NULL`),
   }),
 );
 
@@ -915,9 +958,7 @@ export const externalResearchDocuments = pgTable(
   "external_research_documents",
   {
     id: uuid("id").defaultRandom().primaryKey(),
-    userId: uuid("user_id")
-      .notNull()
-      .references(() => users.id),
+    userId: uuid("user_id").references(() => users.id),
     providerDocumentId: varchar("provider_document_id", {
       length: 160,
     }).notNull(),
@@ -958,10 +999,20 @@ export const externalResearchDocuments = pgTable(
     providerDocumentUniqueIdx: uniqueIndex(
       "external_research_documents_provider_doc_idx",
     ).on(table.userId, table.providerId, table.providerDocumentId),
+    globalProviderDocumentUniqueIdx: uniqueIndex(
+      "external_research_documents_global_provider_doc_idx",
+    )
+      .on(table.providerId, table.providerDocumentId)
+      .where(sql`${table.userId} IS NULL`),
     userExpiresIdx: index("external_research_documents_user_expires_idx").on(
       table.userId,
       table.expiresAt,
     ),
+    globalNewsExpiresIdx: index(
+      "external_research_documents_global_news_expires_idx",
+    )
+      .on(table.expiresAt)
+      .where(sql`${table.userId} IS NULL AND ${table.sourceType} = 'news'`),
     securityIdx: index("external_research_documents_security_idx").on(
       table.securityId,
     ),

@@ -2,7 +2,7 @@ import { jwtVerify, SignJWT } from "jose";
 import { createHash, randomUUID } from "node:crypto";
 import type { NextRequest } from "next/server";
 import { getRepositories } from "@/lib/backend/repositories/factory";
-import { getAuthenticatedUserId, getViewerByUserId, type Viewer } from "@/lib/auth/session";
+import { getViewerByUserId, type Viewer } from "@/lib/auth/session";
 
 type MobileTokenType = "access" | "refresh";
 
@@ -128,22 +128,17 @@ function readBearerToken(request: NextRequest) {
 
 export async function getMobileViewerFromRequest(request: NextRequest): Promise<Viewer | null> {
   const bearerToken = readBearerToken(request);
-  if (bearerToken) {
-    try {
-      const payload = await verifyMobileToken(bearerToken, "access");
-      if (!payload.sub) {
-        return null;
-      }
-      return getViewerByUserId(payload.sub);
-    } catch {
-      return null;
-    }
-  }
-
-  const sessionUserId = await getAuthenticatedUserId();
-  if (!sessionUserId) {
+  if (!bearerToken) {
     return null;
   }
 
-  return getViewerByUserId(sessionUserId);
+  try {
+    const payload = await verifyMobileToken(bearerToken, "access");
+    if (!payload.sub) {
+      return null;
+    }
+    return getViewerByUserId(payload.sub);
+  } catch {
+    return null;
+  }
 }

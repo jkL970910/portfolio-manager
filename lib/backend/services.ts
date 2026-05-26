@@ -717,6 +717,7 @@ const MOBILE_ONBOARDING_VERSION = "mvp-2026-05";
 const MOBILE_ONBOARDING_CHECKLIST: MobileOnboardingChecklistKey[] = [
   "identity",
   "preferences",
+  "aiMinister",
   "registeredRoom",
   "importAssets",
   "healthReview",
@@ -796,9 +797,6 @@ export async function getMobileOnboardingView(userId: string) {
   const autoCompleted = new Set<MobileOnboardingChecklistKey>();
   if (citizen) {
     autoCompleted.add("identity");
-  }
-  if (profile) {
-    autoCompleted.add("preferences");
   }
   if (
     registeredRooms.some((room) => room.remainingRoomCad > 0) ||
@@ -1894,11 +1892,19 @@ export async function getDashboardView(userId: string) {
 
 export async function getPortfolioView(userId: string) {
   const repositories = getRepositories();
-  const [user, userAccounts, userHoldings, userEvents, userSnapshots, profile] =
-    await Promise.all([
+  const [
+    user,
+    userAccounts,
+    userHoldings,
+    userCashAccounts,
+    userEvents,
+    userSnapshots,
+    profile,
+  ] = await Promise.all([
       repositories.users.getById(userId),
       repositories.accounts.listByUserId(userId),
       repositories.holdings.listByUserId(userId),
+      repositories.cashAccounts.listByUserId(userId),
       repositories.portfolioEvents.listByUserId(userId),
       repositories.snapshots.listByUserId(userId),
       repositories.preferences.getByUserId(userId),
@@ -1920,6 +1926,7 @@ export async function getPortfolioView(userId: string) {
         language: user.displayLanguage,
         accounts: userAccounts,
         holdings: userHoldings,
+        cashAccounts: userCashAccounts,
         portfolioEvents: userEvents,
         priceHistory: userPriceHistory,
         snapshots: userSnapshots,
@@ -4081,6 +4088,38 @@ export async function createIbkrBrokerageDraftFromCredentials(
   return createBrokerageImportDraft(userId, preview);
 }
 
+function buildBrokerageHoldingSourceKey(input: {
+  provider: string;
+  sourceAccountId: string;
+  securityId: string;
+  symbol: string;
+  exchange?: string | null;
+  currency: CurrencyCode;
+}) {
+  return [
+    input.provider.trim().toLowerCase(),
+    input.sourceAccountId.trim(),
+    input.securityId.trim(),
+    input.symbol.trim().toUpperCase(),
+    input.exchange?.trim().toUpperCase() || "UNKNOWN",
+    input.currency,
+  ].join("|");
+}
+
+function isSameBrokerageLineage(
+  row: {
+    importSourceProvider?: string | null;
+    importSourceAccountId?: string | null;
+  },
+  provider: string,
+  sourceAccountId: string,
+) {
+  return (
+    row.importSourceProvider === provider &&
+    row.importSourceAccountId === sourceAccountId
+  );
+}
+
 type SnapTradeConnectionPortalInput = z.infer<
   typeof snapTradeConnectionPortalInputSchema
 >;
@@ -4325,6 +4364,7 @@ export async function confirmBrokerageImportDraft(
     const accountPrefix =
       preview.provider === "snaptrade" ? "Wealthsimple" : "IBKR";
     const brokerageAccountMarker = `${accountPrefix}:`;
+    const sourceProvider = preview.provider;
     const eventSource =
       preview.provider === "snaptrade"
         ? "snaptrade-import"
@@ -4348,13 +4388,43 @@ export async function confirmBrokerageImportDraft(
       const accountMarketValueCad =
         (await toCadAmount(accountMarketValueAmount, currency)) ?? 0;
 
-      const existingAccount = await tx.query.investmentAccounts.findFirst({
+      const existingAccountBySource =
+        await tx.query.investmentAccounts.findFirst({
+          where: and(
+            eq(investmentAccounts.userId, userId),
+            eq(investmentAccounts.importSourceProvider, sourceProvider),
+            eq(investmentAccounts.importSourceAccountId, sourceAccountId),
+          ),
+        });
+      const existingAccountByNickname = await tx.query.investmentAccounts.findFirst({
         where: and(
           eq(investmentAccounts.userId, userId),
           eq(investmentAccounts.institution, institution),
           eq(investmentAccounts.nickname, nickname),
         ),
       });
+      if (
+        existingAccountBySource &&
+        existingAccountByNickname &&
+        existingAccountBySource.id !== existingAccountByNickname.id
+      ) {
+        throw new Error(
+          `Brokerage account ${sourceAccountId} conflicts with another saved account for this provider. Resolve the duplicate account before syncing.`,
+        );
+      }
+      if (
+        existingAccountByNickname?.importSourceProvider &&
+        !isSameBrokerageLineage(
+          existingAccountByNickname,
+          sourceProvider,
+          sourceAccountId,
+        )
+      ) {
+        throw new Error(
+          `Brokerage account ${sourceAccountId} is already linked to another provider account. Resolve the source mapping before syncing.`,
+        );
+      }
+      const existingAccount = existingAccountBySource ?? existingAccountByNickname;
       const legacyAccount = existingAccount
         ? null
         : await tx.query.investmentAccounts.findFirst({
@@ -4383,6 +4453,9 @@ export async function confirmBrokerageImportDraft(
               marketValueAmount: accountMarketValueAmount.toFixed(2),
               marketValueCad: accountMarketValueCad.toFixed(2),
               contributionRoomCad: null,
+              importSourceProvider: sourceProvider,
+              importSourceAccountId: sourceAccountId,
+              lastImportedAt: new Date(),
             })
             .returning()
         )[0];
@@ -4397,6 +4470,9 @@ export async function confirmBrokerageImportDraft(
             currency,
             marketValueAmount: accountMarketValueAmount.toFixed(2),
             marketValueCad: accountMarketValueCad.toFixed(2),
+            importSourceProvider: sourceProvider,
+            importSourceAccountId: sourceAccountId,
+            lastImportedAt: new Date(),
             updatedAt: new Date(),
           })
           .where(eq(investmentAccounts.id, existingAccount.id));
@@ -4451,6 +4527,7 @@ export async function confirmBrokerageImportDraft(
       }
 
       const activeSecurityIds = new Set<string>();
+      const activeHoldingKeys = new Set<string>();
 
       for (const sourceHolding of sourceAccount.holdings) {
         const holdingCurrency = normalizeCurrencyCode(sourceHolding.currency);
@@ -4478,14 +4555,57 @@ export async function confirmBrokerageImportDraft(
           securityType: isOtherAsset ? "Other / Manual" : sourceHolding.assetCategory,
         });
         activeSecurityIds.add(security.id);
+        const sourceHoldingKey = buildBrokerageHoldingSourceKey({
+          provider: sourceProvider,
+          sourceAccountId,
+          securityId: security.id,
+          symbol: sourceHolding.symbol,
+          exchange: isOtherAsset
+            ? "OTHER"
+            : (sourceHolding.exchange ?? security.canonicalExchange),
+          currency: holdingCurrency,
+        });
+        activeHoldingKeys.add(sourceHoldingKey);
 
-        const existingHolding = await tx.query.holdingPositions.findFirst({
+        const existingHoldingBySource =
+          await tx.query.holdingPositions.findFirst({
+            where: and(
+              eq(holdingPositions.userId, userId),
+              eq(holdingPositions.importSourceProvider, sourceProvider),
+              eq(holdingPositions.importSourceAccountId, sourceAccountId),
+              eq(holdingPositions.importSourceHoldingKey, sourceHoldingKey),
+            ),
+          });
+        const existingHoldingBySecurity = await tx.query.holdingPositions.findFirst({
           where: and(
             eq(holdingPositions.userId, userId),
             eq(holdingPositions.accountId, accountRow.id),
             eq(holdingPositions.securityId, security.id),
           ),
         });
+        if (
+          existingHoldingBySource &&
+          existingHoldingBySecurity &&
+          existingHoldingBySource.id !== existingHoldingBySecurity.id
+        ) {
+          throw new Error(
+            `Brokerage holding ${sourceHolding.symbol} has conflicting source and security mappings. Resolve the draft before confirming.`,
+          );
+        }
+        if (
+          existingHoldingBySecurity?.importSourceProvider &&
+          !isSameBrokerageLineage(
+            existingHoldingBySecurity,
+            sourceProvider,
+            sourceAccountId,
+          )
+        ) {
+          throw new Error(
+            `Brokerage holding ${sourceHolding.symbol} is already linked to another provider account. Resolve the source mapping before syncing.`,
+          );
+        }
+        const existingHolding =
+          existingHoldingBySource ?? existingHoldingBySecurity;
         const sourceAvgCostPerShareAmount = sourceHolding.avgCostPerShare ?? null;
         const sourceCostBasisAmount =
           sourceHolding.costBasis ??
@@ -4546,6 +4666,13 @@ export async function confirmBrokerageImportDraft(
           gainLossPct:
             typeof gainLossPct === "number" ? gainLossPct.toFixed(2) : gainLossPct,
           weightPct: "0.00",
+          importSourceProvider: sourceProvider,
+          importSourceAccountId: sourceAccountId,
+          importSourceHoldingKey: sourceHoldingKey,
+          importStatus: "active",
+          importSyncedAt: new Date(),
+          importClosedAt: null,
+          importCloseReason: null,
           assetClassOverride: existingHolding?.assetClassOverride ?? null,
           sectorOverride: existingHolding?.sectorOverride ?? null,
           securityTypeOverride: isOtherAsset
@@ -4607,6 +4734,28 @@ export async function confirmBrokerageImportDraft(
           ),
         });
         for (const staleHolding of existingAccountHoldings) {
+          const isImportedFromSameSource = isSameBrokerageLineage(
+            staleHolding,
+            sourceProvider,
+            sourceAccountId,
+          );
+          const isLegacyImportedHolding =
+            !staleHolding.importSourceProvider &&
+            !staleHolding.importSourceAccountId &&
+            (isSameBrokerageLineage(accountRow, sourceProvider, sourceAccountId) ||
+              accountRow.nickname === nickname);
+          if (!isImportedFromSameSource && !isLegacyImportedHolding) {
+            continue;
+          }
+          if (staleHolding.importStatus === "closed") {
+            continue;
+          }
+          if (
+            staleHolding.importSourceHoldingKey &&
+            activeHoldingKeys.has(staleHolding.importSourceHoldingKey)
+          ) {
+            continue;
+          }
           if (!staleHolding.securityId || activeSecurityIds.has(staleHolding.securityId)) {
             continue;
           }
@@ -4627,6 +4776,11 @@ export async function confirmBrokerageImportDraft(
                   ? "0.00"
                   : String(staleHolding.gainLossPct),
               weightPct: "0.00",
+              importSourceProvider: sourceProvider,
+              importSourceAccountId: sourceAccountId,
+              importStatus: "closed",
+              importClosedAt: new Date(),
+              importCloseReason: "snapshot_replace_missing",
               updatedAt: new Date(),
             })
             .where(eq(holdingPositions.id, staleHolding.id));

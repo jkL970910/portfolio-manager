@@ -47,10 +47,12 @@ String? _draftIdFallbackFromResponse(Map<String, dynamic>? data) {
 class ImportPage extends StatefulWidget {
   const ImportPage({
     required this.apiClient,
+    this.initialGuide,
     super.key,
   });
 
   final LooApiClient apiClient;
+  final String? initialGuide;
 
   @override
   State<ImportPage> createState() => _ImportPageState();
@@ -99,8 +101,12 @@ class _ImportPageState extends State<ImportPage> {
         return;
       }
       final onboarding = MobileOnboardingState.fromJson(data);
-      if (onboarding.skippedAll ||
-          onboarding.coachStatusFor("import") != "pending") {
+      final forceGuide = widget.initialGuide == "import";
+      if (!forceGuide &&
+          (onboarding.skippedAll ||
+              onboarding.completed ||
+              onboarding.statusFor("importAssets") == "completed" ||
+              onboarding.coachStatusFor("import") != "pending")) {
         return;
       }
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -113,18 +119,21 @@ class _ImportPageState extends State<ImportPage> {
             steps: [
               LooCoachStep(
                 targetKey: _heroCoachKey,
-                title: "进贡先预览",
-                body: "这里显示已经入账的账户和持仓。券商同步也会先生成草稿，不会直接写入。",
+                title: "上贡先验货",
+                body:
+                    "陛下，所有资产进国库前都先在这里验货。券商同步也只会生成草稿，臣不会擅自把任何持仓写进账本。",
               ),
               LooCoachStep(
                 targetKey: _entryCoachKey,
-                title: "选择上贡方式",
-                body: "手动上贡适合少量修正；券商同步适合 IBKR 或 Wealthsimple 的批量导入。",
+                title: "挑一条上贡路",
+                body:
+                    "少量修正可手动上贡；IBKR 或 Wealthsimple 这类大批账册，走券商同步更稳。确认前都能先看草稿。",
               ),
               LooCoachStep(
                 targetKey: _vaultCoachKey,
-                title: "确认国库",
-                body: "写入后的账户会集中在这里。后续如果重复或错误，可在账户详情内处理。",
+                title: "核准后才入库",
+                body:
+                    "写入后的账户会在这里列队。若后续发现重复或错账，再进账户详情合并、删除或修正。",
               ),
             ],
             onCompleted: () => widget.apiClient.updateOnboarding({
@@ -746,7 +755,11 @@ class _AccountVaultCardState extends State<_AccountVaultCard> {
                     ],
                   ),
                 ),
-                _ImportPill("$itemCount 个账户"),
+                _ImportPill(
+                  cashAccounts.isEmpty
+                      ? "${accounts.length} 个投资账户"
+                      : "${accounts.length} 投资 · ${cashAccounts.length} 现金",
+                ),
                 const SizedBox(width: 8),
                 AnimatedRotation(
                   turns: _expanded ? 0.5 : 0,
@@ -1333,10 +1346,10 @@ class _IbkrFlexPreviewSheetState extends State<_IbkrFlexPreviewSheet> {
                   const SizedBox(height: 16),
                   TextFormField(
                     controller: _tokenController,
-                    decoration: const InputDecoration(
-                      labelText: "授权口令（Flex Token）",
-                      helperText: "报告 → Flex 查询 → Flex 网页服务设置",
-                    ),
+                      decoration: const InputDecoration(
+                        labelText: "授权口令（Flex Token）",
+                        helperText: "报表和税务 → 活动报表 → Flex Web Service Configuration",
+                      ),
                     obscureText: true,
                     validator: (value) =>
                         value == null || value.trim().length < 8
@@ -1440,12 +1453,16 @@ class _IbkrSetupGuideCard extends StatelessWidget {
   Widget build(BuildContext context) {
     const steps = [
       (
+        title: "0. 打开 IBKR 客户端门户",
+        body: "先在浏览器或 IBKR app 登录 Client Portal（客户端门户）：interactivebrokers.com → Log In → Client Portal。进入后从左侧菜单打开“报表和税务”，再进入“活动报表”。",
+      ),
+      (
         title: "1. 生成授权口令",
-        body: "业绩与报告 → 自主查询 → 自主网络服务配置，确认状态为“已启用”，进入齿轮后复制“授权口令 / Token”。",
+        body: "在“活动报表”页切到 Flex Queries。找到 Flex Web Service Configuration，确认 Flex Web Service Status 为 Enabled，点击齿轮后复制“授权口令 / Token”。",
       ),
       (
         title: "2. 创建活动 Flex 查询",
-        body: "在“活动自主查询”右上角点 +，新建查询。格式选 XML，保存后不要填查询名称，要复制数字“查询编号 / Query ID”。",
+        body: "在 Activity Flex Query 右上角点 + 新建查询。格式选 XML，保存后复制该查询右侧箭头/运行入口对应的数字“查询编号 / Query ID”。",
       ),
       (
         title: "3. 必选报表字段",

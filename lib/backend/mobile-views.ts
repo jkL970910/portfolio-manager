@@ -106,6 +106,7 @@ type MobilePortfolioOverviewData = {
   displayContext: PortfolioData["displayContext"];
   performance: PortfolioData["performance"];
   chartSeries?: PortfolioData["chartSeries"];
+  buyingPower: PortfolioData["buyingPower"];
   accountTypeAllocation: PortfolioData["accountTypeAllocation"];
   accountInstanceAllocation: PortfolioData["accountInstanceAllocation"];
   assetClassDrilldown: PortfolioData["assetClassDrilldown"];
@@ -122,6 +123,7 @@ type MobilePortfolioOverviewData = {
     room: string;
     topHoldings: string[];
   }>;
+  cashAccounts: PortfolioData["cashAccounts"];
   holdings: Array<{
     id: string;
     symbol: string;
@@ -794,6 +796,7 @@ function mapMobilePortfolioOverviewData(
     displayContext: payload.data.displayContext,
     performance: payload.data.performance,
     chartSeries: payload.data.chartSeries,
+    buyingPower: payload.data.buyingPower,
     accountTypeAllocation: payload.data.accountTypeAllocation,
     accountInstanceAllocation: payload.data.accountInstanceAllocation,
     assetClassDrilldown: payload.data.assetClassDrilldown,
@@ -810,6 +813,7 @@ function mapMobilePortfolioOverviewData(
       room: account.room,
       topHoldings: account.topHoldings,
     })),
+    cashAccounts: payload.data.cashAccounts,
     holdings: payload.data.holdings.map((holding) => ({
       id: holding.id,
       securityId: holding.securityId,

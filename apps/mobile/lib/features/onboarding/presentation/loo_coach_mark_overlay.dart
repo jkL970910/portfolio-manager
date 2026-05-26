@@ -81,7 +81,7 @@ class _LooCoachMarkDialogState extends State<_LooCoachMarkDialog> {
         initialKeyContext,
         duration: const Duration(milliseconds: 260),
         curve: Curves.easeOutCubic,
-        alignment: 0.12,
+        alignment: 0.42,
       );
       await Future<void>.delayed(const Duration(milliseconds: 80));
     }

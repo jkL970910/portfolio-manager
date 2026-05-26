@@ -48,9 +48,16 @@ List<String> _parseTextList(String value, {int max = 20}) {
 }
 
 class InvestmentPreferencesCard extends StatefulWidget {
-  const InvestmentPreferencesCard({required this.apiClient, super.key});
+  const InvestmentPreferencesCard({
+    required this.apiClient,
+    this.preferencesGuideKey,
+    this.registeredRoomGuideKey,
+    super.key,
+  });
 
   final LooApiClient apiClient;
+  final GlobalKey? preferencesGuideKey;
+  final GlobalKey? registeredRoomGuideKey;
 
   @override
   State<InvestmentPreferencesCard> createState() =>
@@ -98,6 +105,16 @@ class _InvestmentPreferencesCardState extends State<InvestmentPreferencesCard> {
     });
   }
 
+  Future<void> _markPreferencesOnboardingCompleted() async {
+    try {
+      await widget.apiClient.updateOnboarding({
+        "checklist": {"preferences": "completed"},
+      });
+    } catch (_) {
+      // Preference saving remains valid; onboarding progress can refresh later.
+    }
+  }
+
   Future<void> _openEditor(MobilePreferenceProfile profile) async {
     final saved = await showModalBottomSheet<bool>(
       context: context,
@@ -108,6 +125,8 @@ class _InvestmentPreferencesCardState extends State<InvestmentPreferencesCard> {
       ),
     );
     if (saved == true && mounted) {
+      await _markPreferencesOnboardingCompleted();
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("投资偏好已保存，推荐逻辑会使用新规则。")),
       );
@@ -125,6 +144,8 @@ class _InvestmentPreferencesCardState extends State<InvestmentPreferencesCard> {
       ),
     );
     if (saved == true && mounted) {
+      await _markPreferencesOnboardingCompleted();
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("引导式投资偏好已应用。")),
       );
@@ -142,6 +163,8 @@ class _InvestmentPreferencesCardState extends State<InvestmentPreferencesCard> {
       ),
     );
     if (saved == true && mounted) {
+      await _markPreferencesOnboardingCompleted();
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("候选池治理已保存，下一次 Loo皇推荐会读取新边界。")),
       );
@@ -159,6 +182,8 @@ class _InvestmentPreferencesCardState extends State<InvestmentPreferencesCard> {
       ),
     );
     if (saved == true && mounted) {
+      await _markPreferencesOnboardingCompleted();
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("进阶偏好已保存，V2.1 推荐会读取这些参数。")),
       );
@@ -253,24 +278,27 @@ class _InvestmentPreferencesCardState extends State<InvestmentPreferencesCard> {
                 const SizedBox(height: 8),
                 Text(profile.summary),
                 const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Expanded(
-                      child: FilledButton.icon(
-                        onPressed: () => _openGuidedSetup(profile),
-                        icon: const Icon(Icons.auto_awesome),
-                        label: const Text("新手引导"),
+                KeyedSubtree(
+                  key: widget.preferencesGuideKey,
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: FilledButton.icon(
+                          onPressed: () => _openGuidedSetup(profile),
+                          icon: const Icon(Icons.auto_awesome),
+                          label: const Text("新手引导"),
+                        ),
                       ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        onPressed: () => _openManualAdvancedEditor(profile),
-                        icon: const Icon(Icons.tune),
-                        label: const Text("手动进阶"),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: () => _openManualAdvancedEditor(profile),
+                          icon: const Icon(Icons.tune),
+                          label: const Text("手动进阶"),
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
                 const SizedBox(height: 10),
                 Text("已应用参数摘要", style: Theme.of(context).textTheme.titleMedium),
@@ -289,9 +317,12 @@ class _InvestmentPreferencesCardState extends State<InvestmentPreferencesCard> {
                   ],
                 ),
                 const SizedBox(height: 12),
-                _RegisteredRoomSummaryCard(
-                  registeredRooms: registeredRooms,
-                  onEdit: () => _openRegisteredRoomEditor(registeredRooms),
+                KeyedSubtree(
+                  key: widget.registeredRoomGuideKey,
+                  child: _RegisteredRoomSummaryCard(
+                    registeredRooms: registeredRooms,
+                    onEdit: () => _openRegisteredRoomEditor(registeredRooms),
+                  ),
                 ),
                 const SizedBox(height: 10),
                 Text("进阶偏好：${profile.preferenceFactors.summary}"),

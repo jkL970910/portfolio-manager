@@ -103,6 +103,9 @@ function mapAccount(
       row.contributionRoomCad == null
         ? null
         : toNumber(row.contributionRoomCad),
+    importSourceProvider: row.importSourceProvider ?? null,
+    importSourceAccountId: row.importSourceAccountId ?? null,
+    lastImportedAt: row.lastImportedAt?.toISOString() ?? null,
   };
 }
 
@@ -803,6 +806,13 @@ export const postgresRepositories: BackendRepositories = {
             lastQuoteErrorCode: row.lastQuoteErrorCode ?? null,
             lastQuoteErrorMessage: row.lastQuoteErrorMessage ?? null,
             marketDataRefreshRunId: row.marketDataRefreshRunId ?? null,
+            importSourceProvider: row.importSourceProvider ?? null,
+            importSourceAccountId: row.importSourceAccountId ?? null,
+            importSourceHoldingKey: row.importSourceHoldingKey ?? null,
+            importStatus: row.importStatus ?? null,
+            importSyncedAt: row.importSyncedAt?.toISOString() ?? null,
+            importClosedAt: row.importClosedAt?.toISOString() ?? null,
+            importCloseReason: row.importCloseReason ?? null,
             weightPct: toNumber(row.weightPct),
             gainLossPct: toNumber(row.gainLossPct),
             createdAt: row.createdAt.toISOString(),
@@ -1861,6 +1871,63 @@ export const postgresRepositories: BackendRepositories = {
       }
       return mapExternalResearchDocument(row);
     },
+    async createGlobal(input) {
+      const db = getDb();
+      const values = {
+        userId: null,
+        providerDocumentId: input.providerDocumentId,
+        sourceType: input.sourceType,
+        providerId: input.providerId,
+        sourceName: input.sourceName,
+        title: input.title,
+        summary: input.summary,
+        url: input.url,
+        publishedAt: input.publishedAt ? new Date(input.publishedAt) : null,
+        capturedAt: new Date(input.capturedAt),
+        expiresAt: new Date(input.expiresAt),
+        language: input.language,
+        securityId: input.security?.securityId ?? null,
+        symbol: input.security?.symbol ?? null,
+        exchange: input.security?.exchange ?? null,
+        currency: input.security?.currency ?? null,
+        securityName: input.security?.name ?? null,
+        securityProvider: input.security?.provider ?? null,
+        securityType: input.security?.securityType ?? null,
+        underlyingId: input.underlyingId,
+        confidence: input.confidence,
+        sentiment: input.sentiment,
+        relevanceScore: input.relevanceScore,
+        sourceReliability: input.sourceReliability,
+        keyPoints: input.keyPoints,
+        riskFlags: input.riskFlags,
+        tags: input.tags,
+        rawPayload: input.rawPayload,
+      };
+      const existing = await db.query.externalResearchDocuments.findFirst({
+        where: and(
+          isNull(externalResearchDocuments.userId),
+          eq(externalResearchDocuments.providerId, input.providerId),
+          eq(
+            externalResearchDocuments.providerDocumentId,
+            input.providerDocumentId,
+          ),
+        ),
+      });
+      const [row] = existing
+        ? await db
+            .update(externalResearchDocuments)
+            .set({
+              ...values,
+              updatedAt: new Date(),
+            })
+            .where(eq(externalResearchDocuments.id, existing.id))
+            .returning()
+        : await db.insert(externalResearchDocuments).values(values).returning();
+      if (!row) {
+        throw new Error("Failed to persist global external research document.");
+      }
+      return mapExternalResearchDocument(row);
+    },
     async listFreshByUserId(userId, params) {
       const db = getDb();
       const symbol = params.symbol?.trim().toUpperCase() || null;
@@ -1887,12 +1954,40 @@ export const postgresRepositories: BackendRepositories = {
               : undefined;
       const rows = await db.query.externalResearchDocuments.findMany({
         where: and(
-          eq(externalResearchDocuments.userId, userId),
+          identityFilter || params.underlyingId
+            ? eq(externalResearchDocuments.userId, userId)
+            : or(
+                eq(externalResearchDocuments.userId, userId),
+                and(
+                  isNull(externalResearchDocuments.userId),
+                  eq(externalResearchDocuments.sourceType, "news"),
+                  isNull(externalResearchDocuments.securityId),
+                  isNull(externalResearchDocuments.symbol),
+                ),
+              ),
           gt(externalResearchDocuments.expiresAt, params.now),
           identityFilter,
           params.underlyingId
             ? eq(externalResearchDocuments.underlyingId, params.underlyingId)
             : undefined,
+        ),
+        orderBy: [
+          desc(externalResearchDocuments.relevanceScore),
+          desc(externalResearchDocuments.capturedAt),
+        ],
+        limit: Math.min(Math.max(Math.trunc(params.limit), 1), 50),
+      });
+      return rows.map(mapExternalResearchDocument);
+    },
+    async listFreshGlobalNews(params) {
+      const db = getDb();
+      const rows = await db.query.externalResearchDocuments.findMany({
+        where: and(
+          isNull(externalResearchDocuments.userId),
+          eq(externalResearchDocuments.sourceType, "news"),
+          isNull(externalResearchDocuments.securityId),
+          isNull(externalResearchDocuments.symbol),
+          gt(externalResearchDocuments.expiresAt, params.now),
         ),
         orderBy: [
           desc(externalResearchDocuments.relevanceScore),

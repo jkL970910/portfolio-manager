@@ -11,6 +11,38 @@ class MobileRoutes {
   static const importFlow = "/import";
   static const settings = "/settings";
 
+  static String recommendationsGuide(String guide) {
+    final trimmed = guide.trim();
+    if (trimmed.isEmpty) {
+      return recommendations;
+    }
+    return "$recommendations?guide=${_encode(trimmed)}";
+  }
+
+  static String importGuide(String guide) {
+    final trimmed = guide.trim();
+    if (trimmed.isEmpty) {
+      return importFlow;
+    }
+    return "$importFlow?guide=${_encode(trimmed)}";
+  }
+
+  static String portfolioHealthGuide(String guide) {
+    final trimmed = guide.trim();
+    if (trimmed.isEmpty) {
+      return portfolioHealth;
+    }
+    return "$portfolioHealth?guide=${_encode(trimmed)}";
+  }
+
+  static String settingsGuide(String guide) {
+    final trimmed = guide.trim();
+    if (trimmed.isEmpty) {
+      return settings;
+    }
+    return "$settings?guide=${_encode(trimmed)}";
+  }
+
   static String accountDetail(String accountId) {
     return "/portfolio/accounts/${_encode(accountId)}";
   }

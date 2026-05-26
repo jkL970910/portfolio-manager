@@ -256,10 +256,87 @@ test("daily intelligence hides local fallback cards when external news exists", 
   assert.ok(response.data.items.some((item) => item.sourceType === "news"));
 });
 
+test("daily intelligence shares global overview news across users", async () => {
+  const now = new Date("2026-05-25T13:00:00.000Z");
+  await mockRepositories.externalResearchDocuments.createGlobal({
+    providerDocumentId: "alpha-vantage-news:macro:shared",
+    sourceType: "news",
+    providerId: "alpha-vantage-news",
+    sourceName: "Alpha Vantage News",
+    title: "Global markets weigh rate expectations",
+    summary: "A shared market news item should be read by every user.",
+    url: "https://example.com/global-markets",
+    publishedAt: "2026-05-25T12:00:00.000Z",
+    capturedAt: now.toISOString(),
+    expiresAt: "2099-05-26T13:00:00.000Z",
+    language: "en",
+    security: null,
+    underlyingId: null,
+    confidence: "high",
+    sentiment: "neutral",
+    relevanceScore: 82,
+    sourceReliability: 74,
+    keyPoints: ["Rate expectations changed across markets."],
+    riskFlags: ["News is background information, not a trading signal."],
+    tags: ["news", "alpha-vantage", "macro"],
+    rawPayload: {},
+  });
+
+  const firstUser = await getMobileDailyIntelligenceView(
+    "daily_intel_global_user_1",
+    8,
+  );
+  const secondUser = await getMobileDailyIntelligenceView(
+    "daily_intel_global_user_2",
+    8,
+  );
+
+  assert.ok(
+    firstUser.data.items.some((item) =>
+      item.title.includes("Global markets"),
+    ),
+  );
+  assert.ok(
+    secondUser.data.items.some((item) =>
+      item.title.includes("Global markets"),
+    ),
+  );
+  assert.ok(
+    firstUser.data.items.every((item) => !item.id.startsWith("sentiment:")),
+  );
+  assert.ok(
+    secondUser.data.items.every((item) => !item.id.startsWith("sentiment:")),
+  );
+});
+
 test("daily intelligence returns at least three market pulse cards without research cache", async () => {
+  await mockRepositories.externalResearchDocuments.createGlobal({
+    providerDocumentId: "alpha-vantage-news:macro:expired",
+    sourceType: "news",
+    providerId: "alpha-vantage-news",
+    sourceName: "Expired Global News",
+    title: "Expired global macro news",
+    summary: "Expired news should not suppress market pulse fallback.",
+    url: "https://example.com/expired",
+    publishedAt: "2026-05-20T12:00:00.000Z",
+    capturedAt: "2026-05-20T13:00:00.000Z",
+    expiresAt: "2026-05-21T13:00:00.000Z",
+    language: "en",
+    security: null,
+    underlyingId: null,
+    confidence: "high",
+    sentiment: "neutral",
+    relevanceScore: 99,
+    sourceReliability: 74,
+    keyPoints: ["Expired point."],
+    riskFlags: [],
+    tags: ["news", "macro"],
+    rawPayload: {},
+  });
   const response = await getMobileDailyIntelligenceView(
     "daily_intel_empty_user",
     8,
+    new Date("2100-05-22T13:00:00.000Z"),
   );
 
   assert.ok(response.data.items.length >= 3);

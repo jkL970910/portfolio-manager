@@ -5,6 +5,8 @@ import "../../shared/data/mobile_models.dart";
 class MobilePortfolioSnapshot {
   const MobilePortfolioSnapshot({
     required this.accounts,
+    required this.cashAccounts,
+    required this.buyingPower,
     required this.holdings,
     required this.securityHoldings,
     required this.quoteStatus,
@@ -20,6 +22,8 @@ class MobilePortfolioSnapshot {
   });
 
   final List<MobileAccountCard> accounts;
+  final List<MobilePortfolioCashAccount> cashAccounts;
+  final MobilePortfolioBuyingPower buyingPower;
   final List<MobileHoldingCard> holdings;
   final List<MobileHoldingCard> securityHoldings;
   final String quoteStatus;
@@ -139,6 +143,10 @@ class MobilePortfolioSnapshot {
       accounts: readJsonList(json, "accountCards")
           .map(MobileAccountCard.fromJson)
           .toList(),
+      cashAccounts: readJsonList(json, "cashAccounts")
+          .map(MobilePortfolioCashAccount.fromJson)
+          .toList(),
+      buyingPower: MobilePortfolioBuyingPower.fromJson(json["buyingPower"]),
       holdings: readJsonList(json, "holdings")
           .map(MobileHoldingCard.fromJson)
           .toList(),
@@ -184,6 +192,8 @@ class MobilePortfolioSnapshot {
     return MobilePortfolioSnapshot(
       accounts:
           accounts.where((account) => account.typeId == accountType).toList(),
+      cashAccounts: cashAccounts,
+      buyingPower: buyingPower,
       holdings: holdings
           .where((holding) => holding.accountType == accountType)
           .toList(),
@@ -198,6 +208,68 @@ class MobilePortfolioSnapshot {
       accountTypeAllocation: accountTypeAllocation,
       accountInstanceAllocation: accountInstanceAllocation,
       assetClassDrilldown: assetClassDrilldown,
+    );
+  }
+}
+
+class MobilePortfolioCashAccount {
+  const MobilePortfolioCashAccount({
+    required this.id,
+    required this.name,
+    required this.institution,
+    required this.currency,
+    required this.value,
+    required this.detail,
+  });
+
+  final String id;
+  final String name;
+  final String institution;
+  final String currency;
+  final String value;
+  final String detail;
+
+  factory MobilePortfolioCashAccount.fromJson(Map<String, dynamic> json) {
+    return MobilePortfolioCashAccount(
+      id: json["id"] as String? ?? "",
+      name: json["name"] as String? ?? "现金账户",
+      institution: json["institution"] as String? ?? "",
+      currency: json["currency"] as String? ?? "CAD",
+      value: json["value"] as String? ?? "--",
+      detail: json["detail"] as String? ?? "",
+    );
+  }
+}
+
+class MobilePortfolioBuyingPower {
+  const MobilePortfolioBuyingPower({
+    required this.label,
+    required this.value,
+    required this.detail,
+    required this.confidence,
+  });
+
+  final String label;
+  final String value;
+  final String detail;
+  final String confidence;
+
+  bool get hasCash => confidence != "low" && value != "--";
+
+  factory MobilePortfolioBuyingPower.fromJson(dynamic json) {
+    if (json is! Map<String, dynamic>) {
+      return const MobilePortfolioBuyingPower(
+        label: "Buying Power",
+        value: "--",
+        detail: "尚未添加现金账户。",
+        confidence: "low",
+      );
+    }
+    return MobilePortfolioBuyingPower(
+      label: json["label"] as String? ?? "Buying Power",
+      value: json["value"] as String? ?? "--",
+      detail: json["detail"] as String? ?? "",
+      confidence: json["confidence"] as String? ?? "low",
     );
   }
 }

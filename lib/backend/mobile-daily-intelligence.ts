@@ -601,13 +601,14 @@ export async function getDailyIntelligenceItemsForUser(
 export async function getMobileDailyIntelligenceView(
   userId: string,
   limit = 8,
+  now = new Date(),
 ) {
   const policy = getExternalResearchPolicy();
-  const items = await getDailyIntelligenceItemsForUser(userId, limit);
+  const items = await getDailyIntelligenceItemsForUser(userId, limit, now);
 
   return apiSuccess<DailyIntelligenceData>(
     {
-      generatedAt: new Date().toISOString(),
+      generatedAt: now.toISOString(),
       policy: {
         manualTriggerOnly: !policy.scheduledOverviewEnabled,
         scheduledOverviewEnabled: policy.scheduledOverviewEnabled,

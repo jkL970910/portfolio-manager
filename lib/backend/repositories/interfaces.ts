@@ -309,6 +309,12 @@ export interface ExternalResearchDocumentRepository {
   create(
     input: Omit<ExternalResearchDocumentRecord, "id" | "createdAt" | "updatedAt">,
   ): Promise<ExternalResearchDocumentRecord>;
+  createGlobal(
+    input: Omit<
+      ExternalResearchDocumentRecord,
+      "id" | "userId" | "createdAt" | "updatedAt"
+    >,
+  ): Promise<ExternalResearchDocumentRecord>;
   listFreshByUserId(
     userId: EntityId,
     params: {
@@ -321,6 +327,10 @@ export interface ExternalResearchDocumentRepository {
       underlyingId?: string | null;
     },
   ): Promise<ExternalResearchDocumentRecord[]>;
+  listFreshGlobalNews(params: {
+    now: Date;
+    limit: number;
+  }): Promise<ExternalResearchDocumentRecord[]>;
 }
 
 export interface MarketSentimentSnapshotRepository {

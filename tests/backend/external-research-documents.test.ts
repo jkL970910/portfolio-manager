@@ -206,3 +206,64 @@ test("external research document repository upserts and lists fresh identity-sco
   assert.equal(fresh[0]?.title, "Updated title");
   assert.equal(fresh[0]?.relevanceScore, 90);
 });
+
+test("external research document repository shares global macro news without leaking user documents", async () => {
+  await mockRepositories.externalResearchDocuments.createGlobal({
+    providerDocumentId: "global_news_1",
+    sourceType: "news",
+    providerId: "alpha-vantage-news",
+    sourceName: "Global News",
+    title: "Shared macro news",
+    summary: "This macro news item is global.",
+    url: "https://example.com/global",
+    publishedAt: "2026-05-25T10:00:00.000Z",
+    capturedAt: "2026-05-25T10:05:00.000Z",
+    expiresAt: "2099-05-26T10:00:00.000Z",
+    language: "en",
+    security: null,
+    underlyingId: null,
+    confidence: "high",
+    sentiment: "neutral",
+    relevanceScore: 88,
+    sourceReliability: 80,
+    keyPoints: ["Shared market background."],
+    riskFlags: [],
+    tags: ["news", "macro"],
+    rawPayload: {},
+  });
+  await mockRepositories.externalResearchDocuments.create({
+    userId: "user_doc_private",
+    providerDocumentId: "private_doc_1",
+    sourceType: "institutional",
+    providerId: "alpha-vantage-profile",
+    sourceName: "Private Profile",
+    title: "Private user profile",
+    summary: "This should not leak to another user.",
+    url: null,
+    publishedAt: null,
+    capturedAt: "2026-05-25T10:05:00.000Z",
+    expiresAt: "2099-05-26T10:00:00.000Z",
+    language: "en",
+    security: null,
+    underlyingId: null,
+    confidence: "medium",
+    sentiment: "neutral",
+    relevanceScore: 90,
+    sourceReliability: 70,
+    keyPoints: [],
+    riskFlags: [],
+    tags: ["profile"],
+    rawPayload: {},
+  });
+
+  const visible = await mockRepositories.externalResearchDocuments.listFreshByUserId(
+    "user_doc_other",
+    {
+      now: new Date("2026-05-25T12:00:00.000Z"),
+      limit: 10,
+    },
+  );
+
+  assert.ok(visible.some((item) => item.title === "Shared macro news"));
+  assert.ok(!visible.some((item) => item.title === "Private user profile"));
+});

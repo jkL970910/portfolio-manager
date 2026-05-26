@@ -2636,6 +2636,21 @@ export function buildDashboardData(args: {
               : PRIORITY_BADGE_VARIANTS.later,
         href: `/portfolio/account/${account.id}`,
       })),
+    cashAccounts: [...cashAccounts]
+      .sort((left, right) => right.currentBalanceCad - left.currentBalanceCad)
+      .map((account) => ({
+        id: account.id,
+        name: account.nickname || account.institution || pick(language, "现金账户", "Cash account"),
+        institution: account.institution,
+        currency: account.currency,
+        value: formatDisplayCurrency(account.currentBalanceCad, display),
+        detail: pick(
+          language,
+          `${account.institution} · ${account.currency} · Buying Power`,
+          `${account.institution} · ${account.currency} · Buying Power`,
+        ),
+        updatedAt: account.updatedAt,
+      })),
     drift: drift.map((item) => ({
       assetClass: getAssetClassLabel(item.assetClass, language),
       current: formatCompactPercent(item.current, 0),
@@ -2739,6 +2754,7 @@ export function buildPortfolioData(args: {
   language: DisplayLanguage;
   accounts: InvestmentAccount[];
   holdings: HoldingPosition[];
+  cashAccounts?: CashAccount[];
   portfolioEvents?: PortfolioEvent[];
   priceHistory?: SecurityPriceHistoryPoint[];
   snapshots?: PortfolioSnapshot[];
@@ -2750,6 +2766,7 @@ export function buildPortfolioData(args: {
     language,
     accounts,
     holdings,
+    cashAccounts = [],
     portfolioEvents = [],
     priceHistory = [],
     snapshots = [],
@@ -2774,6 +2791,11 @@ export function buildPortfolioData(args: {
     display,
   });
   const totalPortfolio = sum(accounts.map((account) => account.marketValueCad));
+  const buyingPower = buildBuyingPowerSummary({
+    cashAccounts,
+    display,
+    language,
+  });
   const replayedPortfolioPerformance = buildReplayedAggregateValueSeries({
     holdings,
     priceHistory,
@@ -3205,6 +3227,22 @@ export function buildPortfolioData(args: {
     accountInstanceAllocation,
     assetClassDrilldown,
     accountCards,
+    cashAccounts: [...cashAccounts]
+      .sort((left, right) => right.currentBalanceCad - left.currentBalanceCad)
+      .map((account) => ({
+        id: account.id,
+        name: account.nickname || account.institution || pick(language, "现金账户", "Cash account"),
+        institution: account.institution,
+        currency: account.currency,
+        value: formatDisplayCurrency(account.currentBalanceCad, display),
+        detail: pick(
+          language,
+          `${account.institution} · ${account.currency} · Buying Power`,
+          `${account.institution} · ${account.currency} · Buying Power`,
+        ),
+        updatedAt: account.updatedAt,
+      })),
+    buyingPower,
     accountContexts,
     sectorExposure,
     quoteStatus: getPortfolioQuoteStatus(holdings, language),

@@ -151,6 +151,8 @@ class _PortfolioPageState extends State<PortfolioPage> {
                         _AccountsDropdownCard(
                           key: _accountsKey,
                           accounts: snapshot.data!.accounts,
+                          cashAccounts: snapshot.data!.cashAccounts,
+                          buyingPower: snapshot.data!.buyingPower,
                           onOpenAccount: (account) async {
                             final changed = await context.push<bool>(
                               MobileRoutes.accountDetail(account.id),
@@ -869,11 +871,15 @@ class _PortfolioTrendCard extends StatelessWidget {
 class _AccountsDropdownCard extends StatefulWidget {
   const _AccountsDropdownCard({
     required this.accounts,
+    required this.cashAccounts,
+    required this.buyingPower,
     required this.onOpenAccount,
     super.key,
   });
 
   final List<MobileAccountCard> accounts;
+  final List<MobilePortfolioCashAccount> cashAccounts;
+  final MobilePortfolioBuyingPower buyingPower;
   final ValueChanged<MobileAccountCard> onOpenAccount;
 
   @override
@@ -886,6 +892,7 @@ class _AccountsDropdownCardState extends State<_AccountsDropdownCard> {
   @override
   Widget build(BuildContext context) {
     final tokens = context.looTokens;
+    final totalBuckets = widget.accounts.length + widget.cashAccounts.length;
     return LooGlassCard(
       padding: EdgeInsets.all(tokens.gapMd),
       child: AnimatedSize(
@@ -913,7 +920,9 @@ class _AccountsDropdownCardState extends State<_AccountsDropdownCard> {
                           ),
                           SizedBox(height: tokens.gapXs),
                           Text(
-                            "展开查看账户，点击单个账户进入详情。",
+                            widget.buyingPower.hasCash
+                                ? "投资账户可进入详情；现金账户汇入 Buying Power。"
+                                : "展开查看投资账户，点击单个账户进入详情。",
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis,
                             style:
@@ -929,7 +938,7 @@ class _AccountsDropdownCardState extends State<_AccountsDropdownCard> {
                       crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
                         Text(
-                          "${widget.accounts.length} 个",
+                          "$totalBuckets 个",
                           style: Theme.of(context).textTheme.titleLarge,
                         ),
                         SizedBox(height: tokens.gapXs),
@@ -963,15 +972,80 @@ class _AccountsDropdownCardState extends State<_AccountsDropdownCard> {
                   ),
                 )
               else
-                ...widget.accounts.map(
-                  (account) => _CompactAccountRow(
-                    account: account,
-                    onTap: () => widget.onOpenAccount(account),
+                ...[
+                  ...widget.accounts.map(
+                    (account) => _CompactAccountRow(
+                      account: account,
+                      onTap: () => widget.onOpenAccount(account),
+                    ),
                   ),
-                ),
+                  if (widget.cashAccounts.isNotEmpty) ...[
+                    SizedBox(height: tokens.gapXs),
+                    ...widget.cashAccounts.map(_CashBalanceRow.new),
+                  ],
+                ],
             ],
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _CashBalanceRow extends StatelessWidget {
+  const _CashBalanceRow(this.account);
+
+  final MobilePortfolioCashAccount account;
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = context.looTokens;
+    return Container(
+      padding: EdgeInsets.symmetric(
+        horizontal: tokens.gapSm,
+        vertical: tokens.gapSm,
+      ),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(tokens.radiusSm),
+        border: Border.all(color: tokens.cardBorder),
+      ),
+      child: Row(
+        children: [
+          const _EntryIcon(Icons.payments_outlined),
+          SizedBox(width: tokens.gapSm),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  account.name,
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        fontWeight: FontWeight.w800,
+                      ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  account.detail.isEmpty
+                      ? "已汇入 Buying Power，不作为普通持仓账户展示。"
+                      : account.detail,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: tokens.mutedText,
+                      ),
+                ),
+              ],
+            ),
+          ),
+          SizedBox(width: tokens.gapSm),
+          Text(
+            account.value,
+            style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                  fontWeight: FontWeight.w900,
+                ),
+          ),
+        ],
       ),
     );
   }

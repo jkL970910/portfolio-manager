@@ -83,6 +83,15 @@ export interface DashboardData {
     badgeVariant: "primary" | "success" | "warning" | "neutral";
     href: string;
   }[];
+  cashAccounts: {
+    id: string;
+    name: string;
+    institution: string;
+    currency: "CAD" | "USD";
+    value: string;
+    detail: string;
+    updatedAt: string;
+  }[];
   drift: {
     assetClass: string;
     current: string;
@@ -300,6 +309,8 @@ export interface PortfolioData {
     topHoldings: string[];
     href: string;
   }[];
+  cashAccounts: DashboardData["cashAccounts"];
+  buyingPower: DashboardData["buyingPower"];
   accountContexts: {
     id: string;
     name: string;

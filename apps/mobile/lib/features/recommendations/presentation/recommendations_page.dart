@@ -14,10 +14,12 @@ import "../data/mobile_recommendation_models.dart";
 class RecommendationsPage extends StatefulWidget {
   const RecommendationsPage({
     required this.apiClient,
+    this.initialGuide,
     super.key,
   });
 
   final LooApiClient apiClient;
+  final String? initialGuide;
 
   @override
   State<RecommendationsPage> createState() => _RecommendationsPageState();
@@ -65,7 +67,6 @@ class _RecommendationsPageState extends State<RecommendationsPage> {
     }
 
     final parsed = MobileRecommendationsSnapshot.fromJson(data);
-    _scheduleRecommendationCoachMarks();
     return parsed;
   }
 
@@ -201,7 +202,6 @@ class _RecommendationsPageState extends State<RecommendationsPage> {
     if (_coachScheduled || !mounted) {
       return;
     }
-    _coachScheduled = true;
     try {
       final response = await widget.apiClient.getOnboarding();
       final data = response["data"];
@@ -209,10 +209,15 @@ class _RecommendationsPageState extends State<RecommendationsPage> {
         return;
       }
       final onboarding = MobileOnboardingState.fromJson(data);
-      if (onboarding.skippedAll ||
-          onboarding.coachStatusFor("recommendations") != "pending") {
+      final forceGuide = widget.initialGuide == "recommendations";
+      if (!forceGuide &&
+          (onboarding.skippedAll ||
+              onboarding.completed ||
+              onboarding.statusFor("firstRecommendation") == "completed" ||
+              onboarding.coachStatusFor("recommendations") != "pending")) {
         return;
       }
+      _coachScheduled = true;
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) {
           return;
@@ -223,22 +228,29 @@ class _RecommendationsPageState extends State<RecommendationsPage> {
             steps: [
               LooCoachStep(
                 targetKey: _summaryCoachKey,
-                title: "进货预算",
-                body: "这里控制本次准备投入的银两，也可以进入搜货台主动查标的。",
+                title: "先报本轮银两",
+                body:
+                    "陛下先告诉臣这轮准备动用多少银两。预算一变，候选排序、账户适配和护栏都会跟着重算。",
               ),
               LooCoachStep(
                 targetKey: _recentCoachKey,
-                title: "近期观察",
-                body: "你最近看过的标的会在这里聚合去重，方便回到详情继续判断。",
+                title: "臣记下你看过的货",
+                body:
+                    "近期观察是陛下刚翻过的货架。系统会按完整身份去重，方便你回头继续看，不让裸 ticker 混进国库。",
               ),
               LooCoachStep(
                 targetKey: _priorityKey,
                 title: "Loo皇推荐",
-                body: "候选会按组合缺口、账户适配和护栏排序。展开后能查看推荐依据。",
+                body:
+                    "这里不是热榜，而是按组合缺口、账户适配、候选池规矩和护栏筛出的进货顺序。展开可看臣为何推荐或拦下它。",
+                beforeResolve: () => _prepareRecommendationCoachTarget(
+                  _priorityKey,
+                ),
               ),
             ],
             onCompleted: () => widget.apiClient.updateOnboarding({
               "coachMarks": {"recommendations": "completed"},
+              "checklist": {"firstRecommendation": "completed"},
             }),
             onSkipped: () => widget.apiClient.updateOnboarding({
               "coachMarks": {"recommendations": "skipped"},
@@ -249,6 +261,28 @@ class _RecommendationsPageState extends State<RecommendationsPage> {
     } catch (_) {
       // Onboarding should never block the recommendation page.
     }
+  }
+
+  Future<void> _prepareRecommendationCoachTarget(GlobalKey targetKey) async {
+    if (!_scrollController.hasClients) {
+      return;
+    }
+    final context = targetKey.currentContext;
+    if (context == null || !context.mounted) {
+      await _scrollController.animateTo(
+        _scrollController.position.maxScrollExtent,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeOutCubic,
+      );
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+      return;
+    }
+    await Scrollable.ensureVisible(
+      context,
+      duration: const Duration(milliseconds: 300),
+      curve: Curves.easeOutCubic,
+      alignment: 0.36,
+    );
   }
 
   @override
@@ -283,10 +317,12 @@ class _RecommendationsPageState extends State<RecommendationsPage> {
                     ),
                   )
                 else if (snapshot.hasData)
-                  SliverPadding(
-                    padding: looPagePadding(context),
-                    sliver: SliverList.list(
-                      children: [
+                  Builder(builder: (context) {
+                    unawaited(_scheduleRecommendationCoachMarks());
+                    return SliverPadding(
+                      padding: looPagePadding(context),
+                      sliver: SliverList.list(
+                        children: [
                         KeyedSubtree(
                           key: _summaryCoachKey,
                           child: _SummaryCard(
@@ -321,22 +357,21 @@ class _RecommendationsPageState extends State<RecommendationsPage> {
                           ),
                         ),
                         const SizedBox(height: 16),
-                        if (snapshot.data!.priorities.isEmpty)
-                          snapshot.data!.poolStatus.needsPolicyRelaxation
-                              ? _PoolPolicyEmptyCard(
-                                  status: snapshot.data!.poolStatus,
-                                  onOpenSettings: _openCandidatePoolSettings,
-                                )
-                              : const _EmptyCard(
-                                  "暂时没有新的推荐。先完成持仓导入，Loo皇会再下达谕令。",
-                                )
-                        else
-                          KeyedSubtree(
-                            key: _priorityKey,
-                            child: _PriorityWorkbench(
-                              priorities: snapshot.data!.priorities,
-                              onOpenSecurity: _openSecurityDetail,
-                            ),
+                        KeyedSubtree(
+                          key: _priorityKey,
+                          child: snapshot.data!.priorities.isEmpty
+                              ? snapshot.data!.poolStatus.needsPolicyRelaxation
+                                  ? _PoolPolicyEmptyCard(
+                                      status: snapshot.data!.poolStatus,
+                                      onOpenSettings: _openCandidatePoolSettings,
+                                    )
+                                  : const _EmptyCard(
+                                      "暂时没有新的推荐。先完成持仓导入，Loo皇会再下达谕令。",
+                                    )
+                              : _PriorityWorkbench(
+                                  priorities: snapshot.data!.priorities,
+                                  onOpenSecurity: _openSecurityDetail,
+                                ),
                           ),
                         const SizedBox(height: 16),
                         _RecommendationPoolVisibilityCard(
@@ -347,7 +382,8 @@ class _RecommendationsPageState extends State<RecommendationsPage> {
                         ),
                       ],
                     ),
-                  ),
+                    );
+                  }),
               ],
             ),
           ),

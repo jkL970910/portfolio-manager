@@ -3,6 +3,7 @@ import "package:flutter/material.dart";
 import "../../../core/api/loo_api_client.dart";
 import "../../../core/presentation/loo_components.dart";
 import "../../../core/theme/loo_theme.dart";
+import "../../onboarding/presentation/loo_coach_mark_overlay.dart";
 import "../data/market_data_refresh_models.dart";
 import "investment_preferences_card.dart";
 
@@ -15,6 +16,7 @@ class SettingsPage extends StatefulWidget {
     required this.onDisplayCurrencyChanged,
     required this.onThemeModeChanged,
     required this.onLogout,
+    this.initialGuide,
     super.key,
   });
 
@@ -25,6 +27,7 @@ class SettingsPage extends StatefulWidget {
   final Future<void> Function(String currency) onDisplayCurrencyChanged;
   final Future<void> Function(LooThemeMode mode) onThemeModeChanged;
   final VoidCallback onLogout;
+  final String? initialGuide;
 
   @override
   State<SettingsPage> createState() => _SettingsPageState();
@@ -33,12 +36,120 @@ class SettingsPage extends StatefulWidget {
 class _SettingsPageState extends State<SettingsPage> {
   late var _currency = widget.baseCurrency;
   late var _themeMode = widget.themeMode;
+  final _settingsScrollController = ScrollController();
+  final _identityGuideKey = GlobalKey();
+  final _preferencesGuideKey = GlobalKey();
+  final _preferencesActionGuideKey = GlobalKey();
+  final _aiMinisterGuideKey = GlobalKey();
+  final _aiMinisterActionGuideKey = GlobalKey();
+  final _registeredRoomGuideKey = GlobalKey();
+  var _guideShown = false;
   var _savingCurrency = false;
   var _refreshingQuotes = false;
   var _refreshingFx = false;
   String? _refreshResult;
   String? _fxRefreshResult;
   String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _showInitialGuide());
+  }
+
+  @override
+  void dispose() {
+    _settingsScrollController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _showInitialGuide() async {
+    if (_guideShown || widget.initialGuide == null || !mounted) {
+      return;
+    }
+    final guide = widget.initialGuide!;
+    final step = switch (guide) {
+      "identity" => LooCoachStep(
+          targetKey: _identityGuideKey,
+          title: "先把名号刻进玉牒",
+          body:
+              "陛下在这里定下称呼、头像、主题和显示币种。之后臣在各页奏报，都会按这份身份与口径呈现。",
+          beforeResolve: () => _prepareSettingsGuideTarget(
+            _identityGuideKey,
+            approximateOffset: 0,
+          ),
+        ),
+      "preferences" => LooCoachStep(
+          targetKey: _preferencesActionGuideKey,
+          title: "立下进货规矩",
+          body:
+              "这里是国库律令：风险胃口、账户顺序、候选池边界和偏好因子都在此立法。规矩越清楚，Loo皇推荐越不会跑偏。",
+          beforeResolve: () => _prepareSettingsGuideTarget(
+            _preferencesActionGuideKey,
+            approximateOffset: 260,
+          ),
+        ),
+      "registeredRoom" => LooCoachStep(
+          targetKey: _registeredRoomGuideKey,
+          title: "登记额度与银两",
+          body:
+              "TFSA、RRSP、FHSA 的额度是按账户类别共享的国库仓位，不属于某一家券商。登记清楚后，首页 buying power 和进货路线才有边界。",
+          beforeResolve: () => _prepareSettingsGuideTarget(
+            _registeredRoomGuideKey,
+            approximateOffset: 360,
+          ),
+        ),
+      "aiMinister" => LooCoachStep(
+          targetKey: _aiMinisterActionGuideKey,
+          title: "召请外部智囊",
+          body:
+              "这里放入 OpenRouter 或 OpenAI API Key。保存后，Loo皇深度思考与增强解读会使用你的外部额度；不配置也能继续用本地大臣轻量答疑。",
+          beforeResolve: () => _prepareSettingsGuideTarget(
+            _aiMinisterActionGuideKey,
+            approximateOffset: 700,
+          ),
+        ),
+      _ => null,
+    };
+    if (step == null) {
+      return;
+    }
+    _guideShown = true;
+    await showLooCoachMarks(
+      context: context,
+      steps: [step],
+      onCompleted: () async {},
+      onSkipped: () async {},
+    );
+  }
+
+  Future<void> _prepareSettingsGuideTarget(
+    GlobalKey targetKey, {
+    required double approximateOffset,
+  }) async {
+    if (!_settingsScrollController.hasClients) {
+      return;
+    }
+    final existingContext = targetKey.currentContext;
+    if (existingContext != null) {
+      await Scrollable.ensureVisible(
+        existingContext,
+        duration: const Duration(milliseconds: 260),
+        curve: Curves.easeOutCubic,
+        alignment: 0.36,
+      );
+      return;
+    }
+    await _settingsScrollController.animateTo(
+      approximateOffset.clamp(
+        0.0,
+        _settingsScrollController.position.maxScrollExtent,
+      ),
+      duration: const Duration(milliseconds: 300),
+      curve: Curves.easeOutCubic,
+    );
+    await WidgetsBinding.instance.endOfFrame;
+  }
 
   Future<void> _changeThemeMode(LooThemeMode mode) async {
     if (mode == _themeMode) return;
@@ -159,6 +270,7 @@ class _SettingsPageState extends State<SettingsPage> {
   @override
   Widget build(BuildContext context) {
     return SingleChildScrollView(
+      controller: _settingsScrollController,
       padding: looPagePadding(context, left: 24, top: 24, right: 24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -170,14 +282,17 @@ class _SettingsPageState extends State<SettingsPage> {
             style: Theme.of(context).textTheme.bodyMedium,
           ),
           const SizedBox(height: 14),
-          _SettingsSectionCard(
-            icon: Icons.badge_outlined,
-            title: "Loo国身份",
-            subtitle: "公民证件、爵位和住址",
-            initiallyExpanded: true,
-            children: [
-              _CitizenProfileCard(apiClient: widget.apiClient),
-            ],
+          KeyedSubtree(
+            key: _identityGuideKey,
+            child: _SettingsSectionCard(
+              icon: Icons.badge_outlined,
+              title: "Loo国身份",
+              subtitle: "公民证件、爵位和住址",
+              initiallyExpanded: true,
+              children: [
+                _CitizenProfileCard(apiClient: widget.apiClient),
+              ],
+            ),
           ),
           const SizedBox(height: 16),
           _SettingsSectionCard(
@@ -200,14 +315,22 @@ class _SettingsPageState extends State<SettingsPage> {
             ],
           ),
           const SizedBox(height: 16),
-          _SettingsSectionCard(
-            icon: Icons.tune_rounded,
-            title: "候选池治理",
-            subtitle: "风险偏好、税务偏好和推荐候选边界",
-            initiallyExpanded: false,
-            children: [
-              InvestmentPreferencesCard(apiClient: widget.apiClient),
-            ],
+          KeyedSubtree(
+            key: _preferencesGuideKey,
+            child: _SettingsSectionCard(
+              icon: Icons.tune_rounded,
+              title: "候选池治理",
+              subtitle: "风险偏好、税务偏好和推荐候选边界",
+              initiallyExpanded: widget.initialGuide == "registeredRoom" ||
+                  widget.initialGuide == "preferences",
+              children: [
+                InvestmentPreferencesCard(
+                  apiClient: widget.apiClient,
+                  preferencesGuideKey: _preferencesActionGuideKey,
+                  registeredRoomGuideKey: _registeredRoomGuideKey,
+                ),
+              ],
+            ),
           ),
           const SizedBox(height: 16),
           _SettingsSectionCard(
@@ -220,18 +343,24 @@ class _SettingsPageState extends State<SettingsPage> {
             ],
           ),
           const SizedBox(height: 16),
-          _SettingsSectionCard(
-            icon: Icons.smart_toy_outlined,
-            title: "AI 与大臣",
-            subtitle: "OpenRouter / OpenAI Key、Loo皇深度思考和调用状态",
-            initiallyExpanded: false,
-            children: [
-              _AiMinisterSettingsCard(apiClient: widget.apiClient),
-              const SizedBox(height: 12),
-              _DataAiCapabilitiesCard(apiClient: widget.apiClient),
-              const SizedBox(height: 12),
-              _RecentAnalysisCard(apiClient: widget.apiClient),
-            ],
+          KeyedSubtree(
+            key: _aiMinisterGuideKey,
+            child: _SettingsSectionCard(
+              icon: Icons.smart_toy_outlined,
+              title: "AI 与大臣",
+              subtitle: "OpenRouter / OpenAI Key、Loo皇深度思考和调用状态",
+              initiallyExpanded: widget.initialGuide == "aiMinister",
+              children: [
+                _AiMinisterSettingsCard(
+                  apiClient: widget.apiClient,
+                  guideKey: _aiMinisterActionGuideKey,
+                ),
+                const SizedBox(height: 12),
+                _DataAiCapabilitiesCard(apiClient: widget.apiClient),
+                const SizedBox(height: 12),
+                _RecentAnalysisCard(apiClient: widget.apiClient),
+              ],
+            ),
           ),
           const SizedBox(height: 16),
           _SettingsSectionCard(
@@ -1263,9 +1392,13 @@ class _CitizenProfileView {
 }
 
 class _AiMinisterSettingsCard extends StatefulWidget {
-  const _AiMinisterSettingsCard({required this.apiClient});
+  const _AiMinisterSettingsCard({
+    required this.apiClient,
+    this.guideKey,
+  });
 
   final LooApiClient apiClient;
+  final GlobalKey? guideKey;
 
   @override
   State<_AiMinisterSettingsCard> createState() =>
@@ -1332,6 +1465,14 @@ class _AiMinisterSettingsCardState extends State<_AiMinisterSettingsCard> {
       final payload =
           data is Map<String, dynamic> ? data : const <String, dynamic>{};
       if (mounted) {
+        if (apiKey.isNotEmpty && !clearApiKey) {
+          await widget.apiClient.updateOnboarding({
+            "checklist": {"aiMinister": "completed"},
+          });
+          if (!mounted) {
+            return;
+          }
+        }
         setState(() {
           _apiKeyController.clear();
           _modelController.clear();
@@ -1474,14 +1615,17 @@ class _AiMinisterSettingsCardState extends State<_AiMinisterSettingsCard> {
                   ),
                 ),
                 const SizedBox(height: 10),
-                TextField(
-                  controller: _apiKeyController,
-                  obscureText: true,
-                  decoration: InputDecoration(
-                    labelText: settings.provider == "openrouter-compatible"
-                        ? "Router API Key"
-                        : "OpenAI API Key",
-                    helperText: "只保存到后端加密存储；不会写入 Flutter 客户端。",
+                KeyedSubtree(
+                  key: widget.guideKey,
+                  child: TextField(
+                    controller: _apiKeyController,
+                    obscureText: true,
+                    decoration: InputDecoration(
+                      labelText: settings.provider == "openrouter-compatible"
+                          ? "Router API Key"
+                          : "OpenAI API Key",
+                      helperText: "只保存到后端加密存储；不会写入 Flutter 客户端。",
+                    ),
                   ),
                 ),
                 const SizedBox(height: 10),

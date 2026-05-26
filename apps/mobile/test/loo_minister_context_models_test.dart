@@ -197,6 +197,13 @@ void main() {
   test("builds portfolio minister context from typed portfolio snapshot", () {
     const snapshot = MobilePortfolioSnapshot(
       accounts: [],
+      cashAccounts: [],
+      buyingPower: MobilePortfolioBuyingPower(
+        label: "Buying Power",
+        value: "--",
+        detail: "尚未添加现金账户。",
+        confidence: "low",
+      ),
       holdings: [],
       securityHoldings: [],
       quoteStatus: "报价刚刚刷新",

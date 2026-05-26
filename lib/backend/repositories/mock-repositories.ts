@@ -766,12 +766,46 @@ export const mockRepositories: BackendRepositories = {
       externalResearchDocuments.unshift(document);
       return document;
     },
+    async createGlobal(input) {
+      const existing = externalResearchDocuments.find(
+        (document) =>
+          document.userId === null &&
+          document.providerId === input.providerId &&
+          document.providerDocumentId === input.providerDocumentId,
+      );
+      const now = new Date().toISOString();
+      if (existing) {
+        Object.assign(existing, input, { userId: null, updatedAt: now });
+        return existing;
+      }
+      const document: ExternalResearchDocumentRecord = {
+        id: `external_research_document_${externalResearchDocuments.length + 1}`,
+        userId: null,
+        createdAt: now,
+        updatedAt: now,
+        ...input,
+      };
+      externalResearchDocuments.unshift(document);
+      return document;
+    },
     async listFreshByUserId(userId, params) {
       const symbol = params.symbol?.trim().toUpperCase() || null;
       const exchange = params.exchange?.trim().toUpperCase() || null;
       const currency = params.currency?.trim().toUpperCase() || null;
+      const hasIdentityFilter = Boolean(params.securityId || symbol);
       return externalResearchDocuments
-        .filter((document) => document.userId === userId)
+        .filter((document) => {
+          if (document.userId === userId) {
+            return true;
+          }
+          return (
+            !hasIdentityFilter &&
+            !params.underlyingId &&
+            document.userId === null &&
+            document.sourceType === "news" &&
+            !document.security
+          );
+        })
         .filter((document) => Date.parse(document.expiresAt) > params.now.getTime())
         .filter((document) => {
           const securityIdMatches = params.securityId
@@ -796,6 +830,18 @@ export const mockRepositories: BackendRepositories = {
             ? document.underlyingId === params.underlyingId
             : true,
         )
+        .sort((left, right) => right.relevanceScore - left.relevanceScore)
+        .slice(0, Math.min(Math.max(Math.trunc(params.limit), 1), 50));
+    },
+    async listFreshGlobalNews(params) {
+      return externalResearchDocuments
+        .filter(
+          (document) =>
+            document.userId === null &&
+            document.sourceType === "news" &&
+            !document.security,
+        )
+        .filter((document) => Date.parse(document.expiresAt) > params.now.getTime())
         .sort((left, right) => right.relevanceScore - left.relevanceScore)
         .slice(0, Math.min(Math.max(Math.trunc(params.limit), 1), 50));
     },

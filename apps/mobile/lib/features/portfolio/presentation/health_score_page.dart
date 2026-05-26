@@ -5,6 +5,7 @@ import "../../../app/mobile_routes.dart";
 import "../../../core/api/loo_api_client.dart";
 import "../../../core/presentation/loo_components.dart";
 import "../../../core/theme/loo_theme.dart";
+import "../../onboarding/presentation/loo_coach_mark_overlay.dart";
 import "../../shared/data/loo_minister_context_models.dart";
 import "../../shared/data/mobile_models.dart";
 import "../../shared/presentation/loo_charts.dart";
@@ -17,12 +18,14 @@ class HealthScorePage extends StatefulWidget {
     required this.apiClient,
     this.accountId,
     this.fallbackTitle = "健康巡查",
+    this.initialGuide,
     super.key,
   });
 
   final LooApiClient apiClient;
   final String? accountId;
   final String fallbackTitle;
+  final String? initialGuide;
 
   @override
   State<HealthScorePage> createState() => _HealthScorePageState();
@@ -30,6 +33,9 @@ class HealthScorePage extends StatefulWidget {
 
 class _HealthScorePageState extends State<HealthScorePage> {
   late Future<MobileHealthSnapshot> _snapshot;
+  final _summaryCoachKey = GlobalKey();
+  final _briefingCoachKey = GlobalKey();
+  var _coachScheduled = false;
 
   @override
   void initState() {
@@ -54,8 +60,45 @@ class _HealthScorePageState extends State<HealthScorePage> {
           asOf: DateTime.now().toUtc().toIso8601String(),
         ),
       );
+      _scheduleHealthCoachMarks();
     }
     return snapshot;
+  }
+
+  void _scheduleHealthCoachMarks() {
+    if (_coachScheduled || widget.initialGuide != "health") {
+      return;
+    }
+    _coachScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        return;
+      }
+      showLooCoachMarks(
+        context: context,
+        steps: [
+          LooCoachStep(
+            targetKey: _summaryCoachKey,
+            title: "请 Loo皇巡阅",
+            body:
+                "这里是国库巡阅台。总分先告诉你国库是否稳，最强与最弱维度则提示臣该先守哪里、补哪里。",
+          ),
+          LooCoachStep(
+            targetKey: _briefingCoachKey,
+            title: "读 Loo皇批注",
+            body:
+                "臣已把优先行动和巡阅细节折进批注里。先读一句摘要，想追根究底再展开，不必被满屏报告淹没。",
+          ),
+        ],
+        onCompleted: () => widget.apiClient.updateOnboarding({
+          "coachMarks": {"health": "completed"},
+          "checklist": {"healthReview": "completed"},
+        }),
+        onSkipped: () => widget.apiClient.updateOnboarding({
+          "coachMarks": {"health": "skipped"},
+        }),
+      );
+    });
   }
 
   void _refresh() {
@@ -98,7 +141,10 @@ class _HealthScorePageState extends State<HealthScorePage> {
               child: ListView(
                 padding: const EdgeInsets.fromLTRB(20, 12, 20, 28),
                 children: [
-                  _SummaryCard(data),
+                  KeyedSubtree(
+                    key: _summaryCoachKey,
+                    child: _SummaryCard(data),
+                  ),
                   if (data.recommendationBridge != null) ...[
                     const SizedBox(height: 12),
                     _RecommendationBridgeCard(
@@ -107,10 +153,13 @@ class _HealthScorePageState extends State<HealthScorePage> {
                     ),
                   ],
                   const SizedBox(height: 12),
-                  _LooHealthBriefingCard(
-                    data: data,
-                    apiClient: widget.apiClient,
-                    accountId: widget.accountId,
+                  KeyedSubtree(
+                    key: _briefingCoachKey,
+                    child: _LooHealthBriefingCard(
+                      data: data,
+                      apiClient: widget.apiClient,
+                      accountId: widget.accountId,
+                    ),
                   ),
                   if (data.dimensions.isNotEmpty) ...[
                     const SizedBox(height: 16),

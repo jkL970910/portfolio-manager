@@ -656,57 +656,48 @@ export async function enqueueDailyOverviewExternalResearchJobs(
     .limit(maxUsers);
   result.usersChecked = userRows.length;
 
-  for (const user of userRows) {
-    let queuedForUser = 0;
-    if (sourceId === "news") {
-      const freshNewsDocuments =
-        await repositories.externalResearchDocuments.listFreshByUserId(
-          user.id,
-          {
-            now,
-            limit: 10,
-          },
-        );
-      const hasFreshMacroNews = freshNewsDocuments.some(
-        (document) => document.sourceType === "news" && !document.security,
-      );
-      if (!hasFreshMacroNews) {
-        try {
-          await enqueueExternalResearchJob(
-            user.id,
-            {
-              scope: "portfolio",
-              mode: "quick",
-              cacheStrategy: "prefer-cache",
-              maxCacheAgeSeconds,
-              includeExternalResearch: true,
-            },
-            now,
-            { sourceIds: [sourceId], priority: 6 },
-          );
-          queuedForUser += 1;
-          result.queuedJobs += 1;
-        } catch (error) {
-          const message =
-            error instanceof Error
-              ? error.message
-              : "Failed to enqueue daily overview market news.";
-          result.errors.push(`market-news: ${message}`);
-          if (/daily limit/i.test(message)) {
-            continue;
-          }
-        }
-      } else {
-        result.skippedFresh += 1;
-      }
-
-      // Overview news is a portfolio-level feed. Do not fan out news jobs to
-      // individual holdings: TSX ETFs/CDRs often return empty provider payloads
-      // and they waste the shared Alpha Vantage quota without improving the
-      // user-facing "Loo国今日秘闻" card.
-      continue;
+  if (sourceId === "news") {
+    const freshGlobalNews =
+      await repositories.externalResearchDocuments.listFreshGlobalNews({
+        now,
+        limit: 10,
+      });
+    if (freshGlobalNews.length > 0) {
+      result.skippedFresh += 1;
+      return result;
     }
 
+    const seedUser = userRows[0];
+    if (!seedUser) {
+      return result;
+    }
+
+    try {
+      await enqueueExternalResearchJob(
+        seedUser.id,
+        {
+          scope: "portfolio",
+          mode: "quick",
+          cacheStrategy: "prefer-cache",
+          maxCacheAgeSeconds,
+          includeExternalResearch: true,
+        },
+        now,
+        { sourceIds: [sourceId], priority: 6 },
+      );
+      result.queuedJobs += 1;
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Failed to enqueue daily overview market news.";
+      result.errors.push(`market-news: ${message}`);
+    }
+    return result;
+  }
+
+  for (const user of userRows) {
+    let queuedForUser = 0;
     const holdings = await db
       .select({
         securityId: holdingPositions.securityId,
@@ -923,9 +914,13 @@ async function persistExternalResearchDocuments(args: {
   const repositories = getRepositories();
   return Promise.all(
     documents.map((document) =>
-      repositories.externalResearchDocuments.create(
-        mapExternalResearchDocumentForPersistence(args.userId, document),
-      ),
+      document.sourceType === "news" && !document.security
+        ? repositories.externalResearchDocuments.createGlobal(
+            mapExternalResearchDocumentForPersistence(args.userId, document),
+          )
+        : repositories.externalResearchDocuments.create(
+            mapExternalResearchDocumentForPersistence(args.userId, document),
+          ),
     ),
   );
 }

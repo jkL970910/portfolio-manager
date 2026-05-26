@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  getMobileViewerFromRequest,
   issueMobileAuthTokens,
   rotateMobileRefreshToken,
   verifyMobileRefreshToken,
@@ -43,4 +44,16 @@ test("mobile logout revokes the current refresh token", async () => {
     () => verifyMobileRefreshToken(tokens.refreshToken),
     /revoked|invalid/i,
   );
+});
+
+test("mobile API auth does not fall back to browser cookie sessions", async () => {
+  const request = {
+    headers: {
+      get() {
+        return null;
+      },
+    },
+  };
+
+  assert.equal(await getMobileViewerFromRequest(request as never), null);
 });

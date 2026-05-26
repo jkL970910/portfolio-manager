@@ -39,9 +39,10 @@ class _OverviewPageState extends State<OverviewPage> {
   late Future<MobileHomeSnapshot> _snapshot;
   late Future<MobileDailyIntelligenceSnapshot> _dailyIntelligence;
   final _scrollController = ScrollController();
-  final _summaryCoachKey = GlobalKey();
+  final _welcomeCoachKey = GlobalKey();
+  final _healthCoachKey = GlobalKey();
   final _intelligenceCoachKey = GlobalKey();
-  final _accountsCoachKey = GlobalKey();
+  final _onboardingChecklistKey = GlobalKey<OnboardingChecklistCardState>();
   var _coachScheduled = false;
 
   @override
@@ -53,6 +54,7 @@ class _OverviewPageState extends State<OverviewPage> {
 
   @override
   void dispose() {
+    LooMinisterScope.setFloatingVisible(context, true);
     _scrollController.dispose();
     super.dispose();
   }
@@ -66,6 +68,7 @@ class _OverviewPageState extends State<OverviewPage> {
 
     final snapshot = MobileHomeSnapshot.fromJson(data);
     if (mounted) {
+      LooMinisterScope.setFloatingVisible(context, true);
       LooMinisterScope.report(
         context,
         snapshot.toMinisterContext(
@@ -91,26 +94,33 @@ class _OverviewPageState extends State<OverviewPage> {
         context: context,
         steps: [
           LooCoachStep(
-            targetKey: _summaryCoachKey,
-            title: "国库总览",
-            body: "这里看总资产、健康分、buying power 和主要入口。",
+            targetKey: _welcomeCoachKey,
+            title: "臣在此恭迎入境",
+            body:
+                "陛下，这里不是冷冰冰的记账表，而是你的私人国库。臣会先把账户、持仓、额度和可进货候选整理成一张国库地图，再陪你巡查哪里稳、哪里漏风。",
+          ),
+          if (LooMinisterScope.floatingButtonKeyOf(context) != null)
+            LooCoachStep(
+              targetKey: LooMinisterScope.floatingButtonKeyOf(context)!,
+              title: "殿前随时问大臣",
+              body:
+                  "右下角这枚“问大臣”会跟随当前页面。看不懂分数、卡片或某支标的时，直接召臣来解释；臣只按你当前页面和国库上下文回答，不会替你擅自下单。",
+            ),
+          LooCoachStep(
+            targetKey: _healthCoachKey,
+            title: "点开印玺，看见内情",
+            body:
+                "健康分、组合占比这类小印玺不是装饰。轻点一下，就能展开雷达图、比例图和国库巡查结论。",
           ),
           LooCoachStep(
             targetKey: _intelligenceCoachKey,
-            title: "Loo国秘闻",
-            body: "这里是每日市场摘要，不是单个标的买卖指令。",
+            title: "每日秘闻，先由臣筛过",
+            body:
+                "这里是臣每日整理好的市场风向。横滑可快速扫过重点，展开可看原文、影响领域和 Loo皇总结；陛下不用自己翻新闻海。",
             beforeResolve: () => _prepareLazyCoachTarget(
               _intelligenceCoachKey,
               approximateOffset: 760,
-            ),
-          ),
-          LooCoachStep(
-            targetKey: _accountsCoachKey,
-            title: "账户入口",
-            body: "这里进入单个账户和持仓明细。",
-            beforeResolve: () => _prepareLazyCoachTarget(
-              _accountsCoachKey,
-              approximateOffset: 1180,
+              waitForAsyncContent: true,
             ),
           ),
         ],
@@ -127,17 +137,32 @@ class _OverviewPageState extends State<OverviewPage> {
   Future<void> _prepareLazyCoachTarget(
     GlobalKey targetKey, {
     required double approximateOffset,
+    bool waitForAsyncContent = false,
   }) async {
     if (!_scrollController.hasClients) {
       return;
     }
+    if (waitForAsyncContent) {
+      try {
+        await _dailyIntelligence;
+      } catch (_) {
+        // The card still renders its error state, so it remains a valid target.
+      }
+      if (!mounted) {
+        return;
+      }
+      await WidgetsBinding.instance.endOfFrame;
+    }
     final existingContext = targetKey.currentContext;
     if (existingContext != null) {
+      if (!existingContext.mounted) {
+        return;
+      }
       await Scrollable.ensureVisible(
         existingContext,
         duration: const Duration(milliseconds: 260),
         curve: Curves.easeOutCubic,
-        alignment: 0.12,
+        alignment: 0.36,
       );
       return;
     }
@@ -174,6 +199,23 @@ class _OverviewPageState extends State<OverviewPage> {
     _refresh();
   }
 
+  Future<void> _markOnboardingStepCompleted(String stepKey) async {
+    try {
+      await widget.apiClient.updateOnboarding({
+        "checklist": {stepKey: "completed"},
+      });
+      _onboardingChecklistKey.currentState?.markSyncFinished(stepKey);
+    } catch (error) {
+      _onboardingChecklistKey.currentState?.markSyncFailed(stepKey);
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("开国任务状态保存失败：$error")),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return FutureBuilder<MobileHomeSnapshot>(
@@ -187,12 +229,15 @@ class _OverviewPageState extends State<OverviewPage> {
               physics: const AlwaysScrollableScrollPhysics(),
               slivers: [
                 SliverToBoxAdapter(
-                  child: _PageHeader(
-                    title: "Loo国总览",
-                    subtitle: snapshot.hasData
-                        ? "欢迎回来，${snapshot.data!.viewerName}"
-                        : "正在召集 Loo 国财政大臣...",
-                    profile: snapshot.data?.citizenProfile,
+                  child: KeyedSubtree(
+                    key: _welcomeCoachKey,
+                    child: _PageHeader(
+                      title: "Loo国总览",
+                      subtitle: snapshot.hasData
+                          ? "欢迎回来，${snapshot.data!.viewerName}"
+                          : "正在召集 Loo 国财政大臣...",
+                      profile: snapshot.data?.citizenProfile,
+                    ),
                   ),
                 ),
                 if (snapshot.connectionState == ConnectionState.waiting)
@@ -209,7 +254,6 @@ class _OverviewPageState extends State<OverviewPage> {
                     sliver: SliverList.list(
                       children: [
                         KeyedSubtree(
-                          key: _summaryCoachKey,
                           child: _OverviewSummaryPanel(
                             snapshot.data!,
                             onOpenHealth: _openHealthScore,
@@ -218,19 +262,37 @@ class _OverviewPageState extends State<OverviewPage> {
                               snapshot.data!.topHoldings,
                             ),
                             onOpenRecommendations: widget.onOpenRecommendations,
+                            healthCoachKey: _healthCoachKey,
                           ),
                         ),
                         if (snapshot.data!.onboarding.shouldShowChecklist) ...[
                           const SizedBox(height: 18),
                           OnboardingChecklistCard(
+                            key: _onboardingChecklistKey,
                             state: snapshot.data!.onboarding,
-                            onOpenSettings: () =>
-                                context.push(MobileRoutes.settings),
+                            onOpenIdentitySettings: () => context.push(
+                              MobileRoutes.settingsGuide("identity"),
+                            ),
+                            onOpenPreferenceSettings: () => context.push(
+                              MobileRoutes.settingsGuide("preferences"),
+                            ),
+                            onOpenAiMinisterSettings: () => context.push(
+                              MobileRoutes.settingsGuide("aiMinister"),
+                            ),
+                            onOpenRegisteredRoomSettings: () => context.push(
+                              MobileRoutes.settingsGuide("registeredRoom"),
+                            ),
                             onOpenImport: () =>
-                                context.push(MobileRoutes.importFlow),
-                            onOpenHealth: _openHealthScore,
-                            onOpenRecommendations:
-                                widget.onOpenRecommendations ?? () {},
+                                context.push(MobileRoutes.importGuide("import")),
+                            onOpenHealth: () => context.push(
+                              MobileRoutes.portfolioHealthGuide("health"),
+                            ),
+                            onOpenRecommendations: () => context.push(
+                              MobileRoutes.recommendationsGuide(
+                                  "recommendations"),
+                            ),
+                            onMarkCompleted: _markOnboardingStepCompleted,
+                            onAllCompleted: _refresh,
                             onSkip: _skipOnboarding,
                           ),
                         ],
@@ -271,23 +333,20 @@ class _OverviewPageState extends State<OverviewPage> {
                           ),
                         ),
                         const SizedBox(height: 18),
-                        KeyedSubtree(
-                          key: _accountsCoachKey,
-                          child: Column(
-                            children: [
-                              _SectionTitle(
-                                  title: "账户入口",
-                                  actionLabel: "前往账户",
-                                  onAction: widget.onOpenAccounts),
-                              const SizedBox(height: 10),
-                              ...snapshot.data!.accounts.map(
-                                (account) => _AccountTile(
-                                  account,
-                                  onTap: () => _openAccountDetail(account),
-                                ),
+                        Column(
+                          children: [
+                            _SectionTitle(
+                                title: "账户入口",
+                                actionLabel: "前往账户",
+                                onAction: widget.onOpenAccounts),
+                            const SizedBox(height: 10),
+                            ...snapshot.data!.accounts.map(
+                              (account) => _AccountTile(
+                                account,
+                                onTap: () => _openAccountDetail(account),
                               ),
-                            ],
-                          ),
+                            ),
+                          ],
                         ),
                       ],
                     ),
@@ -476,6 +535,7 @@ class _OverviewSummaryPanel extends StatelessWidget {
     required this.onOpenHoldings,
     required this.onShowHoldingsShare,
     required this.onOpenRecommendations,
+    required this.healthCoachKey,
   });
 
   final MobileHomeSnapshot snapshot;
@@ -483,6 +543,7 @@ class _OverviewSummaryPanel extends StatelessWidget {
   final VoidCallback? onOpenHoldings;
   final VoidCallback onShowHoldingsShare;
   final VoidCallback? onOpenRecommendations;
+  final GlobalKey healthCoachKey;
 
   @override
   Widget build(BuildContext context) {
@@ -529,12 +590,15 @@ class _OverviewSummaryPanel extends StatelessWidget {
               const SizedBox(width: 12),
               Expanded(
                 flex: 4,
-                child: _CompactHealthCard(
-                  score: health?.value ?? snapshot.health.score,
-                  status: health?.detail.isNotEmpty == true
-                      ? health!.detail
-                      : snapshot.health.status,
-                  onTap: onOpenHealth,
+                child: KeyedSubtree(
+                  key: healthCoachKey,
+                  child: _CompactHealthCard(
+                    score: health?.value ?? snapshot.health.score,
+                    status: health?.detail.isNotEmpty == true
+                        ? health!.detail
+                        : snapshot.health.status,
+                    onTap: onOpenHealth,
+                  ),
                 ),
               ),
             ],
@@ -1827,9 +1891,9 @@ class _MarketPulseDistributionPage extends StatelessWidget {
         const SizedBox(height: 10),
         Expanded(
           child: indicators.isEmpty
-              ? Center(
-                  child: Text(
-                    "真实指标暂不可用，等待下一次后台刷新。",
+                ? Center(
+                    child: Text(
+                    "巡查指标暂未生成，稍后再来即可查看。",
                     style: theme.textTheme.bodySmall?.copyWith(
                       color: context.looTokens.mutedText,
                     ),

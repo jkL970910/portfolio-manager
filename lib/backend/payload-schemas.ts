@@ -14,6 +14,7 @@ const mobileOnboardingStatusSchema = z.enum([
 const mobileOnboardingChecklistKeySchema = z.enum([
   "identity",
   "preferences",
+  "aiMinister",
   "registeredRoom",
   "importAssets",
   "healthReview",

@@ -75,6 +75,9 @@ export interface InvestmentAccount {
   marketValueAmount?: number;
   marketValueCad: number;
   contributionRoomCad: number | null;
+  importSourceProvider?: string | null;
+  importSourceAccountId?: string | null;
+  lastImportedAt?: string | null;
 }
 
 export interface RegisteredAccountRoom {
@@ -92,6 +95,7 @@ export type MobileOnboardingStatus = "pending" | "completed" | "skipped";
 export type MobileOnboardingChecklistKey =
   | "identity"
   | "preferences"
+  | "aiMinister"
   | "registeredRoom"
   | "importAssets"
   | "healthReview"
@@ -157,6 +161,13 @@ export interface HoldingPosition {
   lastQuoteErrorCode?: string | null;
   lastQuoteErrorMessage?: string | null;
   marketDataRefreshRunId?: string | null;
+  importSourceProvider?: string | null;
+  importSourceAccountId?: string | null;
+  importSourceHoldingKey?: string | null;
+  importStatus?: string | null;
+  importSyncedAt?: string | null;
+  importClosedAt?: string | null;
+  importCloseReason?: string | null;
   weightPct: number;
   gainLossPct: number;
   createdAt?: string | null;
@@ -689,7 +700,7 @@ export interface ExternalResearchUsageCounter {
 
 export interface ExternalResearchDocumentRecord {
   id: EntityId;
-  userId: EntityId;
+  userId: EntityId | null;
   providerDocumentId: string;
   sourceType: "market-data" | "news" | "forum" | "institutional" | "manual";
   providerId: string;

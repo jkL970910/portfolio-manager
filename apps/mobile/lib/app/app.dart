@@ -45,6 +45,7 @@ class _LooWealthAppState extends State<LooWealthApp> {
   final _navigatorKey = GlobalKey<NavigatorState>();
   final _ministerAnalysisAction =
       ValueNotifier<LooMinisterSuggestedAction?>(null);
+  final _ministerFloatingButtonKey = GlobalKey();
 
   MobileAuthSession? _session;
   LooMinisterPageContext? _ministerContext;
@@ -52,6 +53,7 @@ class _LooWealthAppState extends State<LooWealthApp> {
   Future<String?>? _refreshInFlight;
   var _themeMode = LooThemeMode.dark;
   var _showRegister = false;
+  var _showMinisterFloatingButton = true;
   var _loading = true;
 
   @override
@@ -155,6 +157,20 @@ class _LooWealthAppState extends State<LooWealthApp> {
     });
   }
 
+  Future<void> _setInteractiveSession(MobileAuthSession session) async {
+    await _setSession(session);
+    if (!mounted) {
+      return;
+    }
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        return;
+      }
+      _router.go(MobileRoutes.overview);
+    });
+  }
+
   Future<void> _setThemeMode(LooThemeMode mode) async {
     await _themeStore.save(mode);
     if (!mounted) return;
@@ -182,6 +198,15 @@ class _LooWealthAppState extends State<LooWealthApp> {
     setState(() {
       _ministerContext = pageContext;
       _recentMinisterSubjects = _updatedRecentMinisterSubjects(pageContext);
+    });
+  }
+
+  void _setMinisterFloatingVisible(bool visible) {
+    if (!mounted || _showMinisterFloatingButton == visible) {
+      return;
+    }
+    setState(() {
+      _showMinisterFloatingButton = visible;
     });
   }
 
@@ -475,6 +500,7 @@ class _LooWealthAppState extends State<LooWealthApp> {
               accountId:
                   accountId == null || accountId.isEmpty ? null : accountId,
               fallbackTitle: "健康巡查",
+              initialGuide: state.uri.queryParameters["guide"],
             );
           },
         ),
@@ -498,7 +524,10 @@ class _LooWealthAppState extends State<LooWealthApp> {
           builder: (context, state) => _buildRootShell(
             context,
             currentIndex: 2,
-            child: RecommendationsPage(apiClient: _currentApiClient),
+            child: RecommendationsPage(
+              apiClient: _currentApiClient,
+              initialGuide: state.uri.queryParameters["guide"],
+            ),
           ),
         ),
         GoRoute(
@@ -512,7 +541,10 @@ class _LooWealthAppState extends State<LooWealthApp> {
           builder: (context, state) => _buildRootShell(
             context,
             currentIndex: 3,
-            child: ImportPage(apiClient: _currentApiClient),
+            child: ImportPage(
+              apiClient: _currentApiClient,
+              initialGuide: state.uri.queryParameters["guide"],
+            ),
           ),
         ),
         GoRoute(
@@ -528,6 +560,7 @@ class _LooWealthAppState extends State<LooWealthApp> {
               onDisplayCurrencyChanged: _setDisplayCurrency,
               onThemeModeChanged: _setThemeMode,
               onLogout: _logout,
+              initialGuide: state.uri.queryParameters["guide"],
             ),
           ),
         ),
@@ -602,18 +635,24 @@ class _LooWealthAppState extends State<LooWealthApp> {
 
       return LooMinisterScope(
         onContextChanged: _setMinisterContext,
+        onFloatingVisibilityChanged: _setMinisterFloatingVisible,
         analysisActionListenable: _ministerAnalysisAction,
+        floatingButtonKey: _ministerFloatingButtonKey,
         child: Stack(
           children: [
             Positioned.fill(child: currentChild),
-            LooMinisterFloatingButton(
-              apiClient: apiClient,
-              navigatorKey: _navigatorKey,
-              pageContext: _ministerContext ?? _fallbackMinisterContext,
-              recentSubjects: _recentMinisterSubjects,
-              suggestedQuestion: _suggestedMinisterQuestion,
-              onSuggestedActionConfirmed: _requestMinisterAnalysisAction,
-            ),
+            if (_showMinisterFloatingButton)
+              KeyedSubtree(
+                key: _ministerFloatingButtonKey,
+                child: LooMinisterFloatingButton(
+                  apiClient: apiClient,
+                  navigatorKey: _navigatorKey,
+                  pageContext: _ministerContext ?? _fallbackMinisterContext,
+                  recentSubjects: _recentMinisterSubjects,
+                  suggestedQuestion: _suggestedMinisterQuestion,
+                  onSuggestedActionConfirmed: _requestMinisterAnalysisAction,
+                ),
+              ),
           ],
         ),
       );
@@ -631,13 +670,13 @@ class _LooWealthAppState extends State<LooWealthApp> {
             ? const _StartupScreen()
             : (_showRegister
                 ? RegisterPage(
-                    onAuthenticated: _setSession,
+                    onAuthenticated: _setInteractiveSession,
                     onBackToLogin: () => setState(() {
                       _showRegister = false;
                     }),
                   )
                 : LoginPage(
-                    onAuthenticated: _setSession,
+                    onAuthenticated: _setInteractiveSession,
                     onOpenRegister: () => setState(() {
                       _showRegister = true;
                     }),
