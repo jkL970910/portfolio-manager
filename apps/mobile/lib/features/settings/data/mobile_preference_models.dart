@@ -14,10 +14,17 @@ const kPreferenceRiskPresets = {
     "Cash": 10,
   },
   "Growth": {
-    "Canadian Equity": 16,
-    "US Equity": 42,
-    "International Equity": 22,
+    "Canadian Equity": 10,
+    "US Equity": 50,
+    "International Equity": 25,
     "Fixed Income": 10,
+    "Cash": 5,
+  },
+  "Aggressive": {
+    "Canadian Equity": 5,
+    "US Equity": 65,
+    "International Equity": 15,
+    "Fixed Income": 5,
     "Cash": 10,
   },
 };
@@ -51,6 +58,7 @@ class MobilePreferenceProfile {
 
   String get riskProfileLabel => switch (riskProfile) {
         "Conservative" => "保守",
+        "Aggressive" => "进攻",
         "Growth" => "成长",
         _ => "平衡",
       };
@@ -498,6 +506,7 @@ class MobileGuidedDraft {
 
   String get riskLabel => switch (riskProfile) {
         "Conservative" => "保守",
+        "Aggressive" => "进攻",
         "Growth" => "成长",
         _ => "平衡",
       };
@@ -552,17 +561,25 @@ class MobileGuidedDraft {
     String homePlan = "none",
     String taxFocus = "medium",
     String usdFundingPath = "unknown",
+    String concentrationTolerance = "medium",
     bool allowExternalSignals = false,
   }) {
     var score = 0;
     if (horizon == "long") score += 1;
     if (volatility == "high") score += 1;
+    if (volatility == "very_high") score += 2;
     if (goal == "wealth" || goal == "retirement") score += 1;
     if (cashNeed == "high") score -= 1;
     if (goal == "capital-preservation") score -= 2;
     if (goal == "home" && horizon == "short") score -= 2;
 
-    final riskProfile = score >= 2
+    final aggressiveTilt = horizon == "long" &&
+        (volatility == "high" || volatility == "very_high") &&
+        sectorTilt == "nasdaq-tech" &&
+        concentrationTolerance != "low";
+    final riskProfile = aggressiveTilt
+        ? "Aggressive"
+        : score >= 2
         ? "Growth"
         : score <= 0
             ? "Conservative"
@@ -591,12 +608,17 @@ class MobileGuidedDraft {
       adjust("Fixed Income", 5);
       adjust("Cash", 5);
       adjust("US Equity", -10);
-    } else if (volatility == "high" && horizon == "long") {
+    } else if ((volatility == "high" || volatility == "very_high") &&
+        horizon == "long") {
       adjust("International Equity", 4);
       adjust("Fixed Income", -2);
       adjust("Cash", -2);
     }
-    if (sectorTilt == "tech-energy" && volatility == "high") {
+    if (sectorTilt == "nasdaq-tech") {
+      adjust("US Equity", 5);
+      adjust("International Equity", -5);
+    } else if (sectorTilt == "tech-energy" &&
+        (volatility == "high" || volatility == "very_high")) {
       adjust("US Equity", 4);
       adjust("Fixed Income", -2);
       adjust("Cash", -2);
@@ -636,27 +658,32 @@ class MobileGuidedDraft {
                 : ["TFSA", "Taxable", "RRSP"];
     final homePurchaseEnabled = goal == "home" || homePlan != "none";
     final preferredSectors = switch (sectorTilt) {
+      "nasdaq-tech" => const ["Technology", "Semiconductors"],
       "tech-energy" => const ["Technology", "Energy"],
       "dividend-quality" => const ["Financial Services", "Utilities"],
       "canada-home" => const ["Canadian Equity"],
       _ => const <String>[],
     };
     final styleTilts = switch (sectorTilt) {
+      "nasdaq-tech" => const ["Growth", "Quality", "AI"],
       "tech-energy" => const ["Growth"],
       "dividend-quality" => const ["Dividend", "Quality"],
       _ => volatility == "high" ? const ["Growth"] : const <String>[],
     };
-    final thematicInterests = sectorTilt == "tech-energy"
+    final thematicInterests = sectorTilt == "nasdaq-tech"
+        ? const ["Nasdaq 100", "AI infrastructure", "Semiconductors"]
+        : sectorTilt == "tech-energy"
         ? const ["AI infrastructure", "Energy transition"]
         : const <String>[];
     final preferenceFactors = MobilePreferenceFactors(
-      riskCapacity: volatility == "high" && horizon == "long"
+      riskCapacity: (volatility == "high" || volatility == "very_high") &&
+              horizon == "long"
           ? "high"
           : volatility == "low" || goal == "capital-preservation"
               ? "low"
               : "medium",
-      volatilityComfort: volatility,
-      concentrationTolerance: volatility == "high" ? "high" : "medium",
+      volatilityComfort: volatility == "very_high" ? "high" : volatility,
+      concentrationTolerance: concentrationTolerance,
       leverageAllowed: false,
       optionsAllowed: false,
       cryptoAllowed: false,
@@ -713,6 +740,7 @@ class MobileGuidedDraft {
         "homePlan": homePlan,
         "taxFocus": taxFocus,
         "usdFundingPath": usdFundingPath,
+        "concentrationTolerance": concentrationTolerance,
         "allowExternalSignals": allowExternalSignals.toString(),
       },
       riskProfile: riskProfile,
@@ -729,6 +757,7 @@ class MobileGuidedDraft {
         "期限：$horizon",
         "波动承受：$volatility",
         "现金需求：$cashNeed",
+        "集中度承受：$concentrationTolerance",
         "行业/风格：$sectorTilt",
         "税务关注：$taxFocus",
         "进阶偏好：${preferenceFactors.summary}",
@@ -738,6 +767,8 @@ class MobileGuidedDraft {
         taxAwarePlacement ? "启用税务感知放置，优先使用更合适的账户桶。" : "使用较简洁的账户匹配规则。",
         sectorTilt == "broad"
             ? "未设置明显行业倾向，保持更宽的分散度。"
+            : sectorTilt == "nasdaq-tech"
+                ? "识别到纳指/科技进攻倾向，提高美国股票目标，同时保留集中度护栏。"
             : "根据行业/风格回答写入 Preference Factors V2。",
         homePurchaseEnabled ? "识别到买房或首付目标，提升流动性和 FHSA 相关参数。" : "未开启买房目标。",
         "调整节奏设为 $transitionPreference，推荐策略设为 $recommendationStrategy。",
@@ -775,15 +806,18 @@ class MobileGuidedDraft {
         factors.preferredSectors.map((item) => item.toLowerCase()).toSet();
     final styleTilts =
         factors.styleTilts.map((item) => item.toLowerCase()).toSet();
-    final sectorTilt = preferredSectors.contains("technology") ||
-            preferredSectors.contains("energy") ||
-            styleTilts.contains("growth")
-        ? "tech-energy"
-        : styleTilts.contains("dividend") || styleTilts.contains("quality")
-            ? "dividend-quality"
-            : preferredSectors.contains("canadian equity")
-                ? "canada-home"
-                : "broad";
+    final sectorTilt = preferredSectors.contains("semiconductors") ||
+            profile.riskProfile == "Aggressive"
+        ? "nasdaq-tech"
+        : preferredSectors.contains("technology") ||
+                preferredSectors.contains("energy") ||
+                styleTilts.contains("growth")
+            ? "tech-energy"
+            : styleTilts.contains("dividend") || styleTilts.contains("quality")
+                ? "dividend-quality"
+                : preferredSectors.contains("canadian equity")
+                    ? "canada-home"
+                    : "broad";
     final homePlan = !factors.homePurchaseEnabled
         ? "none"
         : (factors.homePurchasePriority == "high" ? "active" : "possible");
@@ -800,6 +834,7 @@ class MobileGuidedDraft {
         "homePlan": homePlan,
         "taxFocus": taxFocus,
         "usdFundingPath": factors.usdFundingPath,
+        "concentrationTolerance": factors.concentrationTolerance,
         "allowExternalSignals": (factors.allowNewsSignals ||
                 factors.allowInstitutionalSignals ||
                 factors.allowCommunitySignals)

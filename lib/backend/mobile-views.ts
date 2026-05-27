@@ -1448,6 +1448,8 @@ function buildMobileRecommendationEngineSummary(input: {
 function riskProfileLabel(value: string) {
   return value === "Conservative"
     ? "保守"
+    : value === "Aggressive"
+      ? "进攻"
     : value === "Growth"
       ? "成长"
       : "平衡";

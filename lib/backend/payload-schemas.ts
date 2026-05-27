@@ -200,7 +200,7 @@ const preferenceFactorsSchema = z.object({
 
 export const preferenceProfileInputSchema = z
   .object({
-    riskProfile: z.enum(["Conservative", "Balanced", "Growth"]),
+    riskProfile: z.enum(["Conservative", "Balanced", "Growth", "Aggressive"]),
     targetAllocation: z.array(allocationTargetSchema).min(1),
     accountFundingPriority: z
       .array(z.enum(["TFSA", "RRSP", "FHSA", "Taxable"]))
@@ -760,7 +760,7 @@ export const guidedAllocationDraftSchema = z.object({
   }),
   suggestedProfile: z
     .object({
-      riskProfile: z.enum(["Conservative", "Balanced", "Growth"]),
+      riskProfile: z.enum(["Conservative", "Balanced", "Growth", "Aggressive"]),
       targetAllocation: z.array(allocationTargetSchema).min(1),
       accountFundingPriority: z
         .array(z.enum(["TFSA", "RRSP", "FHSA", "Taxable"]))

@@ -38,10 +38,17 @@ const RISK_PRESETS: Record<PreferenceProfile["riskProfile"], PreferenceProfile["
     { assetClass: "Cash", targetPct: 10 }
   ],
   Growth: [
-    { assetClass: "Canadian Equity", targetPct: 16 },
-    { assetClass: "US Equity", targetPct: 42 },
-    { assetClass: "International Equity", targetPct: 22 },
+    { assetClass: "Canadian Equity", targetPct: 10 },
+    { assetClass: "US Equity", targetPct: 50 },
+    { assetClass: "International Equity", targetPct: 25 },
     { assetClass: "Fixed Income", targetPct: 10 },
+    { assetClass: "Cash", targetPct: 5 }
+  ],
+  Aggressive: [
+    { assetClass: "Canadian Equity", targetPct: 5 },
+    { assetClass: "US Equity", targetPct: 65 },
+    { assetClass: "International Equity", targetPct: 15 },
+    { assetClass: "Fixed Income", targetPct: 5 },
     { assetClass: "Cash", targetPct: 10 }
   ]
 };
@@ -96,9 +103,9 @@ function getTargetMixLabel(targetAllocation: PreferenceProfile["targetAllocation
 
 function getDefaultGuidedAnswers(profile: PreferenceProfile): GuidedAllocationAnswers {
   return {
-    goal: profile.accountFundingPriority.includes("FHSA") ? "home" : profile.riskProfile === "Growth" ? "wealth" : "retirement",
-    horizon: profile.riskProfile === "Growth" ? "long" : profile.riskProfile === "Balanced" ? "medium" : "short",
-    volatility: profile.riskProfile === "Growth" ? "high" : profile.riskProfile === "Balanced" ? "medium" : "low",
+    goal: profile.accountFundingPriority.includes("FHSA") ? "home" : profile.riskProfile === "Growth" || profile.riskProfile === "Aggressive" ? "wealth" : "retirement",
+    horizon: profile.riskProfile === "Growth" || profile.riskProfile === "Aggressive" ? "long" : profile.riskProfile === "Balanced" ? "medium" : "short",
+    volatility: profile.riskProfile === "Aggressive" ? "high" : profile.riskProfile === "Growth" ? "high" : profile.riskProfile === "Balanced" ? "medium" : "low",
     priority: profile.taxAwarePlacement ? "tax-efficiency" : profile.transitionPreference === "stay-close" ? "stay-close" : "balanced",
     cashNeed: profile.cashBufferTargetCad >= 15000 ? "high" : profile.cashBufferTargetCad >= 7000 ? "medium" : "low"
   };
@@ -126,7 +133,7 @@ function buildGuidedDraft(answers: GuidedAllocationAnswers): GuidedDraft {
   if (answers.goal === "capital-preservation") score -= 2;
   if (answers.goal === "home" && answers.horizon === "short") score -= 2;
 
-  const riskProfile: PreferenceProfile["riskProfile"] = score >= 2 ? "Growth" : score <= 0 ? "Conservative" : "Balanced";
+  const riskProfile: PreferenceProfile["riskProfile"] = score >= 3 ? "Aggressive" : score >= 2 ? "Growth" : score <= 0 ? "Conservative" : "Balanced";
   const baseAllocation = RISK_PRESETS[riskProfile].map((target) => ({ ...target }));
 
   if (answers.goal === "home" || answers.cashNeed === "high") {
@@ -741,6 +748,7 @@ export function PreferencesWorkbench({
                             <option value="Conservative">{pick(language, "保守", "Conservative")}</option>
                             <option value="Balanced">{pick(language, "平衡", "Balanced")}</option>
                             <option value="Growth">{pick(language, "成长", "Growth")}</option>
+                            <option value="Aggressive">{pick(language, "进攻", "Aggressive")}</option>
                           </select>
                         </Field>
                         <Field label={pick(language, "过渡方式", "Transition preference")}>

@@ -32,30 +32,7 @@ import {
   type RecommendationPoolStatus,
 } from "@/lib/backend/recommendation-v3/candidate-pool-policy";
 import { getCoreRecommendationUniverse } from "@/lib/backend/recommendation-v3/core-universe";
-
-const DEFAULT_TARGETS_BY_RISK = {
-  Conservative: [
-    { assetClass: "Canadian Equity", targetPct: 18 },
-    { assetClass: "US Equity", targetPct: 22 },
-    { assetClass: "International Equity", targetPct: 10 },
-    { assetClass: "Fixed Income", targetPct: 35 },
-    { assetClass: "Cash", targetPct: 15 }
-  ],
-  Balanced: [
-    { assetClass: "Canadian Equity", targetPct: 22 },
-    { assetClass: "US Equity", targetPct: 32 },
-    { assetClass: "International Equity", targetPct: 16 },
-    { assetClass: "Fixed Income", targetPct: 20 },
-    { assetClass: "Cash", targetPct: 10 }
-  ],
-  Growth: [
-    { assetClass: "Canadian Equity", targetPct: 16 },
-    { assetClass: "US Equity", targetPct: 42 },
-    { assetClass: "International Equity", targetPct: 22 },
-    { assetClass: "Fixed Income", targetPct: 10 },
-    { assetClass: "Cash", targetPct: 10 }
-  ]
-} as const;
+import { getActiveTargetAllocation } from "@/lib/backend/recommendation-v4/strategy-policy";
 
 type SecurityCandidate = RecommendationCandidate;
 
@@ -302,9 +279,7 @@ function getPreferenceFitAdjustment(
 }
 
 function getTargetAllocation(profile: PreferenceProfile) {
-  return profile.targetAllocation.length > 0
-    ? profile.targetAllocation
-    : DEFAULT_TARGETS_BY_RISK[profile.riskProfile];
+  return getActiveTargetAllocation(profile);
 }
 
 function getCurrentAllocationFromHoldings(holdings: HoldingPosition[]) {

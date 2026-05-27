@@ -17,7 +17,7 @@ export type CitizenAddressTier =
 export type CitizenAvatarType = "default" | "male" | "female" | "emperor";
 
 export type AccountType = "TFSA" | "RRSP" | "FHSA" | "Taxable";
-export type RiskProfile = "Conservative" | "Balanced" | "Growth";
+export type RiskProfile = "Conservative" | "Balanced" | "Growth" | "Aggressive";
 export type TransitionPreference = "stay-close" | "gradual" | "direct";
 export type RecommendationStrategy = "tax-aware" | "target-first" | "balanced";
 export type PreferenceProfileSource = "manual" | "guided";

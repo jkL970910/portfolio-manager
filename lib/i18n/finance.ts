@@ -36,7 +36,8 @@ export function getRiskProfileLabel(value: RiskProfile, language: DisplayLanguag
   const map = {
     Conservative: { zh: "保守型", en: "Conservative" },
     Balanced: { zh: "平衡型", en: "Balanced" },
-    Growth: { zh: "成长型", en: "Growth" }
+    Growth: { zh: "成长型", en: "Growth" },
+    Aggressive: { zh: "进攻型", en: "Aggressive" }
   } as const;
   return pick(language, map[value].zh, map[value].en);
 }

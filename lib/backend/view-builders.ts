@@ -30,6 +30,7 @@ import {
   UserProfile,
 } from "@/lib/backend/models";
 import { buildPortfolioHealthSummary } from "@/lib/backend/portfolio-health";
+import { getActiveTargetAllocation } from "@/lib/backend/recommendation-v4/strategy-policy";
 import {
   getAccountTypeLabel,
   getAssetClassLabel,
@@ -102,30 +103,10 @@ const RISK_DETAILS: Record<RiskProfile, { zh: string; en: string }> = {
     zh: "股票比例更高，波动也会更明显。",
     en: "Higher equity exposure than target comfort band.",
   },
-};
-
-const TARGET_PRESETS: Record<RiskProfile, AllocationTarget[]> = {
-  Conservative: [
-    { assetClass: "Canadian Equity", targetPct: 18 },
-    { assetClass: "US Equity", targetPct: 22 },
-    { assetClass: "International Equity", targetPct: 10 },
-    { assetClass: "Fixed Income", targetPct: 35 },
-    { assetClass: "Cash", targetPct: 15 },
-  ],
-  Balanced: [
-    { assetClass: "Canadian Equity", targetPct: 22 },
-    { assetClass: "US Equity", targetPct: 32 },
-    { assetClass: "International Equity", targetPct: 16 },
-    { assetClass: "Fixed Income", targetPct: 20 },
-    { assetClass: "Cash", targetPct: 10 },
-  ],
-  Growth: [
-    { assetClass: "Canadian Equity", targetPct: 16 },
-    { assetClass: "US Equity", targetPct: 42 },
-    { assetClass: "International Equity", targetPct: 22 },
-    { assetClass: "Fixed Income", targetPct: 10 },
-    { assetClass: "Cash", targetPct: 10 },
-  ],
+  Aggressive: {
+    zh: "显著偏进攻，适合长周期且能承受较大回撤。",
+    en: "Aggressive long-horizon profile with materially higher drawdown tolerance.",
+  },
 };
 
 function getSecurityTypeOptionLabel(value: string, language: DisplayLanguage) {
@@ -453,16 +434,8 @@ function getAccountPriorityRank(
 }
 
 function getTargetAllocation(profile: PreferenceProfile) {
-  if (profile.targetAllocation.length > 0) {
-    return new Map(
-      profile.targetAllocation.map((target) => [
-        target.assetClass,
-        target.targetPct,
-      ]),
-    );
-  }
   return new Map(
-    TARGET_PRESETS[profile.riskProfile].map((target) => [
+    getActiveTargetAllocation(profile).map((target) => [
       target.assetClass,
       target.targetPct,
     ]),

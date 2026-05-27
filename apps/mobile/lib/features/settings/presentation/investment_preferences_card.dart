@@ -185,7 +185,7 @@ class _InvestmentPreferencesCardState extends State<InvestmentPreferencesCard> {
       await _markPreferencesOnboardingCompleted();
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("进阶偏好已保存，V2.1 推荐会读取这些参数。")),
+        const SnackBar(content: Text("进阶偏好已保存，推荐 V4 会读取这些参数。")),
       );
       _refresh();
     }
@@ -1534,7 +1534,7 @@ class _PreferenceFactorsSheetState extends State<_PreferenceFactorsSheet> {
           children: [
             Text("进阶偏好", style: Theme.of(context).textTheme.headlineMedium),
             const SizedBox(height: 8),
-            const Text("这些参数会影响 V2.1 的候选排序和解释；不会覆盖你的目标配置。"),
+            const Text("这些参数会影响推荐 V4 的候选排序和解释；不会覆盖你的目标配置。"),
             const SizedBox(height: 16),
             TextField(
               controller: _ministerPromptController,
@@ -1602,7 +1602,7 @@ class _PreferenceFactorsSheetState extends State<_PreferenceFactorsSheet> {
                   : (value) => setState(() => _concentrationTolerance = value),
             ),
             _factorTextField(_preferredSectorsController, "偏好行业",
-                "例如 Technology, Energy；V2.1 会轻量加分。"),
+                "例如 Technology, Energy；推荐 V4 会轻量加分。"),
             _factorTextField(
                 _avoidedSectorsController, "回避行业", "例如 Tobacco；命中后会降低候选分。"),
             _factorTextField(
@@ -1725,7 +1725,7 @@ class _PreferenceFactorsSheetState extends State<_PreferenceFactorsSheet> {
             SwitchListTile(
               contentPadding: EdgeInsets.zero,
               title: const Text("允许新闻信号影响推荐"),
-              subtitle: const Text("当前只保存偏好；V3 接入外部信息后读取。"),
+              subtitle: const Text("当前只保存偏好；推荐 V4 会在外部情报可用时读取。"),
               value: _allowNewsSignals,
               onChanged: _saving
                   ? null
@@ -1806,9 +1806,13 @@ class _GuidedPreferenceSheetState extends State<_GuidedPreferenceSheet> {
   late var _homePlan = _initialAnswers["homePlan"] ?? "none";
   late var _taxFocus = _initialAnswers["taxFocus"] ?? "medium";
   late var _usdFundingPath = _initialAnswers["usdFundingPath"] ?? "unknown";
+  late var _concentrationTolerance =
+      _initialAnswers["concentrationTolerance"] ?? "medium";
   late var _allowExternalSignals =
       _initialAnswers["allowExternalSignals"] == "true";
+  final _pageController = PageController();
   final _narrativeController = TextEditingController();
+  var _guidePage = 0;
   MobilePreferenceFactors? _ministerFactors;
   String? _ministerSummary;
   List<String> _ministerRationale = const [];
@@ -1830,11 +1834,13 @@ class _GuidedPreferenceSheetState extends State<_GuidedPreferenceSheet> {
         homePlan: _homePlan,
         taxFocus: _taxFocus,
         usdFundingPath: _usdFundingPath,
+        concentrationTolerance: _concentrationTolerance,
         allowExternalSignals: _allowExternalSignals,
       );
 
   @override
   void dispose() {
+    _pageController.dispose();
     _narrativeController.dispose();
     super.dispose();
   }
@@ -1856,6 +1862,7 @@ class _GuidedPreferenceSheetState extends State<_GuidedPreferenceSheet> {
       "买房计划: $_homePlan",
       "税务关注: $_taxFocus",
       "USD 入金路径: $_usdFundingPath",
+      "集中度承受: $_concentrationTolerance",
       "允许外部信息: $_allowExternalSignals",
       "当前本地草稿: ${draft.preferenceFactors.toPayload()}",
       if (userText.isNotEmpty) "用户补充: $userText",
@@ -1943,204 +1950,280 @@ class _GuidedPreferenceSheetState extends State<_GuidedPreferenceSheet> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text("引导式偏好设置", style: Theme.of(context).textTheme.headlineMedium),
+            Text("Loo皇定国策", style: Theme.of(context).textTheme.headlineMedium),
             const SizedBox(height: 8),
-            const Text("回答核心问题后，Loo皇会先生成完整本地草稿；你也可以请大臣补全进阶参数再应用。"),
-            const SizedBox(height: 16),
-            _GuidedSelect(
-              label: "目标",
-              value: _goal,
-              items: const {
-                "retirement": "退休长期积累",
-                "home": "买房/首套房",
-                "wealth": "财富增长",
-                "capital-preservation": "本金保护",
-              },
-              onChanged: _saving || _drafting
-                  ? null
-                  : (value) => setState(() {
-                        _goal = value;
-                        _ministerFactors = null;
-                      }),
-            ),
-            _GuidedSelect(
-              label: "投资期限",
-              value: _horizon,
-              items: const {"short": "短期", "medium": "中期", "long": "长期"},
-              onChanged: _saving || _drafting
-                  ? null
-                  : (value) => setState(() {
-                        _horizon = value;
-                        _ministerFactors = null;
-                      }),
-            ),
-            _GuidedSelect(
-              label: "波动承受",
-              value: _volatility,
-              items: const {"low": "低", "medium": "中", "high": "高"},
-              onChanged: _saving || _drafting
-                  ? null
-                  : (value) => setState(() {
-                        _volatility = value;
-                        _ministerFactors = null;
-                      }),
-            ),
-            _GuidedSelect(
-              label: "推荐优先级",
-              value: _priority,
-              items: const {
-                "tax-efficiency": "税务优先",
-                "balanced": "平衡",
-                "stay-close": "贴近现状",
-              },
-              onChanged: _saving || _drafting
-                  ? null
-                  : (value) => setState(() {
-                        _priority = value;
-                        _ministerFactors = null;
-                      }),
-            ),
-            _GuidedSelect(
-              label: "现金需求",
-              value: _cashNeed,
-              items: const {"low": "低", "medium": "中", "high": "高"},
-              onChanged: _saving || _drafting
-                  ? null
-                  : (value) => setState(() {
-                        _cashNeed = value;
-                        _ministerFactors = null;
-                      }),
-            ),
-            _GuidedSelect(
-              label: "行业/风格倾向",
-              value: _sectorTilt,
-              items: const {
-                "broad": "保持宽分散",
-                "tech-energy": "偏科技/能源成长",
-                "dividend-quality": "偏分红/质量",
-                "canada-home": "偏加拿大/买房相关",
-              },
-              onChanged: _saving || _drafting
-                  ? null
-                  : (value) => setState(() {
-                        _sectorTilt = value;
-                        _ministerFactors = null;
-                      }),
-            ),
-            _GuidedSelect(
-              label: "买房计划",
-              value: _homePlan,
-              items: const {
-                "none": "暂时没有",
-                "possible": "未来可能买房",
-                "active": "已有明确首付目标",
-              },
-              onChanged: _saving || _drafting
-                  ? null
-                  : (value) => setState(() {
-                        _homePlan = value;
-                        _ministerFactors = null;
-                      }),
-            ),
-            _GuidedSelect(
-              label: "税务优化关注",
-              value: _taxFocus,
-              items: const {"low": "低", "medium": "中", "high": "高"},
-              onChanged: _saving || _drafting
-                  ? null
-                  : (value) => setState(() {
-                        _taxFocus = value;
-                        _ministerFactors = null;
-                      }),
-            ),
-            _GuidedSelect(
-              label: "USD 入金/换汇路径",
-              value: _usdFundingPath,
-              items: const {
-                "unknown": "还不确定",
-                "available": "可稳定使用",
-                "avoid": "尽量避免",
-              },
-              onChanged: _saving || _drafting
-                  ? null
-                  : (value) => setState(() {
-                        _usdFundingPath = value;
-                        _ministerFactors = null;
-                      }),
-            ),
-            SwitchListTile(
-              contentPadding: EdgeInsets.zero,
-              title: const Text("允许外部信息辅助推荐"),
-              subtitle: const Text("V3 会读取该偏好，结合新闻/研究信息但仍显示来源和新鲜度。"),
-              value: _allowExternalSignals,
-              onChanged: _saving || _drafting
-                  ? null
-                  : (value) => setState(() {
-                        _allowExternalSignals = value;
-                        _ministerFactors = null;
-                      }),
-            ),
-            TextField(
-              controller: _narrativeController,
-              enabled: !_saving && !_drafting,
-              minLines: 2,
-              maxLines: 4,
-              decoration: const InputDecoration(
-                labelText: "补充说明 可选",
-                helperText: "例如：我更激进，偏科技能源，5 年内可能买房，也想考虑税务优化。",
-              ),
-            ),
+            Text("第 ${_guidePage + 1}/5 阶段 · 回答后横滑进入下一段，最后确认国策比例。"),
             const SizedBox(height: 10),
+            LinearProgressIndicator(value: (_guidePage + 1) / 5),
+            const SizedBox(height: 16),
             SizedBox(
-              width: double.infinity,
-              child: OutlinedButton.icon(
-                onPressed:
-                    _saving || _drafting ? null : _askMinisterForFullDraft,
-                icon: const Icon(Icons.auto_awesome),
-                label: Text(_drafting ? "大臣补全中..." : "请大臣补全进阶参数"),
+              height: 500,
+              child: PageView(
+                controller: _pageController,
+                onPageChanged: (page) => setState(() => _guidePage = page),
+                children: [
+                  _GuidedStageCard(
+                    title: "一、国库期限",
+                    subtitle: "先判断这笔钱能不能长期留在战场。",
+                    children: [
+                      _GuidedSelect(
+                        label: "目标",
+                        value: _goal,
+                        items: const {
+                          "retirement": "退休长期积累",
+                          "home": "买房/首套房",
+                          "wealth": "财富增长",
+                          "capital-preservation": "本金保护",
+                        },
+                        onChanged: _saving || _drafting
+                            ? null
+                            : (value) => setState(() {
+                                  _goal = value;
+                                  _ministerFactors = null;
+                                }),
+                      ),
+                      _GuidedSelect(
+                        label: "投资期限",
+                        value: _horizon,
+                        items: const {
+                          "short": "3 年内可能要用",
+                          "medium": "3-7 年",
+                          "long": "7 年以上",
+                        },
+                        onChanged: _saving || _drafting
+                            ? null
+                            : (value) => setState(() {
+                                  _horizon = value;
+                                  _ministerFactors = null;
+                                }),
+                      ),
+                      _GuidedSelect(
+                        label: "买房计划",
+                        value: _homePlan,
+                        items: const {
+                          "none": "暂时没有",
+                          "possible": "未来可能买房",
+                          "active": "已有明确首付目标",
+                        },
+                        onChanged: _saving || _drafting
+                            ? null
+                            : (value) => setState(() {
+                                  _homePlan = value;
+                                  _ministerFactors = null;
+                                }),
+                      ),
+                    ],
+                  ),
+                  _GuidedStageCard(
+                    title: "二、回撤承受",
+                    subtitle: "高风险不是口号，要先确认跌下来会不会乱阵脚。",
+                    children: [
+                      _GuidedSelect(
+                        label: "最大波动承受",
+                        value: _volatility,
+                        items: const {
+                          "low": "跌 10-15% 就会难受",
+                          "medium": "能承受 20-30%",
+                          "high": "能承受 35% 左右",
+                          "very_high": "50% 回撤也能按纪律持有",
+                        },
+                        onChanged: _saving || _drafting
+                            ? null
+                            : (value) => setState(() {
+                                  _volatility = value;
+                                  _ministerFactors = null;
+                                }),
+                      ),
+                      _GuidedSelect(
+                        label: "现金需求",
+                        value: _cashNeed,
+                        items: const {
+                          "low": "现金需求低",
+                          "medium": "保留常规缓冲",
+                          "high": "近期需要高现金水位",
+                        },
+                        onChanged: _saving || _drafting
+                            ? null
+                            : (value) => setState(() {
+                                  _cashNeed = value;
+                                  _ministerFactors = null;
+                                }),
+                      ),
+                    ],
+                  ),
+                  _GuidedStageCard(
+                    title: "三、进攻方向",
+                    subtitle: "这里决定是全球成长，还是明确偏纳指/科技进攻。",
+                    children: [
+                      _GuidedSelect(
+                        label: "行业/风格倾向",
+                        value: _sectorTilt,
+                        items: const {
+                          "broad": "保持宽分散",
+                          "nasdaq-tech": "偏纳指/科技/AI",
+                          "tech-energy": "偏科技/能源成长",
+                          "dividend-quality": "偏分红/质量",
+                          "canada-home": "偏加拿大/买房相关",
+                        },
+                        onChanged: _saving || _drafting
+                            ? null
+                            : (value) => setState(() {
+                                  _sectorTilt = value;
+                                  _ministerFactors = null;
+                                }),
+                      ),
+                      _GuidedSelect(
+                        label: "集中度承受",
+                        value: _concentrationTolerance,
+                        items: const {
+                          "low": "单一标的要严格分散",
+                          "medium": "允许核心 ETF 稍重",
+                          "high": "可接受纳指/科技明显超配",
+                        },
+                        onChanged: _saving || _drafting
+                            ? null
+                            : (value) => setState(() {
+                                  _concentrationTolerance = value;
+                                  _ministerFactors = null;
+                                }),
+                      ),
+                    ],
+                  ),
+                  _GuidedStageCard(
+                    title: "四、账户路线",
+                    subtitle: "同一标的放进不同账户，长期效果可能不一样。",
+                    children: [
+                      _GuidedSelect(
+                        label: "推荐优先级",
+                        value: _priority,
+                        items: const {
+                          "tax-efficiency": "税务优先",
+                          "balanced": "平衡",
+                          "stay-close": "贴近现状",
+                        },
+                        onChanged: _saving || _drafting
+                            ? null
+                            : (value) => setState(() {
+                                  _priority = value;
+                                  _ministerFactors = null;
+                                }),
+                      ),
+                      _GuidedSelect(
+                        label: "税务优化关注",
+                        value: _taxFocus,
+                        items: const {"low": "低", "medium": "中", "high": "高"},
+                        onChanged: _saving || _drafting
+                            ? null
+                            : (value) => setState(() {
+                                  _taxFocus = value;
+                                  _ministerFactors = null;
+                                }),
+                      ),
+                      _GuidedSelect(
+                        label: "USD 入金/换汇路径",
+                        value: _usdFundingPath,
+                        items: const {
+                          "unknown": "还不确定",
+                          "available": "可稳定使用",
+                          "avoid": "尽量避免",
+                        },
+                        onChanged: _saving || _drafting
+                            ? null
+                            : (value) => setState(() {
+                                  _usdFundingPath = value;
+                                  _ministerFactors = null;
+                                }),
+                      ),
+                    ],
+                  ),
+                  _GuidedStageCard(
+                    title: "五、确认国策",
+                    subtitle: "保存前先看清楚比例和护栏；这是之后推荐 V4 的目标地图。",
+                    children: [
+                      Text(draft.summary),
+                      const SizedBox(height: 8),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: [
+                          _InfoChip("风险档位", draft.riskLabel),
+                          _InfoChip("再平衡阈值", "${draft.rebalancingTolerancePct}%"),
+                          _InfoChip("现金缓冲",
+                              "\$${draft.cashBufferTargetCad.toStringAsFixed(0)}"),
+                          _InfoChip("税务放置", draft.taxAwarePlacement ? "开启" : "关闭"),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Text("进阶偏好：${factors.summary}"),
+                      SwitchListTile(
+                        contentPadding: EdgeInsets.zero,
+                        title: const Text("允许外部信息辅助推荐"),
+                        value: _allowExternalSignals,
+                        onChanged: _saving || _drafting
+                            ? null
+                            : (value) => setState(() {
+                                  _allowExternalSignals = value;
+                                  _ministerFactors = null;
+                                }),
+                      ),
+                      TextField(
+                        controller: _narrativeController,
+                        enabled: !_saving && !_drafting,
+                        minLines: 2,
+                        maxLines: 3,
+                        decoration: const InputDecoration(
+                          labelText: "补充说明 可选",
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      OutlinedButton.icon(
+                        onPressed: _saving || _drafting
+                            ? null
+                            : _askMinisterForFullDraft,
+                        icon: const Icon(Icons.auto_awesome),
+                        label: Text(_drafting ? "大臣补全中..." : "请大臣补全进阶参数"),
+                      ),
+                      if (_ministerSummary != null) ...[
+                        const SizedBox(height: 8),
+                        Text("大臣补全：$_ministerSummary"),
+                        ..._ministerRationale
+                            .take(2)
+                            .map((item) => Text("• $item")),
+                      ],
+                    ],
+                  ),
+                ],
               ),
             ),
             const SizedBox(height: 12),
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(14),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text("生成草稿", style: Theme.of(context).textTheme.titleLarge),
-                    const SizedBox(height: 8),
-                    Text(draft.summary),
-                    const SizedBox(height: 8),
-                    Text("由问答推导出的参数",
-                        style: Theme.of(context).textTheme.titleMedium),
-                    const SizedBox(height: 6),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: [
-                        _InfoChip("风险档位", draft.riskLabel),
-                        _InfoChip("再平衡阈值", "${draft.rebalancingTolerancePct}%"),
-                        _InfoChip("现金缓冲",
-                            "\$${draft.cashBufferTargetCad.toStringAsFixed(0)}"),
-                        _InfoChip(
-                            "税务放置", draft.taxAwarePlacement ? "开启" : "关闭"),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    Text("进阶偏好：${factors.summary}"),
-                    if (_ministerSummary != null) ...[
-                      const SizedBox(height: 8),
-                      Text("大臣补全：$_ministerSummary"),
-                      const SizedBox(height: 6),
-                      ..._ministerRationale
-                          .take(3)
-                          .map((item) => Text("• $item")),
-                    ],
-                    const SizedBox(height: 8),
-                    ...draft.rationale.take(3).map((item) => Text("• $item")),
-                  ],
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: _guidePage <= 0
+                        ? null
+                        : () => _pageController.previousPage(
+                              duration: const Duration(milliseconds: 260),
+                              curve: Curves.easeOutCubic,
+                            ),
+                    child: const Text("上一步"),
+                  ),
                 ),
-              ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: FilledButton(
+                    onPressed: _guidePage >= 4
+                        ? (_saving ? null : _apply)
+                        : () => _pageController.nextPage(
+                              duration: const Duration(milliseconds: 260),
+                              curve: Curves.easeOutCubic,
+                            ),
+                    child: Text(_guidePage >= 4
+                        ? (_saving ? "应用中..." : "应用国策")
+                        : "下一步"),
+                  ),
+                ),
+              ],
             ),
             if (_error != null) ...[
               const SizedBox(height: 12),
@@ -2189,6 +2272,48 @@ class _GuidedSelect extends StatelessWidget {
         onChanged: onChanged == null
             ? null
             : (value) => onChanged!(value ?? this.value),
+      ),
+    );
+  }
+}
+
+class _GuidedStageCard extends StatelessWidget {
+  const _GuidedStageCard({
+    required this.title,
+    required this.subtitle,
+    required this.children,
+  });
+
+  final String title;
+  final String subtitle;
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedSwitcher(
+      duration: const Duration(milliseconds: 220),
+      child: Card(
+        key: ValueKey(title),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title, style: Theme.of(context).textTheme.titleLarge),
+                const SizedBox(height: 6),
+                Text(
+                  subtitle,
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                ),
+                const SizedBox(height: 16),
+                ...children,
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -2333,6 +2458,7 @@ class _PreferenceEditorSheetState extends State<_PreferenceEditorSheet> {
                   ButtonSegment(value: "Conservative", label: Text("保守")),
                   ButtonSegment(value: "Balanced", label: Text("平衡")),
                   ButtonSegment(value: "Growth", label: Text("成长")),
+                  ButtonSegment(value: "Aggressive", label: Text("进攻")),
                 ],
                 selected: {_riskProfile},
                 onSelectionChanged:

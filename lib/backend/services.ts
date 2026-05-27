@@ -65,6 +65,7 @@ import {
   scoreCandidateSecurity,
 } from "@/lib/backend/recommendation-v2";
 import { refreshRecommendationDynamicPoolForUser } from "@/lib/backend/recommendation-v4/dynamic-pool-worker";
+import { getDefaultTargetAllocationForRisk } from "@/lib/backend/recommendation-v4/strategy-policy";
 import {
   DEFAULT_RECOMMENDATION_CONSTRAINTS,
   normalizeRecommendationConstraints,
@@ -439,36 +440,12 @@ export async function createManualCashAccount(
   return account;
 }
 
-const DEFAULT_TARGETS_BY_RISK: Record<RiskProfile, AllocationTarget[]> = {
-  Conservative: [
-    { assetClass: "Canadian Equity", targetPct: 18 },
-    { assetClass: "US Equity", targetPct: 22 },
-    { assetClass: "International Equity", targetPct: 10 },
-    { assetClass: "Fixed Income", targetPct: 35 },
-    { assetClass: "Cash", targetPct: 15 },
-  ],
-  Balanced: [
-    { assetClass: "Canadian Equity", targetPct: 22 },
-    { assetClass: "US Equity", targetPct: 32 },
-    { assetClass: "International Equity", targetPct: 16 },
-    { assetClass: "Fixed Income", targetPct: 20 },
-    { assetClass: "Cash", targetPct: 10 },
-  ],
-  Growth: [
-    { assetClass: "Canadian Equity", targetPct: 16 },
-    { assetClass: "US Equity", targetPct: 42 },
-    { assetClass: "International Equity", targetPct: 22 },
-    { assetClass: "Fixed Income", targetPct: 10 },
-    { assetClass: "Cash", targetPct: 10 },
-  ],
-};
-
 function getDefaultPreferenceInput(
   riskProfile: RiskProfile = "Balanced",
 ): PreferenceProfileInput {
   return {
     riskProfile,
-    targetAllocation: DEFAULT_TARGETS_BY_RISK[riskProfile],
+    targetAllocation: getDefaultTargetAllocationForRisk(riskProfile),
     accountFundingPriority: ["TFSA", "RRSP", "Taxable"],
     taxAwarePlacement: true,
     cashBufferTargetCad: 10000,

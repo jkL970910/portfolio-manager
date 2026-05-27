@@ -3,6 +3,7 @@ import { getAssetClassLabel, getAccountTypeLabel } from "@/lib/i18n/finance";
 import type { DisplayLanguage } from "@/lib/i18n/ui";
 import { pick } from "@/lib/i18n/ui";
 import { getAccountPlacementMatrix } from "@/lib/backend/recommendation-v2";
+import { getActiveTargetAllocation } from "@/lib/backend/recommendation-v4/strategy-policy";
 import { getHoldingEconomicAssetClass } from "@/lib/backend/security-economic-exposure";
 
 function clamp(value: number, min: number, max: number) {
@@ -19,15 +20,7 @@ function sum(values: number[]) {
 }
 
 function getTargetAllocation(profile: PreferenceProfile) {
-  return profile.targetAllocation.length > 0
-    ? profile.targetAllocation
-    : [
-      { assetClass: "Canadian Equity", targetPct: 22 },
-      { assetClass: "US Equity", targetPct: 32 },
-      { assetClass: "International Equity", targetPct: 16 },
-      { assetClass: "Fixed Income", targetPct: 20 },
-      { assetClass: "Cash", targetPct: 10 }
-    ];
+  return getActiveTargetAllocation(profile);
 }
 
 function getConstrainedTargetAllocation(profile: PreferenceProfile) {
