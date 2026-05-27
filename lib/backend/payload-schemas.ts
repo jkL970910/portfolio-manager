@@ -747,15 +747,22 @@ export const guidedAllocationDraftSchema = z.object({
   answers: z.object({
     goal: z.enum(["retirement", "home", "wealth", "capital-preservation"]),
     horizon: z.enum(["short", "medium", "long"]),
-    volatility: z.enum(["low", "medium", "high"]),
+    volatility: z.enum(["low", "medium", "high", "very_high"]),
     priority: z.enum(["tax-efficiency", "balanced", "stay-close"]),
     cashNeed: z.enum(["low", "medium", "high"]),
     sectorTilt: z
-      .enum(["broad", "tech-energy", "dividend-quality", "canada-home"])
+      .enum([
+        "broad",
+        "nasdaq-tech",
+        "tech-energy",
+        "dividend-quality",
+        "canada-home",
+      ])
       .optional(),
     homePlan: z.enum(["none", "possible", "active"]).optional(),
     taxFocus: z.enum(["low", "medium", "high"]).optional(),
     usdFundingPath: z.enum(["unknown", "available", "avoid"]).optional(),
+    concentrationTolerance: z.enum(["low", "medium", "high"]).optional(),
     allowExternalSignals: z.string().optional(),
   }),
   suggestedProfile: z

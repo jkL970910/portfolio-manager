@@ -29,12 +29,23 @@ export type GuidedAllocationGoal =
   | "wealth"
   | "capital-preservation";
 export type GuidedAllocationHorizon = "short" | "medium" | "long";
-export type GuidedAllocationVolatility = "low" | "medium" | "high";
+export type GuidedAllocationVolatility =
+  | "low"
+  | "medium"
+  | "high"
+  | "very_high";
 export type GuidedAllocationPriority =
   | "tax-efficiency"
   | "balanced"
   | "stay-close";
 export type GuidedAllocationCashNeed = "low" | "medium" | "high";
+export type GuidedAllocationSectorTilt =
+  | "broad"
+  | "nasdaq-tech"
+  | "tech-energy"
+  | "dividend-quality"
+  | "canada-home";
+export type GuidedAllocationHomePlan = "none" | "possible" | "active";
 
 export interface UserProfile {
   id: EntityId;
@@ -467,6 +478,12 @@ export interface GuidedAllocationAnswers {
   volatility: GuidedAllocationVolatility;
   priority: GuidedAllocationPriority;
   cashNeed: GuidedAllocationCashNeed;
+  sectorTilt?: GuidedAllocationSectorTilt;
+  homePlan?: GuidedAllocationHomePlan;
+  taxFocus?: PreferenceFactorLevel;
+  usdFundingPath?: UsdFundingPath;
+  concentrationTolerance?: PreferenceFactorLevel;
+  allowExternalSignals?: string;
 }
 
 export interface GuidedAllocationDraft {

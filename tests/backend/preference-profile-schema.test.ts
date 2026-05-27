@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { preferenceProfileInputSchema } from "@/lib/backend/payload-schemas";
+import {
+  guidedAllocationDraftSchema,
+  preferenceProfileInputSchema,
+} from "@/lib/backend/payload-schemas";
 
 function makePreferencePayload(overrides: Record<string, unknown> = {}) {
   return {
@@ -166,4 +169,42 @@ test("preference schema rejects oversized recommendation constraint lists", () =
   }));
 
   assert.equal(parsed.success, false);
+});
+
+test("guided allocation draft accepts aggressive strategy answers", () => {
+  const parsed = guidedAllocationDraftSchema.safeParse({
+    answers: {
+      goal: "wealth",
+      horizon: "long",
+      volatility: "very_high",
+      priority: "tax-efficiency",
+      cashNeed: "medium",
+      sectorTilt: "nasdaq-tech",
+      homePlan: "active",
+      taxFocus: "high",
+      usdFundingPath: "available",
+      concentrationTolerance: "high",
+      allowExternalSignals: "true"
+    },
+    suggestedProfile: {
+      riskProfile: "Aggressive",
+      targetAllocation: [
+        { assetClass: "Canadian Equity", targetPct: 5 },
+        { assetClass: "US Equity", targetPct: 70 },
+        { assetClass: "International Equity", targetPct: 10 },
+        { assetClass: "Fixed Income", targetPct: 5 },
+        { assetClass: "Cash", targetPct: 10 }
+      ],
+      accountFundingPriority: ["TFSA", "Taxable", "RRSP"],
+      taxAwarePlacement: true,
+      cashBufferTargetCad: 4000,
+      transitionPreference: "direct",
+      recommendationStrategy: "tax-aware",
+      rebalancingTolerancePct: 10
+    },
+    assumptions: ["长期进攻型国策"],
+    rationale: ["允许纳斯达克/科技倾斜"]
+  });
+
+  assert.equal(parsed.success, true);
 });
