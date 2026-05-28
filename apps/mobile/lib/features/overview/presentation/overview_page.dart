@@ -44,12 +44,17 @@ class _OverviewPageState extends State<OverviewPage> {
   final _intelligenceCoachKey = GlobalKey();
   final _onboardingChecklistKey = GlobalKey<OnboardingChecklistCardState>();
   var _coachScheduled = false;
+  var _deferHeavySections = true;
 
   @override
   void initState() {
     super.initState();
     _snapshot = _loadSnapshot();
     _dailyIntelligence = _loadDailyIntelligence();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      setState(() => _deferHeavySections = false);
+    });
   }
 
   @override
@@ -109,14 +114,12 @@ class _OverviewPageState extends State<OverviewPage> {
           LooCoachStep(
             targetKey: _healthCoachKey,
             title: "点开印玺，看见内情",
-            body:
-                "健康分、组合占比这类小印玺不是装饰。轻点一下，就能展开雷达图、比例图和国库巡查结论。",
+            body: "健康分、组合占比这类小印玺不是装饰。轻点一下，就能展开雷达图、比例图和国库巡查结论。",
           ),
           LooCoachStep(
             targetKey: _intelligenceCoachKey,
             title: "每日秘闻，先由臣筛过",
-            body:
-                "这里是臣每日整理好的市场风向。横滑可快速扫过重点，展开可看原文、影响领域和 Loo皇总结；陛下不用自己翻新闻海。",
+            body: "这里是臣每日整理好的市场风向。横滑可快速扫过重点，展开可看原文、影响领域和 Loo皇总结；陛下不用自己翻新闻海。",
             beforeResolve: () => _prepareLazyCoachTarget(
               _intelligenceCoachKey,
               approximateOffset: 760,
@@ -186,6 +189,7 @@ class _OverviewPageState extends State<OverviewPage> {
 
   void _refresh() {
     setState(() {
+      _deferHeavySections = false;
       _snapshot = _loadSnapshot();
       _dailyIntelligence = _loadDailyIntelligence();
     });
@@ -282,8 +286,8 @@ class _OverviewPageState extends State<OverviewPage> {
                             onOpenRegisteredRoomSettings: () => context.push(
                               MobileRoutes.settingsGuide("registeredRoom"),
                             ),
-                            onOpenImport: () =>
-                                context.push(MobileRoutes.importGuide("import")),
+                            onOpenImport: () => context
+                                .push(MobileRoutes.importGuide("import")),
                             onOpenHealth: () => context.push(
                               MobileRoutes.portfolioHealthGuide("health"),
                             ),
@@ -296,15 +300,17 @@ class _OverviewPageState extends State<OverviewPage> {
                             onSkip: _skipOnboarding,
                           ),
                         ],
-                        if (snapshot.data!.netWorthChart != null ||
-                            snapshot.data!.netWorthTrend.isNotEmpty) ...[
+                        if (!_deferHeavySections &&
+                            (snapshot.data!.netWorthChart != null ||
+                                snapshot.data!.netWorthTrend.isNotEmpty)) ...[
                           const SizedBox(height: 18),
                           _OverviewTrendCard(
                             chart: snapshot.data!.netWorthChart,
                             fallbackPoints: snapshot.data!.netWorthTrend,
                           ),
                         ],
-                        if (snapshot.data!.marketSentiment != null) ...[
+                        if (!_deferHeavySections &&
+                            snapshot.data!.marketSentiment != null) ...[
                           const SizedBox(height: 18),
                           _MarketSentimentCard(
                             snapshot.data!.marketSentiment!,
@@ -954,8 +960,10 @@ class _CompactHealthCard extends StatelessWidget {
                   child: SizedBox(
                     width: 106,
                     height: 106,
-                    child: CustomPaint(
-                      painter: _MiniRadarPainter(tokens),
+                    child: RepaintBoundary(
+                      child: CustomPaint(
+                        painter: _MiniRadarPainter(tokens),
+                      ),
                     ),
                   ),
                 ),
@@ -1314,16 +1322,18 @@ class _TopHoldingsDonutChart extends StatelessWidget {
     return SizedBox(
       width: 172,
       height: 172,
-      child: CustomPaint(
-        painter: _TopHoldingsDonutPainter(
-          slices: slices,
-          total: total <= 0 ? 1 : total,
-          tokens: tokens,
-        ),
-        child: Center(
-          child: Text(
-            "${total.toStringAsFixed(1)}%",
-            style: Theme.of(context).textTheme.titleLarge,
+      child: RepaintBoundary(
+        child: CustomPaint(
+          painter: _TopHoldingsDonutPainter(
+            slices: slices,
+            total: total <= 0 ? 1 : total,
+            tokens: tokens,
+          ),
+          child: Center(
+            child: Text(
+              "${total.toStringAsFixed(1)}%",
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
           ),
         ),
       ),
@@ -1492,11 +1502,6 @@ class _MarketSentimentCardState extends State<_MarketSentimentCard> {
 
   @override
   Widget build(BuildContext context) {
-    final pages = <Widget>[
-      _MarketPulseSummaryPage(widget.sentiment),
-      _MarketPulseQuadrantPage(widget.sentiment),
-      _MarketPulseDistributionPage(widget.sentiment),
-    ];
     return LooGlassCard(
       padding: const EdgeInsets.all(16),
       child: Column(
@@ -1509,15 +1514,20 @@ class _MarketSentimentCardState extends State<_MarketSentimentCard> {
           const SizedBox(height: 12),
           SizedBox(
             height: 354,
-            child: PageView(
+            child: PageView.builder(
               controller: _controller,
+              itemCount: 3,
               onPageChanged: (value) => setState(() => _page = value),
-              children: pages,
+              itemBuilder: (context, index) => switch (index) {
+                0 => _MarketPulseSummaryPage(widget.sentiment),
+                1 => _MarketPulseQuadrantPage(widget.sentiment),
+                _ => _MarketPulseDistributionPage(widget.sentiment),
+              },
             ),
           ),
           const SizedBox(height: 12),
           Center(
-            child: _CarouselDots(count: pages.length, activeIndex: _page),
+            child: _CarouselDots(count: 3, activeIndex: _page),
           ),
         ],
       ),
@@ -1891,8 +1901,8 @@ class _MarketPulseDistributionPage extends StatelessWidget {
         const SizedBox(height: 10),
         Expanded(
           child: indicators.isEmpty
-                ? Center(
-                    child: Text(
+              ? Center(
+                  child: Text(
                     "巡查指标暂未生成，稍后再来即可查看。",
                     style: theme.textTheme.bodySmall?.copyWith(
                       color: context.looTokens.mutedText,
@@ -2370,22 +2380,24 @@ class _PulseGaugeTile extends StatelessWidget {
         children: [
           SizedBox(
             height: 48,
-            child: CustomPaint(
-              painter: _PulseGaugePainter(
-                value: gaugeValue.clamp(0, 100).toDouble(),
-                tokens: tokens,
-                needleColor: Theme.of(context).colorScheme.onSurface,
-              ),
-              child: Center(
-                child: Padding(
-                  padding: const EdgeInsets.only(top: 14),
-                  child: Text(
-                    value,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                          fontWeight: FontWeight.w900,
-                        ),
+            child: RepaintBoundary(
+              child: CustomPaint(
+                painter: _PulseGaugePainter(
+                  value: gaugeValue.clamp(0, 100).toDouble(),
+                  tokens: tokens,
+                  needleColor: Theme.of(context).colorScheme.onSurface,
+                ),
+                child: Center(
+                  child: Padding(
+                    padding: const EdgeInsets.only(top: 14),
+                    child: Text(
+                      value,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                            fontWeight: FontWeight.w900,
+                          ),
+                    ),
                   ),
                 ),
               ),
@@ -2569,12 +2581,14 @@ class _PulsePerformanceTile extends StatelessWidget {
         SizedBox(
           height: 34,
           width: double.infinity,
-          child: CustomPaint(
-            painter: _MiniPulseSparklinePainter(
-              points: item.points,
-              color: _changeColor(tokens, item.changePct),
-              fillColor:
-                  _changeColor(tokens, item.changePct).withValues(alpha: 0.10),
+          child: RepaintBoundary(
+            child: CustomPaint(
+              painter: _MiniPulseSparklinePainter(
+                points: item.points,
+                color: _changeColor(tokens, item.changePct),
+                fillColor: _changeColor(tokens, item.changePct)
+                    .withValues(alpha: 0.10),
+              ),
             ),
           ),
         ),

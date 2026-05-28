@@ -47,6 +47,7 @@ class LooTrendChart extends StatefulWidget {
 class _LooTrendChartState extends State<LooTrendChart> {
   late LooTrendRange _selectedRange = widget.initialRange;
   late final PageController _pageController;
+  late _PreparedTrendData _prepared;
   var _selectedMode = _LooTrendChartMode.amount;
   var _page = 0;
 
@@ -54,11 +55,15 @@ class _LooTrendChartState extends State<LooTrendChart> {
   void initState() {
     super.initState();
     _pageController = PageController();
+    _prepared = _prepareData(widget.points);
   }
 
   @override
   void didUpdateWidget(covariant LooTrendChart oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (oldWidget.points != widget.points) {
+      _prepared = _prepareData(widget.points);
+    }
     if (oldWidget.initialRange != widget.initialRange) {
       _selectedRange = widget.initialRange;
     }
@@ -72,11 +77,8 @@ class _LooTrendChartState extends State<LooTrendChart> {
 
   @override
   Widget build(BuildContext context) {
-    final allPoints = _normalizeSeries(widget.points);
-    final enabledRanges = {
-      for (final range in LooTrendRange.values)
-        range: _filteredPoints(allPoints, range).length >= 2,
-    };
+    final allPoints = _prepared.normalizedPoints;
+    final enabledRanges = _prepared.enabledRanges;
     if (enabledRanges[_selectedRange] != true) {
       _selectedRange = enabledRanges[LooTrendRange.ytd] == true
           ? LooTrendRange.ytd
@@ -86,7 +88,7 @@ class _LooTrendChartState extends State<LooTrendChart> {
             );
     }
     final points = enabledRanges[_selectedRange] == true
-        ? _filteredPoints(allPoints, _selectedRange)
+        ? _prepared.pointsByRange[_selectedRange] ?? const <LooTrendPoint>[]
         : allPoints;
     if (points.length < 2) {
       return const SizedBox.shrink();
@@ -101,7 +103,7 @@ class _LooTrendChartState extends State<LooTrendChart> {
     final mutedColor = colorScheme.onSurface.withValues(alpha: 0.64);
     final positiveColor = colorScheme.tertiary;
     final negativeColor = colorScheme.error;
-    final monthlyReturns = _monthlyReturns(allPoints);
+    final monthlyReturns = _prepared.monthlyReturns;
     final pages = <Widget>[
       _TrendLinePanel(
         points: points,
@@ -142,10 +144,11 @@ class _LooTrendChartState extends State<LooTrendChart> {
         const SizedBox(height: 12),
         SizedBox(
           height: 286,
-          child: PageView(
+          child: PageView.builder(
             controller: _pageController,
+            itemCount: 2,
             onPageChanged: (value) => setState(() => _page = value),
-            children: pages,
+            itemBuilder: (context, index) => pages[index],
           ),
         ),
         const SizedBox(height: 12),
@@ -156,6 +159,23 @@ class _LooTrendChartState extends State<LooTrendChart> {
           ),
         ),
       ],
+    );
+  }
+
+  _PreparedTrendData _prepareData(List<LooTrendPoint> points) {
+    final normalized = _normalizeSeries(points);
+    final pointsByRange = {
+      for (final range in LooTrendRange.values)
+        range: _filteredPoints(normalized, range),
+    };
+    return _PreparedTrendData(
+      normalizedPoints: normalized,
+      pointsByRange: pointsByRange,
+      enabledRanges: {
+        for (final entry in pointsByRange.entries)
+          entry.key: entry.value.length >= 2,
+      },
+      monthlyReturns: _monthlyReturns(normalized),
     );
   }
 
@@ -287,6 +307,20 @@ class _LooTrendChartState extends State<LooTrendChart> {
   }
 }
 
+class _PreparedTrendData {
+  const _PreparedTrendData({
+    required this.normalizedPoints,
+    required this.pointsByRange,
+    required this.enabledRanges,
+    required this.monthlyReturns,
+  });
+
+  final List<LooTrendPoint> normalizedPoints;
+  final Map<LooTrendRange, List<LooTrendPoint>> pointsByRange;
+  final Map<LooTrendRange, bool> enabledRanges;
+  final List<_MonthlyReturn> monthlyReturns;
+}
+
 class _TrendLinePanel extends StatelessWidget {
   const _TrendLinePanel({
     required this.points,
@@ -345,11 +379,13 @@ class _TrendLinePanel extends StatelessWidget {
         const SizedBox(height: 10),
         SizedBox(
           height: 176,
-          child: LooLineChart(
-            points: chartPoints,
-            axisValueFormatter: selectedMode == _LooTrendChartMode.percent
-                ? _formatAxisPercent
-                : null,
+          child: RepaintBoundary(
+            child: LooLineChart(
+              points: chartPoints,
+              axisValueFormatter: selectedMode == _LooTrendChartMode.percent
+                  ? _formatAxisPercent
+                  : null,
+            ),
           ),
         ),
         const SizedBox(height: 10),
@@ -1060,22 +1096,24 @@ class LooDistributionBar extends StatelessWidget {
       children: [
         ClipRRect(
           borderRadius: BorderRadius.circular(height),
-          child: Row(
-            children: [
-              for (var index = 0; index < segments.length; index++)
-                Expanded(
-                  flex: math.max(
-                    1,
-                    ((math.max(0, segments[index].value) / total) * 1000)
-                        .round(),
+          child: RepaintBoundary(
+            child: Row(
+              children: [
+                for (var index = 0; index < segments.length; index++)
+                  Expanded(
+                    flex: math.max(
+                      1,
+                      ((math.max(0, segments[index].value) / total) * 1000)
+                          .round(),
+                    ),
+                    child: ColoredBox(
+                      color: segments[index].color ??
+                          colors[index % colors.length],
+                      child: SizedBox(height: height),
+                    ),
                   ),
-                  child: ColoredBox(
-                    color:
-                        segments[index].color ?? colors[index % colors.length],
-                    child: SizedBox(height: height),
-                  ),
-                ),
-            ],
+              ],
+            ),
           ),
         ),
         const SizedBox(height: 12),
@@ -1117,14 +1155,16 @@ class LooRadarChart extends StatelessWidget {
 
     return SizedBox(
       height: height,
-      child: CustomPaint(
-        painter: _RadarChartPainter(
-          points: points,
-          axisColor: theme.colorScheme.outlineVariant,
-          fillColor: theme.colorScheme.primary.withValues(alpha: 0.16),
-          strokeColor: theme.colorScheme.primary,
-          labelColor: theme.colorScheme.onSurfaceVariant,
-          showLabels: showLabels,
+      child: RepaintBoundary(
+        child: CustomPaint(
+          painter: _RadarChartPainter(
+            points: points,
+            axisColor: theme.colorScheme.outlineVariant,
+            fillColor: theme.colorScheme.primary.withValues(alpha: 0.16),
+            strokeColor: theme.colorScheme.primary,
+            labelColor: theme.colorScheme.onSurfaceVariant,
+            showLabels: showLabels,
+          ),
         ),
       ),
     );

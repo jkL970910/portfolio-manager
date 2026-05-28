@@ -229,20 +229,17 @@ class _RecommendationsPageState extends State<RecommendationsPage> {
               LooCoachStep(
                 targetKey: _summaryCoachKey,
                 title: "先报本轮银两",
-                body:
-                    "陛下先告诉臣这轮准备动用多少银两。预算一变，候选排序、账户适配和护栏都会跟着重算。",
+                body: "陛下先告诉臣这轮准备动用多少银两。预算一变，候选排序、账户适配和护栏都会跟着重算。",
               ),
               LooCoachStep(
                 targetKey: _recentCoachKey,
                 title: "臣记下你看过的货",
-                body:
-                    "近期观察是陛下刚翻过的货架。系统会按完整身份去重，方便你回头继续看，不让裸 ticker 混进国库。",
+                body: "近期观察是陛下刚翻过的货架。系统会按完整身份去重，方便你回头继续看，不让裸 ticker 混进国库。",
               ),
               LooCoachStep(
                 targetKey: _priorityKey,
                 title: "Loo皇推荐",
-                body:
-                    "这里不是热榜，而是按组合缺口、账户适配、候选池规矩和护栏筛出的进货顺序。展开可看臣为何推荐或拦下它。",
+                body: "这里不是热榜，而是按组合缺口、账户适配、候选池规矩和护栏筛出的进货顺序。展开可看臣为何推荐或拦下它。",
                 beforeResolve: () => _prepareRecommendationCoachTarget(
                   _priorityKey,
                 ),
@@ -323,65 +320,67 @@ class _RecommendationsPageState extends State<RecommendationsPage> {
                       padding: looPagePadding(context),
                       sliver: SliverList.list(
                         children: [
-                        KeyedSubtree(
-                          key: _summaryCoachKey,
-                          child: _SummaryCard(
-                            snapshot.data!,
-                            working: _working,
-                            onCustomAmount: _createCustomRun,
-                            onRunAmount: _createRun,
-                            onDiscover: _openDiscover,
+                          KeyedSubtree(
+                            key: _summaryCoachKey,
+                            child: _SummaryCard(
+                              snapshot.data!,
+                              working: _working,
+                              onCustomAmount: _createCustomRun,
+                              onRunAmount: _createRun,
+                              onDiscover: _openDiscover,
+                              onOpenSettings: _openCandidatePoolSettings,
+                              onOpenPriorities: () =>
+                                  _scrollToSection(_priorityKey),
+                              onOpenWatchlist: () =>
+                                  _scrollToSection(_watchlistKey),
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          KeyedSubtree(
+                            key: _recentCoachKey,
+                            child: _RecentObservationCard(
+                              items: snapshot.data!.recentObservationItems,
+                              onOpen: _openMarketItem,
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          KeyedSubtree(
+                            key: _watchlistKey,
+                            child: _WatchlistCard(
+                              items: snapshot.data!.watchlistMarketItems,
+                              working: _working,
+                              onRemove: _removeWatchlistSymbol,
+                              onOpen: _openMarketItem,
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          KeyedSubtree(
+                            key: _priorityKey,
+                            child: snapshot.data!.priorities.isEmpty
+                                ? snapshot
+                                        .data!.poolStatus.needsPolicyRelaxation
+                                    ? _PoolPolicyEmptyCard(
+                                        status: snapshot.data!.poolStatus,
+                                        onOpenSettings:
+                                            _openCandidatePoolSettings,
+                                      )
+                                    : const _EmptyCard(
+                                        "暂时没有新的推荐。先完成持仓导入，Loo皇会再下达谕令。",
+                                      )
+                                : _PriorityWorkbench(
+                                    priorities: snapshot.data!.priorities,
+                                    onOpenSecurity: _openSecurityDetail,
+                                  ),
+                          ),
+                          const SizedBox(height: 16),
+                          _RecommendationPoolVisibilityCard(
+                            visibility: snapshot.data!.recommendationV4,
                             onOpenSettings: _openCandidatePoolSettings,
-                            onOpenPriorities: () =>
-                                _scrollToSection(_priorityKey),
-                            onOpenWatchlist: () =>
-                                _scrollToSection(_watchlistKey),
+                            onRunRelaxedCoreFallback:
+                                _createRelaxedCoreFallbackRun,
                           ),
-                        ),
-                        const SizedBox(height: 16),
-                        KeyedSubtree(
-                          key: _recentCoachKey,
-                          child: _RecentObservationCard(
-                            items: snapshot.data!.recentObservationItems,
-                            onOpen: _openMarketItem,
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                        KeyedSubtree(
-                          key: _watchlistKey,
-                          child: _WatchlistCard(
-                            items: snapshot.data!.watchlistMarketItems,
-                            working: _working,
-                            onRemove: _removeWatchlistSymbol,
-                            onOpen: _openMarketItem,
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                        KeyedSubtree(
-                          key: _priorityKey,
-                          child: snapshot.data!.priorities.isEmpty
-                              ? snapshot.data!.poolStatus.needsPolicyRelaxation
-                                  ? _PoolPolicyEmptyCard(
-                                      status: snapshot.data!.poolStatus,
-                                      onOpenSettings: _openCandidatePoolSettings,
-                                    )
-                                  : const _EmptyCard(
-                                      "暂时没有新的推荐。先完成持仓导入，Loo皇会再下达谕令。",
-                                    )
-                              : _PriorityWorkbench(
-                                  priorities: snapshot.data!.priorities,
-                                  onOpenSecurity: _openSecurityDetail,
-                                ),
-                          ),
-                        const SizedBox(height: 16),
-                        _RecommendationPoolVisibilityCard(
-                          visibility: snapshot.data!.recommendationV4,
-                          onOpenSettings: _openCandidatePoolSettings,
-                          onRunRelaxedCoreFallback:
-                              _createRelaxedCoreFallbackRun,
-                        ),
-                      ],
-                    ),
+                        ],
+                      ),
                     );
                   }),
               ],
@@ -1385,21 +1384,22 @@ class _MarketItemRail extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      physics: const BouncingScrollPhysics(),
-      child: Row(
-        children: [
-          for (final item in items.take(12)) ...[
-            _MarketItemCard(
-              item: item,
-              onTap: () => onOpen(item),
-              onLongPress:
-                  onLongPress == null ? null : () => onLongPress!(item),
-            ),
-            const SizedBox(width: 10),
-          ],
-        ],
+    final visibleItems = items.take(12).toList(growable: false);
+    return SizedBox(
+      height: 112,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        physics: const BouncingScrollPhysics(),
+        itemCount: visibleItems.length,
+        separatorBuilder: (context, index) => const SizedBox(width: 10),
+        itemBuilder: (context, index) {
+          final item = visibleItems[index];
+          return _MarketItemCard(
+            item: item,
+            onTap: () => onOpen(item),
+            onLongPress: onLongPress == null ? null : () => onLongPress!(item),
+          );
+        },
       ),
     );
   }
