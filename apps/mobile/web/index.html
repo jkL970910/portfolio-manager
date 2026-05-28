@@ -18,18 +18,22 @@
 
   <meta charset="UTF-8">
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">
-  <meta name="description" content="A new Flutter project.">
+  <meta name="description" content="Loo国财富宝库：个人组合、进货推荐、上贡同步与Loo皇巡阅。">
+  <meta name="theme-color" content="#7F3147">
+  <meta name="color-scheme" content="dark light">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 
   <!-- iOS meta tags & icons -->
   <meta name="mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black">
-  <meta name="apple-mobile-web-app-title" content="loo_wealth_mobile">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Loo国">
   <link rel="apple-touch-icon" href="icons/Icon-192.png">
 
   <!-- Favicon -->
   <link rel="icon" type="image/png" href="favicon.png"/>
 
-  <title>loo_wealth_mobile</title>
+  <title>Loo国财富宝库</title>
   <link rel="manifest" href="manifest.json">
 </head>
 <body>
@@ -44,7 +48,7 @@
     if ("caches" in window) {
       caches.keys().then((keys) => {
         keys
-          .filter((key) => key.includes("flutter") || key.includes("loo_wealth_mobile"))
+          .filter((key) => key.includes("flutter") || key.includes("loo_wealth_mobile") || key.includes("loo-wealth-mobile"))
           .forEach((key) => caches.delete(key));
       });
     }
