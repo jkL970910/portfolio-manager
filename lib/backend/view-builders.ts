@@ -3905,6 +3905,7 @@ export function buildPortfolioSecurityDetailData(args: {
   securityId?: string | null;
   exchange?: string | null;
   currency?: CurrencyCode | null;
+  researchDossier?: PortfolioSecurityDetailData["researchDossier"];
 }): PortfolioSecurityDetailData | null {
   const {
     language,
@@ -3919,6 +3920,7 @@ export function buildPortfolioSecurityDetailData(args: {
     securityId,
     exchange,
     currency,
+    researchDossier = null,
   } = args;
   const normalizedSymbol = symbol.trim().toUpperCase();
   const normalizedExchange = exchange?.trim().toUpperCase() || null;
@@ -4509,6 +4511,7 @@ export function buildPortfolioSecurityDetailData(args: {
     chartSeries: {
       priceHistory: priceHistoryChart,
     },
+    researchDossier,
     summaryPoints: [
       totalValueCad > 0
         ? pick(

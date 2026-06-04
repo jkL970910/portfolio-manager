@@ -27,6 +27,7 @@ import {
   RecommendationDynamicCandidateRecord,
   RecommendationRun,
   RegisteredAccountRoom,
+  SecurityResearchDossier,
   UserProfile,
 } from "@/lib/backend/models";
 
@@ -176,6 +177,26 @@ export interface MobileSecurityObservationRepository {
     userId: EntityId,
     symbol: string,
   ): Promise<number>;
+}
+
+export interface SecurityResearchDossierRepository {
+  getByUserAndSecurity(
+    userId: EntityId,
+    securityId: EntityId,
+  ): Promise<SecurityResearchDossier | null>;
+  upsert(input: {
+    userId: EntityId;
+    securityId: EntityId;
+    thesisSummary?: string | null;
+    role?: SecurityResearchDossier["role"];
+    maxAllocationPct?: number | null;
+    reviewTriggers?: string[];
+    exitTriggers?: string[];
+    confidenceLevel?: SecurityResearchDossier["confidenceLevel"];
+    lastReviewedAt?: Date | null;
+    nextReviewAt?: Date | null;
+    source?: SecurityResearchDossier["source"];
+  }): Promise<SecurityResearchDossier>;
 }
 
 export interface MobileRefreshTokenRepository {
@@ -361,6 +382,7 @@ export interface BackendRepositories {
   securityPriceHistory: SecurityPriceHistoryRepository;
   securities: SecurityRepository;
   mobileSecurityObservations: MobileSecurityObservationRepository;
+  securityResearchDossiers: SecurityResearchDossierRepository;
   mobileRefreshTokens: MobileRefreshTokenRepository;
   mobileOnboardingStates: MobileOnboardingStateRepository;
   preferences: PreferenceRepository;

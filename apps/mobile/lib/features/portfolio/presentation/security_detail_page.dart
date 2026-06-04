@@ -52,6 +52,7 @@ class _SecurityDetailPageState extends State<SecurityDetailPage> {
   String? _resolvedCurrency;
   Set<String> _watchlistSymbols = const {};
   bool _isUpdatingWatchlist = false;
+  bool _isSavingDossier = false;
   bool _observationFailureNotified = false;
   String _selectedResearchScopeId = _ResearchScope.aggregateId;
   final AiAnalysisController _analysisController = AiAnalysisController();
@@ -197,6 +198,51 @@ class _SecurityDetailPageState extends State<SecurityDetailPage> {
   bool _isWatchlistTracked(MobileSecurityDetailSnapshot data) {
     final key = _watchlistKeyForData(data);
     return key != null && _watchlistSymbols.contains(key);
+  }
+
+  Future<void> _saveResearchDossier(
+    MobileSecurityDetailSnapshot data,
+    _SecurityResearchDossierForm form,
+  ) async {
+    if (data.securityId.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("标的身份还没确认，暂时不能立档。")),
+      );
+      return;
+    }
+    setState(() => _isSavingDossier = true);
+    try {
+      await widget.apiClient.updateSecurityResearchDossier(
+        data.symbol,
+        securityId: data.securityId,
+        thesisSummary: form.thesisSummary.trim().isEmpty
+            ? null
+            : form.thesisSummary.trim(),
+        role: form.role,
+        maxAllocationPct: form.maxAllocationPct,
+        reviewTriggers: form.reviewTriggers,
+        exitTriggers: form.exitTriggers,
+        confidenceLevel: form.confidenceLevel,
+        lastReviewedAt: form.markReviewedNow
+            ? DateTime.now().toUtc().toIso8601String()
+            : form.lastReviewedAt,
+        nextReviewAt: form.nextReviewAt,
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("研究档案已入库。")),
+      );
+      _refresh();
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("研究档案保存失败：$error")),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isSavingDossier = false);
+      }
+    }
   }
 
   Future<void> _refreshQuote() async {
@@ -738,6 +784,12 @@ class _SecurityDetailPageState extends State<SecurityDetailPage> {
                     _PerformanceChartCard(chart: priceHistoryChart),
                   ],
                   const SizedBox(height: 12),
+                  _ResearchDossierSection(
+                    dossier: data.researchDossier,
+                    isSaving: _isSavingDossier,
+                    onSave: (form) => _saveResearchDossier(data, form),
+                  ),
+                  const SizedBox(height: 12),
                   if (data.heldPosition == null)
                     _UnheldPositionCard(
                       watchlistKey: _watchlistKeyForData(data),
@@ -858,6 +910,7 @@ class MobileSecurityDetailSnapshot {
     required this.facts,
     required this.relatedHoldings,
     required this.heldPosition,
+    required this.researchDossier,
     required this.researchRefreshActions,
   });
 
@@ -881,6 +934,7 @@ class MobileSecurityDetailSnapshot {
   final List<MobileFact> facts;
   final List<MobileHoldingCard> relatedHoldings;
   final MobileHeldPosition? heldPosition;
+  final MobileSecurityResearchDossier? researchDossier;
   final List<MobileResearchRefreshAction> researchRefreshActions;
 
   MobileResearchRefreshAction? researchRefreshAction(String id) {
@@ -1053,6 +1107,8 @@ class MobileSecurityDetailSnapshot {
           .map(MobileHoldingCard.fromJson)
           .toList(),
       heldPosition: MobileHeldPosition.fromJson(json["heldPosition"]),
+      researchDossier:
+          MobileSecurityResearchDossier.fromJson(json["researchDossier"]),
       researchRefreshActions: readJsonList(json, "researchRefreshActions")
           .map(MobileResearchRefreshAction.fromJson)
           .toList(),
@@ -1147,6 +1203,106 @@ class MobileResearchRefreshActionCache {
       confirmationMessage: json["confirmationMessage"] as String?,
     );
   }
+}
+
+class MobileSecurityResearchDossier {
+  const MobileSecurityResearchDossier({
+    required this.id,
+    required this.securityId,
+    required this.thesisSummary,
+    required this.role,
+    required this.roleLabel,
+    required this.maxAllocationPct,
+    required this.maxAllocationLabel,
+    required this.reviewTriggers,
+    required this.exitTriggers,
+    required this.confidenceLevel,
+    required this.confidenceLabel,
+    required this.lastReviewedAt,
+    required this.lastReviewedLabel,
+    required this.nextReviewAt,
+    required this.nextReviewLabel,
+    required this.sourceLabel,
+    required this.updatedAt,
+  });
+
+  final String id;
+  final String securityId;
+  final String? thesisSummary;
+  final String role;
+  final String roleLabel;
+  final double? maxAllocationPct;
+  final String maxAllocationLabel;
+  final List<String> reviewTriggers;
+  final List<String> exitTriggers;
+  final String confidenceLevel;
+  final String confidenceLabel;
+  final String? lastReviewedAt;
+  final String lastReviewedLabel;
+  final String? nextReviewAt;
+  final String nextReviewLabel;
+  final String sourceLabel;
+  final String updatedAt;
+
+  bool get hasContent =>
+      (thesisSummary?.trim().isNotEmpty ?? false) ||
+      reviewTriggers.isNotEmpty ||
+      exitTriggers.isNotEmpty ||
+      maxAllocationPct != null;
+
+  static MobileSecurityResearchDossier? fromJson(Object? value) {
+    final json = value is Map<String, dynamic> ? value : null;
+    if (json == null) return null;
+    final maxAllocation = json["maxAllocationPct"];
+    return MobileSecurityResearchDossier(
+      id: json["id"] as String? ?? "",
+      securityId: json["securityId"] as String? ?? "",
+      thesisSummary: json["thesisSummary"] as String?,
+      role: json["role"] as String? ?? "watch",
+      roleLabel: json["roleLabel"] as String? ?? "观察仓",
+      maxAllocationPct:
+          maxAllocation is num ? maxAllocation.toDouble() : null,
+      maxAllocationLabel: json["maxAllocationLabel"] as String? ?? "未设上限",
+      reviewTriggers:
+          (json["reviewTriggers"] as List?)?.whereType<String>().toList() ??
+              const [],
+      exitTriggers:
+          (json["exitTriggers"] as List?)?.whereType<String>().toList() ??
+              const [],
+      confidenceLevel: json["confidenceLevel"] as String? ?? "medium",
+      confidenceLabel: json["confidenceLabel"] as String? ?? "理解中等",
+      lastReviewedAt: json["lastReviewedAt"] as String?,
+      lastReviewedLabel: json["lastReviewedLabel"] as String? ?? "尚未复核",
+      nextReviewAt: json["nextReviewAt"] as String?,
+      nextReviewLabel: json["nextReviewLabel"] as String? ?? "未设下次复核",
+      sourceLabel: json["sourceLabel"] as String? ?? "你亲自立档",
+      updatedAt: json["updatedAt"] as String? ?? "",
+    );
+  }
+}
+
+class _SecurityResearchDossierForm {
+  const _SecurityResearchDossierForm({
+    required this.thesisSummary,
+    required this.role,
+    required this.maxAllocationPct,
+    required this.reviewTriggers,
+    required this.exitTriggers,
+    required this.confidenceLevel,
+    required this.lastReviewedAt,
+    required this.nextReviewAt,
+    required this.markReviewedNow,
+  });
+
+  final String thesisSummary;
+  final String role;
+  final double? maxAllocationPct;
+  final List<String> reviewTriggers;
+  final List<String> exitTriggers;
+  final String confidenceLevel;
+  final String? lastReviewedAt;
+  final String? nextReviewAt;
+  final bool markReviewedNow;
 }
 
 class _SecurityHeroFactsCard extends StatelessWidget {
@@ -1255,6 +1411,285 @@ String _securityDisplayName(MobileSecurityDetailSnapshot data) {
     return "";
   }
   return name;
+}
+
+class _ResearchDossierSection extends StatefulWidget {
+  const _ResearchDossierSection({
+    required this.dossier,
+    required this.isSaving,
+    required this.onSave,
+  });
+
+  final MobileSecurityResearchDossier? dossier;
+  final bool isSaving;
+  final ValueChanged<_SecurityResearchDossierForm> onSave;
+
+  @override
+  State<_ResearchDossierSection> createState() =>
+      _ResearchDossierSectionState();
+}
+
+class _ResearchDossierSectionState extends State<_ResearchDossierSection> {
+  late final TextEditingController _thesisController;
+  late final TextEditingController _maxAllocationController;
+  late final TextEditingController _reviewTriggersController;
+  late final TextEditingController _exitTriggersController;
+  late String _role;
+  late String _confidenceLevel;
+  var _expanded = false;
+  var _markReviewedNow = false;
+
+  @override
+  void initState() {
+    super.initState();
+    final dossier = widget.dossier;
+    _role = dossier?.role ?? "watch";
+    _confidenceLevel = dossier?.confidenceLevel ?? "medium";
+    _thesisController =
+        TextEditingController(text: dossier?.thesisSummary ?? "");
+    _maxAllocationController = TextEditingController(
+      text: dossier?.maxAllocationPct == null
+          ? ""
+          : dossier!.maxAllocationPct!.toStringAsFixed(1).replaceAll(".0", ""),
+    );
+    _reviewTriggersController =
+        TextEditingController(text: dossier?.reviewTriggers.join("\n") ?? "");
+    _exitTriggersController =
+        TextEditingController(text: dossier?.exitTriggers.join("\n") ?? "");
+  }
+
+  @override
+  void didUpdateWidget(covariant _ResearchDossierSection oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.dossier?.id == widget.dossier?.id ||
+        widget.dossier == null) {
+      return;
+    }
+    final dossier = widget.dossier!;
+    _role = dossier.role;
+    _confidenceLevel = dossier.confidenceLevel;
+    _thesisController.text = dossier.thesisSummary ?? "";
+    _maxAllocationController.text = dossier.maxAllocationPct == null
+        ? ""
+        : dossier.maxAllocationPct!.toStringAsFixed(1).replaceAll(".0", "");
+    _reviewTriggersController.text = dossier.reviewTriggers.join("\n");
+    _exitTriggersController.text = dossier.exitTriggers.join("\n");
+    _markReviewedNow = false;
+  }
+
+  @override
+  void dispose() {
+    _thesisController.dispose();
+    _maxAllocationController.dispose();
+    _reviewTriggersController.dispose();
+    _exitTriggersController.dispose();
+    super.dispose();
+  }
+
+  List<String> _splitLines(String value) {
+    return value
+        .split(RegExp(r"[\n；;]"))
+        .map((item) => item.trim())
+        .where((item) => item.isNotEmpty)
+        .take(12)
+        .toList();
+  }
+
+  void _submit() {
+    final rawMaxAllocation = _maxAllocationController.text.trim();
+    final maxAllocation = rawMaxAllocation.isEmpty
+        ? null
+        : double.tryParse(rawMaxAllocation.replaceAll("%", ""));
+    if (rawMaxAllocation.isNotEmpty &&
+        (maxAllocation == null || maxAllocation < 0 || maxAllocation > 100)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("最大仓位请填写 0 到 100 之间的数字。")),
+      );
+      return;
+    }
+    widget.onSave(
+      _SecurityResearchDossierForm(
+        thesisSummary: _thesisController.text,
+        role: _role,
+        maxAllocationPct: maxAllocation,
+        reviewTriggers: _splitLines(_reviewTriggersController.text),
+        exitTriggers: _splitLines(_exitTriggersController.text),
+        confidenceLevel: _confidenceLevel,
+        lastReviewedAt: widget.dossier?.lastReviewedAt,
+        nextReviewAt: widget.dossier?.nextReviewAt,
+        markReviewedNow: _markReviewedNow,
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = context.looTokens;
+    final theme = Theme.of(context);
+    final dossier = widget.dossier;
+    final hasDossier = dossier?.hasContent == true;
+    final summary = hasDossier
+        ? dossier!.thesisSummary?.trim().isNotEmpty == true
+            ? dossier.thesisSummary!.trim()
+            : "已立档，等待补充持有理由。"
+        : "给这支标的留下你的持有理由、仓位角色和复核条件。";
+
+    return LooGlassCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          InkWell(
+            borderRadius: BorderRadius.circular(tokens.radiusMd),
+            onTap: () => setState(() => _expanded = !_expanded),
+            child: Row(
+              children: [
+                Expanded(
+                  child: _SectionHeader(
+                    title: "Loo国研究档案",
+                    trailing: hasDossier ? "已立档" : "待立档",
+                  ),
+                ),
+                AnimatedRotation(
+                  turns: _expanded ? 0.5 : 0,
+                  duration: const Duration(milliseconds: 180),
+                  curve: Curves.easeOutCubic,
+                  child: Icon(
+                    Icons.keyboard_arrow_down_rounded,
+                    color: tokens.mutedText,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            summary,
+            maxLines: _expanded ? 4 : 2,
+            overflow: TextOverflow.ellipsis,
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: tokens.mutedText,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              _InfoChip(dossier?.roleLabel ?? "观察仓"),
+              _InfoChip("上限 ${dossier?.maxAllocationLabel ?? "未设"}"),
+              _InfoChip(dossier?.confidenceLabel ?? "理解中等"),
+              _InfoChip(dossier?.nextReviewLabel ?? "未设复核"),
+            ],
+          ),
+          if (_expanded) ...[
+            const SizedBox(height: 14),
+            TextField(
+              controller: _thesisController,
+              maxLines: 4,
+              decoration: const InputDecoration(
+                labelText: "我的理由",
+                hintText: "例如：长期核心宽基、AI 算力主题、或只是先观察。",
+              ),
+            ),
+            const SizedBox(height: 12),
+            SegmentedButton<String>(
+              segments: const [
+                ButtonSegment(value: "core", label: Text("核心")),
+                ButtonSegment(value: "satellite", label: Text("卫星")),
+                ButtonSegment(value: "watch", label: Text("观察")),
+                ButtonSegment(value: "defensive", label: Text("防守")),
+              ],
+              selected: {_role},
+              onSelectionChanged: widget.isSaving
+                  ? null
+                  : (value) => setState(() => _role = value.first),
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _maxAllocationController,
+                    keyboardType:
+                        const TextInputType.numberWithOptions(decimal: true),
+                    decoration: const InputDecoration(
+                      labelText: "最大仓位 %",
+                      hintText: "例如 15",
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: DropdownButtonFormField<String>(
+                    initialValue: _confidenceLevel,
+                    decoration: const InputDecoration(labelText: "理解程度"),
+                    items: const [
+                      DropdownMenuItem(value: "low", child: Text("了解较少")),
+                      DropdownMenuItem(value: "medium", child: Text("理解中等")),
+                      DropdownMenuItem(value: "high", child: Text("理解较深")),
+                    ],
+                    onChanged: widget.isSaving
+                        ? null
+                        : (value) => setState(
+                              () => _confidenceLevel = value ?? "medium",
+                            ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _reviewTriggersController,
+              maxLines: 3,
+              decoration: const InputDecoration(
+                labelText: "复核触发条件",
+                hintText: "一行一个：跌破 MA200；财报增速放缓；仓位超过上限",
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _exitTriggersController,
+              maxLines: 3,
+              decoration: const InputDecoration(
+                labelText: "减仓 / 退出条件",
+                hintText: "一行一个： thesis 失效；估值过热；基本面恶化",
+              ),
+            ),
+            const SizedBox(height: 8),
+            CheckboxListTile(
+              value: _markReviewedNow,
+              contentPadding: EdgeInsets.zero,
+              onChanged: widget.isSaving
+                  ? null
+                  : (value) => setState(() => _markReviewedNow = value == true),
+              title: const Text("本次保存同时标记为已复核"),
+              subtitle: Text(
+                "后续 P1.2 会用复核时间判断 thesis drift 和资料健康度。",
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: tokens.mutedText,
+                ),
+              ),
+            ),
+            const SizedBox(height: 10),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton.icon(
+                onPressed: widget.isSaving ? null : _submit,
+                icon: widget.isSaving
+                    ? const SizedBox(
+                        height: 16,
+                        width: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.save_outlined),
+                label: Text(widget.isSaving ? "入库中..." : "保存研究档案"),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
 }
 
 class _ResearchWorkbenchSection extends StatefulWidget {

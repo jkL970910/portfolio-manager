@@ -47,6 +47,7 @@ import {
   AccountType,
   UserProfile,
   MobileSecurityObservation,
+  SecurityResearchDossier,
 } from "@/lib/backend/models";
 import {
   buildPortfolioAccountDetailData,
@@ -120,6 +121,7 @@ import {
 import { resolveCanonicalSecurityIdentity } from "@/lib/market-data/security-identity";
 import { inferEconomicAssetClass } from "@/lib/backend/security-economic-exposure";
 import type { MobileSecurityObservationInputPayload } from "@/lib/backend/payload-schemas";
+import type { SecurityResearchDossierInputPayload } from "@/lib/backend/payload-schemas";
 import type { IbkrConnectionSaveInputPayload } from "@/lib/backend/payload-schemas";
 import type { snapTradeConnectionPortalInputSchema } from "@/lib/backend/payload-schemas";
 import type { RegisteredAccountRoomsInputPayload } from "@/lib/backend/payload-schemas";
@@ -129,6 +131,7 @@ import type {
   SecurityHistoricalPoint,
   SecurityResolution,
 } from "@/lib/market-data/types";
+import type { PortfolioSecurityDetailData } from "@/lib/contracts";
 import { getProviderLimitSnapshot } from "@/lib/market-data/provider-limits";
 import { getAssetClassLabel } from "@/lib/i18n/finance";
 import { pick } from "@/lib/i18n/ui";
@@ -136,6 +139,98 @@ import { pick } from "@/lib/i18n/ui";
 type DbTransaction = Parameters<
   Parameters<ReturnType<typeof getDb>["transaction"]>[0]
 >[0];
+
+function formatDossierDate(
+  value: string | null,
+  language: DisplayLanguage,
+  fallback: string,
+) {
+  if (!value) {
+    return fallback;
+  }
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return fallback;
+  }
+  return date.toLocaleDateString(language === "zh" ? "zh-CN" : "en-CA", {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  });
+}
+
+function getDossierRoleLabel(
+  role: SecurityResearchDossier["role"],
+  language: DisplayLanguage,
+) {
+  return (
+    {
+      core: pick(language, "核心仓", "Core"),
+      satellite: pick(language, "卫星仓", "Satellite"),
+      watch: pick(language, "观察仓", "Watch"),
+      cash: pick(language, "现金替代", "Cash alternative"),
+      defensive: pick(language, "防守仓", "Defensive"),
+    } satisfies Record<SecurityResearchDossier["role"], string>
+  )[role];
+}
+
+function getDossierConfidenceLabel(
+  confidence: SecurityResearchDossier["confidenceLevel"],
+  language: DisplayLanguage,
+) {
+  return (
+    {
+      low: pick(language, "了解较少", "Low"),
+      medium: pick(language, "理解中等", "Medium"),
+      high: pick(language, "理解较深", "High"),
+    } satisfies Record<SecurityResearchDossier["confidenceLevel"], string>
+  )[confidence];
+}
+
+function mapSecurityResearchDossierForView(
+  dossier: SecurityResearchDossier,
+  language: DisplayLanguage,
+): NonNullable<PortfolioSecurityDetailData["researchDossier"]> {
+  return {
+    id: dossier.id,
+    securityId: dossier.securityId,
+    thesisSummary: dossier.thesisSummary,
+    role: dossier.role,
+    roleLabel: getDossierRoleLabel(dossier.role, language),
+    maxAllocationPct: dossier.maxAllocationPct,
+    maxAllocationLabel:
+      dossier.maxAllocationPct == null
+        ? pick(language, "未设上限", "No cap set")
+        : `${dossier.maxAllocationPct.toFixed(1).replace(/\.0$/u, "")}%`,
+    reviewTriggers: dossier.reviewTriggers,
+    exitTriggers: dossier.exitTriggers,
+    confidenceLevel: dossier.confidenceLevel,
+    confidenceLabel: getDossierConfidenceLabel(
+      dossier.confidenceLevel,
+      language,
+    ),
+    lastReviewedAt: dossier.lastReviewedAt,
+    lastReviewedLabel: formatDossierDate(
+      dossier.lastReviewedAt,
+      language,
+      pick(language, "尚未复核", "Not reviewed"),
+    ),
+    nextReviewAt: dossier.nextReviewAt,
+    nextReviewLabel: formatDossierDate(
+      dossier.nextReviewAt,
+      language,
+      pick(language, "未设下次复核", "No next review"),
+    ),
+    source: dossier.source,
+    sourceLabel:
+      dossier.source === "user"
+        ? pick(language, "你亲自立档", "User-owned")
+        : dossier.source === "loo-generated"
+          ? pick(language, "Loo皇草拟", "Loo draft")
+          : pick(language, "导入资料", "Imported"),
+    updatedAt: dossier.updatedAt,
+  };
+}
 
 export interface PreferenceProfileInput {
   riskProfile: RiskProfile;
@@ -2429,6 +2524,17 @@ export async function getPortfolioSecurityDetailView(
     await repositories.securityPriceHistory.listBySecurityId(
       canonicalSecurity.id,
     );
+  const researchDossierRecord =
+    await repositories.securityResearchDossiers.getByUserAndSecurity(
+      userId,
+      canonicalSecurity.id,
+    );
+  const researchDossier = researchDossierRecord
+    ? mapSecurityResearchDossierForView(
+        researchDossierRecord,
+        user.displayLanguage,
+      )
+    : null;
   const shouldPersistFetchedHistory =
     hydratedPriceHistory.length < 2 ||
     historyNeedsHigherDensity(hydratedPriceHistory);
@@ -2485,6 +2591,7 @@ export async function getPortfolioSecurityDetailView(
     securityId: canonicalSecurity.id,
     exchange: canonicalSecurity.canonicalExchange,
     currency: canonicalSecurity.currency,
+    researchDossier,
   });
 
   if (!data) {
@@ -2659,6 +2766,32 @@ export async function recordMobileSecurityObservation(
       .catch(() => 0);
   }
   return observation;
+}
+
+export async function updateSecurityResearchDossier(
+  userId: string,
+  securityId: string,
+  input: SecurityResearchDossierInputPayload,
+) {
+  const repositories = getRepositories();
+  const security = await repositories.securities.getById(securityId);
+  if (!security) {
+    throw new Error("Security was not found.");
+  }
+
+  return repositories.securityResearchDossiers.upsert({
+    userId,
+    securityId,
+    thesisSummary: input.thesisSummary?.trim() || null,
+    role: input.role,
+    maxAllocationPct: input.maxAllocationPct ?? null,
+    reviewTriggers: input.reviewTriggers ?? [],
+    exitTriggers: input.exitTriggers ?? [],
+    confidenceLevel: input.confidenceLevel,
+    lastReviewedAt: input.lastReviewedAt ? new Date(input.lastReviewedAt) : null,
+    nextReviewAt: input.nextReviewAt ? new Date(input.nextReviewAt) : null,
+    source: "user",
+  });
 }
 
 export async function updateHoldingPosition(

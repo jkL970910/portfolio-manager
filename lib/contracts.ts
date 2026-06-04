@@ -717,6 +717,26 @@ export interface PortfolioSecurityDetailData {
     priceHistory?: MobileChartSeries;
   };
   summaryPoints: string[];
+  researchDossier: null | {
+    id: string;
+    securityId: string;
+    thesisSummary: string | null;
+    role: string;
+    roleLabel: string;
+    maxAllocationPct: number | null;
+    maxAllocationLabel: string;
+    reviewTriggers: string[];
+    exitTriggers: string[];
+    confidenceLevel: "low" | "medium" | "high";
+    confidenceLabel: string;
+    lastReviewedAt: string | null;
+    lastReviewedLabel: string;
+    nextReviewAt: string | null;
+    nextReviewLabel: string;
+    source: string;
+    sourceLabel: string;
+    updatedAt: string;
+  };
   relatedHoldings: {
     id: string;
     symbol: string;

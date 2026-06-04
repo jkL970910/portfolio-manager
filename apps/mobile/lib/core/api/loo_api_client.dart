@@ -283,6 +283,33 @@ class LooApiClient {
     );
   }
 
+  Future<Map<String, dynamic>> updateSecurityResearchDossier(
+    String symbol, {
+    required String securityId,
+    String? thesisSummary,
+    String role = "watch",
+    double? maxAllocationPct,
+    List<String> reviewTriggers = const [],
+    List<String> exitTriggers = const [],
+    String confidenceLevel = "medium",
+    String? lastReviewedAt,
+    String? nextReviewAt,
+  }) {
+    return _patchJson(
+      "/api/mobile/portfolio/securities/${Uri.encodeComponent(symbol)}/research-dossier?securityId=${Uri.encodeQueryComponent(securityId)}",
+      body: {
+        "thesisSummary": thesisSummary,
+        "role": role,
+        "maxAllocationPct": maxAllocationPct,
+        "reviewTriggers": reviewTriggers,
+        "exitTriggers": exitTriggers,
+        "confidenceLevel": confidenceLevel,
+        if (lastReviewedAt != null) "lastReviewedAt": lastReviewedAt,
+        if (nextReviewAt != null) "nextReviewAt": nextReviewAt,
+      },
+    );
+  }
+
   Future<Map<String, dynamic>> createManualAccount({
     required String accountType,
     required String institution,

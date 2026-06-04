@@ -237,6 +237,35 @@ export interface MobileSecurityObservation {
   updatedAt: string;
 }
 
+export type SecurityResearchDossierRole =
+  | "core"
+  | "satellite"
+  | "watch"
+  | "cash"
+  | "defensive";
+export type SecurityResearchDossierConfidence = "low" | "medium" | "high";
+export type SecurityResearchDossierSource =
+  | "user"
+  | "loo-generated"
+  | "imported";
+
+export interface SecurityResearchDossier {
+  id: EntityId;
+  userId: EntityId;
+  securityId: EntityId;
+  thesisSummary: string | null;
+  role: SecurityResearchDossierRole;
+  maxAllocationPct: number | null;
+  reviewTriggers: string[];
+  exitTriggers: string[];
+  confidenceLevel: SecurityResearchDossierConfidence;
+  lastReviewedAt: string | null;
+  nextReviewAt: string | null;
+  source: SecurityResearchDossierSource;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface MobileRefreshTokenRecord {
   id: EntityId;
   userId: EntityId;

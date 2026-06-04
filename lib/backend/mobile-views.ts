@@ -975,6 +975,7 @@ function mapMobileSecurityDetailData(
     performance: data.performance,
     chartSeries: data.chartSeries,
     summaryPoints: data.summaryPoints,
+    researchDossier: data.researchDossier,
     researchRefreshActions,
     relatedHoldings: data.relatedHoldings.map((holding) => {
       const { href: _href, ...rest } = holding;

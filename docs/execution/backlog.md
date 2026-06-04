@@ -179,9 +179,11 @@ The following do not block MVP signoff and remain P1/P2:
 
 ## P1 Loo国研究档案 / Thesis Dossier
 
-Status: planned P1 after MVP signoff. This is a long-term product capability,
-not a temporary shortcut and not a direct integration of external skill runtimes
-such as `AlphaGBM/skills`.
+Status: P1 active. `P1.1` now has the durable dossier foundation: a
+canonical-security-scoped research dossier persisted per user and exposed on
+mobile Security Detail. This remains a long-term product capability, not a
+temporary shortcut and not a direct integration of external skill runtimes such
+as `AlphaGBM/skills`.
 
 Product intent:
 
@@ -215,6 +217,26 @@ Core domain model:
     Canadian dividends, semiconductors, or custom.
   - contains canonical securities, thesis summary, target exposure constraints,
     and review cadence.
+
+Implemented P1.1 base:
+
+- `security_research_dossiers` persists one user-owned dossier per
+  `(user_id, security_id)`.
+- Mobile Security Detail shows a collapsible `Loo国研究档案` card between the
+  listing facts/chart area and the position/research sections.
+- Users can save thesis summary, portfolio role, maximum allocation,
+  review triggers, exit triggers, confidence level, and review timestamp.
+- The mobile update API requires `securityId`; dossier writes must not fall
+  back to naked ticker matching.
+- Security Detail read models include `researchDossier` for mobile and shared
+  backend contracts.
+
+Still P1 follow-up:
+
+- Thesis drift snapshots and change detection.
+- Research-health status based on dossier completeness and evidence freshness.
+- Theme baskets and cross-security dossier views.
+- AI 大臣 read access to dossiers and explicit user-confirmed edit suggestions.
 
 Backend contracts:
 

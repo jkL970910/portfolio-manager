@@ -534,6 +534,51 @@ export const mobileSecurityObservations = pgTable(
   }),
 );
 
+export const securityResearchDossiers = pgTable(
+  "security_research_dossiers",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id),
+    securityId: uuid("security_id")
+      .notNull()
+      .references(() => securities.id),
+    thesisSummary: text("thesis_summary"),
+    role: varchar("role", { length: 32 }).notNull().default("watch"),
+    maxAllocationPct: numeric("max_allocation_pct", {
+      precision: 5,
+      scale: 2,
+    }),
+    reviewTriggers: jsonb("review_triggers").notNull().default([]),
+    exitTriggers: jsonb("exit_triggers").notNull().default([]),
+    confidenceLevel: varchar("confidence_level", { length: 16 })
+      .notNull()
+      .default("medium"),
+    lastReviewedAt: timestamp("last_reviewed_at", { withTimezone: true }),
+    nextReviewAt: timestamp("next_review_at", { withTimezone: true }),
+    source: varchar("source", { length: 24 }).notNull().default("user"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => ({
+    userSecurityIdx: uniqueIndex(
+      "security_research_dossiers_user_security_idx",
+    ).on(table.userId, table.securityId),
+    userUpdatedIdx: index("security_research_dossiers_user_updated_idx").on(
+      table.userId,
+      table.updatedAt,
+    ),
+    securityIdx: index("security_research_dossiers_security_idx").on(
+      table.securityId,
+    ),
+  }),
+);
+
 export const preferenceProfiles = pgTable(
   "preference_profiles",
   {

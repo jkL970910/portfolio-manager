@@ -174,6 +174,13 @@ Security Detail starts with `Loo国研究台`:
 - account/portfolio scope tabs for held securities, where listing-level facts
   stay stable and only the user's holding/account lens changes
 
+Security Detail also exposes `Loo国研究档案` as the persistent user-memory layer
+for the same canonical listing. The dossier is saved per user and per
+`security_id`, not per naked ticker. Users can record why they hold or watch the
+security, its intended role, a maximum allocation boundary, review triggers,
+exit triggers, and confidence level. This is a user-owned thesis layer; it does
+not replace deterministic quick scans, guardrails, or portfolio-fit logic.
+
 The `Loo国研究工作台` smart scan then shows:
 
 - 投资判断

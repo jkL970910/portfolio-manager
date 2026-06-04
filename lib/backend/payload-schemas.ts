@@ -249,6 +249,25 @@ export const mobileSecurityObservationInputSchema = z.object({
     .default("security-detail"),
 });
 
+const dossierTriggerListSchema = z
+  .array(z.string().trim().min(1).max(160))
+  .max(12)
+  .default([]);
+
+export const securityResearchDossierInputSchema = z.object({
+  thesisSummary: z.string().trim().max(800).nullable().optional(),
+  role: z
+    .enum(["core", "satellite", "watch", "cash", "defensive"])
+    .default("watch"),
+  maxAllocationPct: z.number().min(0).max(100).nullable().optional(),
+  reviewTriggers: dossierTriggerListSchema.optional(),
+  exitTriggers: dossierTriggerListSchema.optional(),
+  confidenceLevel: z.enum(["low", "medium", "high"]).default("medium"),
+  lastReviewedAt: z.string().datetime().nullable().optional(),
+  nextReviewAt: z.string().datetime().nullable().optional(),
+  source: z.enum(["user", "loo-generated", "imported"]).default("user"),
+});
+
 export const displayCurrencyInputSchema = z.object({
   currency: z.enum(["CAD", "USD"]),
 });
@@ -836,6 +855,9 @@ export type WatchlistSymbolInputPayload = z.infer<
 >;
 export type MobileSecurityObservationInputPayload = z.infer<
   typeof mobileSecurityObservationInputSchema
+>;
+export type SecurityResearchDossierInputPayload = z.infer<
+  typeof securityResearchDossierInputSchema
 >;
 export type IbkrConnectionSaveInputPayload = z.infer<
   typeof ibkrConnectionSaveInputSchema

@@ -27,6 +27,7 @@ import {
   securities,
   securityAliases,
   securityPriceHistory,
+  securityResearchDossiers,
   users,
 } from "@/lib/db/schema";
 import {
@@ -52,6 +53,7 @@ import {
   SecurityAliasRecord,
   SecurityPriceHistoryPoint,
   SecurityRecord,
+  SecurityResearchDossier,
   PreferenceProfile,
   RecommendationDynamicCandidateRecord,
   RecommendationRun,
@@ -194,6 +196,39 @@ function mapMobileSecurityObservation(
       row.source as MobileSecurityObservation["source"],
     observationCount: row.observationCount,
     lastObservedAt: row.lastObservedAt.toISOString(),
+    createdAt: row.createdAt.toISOString(),
+    updatedAt: row.updatedAt.toISOString(),
+  };
+}
+
+function normalizeStringArray(value: unknown): string[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  return value
+    .map((item) => (typeof item === "string" ? item.trim() : ""))
+    .filter(Boolean)
+    .slice(0, 12);
+}
+
+function mapSecurityResearchDossier(
+  row: typeof securityResearchDossiers.$inferSelect,
+): SecurityResearchDossier {
+  return {
+    id: row.id,
+    userId: row.userId,
+    securityId: row.securityId,
+    thesisSummary: row.thesisSummary ?? null,
+    role: row.role as SecurityResearchDossier["role"],
+    maxAllocationPct:
+      row.maxAllocationPct == null ? null : toNumber(row.maxAllocationPct),
+    reviewTriggers: normalizeStringArray(row.reviewTriggers),
+    exitTriggers: normalizeStringArray(row.exitTriggers),
+    confidenceLevel:
+      row.confidenceLevel as SecurityResearchDossier["confidenceLevel"],
+    lastReviewedAt: row.lastReviewedAt?.toISOString() ?? null,
+    nextReviewAt: row.nextReviewAt?.toISOString() ?? null,
+    source: row.source as SecurityResearchDossier["source"],
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   };
@@ -1246,6 +1281,65 @@ export const postgresRepositories: BackendRepositories = {
         )
         .returning({ id: mobileSecurityObservations.id });
       return deletedRows.length;
+    },
+  },
+  securityResearchDossiers: {
+    async getByUserAndSecurity(userId, securityId) {
+      const db = getDb();
+      const row = await db.query.securityResearchDossiers.findFirst({
+        where: and(
+          eq(securityResearchDossiers.userId, userId),
+          eq(securityResearchDossiers.securityId, securityId),
+        ),
+      });
+      return row ? mapSecurityResearchDossier(row) : null;
+    },
+    async upsert(input) {
+      const db = getDb();
+      const now = new Date();
+      const [row] = await db
+        .insert(securityResearchDossiers)
+        .values({
+          userId: input.userId,
+          securityId: input.securityId,
+          thesisSummary: input.thesisSummary ?? null,
+          role: input.role ?? "watch",
+          maxAllocationPct:
+            input.maxAllocationPct == null ? null : String(input.maxAllocationPct),
+          reviewTriggers: input.reviewTriggers ?? [],
+          exitTriggers: input.exitTriggers ?? [],
+          confidenceLevel: input.confidenceLevel ?? "medium",
+          lastReviewedAt: input.lastReviewedAt ?? null,
+          nextReviewAt: input.nextReviewAt ?? null,
+          source: input.source ?? "user",
+          updatedAt: now,
+        })
+        .onConflictDoUpdate({
+          target: [
+            securityResearchDossiers.userId,
+            securityResearchDossiers.securityId,
+          ],
+          set: {
+            thesisSummary: input.thesisSummary ?? null,
+            role: input.role ?? "watch",
+            maxAllocationPct:
+              input.maxAllocationPct == null
+                ? null
+                : String(input.maxAllocationPct),
+            reviewTriggers: input.reviewTriggers ?? [],
+            exitTriggers: input.exitTriggers ?? [],
+            confidenceLevel: input.confidenceLevel ?? "medium",
+            lastReviewedAt: input.lastReviewedAt ?? null,
+            nextReviewAt: input.nextReviewAt ?? null,
+            source: input.source ?? "user",
+            updatedAt: now,
+          },
+        })
+        .returning();
+      if (!row) {
+        throw new Error("Failed to save security research dossier.");
+      }
+      return mapSecurityResearchDossier(row);
     },
   },
   mobileRefreshTokens: {

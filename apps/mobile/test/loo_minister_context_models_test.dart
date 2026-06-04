@@ -390,6 +390,7 @@ void main() {
       facts: [],
       relatedHoldings: [],
       heldPosition: null,
+      researchDossier: null,
       researchRefreshActions: [],
     );
 

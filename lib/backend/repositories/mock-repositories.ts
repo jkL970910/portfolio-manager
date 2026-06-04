@@ -26,6 +26,7 @@ import {
   PortfolioAnalysisRun,
   RecommendationDynamicCandidateRecord,
   RegisteredAccountRoom,
+  SecurityResearchDossier,
 } from "@/lib/backend/models";
 import {
   ExternalResearchJob,
@@ -42,6 +43,7 @@ const externalResearchUsageCounters: ExternalResearchUsageCounter[] = [];
 const externalResearchDocuments: ExternalResearchDocumentRecord[] = [];
 const marketSentimentSnapshots: MarketSentimentSnapshot[] = [];
 const mobileSecurityObservations: MobileSecurityObservation[] = [];
+const securityResearchDossiers: SecurityResearchDossier[] = [];
 const mobileRefreshTokens: MobileRefreshTokenRecord[] = [];
 const mobileOnboardingStates: MobileOnboardingState[] = [];
 const recommendationDynamicCandidates: RecommendationDynamicCandidateRecord[] = [];
@@ -402,6 +404,53 @@ export const mockRepositories: BackendRepositories = {
         }
       }
       return deleted;
+    },
+  },
+  securityResearchDossiers: {
+    async getByUserAndSecurity(userId, securityId) {
+      return (
+        securityResearchDossiers.find(
+          (item) => item.userId === userId && item.securityId === securityId,
+        ) ?? null
+      );
+    },
+    async upsert(input) {
+      const now = new Date().toISOString();
+      const existing = securityResearchDossiers.find(
+        (item) =>
+          item.userId === input.userId && item.securityId === input.securityId,
+      );
+      if (existing) {
+        existing.thesisSummary = input.thesisSummary ?? null;
+        existing.role = input.role ?? "watch";
+        existing.maxAllocationPct = input.maxAllocationPct ?? null;
+        existing.reviewTriggers = input.reviewTriggers ?? [];
+        existing.exitTriggers = input.exitTriggers ?? [];
+        existing.confidenceLevel = input.confidenceLevel ?? "medium";
+        existing.lastReviewedAt = input.lastReviewedAt?.toISOString() ?? null;
+        existing.nextReviewAt = input.nextReviewAt?.toISOString() ?? null;
+        existing.source = input.source ?? "user";
+        existing.updatedAt = now;
+        return existing;
+      }
+      const dossier: SecurityResearchDossier = {
+        id: `security_research_dossier_${securityResearchDossiers.length + 1}`,
+        userId: input.userId,
+        securityId: input.securityId,
+        thesisSummary: input.thesisSummary ?? null,
+        role: input.role ?? "watch",
+        maxAllocationPct: input.maxAllocationPct ?? null,
+        reviewTriggers: input.reviewTriggers ?? [],
+        exitTriggers: input.exitTriggers ?? [],
+        confidenceLevel: input.confidenceLevel ?? "medium",
+        lastReviewedAt: input.lastReviewedAt?.toISOString() ?? null,
+        nextReviewAt: input.nextReviewAt?.toISOString() ?? null,
+        source: input.source ?? "user",
+        createdAt: now,
+        updatedAt: now,
+      };
+      securityResearchDossiers.push(dossier);
+      return dossier;
     },
   },
   mobileRefreshTokens: {
