@@ -2515,12 +2515,15 @@ export function buildDashboardData(args: {
   const unanchoredNetWorthTrend =
     cashBalanceTrend && investedAssetTrend.length > 0
       ? investedAssetTrend.map((point) => {
-          const cashPoint =
+          const pointRawDate =
             "rawDate" in point && typeof point.rawDate === "string"
-              ? cashBalanceTrend.find(
-                  (entry) => entry.rawDate === point.rawDate,
-                )
+              ? point.rawDate
               : null;
+          const cashPoint = pointRawDate
+            ? cashBalanceTrend.find(
+                (entry) => entry.rawDate === pointRawDate.slice(0, 10),
+              )
+            : null;
           return {
             ...point,
             value: round(point.value + (cashPoint?.value ?? 0), 2),

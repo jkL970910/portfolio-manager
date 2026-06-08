@@ -777,6 +777,60 @@ test("mobile home overview chart contract preserves intraday replay points", () 
   assert.equal(chart.points[1]?.value, 1412.5);
 });
 
+test("mobile home overview chart applies cash balance across intraday points", () => {
+  const dashboard = buildDashboardData({
+    viewer: {
+      id: "user_test",
+      email: "tester@example.com",
+      displayName: "Tester",
+      baseCurrency: "CAD",
+      displayLanguage: "zh",
+    },
+    accounts,
+    holdings,
+    transactions: [],
+    cashAccounts: [
+      {
+        id: "cash_test",
+        userId: "user_test",
+        institution: "Wealthsimple",
+        nickname: "Cash",
+        currency: "CAD",
+        currentBalanceAmount: 2500,
+        currentBalanceCad: 2500,
+        createdAt: "2026-04-28T00:00:00.000Z",
+        updatedAt: "2026-04-28T00:00:00.000Z",
+      },
+    ],
+    portfolioEvents: [],
+    priceHistory: [
+      {
+        ...priceHistory[0]!,
+        priceDate: "2026-04-26",
+        priceTime: "2026-04-26T13:30:00.000Z",
+        close: 140.5,
+      },
+      {
+        ...priceHistory[1]!,
+        priceDate: "2026-04-26",
+        priceTime: "2026-04-26T14:30:00.000Z",
+        close: 141.25,
+      },
+    ],
+    snapshots: [],
+    profile,
+    latestRun: null,
+    display,
+  });
+
+  const chart = dashboard.chartSeries?.netWorth;
+  assert.ok(chart);
+  assert.equal(chart.points[0]?.rawDate, "2026-04-26T13:30:00.000Z");
+  assert.equal(chart.points[1]?.rawDate, "2026-04-26T14:30:00.000Z");
+  assert.equal(chart.points[0]?.value, 3905);
+  assert.equal(chart.points[1]?.value, 3912.5);
+});
+
 test("portfolio account context chart contract exposes account freshness", () => {
   const portfolio = buildPortfolioData({
     language: "zh",
