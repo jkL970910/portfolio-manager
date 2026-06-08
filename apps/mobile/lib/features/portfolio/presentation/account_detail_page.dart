@@ -1270,6 +1270,9 @@ class _CompactHoldingRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final tokens = context.looTokens;
+    final accountShare = holding.accountShare.isNotEmpty
+        ? "账户内 ${holding.accountShare}"
+        : holding.weight;
     return InkWell(
       borderRadius: BorderRadius.circular(tokens.radiusMd),
       onTap: onTap,
@@ -1287,10 +1290,10 @@ class _CompactHoldingRow extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                     style: Theme.of(context).textTheme.titleSmall,
                   ),
-                  if (holding.weight.isNotEmpty) ...[
+                  if (accountShare.isNotEmpty) ...[
                     SizedBox(height: tokens.gapXs),
                     Text(
-                      holding.weight,
+                      accountShare,
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
                             color: tokens.mutedText,
                           ),

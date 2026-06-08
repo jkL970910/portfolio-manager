@@ -59,6 +59,8 @@ class MobileHoldingCard {
     required this.value,
     required this.gainLoss,
     required this.weight,
+    required this.portfolioShare,
+    required this.accountShare,
     required this.detail,
     required this.accountType,
     required this.accountCount,
@@ -80,6 +82,8 @@ class MobileHoldingCard {
   final String value;
   final String gainLoss;
   final String weight;
+  final String portfolioShare;
+  final String accountShare;
   final String detail;
   final String accountType;
   final String accountCount;
@@ -105,6 +109,8 @@ class MobileHoldingCard {
         lotCount.isNotEmpty && lotCount != "1" ? "$lotCount 笔仓位" : "";
     final weight =
         json["weight"] as String? ?? json["portfolioShare"] as String? ?? "";
+    final portfolioShare = json["portfolioShare"] as String? ?? weight;
+    final accountShare = json["accountShare"] as String? ?? "";
     final lastUpdated = json["lastUpdated"] as String? ?? "";
     final freshnessVariant = json["freshnessVariant"] as String? ?? "neutral";
     final quoteStatusLabel = json["quoteStatusLabel"] as String? ??
@@ -122,6 +128,8 @@ class MobileHoldingCard {
       value: json["value"] as String? ?? "--",
       gainLoss: json["gainLoss"] as String? ?? "",
       weight: weight,
+      portfolioShare: portfolioShare,
+      accountShare: accountShare,
       detail: [
         account,
         if (accountCountLabel.isNotEmpty && account != accountCountLabel)
