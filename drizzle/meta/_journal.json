@@ -281,6 +281,13 @@
       "when": 1780070400000,
       "tag": "0039_security_research_dossiers",
       "breakpoints": true
+    },
+    {
+      "idx": 40,
+      "version": "7",
+      "when": 1780933200000,
+      "tag": "0040_brokerage_account_aliases",
+      "breakpoints": true
     }
   ]
 }

@@ -23,6 +23,7 @@ export type IbkrFlexPreviewHolding = {
 
 export type IbkrFlexPreviewAccount = {
   accountId: string;
+  accountAliases?: string[];
   accountType: string;
   currency: CurrencyCode;
   netLiquidation: number | null;

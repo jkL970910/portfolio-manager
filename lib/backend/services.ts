@@ -1,6 +1,6 @@
 ﻿import crypto from "node:crypto";
 import { hash } from "bcryptjs";
-import { and, desc, eq, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, or, sql } from "drizzle-orm";
 import { apiSuccess } from "@/lib/backend/contracts";
 import type { PortfolioHoldingDetailData } from "@/lib/contracts";
 import {
@@ -8,6 +8,12 @@ import {
   type BrokerageImportPreview,
   type IbkrFlexPreview,
 } from "@/lib/backend/import/ibkr-flex";
+import {
+  assertSingleBrokerageMatch,
+  getBrokerageSourceAccountIds,
+  isSameBrokerageLineage,
+  mergeBrokerageSourceAccountAliases,
+} from "@/lib/backend/import/brokerage-account-matching";
 import {
   buildSnapTradeUserId,
   createSnapTradeConnectionPortal,
@@ -4216,18 +4222,11 @@ function buildBrokerageHoldingSourceKey(input: {
   ].join("|");
 }
 
-function isSameBrokerageLineage(
-  row: {
-    importSourceProvider?: string | null;
-    importSourceAccountId?: string | null;
-  },
-  provider: string,
-  sourceAccountId: string,
-) {
-  return (
-    row.importSourceProvider === provider &&
-    row.importSourceAccountId === sourceAccountId
-  );
+function brokerageAccountAliasContainsAny(sourceAccountIds: string[]) {
+  return sql`${investmentAccounts.importSourceAccountAliases} ?| array[${sql.join(
+    sourceAccountIds.map((id) => sql`${id}`),
+    sql`, `,
+  )}]`;
 }
 
 type SnapTradeConnectionPortalInput = z.infer<
@@ -4484,9 +4483,11 @@ export async function confirmBrokerageImportDraft(
       holdingsSkipped += sourceAccount.skippedHoldingCount;
       const currency = normalizeCurrencyCode(sourceAccount.currency);
       const sourceAccountId = sourceAccount.accountId.trim();
-      const nickname = `${brokerageAccountMarker}${sourceAccountId}`;
+      const sourceAccountIds = getBrokerageSourceAccountIds(sourceAccount);
+      const displaySourceAccountId = sourceAccountIds[1] ?? sourceAccountId;
+      const nickname = `${brokerageAccountMarker}${displaySourceAccountId}`;
       const accountType = inferBrokerageAccountType(
-        `${sourceAccount.accountType} ${sourceAccountId}`,
+        `${sourceAccount.accountType} ${sourceAccountIds.join(" ")}`,
       );
       const accountMarketValueAmount =
         sourceAccount.netLiquidation ??
@@ -4498,21 +4499,38 @@ export async function confirmBrokerageImportDraft(
       const accountMarketValueCad =
         (await toCadAmount(accountMarketValueAmount, currency)) ?? 0;
 
-      const existingAccountBySource =
-        await tx.query.investmentAccounts.findFirst({
-          where: and(
-            eq(investmentAccounts.userId, userId),
-            eq(investmentAccounts.importSourceProvider, sourceProvider),
-            eq(investmentAccounts.importSourceAccountId, sourceAccountId),
-          ),
-        });
-      const existingAccountByNickname = await tx.query.investmentAccounts.findFirst({
+      const existingAccountsBySource = await tx.query.investmentAccounts.findMany({
         where: and(
           eq(investmentAccounts.userId, userId),
-          eq(investmentAccounts.institution, institution),
-          eq(investmentAccounts.nickname, nickname),
+          eq(investmentAccounts.importSourceProvider, sourceProvider),
+          or(
+            inArray(investmentAccounts.importSourceAccountId, sourceAccountIds),
+            brokerageAccountAliasContainsAny(sourceAccountIds),
+          ),
         ),
       });
+      const existingAccountBySource = assertSingleBrokerageMatch(
+        existingAccountsBySource,
+        sourceAccountId,
+      );
+      const nicknameCandidates = sourceAccountIds.map(
+        (candidateId) => `${brokerageAccountMarker}${candidateId}`,
+      );
+      const existingAccountsByNickname = await Promise.all(
+        nicknameCandidates.map((candidateNickname) =>
+          tx.query.investmentAccounts.findFirst({
+            where: and(
+              eq(investmentAccounts.userId, userId),
+              eq(investmentAccounts.institution, institution),
+              eq(investmentAccounts.nickname, candidateNickname),
+            ),
+          }),
+        ),
+      );
+      const existingAccountByNickname = assertSingleBrokerageMatch(
+        existingAccountsByNickname,
+        sourceAccountId,
+      );
       if (
         existingAccountBySource &&
         existingAccountByNickname &&
@@ -4524,31 +4542,58 @@ export async function confirmBrokerageImportDraft(
       }
       if (
         existingAccountByNickname?.importSourceProvider &&
-        !isSameBrokerageLineage(
-          existingAccountByNickname,
-          sourceProvider,
-          sourceAccountId,
+        !sourceAccountIds.some((candidateId) =>
+          isSameBrokerageLineage(
+            existingAccountByNickname,
+            sourceProvider,
+            candidateId,
+          ),
         )
       ) {
         throw new Error(
           `Brokerage account ${sourceAccountId} is already linked to another provider account. Resolve the source mapping before syncing.`,
         );
       }
-      const existingAccount = existingAccountBySource ?? existingAccountByNickname;
-      const legacyAccount = existingAccount
+      const linkedAccount = existingAccountBySource ?? existingAccountByNickname;
+      const legacyAccount = linkedAccount
         ? null
         : await tx.query.investmentAccounts.findFirst({
             where: and(
               eq(investmentAccounts.userId, userId),
               eq(investmentAccounts.institution, institution),
-              eq(investmentAccounts.nickname, `${accountPrefix} ${sourceAccountId}`),
+              eq(investmentAccounts.nickname, `${accountPrefix} ${displaySourceAccountId}`),
             ),
           });
-      if (legacyAccount) {
+      if (
+        legacyAccount?.importSourceProvider &&
+        !sourceAccountIds.some((candidateId) =>
+          isSameBrokerageLineage(legacyAccount, sourceProvider, candidateId),
+        )
+      ) {
         throw new Error(
-          `Brokerage account ${sourceAccountId} uses an older account identity. Rename or merge the existing account before syncing this provider again.`,
+          `Brokerage account ${sourceAccountId} is already linked to another provider account. Resolve the source mapping before syncing.`,
         );
       }
+      const unlinkedAccountCandidates = linkedAccount || legacyAccount
+        ? []
+        : await tx.query.investmentAccounts.findMany({
+            where: and(
+              eq(investmentAccounts.userId, userId),
+              eq(investmentAccounts.institution, institution),
+              eq(investmentAccounts.type, accountType),
+              sql`${investmentAccounts.importSourceProvider} IS NULL`,
+              sql`${investmentAccounts.importSourceAccountId} IS NULL`,
+            ),
+          });
+      const uniqueUnlinkedAccount =
+        unlinkedAccountCandidates.length === 1
+          ? unlinkedAccountCandidates[0]
+          : null;
+      const existingAccount = linkedAccount ?? legacyAccount ?? uniqueUnlinkedAccount;
+      const importSourceAccountAliases = mergeBrokerageSourceAccountAliases(
+        existingAccount ?? {},
+        sourceAccountIds,
+      );
       const accountRow =
         existingAccount ??
         (
@@ -4565,6 +4610,7 @@ export async function confirmBrokerageImportDraft(
               contributionRoomCad: null,
               importSourceProvider: sourceProvider,
               importSourceAccountId: sourceAccountId,
+              importSourceAccountAliases,
               lastImportedAt: new Date(),
             })
             .returning()
@@ -4582,6 +4628,7 @@ export async function confirmBrokerageImportDraft(
             marketValueCad: accountMarketValueCad.toFixed(2),
             importSourceProvider: sourceProvider,
             importSourceAccountId: sourceAccountId,
+            importSourceAccountAliases,
             lastImportedAt: new Date(),
             updatedAt: new Date(),
           })
@@ -4591,14 +4638,25 @@ export async function confirmBrokerageImportDraft(
       if (sourceAccount.cash != null) {
         const cashBalanceAmount = sourceAccount.cash;
         const cashBalanceCad = (await toCadAmount(cashBalanceAmount, currency)) ?? 0;
-        const cashNickname = `${brokerageAccountMarker}${sourceAccountId}:cash`;
-        const existingCashAccount = await tx.query.cashAccounts.findFirst({
-          where: and(
-            eq(cashAccounts.userId, userId),
-            eq(cashAccounts.institution, institution),
-            eq(cashAccounts.nickname, cashNickname),
+        const cashNickname = `${brokerageAccountMarker}${displaySourceAccountId}:cash`;
+        const cashNicknameCandidates = sourceAccountIds.map(
+          (candidateId) => `${brokerageAccountMarker}${candidateId}:cash`,
+        );
+        const existingCashAccounts = await Promise.all(
+          cashNicknameCandidates.map((candidateNickname) =>
+            tx.query.cashAccounts.findFirst({
+              where: and(
+                eq(cashAccounts.userId, userId),
+                eq(cashAccounts.institution, institution),
+                eq(cashAccounts.nickname, candidateNickname),
+              ),
+            }),
           ),
-        });
+        );
+        const existingCashAccount = assertSingleBrokerageMatch(
+          existingCashAccounts,
+          sourceAccountId,
+        );
         const cashAccountRow =
           existingCashAccount ??
           (
@@ -4618,6 +4676,7 @@ export async function confirmBrokerageImportDraft(
           await tx
             .update(cashAccounts)
             .set({
+              nickname: cashNickname,
               currency,
               currentBalanceAmount: cashBalanceAmount.toFixed(2),
               currentBalanceCad: cashBalanceCad.toFixed(2),
@@ -4677,15 +4736,32 @@ export async function confirmBrokerageImportDraft(
         });
         activeHoldingKeys.add(sourceHoldingKey);
 
-        const existingHoldingBySource =
-          await tx.query.holdingPositions.findFirst({
-            where: and(
-              eq(holdingPositions.userId, userId),
-              eq(holdingPositions.importSourceProvider, sourceProvider),
-              eq(holdingPositions.importSourceAccountId, sourceAccountId),
-              eq(holdingPositions.importSourceHoldingKey, sourceHoldingKey),
-            ),
-          });
+        const existingHoldingsBySource = await Promise.all(
+          sourceAccountIds.map((candidateId) => {
+            const candidateSourceHoldingKey = buildBrokerageHoldingSourceKey({
+              provider: sourceProvider,
+              sourceAccountId: candidateId,
+              securityId: security.id,
+              symbol: sourceHolding.symbol,
+              exchange: isOtherAsset
+                ? "OTHER"
+                : (sourceHolding.exchange ?? security.canonicalExchange),
+              currency: holdingCurrency,
+            });
+            return tx.query.holdingPositions.findFirst({
+              where: and(
+                eq(holdingPositions.userId, userId),
+                eq(holdingPositions.importSourceProvider, sourceProvider),
+                eq(holdingPositions.importSourceAccountId, candidateId),
+                eq(holdingPositions.importSourceHoldingKey, candidateSourceHoldingKey),
+              ),
+            });
+          }),
+        );
+        const existingHoldingBySource = assertSingleBrokerageMatch(
+          existingHoldingsBySource,
+          sourceAccountId,
+        );
         const existingHoldingBySecurity = await tx.query.holdingPositions.findFirst({
           where: and(
             eq(holdingPositions.userId, userId),
@@ -4704,10 +4780,12 @@ export async function confirmBrokerageImportDraft(
         }
         if (
           existingHoldingBySecurity?.importSourceProvider &&
-          !isSameBrokerageLineage(
-            existingHoldingBySecurity,
-            sourceProvider,
-            sourceAccountId,
+          !sourceAccountIds.some((candidateId) =>
+            isSameBrokerageLineage(
+              existingHoldingBySecurity,
+              sourceProvider,
+              candidateId,
+            ),
           )
         ) {
           throw new Error(
@@ -4844,15 +4922,19 @@ export async function confirmBrokerageImportDraft(
           ),
         });
         for (const staleHolding of existingAccountHoldings) {
-          const isImportedFromSameSource = isSameBrokerageLineage(
-            staleHolding,
-            sourceProvider,
-            sourceAccountId,
+          const isImportedFromSameSource = sourceAccountIds.some((candidateId) =>
+            isSameBrokerageLineage(
+              staleHolding,
+              sourceProvider,
+              candidateId,
+            ),
           );
           const isLegacyImportedHolding =
             !staleHolding.importSourceProvider &&
             !staleHolding.importSourceAccountId &&
-            (isSameBrokerageLineage(accountRow, sourceProvider, sourceAccountId) ||
+            (sourceAccountIds.some((candidateId) =>
+              isSameBrokerageLineage(accountRow, sourceProvider, candidateId),
+            ) ||
               accountRow.nickname === nickname);
           if (!isImportedFromSameSource && !isLegacyImportedHolding) {
             continue;

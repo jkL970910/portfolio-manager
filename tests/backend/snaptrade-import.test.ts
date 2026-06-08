@@ -56,6 +56,8 @@ test("builds SnapTrade preview from connection-scoped accounts and positions", (
   assert.equal(preview.provider, "snaptrade");
   assert.equal(preview.accountCount, 1);
   assert.equal(preview.holdingCount, 1);
+  assert.equal(preview.accounts[0]?.accountId, "account-1");
+  assert.deepEqual(preview.accounts[0]?.accountAliases, ["TFSA-1234", "TFSA"]);
   assert.equal(preview.accounts[0]?.accountType, "TFSA");
   assert.equal(preview.accounts[0]?.netLiquidation, 12500.25);
   assert.equal(preview.accounts[0]?.holdings[0]?.symbol, "ZQQ");

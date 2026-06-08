@@ -266,17 +266,28 @@ function mapSnapTradeAccount(
     .filter((holding): holding is IbkrFlexPreviewHolding => holding != null);
 
   return {
-    accountId:
-      account.institution_account_id ??
-      account.number ??
-      account.id ??
-      `${brokerageName} Account`,
+    accountId: account.id ?? account.institution_account_id ?? account.number ?? `${brokerageName} Account`,
+    accountAliases: compactUniqueStrings([
+      account.institution_account_id,
+      account.number,
+      account.name,
+    ]),
     accountType: account.raw_type ?? account.name ?? brokerageName,
     currency,
     netLiquidation: normalizeNumber(total?.amount),
     cash: null,
     holdings,
   };
+}
+
+function compactUniqueStrings(values: unknown[]) {
+  return Array.from(
+    new Set(
+      values
+        .map((value) => getString(value))
+        .filter((value): value is string => Boolean(value)),
+    ),
+  );
 }
 
 function mapSnapTradePosition(

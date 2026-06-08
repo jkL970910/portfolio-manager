@@ -167,6 +167,9 @@ export const investmentAccounts = pgTable(
     }),
     importSourceProvider: varchar("import_source_provider", { length: 32 }),
     importSourceAccountId: varchar("import_source_account_id", { length: 160 }),
+    importSourceAccountAliases: jsonb("import_source_account_aliases")
+      .notNull()
+      .default([]),
     lastImportedAt: timestamp("last_imported_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
