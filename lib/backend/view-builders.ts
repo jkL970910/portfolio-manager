@@ -1252,6 +1252,7 @@ function anchorSeriesToCurrentValue(args: {
   currentValueCad: number;
   language: DisplayLanguage;
   display: DisplayContext;
+  forceCurrentPoint?: boolean;
 }) {
   const today = new Date().toISOString().slice(0, 10);
   const sortedSeries = [...args.series].sort((left, right) =>
@@ -1267,7 +1268,7 @@ function anchorSeriesToCurrentValue(args: {
   const lastHistorical = withoutToday.at(-1) ?? null;
   const comparisonPoint = existingToday ?? lastHistorical;
 
-  if (!comparisonPoint || comparisonPoint.value <= 0) {
+  if (!comparisonPoint || comparisonPoint.value <= 0 || args.forceCurrentPoint) {
     return [...withoutToday, currentPoint].sort((left, right) =>
       (left.rawDate ?? left.label).localeCompare(right.rawDate ?? right.label),
     );
@@ -1288,12 +1289,14 @@ function anchorSeriesToCurrentValue(args: {
 function buildCashBalanceSeries(args: {
   cashAccounts?: CashAccount[];
   cashAccountBalanceEvents?: CashAccountBalanceEvent[];
+  anchorSeries?: { rawDate?: string }[];
   language: DisplayLanguage;
   display: DisplayContext;
 }) {
   const {
     cashAccounts = [],
     cashAccountBalanceEvents = [],
+    anchorSeries = [],
     language,
     display,
   } = args;
@@ -1315,7 +1318,15 @@ function buildCashBalanceSeries(args: {
   }
 
   const allDates = [
-    ...new Set(cashAccountBalanceEvents.map((event) => event.bookedAt).sort()),
+    ...new Set(
+      [
+        ...cashAccountBalanceEvents.map((event) => event.bookedAt),
+        ...anchorSeries
+          .map((point) => point.rawDate?.slice(0, 10))
+          .filter((date): date is string => Boolean(date)),
+        new Date().toISOString().slice(0, 10),
+      ].sort(),
+    ),
   ];
   if (allDates.length < 2) {
     return null;
@@ -2494,6 +2505,10 @@ export function buildDashboardData(args: {
   const cashBalanceTrend = buildCashBalanceSeries({
     cashAccounts,
     cashAccountBalanceEvents,
+    anchorSeries: investedAssetTrend.filter(
+      (point): point is { label: string; value: number; rawDate: string } =>
+        "rawDate" in point && typeof point.rawDate === "string",
+    ),
     language,
     display,
   });
@@ -2517,7 +2532,10 @@ export function buildDashboardData(args: {
     currentValueCad: totalNetWorthCad,
     language,
     display,
+    forceCurrentPoint: cashAccounts.length > 0,
   });
+  const cashHistoryIsAnchored =
+    cashAccounts.length > 0 && cashAccountBalanceEvents.length < 2;
 
   return {
     displayContext: buildDisplayContext(display, language),
@@ -2664,10 +2682,14 @@ export function buildDashboardData(args: {
       description: pick(
         language,
         cashBalanceTrend
-          ? "这里已经把投资资产和现金账户余额一起合进净资产曲线。"
+          ? cashHistoryIsAnchored
+            ? "这里已经把投资资产和现金账户余额一起合进净资产曲线；现金历史不足时，现金部分按当前余额补齐。"
+            : "这里已经把投资资产和现金账户余额一起合进净资产曲线。"
           : "这里目前只回放投资账户里的资产价值，不包含后续会接入的 spending / cash account 余额。",
         cashBalanceTrend
-          ? "This curve now combines invested assets with the cash-account layer."
+          ? cashHistoryIsAnchored
+            ? "This curve combines invested assets with cash balances; when cash history is shallow, the cash layer is filled from the current balance."
+            : "This curve now combines invested assets with the cash-account layer."
           : "This currently replays invested-asset value only and does not yet include the spending/cash account layer planned for later net worth support.",
       ),
       scopeLabel: pick(language, "当前范围", "Current scope"),
@@ -2682,8 +2704,8 @@ export function buildDashboardData(args: {
       sourceDetail: cashBalanceTrend
         ? pick(
             language,
-            `${investedAssetTrendSource === "replayed-prices" ? "真实持仓价格回放" : investedAssetTrendSource === "snapshots" ? "组合历史快照" : "参考曲线"} + 现金余额历史`,
-            `${investedAssetTrendSource === "replayed-prices" ? "replayed holding prices" : investedAssetTrendSource === "snapshots" ? "portfolio snapshots" : "reference curve"} + cash balance history`,
+            `${investedAssetTrendSource === "replayed-prices" ? "真实持仓价格回放" : investedAssetTrendSource === "snapshots" ? "组合历史快照" : "参考曲线"} + ${cashHistoryIsAnchored ? "当前现金余额补齐" : "现金余额历史"}`,
+            `${investedAssetTrendSource === "replayed-prices" ? "replayed holding prices" : investedAssetTrendSource === "snapshots" ? "portfolio snapshots" : "reference curve"} + ${cashHistoryIsAnchored ? "current cash balance fill" : "cash balance history"}`,
           )
         : investedAssetTrendSource === "replayed-prices"
           ? pick(language, "真实持仓价格回放", "Replayed holding prices")

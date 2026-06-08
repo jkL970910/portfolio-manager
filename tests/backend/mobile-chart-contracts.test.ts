@@ -723,9 +723,12 @@ test("mobile home overview chart contract exposes net worth freshness", () => {
   assert.ok(chart);
   assert.equal(chart.id, "overview-net-worth-history");
   assert.equal(chart.title, "总资产走势");
-  assert.equal(chart.freshness.latestDate, "2026-04-26");
-  assert.equal(chart.points.at(-1)?.rawDate, "2026-04-26");
-  assert.equal(chart.points.at(-1)?.value, 1410);
+  assert.equal(chart.freshness.latestDate, new Date().toISOString().slice(0, 10));
+  assert.equal(chart.points.at(-1)?.rawDate, new Date().toISOString().slice(0, 10));
+  assert.equal(chart.points.at(-1)?.value, 12500);
+  assert.ok(
+    dashboard.trendContext.description.includes("现金部分按当前余额补齐"),
+  );
   assert.equal(chart.sourceMode, "local");
   assert.equal(dashboard.buyingPower.totalCad, 2500);
   assert.equal(dashboard.buyingPower.value, "$2,500");
