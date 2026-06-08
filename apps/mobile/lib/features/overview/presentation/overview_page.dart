@@ -305,7 +305,9 @@ class _OverviewPageState extends State<OverviewPage> {
                                 snapshot.data!.netWorthTrend.isNotEmpty)) ...[
                           const SizedBox(height: 18),
                           _OverviewTrendCard(
-                            chart: snapshot.data!.netWorthChart,
+                            netWorthChart: snapshot.data!.netWorthChart,
+                            investedAssetChart:
+                                snapshot.data!.investedAssetChart,
                             fallbackPoints: snapshot.data!.netWorthTrend,
                           ),
                         ],
@@ -1427,51 +1429,96 @@ Color _holdingSliceColorFromTokens(LooThemeTokens tokens, int index) {
 
 class _OverviewTrendCard extends StatelessWidget {
   const _OverviewTrendCard({
-    required this.chart,
+    required this.netWorthChart,
+    required this.investedAssetChart,
     required this.fallbackPoints,
   });
 
-  final MobileChartSeries? chart;
+  final MobileChartSeries? netWorthChart;
+  final MobileChartSeries? investedAssetChart;
   final List<MobileHomeTrendPoint> fallbackPoints;
 
   @override
   Widget build(BuildContext context) {
-    final points = chart?.points
-            .map((point) => (
-                  label: point.label,
-                  displayValue: point.displayValue,
-                  chartValue: point.value,
-                  rawDate: DateTime.tryParse(point.rawDate ?? ""),
-                ))
-            .toList() ??
-        fallbackPoints
-            .map((point) => (
-                  label: point.label,
-                  displayValue: point.displayValue,
-                  chartValue: point.chartValue,
-                  rawDate: null as DateTime?,
-                ))
-            .toList();
-    if (points.length < 2) {
+    final netWorthPoints = _toTrendPoints(
+      netWorthChart?.points
+              .map((point) => (
+                    label: point.label,
+                    displayValue: point.displayValue,
+                    chartValue: point.value,
+                    rawDate: DateTime.tryParse(point.rawDate ?? ""),
+                  ))
+              .toList() ??
+          fallbackPoints
+              .map((point) => (
+                    label: point.label,
+                    displayValue: point.displayValue,
+                    chartValue: point.chartValue,
+                    rawDate: null as DateTime?,
+                  ))
+              .toList(),
+    );
+    if (netWorthPoints.length < 2) {
       return const SizedBox.shrink();
     }
 
+    final investedAssetPoints = _toTrendPoints(
+      investedAssetChart?.points
+              .map((point) => (
+                    label: point.label,
+                    displayValue: point.displayValue,
+                    chartValue: point.value,
+                    rawDate: DateTime.tryParse(point.rawDate ?? ""),
+                  ))
+              .toList() ??
+          const [],
+    );
+    final series = <LooTrendSeries>[
+      LooTrendSeries(
+        id: "net-worth",
+        label: "总资产",
+        title: netWorthChart?.title ?? "总资产走势",
+        points: netWorthPoints,
+      ),
+      if (investedAssetPoints.length >= 2)
+        LooTrendSeries(
+          id: "invested-assets",
+          label: "投资资产",
+          title: investedAssetChart?.title ?? "投资资产走势",
+          points: investedAssetPoints,
+        ),
+    ];
+
     return LooGlassCard(
       child: LooTrendChart(
-        title: chart?.title ?? "总资产走势",
+        title: netWorthChart?.title ?? "总资产走势",
         initialRange: LooTrendRange.threeMonths,
-        points: points
-            .map(
-              (point) => LooTrendPoint(
-                label: point.label,
-                displayValue: point.displayValue,
-                value: point.chartValue,
-                rawDate: point.rawDate,
-              ),
-            )
-            .toList(),
+        points: netWorthPoints,
+        series: series.length > 1 ? series : const <LooTrendSeries>[],
       ),
     );
+  }
+
+  List<LooTrendPoint> _toTrendPoints(
+    List<
+            ({
+              String label,
+              String displayValue,
+              double chartValue,
+              DateTime? rawDate,
+            })>
+        points,
+  ) {
+    return points
+        .map(
+          (point) => LooTrendPoint(
+            label: point.label,
+            displayValue: point.displayValue,
+            value: point.chartValue,
+            rawDate: point.rawDate,
+          ),
+        )
+        .toList();
   }
 }
 

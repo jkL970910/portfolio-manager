@@ -28,16 +28,32 @@ class LooTrendPoint {
   final DateTime? rawDate;
 }
 
+class LooTrendSeries {
+  const LooTrendSeries({
+    required this.id,
+    required this.label,
+    required this.title,
+    required this.points,
+  });
+
+  final String id;
+  final String label;
+  final String title;
+  final List<LooTrendPoint> points;
+}
+
 class LooTrendChart extends StatefulWidget {
   const LooTrendChart({
     required this.title,
     required this.points,
+    this.series = const <LooTrendSeries>[],
     this.initialRange = LooTrendRange.threeMonths,
     super.key,
   });
 
   final String title;
   final List<LooTrendPoint> points;
+  final List<LooTrendSeries> series;
   final LooTrendRange initialRange;
 
   @override
@@ -47,7 +63,8 @@ class LooTrendChart extends StatefulWidget {
 class _LooTrendChartState extends State<LooTrendChart> {
   late LooTrendRange _selectedRange = widget.initialRange;
   late final PageController _pageController;
-  late _PreparedTrendData _prepared;
+  late Map<String, _PreparedTrendData> _preparedBySeries;
+  String? _selectedSeriesId;
   var _selectedMode = _LooTrendChartMode.amount;
   var _page = 0;
 
@@ -55,14 +72,23 @@ class _LooTrendChartState extends State<LooTrendChart> {
   void initState() {
     super.initState();
     _pageController = PageController();
-    _prepared = _prepareData(widget.points);
+    final seriesOptions = _effectiveSeries();
+    _selectedSeriesId = seriesOptions.isEmpty ? null : seriesOptions.first.id;
+    _preparedBySeries = _prepareSeries(seriesOptions);
   }
 
   @override
   void didUpdateWidget(covariant LooTrendChart oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.points != widget.points) {
-      _prepared = _prepareData(widget.points);
+    if (oldWidget.points != widget.points ||
+        oldWidget.series != widget.series ||
+        oldWidget.title != widget.title) {
+      final seriesOptions = _effectiveSeries();
+      _preparedBySeries = _prepareSeries(seriesOptions);
+      if (!seriesOptions.any((series) => series.id == _selectedSeriesId)) {
+        _selectedSeriesId =
+            seriesOptions.isEmpty ? null : seriesOptions.first.id;
+      }
     }
     if (oldWidget.initialRange != widget.initialRange) {
       _selectedRange = widget.initialRange;
@@ -77,8 +103,21 @@ class _LooTrendChartState extends State<LooTrendChart> {
 
   @override
   Widget build(BuildContext context) {
-    final allPoints = _prepared.normalizedPoints;
-    final enabledRanges = _prepared.enabledRanges;
+    final seriesOptions = _effectiveSeries();
+    if (seriesOptions.isEmpty) {
+      return const SizedBox.shrink();
+    }
+    if (!seriesOptions.any((series) => series.id == _selectedSeriesId)) {
+      _selectedSeriesId = seriesOptions.first.id;
+    }
+    final selectedSeries = seriesOptions.firstWhere(
+      (series) => series.id == _selectedSeriesId,
+      orElse: () => seriesOptions.first,
+    );
+    final prepared = _preparedBySeries[selectedSeries.id] ??
+        _prepareData(selectedSeries.points);
+    final allPoints = prepared.normalizedPoints;
+    final enabledRanges = prepared.enabledRanges;
     if (enabledRanges[_selectedRange] != true) {
       _selectedRange = enabledRanges[LooTrendRange.ytd] == true
           ? LooTrendRange.ytd
@@ -88,7 +127,7 @@ class _LooTrendChartState extends State<LooTrendChart> {
             );
     }
     final points = enabledRanges[_selectedRange] == true
-        ? _prepared.pointsByRange[_selectedRange] ?? const <LooTrendPoint>[]
+        ? prepared.pointsByRange[_selectedRange] ?? const <LooTrendPoint>[]
         : allPoints;
     if (points.length < 2) {
       return const SizedBox.shrink();
@@ -103,7 +142,7 @@ class _LooTrendChartState extends State<LooTrendChart> {
     final mutedColor = colorScheme.onSurface.withValues(alpha: 0.64);
     final positiveColor = colorScheme.tertiary;
     final negativeColor = colorScheme.error;
-    final monthlyReturns = _prepared.monthlyReturns;
+    final monthlyReturns = prepared.monthlyReturns;
     final pages = <Widget>[
       _TrendLinePanel(
         points: points,
@@ -133,7 +172,8 @@ class _LooTrendChartState extends State<LooTrendChart> {
         Row(
           children: [
             Expanded(
-              child: Text(widget.title, style: theme.textTheme.titleLarge),
+              child:
+                  Text(selectedSeries.title, style: theme.textTheme.titleLarge),
             ),
             Text(
               last.displayValue,
@@ -142,6 +182,14 @@ class _LooTrendChartState extends State<LooTrendChart> {
           ],
         ),
         const SizedBox(height: 12),
+        if (seriesOptions.length > 1) ...[
+          _TrendSeriesSwitch(
+            series: seriesOptions,
+            selectedId: selectedSeries.id,
+            onChanged: (id) => setState(() => _selectedSeriesId = id),
+          ),
+          const SizedBox(height: 12),
+        ],
         SizedBox(
           height: 286,
           child: PageView.builder(
@@ -160,6 +208,32 @@ class _LooTrendChartState extends State<LooTrendChart> {
         ),
       ],
     );
+  }
+
+  List<LooTrendSeries> _effectiveSeries() {
+    final provided = widget.series
+        .where((series) => series.points.length >= 2)
+        .toList(growable: false);
+    if (provided.isNotEmpty) {
+      return provided;
+    }
+    return [
+      LooTrendSeries(
+        id: "default",
+        label: widget.title,
+        title: widget.title,
+        points: widget.points,
+      ),
+    ];
+  }
+
+  Map<String, _PreparedTrendData> _prepareSeries(
+    List<LooTrendSeries> seriesOptions,
+  ) {
+    return {
+      for (final series in seriesOptions)
+        series.id: _prepareData(series.points),
+    };
   }
 
   _PreparedTrendData _prepareData(List<LooTrendPoint> points) {
@@ -643,6 +717,66 @@ class _TrendCarouselDots extends StatelessWidget {
           ),
         );
       }),
+    );
+  }
+}
+
+class _TrendSeriesSwitch extends StatelessWidget {
+  const _TrendSeriesSwitch({
+    required this.series,
+    required this.selectedId,
+    required this.onChanged,
+  });
+
+  final List<LooTrendSeries> series;
+  final String selectedId;
+  final ValueChanged<String> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.46),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: colorScheme.outlineVariant.withValues(alpha: 0.62),
+        ),
+      ),
+      child: Row(
+        children: series.map((item) {
+          final selected = item.id == selectedId;
+          return Expanded(
+            child: InkWell(
+              borderRadius: BorderRadius.circular(18),
+              onTap: () => onChanged(item.id),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 180),
+                curve: Curves.easeOutCubic,
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+                decoration: BoxDecoration(
+                  color: selected
+                      ? colorScheme.primary.withValues(alpha: 0.20)
+                      : Colors.transparent,
+                  borderRadius: BorderRadius.circular(18),
+                ),
+                child: Text(
+                  item.label,
+                  textAlign: TextAlign.center,
+                  style: theme.textTheme.labelLarge?.copyWith(
+                    color: selected
+                        ? colorScheme.primary
+                        : colorScheme.onSurfaceVariant,
+                    fontWeight: selected ? FontWeight.w900 : FontWeight.w700,
+                  ),
+                ),
+              ),
+            ),
+          );
+        }).toList(),
+      ),
     );
   }
 }

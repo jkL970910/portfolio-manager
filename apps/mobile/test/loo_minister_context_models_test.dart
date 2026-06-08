@@ -168,6 +168,7 @@ void main() {
         ],
         notes: ["走势使用组合快照。"],
       ),
+      investedAssetChart: null,
       fxContext: const MobileFxContext(
         label: "1 USD = 1.37 CAD",
         note: "仅展示折算。",

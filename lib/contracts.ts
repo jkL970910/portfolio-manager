@@ -133,6 +133,7 @@ export interface DashboardData {
   netWorthTrend: { label: string; value: number; rawDate?: string }[];
   chartSeries?: {
     netWorth?: MobileChartSeries;
+    investedAsset?: MobileChartSeries;
   };
   buyingPower: {
     totalCad: number;

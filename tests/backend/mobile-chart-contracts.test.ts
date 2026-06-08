@@ -770,11 +770,13 @@ test("mobile home overview chart contract preserves intraday replay points", () 
 
   const chart = dashboard.chartSeries?.netWorth;
   assert.ok(chart);
-  assert.equal(chart.points.length, 2);
+  assert.equal(chart.points.length, 3);
   assert.equal(chart.points[0]?.rawDate, "2026-04-26T13:30:00.000Z");
   assert.equal(chart.points[1]?.rawDate, "2026-04-26T14:30:00.000Z");
   assert.equal(chart.points[0]?.value, 1405);
   assert.equal(chart.points[1]?.value, 1412.5);
+  assert.equal(chart.points.at(-1)?.rawDate, new Date().toISOString().slice(0, 10));
+  assert.equal(chart.points.at(-1)?.value, 10000);
 });
 
 test("mobile home overview chart applies cash balance across intraday points", () => {
@@ -829,6 +831,49 @@ test("mobile home overview chart applies cash balance across intraday points", (
   assert.equal(chart.points[1]?.rawDate, "2026-04-26T14:30:00.000Z");
   assert.equal(chart.points[0]?.value, 3905);
   assert.equal(chart.points[1]?.value, 3912.5);
+});
+
+test("mobile home overview exposes net worth and invested asset chart scopes", () => {
+  const dashboard = buildDashboardData({
+    viewer: {
+      id: "user_test",
+      email: "tester@example.com",
+      displayName: "Tester",
+      baseCurrency: "CAD",
+      displayLanguage: "zh",
+    },
+    accounts,
+    holdings,
+    transactions: [],
+    cashAccounts: [
+      {
+        id: "cash_test",
+        userId: "user_test",
+        institution: "Wealthsimple",
+        nickname: "Cash",
+        currency: "CAD",
+        currentBalanceAmount: 2500,
+        currentBalanceCad: 2500,
+        createdAt: "2026-04-28T00:00:00.000Z",
+        updatedAt: "2026-04-28T00:00:00.000Z",
+      },
+    ],
+    portfolioEvents: [],
+    priceHistory,
+    snapshots: [],
+    profile,
+    latestRun: null,
+    display,
+  });
+
+  const netWorthChart = dashboard.chartSeries?.netWorth;
+  const investedAssetChart = dashboard.chartSeries?.investedAsset;
+  assert.ok(netWorthChart);
+  assert.ok(investedAssetChart);
+  assert.equal(netWorthChart.title, "总资产走势");
+  assert.equal(investedAssetChart.title, "投资资产走势");
+  assert.equal(netWorthChart.points.at(-1)?.value, 12500);
+  assert.equal(investedAssetChart.points.at(-1)?.value, 10000);
 });
 
 test("portfolio account context chart contract exposes account freshness", () => {

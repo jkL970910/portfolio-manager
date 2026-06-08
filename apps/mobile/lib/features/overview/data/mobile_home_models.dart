@@ -16,6 +16,7 @@ class MobileHomeSnapshot {
     this.holdingCount = 0,
     required this.netWorthTrend,
     required this.netWorthChart,
+    required this.investedAssetChart,
     required this.fxContext,
     required this.recommendationTheme,
     required this.recommendationReason,
@@ -34,6 +35,7 @@ class MobileHomeSnapshot {
   final int holdingCount;
   final List<MobileHomeTrendPoint> netWorthTrend;
   final MobileChartSeries? netWorthChart;
+  final MobileChartSeries? investedAssetChart;
   final MobileFxContext fxContext;
   final String recommendationTheme;
   final String recommendationReason;
@@ -167,6 +169,11 @@ class MobileHomeSnapshot {
         (json["chartSeries"] is Map<String, dynamic>
             ? json["chartSeries"] as Map<String, dynamic>
             : const <String, dynamic>{})["netWorth"],
+      ),
+      investedAssetChart: MobileChartSeries.fromJson(
+        (json["chartSeries"] is Map<String, dynamic>
+            ? json["chartSeries"] as Map<String, dynamic>
+            : const <String, dynamic>{})["investedAsset"],
       ),
       fxContext: MobileFxContext.fromJson(json["displayContext"]),
       recommendationTheme: recommendation is Map<String, dynamic>

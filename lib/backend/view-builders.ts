@@ -2492,7 +2492,7 @@ export function buildDashboardData(args: {
     display,
     getValue: (snapshot) => snapshot.totalValueCad,
   });
-  const investedAssetTrend =
+  const rawInvestedAssetTrend =
     replayedInvestedAssetTrend ??
     snapshotInvestedAssetTrend ??
     getSixMonthSeries(totalPortfolio, profile, getMonthLabels(language));
@@ -2502,6 +2502,13 @@ export function buildDashboardData(args: {
       : snapshotInvestedAssetTrend != null
         ? "snapshots"
         : "reference";
+  const investedAssetTrend = anchorSeriesToCurrentValue({
+    series: rawInvestedAssetTrend,
+    currentValueCad: totalPortfolio,
+    language,
+    display,
+    forceCurrentPoint: true,
+  });
   const cashBalanceTrend = buildCashBalanceSeries({
     cashAccounts,
     cashAccountBalanceEvents,
@@ -2725,6 +2732,16 @@ export function buildDashboardData(args: {
         display,
         id: "overview-net-worth-history",
         title: pick(language, "总资产走势", "Total asset trend"),
+        subjectLabel: pick(language, "总资产", "total assets"),
+      }),
+      investedAsset: buildPortfolioValueChartSeries({
+        performance: investedAssetTrend,
+        source: investedAssetTrendSource,
+        language,
+        display,
+        id: "overview-invested-asset-history",
+        title: pick(language, "投资资产走势", "Invested asset trend"),
+        subjectLabel: pick(language, "投资资产", "invested assets"),
       }),
     },
     spendingMonthLabel: getLatestMonthLabel(language),
