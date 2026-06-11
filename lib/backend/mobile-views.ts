@@ -2221,6 +2221,8 @@ function mapMobileImportData(data: ImportData): MobileImportData {
     existingCashAccounts: data.existingCashAccounts.map((account) => ({
       ...account,
       displayName: account.nickname || account.institution || "现金账户",
+      currentBalanceAmount: account.currentBalanceAmount,
+      currentBalanceCad: account.currentBalanceCad,
       value: new Intl.NumberFormat("en-CA", {
         style: "currency",
         currency: "CAD",

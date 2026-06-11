@@ -468,6 +468,11 @@ export interface CreateManualCashAccountInput {
   currentBalanceAmount: number;
 }
 
+export interface UpdateManualCashAccountBalanceInput {
+  currentBalanceAmount: number;
+  bookedAt?: string;
+}
+
 export interface CreateGuidedImportResult {
   account: InvestmentAccount;
   importJob: ImportJob | null;
@@ -539,6 +544,81 @@ export async function createManualCashAccount(
     source: "manual",
   });
   return account;
+}
+
+export async function updateManualCashAccountBalance(
+  userId: string,
+  cashAccountId: string,
+  input: UpdateManualCashAccountBalanceInput,
+) {
+  const db = getDb();
+  return db.transaction(async (tx) => {
+    const existing = await tx.query.cashAccounts.findFirst({
+      where: and(eq(cashAccounts.userId, userId), eq(cashAccounts.id, cashAccountId)),
+    });
+    if (!existing) {
+      throw new Error("Cash account not found.");
+    }
+
+    const currentBalanceCad =
+      (await toCadAmount(
+        input.currentBalanceAmount,
+        existing.currency as CurrencyCode,
+      )) ?? 0;
+    const bookedAt = input.bookedAt ?? new Date().toISOString().slice(0, 10);
+
+    const [updated] = await tx
+      .update(cashAccounts)
+      .set({
+        currentBalanceAmount: input.currentBalanceAmount.toFixed(2),
+        currentBalanceCad: currentBalanceCad.toFixed(2),
+        updatedAt: new Date(),
+      })
+      .where(and(eq(cashAccounts.userId, userId), eq(cashAccounts.id, cashAccountId)))
+      .returning();
+    if (!updated) {
+      throw new Error("Failed to update cash account.");
+    }
+
+    const [event] = await tx
+      .insert(cashAccountBalanceEvents)
+      .values({
+        userId,
+        cashAccountId,
+        bookedAt,
+        balanceAmount: input.currentBalanceAmount.toFixed(2),
+        balanceCad: currentBalanceCad.toFixed(2),
+        source: "manual-update",
+      })
+      .returning();
+    if (!event) {
+      throw new Error("Failed to record cash balance update.");
+    }
+
+    return {
+      cashAccount: {
+        id: updated.id,
+        userId: updated.userId,
+        institution: updated.institution,
+        nickname: updated.nickname,
+        currency: updated.currency as CurrencyCode,
+        currentBalanceAmount: Number(updated.currentBalanceAmount),
+        currentBalanceCad: Number(updated.currentBalanceCad),
+        createdAt: updated.createdAt.toISOString(),
+        updatedAt: updated.updatedAt.toISOString(),
+      },
+      balanceEvent: {
+        id: event.id,
+        userId: event.userId,
+        cashAccountId: event.cashAccountId,
+        bookedAt: event.bookedAt,
+        balanceAmount: Number(event.balanceAmount),
+        balanceCad: Number(event.balanceCad),
+        source: event.source,
+        createdAt: event.createdAt.toISOString(),
+      },
+    };
+  });
 }
 
 function getDefaultPreferenceInput(
@@ -1076,6 +1156,28 @@ function inferBrokerageAccountType(
     return "FHSA";
   }
   return "Taxable";
+}
+
+function getRegisteredImportAccountTypes(accounts: IbkrFlexPreview["accounts"]) {
+  const types = new Set<Extract<AccountType, "TFSA" | "RRSP" | "FHSA">>();
+  for (const account of accounts) {
+    const accountType = inferBrokerageAccountType(
+      `${account.accountType} ${getBrokerageSourceAccountIds(account).join(" ")}`,
+    );
+    if (
+      accountType === "TFSA" ||
+      accountType === "RRSP" ||
+      accountType === "FHSA"
+    ) {
+      types.add(accountType);
+    }
+  }
+  const order: Array<Extract<AccountType, "TFSA" | "RRSP" | "FHSA">> = [
+    "TFSA",
+    "RRSP",
+    "FHSA",
+  ];
+  return order.filter((type) => types.has(type));
 }
 
 function getBrokerageConnectionEncryptionKey() {
@@ -5018,6 +5120,8 @@ export async function confirmBrokerageImportDraft(
       holdingsSkipped,
       holdingsClosed,
       cashAccountsSynced,
+      importedRegisteredAccountTypes:
+        getRegisteredImportAccountTypes(importableAccounts),
       confirmMode,
     };
   });

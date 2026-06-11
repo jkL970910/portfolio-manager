@@ -606,6 +606,14 @@ export const mobileManualCashAccountCreateSchema = z.object({
   currentBalanceAmount: z.number().min(0).max(100000000).default(0),
 });
 
+export const mobileManualCashAccountBalanceUpdateSchema = z.object({
+  currentBalanceAmount: z.number().min(0).max(100000000),
+  bookedAt: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/)
+    .optional(),
+});
+
 export const recommendationRunCreateSchema = z.object({
   contributionAmountCad: z.number().positive().max(1000000),
   fallbackMode: z.enum(["core_only_relaxed"]).optional(),
@@ -877,6 +885,9 @@ export type MobileManualAccountCreatePayload = z.infer<
 >;
 export type MobileManualCashAccountCreatePayload = z.infer<
   typeof mobileManualCashAccountCreateSchema
+>;
+export type MobileManualCashAccountBalanceUpdatePayload = z.infer<
+  typeof mobileManualCashAccountBalanceUpdateSchema
 >;
 export type RecommendationRunCreatePayload = z.infer<
   typeof recommendationRunCreateSchema

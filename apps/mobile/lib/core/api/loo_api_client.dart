@@ -346,6 +346,18 @@ class LooApiClient {
     );
   }
 
+  Future<Map<String, dynamic>> updateManualCashAccountBalance({
+    required String cashAccountId,
+    required double currentBalanceAmount,
+  }) {
+    return _patchJson(
+      "/api/mobile/import/cash-accounts/${Uri.encodeComponent(cashAccountId)}/balance",
+      body: {
+        "currentBalanceAmount": currentBalanceAmount,
+      },
+    );
+  }
+
   Future<Map<String, dynamic>> createManualHolding({
     required String accountId,
     required String symbol,

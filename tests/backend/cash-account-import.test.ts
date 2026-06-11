@@ -38,6 +38,8 @@ test("manual cash accounts enter the import view contract", () => {
 
   assert.ok(cashAccount);
   assert.equal(cashAccount.nickname, "QA Cash");
+  assert.equal(cashAccount.currency, "CAD");
+  assert.equal(cashAccount.currentBalanceAmount, 1234);
   assert.equal(cashAccount.currentBalanceCad, 1234);
 });
 

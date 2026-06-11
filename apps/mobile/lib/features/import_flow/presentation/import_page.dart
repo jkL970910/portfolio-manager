@@ -44,6 +44,80 @@ String? _draftIdFallbackFromResponse(Map<String, dynamic>? data) {
   return null;
 }
 
+String? _registeredAccountTypeFromLabel(String value) {
+  final normalized = value.trim().toUpperCase();
+  if (normalized.contains("FHSA")) {
+    return "FHSA";
+  }
+  if (normalized.contains("TFSA")) {
+    return "TFSA";
+  }
+  if (normalized.contains("RRSP") || normalized.contains("RSP")) {
+    return "RRSP";
+  }
+  return null;
+}
+
+List<String> _registeredTypesFromBrokerageSelection(
+  MobileIbkrFlexPreview preview,
+  Set<String> selectedAccountIds,
+) {
+  final types = <String>{};
+  for (final account in preview.accounts) {
+    if (!selectedAccountIds.contains(account.accountId)) {
+      continue;
+    }
+    final type = _registeredAccountTypeFromLabel(
+      "${account.accountType} ${account.accountId}",
+    );
+    if (type != null) {
+      types.add(type);
+    }
+  }
+  const order = ["TFSA", "RRSP", "FHSA"];
+  return order.where(types.contains).toList();
+}
+
+List<String> _registeredTypesFromConfirmData(
+  Map<String, dynamic>? data,
+  List<String> fallback,
+) {
+  final raw = data?["importedRegisteredAccountTypes"];
+  if (raw is! List) {
+    return fallback;
+  }
+  final types = <String>{};
+  for (final value in raw) {
+    if (value == "TFSA" || value == "RRSP" || value == "FHSA") {
+      types.add(value as String);
+    }
+  }
+  const order = ["TFSA", "RRSP", "FHSA"];
+  final parsed = order.where(types.contains).toList();
+  return parsed.isEmpty ? fallback : parsed;
+}
+
+Future<bool> _openRegisteredRoomCheckSheet({
+  required BuildContext context,
+  required LooApiClient apiClient,
+  required List<String> accountTypes,
+  required String sourceLabel,
+}) async {
+  if (accountTypes.isEmpty) {
+    return false;
+  }
+  final saved = await showModalBottomSheet<bool>(
+    context: context,
+    isScrollControlled: true,
+    builder: (context) => _BrokerageRegisteredRoomCheckSheet(
+      apiClient: apiClient,
+      accountTypes: accountTypes,
+      sourceLabel: sourceLabel,
+    ),
+  );
+  return saved == true;
+}
+
 class ImportPage extends StatefulWidget {
   const ImportPage({
     required this.apiClient,
@@ -120,20 +194,17 @@ class _ImportPageState extends State<ImportPage> {
               LooCoachStep(
                 targetKey: _heroCoachKey,
                 title: "上贡先验货",
-                body:
-                    "陛下，所有资产进国库前都先在这里验货。券商同步也只会生成草稿，臣不会擅自把任何持仓写进账本。",
+                body: "陛下，所有资产进国库前都先在这里验货。券商同步也只会生成草稿，臣不会擅自把任何持仓写进账本。",
               ),
               LooCoachStep(
                 targetKey: _entryCoachKey,
                 title: "挑一条上贡路",
-                body:
-                    "少量修正可手动上贡；IBKR 或 Wealthsimple 这类大批账册，走券商同步更稳。确认前都能先看草稿。",
+                body: "少量修正可手动上贡；IBKR 或 Wealthsimple 这类大批账册，走券商同步更稳。确认前都能先看草稿。",
               ),
               LooCoachStep(
                 targetKey: _vaultCoachKey,
                 title: "核准后才入库",
-                body:
-                    "写入后的账户会在这里列队。若后续发现重复或错账，再进账户详情合并、删除或修正。",
+                body: "写入后的账户会在这里列队。若后续发现重复或错账，再进账户详情合并、删除或修正。",
               ),
             ],
             onCompleted: () => widget.apiClient.updateOnboarding({
@@ -203,6 +274,7 @@ class _ImportPageState extends State<ImportPage> {
                           child: _AccountVaultCard(
                             accounts: snapshot.data!.accounts,
                             cashAccounts: snapshot.data!.cashAccounts,
+                            onUpdateCashAccount: _openUpdateCashAccountSheet,
                           ),
                         ),
                         if (snapshot.data!.notes.isNotEmpty) ...[
@@ -243,6 +315,22 @@ class _ImportPageState extends State<ImportPage> {
     if (created != null && mounted) {
       _refresh();
       await _showImportResult(created);
+    }
+  }
+
+  Future<void> _openUpdateCashAccountSheet(
+      MobileImportCashAccount account) async {
+    final updated = await showModalBottomSheet<_ImportResult>(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) => _UpdateCashAccountBalanceSheet(
+        apiClient: widget.apiClient,
+        account: account,
+      ),
+    );
+    if (updated != null && mounted) {
+      _refresh();
+      await _showImportResult(updated);
     }
   }
 
@@ -701,10 +789,12 @@ class _AccountVaultCard extends StatefulWidget {
   const _AccountVaultCard({
     required this.accounts,
     required this.cashAccounts,
+    required this.onUpdateCashAccount,
   });
 
   final List<MobileImportAccount> accounts;
   final List<MobileImportCashAccount> cashAccounts;
+  final ValueChanged<MobileImportCashAccount> onUpdateCashAccount;
 
   @override
   State<_AccountVaultCard> createState() => _AccountVaultCardState();
@@ -775,7 +865,12 @@ class _AccountVaultCardState extends State<_AccountVaultCard> {
           ] else if (_expanded) ...[
             const SizedBox(height: 10),
             ...accounts.map(_AccountCard.new),
-            ...cashAccounts.map(_CashAccountCard.new),
+            ...cashAccounts.map(
+              (account) => _CashAccountCard(
+                account,
+                onUpdateBalance: () => widget.onUpdateCashAccount(account),
+              ),
+            ),
           ],
         ],
       ),
@@ -1145,12 +1240,21 @@ class _IbkrFlexPreviewSheetState extends State<_IbkrFlexPreviewSheet> {
     });
 
     try {
+      final registeredTypes = _registeredTypesFromBrokerageSelection(
+        preview,
+        _selectedAccountIds,
+      );
       final response = await widget.apiClient.confirmBrokerageImportDraft(
         preview.draftId,
         selectedAccountIds: _selectedAccountIds.toList(),
         confirmMode: _confirmMode,
       );
       final data = response["data"];
+      final dataMap = data is Map<String, dynamic> ? data : null;
+      final roomCheckTypes = _registeredTypesFromConfirmData(
+        dataMap,
+        registeredTypes,
+      );
       final accountsCreated = data is Map<String, dynamic>
           ? data["accountsCreated"] as int? ?? 0
           : 0;
@@ -1180,6 +1284,14 @@ class _IbkrFlexPreviewSheetState extends State<_IbkrFlexPreviewSheet> {
           message:
               "新增 $accountsCreated 个账户，新增 $holdingsCreated 个持仓，更新 $holdingsUpdated 个持仓。${cashAccountsSynced > 0 ? "同步 $cashAccountsSynced 个现金账户。" : ""}${holdingsClosed > 0 ? "已关闭 $holdingsClosed 个本次快照缺失持仓。" : ""}${holdingsSkipped > 0 ? "已跳过 $holdingsSkipped 个未确认持仓。" : ""}回到国库后可继续检查账户和标的详情。",
         );
+        if (mounted) {
+          await _openRegisteredRoomCheckSheet(
+            context: context,
+            apiClient: widget.apiClient,
+            accountTypes: roomCheckTypes,
+            sourceLabel: "IBKR",
+          );
+        }
         if (mounted) {
           Navigator.of(context).pop(true);
         }
@@ -1346,10 +1458,11 @@ class _IbkrFlexPreviewSheetState extends State<_IbkrFlexPreviewSheet> {
                   const SizedBox(height: 16),
                   TextFormField(
                     controller: _tokenController,
-                      decoration: const InputDecoration(
-                        labelText: "授权口令（Flex Token）",
-                        helperText: "报表和税务 → 活动报表 → Flex Web Service Configuration",
-                      ),
+                    decoration: const InputDecoration(
+                      labelText: "授权口令（Flex Token）",
+                      helperText:
+                          "报表和税务 → 活动报表 → Flex Web Service Configuration",
+                    ),
                     obscureText: true,
                     validator: (value) =>
                         value == null || value.trim().length < 8
@@ -1454,15 +1567,18 @@ class _IbkrSetupGuideCard extends StatelessWidget {
     const steps = [
       (
         title: "0. 打开 IBKR 客户端门户",
-        body: "先在浏览器或 IBKR app 登录 Client Portal（客户端门户）：interactivebrokers.com → Log In → Client Portal。进入后从左侧菜单打开“报表和税务”，再进入“活动报表”。",
+        body:
+            "先在浏览器或 IBKR app 登录 Client Portal（客户端门户）：interactivebrokers.com → Log In → Client Portal。进入后从左侧菜单打开“报表和税务”，再进入“活动报表”。",
       ),
       (
         title: "1. 生成授权口令",
-        body: "在“活动报表”页切到 Flex Queries。找到 Flex Web Service Configuration，确认 Flex Web Service Status 为 Enabled，点击齿轮后复制“授权口令 / Token”。",
+        body:
+            "在“活动报表”页切到 Flex Queries。找到 Flex Web Service Configuration，确认 Flex Web Service Status 为 Enabled，点击齿轮后复制“授权口令 / Token”。",
       ),
       (
         title: "2. 创建活动 Flex 查询",
-        body: "在 Activity Flex Query 右上角点 + 新建查询。格式选 XML，保存后复制该查询右侧箭头/运行入口对应的数字“查询编号 / Query ID”。",
+        body:
+            "在 Activity Flex Query 右上角点 + 新建查询。格式选 XML，保存后复制该查询右侧箭头/运行入口对应的数字“查询编号 / Query ID”。",
       ),
       (
         title: "3. 必选报表字段",
@@ -1871,12 +1987,21 @@ class _SnapTradePreviewSheetState extends State<_SnapTradePreviewSheet> {
     });
 
     try {
+      final registeredTypes = _registeredTypesFromBrokerageSelection(
+        preview,
+        _selectedAccountIds,
+      );
       final response = await widget.apiClient.confirmBrokerageImportDraft(
         preview.draftId,
         selectedAccountIds: _selectedAccountIds.toList(),
         confirmMode: _confirmMode,
       );
       final data = response["data"];
+      final dataMap = data is Map<String, dynamic> ? data : null;
+      final roomCheckTypes = _registeredTypesFromConfirmData(
+        dataMap,
+        registeredTypes,
+      );
       final accountsCreated = data is Map<String, dynamic>
           ? data["accountsCreated"] as int? ?? 0
           : 0;
@@ -1906,6 +2031,14 @@ class _SnapTradePreviewSheetState extends State<_SnapTradePreviewSheet> {
           message:
               "新增 $accountsCreated 个账户，新增 $holdingsCreated 个持仓，更新 $holdingsUpdated 个持仓。${cashAccountsSynced > 0 ? "同步 $cashAccountsSynced 个现金账户。" : ""}${holdingsClosed > 0 ? "已关闭 $holdingsClosed 个本次快照缺失持仓。" : ""}${holdingsSkipped > 0 ? "已跳过 $holdingsSkipped 个未确认持仓。" : ""}",
         );
+        if (mounted) {
+          await _openRegisteredRoomCheckSheet(
+            context: context,
+            apiClient: widget.apiClient,
+            accountTypes: roomCheckTypes,
+            sourceLabel: "Wealthsimple",
+          );
+        }
         if (mounted) {
           Navigator.of(context).pop(true);
         }
@@ -3190,6 +3323,292 @@ class _CreateCashAccountSheetState extends State<_CreateCashAccountSheet> {
   }
 }
 
+class _BrokerageRegisteredRoomCheckSheet extends StatefulWidget {
+  const _BrokerageRegisteredRoomCheckSheet({
+    required this.apiClient,
+    required this.accountTypes,
+    required this.sourceLabel,
+  });
+
+  final LooApiClient apiClient;
+  final List<String> accountTypes;
+  final String sourceLabel;
+
+  @override
+  State<_BrokerageRegisteredRoomCheckSheet> createState() =>
+      _BrokerageRegisteredRoomCheckSheetState();
+}
+
+class _BrokerageRegisteredRoomCheckSheetState
+    extends State<_BrokerageRegisteredRoomCheckSheet> {
+  late final TextEditingController _taxYearController =
+      TextEditingController(text: DateTime.now().year.toString());
+  late final Map<String, TextEditingController> _roomControllers = {
+    for (final type in widget.accountTypes) type: TextEditingController(),
+  };
+  var _saving = false;
+  String? _error;
+
+  @override
+  void dispose() {
+    _taxYearController.dispose();
+    for (final controller in _roomControllers.values) {
+      controller.dispose();
+    }
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    final rooms = _roomControllers.entries
+        .map(
+          (entry) => {
+            "accountType": entry.key,
+            "remainingRoomCad": double.tryParse(entry.value.text.trim()) ?? -1,
+            "note":
+                "${widget.sourceLabel} 导入后手动确认 · ${DateTime.now().toIso8601String().substring(0, 10)}",
+          },
+        )
+        .where((room) => (room["remainingRoomCad"] as double) >= 0)
+        .toList();
+    if (rooms.isEmpty) {
+      setState(() => _error = "至少填写一个剩余额度；不确定可以先跳过。");
+      return;
+    }
+
+    setState(() {
+      _saving = true;
+      _error = null;
+    });
+
+    try {
+      await widget.apiClient.updateRegisteredRooms({
+        "taxYear":
+            int.tryParse(_taxYearController.text.trim()) ?? DateTime.now().year,
+        "rooms": rooms,
+      });
+      if (mounted) {
+        Navigator.of(context).pop(true);
+      }
+    } catch (error) {
+      if (mounted) {
+        setState(() {
+          _error = error.toString();
+          _saving = false;
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
+    final typeText = widget.accountTypes.join(" / ");
+
+    return SafeArea(
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(20, 20, 20, bottomInset + 20),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text("核对注册额度", style: Theme.of(context).textTheme.titleLarge),
+              const SizedBox(height: 8),
+              Text(
+                "本次 ${widget.sourceLabel} 导入包含 $typeText。请按 Wealthsimple、IBKR 或 CRA 页面确认共享剩余额度；买入/卖出不会改变 room。",
+                style: Theme.of(context).textTheme.bodyMedium,
+              ),
+              const SizedBox(height: 14),
+              TextField(
+                controller: _taxYearController,
+                enabled: !_saving,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(
+                  labelText: "税务年度",
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 12),
+              for (final entry in _roomControllers.entries) ...[
+                TextField(
+                  controller: entry.value,
+                  enabled: !_saving,
+                  keyboardType:
+                      const TextInputType.numberWithOptions(decimal: true),
+                  decoration: InputDecoration(
+                    labelText: "${entry.key} 当前剩余额度 CAD",
+                    helperText: "不确定可留空；旧额度会继续沿用。",
+                    border: const OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 12),
+              ],
+              if (_error != null) ...[
+                Text(
+                  _error!,
+                  style: TextStyle(color: Theme.of(context).colorScheme.error),
+                ),
+                const SizedBox(height: 10),
+              ],
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: _saving
+                          ? null
+                          : () => Navigator.of(context).pop(false),
+                      child: const Text("先跳过"),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: FilledButton(
+                      onPressed: _saving ? null : _save,
+                      child: Text(_saving ? "保存中..." : "保存额度"),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _UpdateCashAccountBalanceSheet extends StatefulWidget {
+  const _UpdateCashAccountBalanceSheet({
+    required this.apiClient,
+    required this.account,
+  });
+
+  final LooApiClient apiClient;
+  final MobileImportCashAccount account;
+
+  @override
+  State<_UpdateCashAccountBalanceSheet> createState() =>
+      _UpdateCashAccountBalanceSheetState();
+}
+
+class _UpdateCashAccountBalanceSheetState
+    extends State<_UpdateCashAccountBalanceSheet> {
+  final _formKey = GlobalKey<FormState>();
+  late final TextEditingController _balanceController;
+  var _submitting = false;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _balanceController = TextEditingController(
+      text: widget.account.currentBalanceAmount.toStringAsFixed(2),
+    );
+  }
+
+  @override
+  void dispose() {
+    _balanceController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    if (!_formKey.currentState!.validate()) {
+      return;
+    }
+
+    setState(() {
+      _submitting = true;
+      _error = null;
+    });
+
+    try {
+      await widget.apiClient.updateManualCashAccountBalance(
+        cashAccountId: widget.account.id,
+        currentBalanceAmount:
+            double.tryParse(_balanceController.text.trim()) ?? 0,
+      );
+      if (mounted) {
+        Navigator.of(context).pop(_ImportResult(
+          title: "现金余额已更新",
+          message: [
+            "${widget.account.displayName} 已改为 ${_balanceController.text.trim()} ${widget.account.currency}。",
+            "这只影响 Buying Power 和现金曲线，不会改变 TFSA/RRSP/FHSA room。",
+          ].join("\n"),
+        ));
+      }
+    } catch (error) {
+      if (mounted) {
+        setState(() {
+          _error = error.toString();
+          _submitting = false;
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
+
+    return Padding(
+      padding: EdgeInsets.fromLTRB(20, 20, 20, bottomInset + 20),
+      child: Form(
+        key: _formKey,
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text("更新现金余额", style: Theme.of(context).textTheme.headlineMedium),
+              const SizedBox(height: 8),
+              Text(
+                "${widget.account.displayName} · ${widget.account.currency}",
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: context.looTokens.mutedText,
+                    ),
+              ),
+              const SizedBox(height: 8),
+              const Text("这里记录账户当前现金余额，不会被当成注册账户供款。"),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _balanceController,
+                enabled: !_submitting,
+                keyboardType:
+                    const TextInputType.numberWithOptions(decimal: true),
+                decoration: const InputDecoration(labelText: "当前余额"),
+                validator: _validateMoney,
+              ),
+              if (_error != null) ...[
+                const SizedBox(height: 12),
+                Text(_error!,
+                    style:
+                        TextStyle(color: Theme.of(context).colorScheme.error)),
+              ],
+              const SizedBox(height: 18),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton(
+                  onPressed: _submitting ? null : _submit,
+                  child: Text(_submitting ? "更新中..." : "更新余额"),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  String? _validateMoney(String? value) {
+    final parsed = double.tryParse((value ?? "").trim());
+    if (parsed == null || parsed < 0) {
+      return "请输入大于等于 0 的数字";
+    }
+    return null;
+  }
+}
+
 class _CreateHoldingSheet extends StatefulWidget {
   const _CreateHoldingSheet({
     required this.apiClient,
@@ -3747,9 +4166,10 @@ class _AccountCard extends StatelessWidget {
 }
 
 class _CashAccountCard extends StatelessWidget {
-  const _CashAccountCard(this.account);
+  const _CashAccountCard(this.account, {required this.onUpdateBalance});
 
   final MobileImportCashAccount account;
+  final VoidCallback onUpdateBalance;
 
   @override
   Widget build(BuildContext context) {
@@ -3763,38 +4183,58 @@ class _CashAccountCard extends StatelessWidget {
         ),
         child: Padding(
           padding: const EdgeInsets.all(14),
-          child: Row(
+          child: Column(
             children: [
-              Icon(
-                Icons.savings_outlined,
-                color: context.looTokens.accent,
-                size: 20,
+              Row(
+                children: [
+                  Icon(
+                    Icons.savings_outlined,
+                    color: context.looTokens.accent,
+                    size: 20,
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          account.displayName,
+                          style: Theme.of(context).textTheme.titleMedium,
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          account.detail,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style:
+                              Theme.of(context).textTheme.bodySmall?.copyWith(
+                                    color: context.looTokens.mutedText,
+                                  ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Text(
+                    account.value,
+                    style: Theme.of(context).textTheme.titleLarge,
+                  ),
+                ],
               ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      account.displayName,
-                      style: Theme.of(context).textTheme.titleMedium,
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      account.detail,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: context.looTokens.mutedText,
-                          ),
-                    ),
-                  ],
+              const SizedBox(height: 10),
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton.icon(
+                  onPressed: onUpdateBalance,
+                  icon: const Icon(Icons.edit_rounded, size: 17),
+                  label: const Text("更新余额"),
+                  style: TextButton.styleFrom(
+                    foregroundColor: context.looTokens.accent,
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
                 ),
-              ),
-              const SizedBox(width: 10),
-              Text(
-                account.value,
-                style: Theme.of(context).textTheme.titleLarge,
               ),
             ],
           ),
