@@ -6,6 +6,7 @@ import "../../../core/api/loo_api_client.dart";
 import "../../../core/presentation/loo_components.dart";
 import "../../../core/theme/loo_theme.dart";
 import "../data/mobile_portfolio_models.dart";
+import "cash_account_balance_sheet.dart";
 
 class AccountsListPage extends StatefulWidget {
   const AccountsListPage({required this.apiClient, super.key});
@@ -55,7 +56,7 @@ class _AccountsListPageState extends State<AccountsListPage> {
                   child: LooHeroHeader(
                     title: "账户列表",
                     subtitle: snapshot.hasData
-                        ? "共 ${snapshot.data!.accounts.length} 个账户 · 点击查看账户详情"
+                        ? "共 ${snapshot.data!.totalAccountCount} 个账户 · 投资账户看详情，现金账户可更新余额"
                         : "正在整理账户账本...",
                   ),
                 ),
@@ -96,6 +97,28 @@ class _AccountsListPageState extends State<AccountsListPage> {
                             },
                           ),
                         ),
+                        ...snapshot.data!.cashAccounts.map(
+                          (account) => LooTappableRow(
+                            margin: const EdgeInsets.only(bottom: 10),
+                            leading: const Icon(Icons.payments_outlined),
+                            title: account.name,
+                            subtitle: account.detail.isEmpty
+                                ? "现金账户 · 点击更新余额"
+                                : "${account.detail} · 点击更新余额",
+                            value: account.value,
+                            valueDetail: "现金",
+                            onTap: () async {
+                              final changed = await showCashAccountBalanceSheet(
+                                context: context,
+                                apiClient: widget.apiClient,
+                                account: account,
+                              );
+                              if (changed && context.mounted) {
+                                _refresh();
+                              }
+                            },
+                          ),
+                        ),
                       ],
                     ),
                   ),
@@ -122,7 +145,7 @@ class _AccountsSummaryCard extends StatelessWidget {
           Expanded(
             child: _SummaryMetric(
               label: "账户数",
-              value: "${snapshot.accounts.length}",
+              value: "${snapshot.totalAccountCount}",
             ),
           ),
           SizedBox(width: tokens.gapMd),

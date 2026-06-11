@@ -37,6 +37,8 @@ class MobilePortfolioSnapshot {
   final List<MobilePortfolioAllocationPoint> accountInstanceAllocation;
   final List<MobileAssetClassDrilldown> assetClassDrilldown;
 
+  int get totalAccountCount => accounts.length + cashAccounts.length;
+
   LooMinisterPageContext toMinisterContext({required String asOf}) {
     final chart = portfolioValueChart;
     return LooMinisterPageContext(
@@ -84,7 +86,9 @@ class MobilePortfolioSnapshot {
         LooMinisterFact(
           id: "account-count",
           label: "账户数量",
-          value: "${accounts.length} 个",
+          value: "$totalAccountCount 个",
+          detail:
+              cashAccounts.isEmpty ? null : "含 ${cashAccounts.length} 个现金账户",
         ),
         LooMinisterFact(
           id: "holding-count",
@@ -218,16 +222,22 @@ class MobilePortfolioCashAccount {
     required this.name,
     required this.institution,
     required this.currency,
+    required this.currentBalanceAmount,
+    required this.currentBalanceCad,
     required this.value,
     required this.detail,
+    required this.updatedAt,
   });
 
   final String id;
   final String name;
   final String institution;
   final String currency;
+  final double currentBalanceAmount;
+  final double currentBalanceCad;
   final String value;
   final String detail;
+  final String updatedAt;
 
   factory MobilePortfolioCashAccount.fromJson(Map<String, dynamic> json) {
     return MobilePortfolioCashAccount(
@@ -235,8 +245,12 @@ class MobilePortfolioCashAccount {
       name: json["name"] as String? ?? "现金账户",
       institution: json["institution"] as String? ?? "",
       currency: json["currency"] as String? ?? "CAD",
+      currentBalanceAmount:
+          (json["currentBalanceAmount"] as num?)?.toDouble() ?? 0,
+      currentBalanceCad: (json["currentBalanceCad"] as num?)?.toDouble() ?? 0,
       value: json["value"] as String? ?? "--",
       detail: json["detail"] as String? ?? "",
+      updatedAt: json["updatedAt"] as String? ?? "",
     );
   }
 }

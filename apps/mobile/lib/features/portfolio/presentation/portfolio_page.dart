@@ -12,6 +12,7 @@ import "../../shared/data/mobile_models.dart";
 import "../../shared/presentation/loo_charts.dart";
 import "../../shared/presentation/loo_minister_scope.dart";
 import "../data/mobile_portfolio_models.dart";
+import "cash_account_balance_sheet.dart";
 
 class PortfolioPage extends StatefulWidget {
   const PortfolioPage({
@@ -158,6 +159,16 @@ class _PortfolioPageState extends State<PortfolioPage> {
                               MobileRoutes.accountDetail(account.id),
                             );
                             if (changed == true && context.mounted) {
+                              _refresh();
+                            }
+                          },
+                          onOpenCashAccount: (account) async {
+                            final changed = await showCashAccountBalanceSheet(
+                              context: context,
+                              apiClient: widget.apiClient,
+                              account: account,
+                            );
+                            if (changed && context.mounted) {
                               _refresh();
                             }
                           },
@@ -874,6 +885,7 @@ class _AccountsDropdownCard extends StatefulWidget {
     required this.cashAccounts,
     required this.buyingPower,
     required this.onOpenAccount,
+    required this.onOpenCashAccount,
     super.key,
   });
 
@@ -881,6 +893,7 @@ class _AccountsDropdownCard extends StatefulWidget {
   final List<MobilePortfolioCashAccount> cashAccounts;
   final MobilePortfolioBuyingPower buyingPower;
   final ValueChanged<MobileAccountCard> onOpenAccount;
+  final ValueChanged<MobilePortfolioCashAccount> onOpenCashAccount;
 
   @override
   State<_AccountsDropdownCard> createState() => _AccountsDropdownCardState();
@@ -921,7 +934,7 @@ class _AccountsDropdownCardState extends State<_AccountsDropdownCard> {
                           SizedBox(height: tokens.gapXs),
                           Text(
                             widget.buyingPower.hasCash
-                                ? "投资账户可进入详情；现金账户汇入 Buying Power。"
+                                ? "投资账户看详情；现金账户可直接更新余额。"
                                 : "展开查看投资账户，点击单个账户进入详情。",
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis,
@@ -961,7 +974,7 @@ class _AccountsDropdownCardState extends State<_AccountsDropdownCard> {
               SizedBox(height: tokens.gapMd),
               Divider(height: 1, color: tokens.cardBorder),
               SizedBox(height: tokens.gapSm),
-              if (widget.accounts.isEmpty)
+              if (totalBuckets == 0)
                 Align(
                   alignment: Alignment.centerLeft,
                   child: Text(
@@ -971,19 +984,23 @@ class _AccountsDropdownCardState extends State<_AccountsDropdownCard> {
                         ),
                   ),
                 )
-              else
-                ...[
-                  ...widget.accounts.map(
-                    (account) => _CompactAccountRow(
-                      account: account,
-                      onTap: () => widget.onOpenAccount(account),
+              else ...[
+                ...widget.accounts.map(
+                  (account) => _CompactAccountRow(
+                    account: account,
+                    onTap: () => widget.onOpenAccount(account),
+                  ),
+                ),
+                if (widget.cashAccounts.isNotEmpty) ...[
+                  SizedBox(height: tokens.gapXs),
+                  ...widget.cashAccounts.map(
+                    (account) => _CashBalanceRow(
+                      account,
+                      onTap: () => widget.onOpenCashAccount(account),
                     ),
                   ),
-                  if (widget.cashAccounts.isNotEmpty) ...[
-                    SizedBox(height: tokens.gapXs),
-                    ...widget.cashAccounts.map(_CashBalanceRow.new),
-                  ],
                 ],
+              ],
             ],
           ],
         ),
@@ -993,59 +1010,81 @@ class _AccountsDropdownCardState extends State<_AccountsDropdownCard> {
 }
 
 class _CashBalanceRow extends StatelessWidget {
-  const _CashBalanceRow(this.account);
+  const _CashBalanceRow(this.account, {required this.onTap});
 
   final MobilePortfolioCashAccount account;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     final tokens = context.looTokens;
-    return Container(
-      padding: EdgeInsets.symmetric(
-        horizontal: tokens.gapSm,
-        vertical: tokens.gapSm,
-      ),
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.12),
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
         borderRadius: BorderRadius.circular(tokens.radiusSm),
-        border: Border.all(color: tokens.cardBorder),
-      ),
-      child: Row(
-        children: [
-          const _EntryIcon(Icons.payments_outlined),
-          SizedBox(width: tokens.gapSm),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  account.name,
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        fontWeight: FontWeight.w800,
-                      ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  account.detail.isEmpty
-                      ? "已汇入 Buying Power，不作为普通持仓账户展示。"
-                      : account.detail,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: tokens.mutedText,
-                      ),
-                ),
-              ],
-            ),
+        onTap: onTap,
+        child: Container(
+          padding: EdgeInsets.symmetric(
+            horizontal: tokens.gapSm,
+            vertical: tokens.gapSm,
           ),
-          SizedBox(width: tokens.gapSm),
-          Text(
-            account.value,
-            style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                  fontWeight: FontWeight.w900,
-                ),
+          decoration: BoxDecoration(
+            color:
+                Theme.of(context).colorScheme.surface.withValues(alpha: 0.12),
+            borderRadius: BorderRadius.circular(tokens.radiusSm),
+            border: Border.all(color: tokens.cardBorder),
           ),
-        ],
+          child: Row(
+            children: [
+              const _EntryIcon(Icons.payments_outlined),
+              SizedBox(width: tokens.gapSm),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      account.name,
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            fontWeight: FontWeight.w800,
+                          ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      account.detail.isEmpty
+                          ? "现金账户 · 点击更新余额。"
+                          : "${account.detail} · 点击更新余额",
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: tokens.mutedText,
+                          ),
+                    ),
+                  ],
+                ),
+              ),
+              SizedBox(width: tokens.gapSm),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text(
+                    account.value,
+                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.w900,
+                        ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    "更新",
+                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                          color: tokens.accent,
+                          fontWeight: FontWeight.w800,
+                        ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

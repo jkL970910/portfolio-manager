@@ -685,6 +685,39 @@ test("portfolio overview chart contract uses local history freshness when availa
   assert.ok(chart.notes.some((note) => note.includes("缓存价格历史回放")));
 });
 
+test("portfolio overview exposes cash accounts with editable balance fields", () => {
+  const portfolio = buildPortfolioData({
+    language: "zh",
+    accounts,
+    holdings,
+    cashAccounts: [
+      {
+        id: "cash_test",
+        userId: "user_test",
+        institution: "Wealthsimple",
+        nickname: "WS Cash",
+        currency: "CAD",
+        currentBalanceAmount: 2500,
+        currentBalanceCad: 2500,
+        createdAt: "2026-04-28T00:00:00.000Z",
+        updatedAt: "2026-04-29T00:00:00.000Z",
+      },
+    ],
+    portfolioEvents: [],
+    priceHistory,
+    snapshots: [],
+    profile,
+    display,
+  });
+
+  assert.equal(portfolio.accountCards.length, 1);
+  assert.equal(portfolio.cashAccounts.length, 1);
+  assert.equal(portfolio.cashAccounts[0]?.id, "cash_test");
+  assert.equal(portfolio.cashAccounts[0]?.currentBalanceAmount, 2500);
+  assert.equal(portfolio.cashAccounts[0]?.currentBalanceCad, 2500);
+  assert.equal(portfolio.cashAccounts[0]?.updatedAt, "2026-04-29T00:00:00.000Z");
+});
+
 test("mobile home overview chart contract exposes net worth freshness", () => {
   const cashAccounts: CashAccount[] = [
     {

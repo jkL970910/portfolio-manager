@@ -88,6 +88,8 @@ export interface DashboardData {
     name: string;
     institution: string;
     currency: "CAD" | "USD";
+    currentBalanceAmount: number;
+    currentBalanceCad: number;
     value: string;
     detail: string;
     updatedAt: string;

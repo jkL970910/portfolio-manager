@@ -2644,6 +2644,8 @@ export function buildDashboardData(args: {
         name: account.nickname || account.institution || pick(language, "现金账户", "Cash account"),
         institution: account.institution,
         currency: account.currency,
+        currentBalanceAmount: account.currentBalanceAmount,
+        currentBalanceCad: account.currentBalanceCad,
         value: formatDisplayCurrency(account.currentBalanceCad, display),
         detail: pick(
           language,
@@ -3249,6 +3251,8 @@ export function buildPortfolioData(args: {
         name: account.nickname || account.institution || pick(language, "现金账户", "Cash account"),
         institution: account.institution,
         currency: account.currency,
+        currentBalanceAmount: account.currentBalanceAmount,
+        currentBalanceCad: account.currentBalanceCad,
         value: formatDisplayCurrency(account.currentBalanceCad, display),
         detail: pick(
           language,
