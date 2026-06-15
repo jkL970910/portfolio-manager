@@ -1110,32 +1110,6 @@ class _RegisteredRoomProgressRow extends StatelessWidget {
               ),
             ],
           ),
-          if (room.startingValue != null) ...[
-            SizedBox(height: tokens.gapXs),
-            Text(
-              "估算年初额度 ${room.startingValue}",
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: tokens.mutedText,
-              ),
-            ),
-          ],
-          SizedBox(height: tokens.gapXs),
-          Text(
-            room.sourceLabel,
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: tokens.mutedText,
-            ),
-          ),
-          if (room.note?.trim().isNotEmpty == true) ...[
-            SizedBox(height: tokens.gapXs),
-            Text(
-              room.note!,
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: tokens.mutedText,
-                fontStyle: FontStyle.italic,
-              ),
-            ),
-          ],
         ],
       ),
     );
