@@ -571,6 +571,8 @@ class _OverviewSummaryPanel extends StatelessWidget {
           allTimeReturn: allTimeReturn,
           chart: snapshot.netWorthChart,
           fallbackPoints: snapshot.netWorthTrend,
+          onOpenRegisteredRoom: () =>
+              _showRegisteredRoomDetails(context, snapshot.registeredRoom),
         ),
         const SizedBox(height: 12),
         if (snapshot.topHoldings.isNotEmpty) ...[
@@ -622,6 +624,26 @@ class _OverviewSummaryPanel extends StatelessWidget {
     }
     return null;
   }
+
+  void _showRegisteredRoomDetails(
+    BuildContext context,
+    MobileRegisteredRoomSummary summary,
+  ) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) {
+        return _RegisteredRoomDetailSheet(
+          summary: summary,
+          onOpenSettings: () {
+            Navigator.of(sheetContext).pop();
+            context.push(MobileRoutes.settingsGuide("registeredRoom"));
+          },
+        );
+      },
+    );
+  }
 }
 
 class _AssetHeroCard extends StatelessWidget {
@@ -633,6 +655,7 @@ class _AssetHeroCard extends StatelessWidget {
     required this.allTimeReturn,
     required this.chart,
     required this.fallbackPoints,
+    required this.onOpenRegisteredRoom,
   });
 
   final MobileMetric? total;
@@ -642,6 +665,7 @@ class _AssetHeroCard extends StatelessWidget {
   final MobileMetric? allTimeReturn;
   final MobileChartSeries? chart;
   final List<MobileHomeTrendPoint> fallbackPoints;
+  final VoidCallback onOpenRegisteredRoom;
 
   @override
   Widget build(BuildContext context) {
@@ -709,6 +733,8 @@ class _AssetHeroCard extends StatelessWidget {
                       label: "注册额度",
                       value: registeredRoom.value,
                       valueColor: theme.colorScheme.onSurface,
+                      onTap: onOpenRegisteredRoom,
+                      semanticLabel: "查看注册账户额度详情",
                     ),
                   ),
                   SizedBox(height: tokens.gapSm),
@@ -796,17 +822,21 @@ class _AssetMiniMetric extends StatelessWidget {
     required this.label,
     required this.value,
     required this.valueColor,
+    this.onTap,
+    this.semanticLabel,
   });
 
   final String label;
   final String value;
   final Color valueColor;
+  final VoidCallback? onTap;
+  final String? semanticLabel;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final tokens = context.looTokens;
-    return Container(
+    final content = Container(
       width: double.infinity,
       padding: EdgeInsets.symmetric(
         horizontal: tokens.gapSm,
@@ -815,7 +845,11 @@ class _AssetMiniMetric extends StatelessWidget {
       decoration: BoxDecoration(
         color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.28),
         borderRadius: BorderRadius.circular(tokens.radiusMd),
-        border: Border.all(color: tokens.cardBorder),
+        border: Border.all(
+          color: onTap == null
+              ? tokens.cardBorder
+              : theme.colorScheme.primary.withValues(alpha: 0.35),
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.center,
@@ -844,6 +878,293 @@ class _AssetMiniMetric extends StatelessWidget {
           ),
         ],
       ),
+    );
+    if (onTap == null) return content;
+    return Semantics(
+      button: true,
+      label: semanticLabel ?? "$label $value",
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(tokens.radiusMd),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(tokens.radiusMd),
+          onTap: onTap,
+          child: content,
+        ),
+      ),
+    );
+  }
+}
+
+class _RegisteredRoomDetailSheet extends StatelessWidget {
+  const _RegisteredRoomDetailSheet({
+    required this.summary,
+    required this.onOpenSettings,
+  });
+
+  final MobileRegisteredRoomSummary summary;
+  final VoidCallback onOpenSettings;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final tokens = context.looTokens;
+    return SafeArea(
+      child: Padding(
+        padding: EdgeInsets.only(
+          left: tokens.gapMd,
+          right: tokens.gapMd,
+          bottom: tokens.gapMd + MediaQuery.of(context).viewInsets.bottom,
+        ),
+        child: LooGlassCard(
+          padding: EdgeInsets.all(tokens.gapLg),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            "注册额度详情",
+                            style: theme.textTheme.titleMedium?.copyWith(
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                          SizedBox(height: tokens.gapXs),
+                          Text(
+                            "${summary.taxYear} · TFSA/RRSP/FHSA 按账户类别共享额度",
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: tokens.mutedText,
+                              height: 1.35,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    IconButton(
+                      tooltip: "关闭",
+                      onPressed: () => Navigator.of(context).pop(),
+                      icon: const Icon(Icons.close_rounded),
+                    ),
+                  ],
+                ),
+                SizedBox(height: tokens.gapMd),
+                _RegisteredRoomTotalRow(summary: summary),
+                SizedBox(height: tokens.gapMd),
+                ...summary.rooms.map(
+                  (room) => Padding(
+                    padding: EdgeInsets.only(bottom: tokens.gapSm),
+                    child: _RegisteredRoomProgressRow(room: room),
+                  ),
+                ),
+                SizedBox(height: tokens.gapSm),
+                Text(
+                  "本页展示共享剩余额度与已确认的本年度供款快照。账户内买卖、分红或现金余额变化不会自动改变 CRA contribution room。",
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: tokens.mutedText,
+                    height: 1.35,
+                  ),
+                ),
+                SizedBox(height: tokens.gapMd),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: TextButton.icon(
+                    onPressed: onOpenSettings,
+                    icon: const Icon(Icons.tune_rounded),
+                    label: const Text("去设置维护额度"),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _RegisteredRoomTotalRow extends StatelessWidget {
+  const _RegisteredRoomTotalRow({required this.summary});
+
+  final MobileRegisteredRoomSummary summary;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final tokens = context.looTokens;
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.all(tokens.gapMd),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(tokens.radiusMd),
+        color: theme.colorScheme.primary.withValues(alpha: 0.10),
+        border: Border.all(
+          color: theme.colorScheme.primary.withValues(alpha: 0.22),
+        ),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              "总剩余额度",
+              style: theme.textTheme.labelLarge?.copyWith(
+                color: tokens.mutedText,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
+          Text(
+            summary.value,
+            style: theme.textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _RegisteredRoomProgressRow extends StatelessWidget {
+  const _RegisteredRoomProgressRow({required this.room});
+
+  final MobileRegisteredRoomLine room;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final tokens = context.looTokens;
+    final progress = ((room.usedPct ?? 0) / 100).clamp(0.0, 1.0);
+    return Container(
+      padding: EdgeInsets.all(tokens.gapMd),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(tokens.radiusMd),
+        color: theme.colorScheme.surface.withValues(alpha: 0.34),
+        border: Border.all(color: tokens.cardBorder),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  room.label.isEmpty ? room.accountType : room.label,
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+              Text(
+                room.usageLabel,
+                style: theme.textTheme.labelMedium?.copyWith(
+                  color: tokens.mutedText,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ],
+          ),
+          SizedBox(height: tokens.gapSm),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(999),
+            child: LinearProgressIndicator(
+              value: room.usedPct == null ? 0 : progress,
+              minHeight: 8,
+              backgroundColor: tokens.cardBorder.withValues(alpha: 0.55),
+            ),
+          ),
+          SizedBox(height: tokens.gapSm),
+          Row(
+            children: [
+              Expanded(
+                child: _RoomFact(
+                  label: "已贡献",
+                  value: room.contributedValue,
+                ),
+              ),
+              Expanded(
+                child: _RoomFact(
+                  label: "剩余",
+                  value: room.value,
+                  alignEnd: true,
+                ),
+              ),
+            ],
+          ),
+          if (room.startingValue != null) ...[
+            SizedBox(height: tokens.gapXs),
+            Text(
+              "估算年初额度 ${room.startingValue}",
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: tokens.mutedText,
+              ),
+            ),
+          ],
+          SizedBox(height: tokens.gapXs),
+          Text(
+            room.sourceLabel,
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: tokens.mutedText,
+            ),
+          ),
+          if (room.note?.trim().isNotEmpty == true) ...[
+            SizedBox(height: tokens.gapXs),
+            Text(
+              room.note!,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: tokens.mutedText,
+                fontStyle: FontStyle.italic,
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _RoomFact extends StatelessWidget {
+  const _RoomFact({
+    required this.label,
+    required this.value,
+    this.alignEnd = false,
+  });
+
+  final String label;
+  final String value;
+  final bool alignEnd;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final tokens = context.looTokens;
+    return Column(
+      crossAxisAlignment:
+          alignEnd ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: theme.textTheme.labelSmall?.copyWith(
+            color: tokens.mutedText,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          value,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: theme.textTheme.bodyMedium?.copyWith(
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+      ],
     );
   }
 }

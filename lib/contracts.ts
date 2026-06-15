@@ -159,9 +159,16 @@ export interface DashboardData {
     rooms: {
       accountType: "TFSA" | "RRSP" | "FHSA";
       remainingRoomCad: number;
+      contributedYtdCad: number;
+      startingRoomCad: number | null;
+      usedPct: number | null;
       label: string;
       value: string;
+      contributedValue: string;
+      startingValue: string | null;
       note: string | null;
+      sourceLabel: string;
+      usageLabel: string;
     }[];
   };
   spendingMonthLabel: string;
@@ -1076,9 +1083,16 @@ export interface SettingsData {
     rooms: {
       accountType: "TFSA" | "RRSP" | "FHSA";
       remainingRoomCad: number;
+      contributedYtdCad: number;
+      startingRoomCad: number | null;
+      usedPct: number | null;
       label: string;
       value: string;
+      contributedValue: string;
+      startingValue: string | null;
       note: string | null;
+      sourceLabel: string;
+      usageLabel: string;
     }[];
   };
 }

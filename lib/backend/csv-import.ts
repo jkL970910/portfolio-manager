@@ -22,6 +22,7 @@ export interface ParsedAccountSeed {
   currency: CurrencyCode;
   marketValueAmount: number | null;
   marketValueCad: number | null;
+  /** @deprecated CSV/manual import no longer owns registered room. */
   contributionRoomCad: number | null;
 }
 
@@ -200,7 +201,7 @@ export async function parseImportCsv(csvContent: string, fieldMapping: ImportFie
           currency,
           marketValueAmount: explicitMarketValueAmount,
           marketValueCad: await convertAmountToCad(explicitMarketValueAmount, currency),
-          contributionRoomCad: parseNumber(getMappedValue(record, "contribution_room_cad", fieldMapping))
+          contributionRoomCad: null
         });
         continue;
       }
@@ -275,7 +276,7 @@ export async function parseImportCsv(csvContent: string, fieldMapping: ImportFie
             currency,
             marketValueAmount: null,
             marketValueCad: null,
-            contributionRoomCad: parseNumber(getMappedValue(record, "contribution_room_cad", fieldMapping))
+            contributionRoomCad: null
           });
         }
         continue;

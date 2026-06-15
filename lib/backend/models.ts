@@ -102,6 +102,19 @@ export interface RegisteredAccountRoom {
   updatedAt: string;
 }
 
+export interface RegisteredAccountContributionSnapshot {
+  id: EntityId;
+  userId: EntityId;
+  accountId: EntityId;
+  accountType: AccountType;
+  taxYear: number;
+  netContributionYtdCad: number;
+  sourceLabel: string | null;
+  note: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export type MobileOnboardingStatus = "pending" | "completed" | "skipped";
 export type MobileOnboardingChecklistKey =
   | "identity"

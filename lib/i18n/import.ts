@@ -70,10 +70,10 @@ export function getImportFieldMeta(field: string, language: DisplayLanguage) {
       helpEn: "If the file already includes total value, the system uses it directly."
     },
     contribution_room_cad: {
-      zh: "剩余额度（CAD）",
-      en: "Contribution room (CAD)",
-      helpZh: "注册账户还剩多少可继续放钱的空间。",
-      helpEn: "Remaining contribution room for registered accounts."
+      zh: "旧字段：剩余额度（忽略）",
+      en: "Legacy field: room ignored",
+      helpZh: "CSV/手动导入不再维护注册额度；请在设置页维护共享剩余额度，券商同步后可按账户核对本年度供款。",
+      helpEn: "CSV/manual import no longer manages registered room. Maintain shared room in Settings; confirm account-level YTD contributions after broker sync."
     },
     symbol: {
       zh: "代码",

@@ -23,6 +23,7 @@ import {
   recommendationDynamicCandidates,
   recommendationItems,
   recommendationRuns,
+  registeredAccountContributionSnapshots,
   registeredAccountRooms,
   securities,
   securityAliases,
@@ -57,6 +58,7 @@ import {
   PreferenceProfile,
   RecommendationDynamicCandidateRecord,
   RecommendationRun,
+  RegisteredAccountContributionSnapshot,
   RegisteredAccountRoom,
   UserProfile,
 } from "@/lib/backend/models";
@@ -327,6 +329,24 @@ function mapRegisteredAccountRoom(
     accountType: row.accountType as RegisteredAccountRoom["accountType"],
     taxYear: row.taxYear,
     remainingRoomCad: toNumber(row.remainingRoomCad),
+    note: row.note ?? null,
+    createdAt: row.createdAt.toISOString(),
+    updatedAt: row.updatedAt.toISOString(),
+  };
+}
+
+function mapRegisteredAccountContributionSnapshot(
+  row: typeof registeredAccountContributionSnapshots.$inferSelect,
+): RegisteredAccountContributionSnapshot {
+  return {
+    id: row.id,
+    userId: row.userId,
+    accountId: row.accountId,
+    accountType:
+      row.accountType as RegisteredAccountContributionSnapshot["accountType"],
+    taxYear: row.taxYear,
+    netContributionYtdCad: toNumber(row.netContributionYtdCad),
+    sourceLabel: row.sourceLabel ?? null,
     note: row.note ?? null,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
@@ -745,6 +765,47 @@ export const postgresRepositories: BackendRepositories = {
             .values(values)
             .returning();
       return mapRegisteredAccountRoom(row);
+    },
+  },
+  registeredAccountContributionSnapshots: {
+    async listByUserId(userId) {
+      const rows = await getDb().query.registeredAccountContributionSnapshots.findMany({
+        where: eq(registeredAccountContributionSnapshots.userId, userId),
+        orderBy: [desc(registeredAccountContributionSnapshots.taxYear)],
+      });
+      return rows.map(mapRegisteredAccountContributionSnapshot);
+    },
+    async upsert(input) {
+      const db = getDb();
+      const existing =
+        await db.query.registeredAccountContributionSnapshots.findFirst({
+          where: and(
+            eq(registeredAccountContributionSnapshots.userId, input.userId),
+            eq(registeredAccountContributionSnapshots.accountId, input.accountId),
+            eq(registeredAccountContributionSnapshots.taxYear, input.taxYear),
+          ),
+        });
+      const values = {
+        userId: input.userId,
+        accountId: input.accountId,
+        accountType: input.accountType,
+        taxYear: input.taxYear,
+        netContributionYtdCad: input.netContributionYtdCad.toFixed(2),
+        sourceLabel: input.sourceLabel ?? null,
+        note: input.note ?? null,
+        updatedAt: new Date(),
+      };
+      const [row] = existing
+        ? await db
+            .update(registeredAccountContributionSnapshots)
+            .set(values)
+            .where(eq(registeredAccountContributionSnapshots.id, existing.id))
+            .returning()
+        : await db
+            .insert(registeredAccountContributionSnapshots)
+            .values(values)
+            .returning();
+      return mapRegisteredAccountContributionSnapshot(row);
     },
   },
   holdings: {

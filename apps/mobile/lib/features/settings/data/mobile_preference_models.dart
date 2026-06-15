@@ -151,23 +151,45 @@ class MobileRegisteredRoom {
   const MobileRegisteredRoom({
     required this.accountType,
     required this.remainingRoomCad,
+    required this.contributedYtdCad,
+    required this.startingRoomCad,
+    required this.usedPct,
     required this.label,
     required this.value,
+    required this.contributedValue,
+    required this.startingValue,
+    required this.sourceLabel,
+    required this.usageLabel,
     required this.note,
   });
 
   final String accountType;
   final double remainingRoomCad;
+  final double contributedYtdCad;
+  final double? startingRoomCad;
+  final double? usedPct;
   final String label;
   final String value;
+  final String contributedValue;
+  final String? startingValue;
+  final String sourceLabel;
+  final String usageLabel;
   final String? note;
 
   factory MobileRegisteredRoom.fromJson(Map<String, dynamic> json) {
     return MobileRegisteredRoom(
       accountType: json["accountType"] as String? ?? "TFSA",
       remainingRoomCad: (json["remainingRoomCad"] as num?)?.toDouble() ?? 0,
+      contributedYtdCad:
+          (json["contributedYtdCad"] as num?)?.toDouble() ?? 0,
+      startingRoomCad: (json["startingRoomCad"] as num?)?.toDouble(),
+      usedPct: (json["usedPct"] as num?)?.toDouble(),
       label: json["label"] as String? ?? json["accountType"] as String? ?? "",
       value: json["value"] as String? ?? "",
+      contributedValue: json["contributedValue"] as String? ?? "CAD 0",
+      startingValue: json["startingValue"] as String?,
+      sourceLabel: json["sourceLabel"] as String? ?? "尚无本年度供款快照",
+      usageLabel: json["usageLabel"] as String? ?? "暂无进度",
       note: json["note"] as String?,
     );
   }

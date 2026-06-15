@@ -93,7 +93,7 @@ Use this when you want to onboard one account at a time.
 1. Choose account type
 2. Choose `Upload one account CSV`
 3. Choose whether to add a new account or use an existing account
-4. Enter or confirm institution, nickname, and contribution room
+4. Enter or confirm institution and nickname
 5. Upload the CSV
 6. Review detected headers and adjust field mapping
 7. Click `Continue` to run a dry-run validation
@@ -113,7 +113,7 @@ Use this when you want to add holdings without a broker export.
 1. Choose account type
 2. Choose `Enter holdings manually`
 3. Choose whether to add a new account or use an existing account
-4. Enter or confirm institution, nickname, and contribution room
+4. Enter or confirm institution and nickname
 5. Add one or more holdings
 6. For each holding, you can:
    - search by ticker or security name
@@ -187,7 +187,11 @@ Optional:
 - `account_nickname`
 - `account_currency`
 - `market_value`
-- `contribution_room_cad`
+
+Registered contribution room is not maintained through CSV/manual import.
+Maintain shared TFSA/RRSP/FHSA remaining room in Settings. Broker sync can
+separately record account-level current-year contributed/net-contributed
+amounts after a draft is confirmed.
 
 #### Holding Rows
 

@@ -25,6 +25,7 @@ import {
   SecurityPriceHistoryPoint,
   PreferenceProfile,
   RecommendationRun,
+  RegisteredAccountContributionSnapshot,
   RegisteredAccountRoom,
   RiskProfile,
   UserProfile,
@@ -1420,6 +1421,7 @@ function getCurrentTaxYear() {
 function getRegisteredRoomSummary(args: {
   accounts: InvestmentAccount[];
   registeredRooms?: RegisteredAccountRoom[];
+  contributionSnapshots?: RegisteredAccountContributionSnapshot[];
   display: DisplayContext;
   language: DisplayLanguage;
   taxYear?: number;
@@ -1430,20 +1432,57 @@ function getRegisteredRoomSummary(args: {
       .filter((room) => room.taxYear === taxYear)
       .map((room) => [room.accountType, room]),
   );
+  const contributionByType = new Map<
+    (typeof REGISTERED_ROOM_ACCOUNT_TYPES)[number],
+    number
+  >();
+  for (const snapshot of args.contributionSnapshots ?? []) {
+    if (snapshot.taxYear !== taxYear) continue;
+    if (!REGISTERED_ROOM_ACCOUNT_TYPES.includes(snapshot.accountType as never)) {
+      continue;
+    }
+    const accountType =
+      snapshot.accountType as (typeof REGISTERED_ROOM_ACCOUNT_TYPES)[number];
+    contributionByType.set(
+      accountType,
+      (contributionByType.get(accountType) ?? 0) +
+        snapshot.netContributionYtdCad,
+    );
+  }
   const hasSharedRooms = roomByType.size > 0;
   const rooms = REGISTERED_ROOM_ACCOUNT_TYPES.map((accountType) => {
     const sharedRoom = roomByType.get(accountType);
+    const contributedYtdCad = contributionByType.get(accountType) ?? 0;
     const legacyRoomCad = sum(
       args.accounts
         .filter((account) => account.type === accountType)
         .map((account) => account.contributionRoomCad ?? 0),
     );
     const remainingRoomCad = sharedRoom?.remainingRoomCad ?? legacyRoomCad;
+    const startingRoomCad =
+      remainingRoomCad > 0 || contributedYtdCad > 0
+        ? remainingRoomCad + contributedYtdCad
+        : null;
+    const usedPct =
+      startingRoomCad && startingRoomCad > 0
+        ? Math.min(
+            100,
+            Math.max(0, round((contributedYtdCad / startingRoomCad) * 100, 1)),
+          )
+        : null;
     return {
       accountType,
       remainingRoomCad,
+      contributedYtdCad,
+      startingRoomCad,
+      usedPct,
       label: accountType,
       value: formatDisplayCurrency(remainingRoomCad, args.display),
+      contributedValue: formatDisplayCurrency(contributedYtdCad, args.display),
+      startingValue:
+        startingRoomCad === null
+          ? null
+          : formatDisplayCurrency(startingRoomCad, args.display),
       note:
         sharedRoom?.note ??
         (hasSharedRooms
@@ -1453,6 +1492,26 @@ function getRegisteredRoomSummary(args: {
               "沿用账户旧额度，建议在设置里改为共享额度。",
               "Using legacy account-level room; update shared room in Settings.",
             )),
+      sourceLabel:
+        contributedYtdCad > 0
+          ? pick(
+              args.language,
+              "含本年度供款快照",
+              "includes current-year contribution snapshot",
+            )
+          : pick(
+              args.language,
+              "尚无本年度供款快照",
+              "no current-year contribution snapshot",
+            ),
+      usageLabel:
+        usedPct === null
+          ? pick(args.language, "暂无进度", "No usage progress")
+          : pick(
+              args.language,
+              `已用 ${usedPct.toFixed(1)}%`,
+              `${usedPct.toFixed(1)}% used`,
+            ),
     };
   });
 
@@ -2402,6 +2461,7 @@ export function buildDashboardData(args: {
   cashAccounts?: CashAccount[];
   cashAccountBalanceEvents?: CashAccountBalanceEvent[];
   registeredRooms?: RegisteredAccountRoom[];
+  contributionSnapshots?: RegisteredAccountContributionSnapshot[];
   portfolioEvents?: PortfolioEvent[];
   priceHistory?: SecurityPriceHistoryPoint[];
   snapshots?: PortfolioSnapshot[];
@@ -2417,6 +2477,7 @@ export function buildDashboardData(args: {
     cashAccounts = [],
     cashAccountBalanceEvents = [],
     registeredRooms = [],
+    contributionSnapshots = [],
     portfolioEvents = [],
     priceHistory = [],
     snapshots = [],
@@ -2439,6 +2500,7 @@ export function buildDashboardData(args: {
   const registeredRoom = getRegisteredRoomSummary({
     accounts,
     registeredRooms,
+    contributionSnapshots,
     display,
     language,
   });
@@ -5683,6 +5745,7 @@ export function buildSettingsData(
   input?: {
     accounts?: InvestmentAccount[];
     registeredRooms?: RegisteredAccountRoom[];
+    contributionSnapshots?: RegisteredAccountContributionSnapshot[];
     display?: DisplayContext;
   },
 ): SettingsData {
@@ -5699,6 +5762,7 @@ export function buildSettingsData(
   const registeredRooms = getRegisteredRoomSummary({
     accounts: input?.accounts ?? [],
     registeredRooms: input?.registeredRooms ?? [],
+    contributionSnapshots: input?.contributionSnapshots ?? [],
     display,
     language,
   });

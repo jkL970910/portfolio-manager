@@ -555,6 +555,14 @@ class LooApiClient {
     return _patchJson("/api/mobile/settings/registered-rooms", body: payload);
   }
 
+  Future<Map<String, dynamic>> updateRegisteredAccountContributions(
+      Map<String, dynamic> payload) {
+    return _patchJson(
+      "/api/mobile/settings/registered-account-contributions",
+      body: payload,
+    );
+  }
+
   Future<Map<String, dynamic>> saveGuidedPreferenceDraft(
       Map<String, dynamic> payload) {
     return _patchJson("/api/mobile/settings/guided-draft", body: payload);

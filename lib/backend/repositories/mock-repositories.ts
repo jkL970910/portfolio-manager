@@ -25,6 +25,7 @@ import {
   PortfolioAnalysisGptEnhancement,
   PortfolioAnalysisRun,
   RecommendationDynamicCandidateRecord,
+  RegisteredAccountContributionSnapshot,
   RegisteredAccountRoom,
   SecurityResearchDossier,
 } from "@/lib/backend/models";
@@ -48,6 +49,7 @@ const mobileRefreshTokens: MobileRefreshTokenRecord[] = [];
 const mobileOnboardingStates: MobileOnboardingState[] = [];
 const recommendationDynamicCandidates: RecommendationDynamicCandidateRecord[] = [];
 const registeredAccountRooms: RegisteredAccountRoom[] = [];
+const registeredAccountContributionSnapshots: RegisteredAccountContributionSnapshot[] = [];
 
 export const mockRepositories: BackendRepositories = {
   users: {
@@ -121,6 +123,44 @@ export const mockRepositories: BackendRepositories = {
       };
       registeredAccountRooms.push(room);
       return room;
+    },
+  },
+  registeredAccountContributionSnapshots: {
+    async listByUserId(userId) {
+      return registeredAccountContributionSnapshots.filter(
+        (snapshot) => snapshot.userId === userId,
+      );
+    },
+    async upsert(input) {
+      const now = new Date().toISOString();
+      const existing = registeredAccountContributionSnapshots.find(
+        (snapshot) =>
+          snapshot.userId === input.userId &&
+          snapshot.accountId === input.accountId &&
+          snapshot.taxYear === input.taxYear,
+      );
+      if (existing) {
+        existing.accountType = input.accountType;
+        existing.netContributionYtdCad = input.netContributionYtdCad;
+        existing.sourceLabel = input.sourceLabel ?? null;
+        existing.note = input.note ?? null;
+        existing.updatedAt = now;
+        return existing;
+      }
+      const snapshot: RegisteredAccountContributionSnapshot = {
+        id: `registered_contribution_${registeredAccountContributionSnapshots.length + 1}`,
+        userId: input.userId,
+        accountId: input.accountId,
+        accountType: input.accountType,
+        taxYear: input.taxYear,
+        netContributionYtdCad: input.netContributionYtdCad,
+        sourceLabel: input.sourceLabel ?? null,
+        note: input.note ?? null,
+        createdAt: now,
+        updatedAt: now,
+      };
+      registeredAccountContributionSnapshots.push(snapshot);
+      return snapshot;
     },
   },
   holdings: {

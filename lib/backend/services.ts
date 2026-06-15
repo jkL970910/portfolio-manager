@@ -130,7 +130,10 @@ import type { MobileSecurityObservationInputPayload } from "@/lib/backend/payloa
 import type { SecurityResearchDossierInputPayload } from "@/lib/backend/payload-schemas";
 import type { IbkrConnectionSaveInputPayload } from "@/lib/backend/payload-schemas";
 import type { snapTradeConnectionPortalInputSchema } from "@/lib/backend/payload-schemas";
-import type { RegisteredAccountRoomsInputPayload } from "@/lib/backend/payload-schemas";
+import type {
+  RegisteredAccountContributionsInputPayload,
+  RegisteredAccountRoomsInputPayload,
+} from "@/lib/backend/payload-schemas";
 import type { z } from "zod";
 import type {
   SecurityQuote,
@@ -2011,6 +2014,7 @@ export async function getDashboardView(userId: string) {
     userCashAccounts,
     userCashBalanceEvents,
     userRegisteredRooms,
+    userContributionSnapshots,
     userEvents,
     userSnapshots,
     profile,
@@ -2021,6 +2025,7 @@ export async function getDashboardView(userId: string) {
     repositories.cashAccounts.listByUserId(user.id),
     repositories.cashAccountBalanceEvents.listByUserId(user.id),
     repositories.registeredAccountRooms.listByUserId(user.id),
+    repositories.registeredAccountContributionSnapshots.listByUserId(user.id),
     repositories.portfolioEvents.listByUserId(user.id),
     repositories.snapshots.listByUserId(user.id),
     repositories.preferences.getByUserId(user.id),
@@ -2047,6 +2052,7 @@ export async function getDashboardView(userId: string) {
         cashAccounts: userCashAccounts,
         cashAccountBalanceEvents: userCashBalanceEvents,
         registeredRooms: userRegisteredRooms,
+        contributionSnapshots: userContributionSnapshots,
         portfolioEvents: userEvents,
         priceHistory: userPriceHistory,
         snapshots: userSnapshots,
@@ -4570,6 +4576,14 @@ export async function confirmBrokerageImportDraft(
     let holdingsSkipped = 0;
     let holdingsClosed = 0;
     let cashAccountsSynced = 0;
+    const importedRegisteredAccounts: {
+      accountId: string;
+      sourceAccountId: string;
+      accountType: AccountType;
+      nickname: string;
+      institution: string;
+      currency: CurrencyCode;
+    }[] = [];
     const institution =
       preview.provider === "snaptrade" ? "Wealthsimple" : "Interactive Brokers";
     const accountPrefix =
@@ -4735,6 +4749,20 @@ export async function confirmBrokerageImportDraft(
             updatedAt: new Date(),
           })
           .where(eq(investmentAccounts.id, existingAccount.id));
+      }
+      if (
+        accountType === "TFSA" ||
+        accountType === "RRSP" ||
+        accountType === "FHSA"
+      ) {
+        importedRegisteredAccounts.push({
+          accountId: accountRow.id,
+          sourceAccountId,
+          accountType,
+          nickname: accountRow.nickname,
+          institution: accountRow.institution,
+          currency,
+        });
       }
 
       if (sourceAccount.cash != null) {
@@ -5122,6 +5150,7 @@ export async function confirmBrokerageImportDraft(
       cashAccountsSynced,
       importedRegisteredAccountTypes:
         getRegisteredImportAccountTypes(importableAccounts),
+      importedRegisteredAccounts,
       confirmMode,
     };
   });
@@ -5259,11 +5288,18 @@ function inferBrokerageOtherAssetSector(holding: {
 
 export async function getPreferenceView(userId: string) {
   const repositories = getRepositories();
-  const [user, profile, userAccounts, userRegisteredRooms] = await Promise.all([
+  const [
+    user,
+    profile,
+    userAccounts,
+    userRegisteredRooms,
+    userContributionSnapshots,
+  ] = await Promise.all([
     repositories.users.getById(userId),
     repositories.preferences.getByUserId(userId),
     repositories.accounts.listByUserId(userId),
     repositories.registeredAccountRooms.listByUserId(userId),
+    repositories.registeredAccountContributionSnapshots.listByUserId(userId),
   ]);
   const db = getDb();
   const guidedDraftRow = await db.query.guidedAllocationDrafts.findFirst({
@@ -5295,6 +5331,7 @@ export async function getPreferenceView(userId: string) {
       ...buildSettingsData(profile, user.displayLanguage, {
         accounts: userAccounts,
         registeredRooms: userRegisteredRooms,
+        contributionSnapshots: userContributionSnapshots,
         display: await buildServiceDisplayContext(user.baseCurrency),
       }),
       profile,
@@ -5322,17 +5359,64 @@ export async function updateRegisteredAccountRooms(
       }),
     ),
   );
-  const [profile, userAccounts, userRegisteredRooms] = await Promise.all([
+  const [
+    profile,
+    userAccounts,
+    userRegisteredRooms,
+    userContributionSnapshots,
+  ] = await Promise.all([
     repositories.preferences.getByUserId(userId),
     repositories.accounts.listByUserId(userId),
     repositories.registeredAccountRooms.listByUserId(userId),
+    repositories.registeredAccountContributionSnapshots.listByUserId(userId),
   ]);
   const settings = buildSettingsData(profile, user.displayLanguage, {
     accounts: userAccounts,
     registeredRooms: userRegisteredRooms,
+    contributionSnapshots: userContributionSnapshots,
     display: await buildServiceDisplayContext(user.baseCurrency),
   });
   return settings.registeredRooms;
+}
+
+export async function updateRegisteredAccountContributions(
+  userId: string,
+  input: RegisteredAccountContributionsInputPayload,
+) {
+  const repositories = getRepositories();
+  const taxYear = input.taxYear ?? new Date().getFullYear();
+  const userAccounts = await repositories.accounts.listByUserId(userId);
+  const accountsById = new Map(userAccounts.map((account) => [account.id, account]));
+
+  const snapshots = await Promise.all(
+    input.contributions.map((contribution) => {
+      const account = accountsById.get(contribution.accountId);
+      if (!account) {
+        throw new Error("Registered contribution account was not found.");
+      }
+      if (
+        account.type !== "TFSA" &&
+        account.type !== "RRSP" &&
+        account.type !== "FHSA"
+      ) {
+        throw new Error("Contribution snapshots can only be saved for registered accounts.");
+      }
+      if (account.type !== contribution.accountType) {
+        throw new Error("Contribution account type does not match the saved account.");
+      }
+      return repositories.registeredAccountContributionSnapshots.upsert({
+        userId,
+        accountId: contribution.accountId,
+        accountType: contribution.accountType,
+        taxYear,
+        netContributionYtdCad: contribution.netContributionYtdCad,
+        sourceLabel: input.sourceLabel ?? null,
+        note: contribution.note ?? null,
+      });
+    }),
+  );
+
+  return snapshots;
 }
 
 export async function getCitizenProfileView(userId: string) {
@@ -6166,8 +6250,7 @@ export async function createImportJob(
                   0
                 ).toFixed(2),
                 marketValueCad: (account.marketValueCad ?? 0).toFixed(2),
-                contributionRoomCad:
-                  account.contributionRoomCad?.toFixed(2) ?? null,
+                contributionRoomCad: null,
               })),
             )
             .returning()
@@ -6194,8 +6277,6 @@ export async function createImportJob(
                 0
               ).toFixed(2),
               marketValueCad: (account.marketValueCad ?? 0).toFixed(2),
-              contributionRoomCad:
-                account.contributionRoomCad?.toFixed(2) ?? null,
               updatedAt: new Date(),
             })
             .where(eq(investmentAccounts.id, matched.id));

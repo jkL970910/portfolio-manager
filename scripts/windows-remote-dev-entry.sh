@@ -6,6 +6,7 @@ PROJECT_DIR="$HOME/projects/portfolio-manager"
 
 export PATH="$HOME/.local/flutter/bin:$HOME/.local/bin:$PATH"
 
+unset npm_config_prefix NPM_CONFIG_PREFIX
 export NVM_DIR="$HOME/.nvm"
 if [ -s "$NVM_DIR/nvm.sh" ]; then
   # Desktop launcher shells do not read interactive shell startup files.
@@ -23,10 +24,10 @@ fi
 
 cd "$PROJECT_DIR" || exit 1
 
-echo "==> Starting Loo国 remote dev stack"
+echo "==> Starting Loo Telegram bot interface"
 if ! npm run remote:stack:start; then
   echo
-  echo "Remote dev stack failed to start."
+  echo "Telegram bot interface failed to start."
   echo "Run this in WSL for more details:"
   echo "  cd $PROJECT_DIR && npm run remote:stack:status"
   echo
@@ -41,7 +42,7 @@ echo
 
 if ! tmux attach -t "$SESSION_NAME"; then
   echo
-  echo "tmux attach failed. The stack may still be running."
+  echo "tmux attach failed. The Telegram bot may still be running."
   echo "Try from WSL:"
   echo "  tmux attach -t $SESSION_NAME"
   echo "  npm run remote:stack:status"

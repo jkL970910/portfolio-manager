@@ -2,6 +2,7 @@ import "package:flutter/material.dart";
 
 import "../../../core/api/loo_api_client.dart";
 import "../data/mobile_preference_models.dart";
+import "../data/registered_room_entry.dart";
 
 const _assetClasses = [
   "Canadian Equity",
@@ -2687,9 +2688,13 @@ class _RegisteredRoomEditorSheetState
     extends State<_RegisteredRoomEditorSheet> {
   late final _taxYearController =
       TextEditingController(text: widget.registeredRooms.taxYear.toString());
-  late final Map<String, TextEditingController> _roomControllers = {
+  late final Map<String, TextEditingController> _openingRoomControllers = {
     for (final type in const ["TFSA", "RRSP", "FHSA"])
       type: TextEditingController(text: _initialRoom(type).toStringAsFixed(0)),
+  };
+  late final Map<String, TextEditingController> _netContributionControllers = {
+    for (final type in const ["TFSA", "RRSP", "FHSA"])
+      type: TextEditingController(),
   };
   var _saving = false;
   String? _error;
@@ -2701,8 +2706,15 @@ class _RegisteredRoomEditorSheetState
           orElse: () => MobileRegisteredRoom(
             accountType: accountType,
             remainingRoomCad: 0,
+            contributedYtdCad: 0,
+            startingRoomCad: null,
+            usedPct: null,
             label: accountType,
             value: "\$0",
+            contributedValue: "\$0",
+            startingValue: null,
+            sourceLabel: "尚无本年度供款快照",
+            usageLabel: "暂无进度",
             note: null,
           ),
         )
@@ -2712,10 +2724,30 @@ class _RegisteredRoomEditorSheetState
   @override
   void dispose() {
     _taxYearController.dispose();
-    for (final controller in _roomControllers.values) {
+    for (final controller in _openingRoomControllers.values) {
+      controller.dispose();
+    }
+    for (final controller in _netContributionControllers.values) {
       controller.dispose();
     }
     super.dispose();
+  }
+
+  double _computedRemainingRoom(String accountType) {
+    final openingRoomCad =
+        parseRegisteredRoomNumber(
+          _openingRoomControllers[accountType]?.text ?? "",
+        ) ??
+        0;
+    final netContributionYtdCad =
+        parseRegisteredRoomNumber(
+          _netContributionControllers[accountType]?.text ?? "",
+        ) ??
+        0;
+    return computeRemainingRegisteredRoomCad(
+      openingRoomCad: openingRoomCad,
+      netContributionYtdCad: netContributionYtdCad,
+    );
   }
 
   Future<void> _save() async {
@@ -2728,10 +2760,10 @@ class _RegisteredRoomEditorSheetState
         "taxYear":
             int.tryParse(_taxYearController.text.trim()) ?? DateTime.now().year,
         "rooms": [
-          for (final entry in _roomControllers.entries)
+          for (final type in _openingRoomControllers.keys)
             {
-              "accountType": entry.key,
-              "remainingRoomCad": double.tryParse(entry.value.text.trim()) ?? 0,
+              "accountType": type,
+              "remainingRoomCad": _computedRemainingRoom(type),
             },
         ],
       });
@@ -2766,7 +2798,7 @@ class _RegisteredRoomEditorSheetState
               Text("注册额度", style: Theme.of(context).textTheme.titleLarge),
               const SizedBox(height: 6),
               Text(
-                "这里是 TFSA/RRSP/FHSA 按类别共享的剩余额度，不属于任何单个券商账户。",
+                "这里按账户类别登记共享注册额度。请填写年初可用额度，以及券商页面显示的本年度已供款/净供款，页面会自动换算当前剩余额度。",
                 style: Theme.of(context).textTheme.bodyMedium,
               ),
               const SizedBox(height: 16),
@@ -2779,17 +2811,45 @@ class _RegisteredRoomEditorSheetState
                 ),
               ),
               const SizedBox(height: 12),
-              for (final entry in _roomControllers.entries) ...[
+              for (final type in _openingRoomControllers.keys) ...[
+                Text(type, style: Theme.of(context).textTheme.titleSmall),
+                const SizedBox(height: 8),
                 TextField(
-                  controller: entry.value,
+                  controller: _openingRoomControllers[type],
                   keyboardType:
                       const TextInputType.numberWithOptions(decimal: true),
                   decoration: InputDecoration(
-                    labelText: "${entry.key} 剩余额度 CAD",
+                    labelText: "$type 年初可用额度 CAD",
+                    helperText: "填 CRA 年初可用额度，或你确认无误的年初起始额度。",
                     border: const OutlineInputBorder(),
                   ),
+                  onChanged: (_) => setState(() {}),
                 ),
                 const SizedBox(height: 12),
+                TextField(
+                  controller: _netContributionControllers[type],
+                  keyboardType:
+                      const TextInputType.numberWithOptions(decimal: true),
+                  decoration: InputDecoration(
+                    labelText: "$type 本年度已供款 / 净供款 CAD",
+                    helperText: "按 Wealthsimple、IBKR 或券商页面显示的 year-to-date 口径填写；不需要自己做减法。",
+                    border: const OutlineInputBorder(),
+                  ),
+                  onChanged: (_) => setState(() {}),
+                ),
+                const SizedBox(height: 12),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    "当前登记剩余额度：CAD ${_computedRemainingRoom(type).toStringAsFixed(2)}",
+                  ),
+                ),
+                const SizedBox(height: 16),
               ],
               if (_error != null) ...[
                 Text(
@@ -2807,7 +2867,7 @@ class _RegisteredRoomEditorSheetState
                         child: CircularProgressIndicator(strokeWidth: 2),
                       )
                     : const Icon(Icons.save_outlined),
-                label: Text(_saving ? "保存中…" : "保存注册额度"),
+                label: Text(_saving ? "保存中…" : "保存当前剩余额度"),
               ),
             ],
           ),

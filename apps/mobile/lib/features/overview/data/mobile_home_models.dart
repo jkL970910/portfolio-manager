@@ -563,7 +563,7 @@ class MobileRegisteredRoomSummary {
     return "CAD $buffer";
   }
 
-  String get detail => source == "shared" ? "$taxYear 共享额度" : "$taxYear 旧账户额度";
+  String get detail => source == "shared" ? "$taxYear 共享额度 · 点开看明细" : "$taxYear 旧账户额度 · 建议在设置维护";
 
   factory MobileRegisteredRoomSummary.fromJson(dynamic json) {
     if (json is! Map<String, dynamic>) {
@@ -588,16 +588,47 @@ class MobileRegisteredRoomSummary {
 class MobileRegisteredRoomLine {
   const MobileRegisteredRoomLine({
     required this.accountType,
+    required this.remainingRoomCad,
+    required this.contributedYtdCad,
+    required this.startingRoomCad,
+    required this.usedPct,
+    required this.label,
     required this.value,
+    required this.contributedValue,
+    required this.startingValue,
+    required this.sourceLabel,
+    required this.usageLabel,
+    this.note,
   });
 
   final String accountType;
+  final double remainingRoomCad;
+  final double contributedYtdCad;
+  final double? startingRoomCad;
+  final double? usedPct;
+  final String label;
   final String value;
+  final String contributedValue;
+  final String? startingValue;
+  final String sourceLabel;
+  final String usageLabel;
+  final String? note;
 
   factory MobileRegisteredRoomLine.fromJson(Map<String, dynamic> json) {
     return MobileRegisteredRoomLine(
       accountType: json["accountType"] as String? ?? "",
+      remainingRoomCad: (json["remainingRoomCad"] as num?)?.toDouble() ?? 0,
+      contributedYtdCad:
+          (json["contributedYtdCad"] as num?)?.toDouble() ?? 0,
+      startingRoomCad: (json["startingRoomCad"] as num?)?.toDouble(),
+      usedPct: (json["usedPct"] as num?)?.toDouble(),
+      label: json["label"] as String? ?? json["accountType"] as String? ?? "",
       value: json["value"] as String? ?? "",
+      contributedValue: json["contributedValue"] as String? ?? "CAD 0",
+      startingValue: json["startingValue"] as String?,
+      sourceLabel: json["sourceLabel"] as String? ?? "尚无本年度供款快照",
+      usageLabel: json["usageLabel"] as String? ?? "暂无进度",
+      note: json["note"] as String?,
     );
   }
 }

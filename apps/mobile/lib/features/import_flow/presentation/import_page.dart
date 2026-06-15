@@ -9,6 +9,7 @@ import "../../../core/presentation/loo_components.dart";
 import "../../../core/theme/loo_theme.dart";
 import "../../onboarding/data/mobile_onboarding_models.dart";
 import "../../onboarding/presentation/loo_coach_mark_overlay.dart";
+import "../../settings/data/registered_room_entry.dart";
 import "../data/mobile_import_models.dart";
 
 Future<void> _showImportResultDialog(
@@ -58,11 +59,28 @@ String? _registeredAccountTypeFromLabel(String value) {
   return null;
 }
 
-List<String> _registeredTypesFromBrokerageSelection(
+class _RegisteredContributionReviewAccount {
+  const _RegisteredContributionReviewAccount({
+    required this.localAccountId,
+    required this.sourceAccountId,
+    required this.accountType,
+    required this.label,
+    required this.currency,
+  });
+
+  final String? localAccountId;
+  final String sourceAccountId;
+  final String accountType;
+  final String label;
+  final String currency;
+}
+
+List<_RegisteredContributionReviewAccount>
+    _registeredContributionAccountsFromBrokerageSelection(
   MobileIbkrFlexPreview preview,
   Set<String> selectedAccountIds,
 ) {
-  final types = <String>{};
+  final accounts = <_RegisteredContributionReviewAccount>[];
   for (final account in preview.accounts) {
     if (!selectedAccountIds.contains(account.accountId)) {
       continue;
@@ -71,17 +89,60 @@ List<String> _registeredTypesFromBrokerageSelection(
       "${account.accountType} ${account.accountId}",
     );
     if (type != null) {
-      types.add(type);
+      accounts.add(
+        _RegisteredContributionReviewAccount(
+          localAccountId: null,
+          sourceAccountId: account.accountId,
+          accountType: type,
+          label: account.accountId,
+          currency: account.currency,
+        ),
+      );
     }
   }
-  const order = ["TFSA", "RRSP", "FHSA"];
-  return order.where(types.contains).toList();
+  return accounts;
 }
 
-List<String> _registeredTypesFromConfirmData(
+List<_RegisteredContributionReviewAccount>
+    _registeredContributionAccountsFromConfirmData(
   Map<String, dynamic>? data,
-  List<String> fallback,
+  List<_RegisteredContributionReviewAccount> fallback,
 ) {
+  final rawAccounts = data?["importedRegisteredAccounts"];
+  if (rawAccounts is List) {
+    final accounts = rawAccounts
+        .whereType<Map<String, dynamic>>()
+        .map((json) {
+          final rawAccountType = json["accountType"] as String?;
+          final accountId = json["accountId"] as String?;
+          final sourceAccountId = json["sourceAccountId"] as String?;
+          final String? accountType = rawAccountType == "TFSA" ||
+                  rawAccountType == "RRSP" ||
+                  rawAccountType == "FHSA"
+              ? rawAccountType
+              : null;
+          if (accountId == null ||
+              sourceAccountId == null ||
+              accountType == null) {
+            return null;
+          }
+          final nickname = json["nickname"] as String?;
+          return _RegisteredContributionReviewAccount(
+            localAccountId: accountId,
+            sourceAccountId: sourceAccountId,
+            accountType: accountType,
+            label: nickname == null || nickname.isEmpty
+                ? sourceAccountId
+                : nickname,
+            currency: json["currency"] as String? ?? "CAD",
+          );
+        })
+        .whereType<_RegisteredContributionReviewAccount>()
+        .toList();
+    if (accounts.isNotEmpty) {
+      return accounts;
+    }
+  }
   final raw = data?["importedRegisteredAccountTypes"];
   if (raw is! List) {
     return fallback;
@@ -94,16 +155,31 @@ List<String> _registeredTypesFromConfirmData(
   }
   const order = ["TFSA", "RRSP", "FHSA"];
   final parsed = order.where(types.contains).toList();
-  return parsed.isEmpty ? fallback : parsed;
+  if (parsed.isEmpty || fallback.isNotEmpty) {
+    return fallback;
+  }
+  return parsed
+      .map(
+        (type) => _RegisteredContributionReviewAccount(
+          localAccountId: null,
+          sourceAccountId: type,
+          accountType: type,
+          label: "$type account",
+          currency: "CAD",
+        ),
+      )
+      .toList();
 }
 
 Future<bool> _openRegisteredRoomCheckSheet({
   required BuildContext context,
   required LooApiClient apiClient,
-  required List<String> accountTypes,
+  required List<_RegisteredContributionReviewAccount> accounts,
   required String sourceLabel,
 }) async {
-  if (accountTypes.isEmpty) {
+  final saveableAccounts =
+      accounts.where((account) => account.localAccountId != null).toList();
+  if (saveableAccounts.isEmpty) {
     return false;
   }
   final saved = await showModalBottomSheet<bool>(
@@ -111,7 +187,7 @@ Future<bool> _openRegisteredRoomCheckSheet({
     isScrollControlled: true,
     builder: (context) => _BrokerageRegisteredRoomCheckSheet(
       apiClient: apiClient,
-      accountTypes: accountTypes,
+      accounts: saveableAccounts,
       sourceLabel: sourceLabel,
     ),
   );
@@ -1240,7 +1316,8 @@ class _IbkrFlexPreviewSheetState extends State<_IbkrFlexPreviewSheet> {
     });
 
     try {
-      final registeredTypes = _registeredTypesFromBrokerageSelection(
+      final registeredAccounts =
+          _registeredContributionAccountsFromBrokerageSelection(
         preview,
         _selectedAccountIds,
       );
@@ -1251,9 +1328,10 @@ class _IbkrFlexPreviewSheetState extends State<_IbkrFlexPreviewSheet> {
       );
       final data = response["data"];
       final dataMap = data is Map<String, dynamic> ? data : null;
-      final roomCheckTypes = _registeredTypesFromConfirmData(
+      final contributionReviewAccounts =
+          _registeredContributionAccountsFromConfirmData(
         dataMap,
-        registeredTypes,
+        registeredAccounts,
       );
       final accountsCreated = data is Map<String, dynamic>
           ? data["accountsCreated"] as int? ?? 0
@@ -1288,7 +1366,7 @@ class _IbkrFlexPreviewSheetState extends State<_IbkrFlexPreviewSheet> {
           await _openRegisteredRoomCheckSheet(
             context: context,
             apiClient: widget.apiClient,
-            accountTypes: roomCheckTypes,
+            accounts: contributionReviewAccounts,
             sourceLabel: "IBKR",
           );
         }
@@ -1987,7 +2065,8 @@ class _SnapTradePreviewSheetState extends State<_SnapTradePreviewSheet> {
     });
 
     try {
-      final registeredTypes = _registeredTypesFromBrokerageSelection(
+      final registeredAccounts =
+          _registeredContributionAccountsFromBrokerageSelection(
         preview,
         _selectedAccountIds,
       );
@@ -1998,9 +2077,10 @@ class _SnapTradePreviewSheetState extends State<_SnapTradePreviewSheet> {
       );
       final data = response["data"];
       final dataMap = data is Map<String, dynamic> ? data : null;
-      final roomCheckTypes = _registeredTypesFromConfirmData(
+      final contributionReviewAccounts =
+          _registeredContributionAccountsFromConfirmData(
         dataMap,
-        registeredTypes,
+        registeredAccounts,
       );
       final accountsCreated = data is Map<String, dynamic>
           ? data["accountsCreated"] as int? ?? 0
@@ -2035,7 +2115,7 @@ class _SnapTradePreviewSheetState extends State<_SnapTradePreviewSheet> {
           await _openRegisteredRoomCheckSheet(
             context: context,
             apiClient: widget.apiClient,
-            accountTypes: roomCheckTypes,
+            accounts: contributionReviewAccounts,
             sourceLabel: "Wealthsimple",
           );
         }
@@ -3326,12 +3406,12 @@ class _CreateCashAccountSheetState extends State<_CreateCashAccountSheet> {
 class _BrokerageRegisteredRoomCheckSheet extends StatefulWidget {
   const _BrokerageRegisteredRoomCheckSheet({
     required this.apiClient,
-    required this.accountTypes,
+    required this.accounts,
     required this.sourceLabel,
   });
 
   final LooApiClient apiClient;
-  final List<String> accountTypes;
+  final List<_RegisteredContributionReviewAccount> accounts;
   final String sourceLabel;
 
   @override
@@ -3343,8 +3423,9 @@ class _BrokerageRegisteredRoomCheckSheetState
     extends State<_BrokerageRegisteredRoomCheckSheet> {
   late final TextEditingController _taxYearController =
       TextEditingController(text: DateTime.now().year.toString());
-  late final Map<String, TextEditingController> _roomControllers = {
-    for (final type in widget.accountTypes) type: TextEditingController(),
+  late final Map<String, TextEditingController> _netContributionControllers = {
+    for (final account in widget.accounts)
+      account.sourceAccountId: TextEditingController(),
   };
   var _saving = false;
   String? _error;
@@ -3352,26 +3433,39 @@ class _BrokerageRegisteredRoomCheckSheetState
   @override
   void dispose() {
     _taxYearController.dispose();
-    for (final controller in _roomControllers.values) {
+    for (final controller in _netContributionControllers.values) {
       controller.dispose();
     }
     super.dispose();
   }
 
-  Future<void> _save() async {
-    final rooms = _roomControllers.entries
-        .map(
-          (entry) => {
-            "accountType": entry.key,
-            "remainingRoomCad": double.tryParse(entry.value.text.trim()) ?? -1,
+  double? _netContributionYtdCad(String sourceAccountId) {
+    return parseRegisteredRoomNumber(
+      _netContributionControllers[sourceAccountId]?.text ?? "",
+    );
+  }
+
+  Future<void> _confirm() async {
+    final contributions = widget.accounts
+        .map((account) {
+          final localAccountId = account.localAccountId;
+          final netContributionYtdCad =
+              _netContributionYtdCad(account.sourceAccountId);
+          if (localAccountId == null || netContributionYtdCad == null) {
+            return null;
+          }
+          return {
+            "accountId": localAccountId,
+            "accountType": account.accountType,
+            "netContributionYtdCad": netContributionYtdCad,
             "note":
-                "${widget.sourceLabel} 导入后手动确认 · ${DateTime.now().toIso8601String().substring(0, 10)}",
-          },
-        )
-        .where((room) => (room["remainingRoomCad"] as double) >= 0)
+                "${widget.sourceLabel} 导入后账户级供款核对 · ${DateTime.now().toIso8601String().substring(0, 10)}",
+          };
+        })
+        .whereType<Map<String, Object>>()
         .toList();
-    if (rooms.isEmpty) {
-      setState(() => _error = "至少填写一个剩余额度；不确定可以先跳过。");
+    if (contributions.isEmpty) {
+      setState(() => _error = "至少填写一个注册账户的本年度已供款/净供款；不确定可先跳过。");
       return;
     }
 
@@ -3381,10 +3475,11 @@ class _BrokerageRegisteredRoomCheckSheetState
     });
 
     try {
-      await widget.apiClient.updateRegisteredRooms({
+      await widget.apiClient.updateRegisteredAccountContributions({
         "taxYear":
             int.tryParse(_taxYearController.text.trim()) ?? DateTime.now().year,
-        "rooms": rooms,
+        "sourceLabel": widget.sourceLabel,
+        "contributions": contributions,
       });
       if (mounted) {
         Navigator.of(context).pop(true);
@@ -3402,7 +3497,10 @@ class _BrokerageRegisteredRoomCheckSheetState
   @override
   Widget build(BuildContext context) {
     final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
-    final typeText = widget.accountTypes.join(" / ");
+    final typeText = widget.accounts
+        .map((account) => account.accountType)
+        .toSet()
+        .join(" / ");
 
     return SafeArea(
       child: Padding(
@@ -3412,10 +3510,10 @@ class _BrokerageRegisteredRoomCheckSheetState
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text("核对注册额度", style: Theme.of(context).textTheme.titleLarge),
+              Text("核对本年度供款", style: Theme.of(context).textTheme.titleLarge),
               const SizedBox(height: 8),
               Text(
-                "本次 ${widget.sourceLabel} 导入包含 $typeText。请按 Wealthsimple、IBKR 或 CRA 页面确认共享剩余额度；买入/卖出不会改变 room。",
+                "本次 ${widget.sourceLabel} 导入包含 $typeText 注册账户。请按每个账户填写本税务年度已供款/净供款；这不会覆盖 Settings 里的共享剩余额度。买入、卖出和现金余额同步不会改变 room。",
                 style: Theme.of(context).textTheme.bodyMedium,
               ),
               const SizedBox(height: 14),
@@ -3429,19 +3527,50 @@ class _BrokerageRegisteredRoomCheckSheetState
                 ),
               ),
               const SizedBox(height: 12),
-              for (final entry in _roomControllers.entries) ...[
+              for (final account in widget.accounts) ...[
+                Text(
+                  account.label,
+                  style: Theme.of(context).textTheme.titleSmall,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  "${account.accountType} · ${account.currency} · ${account.sourceAccountId}",
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: context.looTokens.mutedText,
+                      ),
+                ),
+                const SizedBox(height: 8),
                 TextField(
-                  controller: entry.value,
+                  controller:
+                      _netContributionControllers[account.sourceAccountId],
                   enabled: !_saving,
                   keyboardType:
                       const TextInputType.numberWithOptions(decimal: true),
-                  decoration: InputDecoration(
-                    labelText: "${entry.key} 当前剩余额度 CAD",
-                    helperText: "不确定可留空；旧额度会继续沿用。",
-                    border: const OutlineInputBorder(),
+                  decoration: const InputDecoration(
+                    labelText: "本账户本年度已供款 / 净供款 CAD",
+                    helperText:
+                        "按券商页面 year-to-date contribution 口径填写；不确定可留空并先跳过。",
+                    border: OutlineInputBorder(),
                   ),
+                  onChanged: (_) => setState(() {}),
                 ),
                 const SizedBox(height: 12),
+                if (_netContributionYtdCad(account.sourceAccountId) !=
+                    null) ...[
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color:
+                          Theme.of(context).colorScheme.surfaceContainerHighest,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      "已核对：${_taxYearController.text.trim()} 年本账户已供款 / 净供款 CAD ${_netContributionYtdCad(account.sourceAccountId)!.toStringAsFixed(2)}。此值仅代表账户级供款记录，不是 CRA 剩余额度。",
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                ],
               ],
               if (_error != null) ...[
                 Text(
@@ -3463,8 +3592,8 @@ class _BrokerageRegisteredRoomCheckSheetState
                   const SizedBox(width: 10),
                   Expanded(
                     child: FilledButton(
-                      onPressed: _saving ? null : _save,
-                      child: Text(_saving ? "保存中..." : "保存额度"),
+                      onPressed: _saving ? null : _confirm,
+                      child: Text(_saving ? "核对中..." : "已核对供款"),
                     ),
                   ),
                 ],

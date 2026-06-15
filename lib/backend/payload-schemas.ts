@@ -845,6 +845,24 @@ export const registeredAccountRoomsInputSchema = z.object({
 export type RegisteredAccountRoomsInputPayload = z.infer<
   typeof registeredAccountRoomsInputSchema
 >;
+export const registeredAccountContributionsInputSchema = z.object({
+  taxYear: z.number().int().min(2009).max(2100).optional(),
+  sourceLabel: z.string().trim().min(1).max(80).optional(),
+  contributions: z
+    .array(
+      z.object({
+        accountId: z.string().uuid(),
+        accountType: z.enum(["TFSA", "RRSP", "FHSA"]),
+        netContributionYtdCad: z.number().min(0).max(1_000_000),
+        note: z.string().trim().max(240).nullable().optional(),
+      }),
+    )
+    .min(1)
+    .max(20),
+});
+export type RegisteredAccountContributionsInputPayload = z.infer<
+  typeof registeredAccountContributionsInputSchema
+>;
 export type PreferenceFactorsDraftRequestPayload = z.infer<
   typeof preferenceFactorsDraftRequestSchema
 >;

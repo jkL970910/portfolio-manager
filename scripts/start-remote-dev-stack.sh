@@ -5,6 +5,7 @@ SESSION_NAME="portfolio-remote-dev"
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 
 export PATH="$HOME/.local/flutter/bin:$HOME/.local/bin:$PATH"
+unset npm_config_prefix NPM_CONFIG_PREFIX
 export NVM_DIR="$HOME/.nvm"
 if [ -s "$NVM_DIR/nvm.sh" ]; then
   # Desktop launcher shells do not read interactive shell startup files.
@@ -14,11 +15,8 @@ if [ -s "$NVM_DIR/nvm.sh" ]; then
 fi
 
 TMUX_PATH="$PATH"
-BACKEND_CMD="cd '$ROOT_DIR' && export PATH=\"$TMUX_PATH\" && npm run local:start:linux"
-FLUTTER_CMD="cd '$ROOT_DIR' && export PATH=\"$TMUX_PATH\" && npm run mobile:dev:web"
-PROXY_CMD="cd '$ROOT_DIR' && export PATH=\"$TMUX_PATH\" && npm run mobile:preview:proxy"
 DUCTOR_CMD="cd '$ROOT_DIR' && export PATH=\"$TMUX_PATH\" && npm run remote:ductor"
-TUNNEL_CMD="cd '$ROOT_DIR' && export PATH=\"$TMUX_PATH\" && npm run preview:tunnel:cloudflare -- 3010"
+STALE_WINDOWS=(backend app flutter proxy tunnel)
 
 if ! command -v tmux >/dev/null 2>&1; then
   echo 'tmux is required but not installed.' >&2
@@ -35,59 +33,38 @@ if ! command -v ductor >/dev/null 2>&1; then
   exit 1
 fi
 
-if ! command -v cloudflared >/dev/null 2>&1; then
-  echo 'cloudflared is not on PATH. Run: export PATH="$HOME/.local/bin:$PATH"' >&2
-  exit 1
-fi
-
 window_exists() {
   local window_name="$1"
   tmux list-windows -t "$SESSION_NAME" -F '#{window_name}' 2>/dev/null | grep -Fxq "$window_name"
 }
 
+stop_stale_project_windows() {
+  for window_name in "${STALE_WINDOWS[@]}"; do
+    if window_exists "$window_name"; then
+      tmux kill-window -t "$SESSION_NAME:$window_name"
+    fi
+  done
+}
+
 if tmux has-session -t "$SESSION_NAME" 2>/dev/null; then
-  echo "Session '$SESSION_NAME' is already running; ensuring required windows exist."
-  if window_exists app && ! window_exists backend; then
-    tmux rename-window -t "$SESSION_NAME:app" backend
-  fi
-  if ! window_exists backend; then
-    tmux new-window -t "$SESSION_NAME" -n backend "$BACKEND_CMD"
-  fi
-  if ! window_exists flutter; then
-    tmux new-window -t "$SESSION_NAME" -n flutter "$FLUTTER_CMD"
-  fi
-  if window_exists proxy; then
-    tmux respawn-pane -k -t "$SESSION_NAME:proxy" "$PROXY_CMD"
-  else
-    tmux new-window -t "$SESSION_NAME" -n proxy "$PROXY_CMD"
-  fi
+  echo "Session '$SESSION_NAME' is already running; switching to bot-only mode."
   if window_exists ductor; then
     tmux respawn-pane -k -t "$SESSION_NAME:ductor" "$DUCTOR_CMD"
   else
     tmux new-window -t "$SESSION_NAME" -n ductor "$DUCTOR_CMD"
   fi
-  if window_exists tunnel; then
-    tmux respawn-pane -k -t "$SESSION_NAME:tunnel" "$TUNNEL_CMD"
-  else
-    tmux new-window -t "$SESSION_NAME" -n tunnel "$TUNNEL_CMD"
-  fi
+  stop_stale_project_windows
 else
-  tmux new-session -d -s "$SESSION_NAME" -n backend "$BACKEND_CMD"
-  tmux new-window -t "$SESSION_NAME" -n flutter "$FLUTTER_CMD"
-  tmux new-window -t "$SESSION_NAME" -n proxy "$PROXY_CMD"
-  tmux new-window -t "$SESSION_NAME" -n ductor "$DUCTOR_CMD"
-  tmux new-window -t "$SESSION_NAME" -n tunnel "$TUNNEL_CMD"
+  tmux new-session -d -s "$SESSION_NAME" -n ductor "$DUCTOR_CMD"
 fi
 
 cat <<EOF
-Remote dev stack started in tmux session '$SESSION_NAME'.
+Loo Telegram bot interface started in tmux session '$SESSION_NAME'.
 
 Windows:
-- backend: Next.js API/web host on port 3000
-- flutter: Flutter mobile web preview on port 3001
-- proxy: Mobile preview proxy on port 3010 (/api -> 3000, Flutter -> 3001)
 - ductor: Telegram/Codex control plane
-- tunnel: Cloudflare quick tunnel to the mobile preview proxy
+
+Local portfolio, Flutter preview, preview proxy, and Cloudflare tunnel are no longer started by this launcher because those apps are deployed on Vercel.
 
 Useful commands:
 - tmux attach -t $SESSION_NAME

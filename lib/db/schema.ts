@@ -220,6 +220,40 @@ export const registeredAccountRooms = pgTable(
   }),
 );
 
+export const registeredAccountContributionSnapshots = pgTable(
+  "registered_account_contribution_snapshots",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id),
+    accountId: uuid("account_id")
+      .notNull()
+      .references(() => investmentAccounts.id),
+    accountType: varchar("account_type", { length: 24 }).notNull(),
+    taxYear: integer("tax_year").notNull(),
+    netContributionYtdCad: numeric("net_contribution_ytd_cad", {
+      precision: 14,
+      scale: 2,
+    })
+      .notNull()
+      .default("0"),
+    sourceLabel: varchar("source_label", { length: 80 }),
+    note: text("note"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => ({
+    userAccountYearIdx: uniqueIndex(
+      "registered_account_contribution_snapshots_user_account_year_idx",
+    ).on(table.userId, table.accountId, table.taxYear),
+  }),
+);
+
 export const holdingPositions = pgTable(
   "holding_positions",
   {

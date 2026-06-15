@@ -288,6 +288,13 @@
       "when": 1780933200000,
       "tag": "0040_brokerage_account_aliases",
       "breakpoints": true
+    },
+    {
+      "idx": 41,
+      "version": "7",
+      "when": 1781554453704,
+      "tag": "0041_registered_account_contribution_snapshots",
+      "breakpoints": true
     }
   ]
 }

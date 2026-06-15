@@ -26,6 +26,7 @@ import {
   PreferenceProfile,
   RecommendationDynamicCandidateRecord,
   RecommendationRun,
+  RegisteredAccountContributionSnapshot,
   RegisteredAccountRoom,
   SecurityResearchDossier,
   UserProfile,
@@ -63,6 +64,19 @@ export interface RegisteredAccountRoomRepository {
     remainingRoomCad: number;
     note?: string | null;
   }): Promise<RegisteredAccountRoom>;
+}
+
+export interface RegisteredAccountContributionSnapshotRepository {
+  listByUserId(userId: EntityId): Promise<RegisteredAccountContributionSnapshot[]>;
+  upsert(input: {
+    userId: EntityId;
+    accountId: EntityId;
+    accountType: RegisteredAccountContributionSnapshot["accountType"];
+    taxYear: number;
+    netContributionYtdCad: number;
+    sourceLabel?: string | null;
+    note?: string | null;
+  }): Promise<RegisteredAccountContributionSnapshot>;
 }
 
 export interface HoldingRepository {
@@ -373,6 +387,7 @@ export interface BackendRepositories {
   users: UserRepository;
   accounts: AccountRepository;
   registeredAccountRooms: RegisteredAccountRoomRepository;
+  registeredAccountContributionSnapshots: RegisteredAccountContributionSnapshotRepository;
   holdings: HoldingRepository;
   transactions: TransactionRepository;
   cashAccounts: CashAccountRepository;
