@@ -855,15 +855,31 @@ class _AssetMiniMetric extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.center,
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Text(
-            label,
-            textAlign: TextAlign.center,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: theme.textTheme.labelSmall?.copyWith(
-              color: tokens.mutedText,
-              fontWeight: FontWeight.w700,
-            ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Flexible(
+                child: Text(
+                  label,
+                  textAlign: TextAlign.center,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: tokens.mutedText,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+              if (onTap != null) ...[
+                const SizedBox(width: 3),
+                Icon(
+                  Icons.expand_more_rounded,
+                  size: 14,
+                  color: tokens.mutedText,
+                ),
+              ],
+            ],
           ),
           SizedBox(height: tokens.gapXs),
           Text(
@@ -882,15 +898,12 @@ class _AssetMiniMetric extends StatelessWidget {
     if (onTap == null) return content;
     return Semantics(
       button: true,
+      enabled: true,
       label: semanticLabel ?? "$label $value",
-      child: Material(
-        color: Colors.transparent,
-        borderRadius: BorderRadius.circular(tokens.radiusMd),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(tokens.radiusMd),
-          onTap: onTap,
-          child: content,
-        ),
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: onTap,
+        child: content,
       ),
     );
   }
