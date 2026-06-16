@@ -2,27 +2,31 @@ import "package:flutter_test/flutter_test.dart";
 import "package:loo_wealth_mobile/features/settings/data/registered_room_entry.dart";
 
 void main() {
-  test("computes remaining room from opening room and YTD net contribution", () {
+  test("parses blank registered room input as null", () {
+    expect(parseRegisteredRoomNumber("   "), isNull);
+  });
+
+  test("parses registered room number directly", () {
+    expect(parseRegisteredRoomNumber("14646.25"), 14646.25);
+  });
+
+  test("computes remaining room from total room and YTD contribution", () {
     expect(
       computeRemainingRegisteredRoomCad(
-        openingRoomCad: 20000,
-        netContributionYtdCad: 3500,
+        totalRoomCad: 14646,
+        contributedYtdCad: 7223,
       ),
-      16500,
+      7423,
     );
   });
 
-  test("clamps remaining room at zero", () {
+  test("clamps remaining room when contribution exceeds total room", () {
     expect(
       computeRemainingRegisteredRoomCad(
-        openingRoomCad: 5000,
-        netContributionYtdCad: 7000,
+        totalRoomCad: 8000,
+        contributedYtdCad: 12000,
       ),
       0,
     );
-  });
-
-  test("parses blank registered room input as null", () {
-    expect(parseRegisteredRoomNumber("   "), isNull);
   });
 }

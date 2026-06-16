@@ -563,7 +563,7 @@ class MobileRegisteredRoomSummary {
     return "CAD $buffer";
   }
 
-  String get detail => source == "shared" ? "$taxYear 共享额度 · 点开看明细" : "$taxYear 旧账户额度 · 建议在设置维护";
+  String get detail => source == "shared" ? "$taxYear 剩余 room · 点开看明细" : "$taxYear 旧账户额度 · 建议在设置维护";
 
   factory MobileRegisteredRoomSummary.fromJson(dynamic json) {
     if (json is! Map<String, dynamic>) {

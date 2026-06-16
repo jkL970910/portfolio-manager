@@ -730,7 +730,7 @@ class _AssetHeroCard extends StatelessWidget {
                 children: [
                   Expanded(
                     child: _AssetMiniMetric(
-                      label: "注册额度",
+                      label: "剩余 room",
                       value: registeredRoom.value,
                       valueColor: theme.colorScheme.onSurface,
                       onTap: onOpenRegisteredRoom,
@@ -944,14 +944,14 @@ class _RegisteredRoomDetailSheet extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            "注册额度详情",
+                            "注册账户供款空间",
                             style: theme.textTheme.titleMedium?.copyWith(
                               fontWeight: FontWeight.w900,
                             ),
                           ),
                           SizedBox(height: tokens.gapXs),
                           Text(
-                            "${summary.taxYear} · TFSA/RRSP/FHSA 按账户类别共享额度",
+                            "${summary.taxYear} · 总可用 room - 本年供款 = 剩余 room",
                             style: theme.textTheme.bodySmall?.copyWith(
                               color: tokens.mutedText,
                               height: 1.35,
@@ -978,7 +978,7 @@ class _RegisteredRoomDetailSheet extends StatelessWidget {
                 ),
                 SizedBox(height: tokens.gapSm),
                 Text(
-                  "本页展示共享剩余额度与已确认的本年度供款快照。账户内买卖、分红或现金余额变化不会自动改变 CRA contribution room。",
+                  "本页用你在设置里填写的总可用 contribution room，扣除券商同步/手动核对的本年净供款，得到当前剩余 room。账户内买卖、分红或现金余额变化不会自动改变 CRA room。",
                   style: theme.textTheme.bodySmall?.copyWith(
                     color: tokens.mutedText,
                     height: 1.35,
@@ -1025,7 +1025,7 @@ class _RegisteredRoomTotalRow extends StatelessWidget {
         children: [
           Expanded(
             child: Text(
-              "总剩余额度",
+              "当前总剩余 room",
               style: theme.textTheme.labelLarge?.copyWith(
                 color: tokens.mutedText,
                 fontWeight: FontWeight.w800,
@@ -1097,7 +1097,7 @@ class _RegisteredRoomProgressRow extends StatelessWidget {
             children: [
               Expanded(
                 child: _RoomFact(
-                  label: "已贡献",
+                  label: "本年已供款",
                   value: room.contributedValue,
                 ),
               ),
@@ -1110,6 +1110,16 @@ class _RegisteredRoomProgressRow extends StatelessWidget {
               ),
             ],
           ),
+          if (room.startingValue != null) ...[
+            SizedBox(height: tokens.gapXs),
+            Text(
+              "本年总可用 room：${room.startingValue}",
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: tokens.mutedText,
+                height: 1.3,
+              ),
+            ),
+          ],
         ],
       ),
     );

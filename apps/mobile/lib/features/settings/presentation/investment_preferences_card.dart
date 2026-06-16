@@ -2647,7 +2647,7 @@ class _RegisteredRoomSummaryCard extends StatelessWidget {
           ),
           const SizedBox(height: 4),
           Text(
-            "按账户类别共享，多个 TFSA/RRSP/FHSA 账户不会重复计算。",
+            "按账户类别维护总可用 room，并扣除本年供款得到剩余 room；多个 TFSA/RRSP/FHSA 账户不会重复计算。",
             style: Theme.of(context).textTheme.bodySmall,
           ),
           const SizedBox(height: 10),
@@ -2688,65 +2688,62 @@ class _RegisteredRoomEditorSheetState
     extends State<_RegisteredRoomEditorSheet> {
   late final _taxYearController =
       TextEditingController(text: widget.registeredRooms.taxYear.toString());
-  late final Map<String, TextEditingController> _openingRoomControllers = {
+  late final Map<String, TextEditingController> _totalRoomControllers = {
     for (final type in const ["TFSA", "RRSP", "FHSA"])
       type: TextEditingController(text: _initialRoom(type).toStringAsFixed(0)),
-  };
-  late final Map<String, TextEditingController> _netContributionControllers = {
-    for (final type in const ["TFSA", "RRSP", "FHSA"])
-      type: TextEditingController(),
   };
   var _saving = false;
   String? _error;
 
   double _initialRoom(String accountType) {
-    return widget.registeredRooms.rooms
-        .firstWhere(
-          (room) => room.accountType == accountType,
-          orElse: () => MobileRegisteredRoom(
-            accountType: accountType,
-            remainingRoomCad: 0,
-            contributedYtdCad: 0,
-            startingRoomCad: null,
-            usedPct: null,
-            label: accountType,
-            value: "\$0",
-            contributedValue: "\$0",
-            startingValue: null,
-            sourceLabel: "尚无本年度供款快照",
-            usageLabel: "暂无进度",
-            note: null,
-          ),
-        )
-        .remainingRoomCad;
+    final room = _roomFor(accountType);
+    return room.startingRoomCad ?? room.remainingRoomCad;
+  }
+
+  MobileRegisteredRoom _roomFor(String accountType) {
+    return widget.registeredRooms.rooms.firstWhere(
+      (room) => room.accountType == accountType,
+      orElse: () => MobileRegisteredRoom(
+        accountType: accountType,
+        remainingRoomCad: 0,
+        contributedYtdCad: 0,
+        startingRoomCad: null,
+        usedPct: null,
+        label: accountType,
+        value: "\$0",
+        contributedValue: "\$0",
+        startingValue: null,
+        sourceLabel: "尚无本年度供款快照",
+        usageLabel: "暂无进度",
+        note: null,
+      ),
+    );
   }
 
   @override
   void dispose() {
     _taxYearController.dispose();
-    for (final controller in _openingRoomControllers.values) {
-      controller.dispose();
-    }
-    for (final controller in _netContributionControllers.values) {
+    for (final controller in _totalRoomControllers.values) {
       controller.dispose();
     }
     super.dispose();
   }
 
+  double _enteredTotalRoom(String accountType) {
+    return parseRegisteredRoomNumber(
+          _totalRoomControllers[accountType]?.text ?? "",
+        ) ??
+        0;
+  }
+
+  double _contributedYtd(String accountType) {
+    return _roomFor(accountType).contributedYtdCad;
+  }
+
   double _computedRemainingRoom(String accountType) {
-    final openingRoomCad =
-        parseRegisteredRoomNumber(
-          _openingRoomControllers[accountType]?.text ?? "",
-        ) ??
-        0;
-    final netContributionYtdCad =
-        parseRegisteredRoomNumber(
-          _netContributionControllers[accountType]?.text ?? "",
-        ) ??
-        0;
     return computeRemainingRegisteredRoomCad(
-      openingRoomCad: openingRoomCad,
-      netContributionYtdCad: netContributionYtdCad,
+      totalRoomCad: _enteredTotalRoom(accountType),
+      contributedYtdCad: _contributedYtd(accountType),
     );
   }
 
@@ -2760,7 +2757,7 @@ class _RegisteredRoomEditorSheetState
         "taxYear":
             int.tryParse(_taxYearController.text.trim()) ?? DateTime.now().year,
         "rooms": [
-          for (final type in _openingRoomControllers.keys)
+          for (final type in _totalRoomControllers.keys)
             {
               "accountType": type,
               "remainingRoomCad": _computedRemainingRoom(type),
@@ -2798,7 +2795,7 @@ class _RegisteredRoomEditorSheetState
               Text("注册额度", style: Theme.of(context).textTheme.titleLarge),
               const SizedBox(height: 6),
               Text(
-                "这里按账户类别登记共享注册额度。请填写年初可用额度，以及券商页面显示的本年度已供款/净供款，页面会自动换算当前剩余额度。",
+                "这里填写本税务年度可用的总 contribution room。页面会扣除已核对的本年净供款，保存为当前剩余额度；账户内买卖、分红或现金余额变化不会自动改变 CRA room。",
                 style: Theme.of(context).textTheme.bodyMedium,
               ),
               const SizedBox(height: 16),
@@ -2811,28 +2808,16 @@ class _RegisteredRoomEditorSheetState
                 ),
               ),
               const SizedBox(height: 12),
-              for (final type in _openingRoomControllers.keys) ...[
+              for (final type in _totalRoomControllers.keys) ...[
                 Text(type, style: Theme.of(context).textTheme.titleSmall),
                 const SizedBox(height: 8),
                 TextField(
-                  controller: _openingRoomControllers[type],
+                  controller: _totalRoomControllers[type],
                   keyboardType:
                       const TextInputType.numberWithOptions(decimal: true),
                   decoration: InputDecoration(
-                    labelText: "$type 年初可用额度 CAD",
-                    helperText: "填 CRA 年初可用额度，或你确认无误的年初起始额度。",
-                    border: const OutlineInputBorder(),
-                  ),
-                  onChanged: (_) => setState(() {}),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: _netContributionControllers[type],
-                  keyboardType:
-                      const TextInputType.numberWithOptions(decimal: true),
-                  decoration: InputDecoration(
-                    labelText: "$type 本年度已供款 / 净供款 CAD",
-                    helperText: "按 Wealthsimple、IBKR 或券商页面显示的 year-to-date 口径填写；不需要自己做减法。",
+                    labelText: "$type 本年总可用 room CAD",
+                    helperText: "填 CRA/券商确认的总可用额度；系统会自动扣除已核对的本年供款。",
                     border: const OutlineInputBorder(),
                   ),
                   onChanged: (_) => setState(() {}),
@@ -2846,7 +2831,7 @@ class _RegisteredRoomEditorSheetState
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Text(
-                    "当前登记剩余额度：CAD ${_computedRemainingRoom(type).toStringAsFixed(2)}",
+                    "本年已供款 CAD ${_contributedYtd(type).toStringAsFixed(2)}，将保存剩余 room：CAD ${_computedRemainingRoom(type).toStringAsFixed(2)}",
                   ),
                 ),
                 const SizedBox(height: 16),
@@ -2867,7 +2852,7 @@ class _RegisteredRoomEditorSheetState
                         child: CircularProgressIndicator(strokeWidth: 2),
                       )
                     : const Icon(Icons.save_outlined),
-                label: Text(_saving ? "保存中…" : "保存当前剩余额度"),
+                label: Text(_saving ? "保存中…" : "保存并计算剩余额度"),
               ),
             ],
           ),

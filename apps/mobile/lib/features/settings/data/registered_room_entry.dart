@@ -7,9 +7,9 @@ double? parseRegisteredRoomNumber(String value) {
 }
 
 double computeRemainingRegisteredRoomCad({
-  required double openingRoomCad,
-  required double netContributionYtdCad,
+  required double totalRoomCad,
+  required double contributedYtdCad,
 }) {
-  final remaining = openingRoomCad - netContributionYtdCad;
+  final remaining = totalRoomCad - contributedYtdCad;
   return remaining < 0 ? 0 : remaining;
 }
