@@ -1,4 +1,4 @@
-const DEFAULT_TIMEOUT_MS = 25_000;
+const DEFAULT_TIMEOUT_MS = 70_000;
 
 function envFlag(value, fallback = true) {
   if (value == null || value === "") {
@@ -27,27 +27,40 @@ function buildUrl(baseUrl, path, query = {}) {
 
 async function postWorkerEndpoint(env, job) {
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), DEFAULT_TIMEOUT_MS);
-  const response = await fetch(
-    buildUrl(requireEnv(env, "APP_BASE_URL"), job.path, job.query),
-    {
-      method: "POST",
-      headers: {
-        authorization: `Bearer ${requireEnv(env, "PORTFOLIO_WORKER_SECRET")}`,
-        "content-type": "application/json",
-        "user-agent": "portfolio-manager-cloudflare-cron/1.0",
-      },
-      signal: controller.signal,
-    },
-  ).finally(() => clearTimeout(timeout));
+  const timeoutMs = Number(job.timeoutMs || DEFAULT_TIMEOUT_MS);
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
 
-  const text = await response.text();
-  return {
-    name: job.name,
-    ok: response.ok,
-    status: response.status,
-    body: text.slice(0, 1000),
-  };
+  try {
+    const response = await fetch(
+      buildUrl(requireEnv(env, "APP_BASE_URL"), job.path, job.query),
+      {
+        method: "POST",
+        headers: {
+          authorization: `Bearer ${requireEnv(env, "PORTFOLIO_WORKER_SECRET")}`,
+          "content-type": "application/json",
+          "user-agent": "portfolio-manager-cloudflare-cron/1.0",
+        },
+        signal: controller.signal,
+      },
+    );
+
+    const text = await response.text();
+    return {
+      name: job.name,
+      ok: response.ok,
+      status: response.status,
+      body: text.slice(0, 1000),
+    };
+  } catch (error) {
+    return {
+      name: job.name,
+      ok: false,
+      status: 0,
+      error: error instanceof Error ? error.message : "Worker request failed.",
+    };
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
 function scheduledJobs(env) {
