@@ -508,16 +508,6 @@ class _DailyIntelligenceDropdownTile extends StatelessWidget {
               errorMessage: aiSummaryError,
               onGenerate: onGenerateAiSummary,
             ),
-            if (item.primarySourceUrl.isNotEmpty) ...[
-              const SizedBox(height: 10),
-              SelectableText(
-                item.primarySourceUrl,
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.primary,
-                  decoration: TextDecoration.underline,
-                ),
-              ),
-            ],
           ],
           const SizedBox(height: 12),
           Row(
@@ -583,9 +573,8 @@ class _DailyKeywordWrap extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final candidates = <String>[
-      item.primarySourceLabel,
       item.compactFreshnessLabel,
-      item.sourceType == "news" ? "新闻原文" : item.displayTypeLabel,
+      item.displayTypeLabel,
     ]
         .map(_normalizeKeyword)
         .where((value) => value.isNotEmpty)
@@ -606,7 +595,7 @@ class _DailyKeywordWrap extends StatelessWidget {
 
   static String _normalizeKeyword(String value) {
     final trimmed = value.trim();
-    if (trimmed.isEmpty) {
+    if (trimmed.isEmpty || _looksLikeUrl(trimmed)) {
       return "";
     }
     final separators = ["：", ":", "。", ".", "，", ","];
@@ -623,6 +612,13 @@ class _DailyKeywordWrap extends StatelessWidget {
       normalized = "${normalized.substring(0, 18)}...";
     }
     return normalized;
+  }
+
+  static bool _looksLikeUrl(String value) {
+    final lower = value.toLowerCase();
+    return lower.startsWith("http://") ||
+        lower.startsWith("https://") ||
+        lower.startsWith("www.");
   }
 }
 
@@ -731,17 +727,6 @@ class _DailyAiSummarySection extends StatelessWidget {
               else
                 for (final holding in summary.affectedHoldings)
                   _DailyBullet("${holding.symbol}：${holding.reason}"),
-              if (summary.relatedFields.isNotEmpty) ...[
-                const SizedBox(height: 8),
-                Wrap(
-                  spacing: 6,
-                  runSpacing: 6,
-                  children: [
-                    for (final field in summary.relatedFields)
-                      _DailyKeywordChip(field),
-                  ],
-                ),
-              ],
               if (summary.portfolioImpact.isNotEmpty) ...[
                 const SizedBox(height: 8),
                 _DailyAiBlock(

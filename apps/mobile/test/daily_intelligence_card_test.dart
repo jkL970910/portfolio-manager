@@ -67,6 +67,8 @@ void main() {
     expect(find.text("生成 Loo皇总结"), findsOneWidget);
     expect(find.textContaining("新闻情绪"), findsNothing);
     expect(find.textContaining("主题"), findsNothing);
+    expect(find.text("新闻来源"), findsNothing);
+    expect(find.text("发布时间"), findsNothing);
 
     await tester.tap(find.text("标的"));
     expect(openedItem?.identity.securityId, "sec-xbb");

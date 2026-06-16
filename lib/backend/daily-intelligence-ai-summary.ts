@@ -13,7 +13,7 @@ import type { HoldingPosition } from "@/lib/backend/models";
 import { getDailyIntelligenceItemsForUser } from "@/lib/backend/mobile-daily-intelligence";
 import { getRepositories } from "@/lib/backend/repositories/factory";
 
-const PROMPT_VERSION = "daily-intelligence-ai-summary-v2";
+const PROMPT_VERSION = "daily-intelligence-ai-summary-v3";
 const SUMMARY_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
 const impactEntrySchema = z.object({
@@ -201,17 +201,16 @@ function buildLocalSummaryFallback(args: {
   ].slice(0, 5);
   const title = item.title || "今日秘闻";
   const summary = item.summary || item.keyPoints[0] || "";
+  const sourceSummary = buildChineseSourceSummary(title, summary);
   const affectedSectors = inferImpactAreas(`${title} ${summary} ${item.keyPoints.join(" ")}`);
   const affectedSecurities = inferSecurityMentions(`${title} ${summary} ${item.keyPoints.join(" ")}`, args.holdings);
   return {
     generatedAt: new Date().toISOString(),
     headline: title.slice(0, 80),
     coreSummary: summary
-      ? `这条新闻主要围绕「${title}」。原始摘要显示：${summary}`
+      ? `${sourceSummary} 需要结合利率、行业景气和组合暴露判断后续影响。`
       : `这条秘闻目前只有标题「${title}」，暂时不能形成更深入的解读。`,
-    sourceSummary: summary
-      ? `原文核心信息：${summary}`
-      : `原文标题为「${title}」。当前缓存没有更长正文，只能基于标题和来源字段做初步判断。`,
+    sourceSummary,
     affectedSectors,
     affectedSecurities,
     relatedFields: [...new Set(fields)],
@@ -229,6 +228,29 @@ function buildLocalSummaryFallback(args: {
       "如果只是单日消息，优先等待更多数据确认。",
     ],
   };
+}
+
+function buildChineseSourceSummary(title: string, summary: string) {
+  const combined = `${title} ${summary}`.trim();
+  const amount = combined.match(/\$?\d+(?:\.\d+)?\s*(?:billion|million|bn|m)\b/i)?.[0];
+  const rate = combined.match(/\d+(?:\.\d+)?%/)?.[0];
+  const year = combined.match(/\b20\d{2}\b/)?.[0];
+  const issuer = title
+    .replace(/raises|prices|announces|reports|launches|completes|acquires.*/i, "")
+    .trim()
+    .slice(0, 80);
+  const details = [
+    amount ? `规模约 ${amount}` : null,
+    rate ? `利率/收益率信息为 ${rate}` : null,
+    year ? `关键期限或时间点涉及 ${year}` : null,
+  ].filter(Boolean);
+  if (details.length > 0) {
+    return `原文报道「${issuer || title}」相关融资、交易或经营事项，${details.join("，")}。这说明事件可能影响该公司资金成本、资本开支或行业风险偏好。`;
+  }
+  if (summary.trim()) {
+    return `原文围绕「${title}」展开，核心是公司/行业出现新的融资、交易、经营或市场变化。由于缓存正文较短，这里先按事件方向做中文概括，并在下方给出可能影响范围。`;
+  }
+  return `原文标题为「${title}」。当前缓存没有更长正文，只能基于标题和来源字段做初步中文概括。`;
 }
 
 function inferImpactAreas(text: string) {

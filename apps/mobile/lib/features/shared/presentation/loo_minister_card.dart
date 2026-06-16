@@ -4,6 +4,7 @@ import "package:flutter/material.dart";
 
 import "../../../core/api/loo_api_client.dart";
 import "../../../core/presentation/loo_components.dart";
+import "../../../core/theme/loo_theme.dart";
 import "../data/loo_minister_context_models.dart";
 
 class LooMinisterSessionController extends ChangeNotifier {
@@ -482,13 +483,20 @@ class _LooMinisterSheet extends StatelessWidget {
 
 class _LooMinisterCardState extends State<LooMinisterCard> {
   static const _ministerSlowThreshold = Duration(seconds: 20);
+  static const _ministerPhases = [
+    "整理当前页面上下文",
+    "补齐标的/项目资料",
+    "等待外部 GPT 答复",
+    "生成可执行建议",
+  ];
 
   late final TextEditingController _questionController =
       TextEditingController();
   final _messageScrollController = ScrollController();
   final List<Timer> _phaseTimers = [];
   var _loading = false;
-  String? _phaseLabel;
+  var _phaseIndex = 0;
+  String? _phaseDetail;
 
   @override
   void initState() {
@@ -553,20 +561,26 @@ class _LooMinisterCardState extends State<LooMinisterCard> {
 
   void _schedulePhaseUpdates() {
     _clearPhaseTimers();
-    _setPhase("整理当前页面上下文...");
+    _setPhase(0, "读取当前页面、账户和最近对话。");
     _phaseTimers.add(Timer(const Duration(milliseconds: 700), () {
-      _setPhase("补齐标的/项目资料...");
+      _setPhase(1, "检查组合、行情、秘闻和设置上下文。");
     }));
     _phaseTimers.add(Timer(const Duration(seconds: 2), () {
-      _setPhase("等待外部 GPT 答复...");
+      _setPhase(2, "外部模型正在组织回答，可能需要几秒。");
+    }));
+    _phaseTimers.add(Timer(const Duration(seconds: 8), () {
+      _setPhase(3, "收敛结论、风险提示和下一步动作。");
     }));
   }
 
-  void _setPhase(String label) {
+  void _setPhase(int index, String detail) {
     if (!mounted || !_loading) {
       return;
     }
-    setState(() => _phaseLabel = label);
+    setState(() {
+      _phaseIndex = index.clamp(0, _ministerPhases.length - 1);
+      _phaseDetail = detail;
+    });
   }
 
   Future<_MinisterTimeoutChoice?> _showTimeoutChoice() {
@@ -622,17 +636,17 @@ class _LooMinisterCardState extends State<LooMinisterCard> {
       return;
     }
 
-    _setPhase("外部 GPT 响应较慢，等待你的选择...");
+    _setPhase(2, "外部 GPT 响应较慢，等待你的选择。");
     final choice = await _showTimeoutChoice();
     if (choice == _MinisterTimeoutChoice.useLocal) {
-      _setPhase("切换本地大臣答复...");
+      _setPhase(3, "切换为本地大臣，使用已保存资料生成答复。");
       final localResponse =
           await _requestMinister(question, answerMode: "local");
       await _applyMinisterResponse(localResponse);
       return;
     }
 
-    _setPhase("继续等待外部 GPT 答复...");
+    _setPhase(2, "继续等待外部 GPT 答复。");
     await _applyMinisterResponse(await remoteFuture);
   }
 
@@ -655,7 +669,8 @@ class _LooMinisterCardState extends State<LooMinisterCard> {
         _clearPhaseTimers();
         setState(() {
           _loading = false;
-          _phaseLabel = null;
+          _phaseIndex = 0;
+          _phaseDetail = null;
         });
       }
     });
@@ -867,12 +882,11 @@ class _LooMinisterCardState extends State<LooMinisterCard> {
             ),
             if (_loading) ...[
               const SizedBox(height: 12),
-              Text(
-                _phaseLabel ?? "大臣思考中...",
-                style: Theme.of(context).textTheme.bodySmall,
+              _MinisterGenerationProgress(
+                phases: _ministerPhases,
+                activeIndex: _phaseIndex,
+                detail: _phaseDetail,
               ),
-              const SizedBox(height: 6),
-              const LinearProgressIndicator(),
             ],
           ],
         ),
@@ -886,6 +900,128 @@ class _MinisterSlowResponse {
 }
 
 enum _MinisterTimeoutChoice { continueWaiting, useLocal }
+
+class _MinisterGenerationProgress extends StatelessWidget {
+  const _MinisterGenerationProgress({
+    required this.phases,
+    required this.activeIndex,
+    required this.detail,
+  });
+
+  final List<String> phases;
+  final int activeIndex;
+  final String? detail;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final tokens = context.looTokens;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: tokens.accent.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: tokens.accent.withValues(alpha: 0.24)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.auto_awesome, size: 16, color: tokens.accent),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    "大臣正在生成答复",
+                    style: theme.textTheme.labelLarge?.copyWith(
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            for (var index = 0; index < phases.length; index++) ...[
+              _MinisterGenerationPhaseRow(
+                label: phases[index],
+                isReached: index <= activeIndex,
+                isActive: index == activeIndex,
+              ),
+              if (index != phases.length - 1) const SizedBox(height: 6),
+            ],
+            if (detail != null && detail!.trim().isNotEmpty) ...[
+              const SizedBox(height: 10),
+              Text(
+                detail!,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: tokens.mutedText,
+                  height: 1.35,
+                ),
+              ),
+            ],
+            const SizedBox(height: 8),
+            const LinearProgressIndicator(minHeight: 3),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _MinisterGenerationPhaseRow extends StatelessWidget {
+  const _MinisterGenerationPhaseRow({
+    required this.label,
+    required this.isReached,
+    required this.isActive,
+  });
+
+  final String label;
+  final bool isReached;
+  final bool isActive;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final tokens = context.looTokens;
+    final color = isReached ? tokens.accent : tokens.mutedText;
+    return Row(
+      children: [
+        AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          width: 18,
+          height: 18,
+          decoration: BoxDecoration(
+            color: isReached
+                ? tokens.accent.withValues(alpha: isActive ? 0.26 : 0.16)
+                : theme.colorScheme.surfaceContainerHighest,
+            borderRadius: BorderRadius.circular(999),
+            border: Border.all(
+              color: isReached
+                  ? tokens.accent.withValues(alpha: 0.72)
+                  : theme.colorScheme.outlineVariant,
+            ),
+          ),
+          child: Icon(
+            isActive ? Icons.more_horiz : Icons.check_rounded,
+            size: 13,
+            color: color,
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            label,
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: color,
+              fontWeight: isReached ? FontWeight.w800 : FontWeight.w500,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
 
 class LooMinisterChatMessage {
   const LooMinisterChatMessage._({
