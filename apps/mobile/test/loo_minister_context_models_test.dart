@@ -136,7 +136,16 @@ void main() {
         rooms: [
           MobileRegisteredRoomLine(
             accountType: "TFSA",
+            remainingRoomCad: 7000,
+            contributedYtdCad: 0,
+            startingRoomCad: 7000,
+            usedPct: 0,
+            label: "TFSA",
             value: "CAD 7,000",
+            contributedValue: "CAD 0",
+            startingValue: "CAD 7,000",
+            sourceLabel: "尚无本年度供款快照",
+            usageLabel: "0% used",
           ),
         ],
       ),

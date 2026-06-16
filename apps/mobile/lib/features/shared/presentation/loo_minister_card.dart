@@ -484,7 +484,7 @@ class _LooMinisterCardState extends State<LooMinisterCard> {
   static const _ministerSlowThreshold = Duration(seconds: 20);
 
   late final TextEditingController _questionController =
-      TextEditingController(text: widget.suggestedQuestion);
+      TextEditingController();
   final _messageScrollController = ScrollController();
   final List<Timer> _phaseTimers = [];
   var _loading = false;
@@ -789,7 +789,7 @@ class _LooMinisterCardState extends State<LooMinisterCard> {
                       ? null
                       : () {
                           widget.sessionController.startNew();
-                          _questionController.text = widget.suggestedQuestion;
+                          _questionController.clear();
                           _scrollMessagesToBottom();
                         },
                   child: const Text("新对话"),
@@ -844,7 +844,12 @@ class _LooMinisterCardState extends State<LooMinisterCard> {
               controller: _questionController,
               minLines: 1,
               maxLines: 3,
-              decoration: const InputDecoration(labelText: "你的问题"),
+              decoration: InputDecoration(
+                labelText: "你的问题",
+                hintText: widget.suggestedQuestion.trim().isEmpty
+                    ? "例如：这张卡片该怎么看？"
+                    : widget.suggestedQuestion,
+              ),
               onSubmitted: (_) {
                 if (!_loading) {
                   _submit();
@@ -1171,7 +1176,8 @@ class _MinisterSuggestedActionChip extends StatelessWidget {
 
   String get _confirmationDetail {
     return switch (action.actionType) {
-      "run-analysis" => "确认后，大臣会触发当前页面已有的 Loo皇巡阅。是否调用 Loo皇深度思考、是否重新生成，仍由页面分析卡片控制。",
+      "run-analysis" =>
+        "确认后，大臣会触发当前页面已有的 Loo皇巡阅。是否调用 Loo皇深度思考、是否重新生成，仍由页面分析卡片控制。",
       "navigate" => "确认后会打开对应页面，不会修改任何数据。",
       "open-form" => "确认后会打开对应入口。保存前仍需要你在页面内再次确认。",
       "update-preferences" => "确认后会打开偏好设置。大臣不会直接替你保存配置。",

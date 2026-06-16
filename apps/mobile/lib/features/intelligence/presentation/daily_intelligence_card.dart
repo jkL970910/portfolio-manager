@@ -322,21 +322,7 @@ class _DailyIntelligenceCarouselPager extends StatelessWidget {
   double _previewPageHeight(MobileDailyIntelligenceItem item) {
     final titleLines = (item.cleanedTitle.length / 16).ceil().clamp(1, 3);
     final summaryLines = (item.summary.length / 24).ceil().clamp(2, 4);
-    final keywordRows = _previewKeywordCount(item) > 3 ? 2 : 1;
-    return (268 +
-            (titleLines - 1) * 28 +
-            (summaryLines - 2) * 22 +
-            (keywordRows - 1) * 34)
-        .toDouble();
-  }
-
-  int _previewKeywordCount(MobileDailyIntelligenceItem item) {
-    return <String>{
-      ...item.keyPoints,
-      item.reason,
-      item.relevanceLabel,
-      item.confidenceLabel,
-    }.where((value) => value.trim().isNotEmpty).take(4).length;
+    return (268 + (titleLines - 1) * 28 + (summaryLines - 2) * 22).toDouble();
   }
 
   double _expandedPageHeight(BuildContext context) {
@@ -515,21 +501,6 @@ class _DailyIntelligenceDropdownTile extends StatelessWidget {
             _DailyKeywordWrap(item),
           ],
           if (initiallyExpanded) ...[
-            if (item.keyPoints.isNotEmpty) ...[
-              const SizedBox(height: 8),
-              ...item.keyPoints.take(4).map(
-                    (point) => _DailyBullet(point),
-                  ),
-            ],
-            if (item.visibleRiskFlags.isNotEmpty) ...[
-              const SizedBox(height: 8),
-              ...item.visibleRiskFlags.take(2).map(
-                    (risk) => _DailyBullet(
-                      "注意：$risk",
-                      color: theme.colorScheme.error,
-                    ),
-                  ),
-            ],
             const SizedBox(height: 12),
             _DailyAiSummarySection(
               summary: aiSummary,
@@ -612,10 +583,9 @@ class _DailyKeywordWrap extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final candidates = <String>[
-      ...item.keyPoints,
-      item.reason,
-      item.relevanceLabel,
-      item.confidenceLabel,
+      item.primarySourceLabel,
+      item.compactFreshnessLabel,
+      item.sourceType == "news" ? "新闻原文" : item.displayTypeLabel,
     ]
         .map(_normalizeKeyword)
         .where((value) => value.isNotEmpty)
@@ -711,7 +681,7 @@ class _DailyAiSummarySection extends StatelessWidget {
               const LinearProgressIndicator(minHeight: 3)
             else if (summary == null) ...[
               Text(
-                "用你在设置中配置的外部 GPT，生成 Loo皇口吻的新闻要点、相关领域和可能影响的持仓。",
+                "用外部 GPT 生成中文原文摘要，并分析可能影响的行业、标的和现有持仓。",
                 style: theme.textTheme.bodySmall?.copyWith(height: 1.35),
               ),
               if (errorMessage != null) ...[
@@ -733,8 +703,34 @@ class _DailyAiSummarySection extends StatelessWidget {
                 ),
               ),
             ] else ...[
-              Text(summary.coreSummary,
-                  style: theme.textTheme.bodySmall?.copyWith(height: 1.35)),
+              _DailyAiBlock(
+                title: "原文摘要",
+                body: summary.sourceSummary.isNotEmpty
+                    ? summary.sourceSummary
+                    : summary.coreSummary,
+              ),
+              if (summary.affectedSectors.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                Text("可能影响的行业", style: theme.textTheme.labelLarge),
+                const SizedBox(height: 4),
+                for (final sector in summary.affectedSectors)
+                  _DailyBullet("${sector.label}：${sector.reason}"),
+              ],
+              if (summary.affectedSecurities.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                Text("可能影响的标的", style: theme.textTheme.labelLarge),
+                const SizedBox(height: 4),
+                for (final security in summary.affectedSecurities)
+                  _DailyBullet("${security.label}：${security.reason}"),
+              ],
+              const SizedBox(height: 8),
+              Text("现有持仓关联", style: theme.textTheme.labelLarge),
+              const SizedBox(height: 4),
+              if (summary.affectedHoldings.isEmpty)
+                const _DailyBullet("当前账户没有直接匹配的持仓，但仍可作为行业、主题或候选标的观察。")
+              else
+                for (final holding in summary.affectedHoldings)
+                  _DailyBullet("${holding.symbol}：${holding.reason}"),
               if (summary.relatedFields.isNotEmpty) ...[
                 const SizedBox(height: 8),
                 Wrap(
@@ -746,20 +742,11 @@ class _DailyAiSummarySection extends StatelessWidget {
                   ],
                 ),
               ],
-              if (summary.affectedHoldings.isNotEmpty) ...[
-                const SizedBox(height: 8),
-                Text("可能影响的持仓", style: theme.textTheme.labelLarge),
-                const SizedBox(height: 4),
-                for (final holding in summary.affectedHoldings)
-                  _DailyBullet("${holding.symbol}：${holding.reason}"),
-              ],
               if (summary.portfolioImpact.isNotEmpty) ...[
                 const SizedBox(height: 8),
-                Text("组合影响", style: theme.textTheme.labelLarge),
-                const SizedBox(height: 4),
-                Text(
-                  summary.portfolioImpact,
-                  style: theme.textTheme.bodySmall?.copyWith(height: 1.35),
+                _DailyAiBlock(
+                  title: "组合影响",
+                  body: summary.portfolioImpact,
                 ),
               ],
               if (summary.watchPoints.isNotEmpty) ...[
@@ -805,6 +792,32 @@ class _DailyKeywordChip extends StatelessWidget {
   }
 }
 
+class _DailyAiBlock extends StatelessWidget {
+  const _DailyAiBlock({
+    required this.title,
+    required this.body,
+  });
+
+  final String title;
+  final String body;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(title, style: theme.textTheme.labelLarge),
+        const SizedBox(height: 4),
+        Text(
+          body,
+          style: theme.textTheme.bodySmall?.copyWith(height: 1.35),
+        ),
+      ],
+    );
+  }
+}
+
 class _DailyCarouselDots extends StatelessWidget {
   const _DailyCarouselDots({
     required this.count,
@@ -838,10 +851,9 @@ class _DailyCarouselDots extends StatelessWidget {
 }
 
 class _DailyBullet extends StatelessWidget {
-  const _DailyBullet(this.text, {this.color});
+  const _DailyBullet(this.text);
 
   final String text;
-  final Color? color;
 
   @override
   Widget build(BuildContext context) {
@@ -851,11 +863,11 @@ class _DailyBullet extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text("· ", style: theme.textTheme.bodySmall?.copyWith(color: color)),
+          Text("· ", style: theme.textTheme.bodySmall),
           Expanded(
             child: Text(
               text,
-              style: theme.textTheme.bodySmall?.copyWith(color: color),
+              style: theme.textTheme.bodySmall,
             ),
           ),
         ],

@@ -1041,8 +1041,9 @@ class _LineChartPainter extends CustomPainter {
     final range = math.max(1.0, maxValue - minValue);
 
     final gridPaint = Paint()
-      ..color = gridColor
-      ..strokeWidth = 1;
+      ..color = gridColor.withValues(alpha: 0.42)
+      ..strokeWidth = 0.8
+      ..isAntiAlias = true;
     final axisFractions = [0.0, 0.5, 1.0];
     for (final fraction in axisFractions) {
       final y = topPadding + chartHeight * fraction;
@@ -1069,30 +1070,28 @@ class _LineChartPainter extends CustomPainter {
       offsets.add(Offset(x, y));
     }
 
-    final path = Path()..moveTo(offsets.first.dx, offsets.first.dy);
-    for (final offset in offsets.skip(1)) {
-      path.lineTo(offset.dx, offset.dy);
-    }
+    final path = _smoothPath(offsets);
 
     final fillPath = Path.from(path)
       ..lineTo(offsets.last.dx, size.height - bottomPadding)
       ..lineTo(offsets.first.dx, size.height - bottomPadding)
       ..close();
-    canvas.drawPath(fillPath, Paint()..color = fillColor);
+    canvas.drawPath(
+      fillPath,
+      Paint()
+        ..color = fillColor.withValues(alpha: 0.74)
+        ..isAntiAlias = true,
+    );
     canvas.drawPath(
       path,
       Paint()
         ..color = lineColor
-        ..strokeWidth = 3
+        ..strokeWidth = 2.8
         ..style = PaintingStyle.stroke
         ..strokeCap = StrokeCap.round
-        ..strokeJoin = StrokeJoin.round,
+        ..strokeJoin = StrokeJoin.round
+        ..isAntiAlias = true,
     );
-
-    final dotPaint = Paint()..color = lineColor;
-    for (final offset in offsets) {
-      canvas.drawCircle(offset, 3, dotPaint);
-    }
 
     _paintText(
       canvas,
@@ -1122,7 +1121,8 @@ class _LineChartPainter extends CustomPainter {
   ) {
     final guidePaint = Paint()
       ..color = lineColor.withValues(alpha: 0.42)
-      ..strokeWidth = 1;
+      ..strokeWidth = 1
+      ..isAntiAlias = true;
     canvas.drawLine(
       Offset(offset.dx, _LineChartGeometry.topPadding),
       Offset(offset.dx, size.height - _LineChartGeometry.bottomPadding),
@@ -1130,10 +1130,18 @@ class _LineChartPainter extends CustomPainter {
     );
     canvas.drawCircle(
       offset,
-      6,
-      Paint()..color = lineColor.withValues(alpha: 0.18),
+      5,
+      Paint()
+        ..color = lineColor.withValues(alpha: 0.16)
+        ..isAntiAlias = true,
     );
-    canvas.drawCircle(offset, 4, Paint()..color = lineColor);
+    canvas.drawCircle(
+      offset,
+      3.4,
+      Paint()
+        ..color = lineColor
+        ..isAntiAlias = true,
+    );
 
     final value = point.displayValue ?? _formatAxisValue(point.value);
     final label = "${point.label} · $value";
@@ -1180,6 +1188,42 @@ class _LineChartPainter extends CustomPainter {
       return "$sign\$${(absValue / 1000).toStringAsFixed(0)}k";
     }
     return "$sign\$${absValue.toStringAsFixed(0)}";
+  }
+
+  Path _smoothPath(List<Offset> offsets) {
+    if (offsets.length < 3) {
+      final path = Path()..moveTo(offsets.first.dx, offsets.first.dy);
+      for (final offset in offsets.skip(1)) {
+        path.lineTo(offset.dx, offset.dy);
+      }
+      return path;
+    }
+
+    final path = Path()..moveTo(offsets.first.dx, offsets.first.dy);
+    const tension = 0.42;
+    for (var index = 0; index < offsets.length - 1; index++) {
+      final previous = offsets[math.max(0, index - 1)];
+      final current = offsets[index];
+      final next = offsets[index + 1];
+      final following = offsets[math.min(offsets.length - 1, index + 2)];
+      final controlPointOne = Offset(
+        current.dx + (next.dx - previous.dx) * tension / 6,
+        current.dy + (next.dy - previous.dy) * tension / 6,
+      );
+      final controlPointTwo = Offset(
+        next.dx - (following.dx - current.dx) * tension / 6,
+        next.dy - (following.dy - current.dy) * tension / 6,
+      );
+      path.cubicTo(
+        controlPointOne.dx,
+        controlPointOne.dy,
+        controlPointTwo.dx,
+        controlPointTwo.dy,
+        next.dx,
+        next.dy,
+      );
+    }
+    return path;
   }
 
   @override

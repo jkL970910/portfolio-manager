@@ -27,7 +27,7 @@ void main() {
         underlyingId: "",
       ),
       reason: "关联 XBB · TSX · CAD。",
-      keyPoints: ["价格历史按 listing 身份读取。"],
+      keyPoints: ["新闻情绪：Somewhat Bullish", "主题：Real Estate / Finance"],
       riskFlags: ["若 provider 限流，沿用旧报价。"],
       actions: [],
       sources: [
@@ -63,10 +63,44 @@ void main() {
 
     expect(find.text("Loo国今日秘闻"), findsOneWidget);
     expect(find.text("XBB 行情复核"), findsOneWidget);
-    expect(find.text("行情资料"), findsOneWidget);
-    expect(find.textContaining("XBB · TSX · CAD"), findsWidgets);
+    expect(find.textContaining("XBB 报价较新"), findsOneWidget);
+    expect(find.text("生成 Loo皇总结"), findsOneWidget);
+    expect(find.textContaining("新闻情绪"), findsNothing);
+    expect(find.textContaining("主题"), findsNothing);
 
-    await tester.tap(find.text("查看标的"));
+    await tester.tap(find.text("标的"));
     expect(openedItem?.identity.securityId, "sec-xbb");
+  });
+
+  test("parses source summary and impact fields", () {
+    final summary = MobileDailyIntelligenceAiSummary.fromJson({
+      "itemId": "doc-1",
+      "generatedAt": "2026-06-16T02:00:00.000Z",
+      "headline": "REIT 收购新闻",
+      "coreSummary": "这条新闻影响地产资产观察。",
+      "sourceSummary": "原文称大型机构正在收购加拿大公寓 REITs。",
+      "affectedSectors": [
+        {
+          "label": "房地产 / REITs",
+          "reason": "租赁需求和利率变化会影响估值。",
+        },
+      ],
+      "affectedSecurities": [
+        {
+          "label": "Apartment REITs",
+          "reason": "公寓 REITs 是新闻直接讨论的资产。",
+        },
+      ],
+      "relatedFields": ["REITs"],
+      "affectedHoldings": [],
+      "portfolioImpact": "当前无直接持仓匹配，但可作为地产和利率敏感资产观察。",
+      "watchPoints": ["确认是否影响基本面。"],
+      "cached": false,
+      "expiresAt": "2026-06-17T02:00:00.000Z",
+    });
+
+    expect(summary.sourceSummary, contains("大型机构"));
+    expect(summary.affectedSectors.single.label, "房地产 / REITs");
+    expect(summary.affectedSecurities.single.label, "Apartment REITs");
   });
 }

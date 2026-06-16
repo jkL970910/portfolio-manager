@@ -13,13 +13,21 @@ import type { HoldingPosition } from "@/lib/backend/models";
 import { getDailyIntelligenceItemsForUser } from "@/lib/backend/mobile-daily-intelligence";
 import { getRepositories } from "@/lib/backend/repositories/factory";
 
-const PROMPT_VERSION = "daily-intelligence-ai-summary-v1";
+const PROMPT_VERSION = "daily-intelligence-ai-summary-v2";
 const SUMMARY_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+
+const impactEntrySchema = z.object({
+  label: z.string().min(1).max(60),
+  reason: z.string().min(1).max(180),
+});
 
 const dailyIntelligenceAiSummarySchema = z.object({
   generatedAt: z.string(),
   headline: z.string().min(1).max(80),
   coreSummary: z.string().min(1).max(420),
+  sourceSummary: z.string().min(1).max(720),
+  affectedSectors: z.array(impactEntrySchema).max(6),
+  affectedSecurities: z.array(impactEntrySchema).max(8),
   relatedFields: z.array(z.string().min(1).max(30)).max(5),
   affectedHoldings: z
     .array(
@@ -193,12 +201,19 @@ function buildLocalSummaryFallback(args: {
   ].slice(0, 5);
   const title = item.title || "今日秘闻";
   const summary = item.summary || item.keyPoints[0] || "";
+  const affectedSectors = inferImpactAreas(`${title} ${summary} ${item.keyPoints.join(" ")}`);
+  const affectedSecurities = inferSecurityMentions(`${title} ${summary} ${item.keyPoints.join(" ")}`, args.holdings);
   return {
     generatedAt: new Date().toISOString(),
     headline: title.slice(0, 80),
     coreSummary: summary
       ? `这条新闻主要围绕「${title}」。原始摘要显示：${summary}`
       : `这条秘闻目前只有标题「${title}」，暂时不能形成更深入的解读。`,
+    sourceSummary: summary
+      ? `原文核心信息：${summary}`
+      : `原文标题为「${title}」。当前缓存没有更长正文，只能基于标题和来源字段做初步判断。`,
+    affectedSectors,
+    affectedSecurities,
     relatedFields: [...new Set(fields)],
     affectedHoldings: matchedHoldings.map((holding) => ({
       symbol: holding.symbol,
@@ -216,6 +231,68 @@ function buildLocalSummaryFallback(args: {
   };
 }
 
+function inferImpactAreas(text: string) {
+  const normalized = text.toLowerCase();
+  const candidates = [
+    {
+      label: "房地产 / REITs",
+      keywords: ["reit", "apartment", "rental", "rent", "real estate", "housing", "公寓", "租赁", "地产"],
+      reason: "新闻涉及房租、地产资产或 REIT 交易，可能影响地产现金流、利率敏感资产和相关金融机构。",
+    },
+    {
+      label: "利率 / 债券",
+      keywords: ["rate", "yield", "inflation", "fed", "bond", "利率", "通胀", "收益率", "债券"],
+      reason: "新闻涉及利率或通胀预期，可能影响债券、REITs、成长股估值和现金配置节奏。",
+    },
+    {
+      label: "科技 / 成长股",
+      keywords: ["technology", "ai", "software", "semiconductor", "tech", "科技", "芯片", "人工智能"],
+      reason: "新闻可能改变成长型资产的估值叙事、资本开支或风险偏好。",
+    },
+    {
+      label: "金融 / 资管",
+      keywords: ["bank", "blackstone", "asset manager", "financial", "金融", "银行", "资管", "收购"],
+      reason: "新闻涉及大型资本、金融机构或资产收购，可能影响金融与资管板块的风险偏好。",
+    },
+    {
+      label: "能源 / 商品",
+      keywords: ["oil", "energy", "commodity", "gold", "能源", "原油", "黄金", "商品"],
+      reason: "新闻涉及能源或商品供需时，可能影响通胀预期、防御资产和资源股。",
+    },
+  ];
+  const matches = candidates
+    .filter((candidate) =>
+      candidate.keywords.some((keyword) => normalized.includes(keyword)),
+    )
+    .map(({ label, reason }) => ({ label, reason }));
+  if (matches.length > 0) {
+    return matches.slice(0, 6);
+  }
+  return [
+    {
+      label: "市场风险偏好",
+      reason: "当前缓存资料没有明确行业归属，可先作为市场情绪和风险偏好变化的背景观察。",
+    },
+  ];
+}
+
+function inferSecurityMentions(text: string, holdings: HoldingPosition[]) {
+  const normalized = text.toLowerCase();
+  const symbolPattern = /\b[A-Z]{1,5}(?:\.[A-Z])?\b/g;
+  const symbols = new Set(text.match(symbolPattern) ?? []);
+  const holdingMatches = holdings
+    .filter((holding) => {
+      const symbol = holding.symbol.toUpperCase();
+      const name = holding.name.toLowerCase();
+      return symbols.has(symbol) || (name.length > 3 && normalized.includes(name));
+    })
+    .map((holding) => ({
+      label: holding.symbol,
+      reason: "新闻文字与该标的名称或代码直接匹配，需要结合仓位、行业暴露和估值证据复核。",
+    }));
+  return holdingMatches.slice(0, 8);
+}
+
 function textFormat(provider: "official-openai" | "openrouter-compatible") {
   const schema = {
     type: "object",
@@ -224,6 +301,33 @@ function textFormat(provider: "official-openai" | "openrouter-compatible") {
       generatedAt: { type: "string" },
       headline: { type: "string" },
       coreSummary: { type: "string" },
+      sourceSummary: { type: "string" },
+      affectedSectors: {
+        type: "array",
+        maxItems: 6,
+        items: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            label: { type: "string" },
+            reason: { type: "string" },
+          },
+          required: ["label", "reason"],
+        },
+      },
+      affectedSecurities: {
+        type: "array",
+        maxItems: 8,
+        items: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            label: { type: "string" },
+            reason: { type: "string" },
+          },
+          required: ["label", "reason"],
+        },
+      },
       relatedFields: {
         type: "array",
         items: { type: "string" },
@@ -253,6 +357,9 @@ function textFormat(provider: "official-openai" | "openrouter-compatible") {
       "generatedAt",
       "headline",
       "coreSummary",
+      "sourceSummary",
+      "affectedSectors",
+      "affectedSecurities",
       "relatedFields",
       "affectedHoldings",
       "portfolioImpact",
@@ -319,11 +426,14 @@ async function buildPrompt(userId: string, itemId: string) {
     item,
     holdings,
     content: [
-      "请用中文总结这条 Loo国今日秘闻。",
-      "目标用户是中长期个人投资者，不要给直接买卖指令。",
-      "只基于下方已缓存新闻/资料和用户持仓列表判断相关领域、可能影响的持仓；不要编造实时行情、未给出的新闻事实或未在持仓列表里的持仓。",
-      "affectedHoldings 只能包含 userHoldings 里出现的 symbol；如果没有直接影响，返回空数组。",
-      "portfolioImpact 要解释它对组合关注点的影响，例如行业、主题、风险偏好、现金流、利率、科技/能源/金融/金属等，不要只复述新闻。",
+      "请用中文总结这条 Loo国今日秘闻，persona 是“投资新闻研究助理”，不是聊天机器人。",
+      "首要任务：先做原文摘要。sourceSummary 必须用中文概括原文/缓存摘要在说什么，不能只说“这条新闻围绕标题”。",
+      "第二任务：分析这条新闻可能影响的行业、主题和股票。即使 userHoldings 为空，也必须继续分析 affectedSectors 和 affectedSecurities；不要因为没有持仓就停止。",
+      "affectedSecurities 可以包含新闻中提到或明显相关的股票/ETF/公司名称，不限于 userHoldings；label 可用 ticker 或公司名。",
+      "affectedHoldings 只能包含 userHoldings 里出现的 symbol；如果当前没有持仓直接匹配，返回空数组，并在 portfolioImpact 里说明这是候选观察/行业背景，不是持仓复核。",
+      "portfolioImpact 要解释它对组合关注点的影响，例如行业、主题、风险偏好、现金流、利率、科技/能源/金融/REITs/金属等，不要只复述新闻。",
+      "不要输出“新闻情绪”“主题”这类空泛标签；要写出具体行业和具体可能受影响标的。",
+      "不要给直接买卖指令；使用“可能、需要观察、需结合估值/仓位/风险护栏确认”。",
       JSON.stringify(promptPayload),
     ].join("\n\n"),
   };
@@ -363,13 +473,14 @@ async function callProvider(input: {
               {
                 role: "system",
                 content:
-                  "你是 Loo国新闻研究助理。只输出合法 JSON object，中文、简洁、面向普通个人投资者。不要 markdown，不要解释 JSON 外的内容。",
+                  "你是 Loo国投资新闻研究助理。只输出合法 JSON object，中文、简洁、面向普通个人投资者。先摘要原文，再分析可能影响行业/标的/持仓；不要 markdown，不要解释 JSON 外的内容。",
               },
               {
                 role: "user",
                 content: [
                   input.prompt,
-                  "必须返回 JSON object，字段为 generatedAt, headline, coreSummary, relatedFields, affectedHoldings, portfolioImpact, watchPoints。",
+                  "必须返回 JSON object，字段为 generatedAt, headline, coreSummary, sourceSummary, affectedSectors, affectedSecurities, relatedFields, affectedHoldings, portfolioImpact, watchPoints。",
+                  "affectedSectors 和 affectedSecurities 是数组，每项包含 label 和 reason。",
                   "affectedHoldings 是数组，每项包含 symbol 和 reason。",
                 ].join("\n\n"),
               },
@@ -378,7 +489,7 @@ async function callProvider(input: {
         : {
             model: settings.model,
             instructions:
-              "你是 Loo国新闻研究助理。只输出合法 JSON object，中文、简洁、面向普通个人投资者。不要输出 markdown。",
+              "你是 Loo国投资新闻研究助理。只输出合法 JSON object，中文、简洁、面向普通个人投资者。先摘要原文，再分析可能影响行业/标的/持仓；不要输出 markdown。",
             store:
               process.env.LOO_MINISTER_DISABLE_RESPONSE_STORAGE === "true"
                 ? false

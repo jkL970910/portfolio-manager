@@ -54,6 +54,9 @@ class MobileDailyIntelligenceAiSummary {
     required this.generatedAt,
     required this.headline,
     required this.coreSummary,
+    required this.sourceSummary,
+    required this.affectedSectors,
+    required this.affectedSecurities,
     required this.relatedFields,
     required this.affectedHoldings,
     required this.portfolioImpact,
@@ -66,6 +69,9 @@ class MobileDailyIntelligenceAiSummary {
   final String generatedAt;
   final String headline;
   final String coreSummary;
+  final String sourceSummary;
+  final List<MobileDailyIntelligenceImpactEntry> affectedSectors;
+  final List<MobileDailyIntelligenceImpactEntry> affectedSecurities;
   final List<String> relatedFields;
   final List<MobileDailyIntelligenceAffectedHolding> affectedHoldings;
   final String portfolioImpact;
@@ -79,6 +85,15 @@ class MobileDailyIntelligenceAiSummary {
       generatedAt: json["generatedAt"] as String? ?? "",
       headline: json["headline"] as String? ?? "Loo皇总结",
       coreSummary: json["coreSummary"] as String? ?? "",
+      sourceSummary: json["sourceSummary"] as String? ??
+          json["coreSummary"] as String? ??
+          "",
+      affectedSectors: readJsonList(json, "affectedSectors")
+          .map(MobileDailyIntelligenceImpactEntry.fromJson)
+          .toList(),
+      affectedSecurities: readJsonList(json, "affectedSecurities")
+          .map(MobileDailyIntelligenceImpactEntry.fromJson)
+          .toList(),
       relatedFields:
           (json["relatedFields"] as List?)?.whereType<String>().toList() ??
               const [],
@@ -91,6 +106,24 @@ class MobileDailyIntelligenceAiSummary {
               const [],
       cached: json["cached"] as bool? ?? false,
       expiresAt: json["expiresAt"] as String? ?? "",
+    );
+  }
+}
+
+class MobileDailyIntelligenceImpactEntry {
+  const MobileDailyIntelligenceImpactEntry({
+    required this.label,
+    required this.reason,
+  });
+
+  final String label;
+  final String reason;
+
+  factory MobileDailyIntelligenceImpactEntry.fromJson(
+      Map<String, dynamic> json) {
+    return MobileDailyIntelligenceImpactEntry(
+      label: json["label"] as String? ?? "",
+      reason: json["reason"] as String? ?? "",
     );
   }
 }

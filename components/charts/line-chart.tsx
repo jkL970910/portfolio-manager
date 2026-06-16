@@ -128,13 +128,20 @@ export function LineChartCard({
         {isMounted && hasData ? (
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={filteredData} margin={{ top: 12, right: 12, left: -24, bottom: 0 }}>
-              <CartesianGrid stroke="rgba(91,100,114,0.14)" vertical={false} />
-              <XAxis dataKey="label" tickLine={false} axisLine={false} stroke="#5b6472" fontSize={12} />
+              <defs>
+                <linearGradient id={`${dataKey}-soft-line-fill`} x1="0" x2="0" y1="0" y2="1">
+                  <stop offset="0%" stopColor={color} stopOpacity={0.18} />
+                  <stop offset="100%" stopColor={color} stopOpacity={0.02} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid stroke="rgba(91,100,114,0.10)" vertical={false} strokeDasharray="4 8" />
+              <XAxis dataKey="label" tickLine={false} axisLine={false} stroke="#5b6472" fontSize={12} minTickGap={18} />
               <YAxis
                 tickLine={false}
                 axisLine={false}
                 stroke="#5b6472"
                 fontSize={12}
+                tickCount={4}
                 tickFormatter={(value) => {
                   if (typeof value !== "number") {
                     return String(value);
@@ -149,6 +156,7 @@ export function LineChartCard({
                 }}
               />
               <Tooltip
+                cursor={{ stroke: color, strokeOpacity: 0.18, strokeWidth: 2 }}
                 formatter={(value) => {
                   if (typeof value !== "number") {
                     return [value, tooltipLabel];
@@ -156,7 +164,17 @@ export function LineChartCard({
                   return [formatValue(value), tooltipLabel];
                 }}
               />
-              <Line type="monotone" dataKey={dataKey} stroke={color} strokeWidth={3} dot={false} />
+              <Line
+                type="monotoneX"
+                dataKey={dataKey}
+                stroke={color}
+                strokeWidth={3}
+                dot={false}
+                activeDot={{ r: 4, strokeWidth: 0, fill: color }}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                isAnimationActive={false}
+              />
             </LineChart>
           </ResponsiveContainer>
         ) : (
