@@ -6,6 +6,16 @@ MOBILE_DIR="$ROOT_DIR/apps/mobile"
 API_BASE_URL="${LOO_API_BASE_URL:-${PORTFOLIO_API_BASE_URL:-}}"
 BASE_HREF="${FLUTTER_WEB_BASE_HREF:-/}"
 
+if [ -z "$API_BASE_URL" ]; then
+  cat >&2 <<'EOF'
+LOO_API_BASE_URL or PORTFOLIO_API_BASE_URL is required for production mobile web builds.
+Without it, Flutter falls back to the static Pages origin and mobile auth/API calls fail.
+Example:
+  LOO_API_BASE_URL=https://portfolio-manager-pink-one.vercel.app npm run mobile:build:web:prod
+EOF
+  exit 1
+fi
+
 if ! command -v flutter >/dev/null 2>&1; then
   echo 'flutter is not on PATH.' >&2
   echo 'Install Flutter or build mobile web on a machine where Flutter is available.' >&2
@@ -17,10 +27,7 @@ if [ ! -f "$MOBILE_DIR/pubspec.yaml" ]; then
   exit 1
 fi
 
-build_args=(build web --release --base-href "$BASE_HREF")
-if [ -n "$API_BASE_URL" ]; then
-  build_args+=(--dart-define=LOO_API_BASE_URL="$API_BASE_URL")
-fi
+build_args=(build web --release --base-href "$BASE_HREF" --dart-define=LOO_API_BASE_URL="$API_BASE_URL")
 
 cd "$MOBILE_DIR"
 flutter pub get
